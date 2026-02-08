@@ -7,9 +7,8 @@ main branch first.
 
 ## Reporting a Vulnerability
 
-Please report vulnerabilities privately:
+Please report vulnerabilities privately
 
-- Email: `security@replace-with-real-address.example`
 
 Include as much detail as possible:
 
