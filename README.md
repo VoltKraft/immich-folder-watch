@@ -1,7 +1,7 @@
 # immich-folder-watch
 
-[![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/Release-pending-lightgrey?logo=github)](./.github/workflows/release.yml)
+[![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
+[![Release](https://img.shields.io/badge/Release-pending-lightgrey?logo=github)](./.github/workflows/release.yaml)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 Upload new screenshots and media from local folders to Immich automatically using the Immich HTTP API.
@@ -46,14 +46,14 @@ Upload new screenshots and media from local folders to Immich automatically usin
 
 1. Install .NET SDK 8.0 or newer.
 2. Copy the example config:
-   - `cp examples/config.example.yml config.yml`
-3. Edit `config.yml` with your Immich API URL and API key.
+   - `cp examples/config.example.yaml config.yaml`
+3. Edit `config.yaml` with your Immich API URL and API key.
 4. Build and run:
 
 ```powershell
 dotnet restore
 dotnet build .\ImmichFolderWatch.sln -c Release
-dotnet run --project .\src\ImmichFolderWatch.Daemon -- --config .\config.yml
+dotnet run --project .\src\ImmichFolderWatch.Daemon -- --config .\config.yaml
 ```
 
 ## Documentation

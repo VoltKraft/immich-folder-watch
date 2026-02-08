@@ -9,12 +9,12 @@
 ## Console Mode
 
 ```bash
-cp examples/config.example.yml config.yml
-# Edit config.yml
+cp examples/config.example.yaml config.yaml
+# Edit config.yaml
 
 dotnet restore
 dotnet build ImmichFolderWatch.sln -c Release
-dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yml
+dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 ```
 
 ## systemd Unit Template
@@ -30,7 +30,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/immich-folder-watch
-ExecStart=/usr/bin/dotnet /opt/immich-folder-watch/ImmichFolderWatch.Daemon.dll --config /etc/immich-folder-watch/config.yml
+ExecStart=/usr/bin/dotnet /opt/immich-folder-watch/ImmichFolderWatch.Daemon.dll --config /etc/immich-folder-watch/config.yaml
 Restart=always
 RestartSec=5
 User=immichwatch

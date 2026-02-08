@@ -26,7 +26,7 @@
 
 ## Runtime Flow
 
-1. Daemon loads `config.yml` (YAML, `YamlDotNet`) and validates values.
+1. Daemon loads `config.yaml` (YAML, `YamlDotNet`) and validates values.
 2. Daemon verifies Immich connectivity through a ping/lightweight endpoint.
 3. Worker initializes one `FileSystemWatcher` per source folder.
 4. File events are debounced to avoid partial/incomplete writes.

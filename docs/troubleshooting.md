@@ -15,7 +15,7 @@
 ## Upload returns HTTP 401
 
 - API key is missing or invalid.
-- Regenerate API key in Immich and update `config.yml`.
+- Regenerate API key in Immich and update `config.yaml`.
 
 ## Upload returns HTTP 413
 

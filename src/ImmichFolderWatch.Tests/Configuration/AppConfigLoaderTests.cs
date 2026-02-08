@@ -12,7 +12,7 @@ public sealed class AppConfigLoaderTests
         try
         {
             var watchPath = tempRoot.FullName.Replace("\\", "\\\\", StringComparison.Ordinal);
-            var configPath = Path.Combine(tempRoot.FullName, "config.yml");
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
 
             var yaml = $"""
 immich:

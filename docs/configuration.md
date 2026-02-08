@@ -1,10 +1,10 @@
 # Configuration
 
-The daemon reads YAML configuration from `config.yml`.
+The daemon reads YAML configuration from `config.yaml`.
 
 ## Example
 
-See [examples/config.example.yml](../examples/config.example.yml).
+See [examples/config.example.yaml](../examples/config.example.yaml).
 
 ## Schema
 

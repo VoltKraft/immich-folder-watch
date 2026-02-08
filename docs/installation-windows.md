@@ -9,12 +9,12 @@
 ## Console Mode
 
 ```powershell
-copy examples\config.example.yml config.yml
-# Edit config.yml
+copy examples\config.example.yaml config.yaml
+# Edit config.yaml
 
 dotnet restore
 dotnet build ImmichFolderWatch.sln -c Release
-dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yml
+dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 ```
 
 ## Windows Service (Notes)
