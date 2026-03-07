@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Immich Folder Watch"
     Manufacturer="Immich Folder Watch Contributors"
@@ -57,11 +58,13 @@
         Remove="uninstall"
         Wait="yes" />
 
-      <ServiceConfigFailureActions ServiceName="ImmichFolderWatch" ResetPeriod="86400" OnInstall="yes" OnReinstall="yes">
-        <Failure Action="restartService" Delay="5000" />
-        <Failure Action="restartService" Delay="15000" />
-        <Failure Action="none" Delay="0" />
-      </ServiceConfigFailureActions>
+      <util:ServiceConfig
+        ServiceName="ImmichFolderWatch"
+        FirstFailureActionType="restart"
+        SecondFailureActionType="restart"
+        ThirdFailureActionType="none"
+        RestartServiceDelayInSeconds="5"
+        ResetPeriodInDays="1" />
     </Component>
   </Fragment>
 

@@ -8,4 +8,8 @@
     <OutputName Condition="'$(OutputName)' == ''">immich-folder-watch</OutputName>
     <DefineConstants>PublishedAppDir=$(PublishedAppDir);ExampleConfigPath=$(ExampleConfigPath);InstallerVersion=$(InstallerVersion);$(DefineConstants)</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+  </ItemGroup>
 </Project>
