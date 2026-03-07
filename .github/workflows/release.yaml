@@ -1,33 +1,55 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
   workflow_dispatch:
 
 concurrency:
-  group: release-main
+  group: release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
-  build-artifacts:
-    name: Build Windows Release Artifacts
-    runs-on: windows-latest
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    if: >
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref_name == 'main'
+      ) ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      tag_exists: ${{ steps.tag_check.outputs.tag_exists }}
+      target_sha: ${{ steps.target.outputs.target_sha }}
 
     steps:
+      - name: Determine target SHA
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "target_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "target_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
+          ref: ${{ steps.target.outputs.target_sha }}
 
       - name: Read project version
         id: version
@@ -42,12 +64,62 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
 
+      - name: Check changelog entry
+        shell: bash
+        run: |
+          version='${{ steps.version.outputs.version }}'
+          awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > /tmp/release-notes-check.txt
+
+          if [ ! -s /tmp/release-notes-check.txt ]; then
+            echo "Missing changelog entry for version $version" >&2
+            exit 1
+          fi
+
+      - name: Check whether release tag already exists
+        id: tag_check
+        shell: bash
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release tag $tag already exists. Skipping artifact build and publication."
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-artifacts:
+    name: Build Windows Release Artifacts
+    runs-on: windows-latest
+    needs:
+      - prepare-release
+    if: needs.prepare-release.outputs.tag_exists != 'true'
+    outputs:
+      version: ${{ needs.prepare-release.outputs.version }}
+      tag: ${{ needs.prepare-release.outputs.tag }}
+      target_sha: ${{ needs.prepare-release.outputs.target_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
       - name: Restore
         run: dotnet restore ImmichFolderWatch.sln
 
       - name: Build Windows MSI
         shell: pwsh
-        run: .\packaging\windows\build-msi.ps1 -Runtime win-x64 -Version ${{ steps.version.outputs.version }}
+        run: .\packaging\windows\build-msi.ps1 -Runtime win-x64 -Version ${{ needs.prepare-release.outputs.version }}
 
       - name: Collect release assets
         shell: pwsh
@@ -56,8 +128,8 @@ jobs:
           New-Item -ItemType Directory -Path $assetRoot -Force | Out-Null
 
           Copy-Item `
-            -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.msi") `
-            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.msi")
+            -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ needs.prepare-release.outputs.version }}-win-x64.msi") `
+            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ needs.prepare-release.outputs.version }}-win-x64.msi")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -68,16 +140,17 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     needs:
+      - prepare-release
       - build-artifacts
+    if: needs.prepare-release.outputs.tag_exists != 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -88,7 +161,7 @@ jobs:
       - name: Extract changelog entry
         shell: bash
         run: |
-          version='${{ needs.build-artifacts.outputs.version }}'
+          version='${{ needs.prepare-release.outputs.version }}'
           awk -v version="$version" '
             $0 ~ "^## \\[" version "\\]" { capture=1; next }
             capture && /^## \[/ { exit }
@@ -100,20 +173,21 @@ jobs:
             exit 1
           fi
 
-      - name: Update release tag
+      - name: Create immutable release tag
         env:
-          TAG_NAME: ${{ needs.build-artifacts.outputs.tag }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag }}
+          TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f "$TAG_NAME" "$GITHUB_SHA"
-          git push origin "refs/tags/$TAG_NAME" --force
+          git tag "$TAG_NAME" "$TARGET_SHA"
+          git push origin "refs/tags/$TAG_NAME"
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.build-artifacts.outputs.tag }}
-          name: ${{ needs.build-artifacts.outputs.tag }}
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          name: ${{ needs.prepare-release.outputs.tag }}
           body_path: RELEASE_NOTES.md
           files: artifacts/release/*
           draft: false

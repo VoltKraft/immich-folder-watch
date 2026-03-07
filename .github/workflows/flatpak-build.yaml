@@ -4,11 +4,11 @@ on:
   push:
     paths:
       - 'packaging/flatpak/**'
-      - '.github/workflows/flatpak-build.yml'
+      - '.github/workflows/flatpak-build.yaml'
   pull_request:
     paths:
       - 'packaging/flatpak/**'
-      - '.github/workflows/flatpak-build.yml'
+      - '.github/workflows/flatpak-build.yaml'
   workflow_dispatch:
 
 jobs:
