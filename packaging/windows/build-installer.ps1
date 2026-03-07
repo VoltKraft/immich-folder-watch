@@ -60,6 +60,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install-service.ps1") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "uninstall-service.ps1") -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "service-management.ps1") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "README.md") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "installer.stub.md") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\config.example.yaml") -Destination (Join-Path $packageRoot "config.example.yaml")

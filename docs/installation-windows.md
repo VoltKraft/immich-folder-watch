@@ -39,7 +39,7 @@ Recommended first install:
 
 ```powershell
 .\install-service.ps1 -StartupType Manual
-notepad "$env:ProgramData\ImmichFolderWatch\config.yaml"
+notepad "${env:ProgramFiles}\Immich Folder Watch\config.yaml"
 Start-Service ImmichFolderWatch
 ```
 
@@ -55,7 +55,8 @@ For unattended deployment with a prepared config:
 .\uninstall-service.ps1
 ```
 
-By default, configuration and logs under `%ProgramData%\ImmichFolderWatch` are preserved. Pass `-RemoveData` if you want a full cleanup.
+By default, `config.yaml` and the `logs\` folder under `%ProgramFiles%\Immich Folder Watch` are preserved. Pass `-RemoveData` if you want a full cleanup.
+The script now waits for the service to actually disappear before removing files, so reinstall after uninstall is more reliable.
 
 The packaging scripts live under `packaging/windows`.
 
@@ -73,13 +74,13 @@ On the first run, `dotnet` restores the WiX SDK from NuGet.
 Installer behavior:
 
 - Installs binaries into `%ProgramFiles%\Immich Folder Watch`
-- Creates `%ProgramData%\ImmichFolderWatch\config.yaml` from the example config on first install
+- Creates `%ProgramFiles%\Immich Folder Watch\config.yaml` from the example config on first install
 - Registers the `ImmichFolderWatch` Windows service
-- Preserves `config.yaml` on uninstall
+- Preserves `config.yaml` and `logs\` on uninstall
 
 After the MSI install, edit the config and start the service manually the first time:
 
 ```powershell
-notepad C:\ProgramData\ImmichFolderWatch\config.yaml
+notepad "C:\Program Files\Immich Folder Watch\config.yaml"
 Start-Service ImmichFolderWatch
 ```

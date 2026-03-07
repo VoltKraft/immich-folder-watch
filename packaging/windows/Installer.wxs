@@ -16,11 +16,6 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch" />
     </StandardDirectory>
-
-    <StandardDirectory Id="CommonAppDataFolder">
-      <Directory Id="CONFIGDIR" Name="ImmichFolderWatch" />
-    </StandardDirectory>
-
     <Feature Id="MainFeature" Title="Immich Folder Watch" Level="1">
       <ComponentGroupRef Id="PublishedApplicationFiles" />
       <ComponentRef Id="ServiceExecutableComponent" />
@@ -49,7 +44,7 @@
         Type="ownProcess"
         Start="demand"
         ErrorControl="normal"
-        Arguments='--config "[CONFIGDIR]config.yaml"' />
+        Arguments='--config "[INSTALLFOLDER]config.yaml"' />
 
       <ServiceControl
         Id="ServiceController"
@@ -69,7 +64,7 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="ConfigFileComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes" NeverOverwrite="yes">
+    <Component Id="ConfigFileComponent" Directory="INSTALLFOLDER" Guid="*" Permanent="yes" NeverOverwrite="yes">
       <File
         Id="DefaultConfigFile"
         Source="$(ExampleConfigPath)"

@@ -2,7 +2,6 @@
 param(
     [string]$PackageRoot = $PSScriptRoot,
     [string]$InstallRoot = (Join-Path $env:ProgramFiles "Immich Folder Watch"),
-    [string]$DataRoot = (Join-Path $env:ProgramData "ImmichFolderWatch"),
     [string]$ConfigPath,
     [string]$ServiceName = "ImmichFolderWatch",
     [string]$DisplayName = "Immich Folder Watch",
@@ -15,45 +14,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$scExePath = Join-Path $env:SystemRoot "System32\sc.exe"
-
-function Assert-Administrator {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-
-    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        throw "This script must be run from an elevated PowerShell session."
-    }
-}
-
-function Invoke-ServiceCommand {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
-    )
-
-    if (-not (Test-Path -LiteralPath $scExePath)) {
-        throw "sc.exe not found at $scExePath"
-    }
-
-    & $scExePath @Arguments
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "$scExePath $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
-
-function New-ScOption {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$Value
-    )
-
-    return "$Name= $Value"
-}
+. (Join-Path $PSScriptRoot "service-management.ps1")
 
 function Get-ServiceCredential {
     if ($null -ne $Credential) {
@@ -80,44 +41,16 @@ function Get-ServiceCredential {
     }
 }
 
-function Remove-ServiceRegistration {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name
-    )
-
-    $serviceInstance = Get-CimInstance -ClassName Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
-    if ($null -eq $serviceInstance) {
-        return
-    }
-
-    $deleteResult = Invoke-CimMethod -InputObject $serviceInstance -MethodName Delete
-    if ($deleteResult.ReturnValue -ne 0) {
-        throw "Deleting service '$Name' failed with return value $($deleteResult.ReturnValue)."
-    }
-
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        Start-Sleep -Milliseconds 500
-        $remainingService = Get-Service -Name $Name -ErrorAction SilentlyContinue
-        if ($null -eq $remainingService) {
-            return
-        }
-    }
-
-    throw "Service '$Name' was marked for deletion but did not disappear in time."
-}
-
 Assert-Administrator
 
 $installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
-$dataRootFull = [System.IO.Path]::GetFullPath($DataRoot)
 $packageRoot = [System.IO.Path]::GetFullPath($PackageRoot)
 $packageAppRoot = Join-Path $packageRoot "app"
 $serviceExecutable = Join-Path $installRootFull "ImmichFolderWatch.Daemon.exe"
 $exampleConfigPath = Join-Path $packageRoot "config.example.yaml"
 
 if (-not $ConfigPath) {
-    $ConfigPath = Join-Path $dataRootFull "config.yaml"
+    $ConfigPath = Join-Path $installRootFull "config.yaml"
 }
 
 $configPathFull = [System.IO.Path]::GetFullPath($ConfigPath)
@@ -136,10 +69,9 @@ if (-not (Test-Path -LiteralPath $exampleConfigPath)) {
     throw "config.example.yaml not found in $packageRoot"
 }
 
-$existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($existingService -and $existingService.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Stopped) {
-    Stop-Service -Name $ServiceName -Force -ErrorAction Stop
-    $existingService.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(30))
+$existingService = Get-ServiceInstance -Name $ServiceName
+if ($null -ne $existingService) {
+    Stop-ServiceRegistration -Name $ServiceName -TimeoutSeconds 45
 }
 
 New-Item -ItemType Directory -Path $installRootFull -Force | Out-Null
@@ -155,8 +87,8 @@ if (-not (Test-Path -LiteralPath $configPathFull)) {
 
 $serviceCredential = Get-ServiceCredential
 
-if ($existingService) {
-    Remove-ServiceRegistration -Name $ServiceName
+if ($null -ne $existingService) {
+    Remove-ServiceRegistration -Name $ServiceName -TimeoutSeconds 45
 }
 
 $newServiceParameters = @{
