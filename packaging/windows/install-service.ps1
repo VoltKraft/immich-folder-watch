@@ -15,6 +15,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scExePath = Join-Path $env:SystemRoot "System32\sc.exe"
 
 function Assert-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -31,11 +32,27 @@ function Invoke-ServiceCommand {
         [string[]]$Arguments
     )
 
-    & sc.exe @Arguments
+    if (-not (Test-Path -LiteralPath $scExePath)) {
+        throw "sc.exe not found at $scExePath"
+    }
+
+    & $scExePath @Arguments
 
     if ($LASTEXITCODE -ne 0) {
-        throw "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        throw "$scExePath $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
+}
+
+function New-ScOption {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Value
+    )
+
+    return "$Name= $Value"
 }
 
 function Get-ScStartType {
@@ -55,8 +72,8 @@ function Get-ScStartType {
 function Get-ServiceLogonArguments {
     if ($null -ne $Credential) {
         return @(
-            "obj=", $Credential.UserName,
-            "password=", $Credential.GetNetworkCredential().Password
+            (New-ScOption -Name "obj" -Value $Credential.UserName),
+            (New-ScOption -Name "password" -Value $Credential.GetNetworkCredential().Password)
         )
     }
 
@@ -67,7 +84,7 @@ function Get-ServiceLogonArguments {
         default { throw "Unsupported service account: $BuiltInAccount" }
     }
 
-    return @("obj=", $accountName)
+    return @((New-ScOption -Name "obj" -Value $accountName))
 }
 
 Assert-Administrator
@@ -122,9 +139,9 @@ $logonArguments = Get-ServiceLogonArguments
 if ($existingService) {
     $serviceArguments = @(
         "config", $ServiceName,
-        "binPath=", $serviceCommand,
-        "start=", $startMode,
-        "DisplayName=", $DisplayName
+        (New-ScOption -Name "binPath" -Value $serviceCommand),
+        (New-ScOption -Name "start" -Value $startMode),
+        (New-ScOption -Name "DisplayName" -Value $DisplayName)
     ) + $logonArguments
 
     Invoke-ServiceCommand -Arguments $serviceArguments
@@ -132,9 +149,9 @@ if ($existingService) {
 else {
     $serviceArguments = @(
         "create", $ServiceName,
-        "binPath=", $serviceCommand,
-        "start=", $startMode,
-        "DisplayName=", $DisplayName
+        (New-ScOption -Name "binPath" -Value $serviceCommand),
+        (New-ScOption -Name "start" -Value $startMode),
+        (New-ScOption -Name "DisplayName" -Value $DisplayName)
     ) + $logonArguments
 
     Invoke-ServiceCommand -Arguments $serviceArguments
@@ -147,8 +164,8 @@ Invoke-ServiceCommand -Arguments @(
 
 Invoke-ServiceCommand -Arguments @(
     "failure", $ServiceName,
-    "reset=", "86400",
-    "actions=", 'restart/5000/restart/15000/""/0'
+    (New-ScOption -Name "reset" -Value "86400"),
+    (New-ScOption -Name "actions" -Value 'restart/5000/restart/15000/""/0')
 )
 
 if ($StartService) {
