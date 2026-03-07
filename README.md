@@ -44,7 +44,7 @@ Upload new screenshots and media from local folders to Immich automatically usin
 
 ## Quickstart (Windows Console Mode)
 
-1. Install .NET SDK 8.0 or newer.
+1. Install .NET SDK 10.0 or newer.
 2. Copy the example config:
    - `cp examples/config.example.yaml config.yaml`
 3. Edit `config.yaml` with your Immich API URL and API key.

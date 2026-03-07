@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Windows 10/11 or Windows Server
-- .NET SDK 8.0+ (for source-based run/build)
+- .NET SDK 10.0+ (for source-based run/build)
 - Immich server URL and API key
 
 ## Console Mode

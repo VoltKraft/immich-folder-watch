@@ -2,7 +2,7 @@
 
 ## Development Setup
 
-1. Install .NET SDK 8.0 or newer.
+1. Install .NET SDK 10.0 or newer.
 2. Clone the repository.
 3. Restore and build:
 

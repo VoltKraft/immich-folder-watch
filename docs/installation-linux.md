@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Linux distribution with `systemd` (for service mode)
-- .NET SDK 8.0+ (for source-based run/build)
+- .NET SDK 10.0+ (for source-based run/build)
 - Immich server URL and API key
 
 ## Console Mode
