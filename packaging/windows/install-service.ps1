@@ -55,36 +55,56 @@ function New-ScOption {
     return "$Name= $Value"
 }
 
-function Get-ScStartType {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
+function Get-ServiceCredential {
+    if ($null -ne $Credential) {
+        return $Credential
+    }
 
-    switch ($Value) {
-        "Automatic" { return "auto" }
-        "Manual" { return "demand" }
-        "Disabled" { return "disabled" }
-        default { throw "Unsupported startup type: $Value" }
+    switch ($BuiltInAccount) {
+        "LocalSystem" {
+            return $null
+        }
+        "LocalService" {
+            return New-Object System.Management.Automation.PSCredential(
+                "NT AUTHORITY\LocalService",
+                (ConvertTo-SecureString "" -AsPlainText -Force))
+        }
+        "NetworkService" {
+            return New-Object System.Management.Automation.PSCredential(
+                "NT AUTHORITY\NetworkService",
+                (ConvertTo-SecureString "" -AsPlainText -Force))
+        }
+        default {
+            throw "Unsupported service account: $BuiltInAccount"
+        }
     }
 }
 
-function Get-ServiceLogonArguments {
-    if ($null -ne $Credential) {
-        return @(
-            (New-ScOption -Name "obj" -Value $Credential.UserName),
-            (New-ScOption -Name "password" -Value $Credential.GetNetworkCredential().Password)
-        )
+function Remove-ServiceRegistration {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $serviceInstance = Get-CimInstance -ClassName Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
+    if ($null -eq $serviceInstance) {
+        return
     }
 
-    $accountName = switch ($BuiltInAccount) {
-        "LocalSystem" { "LocalSystem" }
-        "LocalService" { "NT AUTHORITY\LocalService" }
-        "NetworkService" { "NT AUTHORITY\NetworkService" }
-        default { throw "Unsupported service account: $BuiltInAccount" }
+    $deleteResult = Invoke-CimMethod -InputObject $serviceInstance -MethodName Delete
+    if ($deleteResult.ReturnValue -ne 0) {
+        throw "Deleting service '$Name' failed with return value $($deleteResult.ReturnValue)."
     }
 
-    return @((New-ScOption -Name "obj" -Value $accountName))
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        Start-Sleep -Milliseconds 500
+        $remainingService = Get-Service -Name $Name -ErrorAction SilentlyContinue
+        if ($null -eq $remainingService) {
+            return
+        }
+    }
+
+    throw "Service '$Name' was marked for deletion but did not disappear in time."
 }
 
 Assert-Administrator
@@ -133,34 +153,25 @@ if (-not (Test-Path -LiteralPath $configPathFull)) {
     $createdExampleConfig = $true
 }
 
-$startMode = Get-ScStartType -Value $StartupType
-$logonArguments = Get-ServiceLogonArguments
+$serviceCredential = Get-ServiceCredential
 
 if ($existingService) {
-    $serviceArguments = @(
-        "config", $ServiceName,
-        (New-ScOption -Name "binPath" -Value $serviceCommand),
-        (New-ScOption -Name "start" -Value $startMode),
-        (New-ScOption -Name "DisplayName" -Value $DisplayName)
-    ) + $logonArguments
-
-    Invoke-ServiceCommand -Arguments $serviceArguments
-}
-else {
-    $serviceArguments = @(
-        "create", $ServiceName,
-        (New-ScOption -Name "binPath" -Value $serviceCommand),
-        (New-ScOption -Name "start" -Value $startMode),
-        (New-ScOption -Name "DisplayName" -Value $DisplayName)
-    ) + $logonArguments
-
-    Invoke-ServiceCommand -Arguments $serviceArguments
+    Remove-ServiceRegistration -Name $ServiceName
 }
 
-Invoke-ServiceCommand -Arguments @(
-    "description", $ServiceName,
-    "Watches local folders and uploads new media to Immich."
-)
+$newServiceParameters = @{
+    Name = $ServiceName
+    BinaryPathName = $serviceCommand
+    DisplayName = $DisplayName
+    Description = "Watches local folders and uploads new media to Immich."
+    StartupType = $StartupType
+}
+
+if ($null -ne $serviceCredential) {
+    $newServiceParameters.Credential = $serviceCredential
+}
+
+New-Service @newServiceParameters | Out-Null
 
 Invoke-ServiceCommand -Arguments @(
     "failure", $ServiceName,
