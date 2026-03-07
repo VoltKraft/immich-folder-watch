@@ -95,8 +95,13 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="ConfigFileComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes" NeverOverwrite="yes">
-      <Condition><![CDATA[NOT LEGACYCONFIGPATH OR STRUCTUREDCONFIGPATH]]></Condition>
+    <Component
+      Id="ConfigFileComponent"
+      Directory="CONFIGDIR"
+      Guid="*"
+      Permanent="yes"
+      NeverOverwrite="yes"
+      Condition="NOT LEGACYCONFIGPATH OR STRUCTUREDCONFIGPATH">
       <File
         Id="DefaultConfigFile"
         Source="$(ExampleConfigPath)"
@@ -106,8 +111,12 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="LegacyConfigMigrationComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes">
-      <Condition><![CDATA[LEGACYCONFIGPATH AND NOT STRUCTUREDCONFIGPATH]]></Condition>
+    <Component
+      Id="LegacyConfigMigrationComponent"
+      Directory="CONFIGDIR"
+      Guid="*"
+      Permanent="yes"
+      Condition="LEGACYCONFIGPATH AND NOT STRUCTUREDCONFIGPATH">
       <CreateFolder />
       <RegistryValue
         Root="HKLM"
