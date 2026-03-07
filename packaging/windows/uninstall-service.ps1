@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scExePath = Join-Path $env:SystemRoot "System32\sc.exe"
 
 function Assert-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -23,10 +24,14 @@ function Invoke-ServiceCommand {
         [string[]]$Arguments
     )
 
-    & sc.exe @Arguments
+    if (-not (Test-Path -LiteralPath $scExePath)) {
+        throw "sc.exe not found at $scExePath"
+    }
+
+    & $scExePath @Arguments
 
     if ($LASTEXITCODE -ne 0) {
-        throw "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        throw "$scExePath $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
 }
 
