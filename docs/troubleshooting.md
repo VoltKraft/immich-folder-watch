@@ -32,3 +32,4 @@
 
 - Console logs include timestamps and structured fields.
 - File logs are written to `logging.logDirectory`.
+- If `logging.logDirectory` is relative, it is resolved relative to the directory that contains `config.yaml`.

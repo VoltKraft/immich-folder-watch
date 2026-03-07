@@ -57,6 +57,10 @@ internal static class Bootstrapper
         var logLevel = LogLevelParser.Parse(appConfig.Logging.Level);
 
         using var host = Host.CreateDefaultBuilder(args)
+            .UseWindowsService(options =>
+            {
+                options.ServiceName = "Immich Folder Watch";
+            })
             .ConfigureLogging(logging =>
             {
                 logging.ClearProviders();

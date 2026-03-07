@@ -48,4 +48,4 @@ logging:
 
 - File extensions are case-insensitive.
 - Extensions without `.` are normalized automatically.
-- Relative paths are allowed but resolved by the host OS.
+- Relative paths are resolved against the directory that contains `config.yaml`.

@@ -1,6 +1,6 @@
 # Installer Stub
 
-This placeholder describes the future Windows installer scope.
+This document describes the future MSI/WiX installer scope.
 
 ## Planned
 
@@ -11,4 +11,6 @@ This placeholder describes the future Windows installer scope.
 
 ## Status
 
-Not implemented yet.
+The script-based Windows installer flow exists today.
+
+MSI/WiX packaging is not implemented yet.

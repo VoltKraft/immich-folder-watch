@@ -17,12 +17,44 @@ dotnet build ImmichFolderWatch.sln -c Release
 dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 ```
 
-## Windows Service (Notes)
+## Windows Service Bundle
 
-Service packaging is planned. Current recommendation:
+Build a distributable bundle with published binaries plus install scripts:
 
-- Publish a self-contained daemon build.
-- Install using your preferred service wrapper (for example `sc.exe`, NSSM, or enterprise tooling).
-- Pass `--config <path>` in service start arguments.
+```powershell
+.\packaging\windows\build-installer.ps1
+```
 
-Packaging stubs live under `packaging/windows`.
+This creates `artifacts\windows\immich-folder-watch-win-x64\`.
+
+## Install as a Service
+
+Open an elevated PowerShell prompt inside the generated bundle and run:
+
+```powershell
+.\install-service.ps1
+```
+
+Recommended first install:
+
+```powershell
+.\install-service.ps1 -StartupType Manual
+notepad "$env:ProgramData\ImmichFolderWatch\config.yaml"
+Start-Service ImmichFolderWatch
+```
+
+For unattended deployment with a prepared config:
+
+```powershell
+.\install-service.ps1 -StartupType Automatic -StartService
+```
+
+## Uninstall
+
+```powershell
+.\uninstall-service.ps1
+```
+
+By default, configuration and logs under `%ProgramData%\ImmichFolderWatch` are preserved. Pass `-RemoveData` if you want a full cleanup.
+
+The packaging scripts live under `packaging/windows`.

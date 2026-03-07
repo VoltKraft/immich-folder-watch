@@ -21,9 +21,10 @@ Upload new screenshots and media from local folders to Immich automatically usin
 - [x] Retry with exponential backoff for transient upload failures
 - [x] Unit tests for config parsing, file-ready behavior, and batching logic
 - [x] CI workflow for Windows and Linux build/test
+- [x] Scriptable Windows service packaging with install/uninstall PowerShell automation
 
 ### 🚧 In progress
-- [ ] Hardened Windows Service packaging and install UX
+- [ ] MSI/WiX-based Windows installer UX
 - [ ] Linux `systemd` service packaging scripts
 - [ ] Flatpak packaging pipeline and runtime integration
 
