@@ -45,10 +45,6 @@ jobs:
       - name: Restore
         run: dotnet restore ImmichFolderWatch.sln
 
-      - name: Build Windows bundle
-        shell: pwsh
-        run: .\packaging\windows\build-installer.ps1 -Runtime win-x64 -Version ${{ steps.version.outputs.version }} -Zip
-
       - name: Build Windows MSI
         shell: pwsh
         run: .\packaging\windows\build-msi.ps1 -Runtime win-x64 -Version ${{ steps.version.outputs.version }}
@@ -58,10 +54,6 @@ jobs:
         run: |
           $assetRoot = Join-Path $PWD "artifacts\release"
           New-Item -ItemType Directory -Path $assetRoot -Force | Out-Null
-
-          Copy-Item `
-            -LiteralPath (Join-Path $PWD "artifacts\windows\immich-folder-watch-win-x64.zip") `
-            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.zip")
 
           Copy-Item `
             -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.msi") `
