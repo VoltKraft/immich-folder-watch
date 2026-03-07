@@ -44,18 +44,29 @@ Open an elevated PowerShell prompt inside the generated bundle and run:
 .\install-service.ps1
 ```
 
+Default behavior:
+
+- registers the service as `Automatic (Delayed Start)`
+- does not start it immediately after installation
+
 Recommended first install:
 
 ```powershell
-.\install-service.ps1 -StartupType Manual
+.\install-service.ps1
 notepad "${env:ProgramFiles}\Immich Folder Watch\config\config.yaml"
+Restart-Computer
+```
+
+If you want to validate the config immediately without rebooting:
+
+```powershell
 Start-Service ImmichFolderWatch
 ```
 
-For unattended deployment with a prepared config:
+For unattended deployment with a prepared config and immediate first start:
 
 ```powershell
-.\install-service.ps1 -StartupType Automatic -StartService
+.\install-service.ps1 -StartService
 ```
 
 ## Uninstall
@@ -86,10 +97,10 @@ Installer behavior:
 - Creates `%ProgramFiles%\Immich Folder Watch\config\config.yaml` from the Windows installer template on first install
 - Creates `%ProgramFiles%\Immich Folder Watch\logs\`
 - Migrates a legacy root-level `config.yaml` into `config\config.yaml` when needed
-- Registers the `ImmichFolderWatch` Windows service
+- Registers the `ImmichFolderWatch` Windows service as `Automatic (Delayed Start)`
 - Preserves `config\` and `logs\` on uninstall
 
-After the MSI install, edit the config and start the service manually the first time:
+After the MSI install, edit the config and reboot, or start the service manually once if you want to validate immediately:
 
 ```powershell
 notepad "C:\Program Files\Immich Folder Watch\config\config.yaml"

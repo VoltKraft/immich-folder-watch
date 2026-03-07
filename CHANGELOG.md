@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-07
+
+### Added
+- In-repo WinGet metadata and bootstrap documentation for `VoltKraft.ImmichFolderWatch`.
+- Dedicated GitHub Actions workflow for post-bootstrap WinGet package updates.
+
+### Changed
+- Windows installations now default to `Automatic (Delayed Start)` service registration instead of manual startup.
+- The top-level README now focuses on what the program is, what it does, and how to use it.
+- Project and packaging version defaults updated to `1.0.1`.
+- MSI publisher metadata now aligns with the planned WinGet publisher identity `VoltKraft`.
+
 ## [1.0.0] - 2026-03-07
 
 ### Added

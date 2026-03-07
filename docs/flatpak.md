@@ -5,7 +5,7 @@ Flatpak support is planned for a future milestone.
 Current repository state:
 
 - Placeholder manifest at `packaging/flatpak/io.github.immich_folder_watch.yaml`
-- Placeholder CI workflow at `.github/workflows/flatpak-build.yaml`
+- No active Flatpak workflow is currently wired into GitHub Actions
 
 ## Goals
 

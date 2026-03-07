@@ -1,0 +1,130 @@
+name: WinGet
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit-winget-update:
+    name: Submit WinGet Update
+    runs-on: windows-latest
+
+    steps:
+      - name: Determine checkout ref
+        id: ref
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+              "target_ref=${{ github.event.release.tag_name }}" >> $env:GITHUB_OUTPUT
+          }
+          else {
+              "target_ref=main" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.ref.outputs.target_ref }}
+
+      - name: Read WinGet metadata
+        id: metadata
+        shell: pwsh
+        run: |
+          $metadata = Get-Content packaging/winget/package.metadata.json -Raw | ConvertFrom-Json
+          $automationEnabled = ([string]$metadata.automationEnabled).ToLowerInvariant()
+          "package_identifier=$($metadata.packageIdentifier)" >> $env:GITHUB_OUTPUT
+          "package_name=$($metadata.packageName)" >> $env:GITHUB_OUTPUT
+          "publisher=$($metadata.publisher)" >> $env:GITHUB_OUTPUT
+          "moniker=$($metadata.moniker)" >> $env:GITHUB_OUTPUT
+          "short_description=$($metadata.shortDescription)" >> $env:GITHUB_OUTPUT
+          "release_asset_name_template=$($metadata.releaseAssetNameTemplate)" >> $env:GITHUB_OUTPUT
+          "automation_enabled=$automationEnabled" >> $env:GITHUB_OUTPUT
+
+      - name: Stop if WinGet automation is not enabled yet
+        if: steps.metadata.outputs.automation_enabled != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "WinGet automation is disabled in packaging/winget/package.metadata.json."
+          Write-Host "Complete the first manual bootstrap submission before enabling updates."
+
+      - name: Read release version
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+              $version = "${{ github.event.release.tag_name }}".TrimStart('v')
+          }
+          else {
+              [xml]$props = Get-Content Directory.Build.props
+              $version = $props.Project.PropertyGroup.Version
+          }
+
+          if ([string]::IsNullOrWhiteSpace($version)) {
+              throw "Version could not be determined."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build release MSI URL
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        id: msi
+        shell: pwsh
+        run: |
+          $template = "${{ steps.metadata.outputs.release_asset_name_template }}"
+          $version = "${{ steps.version.outputs.version }}"
+          $assetName = $template.Replace("{version}", $version)
+          $msiUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/$assetName"
+
+          "asset_name=$assetName" >> $env:GITHUB_OUTPUT
+          "msi_url=$msiUrl" >> $env:GITHUB_OUTPUT
+
+      - name: Verify release MSI URL
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        shell: pwsh
+        run: |
+          $response = Invoke-WebRequest -Uri "${{ steps.msi.outputs.msi_url }}" -Method Head
+          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+              throw "Release MSI URL is not reachable: ${{ steps.msi.outputs.msi_url }}"
+          }
+
+      - name: Ensure WinGet token is available
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        shell: pwsh
+        env:
+          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGETCREATE_TOKEN)) {
+              throw "Missing repository secret WINGETCREATE_TOKEN."
+          }
+
+      - name: Setup .NET 6 for wingetcreate
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Download wingetcreate
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
+
+      - name: Submit WinGet package update
+        if: steps.metadata.outputs.automation_enabled == 'true'
+        shell: pwsh
+        env:
+          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+        run: |
+          .\wingetcreate.exe update `
+            "${{ steps.metadata.outputs.package_identifier }}" `
+            -u "${{ steps.msi.outputs.msi_url }}" `
+            -v "${{ steps.version.outputs.version }}" `
+            -t "$env:WINGETCREATE_TOKEN" `
+            --submit

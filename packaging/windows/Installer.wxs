@@ -3,7 +3,7 @@
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Immich Folder Watch"
-    Manufacturer="Immich Folder Watch Contributors"
+    Manufacturer="VoltKraft"
     Version="$(InstallerVersion)"
     UpgradeCode="F82E51D6-6D61-4A5D-B8AA-9D84A5D0D57D"
     Language="1033"
@@ -60,9 +60,11 @@
         DisplayName="Immich Folder Watch"
         Description="Watches local folders and uploads new media to Immich."
         Type="ownProcess"
-        Start="demand"
+        Start="auto"
         ErrorControl="normal"
-        Arguments='--config "[CONFIGDIR]config.yaml"' />
+        Arguments='--config "[CONFIGDIR]config.yaml"'>
+        <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall="yes" />
+      </ServiceInstall>
 
       <ServiceControl
         Id="ServiceController"

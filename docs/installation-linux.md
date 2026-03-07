@@ -1,6 +1,6 @@
 # Installation on Linux
 
-Linux is not a supported release target in version `1.0.0`.
+Linux is not a supported release target in version `1.0.1`.
 
 There is currently no maintained Linux packaging, no supported `systemd` installer flow, and no published Linux release artifact.
 

@@ -23,7 +23,8 @@ dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 
 - `ci.yaml`: cross-platform build + test coverage for the codebase
 - `release.yaml`: publish a Windows MSI only after successful CI on `main`, and only when the version tag does not already exist
-- `flatpak-build.yaml`: placeholder validation workflow
+- `winget.yaml`: submit WinGet package updates for published releases after the initial manual bootstrap has been completed
+- `packaging/flatpak/`: placeholder assets for future Flatpak support; there is currently no active Flatpak workflow
 
 ## Project Conventions
 

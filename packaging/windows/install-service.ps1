@@ -6,7 +6,7 @@ param(
     [string]$ServiceName = "ImmichFolderWatch",
     [string]$DisplayName = "Immich Folder Watch",
     [ValidateSet("Manual", "Automatic", "Disabled")]
-    [string]$StartupType = "Manual",
+    [string]$StartupType = "Automatic",
     [ValidateSet("LocalSystem", "LocalService", "NetworkService")]
     [string]$BuiltInAccount = "LocalSystem",
     [System.Management.Automation.PSCredential]$Credential,
@@ -146,6 +146,13 @@ if ($null -ne $serviceCredential) {
 
 New-Service @newServiceParameters | Out-Null
 
+if ($StartupType -eq "Automatic") {
+    Invoke-ServiceCommand -Arguments @(
+        "config", $ServiceName,
+        (New-ScOption -Name "start" -Value "delayed-auto")
+    )
+}
+
 Invoke-ServiceCommand -Arguments @(
     "failure", $ServiceName,
     (New-ScOption -Name "reset" -Value "86400"),
@@ -156,7 +163,7 @@ if ($StartService) {
     Start-Service -Name $ServiceName
 }
 elseif ($createdExampleConfig) {
-    Write-Warning "An example config was created at $configPathFull. Edit it before starting the service."
+    Write-Warning "An example config was created at $configPathFull. Edit it before the next system boot or before starting the service manually."
 }
 
 Write-Host "Installed service '$ServiceName'."
