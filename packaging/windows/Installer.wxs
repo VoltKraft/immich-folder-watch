@@ -57,7 +57,7 @@
         Remove="uninstall"
         Wait="yes" />
 
-      <ServiceConfigFailureActions ResetPeriod="86400" OnInstall="yes" OnReinstall="yes">
+      <ServiceConfigFailureActions ServiceName="ImmichFolderWatch" ResetPeriod="86400" OnInstall="yes" OnReinstall="yes">
         <Failure Action="restartService" Delay="5000" />
         <Failure Action="restartService" Delay="15000" />
         <Failure Action="none" Delay="0" />
