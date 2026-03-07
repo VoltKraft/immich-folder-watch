@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 Assert-Administrator
 
 $installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
+$preservedDirectories = @("config", "logs")
 
 if ($null -ne (Get-ServiceInstance -Name $ServiceName)) {
     Remove-ServiceRegistration -Name $ServiceName -TimeoutSeconds 45
@@ -23,15 +24,11 @@ if (Test-Path -LiteralPath $installRootFull) {
     else {
         Get-ChildItem -LiteralPath $installRootFull -Force | ForEach-Object {
             if ($_.PSIsContainer) {
-                if ($_.Name -ieq "logs") {
+                if ($preservedDirectories -contains $_.Name.ToLowerInvariant()) {
                     return
                 }
 
                 Remove-Item -LiteralPath $_.FullName -Recurse -Force
-                return
-            }
-
-            if ($_.Name -ieq "config.yaml") {
                 return
             }
 
@@ -47,5 +44,5 @@ if ($RemoveData) {
     Write-Host "Removed config and logs from $installRootFull"
 }
 else {
-    Write-Host "Preserved config.yaml and logs under $installRootFull"
+    Write-Host "Preserved config and logs under $installRootFull"
 }

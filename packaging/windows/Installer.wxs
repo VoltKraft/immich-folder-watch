@@ -13,19 +13,37 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <Property Id="LEGACYCONFIGPATH">
+      <DirectorySearch Id="LegacyConfigDirectorySearch" Path="[INSTALLFOLDER]">
+        <FileSearch Id="LegacyConfigFileSearch" Name="config.yaml" />
+      </DirectorySearch>
+    </Property>
+
+    <Property Id="STRUCTUREDCONFIGPATH">
+      <DirectorySearch Id="StructuredConfigDirectorySearch" Path="[INSTALLFOLDER]config">
+        <FileSearch Id="StructuredConfigFileSearch" Name="config.yaml" />
+      </DirectorySearch>
+    </Property>
+
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch" />
+      <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch">
+        <Directory Id="BINDIR" Name="bin" />
+        <Directory Id="CONFIGDIR" Name="config" />
+        <Directory Id="LOGSDIR" Name="logs" />
+      </Directory>
     </StandardDirectory>
     <Feature Id="MainFeature" Title="Immich Folder Watch" Level="1">
       <ComponentGroupRef Id="PublishedApplicationFiles" />
       <ComponentRef Id="ServiceExecutableComponent" />
+      <ComponentRef Id="LogsDirectoryComponent" />
       <ComponentRef Id="ConfigFileComponent" />
+      <ComponentRef Id="LegacyConfigMigrationComponent" />
     </Feature>
   </Package>
 
   <Fragment>
     <ComponentGroup Id="PublishedApplicationFiles">
-      <Files Directory="INSTALLFOLDER" Include="$(PublishedAppDir)\**">
+      <Files Directory="BINDIR" Include="$(PublishedAppDir)\**">
         <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.Daemon.exe" />
         <Exclude Files="$(PublishedAppDir)\**\*.pdb" />
       </Files>
@@ -33,7 +51,7 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="ServiceExecutableComponent" Directory="INSTALLFOLDER" Guid="*">
+    <Component Id="ServiceExecutableComponent" Directory="BINDIR" Guid="*">
       <File Id="ServiceExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.Daemon.exe" KeyPath="yes" />
 
       <ServiceInstall
@@ -44,7 +62,7 @@
         Type="ownProcess"
         Start="demand"
         ErrorControl="normal"
-        Arguments='--config "[INSTALLFOLDER]config.yaml"' />
+        Arguments='--config "[CONFIGDIR]config.yaml"' />
 
       <ServiceControl
         Id="ServiceController"
@@ -64,12 +82,46 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="ConfigFileComponent" Directory="INSTALLFOLDER" Guid="*" Permanent="yes" NeverOverwrite="yes">
+    <Component Id="LogsDirectoryComponent" Directory="LOGSDIR" Guid="*" Permanent="yes">
+      <CreateFolder />
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\ImmichFolderWatch"
+        Name="LogsDirectoryInstalled"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="ConfigFileComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes" NeverOverwrite="yes">
+      <Condition><![CDATA[NOT LEGACYCONFIGPATH OR STRUCTUREDCONFIGPATH]]></Condition>
       <File
         Id="DefaultConfigFile"
         Source="$(ExampleConfigPath)"
         Name="config.yaml"
         KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="LegacyConfigMigrationComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes">
+      <Condition><![CDATA[LEGACYCONFIGPATH AND NOT STRUCTUREDCONFIGPATH]]></Condition>
+      <CreateFolder />
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\ImmichFolderWatch"
+        Name="LegacyConfigMigrated"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+      <CopyFile
+        Id="MoveLegacyConfigFile"
+        SourceProperty="LEGACYCONFIGPATH"
+        DestinationDirectory="CONFIGDIR"
+        DestinationName="config.yaml"
+        Delete="yes" />
     </Component>
   </Fragment>
 </Wix>

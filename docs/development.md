@@ -21,8 +21,8 @@ dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 
 ## CI
 
-- `ci.yaml`: build + test on Windows and Linux
-- `release.yaml`: publish artifacts and draft release on tag
+- `ci.yaml`: cross-platform build + test coverage for the codebase
+- `release.yaml`: build Windows release artifacts and update the current versioned GitHub release on every push to `main`
 - `flatpak-build.yaml`: placeholder validation workflow
 
 ## Project Conventions

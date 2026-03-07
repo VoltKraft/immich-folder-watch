@@ -6,6 +6,7 @@ This directory contains the first automation-friendly Windows packaging flow.
 
 - `build-installer.ps1`: publishes the daemon and assembles a distributable bundle
 - `build-msi.ps1`: publishes the daemon and builds an `.msi` installer with WiX
+- `config.windows.example.yaml`: Windows-specific install template that targets `..\logs`
 - `install-service.ps1`: installs or updates the service on a Windows host
 - `uninstall-service.ps1`: removes the service and installed binaries
 - `service-management.ps1`: shared helpers for robust stop/delete/wait service operations
@@ -17,3 +18,12 @@ This directory contains the first automation-friendly Windows packaging flow.
 - Script-based Windows installation is implemented.
 - MSI packaging is implemented.
 - A bootstrapper `.exe` is still planned.
+
+## Default Layout
+
+- `bin\`: daemon executable and runtime files
+- `config\config.yaml`: active Windows config
+- `logs\`: daemon logs
+
+Legacy installs with `config.yaml` in the install root are migrated to `config\config.yaml` automatically if the structured config does not exist yet.
+If both files exist, `config\config.yaml` stays active and the legacy file is left untouched.

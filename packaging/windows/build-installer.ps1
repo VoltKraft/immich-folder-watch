@@ -25,9 +25,14 @@ function Reset-Directory {
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
+$windowsConfigTemplatePath = Join-Path $PSScriptRoot "config.windows.example.yaml"
 $packageRoot = Join-Path $OutputRoot "immich-folder-watch-$Runtime"
-$publishRoot = Join-Path $packageRoot "app"
+$publishRoot = Join-Path $packageRoot "bin"
 $zipPath = "$packageRoot.zip"
+
+if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
+    throw "Windows config template not found: $windowsConfigTemplatePath"
+}
 
 Reset-Directory -Path $packageRoot
 New-Item -ItemType Directory -Path $publishRoot -Force | Out-Null
@@ -63,7 +68,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "uninstall-service.ps1") -Destin
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "service-management.ps1") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "README.md") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "installer.stub.md") -Destination $packageRoot
-Copy-Item -LiteralPath (Join-Path $repoRoot "examples\config.example.yaml") -Destination (Join-Path $packageRoot "config.example.yaml")
+Copy-Item -LiteralPath $windowsConfigTemplatePath -Destination (Join-Path $packageRoot "config.example.yaml")
 
 if ($Zip) {
     if (Test-Path -LiteralPath $zipPath) {

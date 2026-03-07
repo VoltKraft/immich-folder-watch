@@ -1,37 +1,45 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Release](https://img.shields.io/badge/Release-pending-lightgrey?logo=github)](./.github/workflows/release.yaml)
+[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-Upload new screenshots and media from local folders to Immich automatically using the Immich HTTP API.
+Windows service that watches local folders and uploads newly appearing files to Immich through the Immich HTTP API.
 
 > [!IMPORTANT]
 > This project uploads files through the Immich API. It does **not** write files directly into Immich storage.
 
+> [!IMPORTANT]
+> This is **not** a sync client like Nextcloud. It does not mirror folders, propagate deletes, or backfill files that were already present before the daemon started. It only uploads files that generate file-system events while the daemon is running.
+
 ## Project Status
 
-### ✅ Implemented now
-- [x] Cross-platform .NET daemon with primary Windows-first workflow
+Version `1.0.0` is the first supported Windows release.
+
+### Supported in 1.0.0
+- [x] Windows-first .NET 10 daemon
 - [x] YAML configuration via `YamlDotNet`
 - [x] Multiple watched source folders
 - [x] File debouncing and file-ready checks for partial writes
-- [x] Batch uploads with deduplication within a runtime session
+- [x] Upload of newly appearing files while the daemon is running
+- [x] Batch uploads with deduplication within one runtime session
 - [x] Immich API upload client isolated in its own project
 - [x] Retry with exponential backoff for transient upload failures
 - [x] Unit tests for config parsing, file-ready behavior, and batching logic
-- [x] CI workflow for Windows and Linux build/test
+- [x] Cross-platform CI build/test coverage for the codebase
 - [x] Scriptable Windows service packaging with install/uninstall PowerShell automation
 - [x] MSI-based Windows installer build with service registration
 
-### 🚧 In progress
-- [ ] Bootstrapper `.exe` for one-click distribution
-- [ ] Linux `systemd` service packaging scripts
-- [ ] Flatpak packaging pipeline and runtime integration
+### Not part of 1.0.0
+- [ ] Folder sync comparable to Nextcloud
+- [ ] Startup backfill of files that already exist before the daemon starts
+- [ ] Delete or rename synchronization into Immich
+- [ ] Supported Linux installation or Linux service packaging
+- [ ] Flatpak packaging
 
-### 🗺️ Planned
+### Planned next
+- [ ] Bootstrapper `.exe` for one-click distribution
 - [ ] Winget distribution
-- [ ] Flathub distribution
 - [ ] Album management enhancements based on Immich API evolution
 - [ ] Rich observability (metrics, optional OpenTelemetry)
 
@@ -41,12 +49,13 @@ Upload new screenshots and media from local folders to Immich automatically usin
 | --- | --- |
 | Screenshot folders fill up quickly | Watches one or more local folders continuously |
 | Manual uploads are repetitive | Uploads new files automatically in batches |
+| A full sync client would be overkill | Focuses on upload-on-arrival automation |
 | Direct file-copy bypasses Immich indexing | Uses Immich HTTP API so assets appear immediately |
 | Temporary file writes trigger broken uploads | Waits until files are readable before upload |
 
-## Quickstart (Windows Console Mode)
+## Quickstart (Windows)
 
-1. Install .NET SDK 10.0 or newer.
+1. Install .NET SDK 10.0 or newer, or use the Windows installer artifacts.
 2. Copy the example config:
    - `cp examples/config.example.yaml config.yaml`
 3. Edit `config.yaml` with your Immich API URL and API key.
@@ -63,8 +72,7 @@ dotnet run --project .\src\ImmichFolderWatch.Daemon -- --config .\config.yaml
 - [Architecture](./docs/architecture.md)
 - [Configuration](./docs/configuration.md)
 - [Windows Installation](./docs/installation-windows.md)
-- [Linux Installation](./docs/installation-linux.md)
-- [Flatpak Notes](./docs/flatpak.md)
+- [Linux Status](./docs/installation-linux.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Development](./docs/development.md)
 

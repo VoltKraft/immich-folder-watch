@@ -106,4 +106,48 @@ logging:
             tempRoot.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public void Load_ResolvesParentRelativeLogDirectoryAgainstConfigDirectory()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-parent-log-");
+
+        try
+        {
+            var watchDirectory = Directory.CreateDirectory(Path.Combine(tempRoot.FullName, "watch"));
+            var configDirectory = Directory.CreateDirectory(Path.Combine(tempRoot.FullName, "config"));
+            var configPath = Path.Combine(configDirectory.FullName, "config.yaml");
+
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources:
+    - path: "../watch"
+      albumName: "Screenshots"
+      includeSubdirectories: false
+  extensions:
+    - ".png"
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "../logs"
+""";
+
+            File.WriteAllText(configPath, yaml);
+
+            var loader = new AppConfigLoader();
+            var config = loader.Load(configPath);
+
+            Assert.Equal(Path.GetFullPath(watchDirectory.FullName), config.Watch.Sources[0].Path);
+            Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "logs")), config.Logging.LogDirectory);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
 }

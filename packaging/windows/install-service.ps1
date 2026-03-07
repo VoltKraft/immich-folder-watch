@@ -45,24 +45,48 @@ Assert-Administrator
 
 $installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
 $packageRoot = [System.IO.Path]::GetFullPath($PackageRoot)
-$packageAppRoot = Join-Path $packageRoot "app"
-$serviceExecutable = Join-Path $installRootFull "ImmichFolderWatch.Daemon.exe"
+$packageBinRoot = Join-Path $packageRoot "bin"
+$installBinRoot = Join-Path $installRootFull "bin"
+$installConfigRoot = Join-Path $installRootFull "config"
+$installLogsRoot = Join-Path $installRootFull "logs"
+$serviceExecutable = Join-Path $installBinRoot "ImmichFolderWatch.Daemon.exe"
 $exampleConfigPath = Join-Path $packageRoot "config.example.yaml"
+$legacyConfigPath = Join-Path $installRootFull "config.yaml"
+$defaultConfigPath = Join-Path $installConfigRoot "config.yaml"
+$useDefaultConfigPath = -not $PSBoundParameters.ContainsKey("ConfigPath")
+
+function Remove-LegacyRootAppArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceBinRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$InstallRootPath
+    )
+
+    Get-ChildItem -LiteralPath $SourceBinRoot -Force | ForEach-Object {
+        $legacyPath = Join-Path $InstallRootPath $_.Name
+        if (-not (Test-Path -LiteralPath $legacyPath)) {
+            return
+        }
+
+        Remove-Item -LiteralPath $legacyPath -Recurse -Force
+    }
+}
 
 if (-not $ConfigPath) {
-    $ConfigPath = Join-Path $installRootFull "config.yaml"
+    $ConfigPath = $defaultConfigPath
 }
 
 $configPathFull = [System.IO.Path]::GetFullPath($ConfigPath)
 $configDirectory = Split-Path -Path $configPathFull -Parent
 $serviceCommand = "`"$serviceExecutable`" --config `"$configPathFull`""
 
-if (-not (Test-Path -LiteralPath $packageAppRoot)) {
-    throw "Published app folder not found: $packageAppRoot"
+if (-not (Test-Path -LiteralPath $packageBinRoot)) {
+    throw "Published bin folder not found: $packageBinRoot"
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $packageAppRoot "ImmichFolderWatch.Daemon.exe"))) {
-    throw "ImmichFolderWatch.Daemon.exe not found in $packageAppRoot"
+if (-not (Test-Path -LiteralPath (Join-Path $packageBinRoot "ImmichFolderWatch.Daemon.exe"))) {
+    throw "ImmichFolderWatch.Daemon.exe not found in $packageBinRoot"
 }
 
 if (-not (Test-Path -LiteralPath $exampleConfigPath)) {
@@ -75,11 +99,28 @@ if ($null -ne $existingService) {
 }
 
 New-Item -ItemType Directory -Path $installRootFull -Force | Out-Null
+New-Item -ItemType Directory -Path $installBinRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $installConfigRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $installLogsRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 
-Copy-Item -Path (Join-Path $packageAppRoot "*") -Destination $installRootFull -Recurse -Force
+Remove-LegacyRootAppArtifacts -SourceBinRoot $packageBinRoot -InstallRootPath $installRootFull
+Get-ChildItem -LiteralPath $installBinRoot -Force -ErrorAction SilentlyContinue | ForEach-Object {
+    Remove-Item -LiteralPath $_.FullName -Recurse -Force
+}
+Copy-Item -Path (Join-Path $packageBinRoot "*") -Destination $installBinRoot -Recurse -Force
 
 $createdExampleConfig = $false
+if ($useDefaultConfigPath -and (Test-Path -LiteralPath $legacyConfigPath)) {
+    if (Test-Path -LiteralPath $defaultConfigPath) {
+        Write-Warning "Legacy config remains at $legacyConfigPath because $defaultConfigPath already exists. The service will use $defaultConfigPath."
+    }
+    else {
+        Move-Item -LiteralPath $legacyConfigPath -Destination $defaultConfigPath
+        Write-Host "Migrated legacy config to $defaultConfigPath"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $configPathFull)) {
     Copy-Item -LiteralPath $exampleConfigPath -Destination $configPathFull
     $createdExampleConfig = $true
@@ -119,5 +160,6 @@ elseif ($createdExampleConfig) {
 }
 
 Write-Host "Installed service '$ServiceName'."
-Write-Host "Binaries: $installRootFull"
+Write-Host "Binaries: $installBinRoot"
 Write-Host "Config:   $configPathFull"
+Write-Host "Logs:     $installLogsRoot"

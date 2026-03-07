@@ -5,7 +5,7 @@
 - Watch local folders for new media files.
 - Upload files through the Immich HTTP API.
 - Keep upload and HTTP behavior isolated from watcher orchestration.
-- Remain host-ready for Windows Service and Linux `systemd`.
+- Ship Windows Service support first while keeping the daemon host-ready for future Linux service work.
 
 ## Solution Layout
 

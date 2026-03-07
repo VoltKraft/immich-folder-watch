@@ -8,11 +8,14 @@ using ImmichFolderWatch.Immich;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 return await Bootstrapper.RunAsync(args);
 
 internal static class Bootstrapper
 {
+    private static readonly string ProductVersion = GetProductVersion();
+
     public static async Task<int> RunAsync(string[] args)
     {
         if (!CommandLineOptions.TryParse(args, out var options, out var parseMessage, out var helpRequested))
@@ -87,7 +90,7 @@ internal static class Bootstrapper
                     client.BaseAddress = new Uri(normalizedApiUrl, UriKind.Absolute);
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Add("x-api-key", config.Immich.ApiKey);
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("immich-folder-watch/0.1.0");
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd($"immich-folder-watch/{ProductVersion}");
                 });
 
                 services.AddHostedService<FolderWatchWorker>();
@@ -115,5 +118,23 @@ internal static class Bootstrapper
 
         await host.RunAsync();
         return 0;
+    }
+
+    private static string GetProductVersion()
+    {
+        var informationalVersion = typeof(Bootstrapper)
+            .Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var plusIndex = informationalVersion.IndexOf('+');
+            return plusIndex >= 0
+                ? informationalVersion[..plusIndex]
+                : informationalVersion;
+        }
+
+        return "1.0.0";
     }
 }

@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot = (Join-Path $PSScriptRoot "..\..\artifacts\windows\msi"),
-    [string]$Version = "0.1.0",
+    [string]$Version = "1.0.0",
     [switch]$FrameworkDependent
 )
 
@@ -32,7 +32,7 @@ function Get-InstallerVersion {
         return "$($Matches[1]).$($Matches[2]).$($Matches[3])"
     }
 
-    throw "Installer version must start with a numeric major.minor.patch value. Example: 0.1.0"
+    throw "Installer version must start with a numeric major.minor.patch value. Example: 1.0.0"
 }
 
 function Get-InstallerPlatform {
@@ -51,7 +51,7 @@ function Get-InstallerPlatform {
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
 $wixProject = Join-Path $PSScriptRoot "ImmichFolderWatch.Setup.wixproj"
-$exampleConfigPath = Join-Path $repoRoot "examples\config.example.yaml"
+$windowsConfigTemplatePath = Join-Path $PSScriptRoot "config.windows.example.yaml"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
 $msiOutputRoot = Join-Path $OutputRoot "package"
 $installerVersion = Get-InstallerVersion -Value $Version
@@ -63,8 +63,8 @@ if (-not (Test-Path -LiteralPath $wixProject)) {
     throw "WiX project not found: $wixProject"
 }
 
-if (-not (Test-Path -LiteralPath $exampleConfigPath)) {
-    throw "Example config not found: $exampleConfigPath"
+if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
+    throw "Windows config template not found: $windowsConfigTemplatePath"
 }
 
 Reset-Directory -Path $publishRoot
@@ -99,7 +99,7 @@ $buildArgs = @(
     "-p:InstallerPlatform=$installerPlatform",
     "-p:InstallerVersion=$installerVersion",
     "-p:PublishedAppDir=$publishRoot",
-    "-p:ExampleConfigPath=$exampleConfigPath",
+    "-p:ExampleConfigPath=$windowsConfigTemplatePath",
     "-p:OutputPath=$msiOutputRoot\"
 )
 

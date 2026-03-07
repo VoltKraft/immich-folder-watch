@@ -2,57 +2,130 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: true
 
 jobs:
   build-artifacts:
-    name: Build Release Artifacts (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+    name: Build Windows Release Artifacts
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
+      - name: Read project version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = $props.Project.PropertyGroup.Version
+          if ([string]::IsNullOrWhiteSpace($version)) {
+              throw "Version not found in Directory.Build.props."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
       - name: Restore
         run: dotnet restore ImmichFolderWatch.sln
 
-      - name: Publish daemon
-        run: dotnet publish src/ImmichFolderWatch.Daemon/ImmichFolderWatch.Daemon.csproj -c Release -o artifacts/${{ matrix.os }}
+      - name: Build Windows bundle
+        shell: pwsh
+        run: .\packaging\windows\build-installer.ps1 -Runtime win-x64 -Version ${{ steps.version.outputs.version }} -Zip
+
+      - name: Build Windows MSI
+        shell: pwsh
+        run: .\packaging\windows\build-msi.ps1 -Runtime win-x64 -Version ${{ steps.version.outputs.version }}
+
+      - name: Collect release assets
+        shell: pwsh
+        run: |
+          $assetRoot = Join-Path $PWD "artifacts\release"
+          New-Item -ItemType Directory -Path $assetRoot -Force | Out-Null
+
+          Copy-Item `
+            -LiteralPath (Join-Path $PWD "artifacts\windows\immich-folder-watch-win-x64.zip") `
+            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.zip")
+
+          Copy-Item `
+            -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.msi") `
+            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ steps.version.outputs.version }}-win-x64.msi")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: immich-folder-watch-${{ matrix.os }}
-          path: artifacts/${{ matrix.os }}
+          name: immich-folder-watch-release-assets
+          path: artifacts/release
 
-  draft-release:
-    name: Draft GitHub Release
+  publish-release:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs:
       - build-artifacts
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: immich-folder-watch-release-assets
+          path: artifacts/release
 
-      - name: Draft release
+      - name: Extract changelog entry
+        shell: bash
+        run: |
+          version='${{ needs.build-artifacts.outputs.version }}'
+          awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Missing changelog entry for version $version" >&2
+            exit 1
+          fi
+
+      - name: Update release tag
+        env:
+          TAG_NAME: ${{ needs.build-artifacts.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$TAG_NAME" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG_NAME" --force
+
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
-          files: artifacts/**/*
+          tag_name: ${{ needs.build-artifacts.outputs.tag }}
+          name: ${{ needs.build-artifacts.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: artifacts/release/*
+          draft: false
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
