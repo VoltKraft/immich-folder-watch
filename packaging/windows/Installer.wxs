@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Immich Folder Watch"
+    Manufacturer="Immich Folder Watch Contributors"
+    Version="$(InstallerVersion)"
+    UpgradeCode="F82E51D6-6D61-4A5D-B8AA-9D84A5D0D57D"
+    Language="1033"
+    Scope="perMachine"
+    InstallerVersion="500">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="CONFIGDIR" Name="ImmichFolderWatch" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Immich Folder Watch" Level="1">
+      <ComponentGroupRef Id="PublishedApplicationFiles" />
+      <ComponentRef Id="ServiceExecutableComponent" />
+      <ComponentRef Id="ConfigFileComponent" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="PublishedApplicationFiles">
+      <Files Directory="INSTALLFOLDER" Include="$(PublishedAppDir)\**">
+        <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.Daemon.exe" />
+        <Exclude Files="$(PublishedAppDir)\**\*.pdb" />
+      </Files>
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="ServiceExecutableComponent" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="ServiceExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.Daemon.exe" KeyPath="yes" />
+
+      <ServiceInstall
+        Id="ServiceInstaller"
+        Name="ImmichFolderWatch"
+        DisplayName="Immich Folder Watch"
+        Description="Watches local folders and uploads new media to Immich."
+        Type="ownProcess"
+        Start="demand"
+        ErrorControl="normal"
+        Arguments='--config "[CONFIGDIR]config.yaml"' />
+
+      <ServiceControl
+        Id="ServiceController"
+        Name="ImmichFolderWatch"
+        Stop="both"
+        Remove="uninstall"
+        Wait="yes" />
+
+      <ServiceConfigFailureActions ResetPeriod="86400" OnInstall="yes" OnReinstall="yes">
+        <Failure Action="restartService" Delay="5000" />
+        <Failure Action="restartService" Delay="15000" />
+        <Failure Action="none" Delay="0" />
+      </ServiceConfigFailureActions>
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="ConfigFileComponent" Directory="CONFIGDIR" Guid="*" Permanent="yes" NeverOverwrite="yes">
+      <File
+        Id="DefaultConfigFile"
+        Source="$(ExampleConfigPath)"
+        Name="config.yaml"
+        KeyPath="yes" />
+    </Component>
+  </Fragment>
+</Wix>

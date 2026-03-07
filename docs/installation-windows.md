@@ -58,3 +58,28 @@ For unattended deployment with a prepared config:
 By default, configuration and logs under `%ProgramData%\ImmichFolderWatch` are preserved. Pass `-RemoveData` if you want a full cleanup.
 
 The packaging scripts live under `packaging/windows`.
+
+## MSI Installer
+
+Build a Windows Installer package:
+
+```powershell
+.\packaging\windows\build-msi.ps1
+```
+
+This creates an `.msi` under `artifacts\windows\msi\`.
+On the first run, `dotnet` restores the WiX SDK from NuGet.
+
+Installer behavior:
+
+- Installs binaries into `%ProgramFiles%\Immich Folder Watch`
+- Creates `%ProgramData%\ImmichFolderWatch\config.yaml` from the example config on first install
+- Registers the `ImmichFolderWatch` Windows service
+- Preserves `config.yaml` on uninstall
+
+After the MSI install, edit the config and start the service manually the first time:
+
+```powershell
+notepad C:\ProgramData\ImmichFolderWatch\config.yaml
+Start-Service ImmichFolderWatch
+```

@@ -1,16 +1,16 @@
 # Installer Stub
 
-This document describes the future MSI/WiX installer scope.
+This document now describes the future bootstrapper `.exe` scope.
 
 ## Planned
 
-- Install daemon binaries
-- Register optional Windows Service
-- Include upgrade-safe config path strategy
-- Provide uninstall cleanup options
+- Wrap the existing MSI in a one-click bootstrapper `.exe`
+- Support prerequisites detection and friendlier UX
+- Optionally offer first-run config guidance
+- Optionally chain additional enterprise deployment steps
 
 ## Status
 
-The script-based Windows installer flow exists today.
-
-MSI/WiX packaging is not implemented yet.
+- Script-based installation exists today.
+- MSI packaging exists today.
+- Bootstrapper `.exe` packaging is not implemented yet.

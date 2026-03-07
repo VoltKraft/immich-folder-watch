@@ -22,9 +22,10 @@ Upload new screenshots and media from local folders to Immich automatically usin
 - [x] Unit tests for config parsing, file-ready behavior, and batching logic
 - [x] CI workflow for Windows and Linux build/test
 - [x] Scriptable Windows service packaging with install/uninstall PowerShell automation
+- [x] MSI-based Windows installer build with service registration
 
 ### 🚧 In progress
-- [ ] MSI/WiX-based Windows installer UX
+- [ ] Bootstrapper `.exe` for one-click distribution
 - [ ] Linux `systemd` service packaging scripts
 - [ ] Flatpak packaging pipeline and runtime integration
 
