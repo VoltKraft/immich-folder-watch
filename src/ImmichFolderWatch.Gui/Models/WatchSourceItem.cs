@@ -76,13 +76,17 @@ public sealed class WatchSourceItem : BindableBase
 
         try
         {
-            var trimmedPath = path.Trim().TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+            var trimmedPath = path.Trim().TrimEnd('\\', '/');
             if (string.IsNullOrWhiteSpace(trimmedPath))
             {
                 return false;
             }
 
-            albumName = System.IO.Path.GetFileName(trimmedPath);
+            var lastSeparatorIndex = trimmedPath.LastIndexOfAny(['\\', '/']);
+            albumName = lastSeparatorIndex >= 0
+                ? trimmedPath[(lastSeparatorIndex + 1)..]
+                : trimmedPath;
+
             return !string.IsNullOrWhiteSpace(albumName);
         }
         catch (Exception)
