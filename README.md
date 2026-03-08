@@ -1,7 +1,7 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Version](https://img.shields.io/badge/Version-1.3.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.1-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `immich-folder-watch` is a Windows service with a desktop configuration app for people who want local folders to feed new files into Immich automatically.

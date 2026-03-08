@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-03-08
+
+### Fixed
+- The Immich API key reveal button in the Windows GUI now correctly toggles between masked and visible display for real API keys.
+
+### Changed
+- Project, packaging, and release defaults updated to `1.3.1`.
+
 ## [1.3.0] - 2026-03-08
 
 ### Changed

@@ -81,10 +81,14 @@
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="8">
                 <TextBox Grid.Column="0"
+                         IsVisible="{Binding ShowPlainImmichApiKeyInput}"
+                         Text="{Binding ImmichApiKey}"
+                         Watermark="{Binding ImmichApiKeyPlaceholderText}" />
+                <TextBox Grid.Column="0"
+                         IsVisible="{Binding ShouldMaskImmichApiKey}"
                          Text="{Binding ImmichApiKey}"
                          Watermark="{Binding ImmichApiKeyPlaceholderText}"
-                         PasswordChar="●"
-                         RevealPassword="{Binding RevealImmichApiKey}" />
+                         PasswordChar="●" />
                 <Button Grid.Column="1"
                         MinWidth="38"
                         Padding="8,6"

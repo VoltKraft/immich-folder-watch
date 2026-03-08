@@ -43,6 +43,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.ShouldMaskImmichApiKey);
         Assert.False(viewModel.RevealImmichApiKey);
+        Assert.False(viewModel.ShowPlainImmichApiKeyInput);
         Assert.True(viewModel.ShowImmichApiKeyRevealButton);
         Assert.False(viewModel.IsImmichApiKeyPlaceholder);
     }
@@ -56,6 +57,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.ShouldMaskImmichApiKey);
         Assert.True(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowPlainImmichApiKeyInput);
         Assert.False(viewModel.ShowImmichApiKeyRevealButton);
         Assert.True(viewModel.IsImmichApiKeyPlaceholder);
     }
@@ -72,11 +74,13 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.ShouldMaskImmichApiKey);
         Assert.True(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowPlainImmichApiKeyInput);
 
         viewModel.ToggleImmichApiKeyVisibility();
 
         Assert.True(viewModel.ShouldMaskImmichApiKey);
         Assert.False(viewModel.RevealImmichApiKey);
+        Assert.False(viewModel.ShowPlainImmichApiKeyInput);
     }
 
     [Fact]
@@ -91,6 +95,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.ShouldMaskImmichApiKey);
         Assert.False(viewModel.RevealImmichApiKey);
+        Assert.False(viewModel.ShowPlainImmichApiKeyInput);
         Assert.True(viewModel.ShowImmichApiKeyRevealButton);
     }
 
@@ -114,6 +119,21 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.ShouldMaskImmichApiKey);
         Assert.False(viewModel.RevealImmichApiKey);
+        Assert.False(viewModel.ShowPlainImmichApiKeyInput);
         Assert.True(viewModel.ShowImmichApiKeyRevealButton);
+    }
+
+    [Fact]
+    public void ImmichApiKey_UsesPlainDisplay_WhenEmpty()
+    {
+        var viewModel = new MainWindowViewModel
+        {
+            ImmichApiKey = string.Empty,
+        };
+
+        Assert.False(viewModel.ShouldMaskImmichApiKey);
+        Assert.False(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowPlainImmichApiKeyInput);
+        Assert.False(viewModel.ShowImmichApiKeyRevealButton);
     }
 }

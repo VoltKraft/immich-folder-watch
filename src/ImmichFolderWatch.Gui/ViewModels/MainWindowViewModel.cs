@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _immichPermissionsStatusBackground = "#E0E3E8";
     private bool _revealImmichApiKey;
     private bool _shouldMaskImmichApiKey;
+    private bool _showPlainImmichApiKeyInput = true;
     private bool _showImmichApiKeyRevealButton;
     private bool _isImmichApiKeyPlaceholder;
     private string _immichApiKeyRevealToolTip = ShowApiKeyToolTipText;
@@ -230,6 +231,12 @@ public sealed class MainWindowViewModel : BindableBase
         private set => SetProperty(ref _shouldMaskImmichApiKey, value);
     }
 
+    public bool ShowPlainImmichApiKeyInput
+    {
+        get => _showPlainImmichApiKeyInput;
+        private set => SetProperty(ref _showPlainImmichApiKeyInput, value);
+    }
+
     public bool ShowImmichApiKeyRevealButton
     {
         get => _showImmichApiKeyRevealButton;
@@ -308,7 +315,7 @@ public sealed class MainWindowViewModel : BindableBase
             return;
         }
 
-        _revealImmichApiKey = !_revealImmichApiKey;
+        RevealImmichApiKey = !RevealImmichApiKey;
         RefreshImmichApiKeyPresentation(resetVisibleState: false);
     }
 
@@ -523,17 +530,18 @@ public sealed class MainWindowViewModel : BindableBase
     {
         if (resetVisibleState)
         {
-            _revealImmichApiKey = false;
+            RevealImmichApiKey = false;
         }
 
         var trimmedApiKey = (_immichApiKey ?? string.Empty).Trim();
         var isPlaceholder = IsExampleApiKeyPlaceholder(trimmedApiKey);
         var hasRealKey = !string.IsNullOrWhiteSpace(trimmedApiKey) && !isPlaceholder;
-        var revealPassword = isPlaceholder || _revealImmichApiKey;
+        var revealPassword = isPlaceholder || RevealImmichApiKey;
 
         IsImmichApiKeyPlaceholder = isPlaceholder;
         ShowImmichApiKeyRevealButton = hasRealKey;
         ShouldMaskImmichApiKey = hasRealKey && !revealPassword;
+        ShowPlainImmichApiKeyInput = !ShouldMaskImmichApiKey;
         RevealImmichApiKey = revealPassword;
         ImmichApiKeyRevealToolTip = revealPassword ? HideApiKeyToolTipText : ShowApiKeyToolTipText;
     }
