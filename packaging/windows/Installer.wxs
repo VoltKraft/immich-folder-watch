@@ -170,7 +170,7 @@
           Target="[BINDIR]ImmichFolderWatch.Gui.exe"
           WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue
-          Root="HKLM"
+          Root="HKCU"
           Key="Software\ImmichFolderWatch"
           Name="DesktopShortcutInstalled"
           Type="integer"
