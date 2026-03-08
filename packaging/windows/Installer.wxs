@@ -161,7 +161,7 @@
   </Fragment>
 
   <Fragment>
-    <StandardDirectory Id="CommonDesktopFolder">
+    <StandardDirectory Id="DesktopFolder">
       <Component Id="DesktopShortcutComponent" Guid="*">
         <Shortcut
           Id="DesktopShortcut"
