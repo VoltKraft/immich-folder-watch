@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.Immich;
 
-public sealed class ImmichAssetClient : IImmichAssetClient
+public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityVerifier
 {
     private const int MaxBackoffMilliseconds = 30_000;
 

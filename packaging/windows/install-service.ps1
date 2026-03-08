@@ -6,7 +6,7 @@ param(
     [string]$ServiceName = "ImmichFolderWatch",
     [string]$DisplayName = "Immich Folder Watch",
     [ValidateSet("Manual", "Automatic", "Disabled")]
-    [string]$StartupType = "Automatic",
+    [string]$StartupType = "Disabled",
     [ValidateSet("LocalSystem", "LocalService", "NetworkService")]
     [string]$BuiltInAccount = "LocalSystem",
     [System.Management.Automation.PSCredential]$Credential,
@@ -73,6 +73,41 @@ function Remove-LegacyRootAppArtifacts {
     }
 }
 
+function Get-ServiceStartupTypeFromRegistry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $serviceKeyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    if (-not (Test-Path -LiteralPath $serviceKeyPath)) {
+        return $null
+    }
+
+    $serviceKey = Get-ItemProperty -LiteralPath $serviceKeyPath -Name "Start" -ErrorAction Stop
+    switch ([int]$serviceKey.Start) {
+        2 { return "Automatic" }
+        3 { return "Manual" }
+        4 { return "Disabled" }
+        default { return $null }
+    }
+}
+
+function Test-ServiceDelayedAutoStart {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $serviceKeyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    if (-not (Test-Path -LiteralPath $serviceKeyPath)) {
+        return $false
+    }
+
+    $delayedValue = (Get-ItemProperty -LiteralPath $serviceKeyPath -Name "DelayedAutoStart" -ErrorAction SilentlyContinue).DelayedAutoStart
+    return [int]$delayedValue -eq 1
+}
+
 if (-not $ConfigPath) {
     $ConfigPath = $defaultConfigPath
 }
@@ -89,13 +124,35 @@ if (-not (Test-Path -LiteralPath (Join-Path $packageBinRoot "ImmichFolderWatch.D
     throw "ImmichFolderWatch.Daemon.exe not found in $packageBinRoot"
 }
 
+if (-not (Test-Path -LiteralPath (Join-Path $packageBinRoot "ImmichFolderWatch.Gui.exe"))) {
+    throw "ImmichFolderWatch.Gui.exe not found in $packageBinRoot"
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $packageBinRoot "ImmichFolderWatch.Admin.exe"))) {
+    throw "ImmichFolderWatch.Admin.exe not found in $packageBinRoot"
+}
+
 if (-not (Test-Path -LiteralPath $exampleConfigPath)) {
     throw "config.example.yaml not found in $packageRoot"
 }
 
 $existingService = Get-ServiceInstance -Name $ServiceName
+$startupTypeWasExplicitlyRequested = $PSBoundParameters.ContainsKey("StartupType")
+$preserveDelayedAutoStart = $false
 if ($null -ne $existingService) {
+    if (-not $startupTypeWasExplicitlyRequested) {
+        $preservedStartupType = Get-ServiceStartupTypeFromRegistry -Name $ServiceName
+        if ($preservedStartupType) {
+            $StartupType = $preservedStartupType
+        }
+    }
+
+    $preserveDelayedAutoStart = $StartupType -eq "Automatic" -and (Test-ServiceDelayedAutoStart -Name $ServiceName)
     Stop-ServiceRegistration -Name $ServiceName -TimeoutSeconds 45
+}
+
+if ($StartService -and $StartupType -eq "Disabled") {
+    throw "Cannot start the service when StartupType is Disabled. Use -StartupType Automatic or -StartupType Manual."
 }
 
 New-Item -ItemType Directory -Path $installRootFull -Force | Out-Null
@@ -146,7 +203,7 @@ if ($null -ne $serviceCredential) {
 
 New-Service @newServiceParameters | Out-Null
 
-if ($StartupType -eq "Automatic") {
+if ($StartupType -eq "Automatic" -and ($startupTypeWasExplicitlyRequested -or $preserveDelayedAutoStart)) {
     Invoke-ServiceCommand -Arguments @(
         "config", $ServiceName,
         (New-ScOption -Name "start" -Value "delayed-auto")
@@ -163,7 +220,12 @@ if ($StartService) {
     Start-Service -Name $ServiceName
 }
 elseif ($createdExampleConfig) {
-    Write-Warning "An example config was created at $configPathFull. Edit it before the next system boot or before starting the service manually."
+    if ($StartupType -eq "Disabled") {
+        Write-Warning "An example config was created at $configPathFull. Verify it in the GUI before enabling the service."
+    }
+    else {
+        Write-Warning "An example config was created at $configPathFull. Edit it before the next system boot or before starting the service manually."
+    }
 }
 
 Write-Host "Installed service '$ServiceName'."

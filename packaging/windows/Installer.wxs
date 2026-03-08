@@ -25,6 +25,14 @@
       </DirectorySearch>
     </Property>
 
+    <Property Id="EXISTINGSERVICESTART">
+      <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\ImmichFolderWatch" Name="Start" Type="raw" />
+    </Property>
+
+    <Property Id="EXISTINGDELAYEDAUTOSTART">
+      <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\ImmichFolderWatch" Name="DelayedAutoStart" Type="raw" />
+    </Property>
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch">
         <Directory Id="BINDIR" Name="bin" />
@@ -35,9 +43,12 @@
     <Feature Id="MainFeature" Title="Immich Folder Watch" Level="1">
       <ComponentGroupRef Id="PublishedApplicationFiles" />
       <ComponentRef Id="ServiceExecutableComponent" />
+      <ComponentRef Id="GuiExecutableComponent" />
+      <ComponentRef Id="AdminExecutableComponent" />
       <ComponentRef Id="LogsDirectoryComponent" />
       <ComponentRef Id="ConfigFileComponent" />
       <ComponentRef Id="LegacyConfigMigrationComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
   </Package>
 
@@ -45,6 +56,8 @@
     <ComponentGroup Id="PublishedApplicationFiles">
       <Files Directory="BINDIR" Include="$(PublishedAppDir)\**">
         <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.Daemon.exe" />
+        <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.Gui.exe" />
+        <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.Admin.exe" />
         <Exclude Files="$(PublishedAppDir)\**\*.pdb" />
       </Files>
     </ComponentGroup>
@@ -60,10 +73,9 @@
         DisplayName="Immich Folder Watch"
         Description="Watches local folders and uploads new media to Immich."
         Type="ownProcess"
-        Start="auto"
+        Start="disabled"
         ErrorControl="normal"
         Arguments='--config "[CONFIGDIR]config.yaml"'>
-        <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall="yes" />
       </ServiceInstall>
 
       <ServiceControl
@@ -80,6 +92,18 @@
         ThirdFailureActionType="none"
         RestartServiceDelayInSeconds="5"
         ResetPeriodInDays="1" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="GuiExecutableComponent" Directory="BINDIR" Guid="*">
+      <File Id="GuiExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.Gui.exe" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="AdminExecutableComponent" Directory="BINDIR" Guid="*">
+      <File Id="AdminExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.Admin.exe" KeyPath="yes" />
     </Component>
   </Fragment>
 
@@ -134,5 +158,98 @@
         DestinationName="config.yaml"
         Delete="yes" />
     </Component>
+  </Fragment>
+
+  <Fragment>
+    <StandardDirectory Id="CommonDesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="*">
+        <Shortcut
+          Id="DesktopShortcut"
+          Name="Immich Folder Watch"
+          Description="Open the Immich Folder Watch configuration UI."
+          Target="[BINDIR]ImmichFolderWatch.Gui.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue
+          Root="HKLM"
+          Key="Software\ImmichFolderWatch"
+          Name="DesktopShortcutInstalled"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <SetProperty
+      Id="PreserveUpgradeAutomaticDelayedStart"
+      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= delayed-auto'
+      Before="PreserveUpgradeAutomaticDelayedStart"
+      Sequence="execute" />
+    <CustomAction
+      Id="PreserveUpgradeAutomaticDelayedStart"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="check" />
+
+    <SetProperty
+      Id="PreserveUpgradeAutomaticStart"
+      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= auto'
+      Before="PreserveUpgradeAutomaticStart"
+      Sequence="execute" />
+    <CustomAction
+      Id="PreserveUpgradeAutomaticStart"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="check" />
+
+    <SetProperty
+      Id="PreserveUpgradeManualStart"
+      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= demand'
+      Before="PreserveUpgradeManualStart"
+      Sequence="execute" />
+    <CustomAction
+      Id="PreserveUpgradeManualStart"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="check" />
+
+    <SetProperty
+      Id="PreserveUpgradeDisabledStart"
+      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= disabled'
+      Before="PreserveUpgradeDisabledStart"
+      Sequence="execute" />
+    <CustomAction
+      Id="PreserveUpgradeDisabledStart"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="check" />
+
+    <InstallExecuteSequence>
+      <Custom
+        Action="PreserveUpgradeAutomaticDelayedStart"
+        After="InstallServices"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;2&quot; AND EXISTINGDELAYEDAUTOSTART = &quot;1&quot;" />
+      <Custom
+        Action="PreserveUpgradeAutomaticStart"
+        After="PreserveUpgradeAutomaticDelayedStart"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;2&quot; AND EXISTINGDELAYEDAUTOSTART &lt;&gt; &quot;1&quot;" />
+      <Custom
+        Action="PreserveUpgradeManualStart"
+        After="PreserveUpgradeAutomaticStart"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;3&quot;" />
+      <Custom
+        Action="PreserveUpgradeDisabledStart"
+        After="PreserveUpgradeManualStart"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;4&quot;" />
+    </InstallExecuteSequence>
   </Fragment>
 </Wix>

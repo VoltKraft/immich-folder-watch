@@ -17,7 +17,7 @@ dotnet build ImmichFolderWatch.sln -c Release
 dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 ```
 
-## Windows Service Bundle
+## Windows Service Bundle (Advanced / Internal)
 
 Build a distributable bundle with published binaries plus install scripts:
 
@@ -27,10 +27,13 @@ Build a distributable bundle with published binaries plus install scripts:
 
 This creates `artifacts\windows\immich-folder-watch-win-x64\`.
 
+This bundle is mainly for development, recovery, or unattended internal deployment. The supported end-user installation path remains the MSI package.
+
 Installed layout:
 
 - `%ProgramFiles%\Immich Folder Watch\bin\`
 - `%ProgramFiles%\Immich Folder Watch\config\config.yaml`
+- `%ProgramFiles%\Immich Folder Watch\config\activation-state.json`
 - `%ProgramFiles%\Immich Folder Watch\logs\`
 
 If an older Windows install still uses `%ProgramFiles%\Immich Folder Watch\config.yaml`, the bundle installer and MSI migrate it to `config\config.yaml` automatically when the new path does not exist yet.
@@ -46,27 +49,30 @@ Open an elevated PowerShell prompt inside the generated bundle and run:
 
 Default behavior:
 
-- registers the service as `Automatic (Delayed Start)`
+- registers the service as `Disabled`
 - does not start it immediately after installation
 
 Recommended first install:
 
 ```powershell
 .\install-service.ps1
-notepad "${env:ProgramFiles}\Immich Folder Watch\config\config.yaml"
-Restart-Computer
+"${env:ProgramFiles}\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```
 
-If you want to validate the config immediately without rebooting:
+The GUI edits `%ProgramFiles%\Immich Folder Watch\config\config.yaml`, verifies the config against Immich, then enables `Automatic (Delayed Start)` and starts the service on the first successful save.
+
+If you explicitly want the script to leave the service enabled immediately:
 
 ```powershell
-Start-Service ImmichFolderWatch
+.\install-service.ps1 -StartupType Automatic -StartService
 ```
+
+On later GUI saves, a running service is restarted automatically so the changed config is applied immediately.
 
 For unattended deployment with a prepared config and immediate first start:
 
 ```powershell
-.\install-service.ps1 -StartService
+.\install-service.ps1 -StartupType Automatic -StartService
 ```
 
 ## Uninstall
@@ -94,15 +100,18 @@ On the first run, `dotnet` restores the WiX SDK from NuGet.
 Installer behavior:
 
 - Installs binaries into `%ProgramFiles%\Immich Folder Watch\bin\`
+- Installs the GUI, daemon, and admin helper executables together
 - Creates `%ProgramFiles%\Immich Folder Watch\config\config.yaml` from the Windows installer template on first install
+- Stores GUI activation state in `%ProgramFiles%\Immich Folder Watch\config\activation-state.json`
 - Creates `%ProgramFiles%\Immich Folder Watch\logs\`
 - Migrates a legacy root-level `config.yaml` into `config\config.yaml` when needed
-- Registers the `ImmichFolderWatch` Windows service as `Automatic (Delayed Start)`
+- Registers the `ImmichFolderWatch` Windows service as `Disabled`
+- Preserves the current service startup mode across upgrades
+- Creates a desktop shortcut for the GUI
 - Preserves `config\` and `logs\` on uninstall
 
-After the MSI install, edit the config and reboot, or start the service manually once if you want to validate immediately:
+After the MSI install, open the GUI from the desktop shortcut and use **Save And Verify**:
 
 ```powershell
-notepad "C:\Program Files\Immich Folder Watch\config\config.yaml"
-Start-Service ImmichFolderWatch
+"C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```

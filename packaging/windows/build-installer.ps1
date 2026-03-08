@@ -25,9 +25,12 @@ function Reset-Directory {
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
+$guiProject = Join-Path $repoRoot "src\ImmichFolderWatch.Gui\ImmichFolderWatch.Gui.csproj"
+$adminProject = Join-Path $repoRoot "src\ImmichFolderWatch.Admin\ImmichFolderWatch.Admin.csproj"
 $windowsConfigTemplatePath = Join-Path $PSScriptRoot "config.windows.example.yaml"
 $packageRoot = Join-Path $OutputRoot "immich-folder-watch-$Runtime"
 $publishRoot = Join-Path $packageRoot "bin"
+$publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
 $zipPath = "$packageRoot.zip"
 
 if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
@@ -35,33 +38,52 @@ if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
 }
 
 Reset-Directory -Path $packageRoot
+Reset-Directory -Path $publishTempRoot
 New-Item -ItemType Directory -Path $publishRoot -Force | Out-Null
 
-$publishArgs = @(
-    "publish",
-    $daemonProject,
-    "-c", $Configuration,
-    "-r", $Runtime,
-    "-o", $publishRoot
-)
+function Publish-ProjectOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName
+    )
 
-if ($FrameworkDependent) {
-    $publishArgs += "--no-self-contained"
-}
-else {
-    $publishArgs += "--self-contained"
+    $projectPublishRoot = Join-Path $publishTempRoot $ProjectName
+    Reset-Directory -Path $projectPublishRoot
+
+    $publishArgs = @(
+        "publish",
+        $ProjectPath,
+        "-c", $Configuration,
+        "-r", $Runtime,
+        "-o", $projectPublishRoot
+    )
+
+    if ($FrameworkDependent) {
+        $publishArgs += "--no-self-contained"
+    }
+    else {
+        $publishArgs += "--self-contained"
+    }
+
+    if ($Version) {
+        $publishArgs += "/p:Version=$Version"
+    }
+
+    Write-Host "Publishing $ProjectName for $Runtime..."
+    & dotnet @publishArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish for $ProjectName failed with exit code $LASTEXITCODE."
+    }
+
+    Copy-Item -Path (Join-Path $projectPublishRoot "*") -Destination $publishRoot -Recurse -Force
 }
 
-if ($Version) {
-    $publishArgs += "/p:Version=$Version"
-}
-
-Write-Host "Publishing daemon for $Runtime..."
-& dotnet @publishArgs
-
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet publish failed with exit code $LASTEXITCODE."
-}
+Publish-ProjectOutput -ProjectPath $daemonProject -ProjectName "daemon"
+Publish-ProjectOutput -ProjectPath $guiProject -ProjectName "gui"
+Publish-ProjectOutput -ProjectPath $adminProject -ProjectName "admin"
 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install-service.ps1") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "uninstall-service.ps1") -Destination $packageRoot

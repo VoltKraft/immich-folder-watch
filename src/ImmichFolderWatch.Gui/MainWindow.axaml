@@ -1,0 +1,157 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ImmichFolderWatch.Gui.MainWindow"
+        Title="Immich Folder Watch"
+        Width="1080"
+        Height="820"
+        MinWidth="900"
+        MinHeight="700">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0"
+            Padding="24"
+            Background="#10314B"
+            CornerRadius="0,0,24,24">
+      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="Immich Folder Watch"
+                   FontSize="30"
+                   FontWeight="Bold"
+                   Foreground="#F9F6EE" />
+        <TextBlock Grid.Row="1"
+                   Margin="0,8,0,0"
+                   Text="{Binding StatusHeadline}"
+                   FontSize="16"
+                   Foreground="#D7E6E2"
+                   TextWrapping="Wrap" />
+        <TextBlock Grid.Row="0"
+                   Grid.RowSpan="2"
+                   Grid.Column="1"
+                   Width="260"
+                   HorizontalAlignment="Right"
+                   Text="{Binding StatusDetails}"
+                   Foreground="#C6D7D1"
+                   TextAlignment="Right"
+                   TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="18" Spacing="18">
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Immich" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Server API URL" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ImmichServerApiUrl}" Watermark="https://immich.example.com/api" />
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="API Key" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ImmichApiKey}" Watermark="IMMICH_API_KEY" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+              <TextBlock Grid.Column="0" Classes="section-title" Text="Watch Sources" Margin="0" />
+              <Button Grid.Column="1" Click="AddSourceButton_Click" Content="Add Source" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Sources}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Margin="0,0,0,12"
+                          Padding="14"
+                          Background="#F1ECE1"
+                          CornerRadius="12"
+                          BorderBrush="#D9D3C5"
+                          BorderThickness="1">
+                    <Grid ColumnDefinitions="*,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="Album Name" />
+                      <Button Grid.Row="0"
+                              Grid.Column="2"
+                              HorizontalAlignment="Right"
+                              Click="RemoveSourceButton_Click"
+                              Content="Remove" />
+
+                      <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Screenshots" />
+                      <CheckBox Grid.Row="1"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding IncludeSubdirectories}"
+                                Content="Include subdirectories" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Watch Behavior" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Top" Text="Extensions" />
+              <TextBox Grid.Row="0"
+                       Grid.Column="1"
+                       Height="110"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       Text="{Binding ExtensionsText}"
+                       Watermark=".png&#10;.jpg&#10;.heic" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Batch Interval Seconds" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BatchIntervalSeconds}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Max Batch Size" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MaxBatchSize}" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="File Ready Timeout Seconds" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding FileReadyTimeoutSeconds}" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Retry Max Attempts" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding RetryMaxAttempts}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Logging And Retry" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Retry Base Delay (ms)" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding RetryBaseDelayMilliseconds}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Log Level" />
+              <ComboBox Grid.Row="1"
+                        Grid.Column="1"
+                        ItemsSource="{Binding AvailableLogLevels}"
+                        SelectedItem="{Binding LoggingLevel}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Log Directory" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding LogDirectory}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2"
+            Padding="18"
+            Background="#F0E9DB">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+        <Button Grid.Row="0" Grid.Column="0" Click="RefreshStatusButton_Click" Content="Refresh Status" />
+        <Button Grid.Row="0" Grid.Column="1" Click="OpenLogsButton_Click" Content="Open Logs" />
+        <Button Grid.Row="0" Grid.Column="2" Classes="primary" Click="SaveAndVerifyButton_Click" Content="Save And Verify" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="0"
+                   Grid.ColumnSpan="4"
+                   Margin="0,12,0,0"
+                   Text="{Binding OperationMessage}"
+                   TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

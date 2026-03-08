@@ -1,10 +1,10 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Version](https://img.shields.io/badge/Version-1.0.1-blue)](./CHANGELOG.md)
+                               [![Version](https://img.shields.io/badge/Version-1.0.1-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-`immich-folder-watch` is a Windows service for people who want local folders to feed new files into Immich automatically.
+`immich-folder-watch` is a Windows service with a desktop configuration app for people who want local folders to feed new files into Immich automatically.
 
 It watches one or more folders, waits until newly written files are stable, and uploads them through the Immich HTTP API. This keeps uploads inside Immich's normal ingestion path instead of copying files directly into storage.
 
@@ -16,6 +16,7 @@ It watches one or more folders, waits until newly written files are stable, and 
 - Assigns uploads to the configured album name per watched source
 - Retries transient upload failures automatically
 - Runs as a Windows service with logs and config kept on disk
+- Ships a GUI to edit config, verify it, inspect service state, and open logs quickly
 
 ## What It Does Not Do
 
@@ -32,10 +33,10 @@ The supported install path today is the Windows MSI from the GitHub Releases pag
 
 1. Download the latest `.msi` from Releases.
 2. Install it with administrative rights.
-3. Edit `C:\Program Files\Immich Folder Watch\config\config.yaml`.
-4. Reboot, or optionally start the service once manually to validate the config immediately.
+3. Open the installed `Immich Folder Watch` desktop shortcut.
+4. Edit the config in the GUI and use **Save And Verify**.
 
-The service is installed as **Automatic (Delayed Start)** by default.
+The MSI installs the service in the **Disabled** state first. The GUI only enables **Automatic (Delayed Start)** and starts it after the config has been verified successfully.
 
 Detailed setup instructions:
 - [Windows Installation](./docs/installation-windows.md)

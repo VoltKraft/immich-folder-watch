@@ -50,9 +50,12 @@ function Get-InstallerPlatform {
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
+$guiProject = Join-Path $repoRoot "src\ImmichFolderWatch.Gui\ImmichFolderWatch.Gui.csproj"
+$adminProject = Join-Path $repoRoot "src\ImmichFolderWatch.Admin\ImmichFolderWatch.Admin.csproj"
 $wixProject = Join-Path $PSScriptRoot "ImmichFolderWatch.Setup.wixproj"
 $windowsConfigTemplatePath = Join-Path $PSScriptRoot "config.windows.example.yaml"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
+$publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
 $msiOutputRoot = Join-Path $OutputRoot "package"
 $installerVersion = Get-InstallerVersion -Value $Version
 $installerPlatform = Get-InstallerPlatform -Value $Runtime
@@ -68,29 +71,48 @@ if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
 }
 
 Reset-Directory -Path $publishRoot
+Reset-Directory -Path $publishTempRoot
 Reset-Directory -Path $msiOutputRoot
 
-$publishArgs = @(
-    "publish",
-    $daemonProject,
-    "-c", $Configuration,
-    "-r", $Runtime,
-    "-o", $publishRoot
-)
+function Publish-ProjectOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName
+    )
 
-if ($FrameworkDependent) {
-    $publishArgs += "--no-self-contained"
-}
-else {
-    $publishArgs += "--self-contained"
+    $projectPublishRoot = Join-Path $publishTempRoot $ProjectName
+    Reset-Directory -Path $projectPublishRoot
+
+    $publishArgs = @(
+        "publish",
+        $ProjectPath,
+        "-c", $Configuration,
+        "-r", $Runtime,
+        "-o", $projectPublishRoot
+    )
+
+    if ($FrameworkDependent) {
+        $publishArgs += "--no-self-contained"
+    }
+    else {
+        $publishArgs += "--self-contained"
+    }
+
+    Write-Host "Publishing $ProjectName for MSI packaging..."
+    & dotnet @publishArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish for $ProjectName failed with exit code $LASTEXITCODE."
+    }
+
+    Copy-Item -Path (Join-Path $projectPublishRoot "*") -Destination $publishRoot -Recurse -Force
 }
 
-Write-Host "Publishing daemon for MSI packaging..."
-& dotnet @publishArgs
-
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet publish failed with exit code $LASTEXITCODE."
-}
+Publish-ProjectOutput -ProjectPath $daemonProject -ProjectName "daemon"
+Publish-ProjectOutput -ProjectPath $guiProject -ProjectName "gui"
+Publish-ProjectOutput -ProjectPath $adminProject -ProjectName "admin"
 
 $buildArgs = @(
     "build",
