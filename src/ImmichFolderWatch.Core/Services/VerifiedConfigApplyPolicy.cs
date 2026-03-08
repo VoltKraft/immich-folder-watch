@@ -8,16 +8,6 @@ public static class VerifiedConfigApplyPolicy
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        if (!snapshot.IsInitialVerificationCompleted)
-        {
-            return new ConfigApplyActions
-            {
-                SetAutomaticDelayedStart = true,
-                StartService = true,
-                MarkInitialVerificationCompleted = true,
-            };
-        }
-
         if (snapshot.State == ServiceRunState.Running)
         {
             return new ConfigApplyActions

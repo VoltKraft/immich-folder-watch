@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-03-08
+
+### Changed
+- The Windows GUI no longer stores a separate `activation-state.json` file for persistent verified state.
+- The service status panel no longer shows `Verified: Yes/No`.
+- GUI saves now treat local validation plus the Immich check as the authoritative verification step each time the config is applied.
+- README and Windows installation docs now describe the save-time verification flow without a persistent verified-state file.
+- Project, packaging, and release defaults updated to `1.2.3`.
+
 ## [1.2.2] - 2026-03-08
 
 ### Added

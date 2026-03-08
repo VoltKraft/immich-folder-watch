@@ -12,8 +12,6 @@ public sealed class ServiceStatusSnapshot
 
     public bool DelayedAutoStart { get; init; }
 
-    public bool IsInitialVerificationCompleted { get; init; }
-
     public string ConfigPath { get; init; } = string.Empty;
 
     public string LogDirectory { get; init; } = string.Empty;

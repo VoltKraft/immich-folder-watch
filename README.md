@@ -1,7 +1,7 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Version](https://img.shields.io/badge/Version-1.2.2-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.3-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `immich-folder-watch` is a Windows service with a desktop configuration app for people who want local folders to feed new files into Immich automatically.
@@ -36,7 +36,7 @@ The supported install path today is the Windows MSI from the GitHub Releases pag
 3. Open the installed `Immich Folder Watch` desktop shortcut.
 4. Review the automatic Immich access check in the GUI, then edit the config and use **Save and Start**.
 
-The MSI installs the service in the **Manual** state first. Updates also normalize previously disabled installs back to **Manual** so the GUI and admin helper can start the service again. The GUI auto-refreshes the displayed service state, shows the app version in the header, keeps `logging.logDirectory` on an absolute path, runs a one-time access check for the configured Immich URL, API key, and required permissions, and uses **Save and Start** or **Save and Restart** to apply the config. Any GUI-triggered start or restart switches the service to **Automatic (Delayed Start)** unless the service is already configured as **Automatic** without delay.
+The MSI installs the service in the **Manual** state first. Updates also normalize previously disabled installs back to **Manual** so the GUI and admin helper can start the service again. The GUI auto-refreshes the displayed service state, shows the app version in the header, keeps `logging.logDirectory` on an absolute path, runs a one-time access check for the configured Immich URL, API key, and required permissions, and verifies the config again every time you use **Save and Start** or **Save and Restart**. There is no separate persistent `activation-state.json` anymore. Any GUI-triggered start or restart switches the service to **Automatic (Delayed Start)** unless the service is already configured as **Automatic** without delay.
 
 Detailed setup instructions:
 - [Windows Installation](./docs/installation-windows.md)

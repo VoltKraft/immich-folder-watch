@@ -28,12 +28,10 @@ internal static class Bootstrapper
 
         var baseDirectory = AppContext.BaseDirectory;
         var configPath = InstallationPaths.GetConfigPath(baseDirectory);
-        var activationStateStore = new FileActivationStateStore(InstallationPaths.GetActivationStatePath(baseDirectory));
         var serviceManager = new WindowsServiceManager(
             InstallationPaths.ServiceName,
             configPath,
-            InstallationPaths.GetLogDirectory(baseDirectory),
-            activationStateStore);
+            InstallationPaths.GetLogDirectory(baseDirectory));
 
         AdminCommandResponse response;
         try
@@ -44,7 +42,7 @@ internal static class Bootstrapper
                 AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully.", normalizeStartupType: true),
                 AdminCommandKind.StopService => ExecuteServiceAction(serviceManager, static manager => manager.StopService(), "Service stopped successfully."),
                 AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully.", normalizeStartupType: true),
-                AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager, activationStateStore),
+                AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager),
                 _ => throw new InvalidOperationException($"Unsupported command kind: {command.Kind}"),
             };
         }
@@ -97,8 +95,7 @@ internal static class Bootstrapper
     private static async Task<AdminCommandResponse> ApplyVerifiedConfigAsync(
         AdminCommand command,
         string targetConfigPath,
-        IServiceManager serviceManager,
-        IActivationStateStore activationStateStore)
+        IServiceManager serviceManager)
     {
         ArgumentNullException.ThrowIfNull(command.SourcePath);
 
@@ -117,11 +114,7 @@ internal static class Bootstrapper
 
         var actions = VerifiedConfigApplyPolicy.Determine(statusBefore);
 
-        if (actions.SetAutomaticDelayedStart)
-        {
-            serviceManager.SetStartupType(ServiceStartupType.Automatic, delayedAutoStart: true);
-        }
-        else if (actions.StartService || actions.RestartService)
+        if (actions.StartService || actions.RestartService)
         {
             NormalizeStartupForUserInitiatedStartOrRestart(serviceManager, statusBefore);
         }
@@ -134,11 +127,6 @@ internal static class Bootstrapper
         if (actions.RestartService)
         {
             serviceManager.RestartService();
-        }
-
-        if (actions.MarkInitialVerificationCompleted)
-        {
-            activationStateStore.MarkInitialVerificationCompleted();
         }
 
         return new AdminCommandResponse
@@ -260,19 +248,16 @@ internal sealed class WindowsServiceManager : IServiceManager
     private readonly string _serviceName;
     private readonly string _configPath;
     private readonly string _defaultLogDirectory;
-    private readonly IActivationStateStore _activationStateStore;
     private readonly string _scExePath;
 
     public WindowsServiceManager(
         string serviceName,
         string configPath,
-        string defaultLogDirectory,
-        IActivationStateStore activationStateStore)
+        string defaultLogDirectory)
     {
         _serviceName = serviceName;
         _configPath = Path.GetFullPath(configPath);
         _defaultLogDirectory = Path.GetFullPath(defaultLogDirectory);
-        _activationStateStore = activationStateStore;
         _scExePath = Path.Combine(Environment.SystemDirectory, "sc.exe");
     }
 
@@ -286,7 +271,6 @@ internal sealed class WindowsServiceManager : IServiceManager
             State = exists ? GetRunState() : ServiceRunState.NotInstalled,
             StartupType = exists ? GetStartupType() : ServiceStartupType.Unknown,
             DelayedAutoStart = exists && GetDelayedAutoStart(),
-            IsInitialVerificationCompleted = _activationStateStore.IsInitialVerificationCompleted(),
             ConfigPath = _configPath,
             LogDirectory = ResolveLogDirectory(),
         };

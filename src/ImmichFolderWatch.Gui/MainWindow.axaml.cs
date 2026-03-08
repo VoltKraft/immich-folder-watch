@@ -131,7 +131,6 @@ public sealed partial class MainWindow : Window
 
         ViewModel.StatusDetails =
             $"Startup: {startupType}{Environment.NewLine}" +
-            $"Verified: {(status.IsInitialVerificationCompleted ? "Yes" : "No")}{Environment.NewLine}" +
             $"Config: {status.ConfigPath}{Environment.NewLine}" +
             $"Logs: {status.LogDirectory}";
 

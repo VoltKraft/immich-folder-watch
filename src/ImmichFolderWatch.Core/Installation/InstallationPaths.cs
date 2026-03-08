@@ -25,11 +25,6 @@ public static class InstallationPaths
         return Path.Combine(GetInstallRoot(baseDirectory), "logs");
     }
 
-    public static string GetActivationStatePath(string baseDirectory)
-    {
-        return Path.Combine(GetConfigDirectory(baseDirectory), "activation-state.json");
-    }
-
     public static string GetAdminExecutablePath(string baseDirectory)
     {
         return Path.Combine(baseDirectory, "ImmichFolderWatch.Admin.exe");

@@ -33,7 +33,6 @@ Installed layout:
 
 - `%ProgramFiles%\Immich Folder Watch\bin\`
 - `%ProgramFiles%\Immich Folder Watch\config\config.yaml`
-- `%ProgramFiles%\Immich Folder Watch\config\activation-state.json`
 - `%ProgramFiles%\Immich Folder Watch\logs\`
 
 If an older Windows install still uses `%ProgramFiles%\Immich Folder Watch\config.yaml`, the bundle installer and MSI migrate it to `config\config.yaml` automatically when the new path does not exist yet.
@@ -59,7 +58,8 @@ Recommended first install:
 "${env:ProgramFiles}\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```
 
-The GUI edits `%ProgramFiles%\Immich Folder Watch\config\config.yaml`, verifies the config against Immich, then enables `Automatic (Delayed Start)` and starts the service on the first successful save.
+The GUI edits `%ProgramFiles%\Immich Folder Watch\config\config.yaml`, verifies the config against Immich whenever you save, then starts or restarts the service as needed.
+No separate persistent activation-state file is stored anymore.
 The GUI also refreshes service status automatically and keeps `logging.logDirectory` on an absolute path. Use **Use Install Default** if you want to reset logs to `%ProgramFiles%\Immich Folder Watch\logs`.
 
 If you explicitly want the script to leave the service enabled immediately:
@@ -103,7 +103,6 @@ Installer behavior:
 - Installs binaries into `%ProgramFiles%\Immich Folder Watch\bin\`
 - Installs the GUI, daemon, and admin helper executables together
 - Creates `%ProgramFiles%\Immich Folder Watch\config\config.yaml` from the Windows installer template on first install
-- Stores GUI activation state in `%ProgramFiles%\Immich Folder Watch\config\activation-state.json`
 - Creates `%ProgramFiles%\Immich Folder Watch\logs\`
 - Migrates a legacy root-level `config.yaml` into `config\config.yaml` when needed
 - Registers the `ImmichFolderWatch` Windows service as `Manual`
@@ -111,7 +110,7 @@ Installer behavior:
 - Creates a desktop shortcut for the GUI
 - Preserves `config\` and `logs\` on uninstall
 
-After the MSI install, open the GUI from the desktop shortcut and use **Save And Verify**:
+After the MSI install, open the GUI from the desktop shortcut and use **Save and Start**:
 
 ```powershell
 "C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"

@@ -23,10 +23,9 @@ This directory contains the first automation-friendly Windows packaging flow.
 
 - `bin\`: daemon, GUI, admin helper, and runtime files
 - `config\config.yaml`: active Windows config
-- `config\activation-state.json`: first-verification state used by the GUI
 - `logs\`: daemon logs
 
-The GUI keeps the service status refreshed automatically and stores `logging.logDirectory` as an absolute path.
+The GUI keeps the service status refreshed automatically, verifies the config on every save, and stores `logging.logDirectory` as an absolute path.
 
 Legacy installs with `config.yaml` in the install root are migrated to `config\config.yaml` automatically if the structured config does not exist yet.
 If both files exist, `config\config.yaml` stays active and the legacy file is left untouched.
