@@ -60,6 +60,7 @@ Recommended first install:
 ```
 
 The GUI edits `%ProgramFiles%\Immich Folder Watch\config\config.yaml`, verifies the config against Immich, then enables `Automatic (Delayed Start)` and starts the service on the first successful save.
+The GUI also refreshes service status automatically and keeps `logging.logDirectory` on an absolute path. Use **Use Install Default** if you want to reset logs to `%ProgramFiles%\Immich Folder Watch\logs`.
 
 If you explicitly want the script to leave the service enabled immediately:
 
@@ -115,3 +116,5 @@ After the MSI install, open the GUI from the desktop shortcut and use **Save And
 ```powershell
 "C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```
+
+The status panel refreshes automatically while the GUI is open, and the log-folder field is stored as an absolute path.

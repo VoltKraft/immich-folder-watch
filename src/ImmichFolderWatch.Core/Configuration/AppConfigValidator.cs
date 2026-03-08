@@ -117,5 +117,9 @@ public static class AppConfigValidator
         {
             errors.Add("logging.logDirectory is required.");
         }
+        else if (!Path.IsPathFullyQualified(config.Logging.LogDirectory))
+        {
+            errors.Add("logging.logDirectory must be an absolute path.");
+        }
     }
 }

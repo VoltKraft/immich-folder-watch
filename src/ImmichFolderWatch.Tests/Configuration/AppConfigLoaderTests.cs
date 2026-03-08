@@ -12,6 +12,7 @@ public sealed class AppConfigLoaderTests
         try
         {
             var watchPath = tempRoot.FullName.Replace("\\", "\\\\", StringComparison.Ordinal);
+            var logPath = Path.Combine(tempRoot.FullName, "logs").Replace("\\", "\\\\", StringComparison.Ordinal);
             var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
 
             var yaml = $"""
@@ -34,7 +35,7 @@ retry:
   baseDelayMilliseconds: 250
 logging:
   level: "Debug"
-  logDirectory: "logs"
+  logDirectory: "{logPath}"
 """;
 
             File.WriteAllText(configPath, yaml);

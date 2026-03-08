@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-08
+
+### Added
+- Windows desktop GUI for guided configuration, log-folder adjustment, quick log access, and service activation after successful verification.
+- Automatic service-status refresh in the GUI so state changes are reflected without reloading the form.
+
+### Changed
+- Windows installations now keep the service disabled until the first successful **Save And Verify** from the GUI.
+- `logging.logDirectory` is now expected to be configured as an absolute path, and the GUI upgrades existing relative values to an absolute path when opened.
+- Project, packaging, and release defaults updated to `1.1.0`.
+- README and Windows-facing documentation now describe the GUI-first setup flow.
+
 ## [1.0.1] - 2026-03-07
 
 ### Added

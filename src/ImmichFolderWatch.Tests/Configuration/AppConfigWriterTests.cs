@@ -13,6 +13,7 @@ public sealed class AppConfigWriterTests
         {
             var configDirectory = Directory.CreateDirectory(Path.Combine(tempRoot.FullName, "config"));
             var configPath = Path.Combine(configDirectory.FullName, "config.yaml");
+            var logDirectory = Path.Combine(tempRoot.FullName, "logs");
 
             var config = new AppConfig
             {
@@ -49,7 +50,7 @@ public sealed class AppConfigWriterTests
                 Logging = new LoggingSettings
                 {
                     Level = "Warning",
-                    LogDirectory = "../logs",
+                    LogDirectory = logDirectory,
                 },
             };
 
@@ -68,9 +69,9 @@ public sealed class AppConfigWriterTests
             Assert.Equal(20, roundTrip.Watch.MaxBatchSize);
             Assert.Equal(40, roundTrip.Watch.FileReadyTimeoutSeconds);
             Assert.Equal("Warning", roundTrip.Logging.Level);
-            Assert.Equal("../logs", roundTrip.Logging.LogDirectory);
+            Assert.Equal(logDirectory, roundTrip.Logging.LogDirectory);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "watch")), normalized.Watch.Sources[0].Path);
-            Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "logs")), normalized.Logging.LogDirectory);
+            Assert.Equal(Path.GetFullPath(logDirectory), normalized.Logging.LogDirectory);
         }
         finally
         {

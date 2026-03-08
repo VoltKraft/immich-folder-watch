@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Core.Installation;
 using ImmichFolderWatch.Gui.Models;
 
 namespace ImmichFolderWatch.Gui.ViewModels;
@@ -15,7 +16,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _retryMaxAttempts = "5";
     private string _retryBaseDelayMilliseconds = "500";
     private string _loggingLevel = "Information";
-    private string _logDirectory = "../logs";
+    private string _logDirectory = GetDefaultLogDirectory();
     private string _statusHeadline = "Loading current service status...";
     private string _statusDetails = string.Empty;
     private string _operationMessage = string.Empty;
@@ -128,7 +129,7 @@ public sealed class MainWindowViewModel : BindableBase
         RetryMaxAttempts = config.Retry.MaxAttempts.ToString();
         RetryBaseDelayMilliseconds = config.Retry.BaseDelayMilliseconds.ToString();
         LoggingLevel = string.IsNullOrWhiteSpace(config.Logging.Level) ? "Information" : config.Logging.Level;
-        LogDirectory = string.IsNullOrWhiteSpace(config.Logging.LogDirectory) ? "../logs" : config.Logging.LogDirectory;
+        LogDirectory = string.IsNullOrWhiteSpace(config.Logging.LogDirectory) ? GetDefaultLogDirectory() : config.Logging.LogDirectory;
 
         Sources.Clear();
         foreach (var source in config.Watch.Sources)
@@ -156,6 +157,16 @@ public sealed class MainWindowViewModel : BindableBase
         var fileReadyTimeoutSeconds = ParsePositiveInteger(FileReadyTimeoutSeconds, "watch.fileReadyTimeoutSeconds", errorList);
         var retryMaxAttempts = ParsePositiveInteger(RetryMaxAttempts, "retry.maxAttempts", errorList);
         var retryBaseDelayMilliseconds = ParsePositiveInteger(RetryBaseDelayMilliseconds, "retry.baseDelayMilliseconds", errorList);
+        var logDirectory = LogDirectory.Trim();
+
+        if (string.IsNullOrWhiteSpace(logDirectory))
+        {
+            errorList.Add("logging.logDirectory is required.");
+        }
+        else if (!Path.IsPathFullyQualified(logDirectory))
+        {
+            errorList.Add("logging.logDirectory must be an absolute path.");
+        }
 
         config = new AppConfig
         {
@@ -185,7 +196,7 @@ public sealed class MainWindowViewModel : BindableBase
             Logging = new LoggingSettings
             {
                 Level = LoggingLevel.Trim(),
-                LogDirectory = LogDirectory.Trim(),
+                LogDirectory = logDirectory,
             },
         };
 
@@ -219,5 +230,10 @@ public sealed class MainWindowViewModel : BindableBase
         return value
             .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(extension => !string.IsNullOrWhiteSpace(extension));
+    }
+
+    private static string GetDefaultLogDirectory()
+    {
+        return Path.GetFullPath(InstallationPaths.GetLogDirectory(AppContext.BaseDirectory));
     }
 }

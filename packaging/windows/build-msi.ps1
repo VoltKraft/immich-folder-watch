@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot = (Join-Path $PSScriptRoot "..\..\artifacts\windows\msi"),
-    [string]$Version = "1.0.1",
+    [string]$Version = "1.1.0",
     [switch]$FrameworkDependent
 )
 
@@ -32,7 +32,7 @@ function Get-InstallerVersion {
         return "$($Matches[1]).$($Matches[2]).$($Matches[3])"
     }
 
-    throw "Installer version must start with a numeric major.minor.patch value. Example: 1.0.1"
+    throw "Installer version must start with a numeric major.minor.patch value. Example: 1.1.0"
 }
 
 function Get-InstallerPlatform {

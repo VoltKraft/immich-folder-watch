@@ -13,12 +13,12 @@ The repository is prepared for WinGet, but the package is not publicly installab
 
 ## One-Time Bootstrap
 
-1. Publish release `1.0.1` so the MSI is available on GitHub Releases.
+1. Publish release `1.1.0` so the MSI is available on GitHub Releases.
 2. On a Windows machine, install `wingetcreate`.
 3. Run:
 
 ```powershell
-wingetcreate new "https://github.com/VoltKraft/immich-folder-watch/releases/download/v1.0.1/immich-folder-watch-1.0.1-win-x64.msi" --submit
+wingetcreate new "https://github.com/VoltKraft/immich-folder-watch/releases/download/v1.1.0/immich-folder-watch-1.1.0-win-x64.msi" --submit
 ```
 
 4. Use the metadata from `package.metadata.json` when `wingetcreate` prompts for package details.
