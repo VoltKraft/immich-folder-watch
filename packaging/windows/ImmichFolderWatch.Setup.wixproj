@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Package</OutputType>
     <InstallerPlatform Condition="'$(InstallerPlatform)' == ''">x64</InstallerPlatform>
-    <InstallerVersion Condition="'$(InstallerVersion)' == ''">1.2.1</InstallerVersion>
+    <InstallerVersion Condition="'$(InstallerVersion)' == ''">1.2.2</InstallerVersion>
     <PublishedAppDir Condition="'$(PublishedAppDir)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\windows\msi\publish\win-x64</PublishedAppDir>
     <ExampleConfigPath Condition="'$(ExampleConfigPath)' == ''">$(MSBuildProjectDirectory)\config.windows.example.yaml</ExampleConfigPath>
     <OutputName Condition="'$(OutputName)' == ''">immich-folder-watch</OutputName>

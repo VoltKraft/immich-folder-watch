@@ -31,15 +31,21 @@
                    Foreground="#D7E6E2"
                    TextWrapping="Wrap" />
 
-        <TextBlock Grid.Row="0"
-                   Grid.RowSpan="2"
-                   Grid.Column="1"
-                   Width="290"
-                   HorizontalAlignment="Right"
-                   Text="{Binding StatusDetails}"
-                   Foreground="#C6D7D1"
-                   TextAlignment="Right"
-                   TextWrapping="Wrap" />
+        <StackPanel Grid.Row="0"
+                    Grid.RowSpan="2"
+                    Grid.Column="1"
+                    Width="290"
+                    HorizontalAlignment="Right"
+                    Spacing="6">
+          <TextBlock Text="{Binding ProductVersionText}"
+                     Foreground="#F9F6EE"
+                     FontWeight="SemiBold"
+                     TextAlignment="Right" />
+          <TextBlock Text="{Binding StatusDetails}"
+                     Foreground="#C6D7D1"
+                     TextAlignment="Right"
+                     TextWrapping="Wrap" />
+        </StackPanel>
       </Grid>
     </Border>
 
@@ -244,28 +250,31 @@
     <Border Grid.Row="2"
             Padding="18"
             Background="#F0E9DB">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
-        <Button Grid.Row="0" Grid.Column="0" Click="RefreshStatusButton_Click" Content="Refresh Now" />
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
         <Button Grid.Row="0"
-                Grid.Column="1"
+                Grid.Column="0"
                 IsVisible="{Binding ShowStartServiceButton}"
                 Click="StartServiceButton_Click"
                 Content="Start Service" />
         <Button Grid.Row="0"
-                Grid.Column="2"
+                Grid.Column="1"
                 IsVisible="{Binding ShowStopServiceButton}"
                 Click="StopServiceButton_Click"
                 Content="Stop Service" />
         <Button Grid.Row="0"
-                Grid.Column="3"
+                Grid.Column="2"
                 IsVisible="{Binding ShowRestartServiceButton}"
                 Click="RestartServiceButton_Click"
                 Content="Restart Service" />
-        <Button Grid.Row="0" Grid.Column="4" Click="OpenLogsButton_Click" Content="Open Logs" />
-        <Button Grid.Row="0" Grid.Column="5" Classes="primary" Click="SaveAndVerifyButton_Click" Content="Save And Verify" />
+        <Button Grid.Row="0" Grid.Column="3" Click="OpenLogsButton_Click" Content="Open Logs" />
+        <Button Grid.Row="0"
+                Grid.Column="4"
+                Classes="primary"
+                Click="SaveActionButton_Click"
+                Content="{Binding SaveActionButtonText}" />
         <TextBlock Grid.Row="1"
                    Grid.Column="0"
-                   Grid.ColumnSpan="7"
+                   Grid.ColumnSpan="6"
                    Margin="0,12,0,0"
                    Text="{Binding OperationMessage}"
                    TextWrapping="Wrap" />

@@ -41,9 +41,9 @@ internal static class Bootstrapper
             response = command.Kind switch
             {
                 AdminCommandKind.Status => CreateStatusResponse(serviceManager),
-                AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully."),
+                AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully.", normalizeStartupType: true),
                 AdminCommandKind.StopService => ExecuteServiceAction(serviceManager, static manager => manager.StopService(), "Service stopped successfully."),
-                AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully."),
+                AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully.", normalizeStartupType: true),
                 AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager, activationStateStore),
                 _ => throw new InvalidOperationException($"Unsupported command kind: {command.Kind}"),
             };
@@ -72,8 +72,18 @@ internal static class Bootstrapper
         };
     }
 
-    private static AdminCommandResponse ExecuteServiceAction(IServiceManager serviceManager, Action<IServiceManager> action, string successMessage)
+    private static AdminCommandResponse ExecuteServiceAction(
+        IServiceManager serviceManager,
+        Action<IServiceManager> action,
+        string successMessage,
+        bool normalizeStartupType = false)
     {
+        var statusBefore = serviceManager.GetStatus();
+        if (normalizeStartupType)
+        {
+            NormalizeStartupForUserInitiatedStartOrRestart(serviceManager, statusBefore);
+        }
+
         action(serviceManager);
 
         return new AdminCommandResponse
@@ -111,6 +121,10 @@ internal static class Bootstrapper
         {
             serviceManager.SetStartupType(ServiceStartupType.Automatic, delayedAutoStart: true);
         }
+        else if (actions.StartService || actions.RestartService)
+        {
+            NormalizeStartupForUserInitiatedStartOrRestart(serviceManager, statusBefore);
+        }
 
         if (actions.StartService)
         {
@@ -130,9 +144,34 @@ internal static class Bootstrapper
         return new AdminCommandResponse
         {
             Success = true,
-            Message = "Configuration applied successfully.",
+            Message = BuildApplyVerifiedConfigSuccessMessage(actions),
             Status = serviceManager.GetStatus(),
         };
+    }
+
+    private static string BuildApplyVerifiedConfigSuccessMessage(ConfigApplyActions actions)
+    {
+        if (actions.RestartService)
+        {
+            return "Configuration applied and service restarted successfully.";
+        }
+
+        if (actions.StartService)
+        {
+            return "Configuration applied and service started successfully.";
+        }
+
+        return "Configuration applied successfully.";
+    }
+
+    private static void NormalizeStartupForUserInitiatedStartOrRestart(IServiceManager serviceManager, ServiceStatusSnapshot snapshot)
+    {
+        if (!UserInitiatedServiceStartPolicy.ShouldSwitchToAutomaticDelayedStart(snapshot))
+        {
+            return;
+        }
+
+        serviceManager.SetStartupType(ServiceStartupType.Automatic, delayedAutoStart: true);
     }
 
     private static void CopyConfigAtomically(string sourcePath, string targetPath)

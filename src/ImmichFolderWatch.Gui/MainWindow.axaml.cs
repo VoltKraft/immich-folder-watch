@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
         _statusRefreshTimer.Tick += StatusRefreshTimer_Tick;
 
         ViewModel = new MainWindowViewModel();
+        ViewModel.ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}";
         DataContext = ViewModel;
         Closed += MainWindow_Closed;
     }
@@ -349,11 +350,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void RefreshStatusButton_Click(object? sender, RoutedEventArgs e)
-    {
-        await RefreshStatusAsync(updateOperationMessageOnFailure: true, successMessage: "Service status refreshed.");
-    }
-
     private async void VerifyImmichButton_Click(object? sender, RoutedEventArgs e)
     {
         await RunImmichAccessCheckAsync(updateOperationMessage: true);
@@ -419,7 +415,7 @@ public sealed partial class MainWindow : Window
         ViewModel.OperationMessage = "Log directory reset to the default install path.";
     }
 
-    private async void SaveAndVerifyButton_Click(object? sender, RoutedEventArgs e)
+    private async void SaveActionButton_Click(object? sender, RoutedEventArgs e)
     {
         if (!ViewModel.TryCreateConfig(out var draftConfig, out var inputErrors))
         {
@@ -455,7 +451,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            ViewModel.OperationMessage = "Applying configuration with elevated permissions...";
+            ViewModel.OperationMessage = BuildSaveActionPendingMessage();
             var response = await _adminCliClient.ApplyVerifiedConfigAsync(tempConfigPath, CancellationToken.None);
             ApplyStatus(response.Status);
             if (response.Success)
@@ -487,6 +483,13 @@ public sealed partial class MainWindow : Window
                 File.Delete(tempConfigPath);
             }
         }
+    }
+
+    private string BuildSaveActionPendingMessage()
+    {
+        return ViewModel.SaveActionButtonText == "Save and Restart"
+            ? "Applying configuration with elevated permissions and restarting the service..."
+            : "Applying configuration with elevated permissions and starting the service...";
     }
 
     private async void StatusRefreshTimer_Tick(object? sender, EventArgs e)

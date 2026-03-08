@@ -45,7 +45,7 @@ public sealed class VerifiedConfigApplyPolicyTests
     }
 
     [Fact]
-    public void Determine_StoppedVerifiedService_DoesNothing()
+    public void Determine_StoppedVerifiedService_StartsService()
     {
         var snapshot = new ServiceStatusSnapshot
         {
@@ -58,7 +58,7 @@ public sealed class VerifiedConfigApplyPolicyTests
         var actions = VerifiedConfigApplyPolicy.Determine(snapshot);
 
         Assert.False(actions.SetAutomaticDelayedStart);
-        Assert.False(actions.StartService);
+        Assert.True(actions.StartService);
         Assert.False(actions.RestartService);
         Assert.False(actions.MarkInitialVerificationCompleted);
     }

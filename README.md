@@ -1,7 +1,7 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Version](https://img.shields.io/badge/Version-1.2.1-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.2-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `immich-folder-watch` is a Windows service with a desktop configuration app for people who want local folders to feed new files into Immich automatically.
@@ -16,7 +16,7 @@ It watches one or more folders, waits until newly written files are stable, and 
 - Assigns uploads to the configured album name per watched source
 - Retries transient upload failures automatically
 - Runs as a Windows service with logs and config kept on disk
-- Ships a GUI to edit config, verify Immich URL/API key/permissions, auto-refresh service state, start/stop/restart the service, adjust the log folder, and open logs quickly
+- Ships a GUI to edit config, show the current app version, verify Immich URL/API key/permissions, auto-refresh service state, save and start or restart the service, start/stop/restart the service, adjust the log folder, and open logs quickly
 
 ## What It Does Not Do
 
@@ -34,9 +34,9 @@ The supported install path today is the Windows MSI from the GitHub Releases pag
 1. Download the latest `.msi` from Releases.
 2. Install it with administrative rights.
 3. Open the installed `Immich Folder Watch` desktop shortcut.
-4. Review the automatic Immich access check in the GUI, then edit the config and use **Save And Verify**.
+4. Review the automatic Immich access check in the GUI, then edit the config and use **Save and Start**.
 
-The MSI installs the service in the **Manual** state first. Updates also normalize previously disabled installs back to **Manual** so the GUI and admin helper can start the service again. The GUI auto-refreshes the displayed service state, keeps `logging.logDirectory` on an absolute path, runs a one-time access check for the configured Immich URL, API key, and required permissions, and only enables **Automatic (Delayed Start)** plus starts the service after the config has been verified successfully.
+The MSI installs the service in the **Manual** state first. Updates also normalize previously disabled installs back to **Manual** so the GUI and admin helper can start the service again. The GUI auto-refreshes the displayed service state, shows the app version in the header, keeps `logging.logDirectory` on an absolute path, runs a one-time access check for the configured Immich URL, API key, and required permissions, and uses **Save and Start** or **Save and Restart** to apply the config. Any GUI-triggered start or restart switches the service to **Automatic (Delayed Start)** unless the service is already configured as **Automatic** without delay.
 
 Detailed setup instructions:
 - [Windows Installation](./docs/installation-windows.md)

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-03-08
+
+### Added
+- The Windows GUI now shows the current app version in the header.
+
+### Changed
+- The main GUI action now switches between **Save and Start** and **Save and Restart** based on the current service state.
+- Saving a verified config now starts an already verified but currently stopped service again.
+- GUI-triggered service start and restart actions now normalize the service startup type to `Automatic (Delayed Start)`, unless the service is already configured as `Automatic` without delay.
+- Project, packaging, and release defaults updated to `1.2.2`.
+
 ## [1.2.1] - 2026-03-08
 
 ### Fixed

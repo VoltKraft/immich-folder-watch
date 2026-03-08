@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
+    <ProjectReference Include="../ImmichFolderWatch.Gui/ImmichFolderWatch.Gui.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
   </ItemGroup>
 </Project>

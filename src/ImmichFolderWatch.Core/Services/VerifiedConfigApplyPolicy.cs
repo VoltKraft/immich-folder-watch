@@ -26,6 +26,14 @@ public static class VerifiedConfigApplyPolicy
             };
         }
 
+        if (snapshot.State == ServiceRunState.Stopped)
+        {
+            return new ConfigApplyActions
+            {
+                StartService = true,
+            };
+        }
+
         return new ConfigApplyActions();
     }
 }

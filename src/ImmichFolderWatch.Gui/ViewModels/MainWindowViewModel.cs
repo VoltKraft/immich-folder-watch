@@ -22,7 +22,9 @@ public sealed class MainWindowViewModel : BindableBase
     private string _statusDetails = string.Empty;
     private string _serviceBadgeText = "Loading";
     private string _serviceBadgeBackground = "#D7E8FF";
+    private string _productVersionText = string.Empty;
     private string _operationMessage = string.Empty;
+    private string _saveActionButtonText = "Save and Start";
     private string _immichUrlStatusText = "Not checked";
     private string _immichUrlStatusBackground = "#E0E3E8";
     private string _immichApiKeyStatusText = "Not checked";
@@ -153,6 +155,18 @@ public sealed class MainWindowViewModel : BindableBase
     {
         get => _operationMessage;
         set => SetProperty(ref _operationMessage, value);
+    }
+
+    public string ProductVersionText
+    {
+        get => _productVersionText;
+        set => SetProperty(ref _productVersionText, value);
+    }
+
+    public string SaveActionButtonText
+    {
+        get => _saveActionButtonText;
+        set => SetProperty(ref _saveActionButtonText, value);
     }
 
     public string ImmichUrlStatusText
@@ -362,6 +376,9 @@ public sealed class MainWindowViewModel : BindableBase
         ShowStartServiceButton = showStart;
         ShowStopServiceButton = showStop;
         ShowRestartServiceButton = showRestart;
+        SaveActionButtonText = status is { State: ServiceRunState.Running }
+            ? "Save and Restart"
+            : "Save and Start";
     }
 
     private void ResetImmichCheckStatus()
