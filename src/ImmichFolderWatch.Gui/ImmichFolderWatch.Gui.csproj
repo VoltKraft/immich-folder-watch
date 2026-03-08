@@ -16,8 +16,4 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <AvaloniaXaml Include="**\*.axaml" />
-  </ItemGroup>
 </Project>
