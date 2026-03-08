@@ -47,12 +47,22 @@ $installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
 $packageRoot = [System.IO.Path]::GetFullPath($PackageRoot)
 $packageBinRoot = Join-Path $packageRoot "bin"
 $installBinRoot = Join-Path $installRootFull "bin"
-$installConfigRoot = Join-Path $installRootFull "config"
-$installLogsRoot = Join-Path $installRootFull "logs"
+$programDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
+if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $programDataRoot = $env:ProgramData
+    }
+    else {
+        $programDataRoot = "C:\ProgramData"
+    }
+}
+
+$dataRoot = Join-Path $programDataRoot "Immich Folder Watch"
+$installLogsRoot = Join-Path $dataRoot "logs"
 $serviceExecutable = Join-Path $installBinRoot "ImmichFolderWatch.Daemon.exe"
+$adminExecutable = Join-Path $installBinRoot "ImmichFolderWatch.Admin.exe"
 $exampleConfigPath = Join-Path $packageRoot "config.example.yaml"
-$legacyConfigPath = Join-Path $installRootFull "config.yaml"
-$defaultConfigPath = Join-Path $installConfigRoot "config.yaml"
+$defaultConfigPath = Join-Path $dataRoot "config.yaml"
 $useDefaultConfigPath = -not $PSBoundParameters.ContainsKey("ConfigPath")
 
 function Remove-LegacyRootAppArtifacts {
@@ -157,7 +167,7 @@ if ($StartService -and $StartupType -eq "Disabled") {
 
 New-Item -ItemType Directory -Path $installRootFull -Force | Out-Null
 New-Item -ItemType Directory -Path $installBinRoot -Force | Out-Null
-New-Item -ItemType Directory -Path $installConfigRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $dataRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $installLogsRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 
@@ -167,17 +177,16 @@ Get-ChildItem -LiteralPath $installBinRoot -Force -ErrorAction SilentlyContinue 
 }
 Copy-Item -Path (Join-Path $packageBinRoot "*") -Destination $installBinRoot -Recurse -Force
 
-$createdExampleConfig = $false
-if ($useDefaultConfigPath -and (Test-Path -LiteralPath $legacyConfigPath)) {
-    if (Test-Path -LiteralPath $defaultConfigPath) {
-        Write-Warning "Legacy config remains at $legacyConfigPath because $defaultConfigPath already exists. The service will use $defaultConfigPath."
-    }
-    else {
-        Move-Item -LiteralPath $legacyConfigPath -Destination $defaultConfigPath
-        Write-Host "Migrated legacy config to $defaultConfigPath"
+$migrationTriggered = $false
+if ($useDefaultConfigPath) {
+    $migrationTriggered = $true
+    & $adminExecutable migrate-data-layout --legacy-install-root $installRootFull | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "ImmichFolderWatch.Admin migrate-data-layout failed with exit code $LASTEXITCODE."
     }
 }
 
+$createdExampleConfig = $false
 if (-not (Test-Path -LiteralPath $configPathFull)) {
     Copy-Item -LiteralPath $exampleConfigPath -Destination $configPathFull
     $createdExampleConfig = $true
@@ -232,3 +241,6 @@ Write-Host "Installed service '$ServiceName'."
 Write-Host "Binaries: $installBinRoot"
 Write-Host "Config:   $configPathFull"
 Write-Host "Logs:     $installLogsRoot"
+if ($migrationTriggered) {
+    Write-Host "Data root: $dataRoot"
+}

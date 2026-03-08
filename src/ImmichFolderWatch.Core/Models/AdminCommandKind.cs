@@ -7,4 +7,5 @@ public enum AdminCommandKind
     StartService = 2,
     StopService = 3,
     RestartService = 4,
+    MigrateDataLayout = 5,
 }

@@ -10,6 +10,7 @@ Usage:
   ImmichFolderWatch.Admin start-service [--result-file <path>]
   ImmichFolderWatch.Admin stop-service [--result-file <path>]
   ImmichFolderWatch.Admin restart-service [--result-file <path>]
+  ImmichFolderWatch.Admin migrate-data-layout [--legacy-install-root <path>] [--result-file <path>]
   ImmichFolderWatch.Admin apply-verified-config --source <path> [--result-file <path>]
 """;
 
@@ -59,6 +60,11 @@ Usage:
             return TryParseSimpleCommand(AdminCommandKind.RestartService, args[1..], out command, out message);
         }
 
+        if (string.Equals(commandName, "migrate-data-layout", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryParseMigrateDataLayout(args[1..], out command, out message);
+        }
+
         if (string.Equals(commandName, "apply-verified-config", StringComparison.OrdinalIgnoreCase))
         {
             return TryParseApplyVerifiedConfig(args[1..], out command, out message);
@@ -73,18 +79,44 @@ Usage:
         command = null;
         message = string.Empty;
 
-        if (!TryReadCommonOptions(args, requiresSource: false, out var sourcePath, out var resultFilePath, out message))
+        if (!TryReadCommonOptions(args, requiresSource: false, out var sourcePath, out var resultFilePath, out _, out message))
         {
             return false;
         }
 
         if (!string.IsNullOrWhiteSpace(sourcePath))
         {
-            message = $"The status command does not accept --source.{Environment.NewLine}{Usage}";
+            message = $"The {GetCommandName(kind)} command does not accept --source.{Environment.NewLine}{Usage}";
             return false;
         }
 
         command = new AdminCommand(kind, null, resultFilePath);
+        return true;
+    }
+
+    private static bool TryParseMigrateDataLayout(string[] args, out AdminCommand? command, out string message)
+    {
+        command = null;
+        message = string.Empty;
+
+        if (!TryReadCommonOptions(
+                args,
+                requiresSource: false,
+                out var sourcePath,
+                out var resultFilePath,
+                out var legacyInstallRoot,
+                out message))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourcePath))
+        {
+            message = $"The migrate-data-layout command does not accept --source.{Environment.NewLine}{Usage}";
+            return false;
+        }
+
+        command = new AdminCommand(AdminCommandKind.MigrateDataLayout, null, resultFilePath, legacyInstallRoot);
         return true;
     }
 
@@ -93,7 +125,7 @@ Usage:
         command = null;
         message = string.Empty;
 
-        if (!TryReadCommonOptions(args, requiresSource: true, out var sourcePath, out var resultFilePath, out message))
+        if (!TryReadCommonOptions(args, requiresSource: true, out var sourcePath, out var resultFilePath, out _, out message))
         {
             return false;
         }
@@ -107,10 +139,12 @@ Usage:
         bool requiresSource,
         out string? sourcePath,
         out string? resultFilePath,
+        out string? legacyInstallRoot,
         out string message)
     {
         sourcePath = null;
         resultFilePath = null;
+        legacyInstallRoot = null;
         message = string.Empty;
 
         for (var i = 0; i < args.Length; i++)
@@ -126,6 +160,16 @@ Usage:
             if (string.Equals(argument, "--source", StringComparison.OrdinalIgnoreCase))
             {
                 if (!TryReadValue(args, ref i, "--source", out sourcePath, out message))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (string.Equals(argument, "--legacy-install-root", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, "--legacy-install-root", out legacyInstallRoot, out message))
                 {
                     return false;
                 }
@@ -176,5 +220,19 @@ Usage:
     {
         return string.Equals(value, "--help", StringComparison.OrdinalIgnoreCase)
             || string.Equals(value, "-h", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetCommandName(AdminCommandKind kind)
+    {
+        return kind switch
+        {
+            AdminCommandKind.Status => "status",
+            AdminCommandKind.StartService => "start-service",
+            AdminCommandKind.StopService => "stop-service",
+            AdminCommandKind.RestartService => "restart-service",
+            AdminCommandKind.MigrateDataLayout => "migrate-data-layout",
+            AdminCommandKind.ApplyVerifiedConfig => "apply-verified-config",
+            _ => kind.ToString(),
+        };
     }
 }

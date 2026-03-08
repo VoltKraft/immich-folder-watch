@@ -2,7 +2,7 @@ namespace ImmichFolderWatch.Core.Configuration;
 
 public static class AppConfigValidator
 {
-    private const string ExampleApiKeyPlaceholder = "REPLACE_WITH_IMMICH_API_KEY";
+    public const string ExampleApiKeyPlaceholder = "REPLACE_WITH_IMMICH_API_KEY";
 
     public static IReadOnlyList<string> Validate(AppConfig config)
     {

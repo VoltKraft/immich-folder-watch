@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.ServiceProcess;
+using System.Text;
 using System.Text.Json;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
@@ -28,10 +29,12 @@ internal static class Bootstrapper
 
         var baseDirectory = AppContext.BaseDirectory;
         var configPath = InstallationPaths.GetConfigPath(baseDirectory);
+        var defaultLogDirectory = InstallationPaths.GetLogDirectory(baseDirectory);
+        var migrationService = new WindowsDataMigrationService();
         var serviceManager = new WindowsServiceManager(
             InstallationPaths.ServiceName,
             configPath,
-            InstallationPaths.GetLogDirectory(baseDirectory));
+            defaultLogDirectory);
 
         AdminCommandResponse response;
         try
@@ -42,7 +45,8 @@ internal static class Bootstrapper
                 AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully.", normalizeStartupType: true),
                 AdminCommandKind.StopService => ExecuteServiceAction(serviceManager, static manager => manager.StopService(), "Service stopped successfully."),
                 AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully.", normalizeStartupType: true),
-                AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager),
+                AdminCommandKind.MigrateDataLayout => MigrateDataLayout(command, configPath, defaultLogDirectory, baseDirectory, migrationService, serviceManager),
+                AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager, migrationService),
                 _ => throw new InvalidOperationException($"Unsupported command kind: {command.Kind}"),
             };
         }
@@ -95,11 +99,10 @@ internal static class Bootstrapper
     private static async Task<AdminCommandResponse> ApplyVerifiedConfigAsync(
         AdminCommand command,
         string targetConfigPath,
-        IServiceManager serviceManager)
+        IServiceManager serviceManager,
+        WindowsDataMigrationService migrationService)
     {
         ArgumentNullException.ThrowIfNull(command.SourcePath);
-
-        await Task.Run(() => CopyConfigAtomically(command.SourcePath, targetConfigPath));
 
         var statusBefore = serviceManager.GetStatus();
         if (!statusBefore.Exists)
@@ -112,7 +115,26 @@ internal static class Bootstrapper
             };
         }
 
+        var existingConfig = TryLoadConfig(targetConfigPath);
+        var draftConfig = new AppConfigLoader().Load(command.SourcePath);
+        var previousLogDirectory = existingConfig?.Logging.LogDirectory ?? statusBefore.LogDirectory;
+        var logDirectoryChanged = !string.IsNullOrWhiteSpace(previousLogDirectory)
+            && !PathEquals(previousLogDirectory, draftConfig.Logging.LogDirectory);
+
         var actions = VerifiedConfigApplyPolicy.Determine(statusBefore);
+
+        if (logDirectoryChanged && statusBefore.State == ServiceRunState.Running)
+        {
+            serviceManager.StopService();
+        }
+
+        await Task.Run(() => CopyConfigAtomically(command.SourcePath, targetConfigPath));
+
+        WindowsDataMigrationResult? logMigrationResult = null;
+        if (logDirectoryChanged)
+        {
+            logMigrationResult = migrationService.MigrateLogFiles(previousLogDirectory, draftConfig.Logging.LogDirectory);
+        }
 
         if (actions.StartService || actions.RestartService)
         {
@@ -132,24 +154,85 @@ internal static class Bootstrapper
         return new AdminCommandResponse
         {
             Success = true,
-            Message = BuildApplyVerifiedConfigSuccessMessage(actions),
+            Message = BuildApplyVerifiedConfigSuccessMessage(actions, logMigrationResult),
             Status = serviceManager.GetStatus(),
         };
     }
 
-    private static string BuildApplyVerifiedConfigSuccessMessage(ConfigApplyActions actions)
+    private static string BuildApplyVerifiedConfigSuccessMessage(ConfigApplyActions actions, WindowsDataMigrationResult? logMigrationResult)
     {
+        var builder = new StringBuilder();
+
         if (actions.RestartService)
         {
-            return "Configuration applied and service restarted successfully.";
+            builder.Append("Configuration applied and service restarted successfully.");
         }
-
-        if (actions.StartService)
+        else if (actions.StartService)
         {
-            return "Configuration applied and service started successfully.";
+            builder.Append("Configuration applied and service started successfully.");
+        }
+        else
+        {
+            builder.Append("Configuration applied successfully.");
         }
 
-        return "Configuration applied successfully.";
+        AppendLogMigrationDetails(builder, logMigrationResult);
+        return builder.ToString();
+    }
+
+    private static AdminCommandResponse MigrateDataLayout(
+        AdminCommand command,
+        string configPath,
+        string defaultLogDirectory,
+        string baseDirectory,
+        WindowsDataMigrationService migrationService,
+        IServiceManager serviceManager)
+    {
+        var legacyInstallRoot = string.IsNullOrWhiteSpace(command.LegacyInstallRoot)
+            ? InstallationPaths.GetInstallRoot(baseDirectory)
+            : Path.GetFullPath(command.LegacyInstallRoot);
+
+        var migrationResult = migrationService.MigrateLegacyWindowsData(configPath, defaultLogDirectory, legacyInstallRoot);
+        var message = BuildDataLayoutMigrationMessage(migrationResult, configPath, defaultLogDirectory);
+
+        return new AdminCommandResponse
+        {
+            Success = true,
+            Message = message,
+            Status = serviceManager.GetStatus(),
+        };
+    }
+
+    private static string BuildDataLayoutMigrationMessage(
+        WindowsDataMigrationResult migrationResult,
+        string configPath,
+        string logDirectory)
+    {
+        if (migrationResult.UsedExistingConfig)
+        {
+            var existingLayoutMessage = new StringBuilder($"ProgramData data layout already initialized at {configPath}.");
+            AppendLogMigrationDetails(existingLayoutMessage, migrationResult);
+            return existingLayoutMessage.ToString();
+        }
+
+        if (!migrationResult.ConfigMigrated && migrationResult.MovedLogFileCount == 0 && migrationResult.SkippedLogFileCount == 0)
+        {
+            return "No legacy Program Files data needed to be migrated.";
+        }
+
+        var builder = new StringBuilder("ProgramData data layout migration completed successfully.");
+        if (migrationResult.ConfigMigrated)
+        {
+            builder.Append($" Config migrated to {configPath}.");
+        }
+
+        if (migrationResult.RewroteLogDirectoryToDefault)
+        {
+            builder.Append($" logging.logDirectory was updated to {logDirectory}.");
+        }
+
+        AppendLogMigrationDetails(builder, migrationResult);
+        return builder.ToString();
     }
 
     private static void NormalizeStartupForUserInitiatedStartOrRestart(IServiceManager serviceManager, ServiceStatusSnapshot snapshot)
@@ -160,6 +243,42 @@ internal static class Bootstrapper
         }
 
         serviceManager.SetStartupType(ServiceStartupType.Automatic, delayedAutoStart: true);
+    }
+
+    private static AppConfig? TryLoadConfig(string configPath)
+    {
+        if (!File.Exists(configPath))
+        {
+            return null;
+        }
+
+        return new AppConfigLoader().Load(configPath);
+    }
+
+    private static bool PathEquals(string left, string right)
+    {
+        return string.Equals(
+            Path.GetFullPath(left),
+            Path.GetFullPath(right),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AppendLogMigrationDetails(StringBuilder builder, WindowsDataMigrationResult? migrationResult)
+    {
+        if (migrationResult is null)
+        {
+            return;
+        }
+
+        if (migrationResult.MovedLogFileCount > 0)
+        {
+            builder.Append($" Moved {migrationResult.MovedLogFileCount} log file(s).");
+        }
+
+        if (migrationResult.SkippedLogFileCount > 0)
+        {
+            builder.Append($" Skipped {migrationResult.SkippedLogFileCount} conflicting log file(s) already present in the target directory.");
+        }
     }
 
     private static void CopyConfigAtomically(string sourcePath, string targetPath)

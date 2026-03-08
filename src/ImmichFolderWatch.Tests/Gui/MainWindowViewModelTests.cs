@@ -1,4 +1,5 @@
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Gui.ViewModels;
 
 namespace ImmichFolderWatch.Tests.Gui;
@@ -31,5 +32,88 @@ public sealed class MainWindowViewModelTests
         });
 
         Assert.Equal("Save and Start", viewModel.SaveActionButtonText);
+    }
+
+    [Fact]
+    public void ImmichApiKey_UsesMaskedDisplay_ForRealKeyByDefault()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.ImmichApiKey = "demo-key";
+
+        Assert.True(viewModel.ShouldMaskImmichApiKey);
+        Assert.False(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowImmichApiKeyRevealButton);
+        Assert.False(viewModel.IsImmichApiKeyPlaceholder);
+    }
+
+    [Fact]
+    public void ImmichApiKey_UsesPlainDisplay_ForPlaceholderValue()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.ImmichApiKey = AppConfigValidator.ExampleApiKeyPlaceholder;
+
+        Assert.False(viewModel.ShouldMaskImmichApiKey);
+        Assert.True(viewModel.RevealImmichApiKey);
+        Assert.False(viewModel.ShowImmichApiKeyRevealButton);
+        Assert.True(viewModel.IsImmichApiKeyPlaceholder);
+    }
+
+    [Fact]
+    public void ToggleImmichApiKeyVisibility_TogglesMasking_ForRealKey()
+    {
+        var viewModel = new MainWindowViewModel
+        {
+            ImmichApiKey = "demo-key",
+        };
+
+        viewModel.ToggleImmichApiKeyVisibility();
+
+        Assert.False(viewModel.ShouldMaskImmichApiKey);
+        Assert.True(viewModel.RevealImmichApiKey);
+
+        viewModel.ToggleImmichApiKeyVisibility();
+
+        Assert.True(viewModel.ShouldMaskImmichApiKey);
+        Assert.False(viewModel.RevealImmichApiKey);
+    }
+
+    [Fact]
+    public void ImmichApiKey_SwitchingFromPlaceholderToRealKey_ReenablesMasking()
+    {
+        var viewModel = new MainWindowViewModel
+        {
+            ImmichApiKey = AppConfigValidator.ExampleApiKeyPlaceholder,
+        };
+
+        viewModel.ImmichApiKey = "demo-key";
+
+        Assert.True(viewModel.ShouldMaskImmichApiKey);
+        Assert.False(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowImmichApiKeyRevealButton);
+    }
+
+    [Fact]
+    public void Load_ResetsImmichApiKeyVisibility_ForRealKey()
+    {
+        var viewModel = new MainWindowViewModel
+        {
+            ImmichApiKey = "demo-key",
+        };
+
+        viewModel.ToggleImmichApiKeyVisibility();
+        viewModel.Load(new AppConfig
+        {
+            Immich = new ImmichSettings
+            {
+                ServerApiUrl = "https://immich.example.com/api",
+                ApiKey = "demo-key",
+            },
+        });
+
+        Assert.True(viewModel.ShouldMaskImmichApiKey);
+        Assert.False(viewModel.RevealImmichApiKey);
+        Assert.True(viewModel.ShowImmichApiKeyRevealButton);
     }
 }

@@ -33,4 +33,4 @@
 - Console logs include timestamps and structured fields.
 - File logs are written to `logging.logDirectory`.
 - Configure `logging.logDirectory` as an absolute path.
-- The Windows GUI can reset `logging.logDirectory` back to the install default if needed.
+- The Windows GUI can reset `logging.logDirectory` back to `C:\ProgramData\Immich Folder Watch\logs` if needed.

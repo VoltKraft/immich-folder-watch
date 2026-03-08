@@ -34,17 +34,20 @@
         <StackPanel Grid.Row="0"
                     Grid.RowSpan="2"
                     Grid.Column="1"
-                    Width="290"
                     HorizontalAlignment="Right"
+                    Margin="24,0,0,0"
                     Spacing="6">
           <TextBlock Text="{Binding ProductVersionText}"
                      Foreground="#F9F6EE"
                      FontWeight="SemiBold"
-                     TextAlignment="Right" />
+                     TextAlignment="Right"
+                     TextWrapping="NoWrap"
+                     TextTrimming="CharacterEllipsis" />
           <TextBlock Text="{Binding StatusDetails}"
                      Foreground="#C6D7D1"
                      TextAlignment="Right"
-                     TextWrapping="Wrap" />
+                     TextWrapping="NoWrap"
+                     TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </Grid>
     </Border>
@@ -73,10 +76,26 @@
               </Border>
 
               <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="API Key" />
-              <TextBox Grid.Row="1"
-                       Grid.Column="1"
-                       Text="{Binding ImmichApiKey}"
-                       Watermark="IMMICH_API_KEY" />
+              <Grid Grid.Row="1"
+                    Grid.Column="1"
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         Text="{Binding ImmichApiKey}"
+                         Watermark="{Binding ImmichApiKeyPlaceholderText}"
+                         PasswordChar="●"
+                         RevealPassword="{Binding RevealImmichApiKey}" />
+                <Button Grid.Column="1"
+                        MinWidth="38"
+                        Padding="8,6"
+                        IsVisible="{Binding ShowImmichApiKeyRevealButton}"
+                        Click="ToggleApiKeyVisibilityButton_Click"
+                        ToolTip.Tip="{Binding ImmichApiKeyRevealToolTip}">
+                  <PathIcon Width="16"
+                            Height="16"
+                            Data="M12,17C7,17 2.73,13.89 1,9.5C2.73,5.11 7,2 12,2C17,2 21.27,5.11 23,9.5C21.27,13.89 17,17 12,17ZM12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
+                </Button>
+              </Grid>
               <Border Grid.Row="1"
                       Grid.Column="2"
                       Classes="status-pill"
@@ -230,7 +249,7 @@
               <TextBox Grid.Row="2"
                        Grid.Column="1"
                        Text="{Binding LogDirectory}"
-                       Watermark="C:\Program Files\Immich Folder Watch\logs" />
+                       Watermark="C:\ProgramData\Immich Folder Watch\logs" />
               <Button Grid.Row="2"
                       Grid.Column="2"
                       Click="UseDefaultLogDirectoryButton_Click"

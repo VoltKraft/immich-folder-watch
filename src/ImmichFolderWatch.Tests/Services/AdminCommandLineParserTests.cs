@@ -86,6 +86,29 @@ public sealed class AdminCommandLineParserTests
     }
 
     [Fact]
+    public void TryParse_MigrateDataLayoutCommand_Succeeds()
+    {
+        var args = new[]
+        {
+            "migrate-data-layout",
+            "--legacy-install-root",
+            @"C:\Program Files\Immich Folder Watch",
+            "--result-file",
+            "result.json",
+        };
+
+        var parsed = AdminCommandLineParser.TryParse(args, out var command, out var message, out var helpRequested);
+
+        Assert.True(parsed);
+        Assert.False(helpRequested);
+        Assert.Equal(string.Empty, message);
+        Assert.NotNull(command);
+        Assert.Equal(AdminCommandKind.MigrateDataLayout, command!.Kind);
+        Assert.Equal(@"C:\Program Files\Immich Folder Watch", command.LegacyInstallRoot);
+        Assert.Equal("result.json", command.ResultFilePath);
+    }
+
+    [Fact]
     public void TryParse_ApplyVerifiedConfigWithoutSource_Fails()
     {
         var args = new[]

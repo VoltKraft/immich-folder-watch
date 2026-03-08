@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-08
+
+### Changed
+- Windows installations now store the active config under `C:\ProgramData\Immich Folder Watch\config.yaml` and logs under `C:\ProgramData\Immich Folder Watch\logs\`, while binaries remain under `%ProgramFiles%\Immich Folder Watch\bin\`.
+- Windows upgrades and script-based installs now migrate the old default Program Files config and log layout into the new ProgramData location automatically.
+- Successful GUI saves now migrate existing log files when `logging.logDirectory` changes, keeping already existing target files and skipping only conflicting source files.
+- The GUI header status/details area now uses the available width instead of clipping or wrapping early at a fixed narrow width.
+- The GUI now masks real Immich API keys by default, adds a reveal toggle, and keeps the example placeholder visible in plain text so it is obvious when it still needs to be replaced.
+- Project, packaging, and release defaults updated to `1.3.0`.
+
 ## [1.2.3] - 2026-03-08
 
 ### Changed

@@ -354,6 +354,11 @@ public sealed partial class MainWindow : Window
         await RunImmichAccessCheckAsync(updateOperationMessage: true);
     }
 
+    private void ToggleApiKeyVisibilityButton_Click(object? sender, RoutedEventArgs e)
+    {
+        ViewModel.ToggleImmichApiKeyVisibility();
+    }
+
     private async void StartServiceButton_Click(object? sender, RoutedEventArgs e)
     {
         await ExecuteServiceActionAsync(_adminCliClient.StartServiceAsync, "Starting service...");
@@ -411,7 +416,7 @@ public sealed partial class MainWindow : Window
     private void UseDefaultLogDirectoryButton_Click(object? sender, RoutedEventArgs e)
     {
         ViewModel.LogDirectory = Path.GetFullPath(InstallationPaths.GetLogDirectory(AppContext.BaseDirectory));
-        ViewModel.OperationMessage = "Log directory reset to the default install path.";
+        ViewModel.OperationMessage = "Log directory reset to the default ProgramData path.";
     }
 
     private async void SaveActionButton_Click(object? sender, RoutedEventArgs e)

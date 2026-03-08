@@ -25,6 +25,12 @@
       </DirectorySearch>
     </Property>
 
+    <Property Id="PROGRAMDATACONFIGPATH">
+      <DirectorySearch Id="ProgramDataConfigDirectorySearch" Path="[DATADIR]">
+        <FileSearch Id="ProgramDataConfigFileSearch" Name="config.yaml" />
+      </DirectorySearch>
+    </Property>
+
     <Property Id="EXISTINGSERVICESTART">
       <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\ImmichFolderWatch" Name="Start" Type="raw" />
     </Property>
@@ -36,7 +42,10 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch">
         <Directory Id="BINDIR" Name="bin" />
-        <Directory Id="CONFIGDIR" Name="config" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATADIR" Name="Immich Folder Watch">
         <Directory Id="LOGSDIR" Name="logs" />
       </Directory>
     </StandardDirectory>
@@ -47,7 +56,6 @@
       <ComponentRef Id="AdminExecutableComponent" />
       <ComponentRef Id="LogsDirectoryComponent" />
       <ComponentRef Id="ConfigFileComponent" />
-      <ComponentRef Id="LegacyConfigMigrationComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
   </Package>
@@ -75,7 +83,7 @@
         Type="ownProcess"
         Start="demand"
         ErrorControl="normal"
-        Arguments='--config "[CONFIGDIR]config.yaml"'>
+        Arguments='--config "[DATADIR]config.yaml"'>
       </ServiceInstall>
 
       <ServiceControl
@@ -123,40 +131,16 @@
   <Fragment>
     <Component
       Id="ConfigFileComponent"
-      Directory="CONFIGDIR"
+      Directory="DATADIR"
       Guid="*"
       Permanent="yes"
       NeverOverwrite="yes"
-      Condition="NOT LEGACYCONFIGPATH OR STRUCTUREDCONFIGPATH">
+      Condition="NOT PROGRAMDATACONFIGPATH AND NOT LEGACYCONFIGPATH AND NOT STRUCTUREDCONFIGPATH">
       <File
         Id="DefaultConfigFile"
         Source="$(ExampleConfigPath)"
         Name="config.yaml"
         KeyPath="yes" />
-    </Component>
-  </Fragment>
-
-  <Fragment>
-    <Component
-      Id="LegacyConfigMigrationComponent"
-      Directory="CONFIGDIR"
-      Guid="*"
-      Permanent="yes"
-      Condition="LEGACYCONFIGPATH AND NOT STRUCTUREDCONFIGPATH">
-      <CreateFolder />
-      <RegistryValue
-        Root="HKLM"
-        Key="Software\ImmichFolderWatch"
-        Name="LegacyConfigMigrated"
-        Type="integer"
-        Value="1"
-        KeyPath="yes" />
-      <CopyFile
-        Id="MoveLegacyConfigFile"
-        SourceProperty="LEGACYCONFIGPATH"
-        DestinationDirectory="CONFIGDIR"
-        DestinationName="config.yaml"
-        Delete="yes" />
     </Component>
   </Fragment>
 
@@ -181,6 +165,19 @@
   </Fragment>
 
   <Fragment>
+    <SetProperty
+      Id="RunDataLayoutMigration"
+      Value='"[BINDIR]ImmichFolderWatch.Admin.exe" migrate-data-layout --legacy-install-root "[INSTALLFOLDER]"'
+      Before="RunDataLayoutMigration"
+      Sequence="execute" />
+    <CustomAction
+      Id="RunDataLayoutMigration"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="check" />
+
     <SetProperty
       Id="PreserveUpgradeAutomaticDelayedStart"
       Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= delayed-auto'
@@ -234,6 +231,10 @@
       Return="check" />
 
     <InstallExecuteSequence>
+      <Custom
+        Action="RunDataLayoutMigration"
+        After="InstallFiles"
+        Condition="NOT REMOVE" />
       <Custom
         Action="PreserveUpgradeAutomaticDelayedStart"
         After="InstallServices"

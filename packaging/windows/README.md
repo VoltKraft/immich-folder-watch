@@ -6,7 +6,7 @@ This directory contains the first automation-friendly Windows packaging flow.
 
 - `build-installer.ps1`: publishes the daemon, GUI, and admin helper and assembles a distributable bundle
 - `build-msi.ps1`: publishes the daemon, GUI, and admin helper and builds an `.msi` installer with WiX
-- `config.windows.example.yaml`: Windows-specific install template that targets the absolute install log path
+- `config.windows.example.yaml`: Windows-specific install template that targets the ProgramData log path
 - `install-service.ps1`: installs or updates the service on a Windows host
 - `uninstall-service.ps1`: removes the service and installed binaries
 - `service-management.ps1`: shared helpers for robust stop/delete/wait service operations
@@ -21,11 +21,11 @@ This directory contains the first automation-friendly Windows packaging flow.
 
 ## Default Layout
 
-- `bin\`: daemon, GUI, admin helper, and runtime files
-- `config\config.yaml`: active Windows config
-- `logs\`: daemon logs
+- `%ProgramFiles%\Immich Folder Watch\bin\`: daemon, GUI, admin helper, and runtime files
+- `C:\ProgramData\Immich Folder Watch\config.yaml`: active Windows config
+- `C:\ProgramData\Immich Folder Watch\logs\`: daemon logs
 
-The GUI keeps the service status refreshed automatically, verifies the config on every save, and stores `logging.logDirectory` as an absolute path.
+The GUI keeps the service status refreshed automatically, verifies the config on every save, stores `logging.logDirectory` as an absolute path, and migrates existing logs when the configured log directory changes successfully through the GUI.
 
-Legacy installs with `config.yaml` in the install root are migrated to `config\config.yaml` automatically if the structured config does not exist yet.
-If both files exist, `config\config.yaml` stays active and the legacy file is left untouched.
+Legacy installs with `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml` are migrated to `C:\ProgramData\Immich Folder Watch\config.yaml` automatically.
+If the old config still used `%ProgramFiles%\Immich Folder Watch\logs\`, those logs are moved to `C:\ProgramData\Immich Folder Watch\logs\` as well.

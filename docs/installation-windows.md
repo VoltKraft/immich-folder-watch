@@ -32,11 +32,10 @@ This bundle is mainly for development, recovery, or unattended internal deployme
 Installed layout:
 
 - `%ProgramFiles%\Immich Folder Watch\bin\`
-- `%ProgramFiles%\Immich Folder Watch\config\config.yaml`
-- `%ProgramFiles%\Immich Folder Watch\logs\`
+- `C:\ProgramData\Immich Folder Watch\config.yaml`
+- `C:\ProgramData\Immich Folder Watch\logs\`
 
-If an older Windows install still uses `%ProgramFiles%\Immich Folder Watch\config.yaml`, the bundle installer and MSI migrate it to `config\config.yaml` automatically when the new path does not exist yet.
-If both files already exist, `config\config.yaml` stays active and the legacy root-level file is left untouched.
+If an older Windows install still uses `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml`, the bundle installer and MSI migrate that config into `C:\ProgramData\Immich Folder Watch\config.yaml` automatically. Old default logs from `%ProgramFiles%\Immich Folder Watch\logs\` are moved to `C:\ProgramData\Immich Folder Watch\logs\` when the config still used the old default log path.
 
 ## Install as a Service
 
@@ -58,9 +57,9 @@ Recommended first install:
 "${env:ProgramFiles}\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```
 
-The GUI edits `%ProgramFiles%\Immich Folder Watch\config\config.yaml`, verifies the config against Immich whenever you save, then starts or restarts the service as needed.
+The GUI edits `C:\ProgramData\Immich Folder Watch\config.yaml`, masks real API keys by default while still allowing a reveal toggle, keeps the example placeholder visible in plain text, verifies the config against Immich whenever you save, then starts or restarts the service as needed.
 No separate persistent activation-state file is stored anymore.
-The GUI also refreshes service status automatically and keeps `logging.logDirectory` on an absolute path. Use **Use Install Default** if you want to reset logs to `%ProgramFiles%\Immich Folder Watch\logs`.
+The GUI also refreshes service status automatically and keeps `logging.logDirectory` on an absolute path. Use **Use Install Default** if you want to reset logs to `C:\ProgramData\Immich Folder Watch\logs`. If you change the log directory in the GUI and save successfully, existing logs are migrated into the new location. When files with the same name already exist there, the existing target files win and conflicting old files are left in place.
 
 If you explicitly want the script to leave the service enabled immediately:
 
@@ -82,7 +81,7 @@ For unattended deployment with a prepared config and immediate first start:
 .\uninstall-service.ps1
 ```
 
-By default, the `config\` and `logs\` folders under `%ProgramFiles%\Immich Folder Watch` are preserved. Pass `-RemoveData` if you want a full cleanup.
+By default, `C:\ProgramData\Immich Folder Watch\` is preserved. Pass `-RemoveData` if you want a full cleanup of both the ProgramData data and any remaining legacy default data under `%ProgramFiles%\Immich Folder Watch`.
 The script now waits for the service to actually disappear before removing files, so reinstall after uninstall is more reliable.
 
 The packaging scripts live under `packaging/windows`.
@@ -102,13 +101,14 @@ Installer behavior:
 
 - Installs binaries into `%ProgramFiles%\Immich Folder Watch\bin\`
 - Installs the GUI, daemon, and admin helper executables together
-- Creates `%ProgramFiles%\Immich Folder Watch\config\config.yaml` from the Windows installer template on first install
-- Creates `%ProgramFiles%\Immich Folder Watch\logs\`
-- Migrates a legacy root-level `config.yaml` into `config\config.yaml` when needed
+- Creates `C:\ProgramData\Immich Folder Watch\config.yaml` from the Windows installer template on first install
+- Creates `C:\ProgramData\Immich Folder Watch\logs\`
+- Migrates the old default config from `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml` into ProgramData when needed
+- Moves old default logs from `%ProgramFiles%\Immich Folder Watch\logs\` into ProgramData when the previous config still used that default path
 - Registers the `ImmichFolderWatch` Windows service as `Manual`
 - Preserves the current service startup mode across upgrades, except that previously disabled installs are normalized to `Manual`
 - Creates a desktop shortcut for the GUI
-- Preserves `config\` and `logs\` on uninstall
+- Preserves `C:\ProgramData\Immich Folder Watch\` on uninstall
 
 After the MSI install, open the GUI from the desktop shortcut and use **Save and Start**:
 
@@ -116,4 +116,4 @@ After the MSI install, open the GUI from the desktop shortcut and use **Save and
 "C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
 ```
 
-The status panel refreshes automatically while the GUI is open, and the log-folder field is stored as an absolute path.
+The status panel refreshes automatically while the GUI is open, the log-folder field is stored as an absolute path, and successful GUI saves migrate logs when you move `logging.logDirectory` to a new location.

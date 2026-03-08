@@ -8,6 +8,9 @@ namespace ImmichFolderWatch.Gui.ViewModels;
 
 public sealed class MainWindowViewModel : BindableBase
 {
+    private const string ShowApiKeyToolTipText = "Show API key";
+    private const string HideApiKeyToolTipText = "Hide API key";
+
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
     private string _extensionsText = string.Empty;
@@ -31,6 +34,11 @@ public sealed class MainWindowViewModel : BindableBase
     private string _immichApiKeyStatusBackground = "#E0E3E8";
     private string _immichPermissionsStatusText = "Not checked";
     private string _immichPermissionsStatusBackground = "#E0E3E8";
+    private bool _revealImmichApiKey;
+    private bool _shouldMaskImmichApiKey;
+    private bool _showImmichApiKeyRevealButton;
+    private bool _isImmichApiKeyPlaceholder;
+    private string _immichApiKeyRevealToolTip = ShowApiKeyToolTipText;
     private bool _showStartServiceButton;
     private bool _showStopServiceButton;
     private bool _showRestartServiceButton;
@@ -38,6 +46,7 @@ public sealed class MainWindowViewModel : BindableBase
     public MainWindowViewModel()
     {
         Sources.Add(new WatchSourceItem());
+        RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
     }
 
@@ -54,6 +63,8 @@ public sealed class MainWindowViewModel : BindableBase
         "Error",
         "Critical",
     };
+
+    public string ImmichApiKeyPlaceholderText { get; } = AppConfigValidator.ExampleApiKeyPlaceholder;
 
     public string ImmichServerApiUrl
     {
@@ -72,8 +83,10 @@ public sealed class MainWindowViewModel : BindableBase
         get => _immichApiKey;
         set
         {
+            var wasPlaceholder = IsExampleApiKeyPlaceholder(_immichApiKey);
             if (SetProperty(ref _immichApiKey, value))
             {
+                RefreshImmichApiKeyPresentation(resetVisibleState: wasPlaceholder);
                 ResetImmichCheckStatus();
             }
         }
@@ -205,6 +218,36 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _immichPermissionsStatusBackground, value);
     }
 
+    public bool RevealImmichApiKey
+    {
+        get => _revealImmichApiKey;
+        private set => SetProperty(ref _revealImmichApiKey, value);
+    }
+
+    public bool ShouldMaskImmichApiKey
+    {
+        get => _shouldMaskImmichApiKey;
+        private set => SetProperty(ref _shouldMaskImmichApiKey, value);
+    }
+
+    public bool ShowImmichApiKeyRevealButton
+    {
+        get => _showImmichApiKeyRevealButton;
+        private set => SetProperty(ref _showImmichApiKeyRevealButton, value);
+    }
+
+    public bool IsImmichApiKeyPlaceholder
+    {
+        get => _isImmichApiKeyPlaceholder;
+        private set => SetProperty(ref _isImmichApiKeyPlaceholder, value);
+    }
+
+    public string ImmichApiKeyRevealToolTip
+    {
+        get => _immichApiKeyRevealToolTip;
+        private set => SetProperty(ref _immichApiKeyRevealToolTip, value);
+    }
+
     public bool ShowStartServiceButton
     {
         get => _showStartServiceButton;
@@ -254,7 +297,19 @@ public sealed class MainWindowViewModel : BindableBase
             Sources.Add(new WatchSourceItem());
         }
 
+        RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
+    }
+
+    public void ToggleImmichApiKeyVisibility()
+    {
+        if (!ShowImmichApiKeyRevealButton)
+        {
+            return;
+        }
+
+        _revealImmichApiKey = !_revealImmichApiKey;
+        RefreshImmichApiKeyPresentation(resetVisibleState: false);
     }
 
     public bool TryCreateConfig(out AppConfig config, out IReadOnlyList<string> errors)
@@ -462,6 +517,33 @@ public sealed class MainWindowViewModel : BindableBase
     private static string GetDefaultLogDirectory()
     {
         return Path.GetFullPath(InstallationPaths.GetLogDirectory(AppContext.BaseDirectory));
+    }
+
+    private void RefreshImmichApiKeyPresentation(bool resetVisibleState)
+    {
+        if (resetVisibleState)
+        {
+            _revealImmichApiKey = false;
+        }
+
+        var trimmedApiKey = (_immichApiKey ?? string.Empty).Trim();
+        var isPlaceholder = IsExampleApiKeyPlaceholder(trimmedApiKey);
+        var hasRealKey = !string.IsNullOrWhiteSpace(trimmedApiKey) && !isPlaceholder;
+        var revealPassword = isPlaceholder || _revealImmichApiKey;
+
+        IsImmichApiKeyPlaceholder = isPlaceholder;
+        ShowImmichApiKeyRevealButton = hasRealKey;
+        ShouldMaskImmichApiKey = hasRealKey && !revealPassword;
+        RevealImmichApiKey = revealPassword;
+        ImmichApiKeyRevealToolTip = revealPassword ? HideApiKeyToolTipText : ShowApiKeyToolTipText;
+    }
+
+    private static bool IsExampleApiKeyPlaceholder(string? value)
+    {
+        return string.Equals(
+            (value ?? string.Empty).Trim(),
+            AppConfigValidator.ExampleApiKeyPlaceholder,
+            StringComparison.Ordinal);
     }
 
     private static string GetCheckStateText(CheckState state)
