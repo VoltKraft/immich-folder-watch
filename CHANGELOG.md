@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-08
+
+### Changed
+- Uploads can now place new files into the configured `watch.sources[].albumName`, create missing albums automatically, and fail clearly when duplicate exact-name albums already exist.
+- `watch.sources[].albumName` is now optional. Leaving it empty uploads files without assigning them to an album.
+- The Windows GUI now suggests the watched folder name once for a new source's `Immich Album Name` field and keeps a deliberately cleared value empty afterwards.
+- Immich album permissions now become blocking only when the current configuration actually uses album placement.
+- Project, packaging, and release defaults updated to `1.4.0`.
+
 ## [1.3.1] - 2026-03-08
 
 ### Fixed

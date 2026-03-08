@@ -389,6 +389,15 @@ public sealed class MainWindowViewModel : BindableBase
                 ServerApiUrl = ImmichServerApiUrl.Trim(),
                 ApiKey = ImmichApiKey.Trim(),
             },
+            Watch = new WatchSettings
+            {
+                Sources = Sources.Select(source => new WatchSourceSettings
+                {
+                    Path = source.Path.Trim(),
+                    AlbumName = source.AlbumName.Trim(),
+                    IncludeSubdirectories = source.IncludeSubdirectories,
+                }).ToList(),
+            },
             Retry = new RetrySettings
             {
                 MaxAttempts = 1,

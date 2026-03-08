@@ -17,7 +17,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
-        var result = await checker.CheckAsync(CancellationToken.None);
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
 
         Assert.Equal(CheckState.Passed, result.UrlState);
         Assert.Equal(CheckState.Passed, result.ApiKeyState);
@@ -33,7 +33,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.OK),
             CreateResponse(HttpStatusCode.Unauthorized));
 
-        var result = await checker.CheckAsync(CancellationToken.None);
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
 
         Assert.Equal(CheckState.Passed, result.UrlState);
         Assert.Equal(CheckState.Failed, result.ApiKeyState);
@@ -42,7 +42,7 @@ public sealed class ImmichAccessCheckerTests
     }
 
     [Fact]
-    public async Task CheckAsync_ReturnsWarningWhenOnlyAlbumPermissionsAreMissing()
+    public async Task CheckAsync_ReturnsFailedWhenAlbumPermissionsAreMissingAndAlbumPlacementIsRequired()
     {
         var checker = CreateChecker(
             CreateResponse(HttpStatusCode.OK),
@@ -52,14 +52,14 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden));
 
-        var result = await checker.CheckAsync(CancellationToken.None);
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
 
         Assert.Equal(CheckState.Passed, result.UrlState);
         Assert.Equal(CheckState.Passed, result.ApiKeyState);
-        Assert.Equal(CheckState.Warning, result.PermissionsState);
+        Assert.Equal(CheckState.Failed, result.PermissionsState);
         Assert.Equal(CheckState.Passed, result.PermissionResults[0].State);
         Assert.All(result.PermissionResults.Skip(1), permission => Assert.Equal(CheckState.Failed, permission.State));
-        Assert.Empty(result.GetBlockingErrors());
+        Assert.Equal(3, result.GetBlockingErrors().Count);
     }
 
     [Fact]
@@ -73,11 +73,32 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
-        var result = await checker.CheckAsync(CancellationToken.None);
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
 
         Assert.Equal(CheckState.Failed, result.PermissionsState);
         Assert.Equal(CheckState.Failed, result.PermissionResults[0].State);
         Assert.Contains(result.GetBlockingErrors(), error => error.Contains("Asset Upload", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CheckAsync_AllowsMissingAlbumPermissions_WhenNoAlbumPlacementIsRequired()
+    {
+        var checker = CreateChecker(
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.Forbidden));
+
+        var result = await checker.CheckAsync(requireAlbumPermissions: false, CancellationToken.None);
+
+        Assert.Equal(CheckState.Passed, result.UrlState);
+        Assert.Equal(CheckState.Passed, result.ApiKeyState);
+        Assert.Equal(CheckState.Passed, result.PermissionsState);
+        Assert.Equal(CheckState.Passed, result.PermissionResults[0].State);
+        Assert.All(result.PermissionResults.Skip(1), permission => Assert.Equal(CheckState.Failed, permission.State));
+        Assert.Empty(result.GetBlockingErrors());
     }
 
     private static ImmichAccessChecker CreateChecker(params HttpResponseMessage[] responses)

@@ -12,17 +12,18 @@ internal sealed class ConfigVerificationRunner
         ArgumentException.ThrowIfNullOrWhiteSpace(targetConfigPath);
 
         var normalizedConfig = NormalizeConfig(config, targetConfigPath);
+        var requireAlbumPermissions = RequiresAlbumPermissions(normalizedConfig);
 
         var urlError = AppConfigValidator.ValidateServerApiUrl(normalizedConfig.Immich.ServerApiUrl);
         var apiKeyError = AppConfigValidator.ValidateApiKey(normalizedConfig.Immich.ApiKey);
         if (!string.IsNullOrWhiteSpace(urlError) || !string.IsNullOrWhiteSpace(apiKeyError))
         {
-            return CreateValidationFailureResult(urlError, apiKeyError);
+            return CreateValidationFailureResult(urlError, apiKeyError, requireAlbumPermissions);
         }
 
         using var httpClient = CreateHttpClient(normalizedConfig);
         var accessChecker = new ImmichAccessChecker(httpClient);
-        return await accessChecker.CheckAsync(cancellationToken);
+        return await accessChecker.CheckAsync(requireAlbumPermissions, cancellationToken);
     }
 
     public async Task<VerificationResult> VerifyAsync(AppConfig config, string targetConfigPath, CancellationToken cancellationToken)
@@ -72,7 +73,12 @@ internal sealed class ConfigVerificationRunner
         return AppConfigLoader.NormalizeForRuntime(config, configDirectory);
     }
 
-    private static ImmichAccessCheckResult CreateValidationFailureResult(string? urlError, string? apiKeyError)
+    private static bool RequiresAlbumPermissions(AppConfig config)
+    {
+        return config.Watch.Sources.Any(source => !string.IsNullOrWhiteSpace(source.AlbumName));
+    }
+
+    private static ImmichAccessCheckResult CreateValidationFailureResult(string? urlError, string? apiKeyError, bool requireAlbumPermissions)
     {
         return new ImmichAccessCheckResult
         {
@@ -98,6 +104,7 @@ internal sealed class ConfigVerificationRunner
                     PermissionName = "album.read",
                     State = CheckState.NotChecked,
                     Message = "Not checked because the Immich inputs are not valid yet.",
+                    BlocksConfigVerification = requireAlbumPermissions,
                 },
                 new ImmichPermissionCheckResult
                 {
@@ -105,6 +112,7 @@ internal sealed class ConfigVerificationRunner
                     PermissionName = "album.create",
                     State = CheckState.NotChecked,
                     Message = "Not checked because the Immich inputs are not valid yet.",
+                    BlocksConfigVerification = requireAlbumPermissions,
                 },
                 new ImmichPermissionCheckResult
                 {
@@ -112,6 +120,7 @@ internal sealed class ConfigVerificationRunner
                     PermissionName = "albumAsset.create",
                     State = CheckState.NotChecked,
                     Message = "Not checked because the Immich inputs are not valid yet.",
+                    BlocksConfigVerification = requireAlbumPermissions,
                 },
             ],
         };

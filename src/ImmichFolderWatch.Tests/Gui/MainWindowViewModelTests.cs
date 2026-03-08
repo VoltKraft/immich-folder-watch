@@ -1,5 +1,6 @@
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Gui.Models;
 using ImmichFolderWatch.Gui.ViewModels;
 
 namespace ImmichFolderWatch.Tests.Gui;
@@ -135,5 +136,24 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.RevealImmichApiKey);
         Assert.True(viewModel.ShowPlainImmichApiKeyInput);
         Assert.False(viewModel.ShowImmichApiKeyRevealButton);
+    }
+
+    [Fact]
+    public void CreateImmichCheckConfig_IncludesCurrentAlbumAssignments()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.Sources.Clear();
+        viewModel.Sources.Add(new WatchSourceItem
+        {
+            Path = @"C:\Users\jan\Pictures\Screenshots",
+            AlbumName = "Screenshots",
+            IncludeSubdirectories = true,
+        });
+
+        var config = viewModel.CreateImmichCheckConfig();
+
+        Assert.Single(config.Watch.Sources);
+        Assert.Equal("Screenshots", config.Watch.Sources[0].AlbumName);
+        Assert.True(config.Watch.Sources[0].IncludeSubdirectories);
     }
 }

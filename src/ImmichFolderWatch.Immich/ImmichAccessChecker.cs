@@ -16,7 +16,7 @@ public sealed class ImmichAccessChecker
         _httpClient = httpClient;
     }
 
-    public async Task<ImmichAccessCheckResult> CheckAsync(CancellationToken cancellationToken)
+    public async Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, CancellationToken cancellationToken)
     {
         var urlProbe = await ProbeUrlAsync(cancellationToken);
         if (urlProbe.Decision != ProbeDecision.Passed)
@@ -29,7 +29,7 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = "Not checked because the URL could not be verified.",
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the URL could not be verified.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified."),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified.", requireAlbumPermissions),
             };
         }
 
@@ -44,16 +44,16 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = apiKeyProbe.Message,
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the API key was not accepted.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted."),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted.", requireAlbumPermissions),
             };
         }
 
         var permissionResults = new[]
         {
             CreateUploadPermissionResult(await ProbeAssetUploadPermissionAsync(cancellationToken)),
-            CreateAlbumReadPermissionResult(await ProbeAlbumReadPermissionAsync(cancellationToken)),
-            CreateAlbumCreatePermissionResult(await ProbeAlbumCreatePermissionAsync(cancellationToken)),
-            CreateAlbumAssetCreatePermissionResult(await ProbeAlbumAssetCreatePermissionAsync(cancellationToken)),
+            CreateAlbumReadPermissionResult(await ProbeAlbumReadPermissionAsync(cancellationToken), requireAlbumPermissions),
+            CreateAlbumCreatePermissionResult(await ProbeAlbumCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
+            CreateAlbumAssetCreatePermissionResult(await ProbeAlbumAssetCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
         };
 
         return new ImmichAccessCheckResult
@@ -62,8 +62,8 @@ public sealed class ImmichAccessChecker
             UrlMessage = urlProbe.Message,
             ApiKeyState = CheckState.Passed,
             ApiKeyMessage = apiKeyProbe.Message,
-            PermissionsState = DeterminePermissionsOverallState(permissionResults),
-            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults),
+            PermissionsState = DeterminePermissionsOverallState(permissionResults, requireAlbumPermissions),
+            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults, requireAlbumPermissions),
             PermissionResults = permissionResults,
         };
     }
@@ -216,14 +216,14 @@ public sealed class ImmichAccessChecker
         return lastWarning ?? new ProbeResult(ProbeDecision.Warning, "The album asset endpoint could not be verified against the current Immich API shape.");
     }
 
-    private static CheckState DeterminePermissionsOverallState(IReadOnlyList<ImmichPermissionCheckResult> permissionResults)
+    private static CheckState DeterminePermissionsOverallState(IReadOnlyList<ImmichPermissionCheckResult> permissionResults, bool requireAlbumPermissions)
     {
         if (permissionResults.Any(result => result.BlocksConfigVerification && result.State == CheckState.Failed))
         {
             return CheckState.Failed;
         }
 
-        if (permissionResults.Any(result => result.State is CheckState.Warning or CheckState.Failed))
+        if (requireAlbumPermissions && permissionResults.Any(result => result.State is CheckState.Warning or CheckState.Failed))
         {
             return CheckState.Warning;
         }
@@ -231,22 +231,26 @@ public sealed class ImmichAccessChecker
         return CheckState.Passed;
     }
 
-    private static string DeterminePermissionsOverallMessage(IReadOnlyList<ImmichPermissionCheckResult> permissionResults)
+    private static string DeterminePermissionsOverallMessage(IReadOnlyList<ImmichPermissionCheckResult> permissionResults, bool requireAlbumPermissions)
     {
         if (permissionResults.All(result => result.State == CheckState.Passed))
         {
-            return "All required Immich permissions are available.";
+            return requireAlbumPermissions
+                ? "All required Immich permissions for uploads and album placement are available."
+                : "All required Immich permissions for uploads are available.";
         }
 
         if (permissionResults.Any(result => result.BlocksConfigVerification && result.State == CheckState.Failed))
         {
-            return "A permission required for the current save-and-verify flow is missing.";
+            return requireAlbumPermissions
+                ? "A permission required for uploads or album placement is missing."
+                : "A permission required for uploads is missing.";
         }
 
-        return "Album-related permissions are missing or could not be verified yet.";
+        return "Album-related permissions are optional until a source uses an album name.";
     }
 
-    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message)
+    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message, bool requireAlbumPermissions)
     {
         return new[]
         {
@@ -264,7 +268,7 @@ public sealed class ImmichAccessChecker
                 DisplayName = "Album Read",
                 State = CheckState.NotChecked,
                 Message = message,
-                BlocksConfigVerification = false,
+                BlocksConfigVerification = requireAlbumPermissions,
             },
             new ImmichPermissionCheckResult
             {
@@ -272,7 +276,7 @@ public sealed class ImmichAccessChecker
                 DisplayName = "Album Create",
                 State = CheckState.NotChecked,
                 Message = message,
-                BlocksConfigVerification = false,
+                BlocksConfigVerification = requireAlbumPermissions,
             },
             new ImmichPermissionCheckResult
             {
@@ -280,7 +284,7 @@ public sealed class ImmichAccessChecker
                 DisplayName = "Add Asset To Album",
                 State = CheckState.NotChecked,
                 Message = message,
-                BlocksConfigVerification = false,
+                BlocksConfigVerification = requireAlbumPermissions,
             },
         };
     }
@@ -290,19 +294,19 @@ public sealed class ImmichAccessChecker
         return CreatePermissionResult("asset.upload", "Asset Upload", blocksConfigVerification: true, probe);
     }
 
-    private static ImmichPermissionCheckResult CreateAlbumReadPermissionResult(ProbeResult probe)
+    private static ImmichPermissionCheckResult CreateAlbumReadPermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
-        return CreatePermissionResult("album.read", "Album Read", blocksConfigVerification: false, probe);
+        return CreatePermissionResult("album.read", "Album Read", blocksConfigVerification, probe);
     }
 
-    private static ImmichPermissionCheckResult CreateAlbumCreatePermissionResult(ProbeResult probe)
+    private static ImmichPermissionCheckResult CreateAlbumCreatePermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
-        return CreatePermissionResult("album.create", "Album Create", blocksConfigVerification: false, probe);
+        return CreatePermissionResult("album.create", "Album Create", blocksConfigVerification, probe);
     }
 
-    private static ImmichPermissionCheckResult CreateAlbumAssetCreatePermissionResult(ProbeResult probe)
+    private static ImmichPermissionCheckResult CreateAlbumAssetCreatePermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
-        return CreatePermissionResult("albumAsset.create", "Add Asset To Album", blocksConfigVerification: false, probe);
+        return CreatePermissionResult("albumAsset.create", "Add Asset To Album", blocksConfigVerification, probe);
     }
 
     private static ImmichPermissionCheckResult CreatePermissionResult(string permissionName, string displayName, bool blocksConfigVerification, ProbeResult probe)

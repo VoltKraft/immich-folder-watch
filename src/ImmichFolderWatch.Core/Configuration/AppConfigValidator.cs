@@ -88,10 +88,6 @@ public static class AppConfigValidator
                 errors.Add($"watch.sources[{i}].path does not exist: {source.Path}");
             }
 
-            if (string.IsNullOrWhiteSpace(source.AlbumName))
-            {
-                errors.Add($"watch.sources[{i}].albumName is required.");
-            }
         }
 
         if (config.Watch.Extensions.Count == 0)

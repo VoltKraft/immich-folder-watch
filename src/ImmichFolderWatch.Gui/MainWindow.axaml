@@ -113,7 +113,7 @@
                          Grid.Column="1"
                          VerticalAlignment="Center"
                          Foreground="#5E6057"
-                         Text="Checks the permissions needed for upload plus the planned album workflow." />
+                         Text="Checks the permissions needed for uploads and optional album placement." />
               <Border Grid.Row="2"
                       Grid.Column="2"
                       Classes="status-pill"
@@ -193,7 +193,7 @@
                               Content="Remove" />
 
                       <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
-                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Screenshots" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Leave empty for no album" />
                       <CheckBox Grid.Row="1"
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
