@@ -6,7 +6,7 @@ param(
     [string]$ServiceName = "ImmichFolderWatch",
     [string]$DisplayName = "Immich Folder Watch",
     [ValidateSet("Manual", "Automatic", "Disabled")]
-    [string]$StartupType = "Disabled",
+    [string]$StartupType = "Manual",
     [ValidateSet("LocalSystem", "LocalService", "NetworkService")]
     [string]$BuiltInAccount = "LocalSystem",
     [System.Management.Automation.PSCredential]$Credential,
@@ -143,7 +143,7 @@ if ($null -ne $existingService) {
     if (-not $startupTypeWasExplicitlyRequested) {
         $preservedStartupType = Get-ServiceStartupTypeFromRegistry -Name $ServiceName
         if ($preservedStartupType) {
-            $StartupType = $preservedStartupType
+            $StartupType = if ($preservedStartupType -eq "Disabled") { "Manual" } else { $preservedStartupType }
         }
     }
 
@@ -224,7 +224,7 @@ elseif ($createdExampleConfig) {
         Write-Warning "An example config was created at $configPathFull. Verify it in the GUI before enabling the service."
     }
     else {
-        Write-Warning "An example config was created at $configPathFull. Edit it before the next system boot or before starting the service manually."
+        Write-Warning "An example config was created at $configPathFull. Edit it before starting the service manually or switching it to automatic startup."
     }
 }
 

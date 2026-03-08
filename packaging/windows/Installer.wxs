@@ -73,7 +73,7 @@
         DisplayName="Immich Folder Watch"
         Description="Watches local folders and uploads new media to Immich."
         Type="ownProcess"
-        Start="disabled"
+        Start="demand"
         ErrorControl="normal"
         Arguments='--config "[CONFIGDIR]config.yaml"'>
       </ServiceInstall>
@@ -221,12 +221,12 @@
       Return="check" />
 
     <SetProperty
-      Id="PreserveUpgradeDisabledStart"
-      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= disabled'
-      Before="PreserveUpgradeDisabledStart"
+      Id="NormalizeUpgradeDisabledToManual"
+      Value='"[SystemFolder]sc.exe" config ImmichFolderWatch start= demand'
+      Before="NormalizeUpgradeDisabledToManual"
       Sequence="execute" />
     <CustomAction
-      Id="PreserveUpgradeDisabledStart"
+      Id="NormalizeUpgradeDisabledToManual"
       BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
       DllEntry="WixQuietExec"
       Execute="deferred"
@@ -247,7 +247,7 @@
         After="PreserveUpgradeAutomaticStart"
         Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;3&quot;" />
       <Custom
-        Action="PreserveUpgradeDisabledStart"
+        Action="NormalizeUpgradeDisabledToManual"
         After="PreserveUpgradeManualStart"
         Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;4&quot;" />
     </InstallExecuteSequence>

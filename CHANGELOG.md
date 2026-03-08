@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-03-08
+
+### Fixed
+- Windows installs and upgrades now default the service startup mode to `Manual` instead of leaving it `Disabled`.
+- MSI upgrades now normalize previously disabled installs to `Manual` so the GUI and admin helper can start the service again without a manual Services.msc change.
+
+### Changed
+- Script-based Windows service installation now defaults to `Manual` startup as well.
+- Project, packaging, and release defaults updated to `1.2.1`.
+
 ## [1.2.0] - 2026-03-08
 
 ### Added

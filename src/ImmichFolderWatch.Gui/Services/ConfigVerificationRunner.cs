@@ -69,7 +69,7 @@ internal sealed class ConfigVerificationRunner
                 : informationalVersion;
         }
 
-        return "1.2.0";
+        return "1.2.1";
     }
 
     private static HttpClient CreateHttpClient(AppConfig normalizedConfig)

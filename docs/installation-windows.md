@@ -49,7 +49,7 @@ Open an elevated PowerShell prompt inside the generated bundle and run:
 
 Default behavior:
 
-- registers the service as `Disabled`
+- registers the service as `Manual`
 - does not start it immediately after installation
 
 Recommended first install:
@@ -106,8 +106,8 @@ Installer behavior:
 - Stores GUI activation state in `%ProgramFiles%\Immich Folder Watch\config\activation-state.json`
 - Creates `%ProgramFiles%\Immich Folder Watch\logs\`
 - Migrates a legacy root-level `config.yaml` into `config\config.yaml` when needed
-- Registers the `ImmichFolderWatch` Windows service as `Disabled`
-- Preserves the current service startup mode across upgrades
+- Registers the `ImmichFolderWatch` Windows service as `Manual`
+- Preserves the current service startup mode across upgrades, except that previously disabled installs are normalized to `Manual`
 - Creates a desktop shortcut for the GUI
 - Preserves `config\` and `logs\` on uninstall
 
