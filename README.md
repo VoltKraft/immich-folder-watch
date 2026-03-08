@@ -1,10 +1,10 @@
 # immich-folder-watch
 
 [![CI](https://img.shields.io/badge/CI-pending-lightgrey?logo=githubactions)](./.github/workflows/ci.yaml)
-[![Version](https://img.shields.io/badge/Version-1.0.1-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.4.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-`immich-folder-watch` is a Windows service for people who want local folders to feed new files into Immich automatically.
+`immich-folder-watch` is a Windows service with a desktop configuration app for people who want local folders to feed new files into Immich automatically.
 
 It watches one or more folders, waits until newly written files are stable, and uploads them through the Immich HTTP API. This keeps uploads inside Immich's normal ingestion path instead of copying files directly into storage.
 
@@ -13,9 +13,10 @@ It watches one or more folders, waits until newly written files are stable, and 
 - Watches one or more local folders for new media files
 - Waits for files to finish writing before upload
 - Uploads new files to Immich in batches
-- Assigns uploads to the configured album name per watched source
+- Optionally assigns uploads to a per-source Immich album and creates that album automatically when it does not exist yet
 - Retries transient upload failures automatically
 - Runs as a Windows service with logs and config kept on disk
+- Ships a GUI to edit config, show the current app version, mask and selectively reveal the Immich API key, verify Immich URL/API key/permissions, auto-refresh service state, save and start or restart the service, start/stop/restart the service, adjust the log folder, and open logs quickly
 
 ## What It Does Not Do
 
@@ -32,10 +33,10 @@ The supported install path today is the Windows MSI from the GitHub Releases pag
 
 1. Download the latest `.msi` from Releases.
 2. Install it with administrative rights.
-3. Edit `C:\Program Files\Immich Folder Watch\config\config.yaml`.
-4. Reboot, or optionally start the service once manually to validate the config immediately.
+3. Open the installed `Immich Folder Watch` desktop shortcut.
+4. Review the automatic Immich access check in the GUI, then edit the config and use **Save and Start**.
 
-The service is installed as **Automatic (Delayed Start)** by default.
+The MSI installs the service in the **Manual** state first. Updates also normalize previously disabled installs back to **Manual** so the GUI and admin helper can start the service again. Windows binaries stay in `%ProgramFiles%\Immich Folder Watch\bin\`, while the active config and logs live under `C:\ProgramData\Immich Folder Watch\`. Upgrades migrate the old default Program Files config and logs automatically into that ProgramData location. The GUI auto-refreshes the displayed service state, shows the app version in the header, keeps `logging.logDirectory` on an absolute path, masks real API keys by default while still allowing them to be revealed on demand, keeps the example API-key placeholder visible in plain text, runs a one-time access check for the configured Immich URL, API key, and required permissions, verifies the config again every time you use **Save and Start** or **Save and Restart**, and migrates existing logs if you change the configured log directory through the GUI. `Immich Album Name` is optional per watched source: new GUI sources suggest the folder name once by default, leaving the field empty disables album placement, and a configured album name is created automatically in Immich if it does not exist yet. There is no separate persistent `activation-state.json` anymore. Any GUI-triggered start or restart switches the service to **Automatic (Delayed Start)** unless the service is already configured as **Automatic** without delay.
 
 Detailed setup instructions:
 - [Windows Installation](./docs/installation-windows.md)

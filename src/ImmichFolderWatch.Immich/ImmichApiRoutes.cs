@@ -9,4 +9,13 @@ internal static class ImmichApiRoutes
     public const string ServerInfo = "server-info";
 
     public const string AssetUpload = "assets";
+
+    public const string Albums = "albums";
+
+    public const string AlbumsAssets = "albums/assets";
+
+    public static string AlbumAssets(string albumId)
+    {
+        return $"albums/{albumId}/assets";
+    }
 }

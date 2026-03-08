@@ -27,4 +27,4 @@ retry:
 
 logging:
   level: "Information"
-  logDirectory: "logs"
+  logDirectory: "C:\\ImmichFolderWatch\\logs"

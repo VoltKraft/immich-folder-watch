@@ -1,0 +1,38 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fluent="clr-namespace:Avalonia.Themes.Fluent;assembly=Avalonia.Themes.Fluent"
+             x:Class="ImmichFolderWatch.Gui.App">
+  <Application.Styles>
+    <fluent:FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Background" Value="#F5F2EA" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#FFFDF8" />
+      <Setter Property="BorderBrush" Value="#D9D3C5" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="TextBlock.section-title">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#1B2A2F" />
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="Border.status-pill">
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="Border.status-pill > TextBlock">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#1B2A2F" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#0A6B5A" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderBrush" Value="#0A6B5A" />
+      <Setter Property="Padding" Value="16,10" />
+    </Style>
+  </Application.Styles>
+</Application>

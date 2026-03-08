@@ -11,38 +11,36 @@ $ErrorActionPreference = "Stop"
 Assert-Administrator
 
 $installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
-$preservedDirectories = @("config", "logs")
+$programDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
+if ([string]::IsNullOrWhiteSpace($programDataRoot)) {
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $programDataRoot = $env:ProgramData
+    }
+    else {
+        $programDataRoot = "C:\ProgramData"
+    }
+}
+
+$dataRoot = Join-Path $programDataRoot "Immich Folder Watch"
 
 if ($null -ne (Get-ServiceInstance -Name $ServiceName)) {
     Remove-ServiceRegistration -Name $ServiceName -TimeoutSeconds 45
 }
 
 if (Test-Path -LiteralPath $installRootFull) {
-    if ($RemoveData) {
-        Remove-Item -LiteralPath $installRootFull -Recurse -Force
-    }
-    else {
-        Get-ChildItem -LiteralPath $installRootFull -Force | ForEach-Object {
-            if ($_.PSIsContainer) {
-                if ($preservedDirectories -contains $_.Name.ToLowerInvariant()) {
-                    return
-                }
+    Remove-Item -LiteralPath $installRootFull -Recurse -Force
+}
 
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force
-                return
-            }
-
-            Remove-Item -LiteralPath $_.FullName -Force
-        }
-    }
+if ($RemoveData -and (Test-Path -LiteralPath $dataRoot)) {
+    Remove-Item -LiteralPath $dataRoot -Recurse -Force
 }
 
 Write-Host "Removed service '$ServiceName'."
 Write-Host "Removed application binaries from $installRootFull"
 
 if ($RemoveData) {
-    Write-Host "Removed config and logs from $installRootFull"
+    Write-Host "Removed config and logs from $dataRoot"
 }
 else {
-    Write-Host "Preserved config and logs under $installRootFull"
+    Write-Host "Preserved config and logs under $dataRoot"
 }

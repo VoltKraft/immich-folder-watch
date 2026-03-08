@@ -21,8 +21,14 @@
   - Console host and background worker
   - File watcher integration, debounce, and batch upload loop
   - Logging setup (console + file)
+- `ImmichFolderWatch.Gui`
+  - Avalonia desktop UI for editing the YAML config
+  - Service status display, config verification, and quick log access
+- `ImmichFolderWatch.Admin`
+  - Elevated Windows helper for writing config files and changing service state
 - `ImmichFolderWatch.Tests`
   - Unit tests for config parsing, readiness checks, and batching/dedup
+  - Unit tests for config verification, admin CLI parsing, and activation policy
 
 ## Runtime Flow
 

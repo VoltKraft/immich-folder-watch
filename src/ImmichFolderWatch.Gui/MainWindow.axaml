@@ -1,0 +1,307 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ImmichFolderWatch.Gui.MainWindow"
+        Title="Immich Folder Watch"
+        Width="1080"
+        Height="860"
+        MinWidth="960"
+        MinHeight="760">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0"
+            Padding="24"
+            Background="#10314B"
+            CornerRadius="0,0,24,24">
+      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
+          <TextBlock Text="Immich Folder Watch"
+                     FontSize="30"
+                     FontWeight="Bold"
+                     Foreground="#F9F6EE" />
+          <Border Classes="status-pill"
+                  VerticalAlignment="Center"
+                  Background="{Binding ServiceBadgeBackground}">
+            <TextBlock Text="{Binding ServiceBadgeText}" />
+          </Border>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Margin="0,8,0,0"
+                   Text="{Binding StatusHeadline}"
+                   FontSize="16"
+                   Foreground="#D7E6E2"
+                   TextWrapping="Wrap" />
+
+        <StackPanel Grid.Row="0"
+                    Grid.RowSpan="2"
+                    Grid.Column="1"
+                    HorizontalAlignment="Right"
+                    Margin="24,0,0,0"
+                    Spacing="6">
+          <TextBlock Text="{Binding ProductVersionText}"
+                     Foreground="#F9F6EE"
+                     FontWeight="SemiBold"
+                     TextAlignment="Right"
+                     TextWrapping="NoWrap"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding StatusDetails}"
+                     Foreground="#C6D7D1"
+                     TextAlignment="Right"
+                     TextWrapping="NoWrap"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="18" Spacing="18">
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Immich" />
+
+            <Grid ColumnDefinitions="220,*,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  ColumnSpacing="12"
+                  RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Server API URL" />
+              <TextBox Grid.Row="0"
+                       Grid.Column="1"
+                       Text="{Binding ImmichServerApiUrl}"
+                       Watermark="https://immich.example.com/api" />
+              <Border Grid.Row="0"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichUrlStatusBackground}">
+                <TextBlock Text="{Binding ImmichUrlStatusText}" />
+              </Border>
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="API Key" />
+              <Grid Grid.Row="1"
+                    Grid.Column="1"
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         IsVisible="{Binding ShowPlainImmichApiKeyInput}"
+                         Text="{Binding ImmichApiKey}"
+                         Watermark="{Binding ImmichApiKeyPlaceholderText}" />
+                <TextBox Grid.Column="0"
+                         IsVisible="{Binding ShouldMaskImmichApiKey}"
+                         Text="{Binding ImmichApiKey}"
+                         Watermark="{Binding ImmichApiKeyPlaceholderText}"
+                         PasswordChar="●" />
+                <Button Grid.Column="1"
+                        MinWidth="38"
+                        Padding="8,6"
+                        IsVisible="{Binding ShowImmichApiKeyRevealButton}"
+                        Click="ToggleApiKeyVisibilityButton_Click"
+                        ToolTip.Tip="{Binding ImmichApiKeyRevealToolTip}">
+                  <PathIcon Width="16"
+                            Height="16"
+                            Data="M12,17C7,17 2.73,13.89 1,9.5C2.73,5.11 7,2 12,2C17,2 21.27,5.11 23,9.5C21.27,13.89 17,17 12,17ZM12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
+                </Button>
+              </Grid>
+              <Border Grid.Row="1"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichApiKeyStatusBackground}">
+                <TextBlock Text="{Binding ImmichApiKeyStatusText}" />
+              </Border>
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Permissions" />
+              <TextBlock Grid.Row="2"
+                         Grid.Column="1"
+                         VerticalAlignment="Center"
+                         Foreground="#5E6057"
+                         Text="Checks the permissions needed for uploads and optional album placement." />
+              <Border Grid.Row="2"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichPermissionsStatusBackground}">
+                <TextBlock Text="{Binding ImmichPermissionsStatusText}" />
+              </Border>
+
+              <ItemsControl Grid.Row="3"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            ItemsSource="{Binding ImmichPermissionStatuses}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,0,8"
+                            Padding="12"
+                            Background="#F5F1E8"
+                            CornerRadius="12"
+                            BorderBrush="#DDD5C4"
+                            BorderThickness="1">
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+                          <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding PermissionName}" Foreground="#5E6057" />
+                        </StackPanel>
+                        <Border Grid.Row="0"
+                                Grid.Column="1"
+                                Classes="status-pill"
+                                VerticalAlignment="Center"
+                                Background="{Binding StatusBackground}">
+                          <TextBlock Text="{Binding StatusText}" />
+                        </Border>
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Grid.ColumnSpan="2"
+                                   Foreground="#5E6057"
+                                   Text="{Binding Message}"
+                                   TextWrapping="Wrap" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Button Grid.Row="4"
+                      Grid.Column="1"
+                      HorizontalAlignment="Left"
+                      Click="VerifyImmichButton_Click"
+                      Content="Verify Immich Access" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+              <TextBlock Grid.Column="0" Classes="section-title" Text="Watch Sources" Margin="0" />
+              <Button Grid.Column="1" Click="AddSourceButton_Click" Content="Add Source" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Sources}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Margin="0,0,0,12"
+                          Padding="14"
+                          Background="#F1ECE1"
+                          CornerRadius="12"
+                          BorderBrush="#D9D3C5"
+                          BorderThickness="1">
+                    <Grid ColumnDefinitions="*,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="Immich Album Name" />
+                      <Button Grid.Row="0"
+                              Grid.Column="2"
+                              HorizontalAlignment="Right"
+                              Click="RemoveSourceButton_Click"
+                              Content="Remove" />
+
+                      <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Leave empty for no album" />
+                      <CheckBox Grid.Row="1"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding IncludeSubdirectories}"
+                                Content="Include subdirectories" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Watch Behavior" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Top" Text="Extensions" />
+              <TextBox Grid.Row="0"
+                       Grid.Column="1"
+                       Height="110"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       Text="{Binding ExtensionsText}"
+                       Watermark=".png&#10;.jpg&#10;.heic" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Batch Interval Seconds" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BatchIntervalSeconds}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Max Batch Size" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MaxBatchSize}" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="File Ready Timeout Seconds" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding FileReadyTimeoutSeconds}" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Retry Max Attempts" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding RetryMaxAttempts}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Classes="section-title" Text="Logging And Retry" />
+            <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Retry Base Delay (ms)" />
+              <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding RetryBaseDelayMilliseconds}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Log Level" />
+              <ComboBox Grid.Row="1"
+                        Grid.Column="1"
+                        Grid.ColumnSpan="2"
+                        ItemsSource="{Binding AvailableLogLevels}"
+                        SelectedItem="{Binding LoggingLevel}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Log Directory" />
+              <TextBox Grid.Row="2"
+                       Grid.Column="1"
+                       Text="{Binding LogDirectory}"
+                       Watermark="C:\ProgramData\Immich Folder Watch\logs" />
+              <Button Grid.Row="2"
+                      Grid.Column="2"
+                      Click="UseDefaultLogDirectoryButton_Click"
+                      Content="Use Install Default" />
+
+              <TextBlock Grid.Row="3"
+                         Grid.Column="1"
+                         Grid.ColumnSpan="2"
+                         Foreground="#5E6057"
+                         Text="Log Directory must be configured as an absolute path." />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2"
+            Padding="18"
+            Background="#F0E9DB">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+        <Button Grid.Row="0"
+                Grid.Column="0"
+                IsVisible="{Binding ShowStartServiceButton}"
+                Click="StartServiceButton_Click"
+                Content="Start Service" />
+        <Button Grid.Row="0"
+                Grid.Column="1"
+                IsVisible="{Binding ShowStopServiceButton}"
+                Click="StopServiceButton_Click"
+                Content="Stop Service" />
+        <Button Grid.Row="0"
+                Grid.Column="2"
+                IsVisible="{Binding ShowRestartServiceButton}"
+                Click="RestartServiceButton_Click"
+                Content="Restart Service" />
+        <Button Grid.Row="0" Grid.Column="3" Click="OpenLogsButton_Click" Content="Open Logs" />
+        <Button Grid.Row="0"
+                Grid.Column="4"
+                Classes="primary"
+                Click="SaveActionButton_Click"
+                Content="{Binding SaveActionButtonText}" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="0"
+                   Grid.ColumnSpan="6"
+                   Margin="0,12,0,0"
+                   Text="{Binding OperationMessage}"
+                   TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

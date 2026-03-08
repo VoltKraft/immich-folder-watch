@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.Immich;
 
-public sealed class ImmichAssetClient : IImmichAssetClient
+public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityVerifier
 {
     private const int MaxBackoffMilliseconds = 30_000;
 
@@ -64,6 +64,42 @@ public sealed class ImmichAssetClient : IImmichAssetClient
             return UploadAssetResult.Failure(null, $"File does not exist: {request.FilePath}");
         }
 
+        var uploadResult = await UploadAssetFileAsync(request, cancellationToken);
+        if (!uploadResult.IsSuccess)
+        {
+            return uploadResult;
+        }
+
+        var albumName = NormalizeAlbumName(request.AlbumName);
+        if (string.IsNullOrWhiteSpace(albumName))
+        {
+            return uploadResult;
+        }
+
+        if (string.IsNullOrWhiteSpace(uploadResult.AssetId))
+        {
+            return UploadAssetResult.Failure(
+                null,
+                $"Immich did not return an asset id, so the upload could not be placed into album '{albumName}'.");
+        }
+
+        var albumResolution = await ResolveOrCreateAlbumAsync(albumName, cancellationToken);
+        if (!albumResolution.IsSuccess)
+        {
+            return UploadAssetResult.Failure(albumResolution.StatusCode, albumResolution.ErrorMessage ?? "Album resolution failed.");
+        }
+
+        var addResult = await AddAssetToAlbumAsync(albumResolution.AlbumId!, uploadResult.AssetId, cancellationToken);
+        if (!addResult.IsSuccess)
+        {
+            return UploadAssetResult.Failure(addResult.StatusCode, addResult.ErrorMessage ?? "Adding the asset to the album failed.");
+        }
+
+        return uploadResult;
+    }
+
+    private async Task<UploadAssetResult> UploadAssetFileAsync(UploadAssetRequest request, CancellationToken cancellationToken)
+    {
         for (var attempt = 1; attempt <= _retrySettings.MaxAttempts; attempt++)
         {
             try
@@ -74,7 +110,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var assetId = TryExtractAssetId(responseBody);
+                    var assetId = TryExtractId(responseBody);
                     return UploadAssetResult.Success(assetId);
                 }
 
@@ -133,6 +169,223 @@ public sealed class ImmichAssetClient : IImmichAssetClient
         }
 
         return UploadAssetResult.Failure(null, "Upload failed after maximum retry attempts.");
+    }
+
+    private async Task<AlbumResolutionResult> ResolveOrCreateAlbumAsync(string albumName, CancellationToken cancellationToken)
+    {
+        var albumsResult = await GetAlbumsAsync(cancellationToken);
+        if (!albumsResult.IsSuccess)
+        {
+            return AlbumResolutionResult.Failure(
+                albumsResult.StatusCode,
+                $"Failed to list Immich albums for '{albumName}': {albumsResult.ErrorMessage}");
+        }
+
+        var exactMatches = FindExactAlbumMatches(albumsResult.Albums, albumName);
+        if (exactMatches.Count > 1)
+        {
+            return AlbumResolutionResult.Failure(null, BuildDuplicateAlbumError(albumName));
+        }
+
+        if (exactMatches.Count == 1)
+        {
+            return AlbumResolutionResult.Success(exactMatches[0].Id);
+        }
+
+        var createResult = await CreateAlbumAsync(albumName, cancellationToken);
+        if (createResult.IsSuccess)
+        {
+            return createResult;
+        }
+
+        if (createResult.StatusCode == HttpStatusCode.Conflict)
+        {
+            var retryAlbumsResult = await GetAlbumsAsync(cancellationToken);
+            if (!retryAlbumsResult.IsSuccess)
+            {
+                return AlbumResolutionResult.Failure(
+                    retryAlbumsResult.StatusCode,
+                    $"Immich reported a conflict while creating album '{albumName}', and the follow-up lookup failed: {retryAlbumsResult.ErrorMessage}");
+            }
+
+            var retryMatches = FindExactAlbumMatches(retryAlbumsResult.Albums, albumName);
+            if (retryMatches.Count > 1)
+            {
+                return AlbumResolutionResult.Failure(null, BuildDuplicateAlbumError(albumName));
+            }
+
+            if (retryMatches.Count == 1)
+            {
+                return AlbumResolutionResult.Success(retryMatches[0].Id);
+            }
+        }
+
+        return createResult;
+    }
+
+    private async Task<AlbumsResult> GetAlbumsAsync(CancellationToken cancellationToken)
+    {
+        var result = await SendAsync(HttpMethod.Get, ImmichApiRoutes.Albums, content: null, cancellationToken);
+        if (!result.HasHttpResponse)
+        {
+            return AlbumsResult.Failure(null, result.ErrorMessage);
+        }
+
+        if (!result.IsSuccessStatusCode)
+        {
+            return AlbumsResult.Failure(result.StatusCode, $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
+        }
+
+        if (result.StatusCode == HttpStatusCode.NoContent || string.IsNullOrWhiteSpace(result.Body))
+        {
+            return AlbumsResult.Success([]);
+        }
+
+        return TryParseAlbums(result.Body, out var albums)
+            ? AlbumsResult.Success(albums)
+            : AlbumsResult.Failure(result.StatusCode, "The album list response could not be parsed.");
+    }
+
+    private async Task<AlbumResolutionResult> CreateAlbumAsync(string albumName, CancellationToken cancellationToken)
+    {
+        var result = await SendJsonAsync(
+            HttpMethod.Post,
+            ImmichApiRoutes.Albums,
+            new
+            {
+                albumName,
+            },
+            cancellationToken);
+
+        if (!result.HasHttpResponse)
+        {
+            return AlbumResolutionResult.Failure(null, $"Creating album '{albumName}' failed: {result.ErrorMessage}");
+        }
+
+        if (!result.IsSuccessStatusCode)
+        {
+            return AlbumResolutionResult.Failure(
+                result.StatusCode,
+                $"Creating album '{albumName}' failed with HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
+        }
+
+        if (TryExtractAlbum(result.Body, out var album))
+        {
+            return AlbumResolutionResult.Success(album.Id);
+        }
+
+        var albumsResult = await GetAlbumsAsync(cancellationToken);
+        if (!albumsResult.IsSuccess)
+        {
+            return AlbumResolutionResult.Failure(
+                albumsResult.StatusCode,
+                $"Album '{albumName}' was created, but the follow-up lookup failed: {albumsResult.ErrorMessage}");
+        }
+
+        var matches = FindExactAlbumMatches(albumsResult.Albums, albumName);
+        if (matches.Count > 1)
+        {
+            return AlbumResolutionResult.Failure(null, BuildDuplicateAlbumError(albumName));
+        }
+
+        if (matches.Count == 1)
+        {
+            return AlbumResolutionResult.Success(matches[0].Id);
+        }
+
+        return AlbumResolutionResult.Failure(null, $"Album '{albumName}' was created, but Immich did not return a usable album id.");
+    }
+
+    private async Task<AlbumOperationResult> AddAssetToAlbumAsync(string albumId, string assetId, CancellationToken cancellationToken)
+    {
+        var primaryResult = await SendJsonAsync(
+            HttpMethod.Put,
+            ImmichApiRoutes.AlbumAssets(albumId),
+            new
+            {
+                ids = new[] { assetId },
+            },
+            cancellationToken);
+
+        if (primaryResult.IsSuccessStatusCode)
+        {
+            return AlbumOperationResult.Success();
+        }
+
+        if (!primaryResult.HasHttpResponse)
+        {
+            return AlbumOperationResult.Failure(null, $"Adding the asset to album '{albumId}' failed: {primaryResult.ErrorMessage}");
+        }
+
+        if (primaryResult.StatusCode is not HttpStatusCode.NotFound and not HttpStatusCode.MethodNotAllowed)
+        {
+            return AlbumOperationResult.Failure(
+                primaryResult.StatusCode,
+                $"Adding the asset to album '{albumId}' failed with HTTP {(int)primaryResult.StatusCode!.Value}: {TrimForLog(primaryResult.Body)}");
+        }
+
+        var fallbackCandidates = new[]
+        {
+            new AlbumAssetRouteCandidate(
+                HttpMethod.Put,
+                ImmichApiRoutes.AlbumsAssets,
+                new
+                {
+                    albumIds = new[] { albumId },
+                    assetIds = new[] { assetId },
+                }),
+            new AlbumAssetRouteCandidate(
+                HttpMethod.Post,
+                ImmichApiRoutes.AlbumsAssets,
+                new
+                {
+                    albumIds = new[] { albumId },
+                    assetIds = new[] { assetId },
+                }),
+            new AlbumAssetRouteCandidate(
+                HttpMethod.Put,
+                ImmichApiRoutes.AlbumsAssets,
+                new
+                {
+                    albumId,
+                    ids = new[] { assetId },
+                }),
+            new AlbumAssetRouteCandidate(
+                HttpMethod.Post,
+                ImmichApiRoutes.AlbumsAssets,
+                new
+                {
+                    albumId,
+                    ids = new[] { assetId },
+                }),
+        };
+
+        foreach (var candidate in fallbackCandidates)
+        {
+            var fallbackResult = await SendJsonAsync(candidate.Method, candidate.Route, candidate.Payload, cancellationToken);
+            if (fallbackResult.IsSuccessStatusCode)
+            {
+                return AlbumOperationResult.Success();
+            }
+
+            if (!fallbackResult.HasHttpResponse)
+            {
+                return AlbumOperationResult.Failure(null, $"Adding the asset to album '{albumId}' failed: {fallbackResult.ErrorMessage}");
+            }
+
+            if (fallbackResult.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+            {
+                continue;
+            }
+
+            return AlbumOperationResult.Failure(
+                fallbackResult.StatusCode,
+                $"Adding the asset to album '{albumId}' failed with HTTP {(int)fallbackResult.StatusCode!.Value}: {TrimForLog(fallbackResult.Body)}");
+        }
+
+        return AlbumOperationResult.Failure(
+            primaryResult.StatusCode,
+            "Adding the asset to the album failed because the current Immich album-assignment endpoint shape was not available.");
     }
 
     private async Task<bool> TryPingRouteAsync(string route, CancellationToken cancellationToken)
@@ -214,6 +467,35 @@ public sealed class ImmichAssetClient : IImmichAssetClient
         return multipart;
     }
 
+    private async Task<ApiCallResult> SendJsonAsync(HttpMethod method, string route, object payload, CancellationToken cancellationToken)
+    {
+        return await SendAsync(method, route, CreateJsonContent(payload), cancellationToken);
+    }
+
+    private async Task<ApiCallResult> SendAsync(HttpMethod method, string route, HttpContent? content, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(method, route)
+            {
+                Content = content,
+            };
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return ApiCallResult.FromResponse(response.StatusCode, body);
+        }
+        catch (Exception ex)
+        {
+            return ApiCallResult.FromException(ex.Message);
+        }
+    }
+
+    private static StringContent CreateJsonContent<T>(T payload)
+    {
+        return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+    }
+
     private static string CreateDeviceAssetId(FileInfo fileInfo)
     {
         var input = $"{fileInfo.FullName}|{fileInfo.Length}|{fileInfo.LastWriteTimeUtc.Ticks}";
@@ -221,7 +503,137 @@ public sealed class ImmichAssetClient : IImmichAssetClient
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    private static string? TryExtractAssetId(string responseBody)
+    private static string NormalizeAlbumName(string value)
+    {
+        return (value ?? string.Empty).Trim();
+    }
+
+    private static List<AlbumSummary> FindExactAlbumMatches(IReadOnlyList<AlbumSummary> albums, string albumName)
+    {
+        return albums
+            .Where(album => string.Equals(album.Name, albumName, StringComparison.Ordinal))
+            .ToList();
+    }
+
+    private static string BuildDuplicateAlbumError(string albumName)
+    {
+        return $"Multiple Immich albums named '{albumName}' already exist. Rename or remove duplicates so uploads can be assigned unambiguously.";
+    }
+
+    private static bool TryParseAlbums(string responseBody, out List<AlbumSummary> albums)
+    {
+        albums = new List<AlbumSummary>();
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            JsonElement albumArrayElement;
+            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                albumArrayElement = document.RootElement;
+            }
+            else if (document.RootElement.ValueKind == JsonValueKind.Object
+                && TryGetAlbumArrayElement(document.RootElement, out var nestedArray))
+            {
+                albumArrayElement = nestedArray;
+            }
+            else
+            {
+                return false;
+            }
+
+            foreach (var element in albumArrayElement.EnumerateArray())
+            {
+                if (TryExtractAlbum(element, out var album))
+                {
+                    albums.Add(album);
+                }
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            albums = new List<AlbumSummary>();
+            return false;
+        }
+    }
+
+    private static bool TryGetAlbumArrayElement(JsonElement root, out JsonElement albumArray)
+    {
+        if (root.TryGetProperty("albums", out albumArray) && albumArray.ValueKind == JsonValueKind.Array)
+        {
+            return true;
+        }
+
+        if (root.TryGetProperty("items", out albumArray) && albumArray.ValueKind == JsonValueKind.Array)
+        {
+            return true;
+        }
+
+        albumArray = default;
+        return false;
+    }
+
+    private static bool TryExtractAlbum(string responseBody, out AlbumSummary album)
+    {
+        album = default;
+
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            return TryExtractAlbum(document.RootElement, out album);
+        }
+        catch (JsonException)
+        {
+            album = default;
+            return false;
+        }
+    }
+
+    private static bool TryExtractAlbum(JsonElement element, out AlbumSummary album)
+    {
+        album = default;
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!TryExtractString(element, "id", out var id))
+        {
+            return false;
+        }
+
+        if (!TryExtractString(element, "albumName", out var albumName)
+            && !TryExtractString(element, "name", out albumName))
+        {
+            return false;
+        }
+
+        album = new AlbumSummary(id, albumName.Trim());
+        return true;
+    }
+
+    private static bool TryExtractString(JsonElement element, string propertyName, out string value)
+    {
+        value = string.Empty;
+
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static string? TryExtractId(string responseBody)
     {
         if (string.IsNullOrWhiteSpace(responseBody))
         {
@@ -231,16 +643,14 @@ public sealed class ImmichAssetClient : IImmichAssetClient
         try
         {
             using var document = JsonDocument.Parse(responseBody);
-            if (document.RootElement.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String)
-            {
-                return idElement.GetString();
-            }
+            return document.RootElement.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String
+                ? idElement.GetString()
+                : null;
         }
         catch (JsonException)
         {
+            return null;
         }
-
-        return null;
     }
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
@@ -287,6 +697,66 @@ public sealed class ImmichAssetClient : IImmichAssetClient
         if ((int)statusCode >= 500)
         {
             _logger.LogWarning("Upload failed with server error HTTP {StatusCode} for file {FilePath}.", (int)statusCode, filePath);
+        }
+    }
+
+    private readonly record struct AlbumSummary(string Id, string Name);
+
+    private readonly record struct AlbumAssetRouteCandidate(HttpMethod Method, string Route, object Payload);
+
+    private readonly record struct AlbumsResult(bool IsSuccess, IReadOnlyList<AlbumSummary> Albums, HttpStatusCode? StatusCode, string ErrorMessage)
+    {
+        public static AlbumsResult Success(IReadOnlyList<AlbumSummary> albums)
+        {
+            return new AlbumsResult(true, albums, null, string.Empty);
+        }
+
+        public static AlbumsResult Failure(HttpStatusCode? statusCode, string errorMessage)
+        {
+            return new AlbumsResult(false, Array.Empty<AlbumSummary>(), statusCode, errorMessage);
+        }
+    }
+
+    private readonly record struct AlbumResolutionResult(bool IsSuccess, string? AlbumId, HttpStatusCode? StatusCode, string? ErrorMessage)
+    {
+        public static AlbumResolutionResult Success(string albumId)
+        {
+            return new AlbumResolutionResult(true, albumId, null, null);
+        }
+
+        public static AlbumResolutionResult Failure(HttpStatusCode? statusCode, string errorMessage)
+        {
+            return new AlbumResolutionResult(false, null, statusCode, errorMessage);
+        }
+    }
+
+    private readonly record struct AlbumOperationResult(bool IsSuccess, HttpStatusCode? StatusCode, string? ErrorMessage)
+    {
+        public static AlbumOperationResult Success()
+        {
+            return new AlbumOperationResult(true, null, null);
+        }
+
+        public static AlbumOperationResult Failure(HttpStatusCode? statusCode, string errorMessage)
+        {
+            return new AlbumOperationResult(false, statusCode, errorMessage);
+        }
+    }
+
+    private readonly record struct ApiCallResult(HttpStatusCode? StatusCode, string Body, string ErrorMessage)
+    {
+        public bool HasHttpResponse => StatusCode.HasValue;
+
+        public bool IsSuccessStatusCode => StatusCode is >= HttpStatusCode.OK and < HttpStatusCode.MultipleChoices;
+
+        public static ApiCallResult FromResponse(HttpStatusCode statusCode, string body)
+        {
+            return new ApiCallResult(statusCode, body, string.Empty);
+        }
+
+        public static ApiCallResult FromException(string errorMessage)
+        {
+            return new ApiCallResult(null, string.Empty, errorMessage);
         }
     }
 }

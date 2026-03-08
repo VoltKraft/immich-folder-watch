@@ -12,6 +12,7 @@ public sealed class AppConfigLoaderTests
         try
         {
             var watchPath = tempRoot.FullName.Replace("\\", "\\\\", StringComparison.Ordinal);
+            var logPath = Path.Combine(tempRoot.FullName, "logs").Replace("\\", "\\\\", StringComparison.Ordinal);
             var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
 
             var yaml = $"""
@@ -34,7 +35,7 @@ retry:
   baseDelayMilliseconds: 250
 logging:
   level: "Debug"
-  logDirectory: "logs"
+  logDirectory: "{logPath}"
 """;
 
             File.WriteAllText(configPath, yaml);
@@ -144,6 +145,49 @@ logging:
 
             Assert.Equal(Path.GetFullPath(watchDirectory.FullName), config.Watch.Sources[0].Path);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "logs")), config.Logging.LogDirectory);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadForEditing_PreservesRelativePaths()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-edit-");
+
+        try
+        {
+            var configDirectory = Directory.CreateDirectory(Path.Combine(tempRoot.FullName, "config"));
+            var configPath = Path.Combine(configDirectory.FullName, "config.yaml");
+
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources:
+    - path: "../watch"
+      albumName: "Screenshots"
+      includeSubdirectories: false
+  extensions:
+    - ".png"
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "../logs"
+""";
+
+            File.WriteAllText(configPath, yaml);
+
+            var loader = new AppConfigLoader();
+            var config = loader.LoadForEditing(configPath);
+
+            Assert.Equal("../watch", config.Watch.Sources[0].Path);
+            Assert.Equal("../logs", config.Logging.LogDirectory);
         }
         finally
         {

@@ -2,12 +2,50 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$OutputRoot = (Join-Path $PSScriptRoot "..\..\artifacts\windows\msi"),
-    [string]$Version = "1.0.1",
+    [string]$OutputRoot,
+    [string]$Version = "1.4.0",
     [switch]$FrameworkDependent
 )
 
 $ErrorActionPreference = "Stop"
+
+function Get-ScriptRoot {
+    if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        return $PSScriptRoot
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+        return Split-Path -Parent $PSCommandPath
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Path)) {
+        return Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+
+    throw "Unable to determine the script directory."
+}
+
+function Initialize-DotnetEnvironment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CacheRoot
+    )
+
+    if ([string]::IsNullOrWhiteSpace($env:DOTNET_CLI_HOME)) {
+        $env:DOTNET_CLI_HOME = Join-Path $CacheRoot "dotnet-cli"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
+        $env:NUGET_PACKAGES = Join-Path $env:DOTNET_CLI_HOME ".nuget\packages"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE)) {
+        $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
+    }
+
+    New-Item -ItemType Directory -Path $env:DOTNET_CLI_HOME -Force | Out-Null
+    New-Item -ItemType Directory -Path $env:NUGET_PACKAGES -Force | Out-Null
+}
 
 function Reset-Directory {
     param(
@@ -32,7 +70,7 @@ function Get-InstallerVersion {
         return "$($Matches[1]).$($Matches[2]).$($Matches[3])"
     }
 
-    throw "Installer version must start with a numeric major.minor.patch value. Example: 1.0.1"
+    throw "Installer version must start with a numeric major.minor.patch value. Example: 1.1.0"
 }
 
 function Get-InstallerPlatform {
@@ -48,11 +86,27 @@ function Get-InstallerPlatform {
     }
 }
 
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+$scriptRoot = Get-ScriptRoot
+$localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+if ([string]::IsNullOrWhiteSpace($localAppData)) {
+    $localAppData = [System.IO.Path]::GetTempPath()
+}
+
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $OutputRoot = Join-Path $scriptRoot "..\..\artifacts\windows\msi"
+}
+
+$OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+Initialize-DotnetEnvironment -CacheRoot (Join-Path $localAppData "ImmichFolderWatch")
+
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\.."))
 $daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
-$wixProject = Join-Path $PSScriptRoot "ImmichFolderWatch.Setup.wixproj"
-$windowsConfigTemplatePath = Join-Path $PSScriptRoot "config.windows.example.yaml"
+$guiProject = Join-Path $repoRoot "src\ImmichFolderWatch.Gui\ImmichFolderWatch.Gui.csproj"
+$adminProject = Join-Path $repoRoot "src\ImmichFolderWatch.Admin\ImmichFolderWatch.Admin.csproj"
+$wixProject = Join-Path $scriptRoot "ImmichFolderWatch.Setup.wixproj"
+$windowsConfigTemplatePath = Join-Path $scriptRoot "config.windows.example.yaml"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
+$publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
 $msiOutputRoot = Join-Path $OutputRoot "package"
 $installerVersion = Get-InstallerVersion -Value $Version
 $installerPlatform = Get-InstallerPlatform -Value $Runtime
@@ -68,29 +122,48 @@ if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
 }
 
 Reset-Directory -Path $publishRoot
+Reset-Directory -Path $publishTempRoot
 Reset-Directory -Path $msiOutputRoot
 
-$publishArgs = @(
-    "publish",
-    $daemonProject,
-    "-c", $Configuration,
-    "-r", $Runtime,
-    "-o", $publishRoot
-)
+function Publish-ProjectOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName
+    )
 
-if ($FrameworkDependent) {
-    $publishArgs += "--no-self-contained"
-}
-else {
-    $publishArgs += "--self-contained"
+    $projectPublishRoot = Join-Path $publishTempRoot $ProjectName
+    Reset-Directory -Path $projectPublishRoot
+
+    $publishArgs = @(
+        "publish",
+        $ProjectPath,
+        "-c", $Configuration,
+        "-r", $Runtime,
+        "-o", $projectPublishRoot
+    )
+
+    if ($FrameworkDependent) {
+        $publishArgs += "--no-self-contained"
+    }
+    else {
+        $publishArgs += "--self-contained"
+    }
+
+    Write-Host "Publishing $ProjectName for MSI packaging..."
+    & dotnet @publishArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish for $ProjectName failed with exit code $LASTEXITCODE."
+    }
+
+    Copy-Item -Path (Join-Path $projectPublishRoot "*") -Destination $publishRoot -Recurse -Force
 }
 
-Write-Host "Publishing daemon for MSI packaging..."
-& dotnet @publishArgs
-
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet publish failed with exit code $LASTEXITCODE."
-}
+Publish-ProjectOutput -ProjectPath $daemonProject -ProjectName "daemon"
+Publish-ProjectOutput -ProjectPath $guiProject -ProjectName "gui"
+Publish-ProjectOutput -ProjectPath $adminProject -ProjectName "admin"
 
 $buildArgs = @(
     "build",
