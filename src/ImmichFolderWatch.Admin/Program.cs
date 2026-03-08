@@ -41,6 +41,9 @@ internal static class Bootstrapper
             response = command.Kind switch
             {
                 AdminCommandKind.Status => CreateStatusResponse(serviceManager),
+                AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully."),
+                AdminCommandKind.StopService => ExecuteServiceAction(serviceManager, static manager => manager.StopService(), "Service stopped successfully."),
+                AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully."),
                 AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager, activationStateStore),
                 _ => throw new InvalidOperationException($"Unsupported command kind: {command.Kind}"),
             };
@@ -65,6 +68,18 @@ internal static class Bootstrapper
         {
             Success = true,
             Message = "Service status retrieved successfully.",
+            Status = serviceManager.GetStatus(),
+        };
+    }
+
+    private static AdminCommandResponse ExecuteServiceAction(IServiceManager serviceManager, Action<IServiceManager> action, string successMessage)
+    {
+        action(serviceManager);
+
+        return new AdminCommandResponse
+        {
+            Success = true,
+            Message = successMessage,
             Status = serviceManager.GetStatus(),
         };
     }
@@ -268,6 +283,18 @@ internal sealed class WindowsServiceManager : IServiceManager
 
         controller.Start();
         controller.WaitForStatus(ServiceControllerStatus.Running, ServiceTimeout);
+    }
+
+    public void StopService()
+    {
+        using var controller = CreateController();
+        if (controller.Status == ServiceControllerStatus.Stopped)
+        {
+            return;
+        }
+
+        controller.Stop();
+        controller.WaitForStatus(ServiceControllerStatus.Stopped, ServiceTimeout);
     }
 
     public void RestartService()

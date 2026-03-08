@@ -10,5 +10,7 @@ public interface IServiceManager
 
     void StartService();
 
+    void StopService();
+
     void RestartService();
 }

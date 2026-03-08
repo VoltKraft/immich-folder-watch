@@ -20,6 +20,14 @@
       <Setter Property="Foreground" Value="#1B2A2F" />
       <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
+    <Style Selector="Border.status-pill">
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="Border.status-pill > TextBlock">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#1B2A2F" />
+    </Style>
     <Style Selector="Button.primary">
       <Setter Property="Background" Value="#0A6B5A" />
       <Setter Property="Foreground" Value="White" />

@@ -31,6 +31,39 @@ internal sealed class AdminCliClient
             cancellationToken);
     }
 
+    public Task<AdminCommandResponse> StartServiceAsync(CancellationToken cancellationToken)
+    {
+        return InvokeAsync(
+            new[]
+            {
+                "start-service",
+            },
+            elevate: true,
+            cancellationToken);
+    }
+
+    public Task<AdminCommandResponse> StopServiceAsync(CancellationToken cancellationToken)
+    {
+        return InvokeAsync(
+            new[]
+            {
+                "stop-service",
+            },
+            elevate: true,
+            cancellationToken);
+    }
+
+    public Task<AdminCommandResponse> RestartServiceAsync(CancellationToken cancellationToken)
+    {
+        return InvokeAsync(
+            new[]
+            {
+                "restart-service",
+            },
+            elevate: true,
+            cancellationToken);
+    }
+
     public Task<AdminCommandResponse> ApplyVerifiedConfigAsync(string sourcePath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);

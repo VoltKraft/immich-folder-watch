@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-08
+
+### Added
+- GUI check for Immich URL, API key, and the permissions required for upload plus the planned album workflow.
+- Automatic one-time Immich access check when the Windows GUI opens.
+- Visual service-state badge and context-aware **Start Service**, **Stop Service**, and **Restart Service** actions in the GUI.
+
+### Changed
+- The GUI now surfaces URL, API key, and permission results separately instead of only reporting a single verification outcome.
+- The **Watch Sources** editor now labels the album field as **Immich Album Name**.
+- Project, packaging, and release defaults updated to `1.2.0`.
+- README now documents the expanded GUI verification and service-control workflow.
+
 ## [1.1.0] - 2026-03-08
 
 ### Added

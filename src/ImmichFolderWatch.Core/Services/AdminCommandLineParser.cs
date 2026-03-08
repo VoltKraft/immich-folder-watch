@@ -7,6 +7,9 @@ public static class AdminCommandLineParser
     public const string Usage = """
 Usage:
   ImmichFolderWatch.Admin status [--result-file <path>]
+  ImmichFolderWatch.Admin start-service [--result-file <path>]
+  ImmichFolderWatch.Admin stop-service [--result-file <path>]
+  ImmichFolderWatch.Admin restart-service [--result-file <path>]
   ImmichFolderWatch.Admin apply-verified-config --source <path> [--result-file <path>]
 """;
 
@@ -38,7 +41,22 @@ Usage:
 
         if (string.Equals(commandName, "status", StringComparison.OrdinalIgnoreCase))
         {
-            return TryParseStatus(args[1..], out command, out message);
+            return TryParseSimpleCommand(AdminCommandKind.Status, args[1..], out command, out message);
+        }
+
+        if (string.Equals(commandName, "start-service", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryParseSimpleCommand(AdminCommandKind.StartService, args[1..], out command, out message);
+        }
+
+        if (string.Equals(commandName, "stop-service", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryParseSimpleCommand(AdminCommandKind.StopService, args[1..], out command, out message);
+        }
+
+        if (string.Equals(commandName, "restart-service", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryParseSimpleCommand(AdminCommandKind.RestartService, args[1..], out command, out message);
         }
 
         if (string.Equals(commandName, "apply-verified-config", StringComparison.OrdinalIgnoreCase))
@@ -50,7 +68,7 @@ Usage:
         return false;
     }
 
-    private static bool TryParseStatus(string[] args, out AdminCommand? command, out string message)
+    private static bool TryParseSimpleCommand(AdminCommandKind kind, string[] args, out AdminCommand? command, out string message)
     {
         command = null;
         message = string.Empty;
@@ -66,7 +84,7 @@ Usage:
             return false;
         }
 
-        command = new AdminCommand(AdminCommandKind.Status, null, resultFilePath);
+        command = new AdminCommand(kind, null, resultFilePath);
         return true;
     }
 

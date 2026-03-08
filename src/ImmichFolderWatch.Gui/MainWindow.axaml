@@ -3,30 +3,38 @@
         x:Class="ImmichFolderWatch.Gui.MainWindow"
         Title="Immich Folder Watch"
         Width="1080"
-        Height="820"
-        MinWidth="900"
-        MinHeight="700">
+        Height="860"
+        MinWidth="960"
+        MinHeight="760">
   <Grid RowDefinitions="Auto,*,Auto">
     <Border Grid.Row="0"
             Padding="24"
             Background="#10314B"
             CornerRadius="0,0,24,24">
       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-        <TextBlock Grid.Row="0"
-                   Text="Immich Folder Watch"
-                   FontSize="30"
-                   FontWeight="Bold"
-                   Foreground="#F9F6EE" />
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
+          <TextBlock Text="Immich Folder Watch"
+                     FontSize="30"
+                     FontWeight="Bold"
+                     Foreground="#F9F6EE" />
+          <Border Classes="status-pill"
+                  VerticalAlignment="Center"
+                  Background="{Binding ServiceBadgeBackground}">
+            <TextBlock Text="{Binding ServiceBadgeText}" />
+          </Border>
+        </StackPanel>
+
         <TextBlock Grid.Row="1"
                    Margin="0,8,0,0"
                    Text="{Binding StatusHeadline}"
                    FontSize="16"
                    Foreground="#D7E6E2"
                    TextWrapping="Wrap" />
+
         <TextBlock Grid.Row="0"
                    Grid.RowSpan="2"
                    Grid.Column="1"
-                   Width="260"
+                   Width="290"
                    HorizontalAlignment="Right"
                    Text="{Binding StatusDetails}"
                    Foreground="#C6D7D1"
@@ -40,11 +48,92 @@
         <Border Classes="card">
           <StackPanel>
             <TextBlock Classes="section-title" Text="Immich" />
-            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+
+            <Grid ColumnDefinitions="220,*,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  ColumnSpacing="12"
+                  RowSpacing="12">
               <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Server API URL" />
-              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ImmichServerApiUrl}" Watermark="https://immich.example.com/api" />
+              <TextBox Grid.Row="0"
+                       Grid.Column="1"
+                       Text="{Binding ImmichServerApiUrl}"
+                       Watermark="https://immich.example.com/api" />
+              <Border Grid.Row="0"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichUrlStatusBackground}">
+                <TextBlock Text="{Binding ImmichUrlStatusText}" />
+              </Border>
+
               <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="API Key" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ImmichApiKey}" Watermark="IMMICH_API_KEY" />
+              <TextBox Grid.Row="1"
+                       Grid.Column="1"
+                       Text="{Binding ImmichApiKey}"
+                       Watermark="IMMICH_API_KEY" />
+              <Border Grid.Row="1"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichApiKeyStatusBackground}">
+                <TextBlock Text="{Binding ImmichApiKeyStatusText}" />
+              </Border>
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Permissions" />
+              <TextBlock Grid.Row="2"
+                         Grid.Column="1"
+                         VerticalAlignment="Center"
+                         Foreground="#5E6057"
+                         Text="Checks the permissions needed for upload plus the planned album workflow." />
+              <Border Grid.Row="2"
+                      Grid.Column="2"
+                      Classes="status-pill"
+                      VerticalAlignment="Center"
+                      Background="{Binding ImmichPermissionsStatusBackground}">
+                <TextBlock Text="{Binding ImmichPermissionsStatusText}" />
+              </Border>
+
+              <ItemsControl Grid.Row="3"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            ItemsSource="{Binding ImmichPermissionStatuses}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,0,8"
+                            Padding="12"
+                            Background="#F5F1E8"
+                            CornerRadius="12"
+                            BorderBrush="#DDD5C4"
+                            BorderThickness="1">
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+                          <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding PermissionName}" Foreground="#5E6057" />
+                        </StackPanel>
+                        <Border Grid.Row="0"
+                                Grid.Column="1"
+                                Classes="status-pill"
+                                VerticalAlignment="Center"
+                                Background="{Binding StatusBackground}">
+                          <TextBlock Text="{Binding StatusText}" />
+                        </Border>
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Grid.ColumnSpan="2"
+                                   Foreground="#5E6057"
+                                   Text="{Binding Message}"
+                                   TextWrapping="Wrap" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Button Grid.Row="4"
+                      Grid.Column="1"
+                      HorizontalAlignment="Left"
+                      Click="VerifyImmichButton_Click"
+                      Content="Verify Immich Access" />
             </Grid>
           </StackPanel>
         </Border>
@@ -67,7 +156,7 @@
                           BorderThickness="1">
                     <Grid ColumnDefinitions="*,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
                       <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
-                      <TextBlock Grid.Row="0" Grid.Column="1" Text="Album Name" />
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="Immich Album Name" />
                       <Button Grid.Row="0"
                               Grid.Column="2"
                               HorizontalAlignment="Right"
@@ -155,13 +244,28 @@
     <Border Grid.Row="2"
             Padding="18"
             Background="#F0E9DB">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
         <Button Grid.Row="0" Grid.Column="0" Click="RefreshStatusButton_Click" Content="Refresh Now" />
-        <Button Grid.Row="0" Grid.Column="1" Click="OpenLogsButton_Click" Content="Open Logs" />
-        <Button Grid.Row="0" Grid.Column="2" Classes="primary" Click="SaveAndVerifyButton_Click" Content="Save And Verify" />
+        <Button Grid.Row="0"
+                Grid.Column="1"
+                IsVisible="{Binding ShowStartServiceButton}"
+                Click="StartServiceButton_Click"
+                Content="Start Service" />
+        <Button Grid.Row="0"
+                Grid.Column="2"
+                IsVisible="{Binding ShowStopServiceButton}"
+                Click="StopServiceButton_Click"
+                Content="Stop Service" />
+        <Button Grid.Row="0"
+                Grid.Column="3"
+                IsVisible="{Binding ShowRestartServiceButton}"
+                Click="RestartServiceButton_Click"
+                Content="Restart Service" />
+        <Button Grid.Row="0" Grid.Column="4" Click="OpenLogsButton_Click" Content="Open Logs" />
+        <Button Grid.Row="0" Grid.Column="5" Classes="primary" Click="SaveAndVerifyButton_Click" Content="Save And Verify" />
         <TextBlock Grid.Row="1"
                    Grid.Column="0"
-                   Grid.ColumnSpan="4"
+                   Grid.ColumnSpan="7"
                    Margin="0,12,0,0"
                    Text="{Binding OperationMessage}"
                    TextWrapping="Wrap" />

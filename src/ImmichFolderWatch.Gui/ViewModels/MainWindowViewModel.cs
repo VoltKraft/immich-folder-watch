@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
+using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Gui.Models;
 
 namespace ImmichFolderWatch.Gui.ViewModels;
@@ -19,14 +20,28 @@ public sealed class MainWindowViewModel : BindableBase
     private string _logDirectory = GetDefaultLogDirectory();
     private string _statusHeadline = "Loading current service status...";
     private string _statusDetails = string.Empty;
+    private string _serviceBadgeText = "Loading";
+    private string _serviceBadgeBackground = "#D7E8FF";
     private string _operationMessage = string.Empty;
+    private string _immichUrlStatusText = "Not checked";
+    private string _immichUrlStatusBackground = "#E0E3E8";
+    private string _immichApiKeyStatusText = "Not checked";
+    private string _immichApiKeyStatusBackground = "#E0E3E8";
+    private string _immichPermissionsStatusText = "Not checked";
+    private string _immichPermissionsStatusBackground = "#E0E3E8";
+    private bool _showStartServiceButton;
+    private bool _showStopServiceButton;
+    private bool _showRestartServiceButton;
 
     public MainWindowViewModel()
     {
         Sources.Add(new WatchSourceItem());
+        ResetImmichCheckStatus();
     }
 
     public ObservableCollection<WatchSourceItem> Sources { get; } = new();
+
+    public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
 
     public string[] AvailableLogLevels { get; } =
     {
@@ -41,13 +56,25 @@ public sealed class MainWindowViewModel : BindableBase
     public string ImmichServerApiUrl
     {
         get => _immichServerApiUrl;
-        set => SetProperty(ref _immichServerApiUrl, value);
+        set
+        {
+            if (SetProperty(ref _immichServerApiUrl, value))
+            {
+                ResetImmichCheckStatus();
+            }
+        }
     }
 
     public string ImmichApiKey
     {
         get => _immichApiKey;
-        set => SetProperty(ref _immichApiKey, value);
+        set
+        {
+            if (SetProperty(ref _immichApiKey, value))
+            {
+                ResetImmichCheckStatus();
+            }
+        }
     }
 
     public string ExtensionsText
@@ -110,10 +137,76 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _statusDetails, value);
     }
 
+    public string ServiceBadgeText
+    {
+        get => _serviceBadgeText;
+        set => SetProperty(ref _serviceBadgeText, value);
+    }
+
+    public string ServiceBadgeBackground
+    {
+        get => _serviceBadgeBackground;
+        set => SetProperty(ref _serviceBadgeBackground, value);
+    }
+
     public string OperationMessage
     {
         get => _operationMessage;
         set => SetProperty(ref _operationMessage, value);
+    }
+
+    public string ImmichUrlStatusText
+    {
+        get => _immichUrlStatusText;
+        set => SetProperty(ref _immichUrlStatusText, value);
+    }
+
+    public string ImmichUrlStatusBackground
+    {
+        get => _immichUrlStatusBackground;
+        set => SetProperty(ref _immichUrlStatusBackground, value);
+    }
+
+    public string ImmichApiKeyStatusText
+    {
+        get => _immichApiKeyStatusText;
+        set => SetProperty(ref _immichApiKeyStatusText, value);
+    }
+
+    public string ImmichApiKeyStatusBackground
+    {
+        get => _immichApiKeyStatusBackground;
+        set => SetProperty(ref _immichApiKeyStatusBackground, value);
+    }
+
+    public string ImmichPermissionsStatusText
+    {
+        get => _immichPermissionsStatusText;
+        set => SetProperty(ref _immichPermissionsStatusText, value);
+    }
+
+    public string ImmichPermissionsStatusBackground
+    {
+        get => _immichPermissionsStatusBackground;
+        set => SetProperty(ref _immichPermissionsStatusBackground, value);
+    }
+
+    public bool ShowStartServiceButton
+    {
+        get => _showStartServiceButton;
+        set => SetProperty(ref _showStartServiceButton, value);
+    }
+
+    public bool ShowStopServiceButton
+    {
+        get => _showStopServiceButton;
+        set => SetProperty(ref _showStopServiceButton, value);
+    }
+
+    public bool ShowRestartServiceButton
+    {
+        get => _showRestartServiceButton;
+        set => SetProperty(ref _showRestartServiceButton, value);
     }
 
     public void Load(AppConfig config)
@@ -146,6 +239,8 @@ public sealed class MainWindowViewModel : BindableBase
         {
             Sources.Add(new WatchSourceItem());
         }
+
+        ResetImmichCheckStatus();
     }
 
     public bool TryCreateConfig(out AppConfig config, out IReadOnlyList<string> errors)
@@ -209,6 +304,121 @@ public sealed class MainWindowViewModel : BindableBase
         return LogDirectory.Trim();
     }
 
+    public AppConfig CreateImmichCheckConfig()
+    {
+        return new AppConfig
+        {
+            Immich = new ImmichSettings
+            {
+                ServerApiUrl = ImmichServerApiUrl.Trim(),
+                ApiKey = ImmichApiKey.Trim(),
+            },
+            Retry = new RetrySettings
+            {
+                MaxAttempts = 1,
+                BaseDelayMilliseconds = 250,
+            },
+            Logging = new LoggingSettings
+            {
+                Level = "Information",
+                LogDirectory = GetDefaultLogDirectory(),
+            },
+        };
+    }
+
+    public void SetImmichCheckInProgress()
+    {
+        SetImmichUrlStatus(CheckState.Checking);
+        SetImmichApiKeyStatus(CheckState.Checking);
+        SetImmichPermissionsStatus(CheckState.Checking);
+
+        RefreshPermissionStatuses(CreatePermissionItems(
+            new[]
+            {
+                new ImmichPermissionCheckResult { DisplayName = "Asset Upload", PermissionName = "asset.upload", State = CheckState.Checking, Message = "Checking...", BlocksConfigVerification = true },
+                new ImmichPermissionCheckResult { DisplayName = "Album Read", PermissionName = "album.read", State = CheckState.Checking, Message = "Checking..." },
+                new ImmichPermissionCheckResult { DisplayName = "Album Create", PermissionName = "album.create", State = CheckState.Checking, Message = "Checking..." },
+                new ImmichPermissionCheckResult { DisplayName = "Add Asset To Album", PermissionName = "albumAsset.create", State = CheckState.Checking, Message = "Checking..." },
+            }));
+    }
+
+    public void ApplyImmichCheckResult(ImmichAccessCheckResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        SetImmichUrlStatus(result.UrlState);
+        SetImmichApiKeyStatus(result.ApiKeyState);
+        SetImmichPermissionsStatus(result.PermissionsState);
+
+        RefreshPermissionStatuses(CreatePermissionItems(result.PermissionResults));
+    }
+
+    public void ApplyServiceActionVisibility(ServiceStatusSnapshot? status)
+    {
+        var showStart = status is { Exists: true, State: ServiceRunState.Stopped };
+        var showStop = status is { Exists: true, State: ServiceRunState.Running };
+        var showRestart = status is { Exists: true, State: ServiceRunState.Running };
+
+        ShowStartServiceButton = showStart;
+        ShowStopServiceButton = showStop;
+        ShowRestartServiceButton = showRestart;
+    }
+
+    private void ResetImmichCheckStatus()
+    {
+        SetImmichUrlStatus(CheckState.NotChecked);
+        SetImmichApiKeyStatus(CheckState.NotChecked);
+        SetImmichPermissionsStatus(CheckState.NotChecked);
+
+        RefreshPermissionStatuses(CreatePermissionItems(
+            new[]
+            {
+                new ImmichPermissionCheckResult { DisplayName = "Asset Upload", PermissionName = "asset.upload", State = CheckState.NotChecked, Message = "Not checked yet.", BlocksConfigVerification = true },
+                new ImmichPermissionCheckResult { DisplayName = "Album Read", PermissionName = "album.read", State = CheckState.NotChecked, Message = "Not checked yet." },
+                new ImmichPermissionCheckResult { DisplayName = "Album Create", PermissionName = "album.create", State = CheckState.NotChecked, Message = "Not checked yet." },
+                new ImmichPermissionCheckResult { DisplayName = "Add Asset To Album", PermissionName = "albumAsset.create", State = CheckState.NotChecked, Message = "Not checked yet." },
+            }));
+    }
+
+    private void SetImmichUrlStatus(CheckState state)
+    {
+        ImmichUrlStatusText = GetCheckStateText(state);
+        ImmichUrlStatusBackground = GetCheckStateBackground(state);
+    }
+
+    private void SetImmichApiKeyStatus(CheckState state)
+    {
+        ImmichApiKeyStatusText = GetCheckStateText(state);
+        ImmichApiKeyStatusBackground = GetCheckStateBackground(state);
+    }
+
+    private void SetImmichPermissionsStatus(CheckState state)
+    {
+        ImmichPermissionsStatusText = GetCheckStateText(state);
+        ImmichPermissionsStatusBackground = GetCheckStateBackground(state);
+    }
+
+    private void RefreshPermissionStatuses(IEnumerable<ImmichPermissionStatusItem> items)
+    {
+        ImmichPermissionStatuses.Clear();
+        foreach (var item in items)
+        {
+            ImmichPermissionStatuses.Add(item);
+        }
+    }
+
+    private static IEnumerable<ImmichPermissionStatusItem> CreatePermissionItems(IEnumerable<ImmichPermissionCheckResult> results)
+    {
+        return results.Select(result => new ImmichPermissionStatusItem
+        {
+            DisplayName = result.DisplayName,
+            PermissionName = result.PermissionName,
+            StatusText = GetCheckStateText(result.State),
+            StatusBackground = GetCheckStateBackground(result.State),
+            Message = result.Message,
+        });
+    }
+
     private static int ParsePositiveInteger(string value, string fieldName, List<string> errors)
     {
         if (!int.TryParse(value, out var parsedValue))
@@ -235,5 +445,29 @@ public sealed class MainWindowViewModel : BindableBase
     private static string GetDefaultLogDirectory()
     {
         return Path.GetFullPath(InstallationPaths.GetLogDirectory(AppContext.BaseDirectory));
+    }
+
+    private static string GetCheckStateText(CheckState state)
+    {
+        return state switch
+        {
+            CheckState.Passed => "OK",
+            CheckState.Warning => "Warning",
+            CheckState.Failed => "Failed",
+            CheckState.Checking => "Checking",
+            _ => "Not checked",
+        };
+    }
+
+    private static string GetCheckStateBackground(CheckState state)
+    {
+        return state switch
+        {
+            CheckState.Passed => "#D8F0D9",
+            CheckState.Warning => "#F9E3B4",
+            CheckState.Failed => "#F3C7C2",
+            CheckState.Checking => "#D7E8FF",
+            _ => "#E0E3E8",
+        };
     }
 }

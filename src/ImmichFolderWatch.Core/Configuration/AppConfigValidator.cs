@@ -23,32 +23,48 @@ public static class AppConfigValidator
         return value.EndsWith('/') ? value : $"{value}/";
     }
 
-    private static void ValidateImmich(AppConfig config, List<string> errors)
+    public static string? ValidateServerApiUrl(string value)
     {
-        if (string.IsNullOrWhiteSpace(config.Immich.ServerApiUrl))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add("immich.serverApiUrl is required.");
-        }
-        else if (!Uri.TryCreate(config.Immich.ServerApiUrl, UriKind.Absolute, out var uri))
-        {
-            errors.Add("immich.serverApiUrl must be a valid absolute URL.");
-        }
-        else
-        {
-            var normalizedPath = uri.AbsolutePath.TrimEnd('/');
-            if (!normalizedPath.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-            {
-                errors.Add("immich.serverApiUrl must include '/api' at the end of the path.");
-            }
+            return "immich.serverApiUrl is required.";
         }
 
-        if (string.IsNullOrWhiteSpace(config.Immich.ApiKey))
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
         {
-            errors.Add("immich.apiKey is required.");
+            return "immich.serverApiUrl must be a valid absolute URL.";
         }
-        else if (string.Equals(config.Immich.ApiKey.Trim(), ExampleApiKeyPlaceholder, StringComparison.Ordinal))
+
+        var normalizedPath = uri.AbsolutePath.TrimEnd('/');
+        return normalizedPath.EndsWith("/api", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : "immich.serverApiUrl must include '/api' at the end of the path.";
+    }
+
+    public static string? ValidateApiKey(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add("immich.apiKey must be replaced with a real Immich API key.");
+            return "immich.apiKey is required.";
+        }
+
+        return string.Equals(value.Trim(), ExampleApiKeyPlaceholder, StringComparison.Ordinal)
+            ? "immich.apiKey must be replaced with a real Immich API key."
+            : null;
+    }
+
+    private static void ValidateImmich(AppConfig config, List<string> errors)
+    {
+        var apiUrlError = ValidateServerApiUrl(config.Immich.ServerApiUrl);
+        if (!string.IsNullOrWhiteSpace(apiUrlError))
+        {
+            errors.Add(apiUrlError);
+        }
+
+        var apiKeyError = ValidateApiKey(config.Immich.ApiKey);
+        if (!string.IsNullOrWhiteSpace(apiKeyError))
+        {
+            errors.Add(apiKeyError);
         }
     }
 

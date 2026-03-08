@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly AppConfigLoader _configLoader;
     private readonly DispatcherTimer _statusRefreshTimer;
     private bool _isStatusRefreshInProgress;
+    private bool _isImmichCheckInProgress;
 
     public MainWindow()
     {
@@ -51,6 +52,7 @@ public sealed partial class MainWindow : Window
     {
         var statusResponse = await RefreshStatusAsync(updateOperationMessageOnFailure: true);
         LoadConfigFromDisk(statusResponse?.Status?.ConfigPath ?? InstallationPaths.GetConfigPath(AppContext.BaseDirectory));
+        await RunImmichAccessCheckAsync(updateOperationMessage: false);
     }
 
     private void LoadConfigFromDisk(string configPath)
@@ -112,6 +114,9 @@ public sealed partial class MainWindow : Window
         {
             ViewModel.StatusHeadline = "Service status unavailable";
             ViewModel.StatusDetails = "The admin helper did not return any status information.";
+            ViewModel.ServiceBadgeText = "Unavailable";
+            ViewModel.ServiceBadgeBackground = "#E0E3E8";
+            ViewModel.ApplyServiceActionVisibility(null);
             return;
         }
 
@@ -128,6 +133,43 @@ public sealed partial class MainWindow : Window
             $"Verified: {(status.IsInitialVerificationCompleted ? "Yes" : "No")}{Environment.NewLine}" +
             $"Config: {status.ConfigPath}{Environment.NewLine}" +
             $"Logs: {status.LogDirectory}";
+
+        ApplyServiceBadge(status);
+        ViewModel.ApplyServiceActionVisibility(status);
+    }
+
+    private void ApplyServiceBadge(ServiceStatusSnapshot status)
+    {
+        if (!status.Exists)
+        {
+            ViewModel.ServiceBadgeText = "Not installed";
+            ViewModel.ServiceBadgeBackground = "#E0E3E8";
+            return;
+        }
+
+        switch (status.State)
+        {
+            case ServiceRunState.Running:
+                ViewModel.ServiceBadgeText = "Running";
+                ViewModel.ServiceBadgeBackground = "#D8F0D9";
+                break;
+            case ServiceRunState.Stopped:
+                ViewModel.ServiceBadgeText = "Stopped";
+                ViewModel.ServiceBadgeBackground = "#F9E3B4";
+                break;
+            case ServiceRunState.StartPending:
+                ViewModel.ServiceBadgeText = "Starting";
+                ViewModel.ServiceBadgeBackground = "#D7E8FF";
+                break;
+            case ServiceRunState.StopPending:
+                ViewModel.ServiceBadgeText = "Stopping";
+                ViewModel.ServiceBadgeBackground = "#D7E8FF";
+                break;
+            default:
+                ViewModel.ServiceBadgeText = "Unknown";
+                ViewModel.ServiceBadgeBackground = "#E0E3E8";
+                break;
+        }
     }
 
     private async Task<AdminCommandResponse?> RefreshStatusAsync(bool updateOperationMessageOnFailure, string? successMessage = null)
@@ -167,9 +209,169 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task RunImmichAccessCheckAsync(bool updateOperationMessage)
+    {
+        if (_isImmichCheckInProgress)
+        {
+            return;
+        }
+
+        _isImmichCheckInProgress = true;
+
+        try
+        {
+            ViewModel.SetImmichCheckInProgress();
+
+            if (updateOperationMessage)
+            {
+                ViewModel.OperationMessage = "Checking Immich URL, API key, and permissions...";
+            }
+
+            var accessResult = await _verificationRunner.CheckImmichAccessAsync(
+                ViewModel.CreateImmichCheckConfig(),
+                InstallationPaths.GetConfigPath(AppContext.BaseDirectory),
+                CancellationToken.None);
+
+            ViewModel.ApplyImmichCheckResult(accessResult);
+
+            if (updateOperationMessage)
+            {
+                ViewModel.OperationMessage = BuildImmichCheckSummary(accessResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ApplyImmichCheckResult(CreateUnexpectedImmichCheckFailureResult(ex.Message));
+            ViewModel.OperationMessage = $"Immich access check failed: {ex.Message}";
+        }
+        finally
+        {
+            _isImmichCheckInProgress = false;
+        }
+    }
+
+    private static string BuildImmichCheckSummary(ImmichAccessCheckResult accessResult)
+    {
+        if (accessResult.UrlState == CheckState.Failed)
+        {
+            return accessResult.UrlMessage;
+        }
+
+        if (accessResult.ApiKeyState == CheckState.Failed)
+        {
+            return accessResult.ApiKeyMessage;
+        }
+
+        return accessResult.PermissionsState switch
+        {
+            CheckState.Passed => "Immich access check completed successfully.",
+            CheckState.Warning => accessResult.PermissionsMessage,
+            CheckState.Failed => accessResult.PermissionsMessage,
+            _ => "Immich access check completed.",
+        };
+    }
+
+    private static ImmichAccessCheckResult CreateUnexpectedImmichCheckFailureResult(string message)
+    {
+        const string notCheckedMessage = "Not checked because the Immich access check failed unexpectedly.";
+
+        return new ImmichAccessCheckResult
+        {
+            UrlState = CheckState.Failed,
+            UrlMessage = $"Immich access check failed unexpectedly: {message}",
+            ApiKeyState = CheckState.NotChecked,
+            ApiKeyMessage = notCheckedMessage,
+            PermissionsState = CheckState.NotChecked,
+            PermissionsMessage = notCheckedMessage,
+            PermissionResults =
+            [
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Asset Upload",
+                    PermissionName = "asset.upload",
+                    State = CheckState.NotChecked,
+                    Message = notCheckedMessage,
+                    BlocksConfigVerification = true,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Album Read",
+                    PermissionName = "album.read",
+                    State = CheckState.NotChecked,
+                    Message = notCheckedMessage,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Album Create",
+                    PermissionName = "album.create",
+                    State = CheckState.NotChecked,
+                    Message = notCheckedMessage,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Add Asset To Album",
+                    PermissionName = "albumAsset.create",
+                    State = CheckState.NotChecked,
+                    Message = notCheckedMessage,
+                },
+            ],
+        };
+    }
+
+    private async Task ExecuteServiceActionAsync(
+        Func<CancellationToken, Task<AdminCommandResponse>> action,
+        string pendingMessage)
+    {
+        try
+        {
+            _statusRefreshTimer.Stop();
+            ViewModel.OperationMessage = pendingMessage;
+
+            var response = await action(CancellationToken.None);
+            ApplyStatus(response.Status);
+            ViewModel.OperationMessage = response.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            ViewModel.OperationMessage = "The elevation prompt was canceled.";
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            ViewModel.OperationMessage = "The elevation prompt was canceled.";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.OperationMessage = $"Service action failed: {ex.Message}";
+        }
+        finally
+        {
+            _statusRefreshTimer.Start();
+        }
+    }
+
     private async void RefreshStatusButton_Click(object? sender, RoutedEventArgs e)
     {
         await RefreshStatusAsync(updateOperationMessageOnFailure: true, successMessage: "Service status refreshed.");
+    }
+
+    private async void VerifyImmichButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await RunImmichAccessCheckAsync(updateOperationMessage: true);
+    }
+
+    private async void StartServiceButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await ExecuteServiceActionAsync(_adminCliClient.StartServiceAsync, "Starting service...");
+    }
+
+    private async void StopServiceButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await ExecuteServiceActionAsync(_adminCliClient.StopServiceAsync, "Stopping service...");
+    }
+
+    private async void RestartServiceButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await ExecuteServiceActionAsync(_adminCliClient.RestartServiceAsync, "Restarting service...");
     }
 
     private void AddSourceButton_Click(object? sender, RoutedEventArgs e)
@@ -233,11 +435,20 @@ public sealed partial class MainWindow : Window
             var writer = new AppConfigWriter();
             File.WriteAllText(tempConfigPath, writer.Serialize(draftConfig));
 
+            ViewModel.SetImmichCheckInProgress();
             ViewModel.OperationMessage = "Verifying configuration against Immich...";
-            var verificationResult = await _verificationRunner.VerifyAsync(
+
+            var accessResult = await _verificationRunner.CheckImmichAccessAsync(
                 draftConfig,
                 InstallationPaths.GetConfigPath(AppContext.BaseDirectory),
                 CancellationToken.None);
+            ViewModel.ApplyImmichCheckResult(accessResult);
+
+            var verificationResult = _verificationRunner.BuildVerificationResult(
+                draftConfig,
+                InstallationPaths.GetConfigPath(AppContext.BaseDirectory),
+                accessResult);
+
             if (!verificationResult.Success)
             {
                 ViewModel.OperationMessage = string.Join(Environment.NewLine, verificationResult.Errors);
@@ -250,7 +461,9 @@ public sealed partial class MainWindow : Window
             if (response.Success)
             {
                 LoadConfigFromDisk(response.Status?.ConfigPath ?? InstallationPaths.GetConfigPath(AppContext.BaseDirectory));
+                await RunImmichAccessCheckAsync(updateOperationMessage: false);
             }
+
             ViewModel.OperationMessage = response.Message;
         }
         catch (OperationCanceledException)

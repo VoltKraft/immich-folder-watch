@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot,
-    [string]$Version = "1.1.0",
+    [string]$Version = "1.2.0",
     [switch]$FrameworkDependent
 )
 
