@@ -73,6 +73,30 @@ public sealed class ConfigVerificationServiceTests
     }
 
     [Fact]
+    public async Task VerifyAsync_RejectsExampleApiKeyWithoutPing()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory("ifw-verify-placeholder-key-");
+
+        try
+        {
+            var connectivityVerifier = new FakeConnectivityVerifier();
+            var service = new ConfigVerificationService(connectivityVerifier);
+            var config = CreateValidConfig(tempDirectory.FullName);
+            config.Immich.ApiKey = "REPLACE_WITH_IMMICH_API_KEY";
+
+            var result = await service.VerifyAsync(config, CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Contains("immich.apiKey must be replaced with a real Immich API key.", result.Errors);
+            Assert.Equal(0, connectivityVerifier.PingCallCount);
+        }
+        finally
+        {
+            tempDirectory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task VerifyAsync_ReturnsSuccessForValidConfig()
     {
         var tempDirectory = Directory.CreateTempSubdirectory("ifw-verify-success-");

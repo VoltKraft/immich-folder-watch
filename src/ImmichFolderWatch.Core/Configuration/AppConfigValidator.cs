@@ -2,6 +2,8 @@ namespace ImmichFolderWatch.Core.Configuration;
 
 public static class AppConfigValidator
 {
+    private const string ExampleApiKeyPlaceholder = "REPLACE_WITH_IMMICH_API_KEY";
+
     public static IReadOnlyList<string> Validate(AppConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -43,6 +45,10 @@ public static class AppConfigValidator
         if (string.IsNullOrWhiteSpace(config.Immich.ApiKey))
         {
             errors.Add("immich.apiKey is required.");
+        }
+        else if (string.Equals(config.Immich.ApiKey.Trim(), ExampleApiKeyPlaceholder, StringComparison.Ordinal))
+        {
+            errors.Add("immich.apiKey must be replaced with a real Immich API key.");
         }
     }
 

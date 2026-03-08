@@ -4,11 +4,8 @@ immich:
 
 watch:
   sources:
-    - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
-      albumName: "Screenshots"
-      includeSubdirectories: false
-    - path: "C:\\Users\\YOUR_USER\\Pictures\\Camera"
-      albumName: "Camera Imports"
+    - path: "C:\\Users\\YOUR_USER\\Pictures"
+      albumName: "Pictures"
       includeSubdirectories: true
   extensions:
     - ".png"
