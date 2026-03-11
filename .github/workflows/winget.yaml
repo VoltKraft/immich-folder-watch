@@ -31,7 +31,7 @@ jobs:
               $releaseTag = $targetRef
           }
           elseif (-not [string]::IsNullOrWhiteSpace($manualTag)) {
-              $targetRef = $manualTag
+              $targetRef = "main"
               $releaseTag = $manualTag
           }
           else {
