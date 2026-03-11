@@ -98,10 +98,10 @@ jobs:
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
         env:
-          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN || secrets.WINGET }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINGETCREATE_TOKEN)) {
-              throw "Missing repository secret WINGETCREATE_TOKEN."
+              throw "Missing repository secret WINGETCREATE_TOKEN or WINGET."
           }
 
       - name: Setup .NET 6 for wingetcreate
@@ -120,7 +120,7 @@ jobs:
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
         env:
-          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+          WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN || secrets.WINGET }}
         run: |
           .\wingetcreate.exe update `
             "${{ steps.metadata.outputs.package_identifier }}" `
