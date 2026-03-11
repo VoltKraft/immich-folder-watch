@@ -5,6 +5,11 @@ on:
     types:
       - published
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional published tag to submit, for example v1.4.0
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,12 +24,23 @@ jobs:
         id: ref
         shell: pwsh
         run: |
+          $manualTag = "${{ inputs.release_tag }}".Trim()
+
           if ("${{ github.event_name }}" -eq "release") {
-              "target_ref=${{ github.event.release.tag_name }}" >> $env:GITHUB_OUTPUT
+              $targetRef = "${{ github.event.release.tag_name }}"
+              $releaseTag = $targetRef
+          }
+          elseif (-not [string]::IsNullOrWhiteSpace($manualTag)) {
+              $targetRef = $manualTag
+              $releaseTag = $manualTag
           }
           else {
-              "target_ref=main" >> $env:GITHUB_OUTPUT
+              $targetRef = "main"
+              $releaseTag = ""
           }
+
+          "target_ref=$targetRef" >> $env:GITHUB_OUTPUT
+          "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,15 +67,20 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "WinGet automation is disabled in packaging/winget/package.metadata.json."
-          Write-Host "Complete the first manual bootstrap submission before enabling updates."
+          Write-Host "Enable automation there before submitting updates."
 
       - name: Read release version
         if: steps.metadata.outputs.automation_enabled == 'true'
         id: version
         shell: pwsh
         run: |
+          $selectedTag = "${{ steps.ref.outputs.release_tag }}"
+
           if ("${{ github.event_name }}" -eq "release") {
               $version = "${{ github.event.release.tag_name }}".TrimStart('v')
+          }
+          elseif (-not [string]::IsNullOrWhiteSpace($selectedTag)) {
+              $version = $selectedTag.TrimStart('v')
           }
           else {
               [xml]$props = Get-Content Directory.Build.props
