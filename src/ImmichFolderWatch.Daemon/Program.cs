@@ -30,12 +30,18 @@ internal static class Bootstrapper
             return 1;
         }
 
+        if (options.VersionRequested)
+        {
+            Console.WriteLine(ProductVersion);
+            return 0;
+        }
+
         var loader = new AppConfigLoader();
         AppConfig appConfig;
 
         try
         {
-            appConfig = loader.Load(options.ConfigPath);
+            appConfig = loader.Load(options.ConfigPath!);
         }
         catch (Exception ex)
         {

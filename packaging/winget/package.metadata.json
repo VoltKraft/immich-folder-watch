@@ -6,5 +6,5 @@
   "shortDescription": "Windows service that watches local folders and uploads newly appearing files to Immich.",
   "installerType": "wix",
   "releaseAssetNameTemplate": "immich-folder-watch-{version}-win-x64.msi",
-  "automationEnabled": false
+  "automationEnabled": true
 }
