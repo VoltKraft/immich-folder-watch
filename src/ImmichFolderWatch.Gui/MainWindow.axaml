@@ -211,26 +211,24 @@
                           <CheckBox IsChecked="{Binding IncludeSubdirectories}"
                                     Content="Include subdirectories" />
 
-                          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                            <StackPanel Spacing="6">
-                              <TextBlock Text="Extensions" />
-                              <TextBox Height="120"
-                                       AcceptsReturn="True"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding ExtensionsText}"
-                                       Watermark=".jpg&#10;.jpeg&#10;.heic" />
-                            </StackPanel>
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="Extensions" />
+                            <TextBox Height="120"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExtensionsText}"
+                                     Watermark=".jpg&#10;.jpeg&#10;.heic" />
+                          </StackPanel>
 
-                            <StackPanel Spacing="6"
-                                        IsVisible="{Binding ShowExcludeDirectories}">
-                              <TextBlock Text="Excluded Directories" />
-                              <TextBox Height="120"
-                                       AcceptsReturn="True"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding ExcludeDirectoriesText}"
-                                       Watermark="private&#10;**/cache" />
-                            </StackPanel>
-                          </Grid>
+                          <StackPanel Spacing="6"
+                                      IsVisible="{Binding ShowExcludeDirectories}">
+                            <TextBlock Text="Excluded Directories" />
+                            <TextBox Height="120"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExcludeDirectoriesText}"
+                                     Watermark="private&#10;**/cache" />
+                          </StackPanel>
 
                           <StackPanel Spacing="6">
                             <TextBlock Text="Excluded File Names" />
