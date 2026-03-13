@@ -4,7 +4,7 @@ The daemon reads YAML configuration from `config.yaml`.
 
 ## Example
 
-See [examples/config.example.yaml](../examples/config.example.yaml).
+See [packaging/windows/config.windows.example.yaml](../packaging/windows/config.windows.example.yaml).
 
 ## Schema
 
@@ -18,11 +18,17 @@ watch:
     - path: "C:\\Users\\<user>\\Pictures\\Screenshots"
       albumName: "Screenshots" # optional; leave empty to upload without album placement
       includeSubdirectories: false
-  extensions:
-    - ".png"
-    - ".jpg"
-    - ".jpeg"
-    - ".heic"
+      extensions:
+        - ".png"
+        - ".jpg"
+        - ".jpeg"
+        - ".heic"
+      excludeDirectories:
+        - "private"
+        - "**/cache"
+      excludeFileNames:
+        - "Thumbs.db"
+        - "*.tmp"
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30
@@ -41,16 +47,21 @@ logging:
 - `immich.serverApiUrl` must be an absolute URL and must include `/api`.
 - `immich.apiKey` must be a valid Immich API key.
 - `watch.sources` must include at least one source.
-- `watch.extensions` must include at least one extension.
+- `watch.sources[].extensions` must include at least one extension for each source.
 - Numeric settings must be positive integers.
 - `logging.logDirectory` must be an absolute filesystem path.
 
 ## Notes
 
 - File extensions are case-insensitive.
+- Each source has its own `extensions` include list.
 - Extensions without `.` are normalized automatically.
+- `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
+- `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
+- `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
 - `watch.sources[].albumName` is optional. Leave it empty to upload files without assigning them to an Immich album.
 - If `watch.sources[].albumName` is set, uploads are added to that album and the daemon creates the album automatically if it does not exist yet.
 - In the Windows GUI, a newly added source suggests the folder name as the album name once; if you clear the field afterwards, it stays empty.
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
+- Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
 - Existing relative `logging.logDirectory` values still run after normalization, but the Windows GUI rewrites them to an absolute path on the next successful save.

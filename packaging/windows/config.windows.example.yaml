@@ -7,13 +7,18 @@ watch:
     - path: "C:\\Users\\YOUR_USER\\Pictures"
       albumName: "Pictures"
       includeSubdirectories: true
-  extensions:
-    - ".png"
-    - ".jpg"
-    - ".jpeg"
-    - ".heic"
-    - ".webp"
-    - ".mp4"
+      extensions:
+        - ".png"
+        - ".jpg"
+        - ".jpeg"
+        - ".heic"
+        - ".webp"
+      excludeDirectories:
+        - "private"
+        - "**/cache"
+      excludeFileNames:
+        - "Thumbs.db"
+        - "*.tmp"
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30

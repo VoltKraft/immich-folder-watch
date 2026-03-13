@@ -13,7 +13,6 @@ public sealed class MainWindowViewModel : BindableBase
 
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
-    private string _extensionsText = string.Empty;
     private string _batchIntervalSeconds = "5";
     private string _maxBatchSize = "25";
     private string _fileReadyTimeoutSeconds = "30";
@@ -91,12 +90,6 @@ public sealed class MainWindowViewModel : BindableBase
                 ResetImmichCheckStatus();
             }
         }
-    }
-
-    public string ExtensionsText
-    {
-        get => _extensionsText;
-        set => SetProperty(ref _extensionsText, value);
     }
 
     public string BatchIntervalSeconds
@@ -279,7 +272,6 @@ public sealed class MainWindowViewModel : BindableBase
 
         ImmichServerApiUrl = config.Immich.ServerApiUrl;
         ImmichApiKey = config.Immich.ApiKey;
-        ExtensionsText = string.Join(Environment.NewLine, config.Watch.Extensions);
         BatchIntervalSeconds = config.Watch.BatchIntervalSeconds.ToString();
         MaxBatchSize = config.Watch.MaxBatchSize.ToString();
         FileReadyTimeoutSeconds = config.Watch.FileReadyTimeoutSeconds.ToString();
@@ -296,6 +288,9 @@ public sealed class MainWindowViewModel : BindableBase
                 Path = source.Path,
                 AlbumName = source.AlbumName,
                 IncludeSubdirectories = source.IncludeSubdirectories,
+                ExtensionsText = string.Join(Environment.NewLine, source.Extensions),
+                ExcludeDirectoriesText = string.Join(Environment.NewLine, source.ExcludeDirectories),
+                ExcludeFileNamesText = string.Join(Environment.NewLine, source.ExcludeFileNames),
             });
         }
 
@@ -353,8 +348,10 @@ public sealed class MainWindowViewModel : BindableBase
                     Path = source.Path.Trim(),
                     AlbumName = source.AlbumName.Trim(),
                     IncludeSubdirectories = source.IncludeSubdirectories,
+                    Extensions = ParseListInput(source.ExtensionsText).ToList(),
+                    ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
+                    ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
                 }).ToList(),
-                Extensions = ParseExtensions(ExtensionsText).ToList(),
                 BatchIntervalSeconds = batchIntervalSeconds,
                 MaxBatchSize = maxBatchSize,
                 FileReadyTimeoutSeconds = fileReadyTimeoutSeconds,
@@ -396,6 +393,9 @@ public sealed class MainWindowViewModel : BindableBase
                     Path = source.Path.Trim(),
                     AlbumName = source.AlbumName.Trim(),
                     IncludeSubdirectories = source.IncludeSubdirectories,
+                    Extensions = ParseListInput(source.ExtensionsText).ToList(),
+                    ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
+                    ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
                 }).ToList(),
             },
             Retry = new RetrySettings
@@ -523,11 +523,11 @@ public sealed class MainWindowViewModel : BindableBase
         return parsedValue;
     }
 
-    private static IEnumerable<string> ParseExtensions(string value)
+    private static IEnumerable<string> ParseListInput(string value)
     {
         return value
             .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(extension => !string.IsNullOrWhiteSpace(extension));
+            .Where(entry => !string.IsNullOrWhiteSpace(entry));
     }
 
     private static string GetDefaultLogDirectory()

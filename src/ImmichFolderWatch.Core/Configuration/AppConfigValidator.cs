@@ -88,11 +88,10 @@ public static class AppConfigValidator
                 errors.Add($"watch.sources[{i}].path does not exist: {source.Path}");
             }
 
-        }
-
-        if (config.Watch.Extensions.Count == 0)
-        {
-            errors.Add("watch.extensions must contain at least one file extension.");
+            if ((source.Extensions?.Count ?? 0) == 0)
+            {
+                errors.Add($"watch.sources[{i}].extensions must contain at least one file extension.");
+            }
         }
 
         if (config.Watch.BatchIntervalSeconds <= 0)

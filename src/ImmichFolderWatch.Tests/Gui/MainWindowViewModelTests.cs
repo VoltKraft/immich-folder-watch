@@ -148,6 +148,9 @@ public sealed class MainWindowViewModelTests
             Path = @"C:\Users\jan\Pictures\Screenshots",
             AlbumName = "Screenshots",
             IncludeSubdirectories = true,
+            ExtensionsText = ".png\r\njpg",
+            ExcludeDirectoriesText = "private\r\n**/cache",
+            ExcludeFileNamesText = "Thumbs.db\r\n*.tmp",
         });
 
         var config = viewModel.CreateImmichCheckConfig();
@@ -155,5 +158,63 @@ public sealed class MainWindowViewModelTests
         Assert.Single(config.Watch.Sources);
         Assert.Equal("Screenshots", config.Watch.Sources[0].AlbumName);
         Assert.True(config.Watch.Sources[0].IncludeSubdirectories);
+        Assert.Equal([".png", "jpg"], config.Watch.Sources[0].Extensions);
+        Assert.Equal(["private", "**/cache"], config.Watch.Sources[0].ExcludeDirectories);
+        Assert.Equal(["Thumbs.db", "*.tmp"], config.Watch.Sources[0].ExcludeFileNames);
+    }
+
+    [Fact]
+    public void Load_PopulatesPerSourceFilterFields()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.Load(new AppConfig
+        {
+            Watch = new WatchSettings
+            {
+                Sources =
+                {
+                    new WatchSourceSettings
+                    {
+                        Path = @"C:\Users\jan\Pictures\Screenshots",
+                        AlbumName = "Screenshots",
+                        IncludeSubdirectories = true,
+                        Extensions = [".png", ".jpg"],
+                        ExcludeDirectories = ["private", "**/cache"],
+                        ExcludeFileNames = ["Thumbs.db", "*.tmp"],
+                    },
+                },
+            },
+        });
+
+        Assert.Single(viewModel.Sources);
+        Assert.Equal(".png\r\n.jpg", viewModel.Sources[0].ExtensionsText);
+        Assert.Equal("private\r\n**/cache", viewModel.Sources[0].ExcludeDirectoriesText);
+        Assert.Equal("Thumbs.db\r\n*.tmp", viewModel.Sources[0].ExcludeFileNamesText);
+    }
+
+    [Fact]
+    public void TryCreateConfig_IncludesPerSourceFilterFields()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.Sources.Clear();
+        viewModel.Sources.Add(new WatchSourceItem
+        {
+            Path = @"C:\Users\jan\Pictures\Camera",
+            AlbumName = "Camera",
+            IncludeSubdirectories = false,
+            ExtensionsText = ".heic\r\n.jpeg",
+            ExcludeDirectoriesText = "**/cache",
+            ExcludeFileNamesText = "*.tmp",
+        });
+
+        var success = viewModel.TryCreateConfig(out var config, out var errors);
+
+        Assert.True(success);
+        Assert.Empty(errors);
+        Assert.Single(config.Watch.Sources);
+        Assert.Equal([".heic", ".jpeg"], config.Watch.Sources[0].Extensions);
+        Assert.Equal(["**/cache"], config.Watch.Sources[0].ExcludeDirectories);
+        Assert.Equal(["*.tmp"], config.Watch.Sources[0].ExcludeFileNames);
     }
 }

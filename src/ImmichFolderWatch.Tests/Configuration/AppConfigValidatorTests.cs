@@ -27,9 +27,9 @@ public sealed class AppConfigValidatorTests
                         {
                             Path = watchPath,
                             AlbumName = string.Empty,
+                            Extensions = [".png"],
                         },
                     ],
-                    Extensions = [".png"],
                     BatchIntervalSeconds = 5,
                     MaxBatchSize = 25,
                     FileReadyTimeoutSeconds = 30,
@@ -49,6 +49,58 @@ public sealed class AppConfigValidatorTests
             var errors = AppConfigValidator.Validate(config);
 
             Assert.DoesNotContain(errors, error => error.Contains("albumName", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(watchPath, recursive: true);
+            Directory.Delete(logPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Validate_RequiresExtensionsPerSource()
+    {
+        var watchPath = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"ifw-watch-{Guid.NewGuid():N}")).FullName;
+        var logPath = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"ifw-logs-{Guid.NewGuid():N}")).FullName;
+
+        try
+        {
+            var config = new AppConfig
+            {
+                Immich = new ImmichSettings
+                {
+                    ServerApiUrl = "https://immich.example.com/api",
+                    ApiKey = "demo-key",
+                },
+                Watch = new WatchSettings
+                {
+                    Sources =
+                    [
+                        new WatchSourceSettings
+                        {
+                            Path = watchPath,
+                            AlbumName = "Screenshots",
+                        },
+                    ],
+                    BatchIntervalSeconds = 5,
+                    MaxBatchSize = 25,
+                    FileReadyTimeoutSeconds = 30,
+                },
+                Retry = new RetrySettings
+                {
+                    MaxAttempts = 5,
+                    BaseDelayMilliseconds = 500,
+                },
+                Logging = new LoggingSettings
+                {
+                    Level = "Information",
+                    LogDirectory = logPath,
+                },
+            };
+
+            var errors = AppConfigValidator.Validate(config);
+
+            Assert.Contains("watch.sources[0].extensions must contain at least one file extension.", errors);
         }
         finally
         {

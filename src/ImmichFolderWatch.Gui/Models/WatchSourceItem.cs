@@ -6,6 +6,9 @@ public sealed class WatchSourceItem : BindableBase
 {
     private string _path = string.Empty;
     private string _albumName = string.Empty;
+    private string _extensionsText = string.Empty;
+    private string _excludeDirectoriesText = string.Empty;
+    private string _excludeFileNamesText = string.Empty;
     private bool _includeSubdirectories;
     private bool _albumNameTouchedByUser;
     private bool _hasAutoFilledAlbumName;
@@ -39,6 +42,24 @@ public sealed class WatchSourceItem : BindableBase
     {
         get => _includeSubdirectories;
         set => SetProperty(ref _includeSubdirectories, value);
+    }
+
+    public string ExtensionsText
+    {
+        get => _extensionsText;
+        set => SetProperty(ref _extensionsText, value);
+    }
+
+    public string ExcludeDirectoriesText
+    {
+        get => _excludeDirectoriesText;
+        set => SetProperty(ref _excludeDirectoriesText, value);
+    }
+
+    public string ExcludeFileNamesText
+    {
+        get => _excludeFileNamesText;
+        set => SetProperty(ref _excludeFileNamesText, value);
     }
 
     private void TrySuggestAlbumNameFromPath()

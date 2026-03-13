@@ -1,7 +1,7 @@
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-1.4.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.5.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a Windows service and desktop app that watches local folders and uploads newly created media to Immich automatically.
@@ -59,7 +59,7 @@ It is intentionally not a sync client. It does not mirror deletions, does not ba
 2. Install it with administrative rights.
 3. Open the `Immich Folder Watch` desktop shortcut.
 4. Enter your Immich URL and API key and review the verification result
-5. Select one or more folder and optionaly album name to be watched
+5. Select one or more folders and configure the per-folder album, extensions, and exclude filters
 6. **Save and Start**.
 
 Installed layout:
@@ -90,16 +90,24 @@ watch:
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
       albumName: "Screenshots"
       includeSubdirectories: false
+      extensions:
+        - ".png"
+      excludeDirectories:
+        - "private"
+      excludeFileNames:
+        - "Thumbs.db"
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Camera"
       albumName: "Camera Imports"
       includeSubdirectories: true
-  extensions:
-    - ".png"
-    - ".jpg"
-    - ".jpeg"
-    - ".heic"
-    - ".webp"
-    - ".mp4"
+      extensions:
+        - ".jpg"
+        - ".jpeg"
+        - ".heic"
+        - ".webp"
+      excludeDirectories:
+        - "**/cache"
+      excludeFileNames:
+        - "*.tmp"
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30

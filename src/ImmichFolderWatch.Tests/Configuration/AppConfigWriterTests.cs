@@ -31,12 +31,26 @@ public sealed class AppConfigWriterTests
                             Path = "../watch",
                             AlbumName = "Screenshots",
                             IncludeSubdirectories = true,
+                            Extensions =
+                            {
+                                ".png",
+                                ".jpg",
+                            },
+                            ExcludeDirectories =
+                            {
+                                "private",
+                                "**/cache",
+                            },
+                            ExcludeFileNames =
+                            {
+                                "Thumbs.db",
+                                "*.tmp",
+                            },
                         },
                     },
                     Extensions =
                     {
-                        ".png",
-                        ".jpg",
+                        ".legacy",
                     },
                     BatchIntervalSeconds = 7,
                     MaxBatchSize = 20,
@@ -55,22 +69,27 @@ public sealed class AppConfigWriterTests
             };
 
             var writer = new AppConfigWriter();
-            File.WriteAllText(configPath, writer.Serialize(config));
+            var yaml = writer.Serialize(config);
+            File.WriteAllText(configPath, yaml);
 
             var roundTrip = new AppConfigLoader().LoadForEditing(configPath);
             var normalized = AppConfigLoader.NormalizeForRuntime(roundTrip, configDirectory.FullName);
 
+            Assert.DoesNotContain($"{Environment.NewLine}  extensions:{Environment.NewLine}", yaml, StringComparison.Ordinal);
             Assert.Equal("../watch", roundTrip.Watch.Sources[0].Path);
             Assert.Equal("Screenshots", roundTrip.Watch.Sources[0].AlbumName);
             Assert.True(roundTrip.Watch.Sources[0].IncludeSubdirectories);
-            Assert.Contains(".png", roundTrip.Watch.Extensions);
-            Assert.Contains(".jpg", roundTrip.Watch.Extensions);
+            Assert.Equal([".png", ".jpg"], roundTrip.Watch.Sources[0].Extensions);
+            Assert.Equal(["private", "**/cache"], roundTrip.Watch.Sources[0].ExcludeDirectories);
+            Assert.Equal(["Thumbs.db", "*.tmp"], roundTrip.Watch.Sources[0].ExcludeFileNames);
+            Assert.Empty(roundTrip.Watch.Extensions);
             Assert.Equal(7, roundTrip.Watch.BatchIntervalSeconds);
             Assert.Equal(20, roundTrip.Watch.MaxBatchSize);
             Assert.Equal(40, roundTrip.Watch.FileReadyTimeoutSeconds);
             Assert.Equal("Warning", roundTrip.Logging.Level);
             Assert.Equal(logDirectory, roundTrip.Logging.LogDirectory);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "watch")), normalized.Watch.Sources[0].Path);
+            Assert.Equal([".png", ".jpg"], normalized.Watch.Sources[0].Extensions);
             Assert.Equal(Path.GetFullPath(logDirectory), normalized.Logging.LogDirectory);
         }
         finally

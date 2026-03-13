@@ -8,7 +8,8 @@
 
 ## Files are detected but not uploaded
 
-- Confirm extension is listed in `watch.extensions`.
+- Confirm the file matches the relevant `watch.sources[].extensions` list.
+- Check that the file does not match `watch.sources[].excludeDirectories` or `watch.sources[].excludeFileNames`.
 - Check read permissions on watched files.
 - Increase `watch.fileReadyTimeoutSeconds` for slow writes.
 
