@@ -167,7 +167,7 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         Assert.Single(viewModel.Sources);
-        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.Equal(JoinLines(ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.False(viewModel.Sources[0].IncludeSubdirectories);
         Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
@@ -209,7 +209,7 @@ public sealed class MainWindowViewModelTests
         viewModel.AddSource();
 
         Assert.Single(viewModel.Sources);
-        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.Equal(JoinLines(ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
     }
@@ -239,9 +239,9 @@ public sealed class MainWindowViewModelTests
         });
 
         Assert.Single(viewModel.Sources);
-        Assert.Equal(".png\r\n.jpg", viewModel.Sources[0].ExtensionsText);
-        Assert.Equal("private\r\n**/cache", viewModel.Sources[0].ExcludeDirectoriesText);
-        Assert.Equal("Thumbs.db\r\n*.tmp", viewModel.Sources[0].ExcludeFileNamesText);
+        Assert.Equal(JoinLines(".png", ".jpg"), viewModel.Sources[0].ExtensionsText);
+        Assert.Equal(JoinLines("private", "**/cache"), viewModel.Sources[0].ExcludeDirectoriesText);
+        Assert.Equal(JoinLines("Thumbs.db", "*.tmp"), viewModel.Sources[0].ExcludeFileNamesText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.True(viewModel.Sources[0].ShowExcludeDirectories);
     }
@@ -254,7 +254,7 @@ public sealed class MainWindowViewModelTests
         viewModel.Load(new AppConfig());
 
         Assert.Single(viewModel.Sources);
-        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.Equal(JoinLines(ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
     }
@@ -289,7 +289,7 @@ public sealed class MainWindowViewModelTests
     {
         var source = new WatchSourceItem
         {
-            ExcludeDirectoriesText = "private\r\n**/cache",
+            ExcludeDirectoriesText = JoinLines("private", "**/cache"),
         };
 
         Assert.False(source.ShowExcludeDirectories);
@@ -301,6 +301,11 @@ public sealed class MainWindowViewModelTests
         source.IncludeSubdirectories = false;
 
         Assert.False(source.ShowExcludeDirectories);
-        Assert.Equal("private\r\n**/cache", source.ExcludeDirectoriesText);
+        Assert.Equal(JoinLines("private", "**/cache"), source.ExcludeDirectoriesText);
+    }
+
+    private static string JoinLines(params string[] values)
+    {
+        return string.Join(Environment.NewLine, values);
     }
 }
