@@ -376,7 +376,7 @@ public sealed partial class MainWindow : Window
 
     private void AddSourceButton_Click(object? sender, RoutedEventArgs e)
     {
-        ViewModel.Sources.Add(new WatchSourceItem());
+        ViewModel.AddSource();
     }
 
     private void RemoveSourceButton_Click(object? sender, RoutedEventArgs e)

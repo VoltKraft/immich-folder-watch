@@ -10,6 +10,7 @@ public sealed class WatchSourceItem : BindableBase
     private string _excludeDirectoriesText = string.Empty;
     private string _excludeFileNamesText = string.Empty;
     private bool _includeSubdirectories;
+    private bool _showAdvancedOptions;
     private bool _albumNameTouchedByUser;
     private bool _hasAutoFilledAlbumName;
     private bool _isApplyingAlbumSuggestion;
@@ -41,7 +42,13 @@ public sealed class WatchSourceItem : BindableBase
     public bool IncludeSubdirectories
     {
         get => _includeSubdirectories;
-        set => SetProperty(ref _includeSubdirectories, value);
+        set
+        {
+            if (SetProperty(ref _includeSubdirectories, value))
+            {
+                RaisePropertyChanged(nameof(ShowExcludeDirectories));
+            }
+        }
     }
 
     public string ExtensionsText
@@ -61,6 +68,14 @@ public sealed class WatchSourceItem : BindableBase
         get => _excludeFileNamesText;
         set => SetProperty(ref _excludeFileNamesText, value);
     }
+
+    public bool ShowAdvancedOptions
+    {
+        get => _showAdvancedOptions;
+        set => SetProperty(ref _showAdvancedOptions, value);
+    }
+
+    public bool ShowExcludeDirectories => IncludeSubdirectories;
 
     private void TrySuggestAlbumNameFromPath()
     {

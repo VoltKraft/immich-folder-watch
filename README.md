@@ -59,7 +59,7 @@ It is intentionally not a sync client. It does not mirror deletions, does not ba
 2. Install it with administrative rights.
 3. Open the `Immich Folder Watch` desktop shortcut.
 4. Enter your Immich URL and API key and review the verification result
-5. Select one or more folders and configure the per-folder album, extensions, and exclude filters
+5. Select one or more folders and expand **Advanced Watch Options** only when you want to adjust subdirectories, extensions, or exclude filters.
 6. **Save and Start**.
 
 Installed layout:
@@ -89,25 +89,31 @@ watch:
   sources:
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
       albumName: "Screenshots"
-      includeSubdirectories: false
+      includeSubdirectories: true
       extensions:
+        - ".avif"
+        - ".bmp"
+        - ".gif"
+        - ".heic"
+        - ".heif"
+        - ".jp2"
+        - ".jpe"
+        - ".jpeg"
+        - ".jpg"
+        - ".insp"
+        - ".jxl"
         - ".png"
+        - ".psd"
+        - ".raw"
+        - ".rw2"
+        - ".svg"
+        - ".tif"
+        - ".tiff"
+        - ".webp"
       excludeDirectories:
         - "private"
       excludeFileNames:
         - "Thumbs.db"
-    - path: "C:\\Users\\YOUR_USER\\Pictures\\Camera"
-      albumName: "Camera Imports"
-      includeSubdirectories: true
-      extensions:
-        - ".jpg"
-        - ".jpeg"
-        - ".heic"
-        - ".webp"
-      excludeDirectories:
-        - "**/cache"
-      excludeFileNames:
-        - "*.tmp"
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30
@@ -124,6 +130,8 @@ logging:
 ---
 
 ## Documentation
+
+The Windows GUI now keeps these per-source watch options collapsed by default and only shows `Excluded Directories` when `Include subdirectories` is enabled.
 
 - [Configuration](./docs/configuration.md)
 - [Windows Installation](./docs/installation-windows.md)

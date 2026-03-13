@@ -195,45 +195,53 @@
                                 Content="Remove" />
                       </Grid>
 
-                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
                         <TextBlock Grid.Row="0" Grid.Column="1" Text="Immich Album Name" />
                         <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
                         <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Leave empty for no album" />
-
-                        <CheckBox Grid.Row="2"
-                                  Grid.Column="0"
-                                  Grid.ColumnSpan="2"
-                                  IsChecked="{Binding IncludeSubdirectories}"
-                                  Content="Include subdirectories" />
-
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Extensions" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Excluded Directories" />
-                        <TextBox Grid.Row="4"
-                                 Grid.Column="0"
-                                 Height="96"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 Text="{Binding ExtensionsText}"
-                                 Watermark=".jpg&#10;.heic&#10;.webp" />
-                        <TextBox Grid.Row="4"
-                                 Grid.Column="1"
-                                 Height="96"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 Text="{Binding ExcludeDirectoriesText}"
-                                 Watermark="private&#10;**/cache" />
-
-                        <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Text="Excluded File Names" />
-                        <TextBox Grid.Row="6"
-                                 Grid.Column="0"
-                                 Grid.ColumnSpan="2"
-                                 Height="96"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 Text="{Binding ExcludeFileNamesText}"
-                                 Watermark="Thumbs.db&#10;*.tmp" />
                       </Grid>
+
+                      <Expander IsExpanded="{Binding ShowAdvancedOptions}">
+                        <Expander.Header>
+                          <TextBlock FontWeight="SemiBold" Text="Advanced Watch Options" />
+                        </Expander.Header>
+
+                        <StackPanel Margin="0,12,0,0" Spacing="10">
+                          <CheckBox IsChecked="{Binding IncludeSubdirectories}"
+                                    Content="Include subdirectories" />
+
+                          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <StackPanel Spacing="6">
+                              <TextBlock Text="Extensions" />
+                              <TextBox Height="120"
+                                       AcceptsReturn="True"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding ExtensionsText}"
+                                       Watermark=".jpg&#10;.jpeg&#10;.heic" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6"
+                                        IsVisible="{Binding ShowExcludeDirectories}">
+                              <TextBlock Text="Excluded Directories" />
+                              <TextBox Height="120"
+                                       AcceptsReturn="True"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding ExcludeDirectoriesText}"
+                                       Watermark="private&#10;**/cache" />
+                            </StackPanel>
+                          </Grid>
+
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="Excluded File Names" />
+                            <TextBox Height="96"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExcludeFileNamesText}"
+                                     Watermark="Thumbs.db&#10;*.tmp" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Expander>
                     </StackPanel>
                   </Border>
                 </DataTemplate>

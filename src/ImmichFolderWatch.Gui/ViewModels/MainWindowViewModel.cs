@@ -10,6 +10,28 @@ public sealed class MainWindowViewModel : BindableBase
 {
     private const string ShowApiKeyToolTipText = "Show API key";
     private const string HideApiKeyToolTipText = "Hide API key";
+    private static readonly string[] DefaultImageExtensions =
+    {
+        ".avif",
+        ".bmp",
+        ".gif",
+        ".heic",
+        ".heif",
+        ".jp2",
+        ".jpe",
+        ".jpeg",
+        ".jpg",
+        ".insp",
+        ".jxl",
+        ".png",
+        ".psd",
+        ".raw",
+        ".rw2",
+        ".svg",
+        ".tif",
+        ".tiff",
+        ".webp",
+    };
 
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
@@ -45,7 +67,7 @@ public sealed class MainWindowViewModel : BindableBase
 
     public MainWindowViewModel()
     {
-        Sources.Add(new WatchSourceItem());
+        AddSource();
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
     }
@@ -266,6 +288,11 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _showRestartServiceButton, value);
     }
 
+    public void AddSource()
+    {
+        Sources.Add(CreateDefaultSource());
+    }
+
     public void Load(AppConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -291,12 +318,13 @@ public sealed class MainWindowViewModel : BindableBase
                 ExtensionsText = string.Join(Environment.NewLine, source.Extensions),
                 ExcludeDirectoriesText = string.Join(Environment.NewLine, source.ExcludeDirectories),
                 ExcludeFileNamesText = string.Join(Environment.NewLine, source.ExcludeFileNames),
+                ShowAdvancedOptions = false,
             });
         }
 
         if (Sources.Count == 0)
         {
-            Sources.Add(new WatchSourceItem());
+            AddSource();
         }
 
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
@@ -528,6 +556,18 @@ public sealed class MainWindowViewModel : BindableBase
         return value
             .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(entry => !string.IsNullOrWhiteSpace(entry));
+    }
+
+    private static WatchSourceItem CreateDefaultSource()
+    {
+        return new WatchSourceItem
+        {
+            IncludeSubdirectories = false,
+            ExtensionsText = string.Join(Environment.NewLine, DefaultImageExtensions),
+            ExcludeDirectoriesText = string.Empty,
+            ExcludeFileNamesText = string.Empty,
+            ShowAdvancedOptions = false,
+        };
     }
 
     private static string GetDefaultLogDirectory()

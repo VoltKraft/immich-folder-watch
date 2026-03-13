@@ -7,6 +7,29 @@ namespace ImmichFolderWatch.Tests.Gui;
 
 public sealed class MainWindowViewModelTests
 {
+    private static readonly string[] ExpectedDefaultImageExtensions =
+    {
+        ".avif",
+        ".bmp",
+        ".gif",
+        ".heic",
+        ".heif",
+        ".jp2",
+        ".jpe",
+        ".jpeg",
+        ".jpg",
+        ".insp",
+        ".jxl",
+        ".png",
+        ".psd",
+        ".raw",
+        ".rw2",
+        ".svg",
+        ".tif",
+        ".tiff",
+        ".webp",
+    };
+
     [Fact]
     public void ApplyServiceActionVisibility_UsesRestartLabel_WhenServiceIsRunning()
     {
@@ -139,6 +162,20 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Constructor_CreatesCollapsedDefaultSourceWithOfficialImageExtensions()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        Assert.Single(viewModel.Sources);
+        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
+        Assert.False(viewModel.Sources[0].IncludeSubdirectories);
+        Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
+        Assert.Equal(string.Empty, viewModel.Sources[0].ExcludeDirectoriesText);
+        Assert.Equal(string.Empty, viewModel.Sources[0].ExcludeFileNamesText);
+    }
+
+    [Fact]
     public void CreateImmichCheckConfig_IncludesCurrentAlbumAssignments()
     {
         var viewModel = new MainWindowViewModel();
@@ -161,6 +198,20 @@ public sealed class MainWindowViewModelTests
         Assert.Equal([".png", "jpg"], config.Watch.Sources[0].Extensions);
         Assert.Equal(["private", "**/cache"], config.Watch.Sources[0].ExcludeDirectories);
         Assert.Equal(["Thumbs.db", "*.tmp"], config.Watch.Sources[0].ExcludeFileNames);
+    }
+
+    [Fact]
+    public void AddSource_UsesTheSameDefaultValuesAsTheInitialSource()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.Sources.Clear();
+
+        viewModel.AddSource();
+
+        Assert.Single(viewModel.Sources);
+        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
+        Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
     }
 
     [Fact]
@@ -191,10 +242,25 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(".png\r\n.jpg", viewModel.Sources[0].ExtensionsText);
         Assert.Equal("private\r\n**/cache", viewModel.Sources[0].ExcludeDirectoriesText);
         Assert.Equal("Thumbs.db\r\n*.tmp", viewModel.Sources[0].ExcludeFileNamesText);
+        Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
+        Assert.True(viewModel.Sources[0].ShowExcludeDirectories);
     }
 
     [Fact]
-    public void TryCreateConfig_IncludesPerSourceFilterFields()
+    public void Load_WithNoSources_CreatesTheDefaultSource()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.Load(new AppConfig());
+
+        Assert.Single(viewModel.Sources);
+        Assert.Equal(string.Join("\r\n", ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
+        Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
+        Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
+    }
+
+    [Fact]
+    public void TryCreateConfig_PreservesHiddenExcludeDirectories()
     {
         var viewModel = new MainWindowViewModel();
         viewModel.Sources.Clear();
@@ -216,5 +282,25 @@ public sealed class MainWindowViewModelTests
         Assert.Equal([".heic", ".jpeg"], config.Watch.Sources[0].Extensions);
         Assert.Equal(["**/cache"], config.Watch.Sources[0].ExcludeDirectories);
         Assert.Equal(["*.tmp"], config.Watch.Sources[0].ExcludeFileNames);
+    }
+
+    [Fact]
+    public void IncludeSubdirectories_TogglesShowExcludeDirectories_WithoutClearingValues()
+    {
+        var source = new WatchSourceItem
+        {
+            ExcludeDirectoriesText = "private\r\n**/cache",
+        };
+
+        Assert.False(source.ShowExcludeDirectories);
+
+        source.IncludeSubdirectories = true;
+
+        Assert.True(source.ShowExcludeDirectories);
+
+        source.IncludeSubdirectories = false;
+
+        Assert.False(source.ShowExcludeDirectories);
+        Assert.Equal("private\r\n**/cache", source.ExcludeDirectoriesText);
     }
 }

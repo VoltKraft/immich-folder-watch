@@ -17,12 +17,27 @@ watch:
   sources:
     - path: "C:\\Users\\<user>\\Pictures\\Screenshots"
       albumName: "Screenshots" # optional; leave empty to upload without album placement
-      includeSubdirectories: false
+      includeSubdirectories: true
       extensions:
-        - ".png"
-        - ".jpg"
-        - ".jpeg"
+        - ".avif"
+        - ".bmp"
+        - ".gif"
         - ".heic"
+        - ".heif"
+        - ".jp2"
+        - ".jpe"
+        - ".jpeg"
+        - ".jpg"
+        - ".insp"
+        - ".jxl"
+        - ".png"
+        - ".psd"
+        - ".raw"
+        - ".rw2"
+        - ".svg"
+        - ".tif"
+        - ".tiff"
+        - ".webp"
       excludeDirectories:
         - "private"
         - "**/cache"
@@ -59,6 +74,8 @@ logging:
 - `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
 - `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
+- In the Windows GUI, new sources prefill the official Immich image-extension list and keep the advanced watch options collapsed by default.
+- In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
 - `watch.sources[].albumName` is optional. Leave it empty to upload files without assigning them to an Immich album.
 - If `watch.sources[].albumName` is set, uploads are added to that album and the daemon creates the album automatically if it does not exist yet.
 - In the Windows GUI, a newly added source suggests the folder name as the album name once; if you clear the field afterwards, it stays empty.
