@@ -5,7 +5,7 @@ namespace ImmichFolderWatch.Tests.Configuration;
 public sealed class AppConfigLoaderTests
 {
     [Fact]
-    public void Load_ParsesExpectedValues()
+    public void Load_MigratesLegacyWatchExtensionsToSourceExtensions()
     {
         var tempRoot = Directory.CreateTempSubdirectory("ifw-config-test-");
 
@@ -48,8 +48,9 @@ logging:
             Assert.Single(config.Watch.Sources);
             Assert.Equal("Screenshots", config.Watch.Sources[0].AlbumName);
             Assert.True(config.Watch.Sources[0].IncludeSubdirectories);
-            Assert.Contains(".png", config.Watch.Extensions);
-            Assert.Contains(".jpg", config.Watch.Extensions);
+            Assert.Contains(".png", config.Watch.Sources[0].Extensions);
+            Assert.Contains(".jpg", config.Watch.Sources[0].Extensions);
+            Assert.Empty(config.Watch.Extensions);
             Assert.Equal(6, config.Watch.BatchIntervalSeconds);
             Assert.Equal(10, config.Watch.MaxBatchSize);
             Assert.Equal(20, config.Watch.FileReadyTimeoutSeconds);
@@ -57,6 +58,66 @@ logging:
             Assert.Equal(250, config.Retry.BaseDelayMilliseconds);
             Assert.Equal("Debug", config.Logging.Level);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "logs")), config.Logging.LogDirectory);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Load_PrefersSourceSpecificFiltersOverLegacyWatchExtensions()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-source-filters-");
+
+        try
+        {
+            var watchPath = tempRoot.FullName.Replace("\\", "\\\\", StringComparison.Ordinal);
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+
+            var yaml = $"""
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources:
+    - path: "{watchPath}"
+      albumName: "Screenshots"
+      includeSubdirectories: true
+      extensions:
+        - PNG
+        - .JPG
+      excludeDirectories:
+        - private
+        - "  **/cache  "
+        - private
+      excludeFileNames:
+        - Thumbs.db
+        - "*.tmp"
+        - THUMBS.DB
+  extensions:
+    - ".gif"
+  batchIntervalSeconds: 6
+  maxBatchSize: 10
+  fileReadyTimeoutSeconds: 20
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Debug"
+  logDirectory: "logs"
+""";
+
+            File.WriteAllText(configPath, yaml);
+
+            var loader = new AppConfigLoader();
+            var config = loader.LoadForEditing(configPath);
+            var source = config.Watch.Sources[0];
+
+            Assert.Equal([".png", ".jpg"], source.Extensions);
+            Assert.Equal(["private", "**/cache"], source.ExcludeDirectories);
+            Assert.Equal(["Thumbs.db", "*.tmp"], source.ExcludeFileNames);
+            Assert.Empty(config.Watch.Extensions);
         }
         finally
         {
@@ -187,6 +248,8 @@ logging:
             var config = loader.LoadForEditing(configPath);
 
             Assert.Equal("../watch", config.Watch.Sources[0].Path);
+            Assert.Contains(".png", config.Watch.Sources[0].Extensions);
+            Assert.Empty(config.Watch.Extensions);
             Assert.Equal("../logs", config.Logging.LogDirectory);
         }
         finally

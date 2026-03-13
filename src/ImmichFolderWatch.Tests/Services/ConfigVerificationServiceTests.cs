@@ -137,11 +137,11 @@ public sealed class ConfigVerificationServiceTests
                         Path = watchDirectory,
                         AlbumName = "Screenshots",
                         IncludeSubdirectories = false,
+                        Extensions =
+                        {
+                            ".png",
+                        },
                     },
-                },
-                Extensions =
-                {
-                    ".png",
                 },
                 BatchIntervalSeconds = 5,
                 MaxBatchSize = 25,

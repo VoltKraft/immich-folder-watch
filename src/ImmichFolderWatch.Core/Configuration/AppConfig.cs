@@ -22,6 +22,7 @@ public sealed class WatchSettings
 {
     public List<WatchSourceSettings> Sources { get; set; } = new();
 
+    // Legacy 1.4.x fallback input. New 1.5.0 configs store extensions per source.
     public List<string> Extensions { get; set; } = new();
 
     public int BatchIntervalSeconds { get; set; } = 5;
@@ -38,6 +39,12 @@ public sealed class WatchSourceSettings
     public string AlbumName { get; set; } = string.Empty;
 
     public bool IncludeSubdirectories { get; set; }
+
+    public List<string> Extensions { get; set; } = new();
+
+    public List<string> ExcludeDirectories { get; set; } = new();
+
+    public List<string> ExcludeFileNames { get; set; } = new();
 }
 
 public sealed class RetrySettings

@@ -7,13 +7,32 @@ watch:
     - path: "C:\\Users\\YOUR_USER\\Pictures"
       albumName: "Pictures"
       includeSubdirectories: true
-  extensions:
-    - ".png"
-    - ".jpg"
-    - ".jpeg"
-    - ".heic"
-    - ".webp"
-    - ".mp4"
+      extensions:
+        - ".avif"
+        - ".bmp"
+        - ".gif"
+        - ".heic"
+        - ".heif"
+        - ".jp2"
+        - ".jpe"
+        - ".jpeg"
+        - ".jpg"
+        - ".insp"
+        - ".jxl"
+        - ".png"
+        - ".psd"
+        - ".raw"
+        - ".rw2"
+        - ".svg"
+        - ".tif"
+        - ".tiff"
+        - ".webp"
+      excludeDirectories:
+        - "private"
+        - "**/cache"
+      excludeFileNames:
+        - "Thumbs.db"
+        - "*.tmp"
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30

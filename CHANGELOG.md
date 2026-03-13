@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-03-13
+
+### Added
+- Per-source `watch.sources[].extensions` include lists in the daemon, GUI, and YAML config.
+- Per-source `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` glob filters for skipping subfolders and file names.
+
+### Changed
+- Existing `1.4.x` configs that still use top-level `watch.extensions` now migrate automatically to the per-source schema when loaded and are rewritten in the new format on save.
+- The Windows GUI now configures extensions and exclude lists directly on each watched source card instead of using one global extensions field.
+- The Windows GUI now keeps per-source subdirectory, extension, and exclude settings inside a collapsed **Advanced Watch Options** section by default.
+- New GUI watch sources and the Windows example config now prefill the full official Immich image-extension list, and `Excluded Directories` is shown only when subdirectory watching is enabled.
+- Project, packaging, and release defaults updated to `1.5.0`.
+
 ## [1.4.0] - 2026-03-08
 
 ### Changed

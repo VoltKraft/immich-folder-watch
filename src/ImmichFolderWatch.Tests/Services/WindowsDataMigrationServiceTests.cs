@@ -71,6 +71,9 @@ public sealed class WindowsDataMigrationServiceTests
             Assert.Equal(0, result.SkippedLogFileCount);
             Assert.Equal(Path.GetFullPath(targetLogDirectory), migratedConfig.Logging.LogDirectory);
             Assert.Equal(Path.GetFullPath(legacyWatchDirectory), migratedConfig.Watch.Sources[0].Path);
+            Assert.Contains(".png", migratedConfig.Watch.Sources[0].Extensions);
+            Assert.Empty(migratedConfig.Watch.Extensions);
+            Assert.DoesNotContain($"{Environment.NewLine}  extensions:{Environment.NewLine}", File.ReadAllText(targetConfigPath), StringComparison.Ordinal);
             Assert.False(File.Exists(legacyConfigPath));
             Assert.True(File.Exists(Path.Combine(targetLogDirectory, "daemon.log")));
         }

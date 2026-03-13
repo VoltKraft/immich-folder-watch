@@ -70,11 +70,15 @@ public sealed class AppConfigLoader : IAppConfigLoader
             Watch = new WatchSettings
             {
                 Sources = config.Watch.Sources
+                    .Where(source => source is not null)
                     .Select(source => new WatchSourceSettings
                     {
                         Path = source.Path,
                         AlbumName = source.AlbumName,
                         IncludeSubdirectories = source.IncludeSubdirectories,
+                        Extensions = (source.Extensions ?? new List<string>()).ToList(),
+                        ExcludeDirectories = (source.ExcludeDirectories ?? new List<string>()).ToList(),
+                        ExcludeFileNames = (source.ExcludeFileNames ?? new List<string>()).ToList(),
                     })
                     .ToList(),
                 Extensions = config.Watch.Extensions.ToList(),
@@ -107,6 +111,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
 
         config.Watch.Sources ??= new List<WatchSourceSettings>();
         config.Watch.Extensions ??= new List<string>();
+        var legacyExtensions = NormalizeExtensions(config.Watch.Extensions);
 
         config.Watch.Sources = config.Watch.Sources
             .Where(source => source is not null)
@@ -115,20 +120,50 @@ public sealed class AppConfigLoader : IAppConfigLoader
                 Path = NormalizePath(source.Path, configDirectory, normalizePaths),
                 AlbumName = (source.AlbumName ?? string.Empty).Trim(),
                 IncludeSubdirectories = source.IncludeSubdirectories,
+                Extensions = GetSourceExtensions(source, legacyExtensions),
+                ExcludeDirectories = NormalizePatterns(source.ExcludeDirectories),
+                ExcludeFileNames = NormalizePatterns(source.ExcludeFileNames),
             })
             .ToList();
 
-        config.Watch.Extensions = config.Watch.Extensions
-            .Where(extension => !string.IsNullOrWhiteSpace(extension))
-            .Select(NormalizeExtension)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        config.Watch.Extensions = new List<string>();
 
         config.Logging.Level = (config.Logging.Level ?? "Information").Trim();
         config.Logging.LogDirectory = NormalizePath(
             string.IsNullOrWhiteSpace(config.Logging.LogDirectory) ? "logs" : config.Logging.LogDirectory,
             configDirectory,
             normalizePaths);
+    }
+
+    private static List<string> GetSourceExtensions(WatchSourceSettings source, IReadOnlyList<string> legacyExtensions)
+    {
+        var sourceExtensions = NormalizeExtensions(source.Extensions);
+        if (sourceExtensions.Count > 0)
+        {
+            return sourceExtensions;
+        }
+
+        return legacyExtensions.Count > 0
+            ? legacyExtensions.ToList()
+            : new List<string>();
+    }
+
+    private static List<string> NormalizeExtensions(IEnumerable<string>? extensions)
+    {
+        return (extensions ?? Array.Empty<string>())
+            .Where(extension => !string.IsNullOrWhiteSpace(extension))
+            .Select(NormalizeExtension)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static List<string> NormalizePatterns(IEnumerable<string>? values)
+    {
+        return (values ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static string NormalizeExtension(string extension)

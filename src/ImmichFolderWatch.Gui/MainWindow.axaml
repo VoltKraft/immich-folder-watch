@@ -183,23 +183,64 @@
                           CornerRadius="12"
                           BorderBrush="#D9D3C5"
                           BorderThickness="1">
-                    <Grid ColumnDefinitions="*,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
-                      <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
-                      <TextBlock Grid.Row="0" Grid.Column="1" Text="Immich Album Name" />
-                      <Button Grid.Row="0"
-                              Grid.Column="2"
-                              HorizontalAlignment="Right"
-                              Click="RemoveSourceButton_Click"
-                              Content="Remove" />
+                    <StackPanel Spacing="10">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   Text="Watch Source" />
+                        <Button Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                Click="RemoveSourceButton_Click"
+                                Content="Remove" />
+                      </Grid>
 
-                      <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
-                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Leave empty for no album" />
-                      <CheckBox Grid.Row="1"
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                IsChecked="{Binding IncludeSubdirectories}"
-                                Content="Include subdirectories" />
-                    </Grid>
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder Path" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Immich Album Name" />
+                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Path}" Watermark="C:\Users\...\Pictures\Screenshots" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AlbumName}" Watermark="Leave empty for no album" />
+                      </Grid>
+
+                      <Expander IsExpanded="{Binding ShowAdvancedOptions}">
+                        <Expander.Header>
+                          <TextBlock FontWeight="SemiBold" Text="Advanced Watch Options" />
+                        </Expander.Header>
+
+                        <StackPanel Margin="0,12,0,0" Spacing="10">
+                          <CheckBox IsChecked="{Binding IncludeSubdirectories}"
+                                    Content="Include subdirectories" />
+
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="Extensions" />
+                            <TextBox Height="120"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExtensionsText}"
+                                     Watermark=".jpg&#10;.jpeg&#10;.heic" />
+                          </StackPanel>
+
+                          <StackPanel Spacing="6"
+                                      IsVisible="{Binding ShowExcludeDirectories}">
+                            <TextBlock Text="Excluded Directories" />
+                            <TextBox Height="120"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExcludeDirectoriesText}"
+                                     Watermark="private&#10;**/cache" />
+                          </StackPanel>
+
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="Excluded File Names" />
+                            <TextBox Height="96"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding ExcludeFileNamesText}"
+                                     Watermark="Thumbs.db&#10;*.tmp" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Expander>
+                    </StackPanel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -210,27 +251,18 @@
         <Border Classes="card">
           <StackPanel>
             <TextBlock Classes="section-title" Text="Watch Behavior" />
-            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
-              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Top" Text="Extensions" />
-              <TextBox Grid.Row="0"
-                       Grid.Column="1"
-                       Height="110"
-                       AcceptsReturn="True"
-                       TextWrapping="Wrap"
-                       Text="{Binding ExtensionsText}"
-                       Watermark=".png&#10;.jpg&#10;.heic" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Batch Interval Seconds" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BatchIntervalSeconds}" />
 
-              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Batch Interval Seconds" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BatchIntervalSeconds}" />
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Max Batch Size" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MaxBatchSize}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Max Batch Size" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MaxBatchSize}" />
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="File Ready Timeout Seconds" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding FileReadyTimeoutSeconds}" />
 
-              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="File Ready Timeout Seconds" />
-              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding FileReadyTimeoutSeconds}" />
-
-              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Retry Max Attempts" />
-              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding RetryMaxAttempts}" />
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Retry Max Attempts" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RetryMaxAttempts}" />
             </Grid>
           </StackPanel>
         </Border>

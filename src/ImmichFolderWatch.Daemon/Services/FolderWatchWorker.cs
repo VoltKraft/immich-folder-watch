@@ -26,8 +26,6 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private readonly List<FileSystemWatcher> _watchers = new();
 
-    private readonly HashSet<string> _allowedExtensions;
-
     private readonly TimeSpan _batchInterval;
 
     private readonly TimeSpan _fileReadyTimeout;
@@ -46,10 +44,6 @@ public sealed class FolderWatchWorker : BackgroundService
         _logger = logger;
         _batchInterval = TimeSpan.FromSeconds(config.Watch.BatchIntervalSeconds);
         _fileReadyTimeout = TimeSpan.FromSeconds(config.Watch.FileReadyTimeoutSeconds);
-        _allowedExtensions = config.Watch.Extensions
-            .Select(NormalizeExtension)
-            .Where(static extension => !string.IsNullOrWhiteSpace(extension))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,6 +92,7 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            var sourceFilter = new WatchSourceFileFilter(source);
             var watcher = new FileSystemWatcher(source.Path)
             {
                 IncludeSubdirectories = source.IncludeSubdirectories,
@@ -108,9 +103,9 @@ public sealed class FolderWatchWorker : BackgroundService
                 EnableRaisingEvents = true,
             };
 
-            watcher.Created += (_, e) => OnFileEvent(e.FullPath, source.AlbumName);
-            watcher.Changed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName);
-            watcher.Renamed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName);
+            watcher.Created += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
+            watcher.Changed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
+            watcher.Renamed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
             watcher.Error += (_, e) => _logger.LogError(e.GetException(), "File watcher error for source {Path}", source.Path);
 
             _watchers.Add(watcher);
@@ -128,9 +123,9 @@ public sealed class FolderWatchWorker : BackgroundService
         }
     }
 
-    private void OnFileEvent(string filePath, string albumName)
+    private void OnFileEvent(string filePath, string albumName, WatchSourceFileFilter sourceFilter)
     {
-        if (!HasAllowedExtension(filePath))
+        if (!sourceFilter.IsMatch(filePath))
         {
             return;
         }
@@ -233,25 +228,6 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
             }
         }
-    }
-
-    private bool HasAllowedExtension(string path)
-    {
-        var extension = NormalizeExtension(Path.GetExtension(path));
-        return !string.IsNullOrWhiteSpace(extension) && _allowedExtensions.Contains(extension);
-    }
-
-    private static string NormalizeExtension(string extension)
-    {
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = extension.Trim();
-        return trimmed.StartsWith('.')
-            ? trimmed.ToLowerInvariant()
-            : $".{trimmed.ToLowerInvariant()}";
     }
 
     private static string NormalizePath(string path)
