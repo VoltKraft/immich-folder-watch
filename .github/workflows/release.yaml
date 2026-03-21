@@ -41,7 +41,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: refs/heads/main
@@ -99,13 +99,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_ref }}
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -127,7 +127,7 @@ jobs:
             -Destination (Join-Path $assetRoot "immich-folder-watch-${{ needs.prepare-release.outputs.version }}-win-x64.msi")
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: immich-folder-watch-release-assets
           path: artifacts/release
@@ -142,13 +142,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_ref }}
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: immich-folder-watch-release-assets
           path: artifacts/release
@@ -178,7 +178,7 @@ jobs:
           git push origin "refs/tags/$TAG_NAME"
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.1
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag }}
           name: ${{ needs.prepare-release.outputs.tag }}
@@ -191,7 +191,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trigger WinGet workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
         with:
