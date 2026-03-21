@@ -170,7 +170,7 @@
 
   <Fragment>
     <SetProperty
-      Id="RecordUpgradeRunningServiceState"
+      Id="WixQuietExecCmdLine"
       Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -Command &quot;$service = Get-Service -Name 'ImmichFolderWatch' -ErrorAction SilentlyContinue; $keyPath = 'HKLM:\Software\ImmichFolderWatch'; if ($null -ne $service -and $service.Status -eq 'Running') { New-Item -Path $keyPath -Force | Out-Null; New-ItemProperty -Path $keyPath -Name 'ResumeServiceAfterUpgrade' -Value 1 -PropertyType DWord -Force | Out-Null; Write-Host 'Recorded running service state for upgrade resume.' } else { if (Test-Path -LiteralPath $keyPath) { Remove-ItemProperty -Path $keyPath -Name 'ResumeServiceAfterUpgrade' -ErrorAction SilentlyContinue }; Write-Host 'No running service state recorded for upgrade resume.' }&quot;"
       Before="RecordUpgradeRunningServiceState"
       Sequence="execute" />
