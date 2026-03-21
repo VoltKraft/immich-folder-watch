@@ -26,7 +26,7 @@ Directory.CreateDirectory(guiOutputRoot);
 Directory.CreateDirectory(flatpakOutputRoot);
 
 using var svg = new SKSvg();
-var picture = svg.Load(logoPath) ?? throw new InvalidOperationException($"Could not load SVG from '{logoPath}'.");
+using var picture = svg.Load(logoPath) ?? throw new InvalidOperationException($"Could not load SVG from '{logoPath}'.");
 
 if (picture.CullRect.Width <= 0 || picture.CullRect.Height <= 0)
 {
