@@ -116,7 +116,7 @@ public sealed partial class MainWindow : Window
             ViewModel.StatusHeadline = "Service status unavailable";
             ViewModel.StatusDetails = "The admin helper did not return any status information.";
             ViewModel.ServiceBadgeText = "Unavailable";
-            ViewModel.ServiceBadgeBackground = "#E0E3E8";
+            ViewModel.ServiceBadgeTone = StatusTone.Neutral;
             ViewModel.ApplyServiceActionVisibility(null);
             return;
         }
@@ -143,31 +143,29 @@ public sealed partial class MainWindow : Window
         if (!status.Exists)
         {
             ViewModel.ServiceBadgeText = "Not installed";
-            ViewModel.ServiceBadgeBackground = "#E0E3E8";
+            ViewModel.ServiceBadgeTone = StatusTone.Neutral;
             return;
         }
+
+        ViewModel.ServiceBadgeTone = StatusToneMapper.FromServiceStatus(status);
 
         switch (status.State)
         {
             case ServiceRunState.Running:
                 ViewModel.ServiceBadgeText = "Running";
-                ViewModel.ServiceBadgeBackground = "#D8F0D9";
                 break;
             case ServiceRunState.Stopped:
                 ViewModel.ServiceBadgeText = "Stopped";
-                ViewModel.ServiceBadgeBackground = "#F9E3B4";
                 break;
             case ServiceRunState.StartPending:
                 ViewModel.ServiceBadgeText = "Starting";
-                ViewModel.ServiceBadgeBackground = "#D7E8FF";
                 break;
             case ServiceRunState.StopPending:
                 ViewModel.ServiceBadgeText = "Stopping";
-                ViewModel.ServiceBadgeBackground = "#D7E8FF";
                 break;
             default:
                 ViewModel.ServiceBadgeText = "Unknown";
-                ViewModel.ServiceBadgeBackground = "#E0E3E8";
+                ViewModel.ServiceBadgeTone = StatusTone.Neutral;
                 break;
         }
     }

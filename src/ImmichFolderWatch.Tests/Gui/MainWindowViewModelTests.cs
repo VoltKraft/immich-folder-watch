@@ -58,6 +58,96 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Save and Start", viewModel.SaveActionButtonText);
     }
 
+
+    [Fact]
+    public void Constructor_InitializesImmichChecksAsNeutral()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        Assert.Equal(StatusTone.Neutral, viewModel.ImmichUrlStatusTone);
+        Assert.Equal(StatusTone.Neutral, viewModel.ImmichApiKeyStatusTone);
+        Assert.Equal(StatusTone.Neutral, viewModel.ImmichPermissionsStatusTone);
+        Assert.All(viewModel.ImmichPermissionStatuses, item => Assert.Equal(StatusTone.Neutral, item.StatusTone));
+    }
+
+    [Fact]
+    public void SetImmichCheckInProgress_UsesInfoToneForChecksAndPermissions()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.SetImmichCheckInProgress();
+
+        Assert.Equal(StatusTone.Info, viewModel.ImmichUrlStatusTone);
+        Assert.Equal(StatusTone.Info, viewModel.ImmichApiKeyStatusTone);
+        Assert.Equal(StatusTone.Info, viewModel.ImmichPermissionsStatusTone);
+        Assert.All(viewModel.ImmichPermissionStatuses, item => Assert.Equal(StatusTone.Info, item.StatusTone));
+    }
+
+    [Fact]
+    public void ApplyImmichCheckResult_MapsCheckStatesToStatusTones()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.ApplyImmichCheckResult(new ImmichAccessCheckResult
+        {
+            UrlState = CheckState.Passed,
+            ApiKeyState = CheckState.Failed,
+            PermissionsState = CheckState.Warning,
+            PermissionResults =
+            [
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Asset Upload",
+                    PermissionName = "asset.upload",
+                    State = CheckState.Passed,
+                    Message = "Upload assets is permitted.",
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Album Read",
+                    PermissionName = "album.read",
+                    State = CheckState.Warning,
+                    Message = "Album access is limited.",
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Album Create",
+                    PermissionName = "album.create",
+                    State = CheckState.Failed,
+                    Message = "Album creation is not permitted.",
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Add Asset To Album",
+                    PermissionName = "albumAsset.create",
+                    State = CheckState.Checking,
+                    Message = "Checking...",
+                },
+            ],
+        });
+
+        Assert.Equal(StatusTone.Success, viewModel.ImmichUrlStatusTone);
+        Assert.Equal(StatusTone.Error, viewModel.ImmichApiKeyStatusTone);
+        Assert.Equal(StatusTone.Warning, viewModel.ImmichPermissionsStatusTone);
+        Assert.Collection(
+            viewModel.ImmichPermissionStatuses,
+            item => Assert.Equal(StatusTone.Success, item.StatusTone),
+            item => Assert.Equal(StatusTone.Warning, item.StatusTone),
+            item => Assert.Equal(StatusTone.Error, item.StatusTone),
+            item => Assert.Equal(StatusTone.Info, item.StatusTone));
+    }
+
+    [Fact]
+    public void StatusToneMapper_MapsServiceStatesToExpectedTones()
+    {
+        Assert.Equal(StatusTone.Neutral, StatusToneMapper.FromServiceStatus(null));
+        Assert.Equal(StatusTone.Neutral, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = false }));
+        Assert.Equal(StatusTone.Success, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.Running }));
+        Assert.Equal(StatusTone.Warning, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.Stopped }));
+        Assert.Equal(StatusTone.Info, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.StartPending }));
+        Assert.Equal(StatusTone.Info, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.StopPending }));
+    }
+
     [Fact]
     public void ImmichApiKey_UsesMaskedDisplay_ForRealKeyByDefault()
     {

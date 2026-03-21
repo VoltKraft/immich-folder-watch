@@ -45,16 +45,16 @@ public sealed class MainWindowViewModel : BindableBase
     private string _statusHeadline = "Loading current service status...";
     private string _statusDetails = string.Empty;
     private string _serviceBadgeText = "Loading";
-    private string _serviceBadgeBackground = "#D7E8FF";
+    private StatusTone _serviceBadgeTone = StatusTone.Info;
     private string _productVersionText = string.Empty;
     private string _operationMessage = string.Empty;
     private string _saveActionButtonText = "Save and Start";
     private string _immichUrlStatusText = "Not checked";
-    private string _immichUrlStatusBackground = "#E0E3E8";
+    private StatusTone _immichUrlStatusTone = StatusTone.Neutral;
     private string _immichApiKeyStatusText = "Not checked";
-    private string _immichApiKeyStatusBackground = "#E0E3E8";
+    private StatusTone _immichApiKeyStatusTone = StatusTone.Neutral;
     private string _immichPermissionsStatusText = "Not checked";
-    private string _immichPermissionsStatusBackground = "#E0E3E8";
+    private StatusTone _immichPermissionsStatusTone = StatusTone.Neutral;
     private bool _revealImmichApiKey;
     private bool _shouldMaskImmichApiKey;
     private bool _showPlainImmichApiKeyInput = true;
@@ -174,10 +174,10 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _serviceBadgeText, value);
     }
 
-    public string ServiceBadgeBackground
+    public StatusTone ServiceBadgeTone
     {
-        get => _serviceBadgeBackground;
-        set => SetProperty(ref _serviceBadgeBackground, value);
+        get => _serviceBadgeTone;
+        set => SetProperty(ref _serviceBadgeTone, value);
     }
 
     public string OperationMessage
@@ -204,10 +204,10 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _immichUrlStatusText, value);
     }
 
-    public string ImmichUrlStatusBackground
+    public StatusTone ImmichUrlStatusTone
     {
-        get => _immichUrlStatusBackground;
-        set => SetProperty(ref _immichUrlStatusBackground, value);
+        get => _immichUrlStatusTone;
+        set => SetProperty(ref _immichUrlStatusTone, value);
     }
 
     public string ImmichApiKeyStatusText
@@ -216,10 +216,10 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _immichApiKeyStatusText, value);
     }
 
-    public string ImmichApiKeyStatusBackground
+    public StatusTone ImmichApiKeyStatusTone
     {
-        get => _immichApiKeyStatusBackground;
-        set => SetProperty(ref _immichApiKeyStatusBackground, value);
+        get => _immichApiKeyStatusTone;
+        set => SetProperty(ref _immichApiKeyStatusTone, value);
     }
 
     public string ImmichPermissionsStatusText
@@ -228,10 +228,10 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _immichPermissionsStatusText, value);
     }
 
-    public string ImmichPermissionsStatusBackground
+    public StatusTone ImmichPermissionsStatusTone
     {
-        get => _immichPermissionsStatusBackground;
-        set => SetProperty(ref _immichPermissionsStatusBackground, value);
+        get => _immichPermissionsStatusTone;
+        set => SetProperty(ref _immichPermissionsStatusTone, value);
     }
 
     public bool RevealImmichApiKey
@@ -499,19 +499,19 @@ public sealed class MainWindowViewModel : BindableBase
     private void SetImmichUrlStatus(CheckState state)
     {
         ImmichUrlStatusText = GetCheckStateText(state);
-        ImmichUrlStatusBackground = GetCheckStateBackground(state);
+        ImmichUrlStatusTone = StatusToneMapper.FromCheckState(state);
     }
 
     private void SetImmichApiKeyStatus(CheckState state)
     {
         ImmichApiKeyStatusText = GetCheckStateText(state);
-        ImmichApiKeyStatusBackground = GetCheckStateBackground(state);
+        ImmichApiKeyStatusTone = StatusToneMapper.FromCheckState(state);
     }
 
     private void SetImmichPermissionsStatus(CheckState state)
     {
         ImmichPermissionsStatusText = GetCheckStateText(state);
-        ImmichPermissionsStatusBackground = GetCheckStateBackground(state);
+        ImmichPermissionsStatusTone = StatusToneMapper.FromCheckState(state);
     }
 
     private void RefreshPermissionStatuses(IEnumerable<ImmichPermissionStatusItem> items)
@@ -530,7 +530,7 @@ public sealed class MainWindowViewModel : BindableBase
             DisplayName = result.DisplayName,
             PermissionName = result.PermissionName,
             StatusText = GetCheckStateText(result.State),
-            StatusBackground = GetCheckStateBackground(result.State),
+            StatusTone = StatusToneMapper.FromCheckState(result.State),
             Message = result.Message,
         });
     }
@@ -615,15 +615,4 @@ public sealed class MainWindowViewModel : BindableBase
         };
     }
 
-    private static string GetCheckStateBackground(CheckState state)
-    {
-        return state switch
-        {
-            CheckState.Passed => "#D8F0D9",
-            CheckState.Warning => "#F9E3B4",
-            CheckState.Failed => "#F3C7C2",
-            CheckState.Checking => "#D7E8FF",
-            _ => "#E0E3E8",
-        };
-    }
 }

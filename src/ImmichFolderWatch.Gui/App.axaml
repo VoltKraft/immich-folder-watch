@@ -1,38 +1,269 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:fluent="clr-namespace:Avalonia.Themes.Fluent;assembly=Avalonia.Themes.Fluent"
-             x:Class="ImmichFolderWatch.Gui.App">
+             x:Class="ImmichFolderWatch.Gui.App"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppWindowBackground" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppCardBackground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppCardBorder" Color="#D7DDE6" />
+          <SolidColorBrush x:Key="AppMutedSurface" Color="#EFF2F6" />
+          <SolidColorBrush x:Key="AppFooterBackground" Color="#EDEFF3" />
+          <SolidColorBrush x:Key="AppHeaderBackground" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppHeaderForeground" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppHeaderSecondaryForeground" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="AppPrimaryText" Color="#111827" />
+          <SolidColorBrush x:Key="AppSecondaryText" Color="#4B5563" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackground" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorder" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppPrimaryButtonForeground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPointerOver" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderPointerOver" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPressed" Color="#1E40AF" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderPressed" Color="#1E40AF" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundDisabled" Color="#BFDBFE" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderDisabled" Color="#BFDBFE" />
+          <SolidColorBrush x:Key="AppPrimaryButtonForegroundDisabled" Color="#EFF6FF" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorder" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="AppButtonSecondaryForeground" Color="#111827" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundPointerOver" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderPointerOver" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundPressed" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderPressed" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundDisabled" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderDisabled" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppButtonSecondaryForegroundDisabled" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppButtonIconBackground" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppButtonIconBorder" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="AppButtonIconForeground" Color="#111827" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundPointerOver" Color="#EFF2F6" />
+          <SolidColorBrush x:Key="AppButtonIconBorderPointerOver" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundPressed" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppButtonIconBorderPressed" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundDisabled" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppButtonIconBorderDisabled" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppButtonIconForegroundDisabled" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppStatusNeutralBackground" Color="#E5E7EB" />
+          <SolidColorBrush x:Key="AppStatusNeutralForeground" Color="#111827" />
+          <SolidColorBrush x:Key="AppStatusInfoBackground" Color="#DBEAFE" />
+          <SolidColorBrush x:Key="AppStatusInfoForeground" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppStatusSuccessBackground" Color="#DCFCE7" />
+          <SolidColorBrush x:Key="AppStatusSuccessForeground" Color="#166534" />
+          <SolidColorBrush x:Key="AppStatusWarningBackground" Color="#FEF3C7" />
+          <SolidColorBrush x:Key="AppStatusWarningForeground" Color="#92400E" />
+          <SolidColorBrush x:Key="AppStatusErrorBackground" Color="#FEE2E2" />
+          <SolidColorBrush x:Key="AppStatusErrorForeground" Color="#B91C1C" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppWindowBackground" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppCardBackground" Color="#111827" />
+          <SolidColorBrush x:Key="AppCardBorder" Color="#334155" />
+          <SolidColorBrush x:Key="AppMutedSurface" Color="#1E293B" />
+          <SolidColorBrush x:Key="AppFooterBackground" Color="#0B1220" />
+          <SolidColorBrush x:Key="AppHeaderBackground" Color="#020617" />
+          <SolidColorBrush x:Key="AppHeaderForeground" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppHeaderSecondaryForeground" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="AppPrimaryText" Color="#E5E7EB" />
+          <SolidColorBrush x:Key="AppSecondaryText" Color="#94A3B8" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackground" Color="#3B82F6" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorder" Color="#3B82F6" />
+          <SolidColorBrush x:Key="AppPrimaryButtonForeground" Color="#EFF6FF" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPointerOver" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderPointerOver" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPressed" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderPressed" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundDisabled" Color="#1E3A8A" />
+          <SolidColorBrush x:Key="AppPrimaryButtonBorderDisabled" Color="#1E3A8A" />
+          <SolidColorBrush x:Key="AppPrimaryButtonForegroundDisabled" Color="#93C5FD" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackground" Color="#1F2937" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorder" Color="#475569" />
+          <SolidColorBrush x:Key="AppButtonSecondaryForeground" Color="#E5E7EB" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundPointerOver" Color="#273449" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderPointerOver" Color="#64748B" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundPressed" Color="#334155" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderPressed" Color="#64748B" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBackgroundDisabled" Color="#111827" />
+          <SolidColorBrush x:Key="AppButtonSecondaryBorderDisabled" Color="#1F2937" />
+          <SolidColorBrush x:Key="AppButtonSecondaryForegroundDisabled" Color="#64748B" />
+          <SolidColorBrush x:Key="AppButtonIconBackground" Color="#1E293B" />
+          <SolidColorBrush x:Key="AppButtonIconBorder" Color="#475569" />
+          <SolidColorBrush x:Key="AppButtonIconForeground" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundPointerOver" Color="#334155" />
+          <SolidColorBrush x:Key="AppButtonIconBorderPointerOver" Color="#64748B" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundPressed" Color="#475569" />
+          <SolidColorBrush x:Key="AppButtonIconBorderPressed" Color="#64748B" />
+          <SolidColorBrush x:Key="AppButtonIconBackgroundDisabled" Color="#111827" />
+          <SolidColorBrush x:Key="AppButtonIconBorderDisabled" Color="#1F2937" />
+          <SolidColorBrush x:Key="AppButtonIconForegroundDisabled" Color="#64748B" />
+          <SolidColorBrush x:Key="AppStatusNeutralBackground" Color="#334155" />
+          <SolidColorBrush x:Key="AppStatusNeutralForeground" Color="#E2E8F0" />
+          <SolidColorBrush x:Key="AppStatusInfoBackground" Color="#1E3A8A" />
+          <SolidColorBrush x:Key="AppStatusInfoForeground" Color="#BFDBFE" />
+          <SolidColorBrush x:Key="AppStatusSuccessBackground" Color="#14532D" />
+          <SolidColorBrush x:Key="AppStatusSuccessForeground" Color="#BBF7D0" />
+          <SolidColorBrush x:Key="AppStatusWarningBackground" Color="#78350F" />
+          <SolidColorBrush x:Key="AppStatusWarningForeground" Color="#FDE68A" />
+          <SolidColorBrush x:Key="AppStatusErrorBackground" Color="#7F1D1D" />
+          <SolidColorBrush x:Key="AppStatusErrorForeground" Color="#FECACA" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <fluent:FluentTheme />
     <Style Selector="Window">
-      <Setter Property="Background" Value="#F5F2EA" />
+      <Setter Property="Background" Value="{DynamicResource AppWindowBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryText}" />
+    </Style>
+    <Style Selector="Border.app-header">
+      <Setter Property="Background" Value="{DynamicResource AppHeaderBackground}" />
+    </Style>
+    <Style Selector="Border.app-footer">
+      <Setter Property="Background" Value="{DynamicResource AppFooterBackground}" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#FFFDF8" />
-      <Setter Property="BorderBrush" Value="#D9D3C5" />
+      <Setter Property="Background" Value="{DynamicResource AppCardBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorder}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="18" />
       <Setter Property="Padding" Value="18" />
     </Style>
+    <Style Selector="Border.muted-surface">
+      <Setter Property="Background" Value="{DynamicResource AppMutedSurface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
     <Style Selector="TextBlock.section-title">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#1B2A2F" />
+      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryText}" />
       <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="TextBlock.header-title">
+      <Setter Property="Foreground" Value="{DynamicResource AppHeaderForeground}" />
+    </Style>
+    <Style Selector="TextBlock.header-subtitle">
+      <Setter Property="Foreground" Value="{DynamicResource AppHeaderSecondaryForeground}" />
+    </Style>
+    <Style Selector="TextBlock.header-meta">
+      <Setter Property="Foreground" Value="{DynamicResource AppHeaderSecondaryForeground}" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppSecondaryText}" />
     </Style>
     <Style Selector="Border.status-pill">
       <Setter Property="CornerRadius" Value="999" />
       <Setter Property="Padding" Value="10,6" />
     </Style>
-    <Style Selector="Border.status-pill > TextBlock">
+    <Style Selector="TextBlock.status-pill-text">
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#1B2A2F" />
+    </Style>
+    <Style Selector="Border.status-pill.tone-neutral">
+      <Setter Property="Background" Value="{DynamicResource AppStatusNeutralBackground}" />
+    </Style>
+    <Style Selector="TextBlock.status-pill-text.tone-neutral">
+      <Setter Property="Foreground" Value="{DynamicResource AppStatusNeutralForeground}" />
+    </Style>
+    <Style Selector="Border.status-pill.tone-info">
+      <Setter Property="Background" Value="{DynamicResource AppStatusInfoBackground}" />
+    </Style>
+    <Style Selector="TextBlock.status-pill-text.tone-info">
+      <Setter Property="Foreground" Value="{DynamicResource AppStatusInfoForeground}" />
+    </Style>
+    <Style Selector="Border.status-pill.tone-success">
+      <Setter Property="Background" Value="{DynamicResource AppStatusSuccessBackground}" />
+    </Style>
+    <Style Selector="TextBlock.status-pill-text.tone-success">
+      <Setter Property="Foreground" Value="{DynamicResource AppStatusSuccessForeground}" />
+    </Style>
+    <Style Selector="Border.status-pill.tone-warning">
+      <Setter Property="Background" Value="{DynamicResource AppStatusWarningBackground}" />
+    </Style>
+    <Style Selector="TextBlock.status-pill-text.tone-warning">
+      <Setter Property="Foreground" Value="{DynamicResource AppStatusWarningForeground}" />
+    </Style>
+    <Style Selector="Border.status-pill.tone-error">
+      <Setter Property="Background" Value="{DynamicResource AppStatusErrorBackground}" />
+    </Style>
+    <Style Selector="TextBlock.status-pill-text.tone-error">
+      <Setter Property="Foreground" Value="{DynamicResource AppStatusErrorForeground}" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Background" Value="{DynamicResource AppButtonSecondaryBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonSecondaryForeground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonSecondaryBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16,10" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AppButtonSecondaryBackgroundPointerOver}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonSecondaryBorderPointerOver}" />
+    </Style>
+    <Style Selector="Button.secondary:pressed">
+      <Setter Property="Background" Value="{DynamicResource AppButtonSecondaryBackgroundPressed}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonSecondaryBorderPressed}" />
+    </Style>
+    <Style Selector="Button.secondary:disabled">
+      <Setter Property="Background" Value="{DynamicResource AppButtonSecondaryBackgroundDisabled}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonSecondaryForegroundDisabled}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonSecondaryBorderDisabled}" />
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="#0A6B5A" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="BorderBrush" Value="#0A6B5A" />
+      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryButtonForeground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Padding" Value="16,10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundPointerOver}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderPointerOver}" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundPressed}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderPressed}" />
+    </Style>
+    <Style Selector="Button.primary:disabled">
+      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundDisabled}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryButtonForegroundDisabled}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderDisabled}" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.icon">
+      <Setter Property="Background" Value="{DynamicResource AppButtonIconBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonIconForeground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonIconBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="MinWidth" Value="38" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AppButtonIconBackgroundPointerOver}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonIconBorderPointerOver}" />
+    </Style>
+    <Style Selector="Button.icon:pressed">
+      <Setter Property="Background" Value="{DynamicResource AppButtonIconBackgroundPressed}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonIconBorderPressed}" />
+    </Style>
+    <Style Selector="Button.icon:disabled">
+      <Setter Property="Background" Value="{DynamicResource AppButtonIconBackgroundDisabled}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonIconForegroundDisabled}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonIconBorderDisabled}" />
+      <Setter Property="Opacity" Value="1" />
     </Style>
   </Application.Styles>
 </Application>
