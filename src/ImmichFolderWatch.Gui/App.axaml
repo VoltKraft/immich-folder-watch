@@ -17,16 +17,16 @@
           <SolidColorBrush x:Key="AppHeaderSecondaryForeground" Color="#CBD5E1" />
           <SolidColorBrush x:Key="AppPrimaryText" Color="#111827" />
           <SolidColorBrush x:Key="AppSecondaryText" Color="#4B5563" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackground" Color="#2563EB" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorder" Color="#2563EB" />
-          <SolidColorBrush x:Key="AppPrimaryButtonForeground" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPointerOver" Color="#1D4ED8" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderPointerOver" Color="#1D4ED8" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPressed" Color="#1E40AF" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderPressed" Color="#1E40AF" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundDisabled" Color="#BFDBFE" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderDisabled" Color="#BFDBFE" />
-          <SolidColorBrush x:Key="AppPrimaryButtonForegroundDisabled" Color="#EFF6FF" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackground" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorder" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppButtonPrimaryForeground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundPointerOver" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderPointerOver" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundPressed" Color="#1E40AF" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderPressed" Color="#1E40AF" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundDisabled" Color="#BFDBFE" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderDisabled" Color="#BFDBFE" />
+          <SolidColorBrush x:Key="AppButtonPrimaryForegroundDisabled" Color="#EFF6FF" />
           <SolidColorBrush x:Key="AppButtonSecondaryBackground" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AppButtonSecondaryBorder" Color="#CBD5E1" />
           <SolidColorBrush x:Key="AppButtonSecondaryForeground" Color="#111827" />
@@ -69,16 +69,16 @@
           <SolidColorBrush x:Key="AppHeaderSecondaryForeground" Color="#CBD5E1" />
           <SolidColorBrush x:Key="AppPrimaryText" Color="#E5E7EB" />
           <SolidColorBrush x:Key="AppSecondaryText" Color="#94A3B8" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackground" Color="#3B82F6" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorder" Color="#3B82F6" />
-          <SolidColorBrush x:Key="AppPrimaryButtonForeground" Color="#EFF6FF" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPointerOver" Color="#60A5FA" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderPointerOver" Color="#60A5FA" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundPressed" Color="#2563EB" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderPressed" Color="#2563EB" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBackgroundDisabled" Color="#1E3A8A" />
-          <SolidColorBrush x:Key="AppPrimaryButtonBorderDisabled" Color="#1E3A8A" />
-          <SolidColorBrush x:Key="AppPrimaryButtonForegroundDisabled" Color="#93C5FD" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackground" Color="#3B82F6" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorder" Color="#3B82F6" />
+          <SolidColorBrush x:Key="AppButtonPrimaryForeground" Color="#EFF6FF" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundPointerOver" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderPointerOver" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundPressed" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderPressed" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBackgroundDisabled" Color="#1E3A8A" />
+          <SolidColorBrush x:Key="AppButtonPrimaryBorderDisabled" Color="#1E3A8A" />
+          <SolidColorBrush x:Key="AppButtonPrimaryForegroundDisabled" Color="#93C5FD" />
           <SolidColorBrush x:Key="AppButtonSecondaryBackground" Color="#1F2937" />
           <SolidColorBrush x:Key="AppButtonSecondaryBorder" Color="#475569" />
           <SolidColorBrush x:Key="AppButtonSecondaryForeground" Color="#E5E7EB" />
@@ -217,9 +217,9 @@
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackground}" />
-      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryButtonForeground}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorder}" />
+      <Setter Property="Background" Value="{DynamicResource AppButtonPrimaryBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonPrimaryForeground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonPrimaryBorder}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Padding" Value="16,10" />
@@ -227,17 +227,17 @@
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.primary:pointerover">
-      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundPointerOver}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderPointerOver}" />
+      <Setter Property="Background" Value="{DynamicResource AppButtonPrimaryBackgroundPointerOver}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonPrimaryBorderPointerOver}" />
     </Style>
     <Style Selector="Button.primary:pressed">
-      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundPressed}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderPressed}" />
+      <Setter Property="Background" Value="{DynamicResource AppButtonPrimaryBackgroundPressed}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonPrimaryBorderPressed}" />
     </Style>
     <Style Selector="Button.primary:disabled">
-      <Setter Property="Background" Value="{DynamicResource AppPrimaryButtonBackgroundDisabled}" />
-      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryButtonForegroundDisabled}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryButtonBorderDisabled}" />
+      <Setter Property="Background" Value="{DynamicResource AppButtonPrimaryBackgroundDisabled}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppButtonPrimaryForegroundDisabled}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppButtonPrimaryBorderDisabled}" />
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.icon">

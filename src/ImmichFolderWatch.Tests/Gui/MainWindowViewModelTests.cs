@@ -67,6 +67,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(StatusTone.Neutral, viewModel.ImmichUrlStatusTone);
         Assert.Equal(StatusTone.Neutral, viewModel.ImmichApiKeyStatusTone);
         Assert.Equal(StatusTone.Neutral, viewModel.ImmichPermissionsStatusTone);
+        Assert.NotEmpty(viewModel.ImmichPermissionStatuses);
         Assert.All(viewModel.ImmichPermissionStatuses, item => Assert.Equal(StatusTone.Neutral, item.StatusTone));
     }
 
@@ -80,6 +81,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(StatusTone.Info, viewModel.ImmichUrlStatusTone);
         Assert.Equal(StatusTone.Info, viewModel.ImmichApiKeyStatusTone);
         Assert.Equal(StatusTone.Info, viewModel.ImmichPermissionsStatusTone);
+        Assert.NotEmpty(viewModel.ImmichPermissionStatuses);
         Assert.All(viewModel.ImmichPermissionStatuses, item => Assert.Equal(StatusTone.Info, item.StatusTone));
     }
 

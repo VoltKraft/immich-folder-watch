@@ -44,25 +44,10 @@ public sealed partial class StatusPill : UserControl
 
     private void UpdateToneClasses(StyledElement element)
     {
-        SetClass(element, "tone-neutral", Tone == StatusTone.Neutral);
-        SetClass(element, "tone-info", Tone == StatusTone.Info);
-        SetClass(element, "tone-success", Tone == StatusTone.Success);
-        SetClass(element, "tone-warning", Tone == StatusTone.Warning);
-        SetClass(element, "tone-error", Tone == StatusTone.Error);
-    }
-
-    private static void SetClass(StyledElement element, string className, bool enabled)
-    {
-        if (enabled)
-        {
-            if (!element.Classes.Contains(className))
-            {
-                element.Classes.Add(className);
-            }
-
-            return;
-        }
-
-        element.Classes.Remove(className);
+        element.Classes.Set("tone-neutral", Tone == StatusTone.Neutral);
+        element.Classes.Set("tone-info", Tone == StatusTone.Info);
+        element.Classes.Set("tone-success", Tone == StatusTone.Success);
+        element.Classes.Set("tone-warning", Tone == StatusTone.Warning);
+        element.Classes.Set("tone-error", Tone == StatusTone.Error);
     }
 }

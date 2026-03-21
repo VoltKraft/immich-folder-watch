@@ -115,8 +115,8 @@ public sealed class BootstrapperTests
 
     private static string GetAssemblyVersion()
     {
-        var informationalVersion = typeof(Bootstrapper)
-            .Assembly
+        var assembly = typeof(Bootstrapper).Assembly;
+        var informationalVersion = assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion;
 
@@ -128,6 +128,8 @@ public sealed class BootstrapperTests
                 : informationalVersion;
         }
 
-        return "1.6.0";
+        var assemblyVersion = assembly.GetName().Version;
+        return assemblyVersion?.ToString(3)
+            ?? throw new InvalidOperationException("Bootstrapper assembly version is unavailable.");
     }
 }
