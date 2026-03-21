@@ -10,6 +10,7 @@ Usage:
   ImmichFolderWatch.Admin start-service [--result-file <path>]
   ImmichFolderWatch.Admin stop-service [--result-file <path>]
   ImmichFolderWatch.Admin restart-service [--result-file <path>]
+  ImmichFolderWatch.Admin resume-service-after-upgrade [--result-file <path>]
   ImmichFolderWatch.Admin migrate-data-layout [--legacy-install-root <path>] [--result-file <path>]
   ImmichFolderWatch.Admin apply-verified-config --source <path> [--result-file <path>]
 """;
@@ -58,6 +59,11 @@ Usage:
         if (string.Equals(commandName, "restart-service", StringComparison.OrdinalIgnoreCase))
         {
             return TryParseSimpleCommand(AdminCommandKind.RestartService, args[1..], out command, out message);
+        }
+
+        if (string.Equals(commandName, "resume-service-after-upgrade", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryParseSimpleCommand(AdminCommandKind.ResumeServiceAfterUpgrade, args[1..], out command, out message);
         }
 
         if (string.Equals(commandName, "migrate-data-layout", StringComparison.OrdinalIgnoreCase))
@@ -230,6 +236,7 @@ Usage:
             AdminCommandKind.StartService => "start-service",
             AdminCommandKind.StopService => "stop-service",
             AdminCommandKind.RestartService => "restart-service",
+            AdminCommandKind.ResumeServiceAfterUpgrade => "resume-service-after-upgrade",
             AdminCommandKind.MigrateDataLayout => "migrate-data-layout",
             AdminCommandKind.ApplyVerifiedConfig => "apply-verified-config",
             _ => kind.ToString(),

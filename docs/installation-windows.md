@@ -107,6 +107,7 @@ Installer behavior:
 - Moves old default logs from `%ProgramFiles%\Immich Folder Watch\logs\` into ProgramData when the previous config still used that default path
 - Registers the `ImmichFolderWatch` Windows service as `Manual`
 - Preserves the current service startup mode across upgrades, except that previously disabled installs are normalized to `Manual`
+- On MSI or WinGet upgrades, starts the service again automatically when it was running before the upgrade and the installed `C:\ProgramData\Immich Folder Watch\config.yaml` still validates successfully
 - Creates a desktop shortcut for the GUI
 - Preserves `C:\ProgramData\Immich Folder Watch\` on uninstall
 

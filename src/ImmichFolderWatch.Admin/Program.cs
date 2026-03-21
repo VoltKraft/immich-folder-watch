@@ -45,6 +45,7 @@ internal static class Bootstrapper
                 AdminCommandKind.StartService => ExecuteServiceAction(serviceManager, static manager => manager.StartService(), "Service started successfully.", normalizeStartupType: true),
                 AdminCommandKind.StopService => ExecuteServiceAction(serviceManager, static manager => manager.StopService(), "Service stopped successfully."),
                 AdminCommandKind.RestartService => ExecuteServiceAction(serviceManager, static manager => manager.RestartService(), "Service restarted successfully.", normalizeStartupType: true),
+                AdminCommandKind.ResumeServiceAfterUpgrade => ResumeServiceAfterUpgrade(serviceManager, configPath),
                 AdminCommandKind.MigrateDataLayout => MigrateDataLayout(command, configPath, defaultLogDirectory, baseDirectory, migrationService, serviceManager),
                 AdminCommandKind.ApplyVerifiedConfig => await ApplyVerifiedConfigAsync(command, configPath, serviceManager, migrationService),
                 _ => throw new InvalidOperationException($"Unsupported command kind: {command.Kind}"),
@@ -92,6 +93,55 @@ internal static class Bootstrapper
         {
             Success = true,
             Message = successMessage,
+            Status = serviceManager.GetStatus(),
+        };
+    }
+
+    private static AdminCommandResponse ResumeServiceAfterUpgrade(
+        IServiceManager serviceManager,
+        string configPath)
+    {
+        var markerStore = new UpgradeResumeMarkerStore();
+        var wasRunningBeforeUpgrade = markerStore.ConsumeWasRunningBeforeUpgrade();
+        var statusBefore = serviceManager.GetStatus();
+
+        if (!wasRunningBeforeUpgrade)
+        {
+            return new AdminCommandResponse
+            {
+                Success = true,
+                Message = "Service was not running before the upgrade. No automatic restart was needed.",
+                Status = statusBefore,
+            };
+        }
+
+        if (!statusBefore.Exists)
+        {
+            return new AdminCommandResponse
+            {
+                Success = false,
+                Message = $"Service '{InstallationPaths.ServiceName}' is not installed after the upgrade.",
+                Status = statusBefore,
+            };
+        }
+
+        var verificationResult = VerifyInstalledConfig(configPath);
+        if (!UpgradeServiceResumePolicy.ShouldStartService(wasRunningBeforeUpgrade, statusBefore, verificationResult))
+        {
+            return new AdminCommandResponse
+            {
+                Success = true,
+                Message = BuildUpgradeResumeSkippedMessage(verificationResult, statusBefore),
+                Status = statusBefore,
+            };
+        }
+
+        serviceManager.StartService();
+
+        return new AdminCommandResponse
+        {
+            Success = true,
+            Message = "Service was running before the upgrade and was started again successfully.",
             Status = serviceManager.GetStatus(),
         };
     }
@@ -180,6 +230,23 @@ internal static class Bootstrapper
         return builder.ToString();
     }
 
+    private static string BuildUpgradeResumeSkippedMessage(
+        VerificationResult verificationResult,
+        ServiceStatusSnapshot snapshot)
+    {
+        if (!verificationResult.Success)
+        {
+            return $"Service was running before the upgrade, but it was not restarted because the installed configuration is not valid: {string.Join(" | ", verificationResult.Errors)}";
+        }
+
+        return snapshot.State switch
+        {
+            ServiceRunState.Running => "Service is already running after the upgrade.",
+            ServiceRunState.StartPending => "Service is already starting after the upgrade.",
+            _ => $"Service was running before the upgrade, but it was not restarted automatically because the current service state is '{snapshot.State}'.",
+        };
+    }
+
     private static AdminCommandResponse MigrateDataLayout(
         AdminCommand command,
         string configPath,
@@ -243,6 +310,22 @@ internal static class Bootstrapper
         }
 
         serviceManager.SetStartupType(ServiceStartupType.Automatic, delayedAutoStart: true);
+    }
+
+    private static VerificationResult VerifyInstalledConfig(string configPath)
+    {
+        try
+        {
+            var config = new AppConfigLoader().Load(configPath);
+            var validationErrors = AppConfigValidator.Validate(config);
+            return validationErrors.Count > 0
+                ? VerificationResult.Failed(validationErrors)
+                : VerificationResult.Passed();
+        }
+        catch (Exception ex)
+        {
+            return VerificationResult.Failed([$"Configuration file could not be loaded: {ex.Message}"]);
+        }
     }
 
     private static AppConfig? TryLoadConfig(string configPath)

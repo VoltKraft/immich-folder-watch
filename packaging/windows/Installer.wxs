@@ -170,6 +170,17 @@
 
   <Fragment>
     <SetProperty
+      Id="RecordUpgradeRunningServiceState"
+      Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -Command &quot;$service = Get-Service -Name 'ImmichFolderWatch' -ErrorAction SilentlyContinue; $keyPath = 'HKLM:\Software\ImmichFolderWatch'; if ($null -ne $service -and $service.Status -eq 'Running') { New-Item -Path $keyPath -Force | Out-Null; New-ItemProperty -Path $keyPath -Name 'ResumeServiceAfterUpgrade' -Value 1 -PropertyType DWord -Force | Out-Null; Write-Host 'Recorded running service state for upgrade resume.' } else { if (Test-Path -LiteralPath $keyPath) { Remove-ItemProperty -Path $keyPath -Name 'ResumeServiceAfterUpgrade' -ErrorAction SilentlyContinue }; Write-Host 'No running service state recorded for upgrade resume.' }&quot;"
+      Before="RecordUpgradeRunningServiceState"
+      Sequence="execute" />
+    <CustomAction
+      Id="RecordUpgradeRunningServiceState"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Return="ignore" />
+
+    <SetProperty
       Id="RunDataLayoutMigration"
       Value='"[BINDIR]ImmichFolderWatch.Admin.exe" migrate-data-layout --legacy-install-root "[INSTALLFOLDER]"'
       Before="RunDataLayoutMigration"
@@ -234,7 +245,24 @@
       Impersonate="no"
       Return="check" />
 
+    <SetProperty
+      Id="ResumeServiceAfterUpgrade"
+      Value="&quot;[BINDIR]ImmichFolderWatch.Admin.exe&quot; resume-service-after-upgrade"
+      Before="ResumeServiceAfterUpgrade"
+      Sequence="execute" />
+    <CustomAction
+      Id="ResumeServiceAfterUpgrade"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="ignore" />
+
     <InstallExecuteSequence>
+      <Custom
+        Action="RecordUpgradeRunningServiceState"
+        Before="RemoveExistingProducts"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED" />
       <Custom
         Action="RunDataLayoutMigration"
         After="InstallFiles"
@@ -255,6 +283,10 @@
         Action="NormalizeUpgradeDisabledToManual"
         After="PreserveUpgradeManualStart"
         Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED AND EXISTINGSERVICESTART = &quot;4&quot;" />
+      <Custom
+        Action="ResumeServiceAfterUpgrade"
+        After="NormalizeUpgradeDisabledToManual"
+        Condition="NOT REMOVE AND WIX_UPGRADE_DETECTED" />
     </InstallExecuteSequence>
   </Fragment>
 </Wix>
