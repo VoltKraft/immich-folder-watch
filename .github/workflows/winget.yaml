@@ -43,7 +43,7 @@ jobs:
           "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.ref.outputs.target_ref }}
@@ -127,7 +127,7 @@ jobs:
 
       - name: Setup .NET 6 for wingetcreate
         if: steps.metadata.outputs.automation_enabled == 'true'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 6.0.x
 
