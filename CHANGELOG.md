@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-03-21
+
+### Changed
+- `StatusTone` and the reusable `StatusPill` control are now documented and use simpler built-in class toggling for tone updates.
+- Windows GUI theme resources now use the consistent `AppButtonPrimary*` naming pattern for primary buttons.
+- Version fallback handling in the GUI and daemon tests now avoids duplicated hardcoded literals, and Immich permission tone tests now assert that the permission list is populated before validating item tones.
+- Project, packaging, and release defaults updated to `1.6.1`.
+
 ## [1.6.0] - 2026-03-21
 
 ### Changed
