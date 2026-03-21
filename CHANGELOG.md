@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-03-21
+
+### Changed
+- Added a central branding asset pipeline with assets/branding/logo.svg as the single maintained source for GUI, installer, README, and future Flatpak icon derivatives.
+- Windows GUI builds now generate and embed the application icon plus a header logo automatically, and the MSI package now reuses the same generated icon for ARP and the desktop shortcut.
+- README and Flatpak placeholder documentation now describe the shared branding asset flow.
+- The branding asset generator now disposes the SKPicture loaded from SKSvg.Load correctly.
+- Project, packaging, and release defaults updated to 1.6.2.
+
 ## [1.6.1] - 2026-03-21
 
 ### Changed
