@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:ImmichFolderWatch.Gui.Controls"
         x:Class="ImmichFolderWatch.Gui.MainWindow"
         Title="Immich Folder Watch"
         Width="1080"
@@ -8,27 +9,25 @@
         MinHeight="760">
   <Grid RowDefinitions="Auto,*,Auto">
     <Border Grid.Row="0"
+            Classes="app-header"
             Padding="24"
-            Background="#10314B"
             CornerRadius="0,0,24,24">
       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-          <TextBlock Text="Immich Folder Watch"
+          <TextBlock Classes="header-title"
+                     Text="Immich Folder Watch"
                      FontSize="30"
-                     FontWeight="Bold"
-                     Foreground="#F9F6EE" />
-          <Border Classes="status-pill"
-                  VerticalAlignment="Center"
-                  Background="{Binding ServiceBadgeBackground}">
-            <TextBlock Text="{Binding ServiceBadgeText}" />
-          </Border>
+                     FontWeight="Bold" />
+          <controls:StatusPill VerticalAlignment="Center"
+                               Text="{Binding ServiceBadgeText}"
+                               Tone="{Binding ServiceBadgeTone}" />
         </StackPanel>
 
         <TextBlock Grid.Row="1"
+                   Classes="header-subtitle"
                    Margin="0,8,0,0"
                    Text="{Binding StatusHeadline}"
                    FontSize="16"
-                   Foreground="#D7E6E2"
                    TextWrapping="Wrap" />
 
         <StackPanel Grid.Row="0"
@@ -37,14 +36,14 @@
                     HorizontalAlignment="Right"
                     Margin="24,0,0,0"
                     Spacing="6">
-          <TextBlock Text="{Binding ProductVersionText}"
-                     Foreground="#F9F6EE"
+          <TextBlock Classes="header-title"
+                     Text="{Binding ProductVersionText}"
                      FontWeight="SemiBold"
                      TextAlignment="Right"
                      TextWrapping="NoWrap"
                      TextTrimming="CharacterEllipsis" />
-          <TextBlock Text="{Binding StatusDetails}"
-                     Foreground="#C6D7D1"
+          <TextBlock Classes="header-meta"
+                     Text="{Binding StatusDetails}"
                      TextAlignment="Right"
                      TextWrapping="NoWrap"
                      TextTrimming="CharacterEllipsis" />
@@ -67,13 +66,11 @@
                        Grid.Column="1"
                        Text="{Binding ImmichServerApiUrl}"
                        Watermark="https://immich.example.com/api" />
-              <Border Grid.Row="0"
-                      Grid.Column="2"
-                      Classes="status-pill"
-                      VerticalAlignment="Center"
-                      Background="{Binding ImmichUrlStatusBackground}">
-                <TextBlock Text="{Binding ImmichUrlStatusText}" />
-              </Border>
+              <controls:StatusPill Grid.Row="0"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding ImmichUrlStatusText}"
+                                   Tone="{Binding ImmichUrlStatusTone}" />
 
               <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="API Key" />
               <Grid Grid.Row="1"
@@ -90,37 +87,33 @@
                          Watermark="{Binding ImmichApiKeyPlaceholderText}"
                          PasswordChar="●" />
                 <Button Grid.Column="1"
-                        MinWidth="38"
-                        Padding="8,6"
+                        Classes="icon"
                         IsVisible="{Binding ShowImmichApiKeyRevealButton}"
                         Click="ToggleApiKeyVisibilityButton_Click"
                         ToolTip.Tip="{Binding ImmichApiKeyRevealToolTip}">
                   <PathIcon Width="16"
                             Height="16"
+                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                             Data="M12,17C7,17 2.73,13.89 1,9.5C2.73,5.11 7,2 12,2C17,2 21.27,5.11 23,9.5C21.27,13.89 17,17 12,17ZM12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
                 </Button>
               </Grid>
-              <Border Grid.Row="1"
-                      Grid.Column="2"
-                      Classes="status-pill"
-                      VerticalAlignment="Center"
-                      Background="{Binding ImmichApiKeyStatusBackground}">
-                <TextBlock Text="{Binding ImmichApiKeyStatusText}" />
-              </Border>
+              <controls:StatusPill Grid.Row="1"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding ImmichApiKeyStatusText}"
+                                   Tone="{Binding ImmichApiKeyStatusTone}" />
 
               <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Permissions" />
               <TextBlock Grid.Row="2"
                          Grid.Column="1"
+                         Classes="muted"
                          VerticalAlignment="Center"
-                         Foreground="#5E6057"
                          Text="Checks the permissions needed for uploads and optional album placement." />
-              <Border Grid.Row="2"
-                      Grid.Column="2"
-                      Classes="status-pill"
-                      VerticalAlignment="Center"
-                      Background="{Binding ImmichPermissionsStatusBackground}">
-                <TextBlock Text="{Binding ImmichPermissionsStatusText}" />
-              </Border>
+              <controls:StatusPill Grid.Row="2"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding ImmichPermissionsStatusText}"
+                                   Tone="{Binding ImmichPermissionsStatusTone}" />
 
               <ItemsControl Grid.Row="3"
                             Grid.Column="1"
@@ -128,28 +121,23 @@
                             ItemsSource="{Binding ImmichPermissionStatuses}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Border Margin="0,0,0,8"
-                            Padding="12"
-                            Background="#F5F1E8"
-                            CornerRadius="12"
-                            BorderBrush="#DDD5C4"
-                            BorderThickness="1">
+                    <Border Classes="muted-surface"
+                            Margin="0,0,0,8"
+                            Padding="12">
                       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
                           <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                          <TextBlock Text="{Binding PermissionName}" Foreground="#5E6057" />
+                          <TextBlock Classes="muted" Text="{Binding PermissionName}" />
                         </StackPanel>
-                        <Border Grid.Row="0"
-                                Grid.Column="1"
-                                Classes="status-pill"
-                                VerticalAlignment="Center"
-                                Background="{Binding StatusBackground}">
-                          <TextBlock Text="{Binding StatusText}" />
-                        </Border>
+                        <controls:StatusPill Grid.Row="0"
+                                             Grid.Column="1"
+                                             VerticalAlignment="Center"
+                                             Text="{Binding StatusText}"
+                                             Tone="{Binding StatusTone}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="0"
                                    Grid.ColumnSpan="2"
-                                   Foreground="#5E6057"
+                                   Classes="muted"
                                    Text="{Binding Message}"
                                    TextWrapping="Wrap" />
                       </Grid>
@@ -160,6 +148,7 @@
 
               <Button Grid.Row="4"
                       Grid.Column="1"
+                      Classes="secondary"
                       HorizontalAlignment="Left"
                       Click="VerifyImmichButton_Click"
                       Content="Verify Immich Access" />
@@ -171,18 +160,15 @@
           <StackPanel>
             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
               <TextBlock Grid.Column="0" Classes="section-title" Text="Watch Sources" Margin="0" />
-              <Button Grid.Column="1" Click="AddSourceButton_Click" Content="Add Source" />
+              <Button Grid.Column="1" Classes="secondary" Click="AddSourceButton_Click" Content="Add Source" />
             </Grid>
 
             <ItemsControl ItemsSource="{Binding Sources}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Border Margin="0,0,0,12"
-                          Padding="14"
-                          Background="#F1ECE1"
-                          CornerRadius="12"
-                          BorderBrush="#D9D3C5"
-                          BorderThickness="1">
+                  <Border Classes="muted-surface"
+                          Margin="0,0,0,12"
+                          Padding="14">
                     <StackPanel Spacing="10">
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                         <TextBlock Grid.Column="0"
@@ -190,6 +176,7 @@
                                    FontWeight="SemiBold"
                                    Text="Watch Source" />
                         <Button Grid.Column="1"
+                                Classes="secondary"
                                 HorizontalAlignment="Right"
                                 Click="RemoveSourceButton_Click"
                                 Content="Remove" />
@@ -288,13 +275,14 @@
                        Watermark="C:\ProgramData\Immich Folder Watch\logs" />
               <Button Grid.Row="2"
                       Grid.Column="2"
+                      Classes="secondary"
                       Click="UseDefaultLogDirectoryButton_Click"
                       Content="Use Install Default" />
 
               <TextBlock Grid.Row="3"
                          Grid.Column="1"
                          Grid.ColumnSpan="2"
-                         Foreground="#5E6057"
+                         Classes="muted"
                          Text="Log Directory must be configured as an absolute path." />
             </Grid>
           </StackPanel>
@@ -303,25 +291,32 @@
     </ScrollViewer>
 
     <Border Grid.Row="2"
-            Padding="18"
-            Background="#F0E9DB">
+            Classes="app-footer"
+            Padding="18">
       <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
         <Button Grid.Row="0"
                 Grid.Column="0"
+                Classes="secondary"
                 IsVisible="{Binding ShowStartServiceButton}"
                 Click="StartServiceButton_Click"
                 Content="Start Service" />
         <Button Grid.Row="0"
                 Grid.Column="1"
+                Classes="secondary"
                 IsVisible="{Binding ShowStopServiceButton}"
                 Click="StopServiceButton_Click"
                 Content="Stop Service" />
         <Button Grid.Row="0"
                 Grid.Column="2"
+                Classes="secondary"
                 IsVisible="{Binding ShowRestartServiceButton}"
                 Click="RestartServiceButton_Click"
                 Content="Restart Service" />
-        <Button Grid.Row="0" Grid.Column="3" Click="OpenLogsButton_Click" Content="Open Logs" />
+        <Button Grid.Row="0"
+                Grid.Column="3"
+                Classes="secondary"
+                Click="OpenLogsButton_Click"
+                Content="Open Logs" />
         <Button Grid.Row="0"
                 Grid.Column="4"
                 Classes="primary"

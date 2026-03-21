@@ -1,7 +1,7 @@
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-1.5.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.6.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a Windows service and desktop app that watches local folders and uploads newly created media to Immich automatically.

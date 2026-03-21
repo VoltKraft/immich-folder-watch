@@ -8,7 +8,7 @@ public sealed class ImmichPermissionStatusItem
 
     public string StatusText { get; init; } = string.Empty;
 
-    public string StatusBackground { get; init; } = string.Empty;
+    public StatusTone StatusTone { get; init; } = StatusTone.Neutral;
 
     public string Message { get; init; } = string.Empty;
 }

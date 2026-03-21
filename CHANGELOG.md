@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-03-21
+
+### Changed
+- The Windows GUI now follows the active system light/dark theme and uses theme-aware colors for cards, header, footer, buttons, and status badges.
+- Status badges in the Windows GUI now use reusable tone-based styling so `Verify Immich Access`, service controls, and permission states stay readable in both light and dark mode.
+- Project, packaging, and release defaults updated to `1.6.0`.
+
 ## [1.5.0] - 2026-03-13
 
 ### Added
