@@ -19,8 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
-    <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
     <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
     <BrandAssetGeneratorInputs Include="$(BrandProjectRoot)/tools/BrandAssetGen/**/*.cs;$(BrandProjectRoot)/tools/BrandAssetGen/**/*.csproj"
                                Exclude="$(BrandProjectRoot)/tools/BrandAssetGen/bin/**/*;$(BrandProjectRoot)/tools/BrandAssetGen/obj/**/*" />
@@ -35,10 +33,19 @@
   </ItemGroup>
 
   <Target Name="GenerateBrandAssets"
-          BeforeTargets="PrepareResources;CoreCompile"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(BrandAssetGeneratorInputs)"
           Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
     <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+  </Target>
+
+  <Target Name="RegisterBrandAssets"
+          BeforeTargets="BuildAvaloniaResources;AddAvaloniaResources;GenerateAvaloniaResources;CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          DependsOnTargets="GenerateBrandAssets">
+    <ItemGroup>
+      <AvaloniaResource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
+      <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
+    </ItemGroup>
   </Target>
 </Project>
