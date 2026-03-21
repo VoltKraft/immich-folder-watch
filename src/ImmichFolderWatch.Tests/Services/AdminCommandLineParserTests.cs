@@ -86,6 +86,26 @@ public sealed class AdminCommandLineParserTests
     }
 
     [Fact]
+    public void TryParse_ResumeServiceAfterUpgradeCommand_Succeeds()
+    {
+        var args = new[]
+        {
+            "resume-service-after-upgrade",
+            "--result-file",
+            "result.json",
+        };
+
+        var parsed = AdminCommandLineParser.TryParse(args, out var command, out var message, out var helpRequested);
+
+        Assert.True(parsed);
+        Assert.False(helpRequested);
+        Assert.Equal(string.Empty, message);
+        Assert.NotNull(command);
+        Assert.Equal(AdminCommandKind.ResumeServiceAfterUpgrade, command!.Kind);
+        Assert.Equal("result.json", command.ResultFilePath);
+    }
+
+    [Fact]
     public void TryParse_MigrateDataLayoutCommand_Succeeds()
     {
         var args = new[]

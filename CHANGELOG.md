@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-03-21
+
+### Changed
+- MSI- and WinGet-driven Windows upgrades now start the `ImmichFolderWatch` service again automatically when it was running before the upgrade and the installed ProgramData config still validates successfully.
+- Project, packaging, and release defaults updated to `1.6.3`.
+
 ## [1.6.2] - 2026-03-21
 
 ### Changed

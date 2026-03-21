@@ -26,6 +26,7 @@ This directory contains the first automation-friendly Windows packaging flow.
 - `C:\ProgramData\Immich Folder Watch\logs\`: daemon logs
 
 The GUI keeps the service status refreshed automatically, verifies the config on every save, stores `logging.logDirectory` as an absolute path, and migrates existing logs when the configured log directory changes successfully through the GUI.
+MSI-based upgrades also restart the service automatically when it was running before the upgrade and the installed ProgramData config still validates.
 
 Legacy installs with `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml` are migrated to `C:\ProgramData\Immich Folder Watch\config.yaml` automatically.
 If the old config still used `%ProgramFiles%\Immich Folder Watch\logs\`, those logs are moved to `C:\ProgramData\Immich Folder Watch\logs\` as well.
