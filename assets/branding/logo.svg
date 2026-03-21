@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Immich Folder Watch logo</title>
+  <desc id="desc">A rounded square app icon with a folder and a multicolor cloud.</desc>
+  <defs>
+    <linearGradient id="bg" x1="160" y1="112" x2="864" y2="912" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A" />
+      <stop offset="1" stop-color="#1E293B" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(760 250) rotate(132.5) scale(300)">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.38" />
+      <stop offset="0.48" stop-color="#22D3EE" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#0F172A" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="folder-top" x1="256" y1="328" x2="824" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFC" />
+      <stop offset="1" stop-color="#E2E8F0" />
+    </linearGradient>
+    <linearGradient id="folder-front" x1="248" y1="402" x2="776" y2="786" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#CBD5E1" />
+    </linearGradient>
+    <linearGradient id="cloud-fill" x1="306" y1="374" x2="740" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F97316" />
+      <stop offset="0.24" stop-color="#F59E0B" />
+      <stop offset="0.47" stop-color="#FACC15" />
+      <stop offset="0.7" stop-color="#14B8A6" />
+      <stop offset="1" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+
+  <rect x="96" y="96" width="832" height="832" rx="208" fill="url(#bg)" />
+  <rect x="96" y="96" width="832" height="832" rx="208" fill="url(#glow)" />
+  <path d="M256 332C256 301.072 281.072 276 312 276H458.096C480.375 276 501.785 284.851 517.537 300.603L568.934 352H714C769.228 352 814 396.772 814 452V486H256V332Z" fill="url(#folder-top)" />
+  <path d="M218 510C218 465.817 253.817 430 298 430H726C770.183 430 806 465.817 806 510V620C806 705.052 737.052 774 652 774H372C286.948 774 218 705.052 218 620V510Z" fill="url(#folder-front)" />
+  <path d="M314 406H730C768.66 406 800 437.34 800 476V512H244V476C244 437.34 275.34 406 314 406Z" fill="#F8FAFC" fill-opacity="0.96" />
+  <path d="M647.5 635H390.5C328.92 635 279 585.303 279 524C279 468.881 319.561 423.244 372.587 414.763C392.972 350.787 452.906 304 523.747 304C611.29 304 682.474 375.017 683.237 462.414C736.867 471.114 777 517.529 777 572C777 606.794 748.646 635 713.671 635H647.5Z" fill="url(#cloud-fill)" />
+  <path d="M423 677C423 660.431 436.431 647 453 647H614C630.569 647 644 660.431 644 677C644 693.569 630.569 707 614 707H453C436.431 707 423 693.569 423 677Z" fill="#FFFFFF" fill-opacity="0.22" />
+  <circle cx="404" cy="478" r="20" fill="#FFFFFF" fill-opacity="0.2" />
+</svg>

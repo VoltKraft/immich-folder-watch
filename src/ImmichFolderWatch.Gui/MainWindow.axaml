@@ -3,6 +3,7 @@
         xmlns:controls="using:ImmichFolderWatch.Gui.Controls"
         x:Class="ImmichFolderWatch.Gui.MainWindow"
         Title="Immich Folder Watch"
+        Icon="avares://ImmichFolderWatch.Gui/Assets/app-icon.ico"
         Width="1080"
         Height="860"
         MinWidth="960"
@@ -13,22 +14,40 @@
             Padding="24"
             CornerRadius="0,0,24,24">
       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-          <TextBlock Classes="header-title"
-                     Text="Immich Folder Watch"
-                     FontSize="30"
-                     FontWeight="Bold" />
-          <controls:StatusPill VerticalAlignment="Center"
-                               Text="{Binding ServiceBadgeText}"
-                               Tone="{Binding ServiceBadgeTone}" />
-        </StackPanel>
+        <StackPanel Grid.Row="0"
+                    Grid.RowSpan="2"
+                    Orientation="Horizontal"
+                    Spacing="16">
+          <Border Width="48"
+                  Height="48"
+                  Padding="4"
+                  CornerRadius="16"
+                  Background="#14FFFFFF"
+                  BorderBrush="#33FFFFFF"
+                  BorderThickness="1">
+            <Image Width="40"
+                   Height="40"
+                   Stretch="Uniform"
+                   Source="avares://ImmichFolderWatch.Gui/Assets/header-logo.png" />
+          </Border>
 
-        <TextBlock Grid.Row="1"
-                   Classes="header-subtitle"
-                   Margin="0,8,0,0"
-                   Text="{Binding StatusHeadline}"
-                   FontSize="16"
-                   TextWrapping="Wrap" />
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <TextBlock Classes="header-title"
+                         Text="Immich Folder Watch"
+                         FontSize="30"
+                         FontWeight="Bold" />
+              <controls:StatusPill VerticalAlignment="Center"
+                                   Text="{Binding ServiceBadgeText}"
+                                   Tone="{Binding ServiceBadgeTone}" />
+            </StackPanel>
+
+            <TextBlock Classes="header-subtitle"
+                       Text="{Binding StatusHeadline}"
+                       FontSize="16"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
 
         <StackPanel Grid.Row="0"
                     Grid.RowSpan="2"

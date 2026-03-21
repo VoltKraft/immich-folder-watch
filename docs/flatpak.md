@@ -6,6 +6,8 @@ Current repository state:
 
 - Placeholder manifest at `packaging/flatpak/io.github.immich_folder_watch.yaml`
 - No active Flatpak workflow is currently wired into GitHub Actions
+- App-ID-aligned icon assets are generated into `artifacts/branding/flatpak/`
+  from the central `assets/branding/logo.svg`
 
 ## Goals
 

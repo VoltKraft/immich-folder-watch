@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/branding/logo.svg" alt="Immich Folder Watch logo" width="128" />
+</p>
+
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)

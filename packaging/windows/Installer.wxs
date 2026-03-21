@@ -12,6 +12,8 @@
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="ImmichFolderWatch.ico" SourceFile="$(BrandingIconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="ImmichFolderWatch.ico" />
 
     <Property Id="LEGACYCONFIGPATH">
       <DirectorySearch Id="LegacyConfigDirectorySearch" Path="[INSTALLFOLDER]">
@@ -152,6 +154,8 @@
           Name="Immich Folder Watch"
           Description="Open the Immich Folder Watch configuration UI."
           Target="[BINDIR]ImmichFolderWatch.Gui.exe"
+          Icon="ImmichFolderWatch.ico"
+          IconIndex="0"
           WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue
           Root="HKCU"
