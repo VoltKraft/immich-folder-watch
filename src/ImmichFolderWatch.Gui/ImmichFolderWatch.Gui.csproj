@@ -2,11 +2,26 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <BrandProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</BrandProjectRoot>
+    <BrandGeneratorProject>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'tools', 'BrandAssetGen', 'BrandAssetGen.csproj'))</BrandGeneratorProject>
+    <BrandLogoSvg>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'assets', 'branding', 'logo.svg'))</BrandLogoSvg>
+    <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
+    <BrandWindowsIcon>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'windows', 'app.ico'))</BrandWindowsIcon>
+    <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.immich_folder_watch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.immich_folder_watch.png'))</BrandFlatpakPng>
+    <ApplicationIcon>$(BrandWindowsIcon)</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
+    <BrandAssetGeneratorInputs Include="$(BrandProjectRoot)/tools/BrandAssetGen/**/*.cs;$(BrandProjectRoot)/tools/BrandAssetGen/**/*.csproj"
+                               Exclude="$(BrandProjectRoot)/tools/BrandAssetGen/bin/**/*;$(BrandProjectRoot)/tools/BrandAssetGen/obj/**/*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,4 +31,21 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
   </ItemGroup>
+
+  <Target Name="GenerateBrandAssets"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(BrandAssetGeneratorInputs)"
+          Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
+    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+  </Target>
+
+  <Target Name="RegisterBrandAssets"
+          BeforeTargets="BuildAvaloniaResources;AddAvaloniaResources;GenerateAvaloniaResources;CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          DependsOnTargets="GenerateBrandAssets">
+    <ItemGroup>
+      <AvaloniaResource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
+      <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
+    </ItemGroup>
+  </Target>
 </Project>

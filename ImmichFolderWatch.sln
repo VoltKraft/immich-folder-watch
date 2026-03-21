@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.Admin", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.Tests", "src/ImmichFolderWatch.Tests/ImmichFolderWatch.Tests.csproj", "{68F9DFD0-1383-4868-9C2A-AD4BB5546022}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrandAssetGen", "tools/BrandAssetGen/BrandAssetGen.csproj", "{0CB9DD0E-576B-4260-9FF8-316260C5C34E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +46,10 @@ Global
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CB9DD0E-576B-4260-9FF8-316260C5C34E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CB9DD0E-576B-4260-9FF8-316260C5C34E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CB9DD0E-576B-4260-9FF8-316260C5C34E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CB9DD0E-576B-4260-9FF8-316260C5C34E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

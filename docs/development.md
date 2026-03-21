@@ -7,6 +7,9 @@ dotnet restore
 dotnet build ImmichFolderWatch.sln -c Debug
 ```
 
+The GUI build generates branding assets automatically from `assets/branding/logo.svg`
+into `artifacts/branding/`.
+
 ## Test
 
 ```bash

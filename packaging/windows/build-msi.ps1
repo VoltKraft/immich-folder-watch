@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot,
-    [string]$Version = "1.6.1",
+    [string]$Version = "1.6.2",
     [switch]$FrameworkDependent
 )
 
@@ -105,6 +105,7 @@ $guiProject = Join-Path $repoRoot "src\ImmichFolderWatch.Gui\ImmichFolderWatch.G
 $adminProject = Join-Path $repoRoot "src\ImmichFolderWatch.Admin\ImmichFolderWatch.Admin.csproj"
 $wixProject = Join-Path $scriptRoot "ImmichFolderWatch.Setup.wixproj"
 $windowsConfigTemplatePath = Join-Path $scriptRoot "config.windows.example.yaml"
+$brandingIconPath = Join-Path $repoRoot "artifacts\branding\windows\app.ico"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
 $publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
 $msiOutputRoot = Join-Path $OutputRoot "package"
@@ -165,6 +166,10 @@ Publish-ProjectOutput -ProjectPath $daemonProject -ProjectName "daemon"
 Publish-ProjectOutput -ProjectPath $guiProject -ProjectName "gui"
 Publish-ProjectOutput -ProjectPath $adminProject -ProjectName "admin"
 
+if (-not (Test-Path -LiteralPath $brandingIconPath)) {
+    throw "Branding icon not found: $brandingIconPath"
+}
+
 $buildArgs = @(
     "build",
     $wixProject,
@@ -172,6 +177,7 @@ $buildArgs = @(
     "-p:InstallerPlatform=$installerPlatform",
     "-p:InstallerVersion=$installerVersion",
     "-p:PublishedAppDir=$publishRoot",
+    "-p:BrandingIconPath=$brandingIconPath",
     "-p:ExampleConfigPath=$windowsConfigTemplatePath",
     "-p:OutputPath=$msiOutputRoot\"
 )
