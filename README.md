@@ -161,7 +161,7 @@ It helps visibility and supports continued development.
 
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/?repos=voltkraft%2Fimmich-folder-watch&type=date&legend=top-left">
+<a href="https://www.star-history.com/#/VoltKraft/immich-folder-watch&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=voltkraft/immich-folder-watch&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=voltkraft/immich-folder-watch&type=date&legend=top-left" />
