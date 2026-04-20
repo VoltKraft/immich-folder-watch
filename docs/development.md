@@ -7,7 +7,7 @@ dotnet restore
 dotnet build ImmichFolderWatch.sln -c Debug
 ```
 
-The GUI build generates branding assets automatically from `assets/branding/logo.svg`
+The app build generates branding assets automatically from `assets/branding/logo.svg`
 into `artifacts/branding/`.
 
 ## Test
@@ -19,8 +19,10 @@ dotnet test ImmichFolderWatch.sln -c Debug
 ## Run
 
 ```bash
-dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
+dotnet run --project src/ImmichFolderWatch.App
 ```
+
+The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. Use the GUI's **Save and Apply** to write it.
 
 ## CI
 
@@ -33,5 +35,5 @@ dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
 
 - Keep user-facing logs in English.
 - Keep comments concise and in English.
-- Avoid coupling daemon orchestration with HTTP details.
+- Avoid coupling watcher/worker orchestration with HTTP details.
 - Keep Core project free of runtime host concerns.

@@ -5,42 +5,56 @@ namespace ImmichFolderWatch.Tests.Installation;
 public sealed class InstallationPathsTests
 {
     [Fact]
-    public void GetConfigPath_ReturnsProgramDataConfigPath()
+    public void GetConfigPath_ReturnsUserLocalAppDataConfigPath()
     {
-        var baseDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            "Immich Folder Watch",
-            "bin");
-        var commonApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonApplicationData))
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
         {
-            commonApplicationData = @"C:\ProgramData";
+            localAppData = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "AppData",
+                "Local");
         }
 
-        var configPath = InstallationPaths.GetConfigPath(baseDirectory);
+        var configPath = InstallationPaths.GetConfigPath();
 
         Assert.Equal(
-            Path.Combine(commonApplicationData, "Immich Folder Watch", "config.yaml"),
+            Path.Combine(localAppData, "Immich Folder Watch", "config.yaml"),
             configPath);
     }
 
     [Fact]
-    public void GetLogDirectory_ReturnsProgramDataLogsPath()
+    public void GetLogDirectory_ReturnsUserLocalAppDataLogsPath()
     {
-        var baseDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            "Immich Folder Watch",
-            "bin");
-        var commonApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonApplicationData))
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
         {
-            commonApplicationData = @"C:\ProgramData";
+            localAppData = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "AppData",
+                "Local");
         }
 
-        var logDirectory = InstallationPaths.GetLogDirectory(baseDirectory);
+        var logDirectory = InstallationPaths.GetLogDirectory();
 
         Assert.Equal(
-            Path.Combine(commonApplicationData, "Immich Folder Watch", "logs"),
+            Path.Combine(localAppData, "Immich Folder Watch", "logs"),
             logDirectory);
+    }
+
+    [Fact]
+    public void GetLegacyProgramDataConfigPath_ReturnsProgramDataConfigPath()
+    {
+        var commonAppData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (string.IsNullOrWhiteSpace(commonAppData))
+        {
+            commonAppData = @"C:\ProgramData";
+        }
+
+        var legacyPath = InstallationPaths.GetLegacyProgramDataConfigPath();
+
+        Assert.Equal(
+            Path.Combine(commonAppData, "Immich Folder Watch", "config.yaml"),
+            legacyPath);
     }
 }

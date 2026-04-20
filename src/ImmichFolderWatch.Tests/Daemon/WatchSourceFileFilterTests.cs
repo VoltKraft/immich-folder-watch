@@ -1,4 +1,4 @@
-using ImmichFolderWatch.Daemon.Services;
+using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Tests.Daemon;
 

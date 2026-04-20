@@ -2,66 +2,54 @@ namespace ImmichFolderWatch.Core.Installation;
 
 public static class InstallationPaths
 {
-    public const string ServiceName = "ImmichFolderWatch";
-    public const string DataDirectoryName = "Immich Folder Watch";
+    public const string ProductFolderName = "Immich Folder Watch";
+    public const string ConfigFileName = "config.yaml";
+    public const string LogsDirectoryName = "logs";
+    public const string AutostartShortcutName = "Immich Folder Watch.lnk";
+    public const string LegacyServiceName = "ImmichFolderWatch";
+    public const string AppExecutableName = "ImmichFolderWatch.App.exe";
 
-    public static string GetInstallRoot(string baseDirectory)
+    public static string GetUserDataRoot()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(baseDirectory);
-        return Path.GetFullPath(Path.Combine(baseDirectory, ".."));
-    }
-
-    public static string GetDataRoot()
-    {
-        var commonApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonApplicationData))
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
         {
-            commonApplicationData = @"C:\ProgramData";
+            localAppData = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "AppData",
+                "Local");
         }
 
-        return Path.Combine(commonApplicationData, DataDirectoryName);
+        return Path.Combine(localAppData, ProductFolderName);
     }
 
-    public static string GetLegacyStructuredConfigPath(string legacyInstallRoot)
+    public static string GetConfigPath() => Path.Combine(GetUserDataRoot(), ConfigFileName);
+
+    public static string GetLogDirectory() => Path.Combine(GetUserDataRoot(), LogsDirectoryName);
+
+    public static string GetLegacyProgramDataRoot()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(legacyInstallRoot);
-        return Path.Combine(Path.GetFullPath(legacyInstallRoot), "config", "config.yaml");
+        var commonAppData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (string.IsNullOrWhiteSpace(commonAppData))
+        {
+            commonAppData = @"C:\ProgramData";
+        }
+
+        return Path.Combine(commonAppData, ProductFolderName);
     }
 
-    public static string GetLegacyRootConfigPath(string legacyInstallRoot)
+    public static string GetLegacyProgramDataConfigPath() =>
+        Path.Combine(GetLegacyProgramDataRoot(), ConfigFileName);
+
+    public static string GetStartupShortcutPath()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(legacyInstallRoot);
-        return Path.Combine(Path.GetFullPath(legacyInstallRoot), "config.yaml");
+        var startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        return Path.Combine(startupFolder, AutostartShortcutName);
     }
 
-    public static string GetLegacyDefaultLogDirectory(string legacyInstallRoot)
+    public static string GetAppExecutablePath(string baseDirectory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(legacyInstallRoot);
-        return Path.Combine(Path.GetFullPath(legacyInstallRoot), "logs");
-    }
-
-    public static string GetConfigDirectory(string baseDirectory)
-    {
-        return GetDataRoot();
-    }
-
-    public static string GetConfigPath(string baseDirectory)
-    {
-        return Path.Combine(GetDataRoot(), "config.yaml");
-    }
-
-    public static string GetLogDirectory(string baseDirectory)
-    {
-        return Path.Combine(GetDataRoot(), "logs");
-    }
-
-    public static string GetAdminExecutablePath(string baseDirectory)
-    {
-        return Path.Combine(baseDirectory, "ImmichFolderWatch.Admin.exe");
-    }
-
-    public static string GetGuiExecutablePath(string baseDirectory)
-    {
-        return Path.Combine(baseDirectory, "ImmichFolderWatch.Gui.exe");
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseDirectory);
+        return Path.Combine(baseDirectory, AppExecutableName);
     }
 }

@@ -1,0 +1,10 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ImmichFolderWatch.App.Controls.StatusPill"
+             x:Name="Self">
+  <Border x:Name="RootBorder" Classes="status-pill">
+    <TextBlock x:Name="TextPresenter"
+               Classes="status-pill-text"
+               Text="{Binding Text, ElementName=Self}" />
+  </Border>
+</UserControl>

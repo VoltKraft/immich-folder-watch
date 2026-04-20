@@ -4,10 +4,9 @@
     <InstallerPlatform Condition="'$(InstallerPlatform)' == ''">x64</InstallerPlatform>
     <InstallerVersion Condition="'$(InstallerVersion)' == ''">1.6.3</InstallerVersion>
     <PublishedAppDir Condition="'$(PublishedAppDir)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\windows\msi\publish\win-x64</PublishedAppDir>
-    <ExampleConfigPath Condition="'$(ExampleConfigPath)' == ''">$(MSBuildProjectDirectory)\config.windows.example.yaml</ExampleConfigPath>
     <BrandingIconPath Condition="'$(BrandingIconPath)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\branding\windows\app.ico</BrandingIconPath>
     <OutputName Condition="'$(OutputName)' == ''">immich-folder-watch</OutputName>
-    <DefineConstants>PublishedAppDir=$(PublishedAppDir);ExampleConfigPath=$(ExampleConfigPath);InstallerVersion=$(InstallerVersion);BrandingIconPath=$(BrandingIconPath);$(DefineConstants)</DefineConstants>
+    <DefineConstants>PublishedAppDir=$(PublishedAppDir);InstallerVersion=$(InstallerVersion);BrandingIconPath=$(BrandingIconPath);$(DefineConstants)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
