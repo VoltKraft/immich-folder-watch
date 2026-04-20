@@ -54,6 +54,12 @@ public sealed class AppConfigWriter
                 Level = config.Logging.Level,
                 LogDirectory = config.Logging.LogDirectory,
             },
+            Localization = new LocalizationSettings
+            {
+                Language = string.IsNullOrWhiteSpace(config.Localization?.Language)
+                    ? "auto"
+                    : config.Localization.Language,
+            },
         };
 
         var yaml = serializer.Serialize(writableConfig);
@@ -71,6 +77,8 @@ public sealed class AppConfigWriter
         public RetrySettings Retry { get; set; } = new();
 
         public LoggingSettings Logging { get; set; } = new();
+
+        public LocalizationSettings Localization { get; set; } = new();
     }
 
     private sealed class WritableWatchSettings

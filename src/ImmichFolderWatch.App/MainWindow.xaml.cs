@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using Button = System.Windows.Controls.Button;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Models;
+using ImmichFolderWatch.App.Resources;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
@@ -28,6 +29,7 @@ public sealed partial class MainWindow : Window
     private readonly AutostartManager _autostartManager;
     private readonly AppConfigLoader _configLoader;
     private readonly ThemeWatcher _themeWatcher;
+    private readonly LocalizationService _localizationService;
     private readonly ConfigVerificationRunner _verificationRunner;
     private bool _isImmichCheckInProgress;
     private bool _isSaveInProgress;
@@ -38,18 +40,20 @@ public sealed partial class MainWindow : Window
         SyncStatusProvider syncStatusProvider,
         AutostartManager autostartManager,
         AppConfigLoader configLoader,
-        ThemeWatcher themeWatcher)
+        ThemeWatcher themeWatcher,
+        LocalizationService localizationService)
     {
         _appHost = appHost ?? throw new ArgumentNullException(nameof(appHost));
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
         _configLoader = configLoader ?? throw new ArgumentNullException(nameof(configLoader));
         _themeWatcher = themeWatcher ?? throw new ArgumentNullException(nameof(themeWatcher));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _verificationRunner = new ConfigVerificationRunner();
 
         InitializeComponent();
 
-        ViewModel = new MainWindowViewModel(_syncStatusProvider, _autostartManager)
+        ViewModel = new MainWindowViewModel(_syncStatusProvider, _autostartManager, _localizationService)
         {
             ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}",
         };
@@ -134,7 +138,7 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             ViewModel.Load(CreateDefaultConfig());
-            ViewModel.OperationMessage = $"Die bestehende Konfiguration konnte nicht geladen werden. Standardwerte wurden geöffnet: {ex.Message}";
+            ViewModel.OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_ConfigLoadFailedFormat, ex.Message);
         }
     }
 
@@ -187,7 +191,7 @@ public sealed partial class MainWindow : Window
 
             if (updateOperationMessage)
             {
-                ViewModel.OperationMessage = "Prüfe Immich-URL, API-Key und Berechtigungen...";
+                ViewModel.OperationMessage = Strings.Op_CheckingImmich;
             }
 
             var accessResult = await _verificationRunner.CheckImmichAccessAsync(
@@ -205,7 +209,7 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             ViewModel.ApplyImmichCheckResult(CreateUnexpectedImmichCheckFailureResult(ex.Message));
-            ViewModel.OperationMessage = $"Immich-Prüfung ist fehlgeschlagen: {ex.Message}";
+            ViewModel.OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_ImmichCheckFailedFormat, ex.Message);
         }
         finally
         {
@@ -227,10 +231,10 @@ public sealed partial class MainWindow : Window
 
         return accessResult.PermissionsState switch
         {
-            CheckState.Passed => "Immich-Zugangsprüfung erfolgreich abgeschlossen.",
+            CheckState.Passed => Strings.Op_ImmichCheckOk,
             CheckState.Warning => accessResult.PermissionsMessage,
             CheckState.Failed => accessResult.PermissionsMessage,
-            _ => "Immich-Zugangsprüfung abgeschlossen.",
+            _ => Strings.Op_ImmichCheckDone,
         };
     }
 
@@ -309,7 +313,7 @@ public sealed partial class MainWindow : Window
         var logDirectory = ViewModel.GetEffectiveLogDirectory();
         if (string.IsNullOrWhiteSpace(logDirectory))
         {
-            ViewModel.OperationMessage = "Kein Log-Verzeichnis konfiguriert.";
+            ViewModel.OperationMessage = Strings.Op_NoLogDir;
             return;
         }
 
@@ -321,7 +325,7 @@ public sealed partial class MainWindow : Window
 
         if (!Directory.Exists(fullPath))
         {
-            ViewModel.OperationMessage = $"Das Log-Verzeichnis existiert nicht: {fullPath}";
+            ViewModel.OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_LogDirMissingFormat, fullPath);
             return;
         }
 
@@ -335,7 +339,7 @@ public sealed partial class MainWindow : Window
     private void UseDefaultLogDirectoryButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.LogDirectory = Path.GetFullPath(InstallationPaths.GetLogDirectory());
-        ViewModel.OperationMessage = "Log-Verzeichnis auf den Standardpfad zurückgesetzt.";
+        ViewModel.OperationMessage = Strings.Op_LogDirReset;
     }
 
     private async void SaveActionButton_Click(object sender, RoutedEventArgs e)
@@ -357,7 +361,7 @@ public sealed partial class MainWindow : Window
             var configPath = InstallationPaths.GetConfigPath();
 
             ViewModel.SetImmichCheckInProgress();
-            ViewModel.OperationMessage = "Prüfe Konfiguration gegen Immich...";
+            ViewModel.OperationMessage = Strings.Op_CheckingConfig;
 
             var accessResult = await _verificationRunner.CheckImmichAccessAsync(
                 draftConfig,
@@ -376,7 +380,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            ViewModel.OperationMessage = "Speichere Konfiguration und starte Sync neu...";
+            ViewModel.OperationMessage = Strings.Op_SavingRestarting;
 
             var configDirectory = Path.GetDirectoryName(configPath);
             if (!string.IsNullOrWhiteSpace(configDirectory))
@@ -390,11 +394,11 @@ public sealed partial class MainWindow : Window
             await _appHost.RestartAsync(draftConfig);
 
             LoadConfigFromDisk(configPath);
-            ViewModel.OperationMessage = "Konfiguration gespeichert und angewendet.";
+            ViewModel.OperationMessage = Strings.Op_SavedApplied;
         }
         catch (Exception ex)
         {
-            ViewModel.OperationMessage = $"Speichern fehlgeschlagen: {ex.Message}";
+            ViewModel.OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_SaveFailedFormat, ex.Message);
         }
         finally
         {

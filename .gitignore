@@ -24,6 +24,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Local configuration
 config.local.yml

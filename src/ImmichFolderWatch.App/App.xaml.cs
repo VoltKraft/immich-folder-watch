@@ -13,6 +13,7 @@ public sealed partial class App : Application
     private readonly SyncStatusProvider _syncStatusProvider = new();
     private readonly AutostartManager _autostartManager = new();
     private readonly AppConfigLoader _configLoader = new();
+    private readonly LocalizationService _localizationService = LocalizationService.Instance;
     private readonly AppHost _appHost;
     private readonly ThemeWatcher _themeWatcher;
 
@@ -36,17 +37,21 @@ public sealed partial class App : Application
 
     public ThemeWatcher ThemeWatcher => _themeWatcher;
 
+    public LocalizationService LocalizationService => _localizationService;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        ApplyStartupLanguage();
+
         _themeWatcher.Initialize();
 
-        _mainWindow = new MainWindow(_appHost, _syncStatusProvider, _autostartManager, _configLoader, _themeWatcher);
+        _mainWindow = new MainWindow(_appHost, _syncStatusProvider, _autostartManager, _configLoader, _themeWatcher, _localizationService);
         _mainWindow.Closing += MainWindow_Closing;
         MainWindow = _mainWindow;
 
-        _trayIconHost = new TrayIconHost(_syncStatusProvider, _themeWatcher);
+        _trayIconHost = new TrayIconHost(_syncStatusProvider, _themeWatcher, _localizationService);
         _trayIconHost.OpenGuiRequested += ShowMainWindow;
         _trayIconHost.RestartRequested += () => _ = RestartSyncAsync();
         _trayIconHost.QuitRequested += () => _ = QuitAsync();
@@ -187,5 +192,24 @@ public sealed partial class App : Application
     private static bool IsFirstRun()
     {
         return !File.Exists(InstallationPaths.GetConfigPath());
+    }
+
+    private void ApplyStartupLanguage()
+    {
+        var language = LocalizationService.LanguageAuto;
+        try
+        {
+            var configPath = InstallationPaths.GetConfigPath();
+            if (File.Exists(configPath))
+            {
+                var config = _configLoader.LoadForEditing(configPath);
+                language = config.Localization?.Language ?? LocalizationService.LanguageAuto;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        _localizationService.SetLanguage(language);
     }
 }

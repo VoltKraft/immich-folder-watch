@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using ImmichFolderWatch.App.Models;
+using ImmichFolderWatch.App.Resources;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
@@ -13,8 +14,6 @@ namespace ImmichFolderWatch.App.ViewModels;
 
 public sealed class MainWindowViewModel : BindableBase
 {
-    private const string ShowApiKeyToolTipText = "Show API key";
-    private const string HideApiKeyToolTipText = "Hide API key";
     private static readonly string[] DefaultImageExtensions =
     {
         ".avif",
@@ -40,7 +39,9 @@ public sealed class MainWindowViewModel : BindableBase
 
     private readonly SyncStatusProvider _syncStatusProvider;
     private readonly AutostartManager _autostartManager;
+    private readonly LocalizationService _localizationService;
     private bool _suppressAutostartWrite;
+    private bool _suppressLanguageWrite;
 
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
@@ -51,37 +52,48 @@ public sealed class MainWindowViewModel : BindableBase
     private string _retryBaseDelayMilliseconds = "500";
     private string _loggingLevel = "Information";
     private string _logDirectory = GetDefaultLogDirectory();
-    private string _statusHeadline = "Immich Folder Watch läuft im Hintergrund.";
+    private string _statusHeadline = string.Empty;
     private string _statusDetails = string.Empty;
-    private string _syncStatusBadgeText = "Bereit";
+    private string _syncStatusBadgeText = string.Empty;
     private StatusTone _syncStatusBadgeTone = StatusTone.Neutral;
-    private string _serverConnectionText = "Unbekannt";
+    private string _serverConnectionText = string.Empty;
     private StatusTone _serverConnectionTone = StatusTone.Neutral;
     private string _serverConnectionDetail = string.Empty;
-    private string _lastSyncText = "Noch kein Sync durchgeführt.";
-    private string _currentUploadText = "Aktuell kein Upload.";
+    private string _lastSyncText = string.Empty;
+    private string _currentUploadText = string.Empty;
     private string _pendingCountText = "0";
     private bool _autostartEnabled;
     private string _productVersionText = string.Empty;
     private string _operationMessage = string.Empty;
-    private string _saveActionButtonText = "Speichern und Anwenden";
-    private string _immichUrlStatusText = "Not checked";
+    private string _saveActionButtonText = string.Empty;
+    private string _immichUrlStatusText = string.Empty;
     private StatusTone _immichUrlStatusTone = StatusTone.Neutral;
-    private string _immichApiKeyStatusText = "Not checked";
+    private string _immichApiKeyStatusText = string.Empty;
     private StatusTone _immichApiKeyStatusTone = StatusTone.Neutral;
-    private string _immichPermissionsStatusText = "Not checked";
+    private string _immichPermissionsStatusText = string.Empty;
     private StatusTone _immichPermissionsStatusTone = StatusTone.Neutral;
     private bool _revealImmichApiKey;
     private bool _shouldMaskImmichApiKey;
     private bool _showPlainImmichApiKeyInput = true;
     private bool _showImmichApiKeyRevealButton;
     private bool _isImmichApiKeyPlaceholder;
-    private string _immichApiKeyRevealToolTip = ShowApiKeyToolTipText;
+    private string _immichApiKeyRevealToolTip = string.Empty;
+    private LanguageOption _selectedLanguage;
 
-    public MainWindowViewModel(SyncStatusProvider syncStatusProvider, AutostartManager autostartManager)
+    public MainWindowViewModel(
+        SyncStatusProvider syncStatusProvider,
+        AutostartManager autostartManager,
+        LocalizationService localizationService)
     {
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
+
+        AvailableLanguages = BuildLanguageOptions();
+        _selectedLanguage = FindLanguageOption(_localizationService.CurrentLanguage);
+        _saveActionButtonText = Strings.App_SaveAndApply;
+        _statusHeadline = Strings.App_StatusHeadline_Running;
+        _immichApiKeyRevealToolTip = Strings.ApiKey_ShowToolTip;
 
         AddSource();
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
@@ -93,11 +105,55 @@ public sealed class MainWindowViewModel : BindableBase
 
         RefreshSyncStatusFromProvider();
         _syncStatusProvider.PropertyChanged += SyncStatusProvider_PropertyChanged;
+        _localizationService.LanguageChanged += LocalizationService_LanguageChanged;
     }
 
     public ObservableCollection<WatchSourceItem> Sources { get; } = new();
 
     public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
+
+    public IReadOnlyList<LanguageOption> AvailableLanguages { get; }
+
+    public LanguageOption SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            if (value is null || SelectedLanguage == value)
+            {
+                return;
+            }
+
+            var previous = _selectedLanguage;
+            if (!SetProperty(ref _selectedLanguage, value))
+            {
+                return;
+            }
+
+            if (_suppressLanguageWrite)
+            {
+                return;
+            }
+
+            try
+            {
+                _localizationService.SetLanguage(value.Code);
+            }
+            catch (Exception)
+            {
+                _suppressLanguageWrite = true;
+                try
+                {
+                    _selectedLanguage = previous;
+                    RaisePropertyChanged(nameof(SelectedLanguage));
+                }
+                finally
+                {
+                    _suppressLanguageWrite = false;
+                }
+            }
+        }
+    }
 
     public string[] AvailableLogLevels { get; } =
     {
@@ -505,13 +561,14 @@ public sealed class MainWindowViewModel : BindableBase
         SetImmichApiKeyStatus(CheckState.Checking);
         SetImmichPermissionsStatus(CheckState.Checking);
 
+        var checkingMessage = $"{Strings.Check_Checking}...";
         RefreshPermissionStatuses(CreatePermissionItems(
             new[]
             {
-                new ImmichPermissionCheckResult { DisplayName = "Asset Upload", PermissionName = "asset.upload", State = CheckState.Checking, Message = "Checking...", BlocksConfigVerification = true },
-                new ImmichPermissionCheckResult { DisplayName = "Album Read", PermissionName = "album.read", State = CheckState.Checking, Message = "Checking..." },
-                new ImmichPermissionCheckResult { DisplayName = "Album Create", PermissionName = "album.create", State = CheckState.Checking, Message = "Checking..." },
-                new ImmichPermissionCheckResult { DisplayName = "Add Asset To Album", PermissionName = "albumAsset.create", State = CheckState.Checking, Message = "Checking..." },
+                new ImmichPermissionCheckResult { PermissionName = "asset.upload", State = CheckState.Checking, Message = checkingMessage, BlocksConfigVerification = true },
+                new ImmichPermissionCheckResult { PermissionName = "album.read", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.Checking, Message = checkingMessage },
             }));
     }
 
@@ -554,7 +611,7 @@ public sealed class MainWindowViewModel : BindableBase
         }
         catch (Exception ex)
         {
-            OperationMessage = $"Autostart konnte nicht aktualisiert werden: {ex.Message}";
+            OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_AutostartFailedFormat, ex.Message);
             _suppressAutostartWrite = true;
             try
             {
@@ -580,23 +637,53 @@ public sealed class MainWindowViewModel : BindableBase
         }
     }
 
+    private void LocalizationService_LanguageChanged(object? sender, EventArgs e)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            ApplyLocalizedStrings();
+        }
+        else
+        {
+            dispatcher.BeginInvoke(new Action(ApplyLocalizedStrings));
+        }
+    }
+
+    private void ApplyLocalizedStrings()
+    {
+        StatusHeadline = Strings.App_StatusHeadline_Running;
+        SaveActionButtonText = Strings.App_SaveAndApply;
+        ImmichApiKeyRevealToolTip = RevealImmichApiKey ? Strings.ApiKey_HideToolTip : Strings.ApiKey_ShowToolTip;
+
+        _suppressLanguageWrite = true;
+        try
+        {
+            var match = FindLanguageOption(_localizationService.CurrentLanguage);
+            if (!ReferenceEquals(match, _selectedLanguage))
+            {
+                _selectedLanguage = match;
+                RaisePropertyChanged(nameof(SelectedLanguage));
+            }
+        }
+        finally
+        {
+            _suppressLanguageWrite = false;
+        }
+
+        RefreshSyncStatusFromProvider();
+        RefreshPermissionStatusTexts();
+    }
+
     private void RefreshSyncStatusFromProvider()
     {
-        switch (_syncStatusProvider.ServerConnection)
+        ServerConnectionText = _syncStatusProvider.ServerConnection switch
         {
-            case ServerConnectionState.Ok:
-                ServerConnectionText = "OK";
-                break;
-            case ServerConnectionState.Error:
-                ServerConnectionText = "Fehler";
-                break;
-            case ServerConnectionState.Checking:
-                ServerConnectionText = "Prüfe…";
-                break;
-            default:
-                ServerConnectionText = "Unbekannt";
-                break;
-        }
+            ServerConnectionState.Ok => Strings.Server_Ok,
+            ServerConnectionState.Error => Strings.Server_Error,
+            ServerConnectionState.Checking => Strings.Server_Checking,
+            _ => Strings.Server_Unknown,
+        };
 
         ServerConnectionTone = StatusToneMapper.FromServerConnection(_syncStatusProvider.ServerConnection);
 
@@ -608,7 +695,7 @@ public sealed class MainWindowViewModel : BindableBase
         else if (_syncStatusProvider.LastServerCheckUtc.HasValue)
         {
             var check = _syncStatusProvider.LastServerCheckUtc.Value.ToLocalTime();
-            ServerConnectionDetail = $"Zuletzt geprüft: {check:HH:mm:ss}";
+            ServerConnectionDetail = string.Format(_localizationService.CurrentCulture, Strings.Status_LastCheckedFormat, check.ToString("HH:mm:ss", _localizationService.CurrentCulture));
         }
         else
         {
@@ -617,8 +704,8 @@ public sealed class MainWindowViewModel : BindableBase
 
         LastSyncText = _syncStatusProvider.LastSyncCompletedUtc.HasValue
             ? _syncStatusProvider.LastSyncCompletedUtc.Value.ToLocalTime()
-                .ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.CurrentCulture)
-            : "Noch kein Sync durchgeführt.";
+                .ToString("dd.MM.yyyy HH:mm:ss", _localizationService.CurrentCulture)
+            : Strings.Status_NoSyncYet;
 
         if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyUploadingFile))
         {
@@ -634,41 +721,73 @@ public sealed class MainWindowViewModel : BindableBase
         }
         else if (_syncStatusProvider.CurrentBatchSize > 0)
         {
-            CurrentUploadText = $"Batch: {_syncStatusProvider.UploadedInCurrentBatch}/{_syncStatusProvider.CurrentBatchSize}";
+            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_BatchProgressFormat, _syncStatusProvider.UploadedInCurrentBatch, _syncStatusProvider.CurrentBatchSize);
         }
         else
         {
-            CurrentUploadText = "Aktuell kein Upload.";
+            CurrentUploadText = Strings.Status_NoCurrentUpload;
         }
 
-        PendingCountText = _syncStatusProvider.PendingCount.ToString(CultureInfo.CurrentCulture);
+        PendingCountText = _syncStatusProvider.PendingCount.ToString(_localizationService.CurrentCulture);
 
         if (_syncStatusProvider.ServerConnection == ServerConnectionState.Error)
         {
-            SyncStatusBadgeText = "Server offline";
+            SyncStatusBadgeText = Strings.Status_ServerOffline;
             SyncStatusBadgeTone = StatusTone.Error;
         }
         else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyUploadingFile)
                  || _syncStatusProvider.CurrentBatchSize > 0)
         {
-            SyncStatusBadgeText = "Sync läuft";
+            SyncStatusBadgeText = Strings.Status_SyncRunning;
             SyncStatusBadgeTone = StatusTone.Info;
         }
         else if (_syncStatusProvider.PendingCount > 0)
         {
-            SyncStatusBadgeText = "Warteschlange";
+            SyncStatusBadgeText = Strings.Status_Queue;
             SyncStatusBadgeTone = StatusTone.Info;
         }
         else if (_syncStatusProvider.ServerConnection == ServerConnectionState.Ok)
         {
-            SyncStatusBadgeText = "Bereit";
+            SyncStatusBadgeText = Strings.Status_Ready;
             SyncStatusBadgeTone = StatusTone.Success;
         }
         else
         {
-            SyncStatusBadgeText = "Bereit";
+            SyncStatusBadgeText = Strings.Status_Ready;
             SyncStatusBadgeTone = StatusTone.Neutral;
         }
+    }
+
+    private void RefreshPermissionStatusTexts()
+    {
+        SetImmichUrlStatus(CheckStateFromTone(ImmichUrlStatusTone));
+        SetImmichApiKeyStatus(CheckStateFromTone(ImmichApiKeyStatusTone));
+        SetImmichPermissionsStatus(CheckStateFromTone(ImmichPermissionsStatusTone));
+
+        for (var i = 0; i < ImmichPermissionStatuses.Count; i++)
+        {
+            var existing = ImmichPermissionStatuses[i];
+            ImmichPermissionStatuses[i] = new ImmichPermissionStatusItem
+            {
+                DisplayName = GetPermissionDisplayName(existing.PermissionName),
+                PermissionName = existing.PermissionName,
+                StatusText = existing.StatusText,
+                StatusTone = existing.StatusTone,
+                Message = existing.Message,
+            };
+        }
+    }
+
+    private static CheckState CheckStateFromTone(StatusTone tone)
+    {
+        return tone switch
+        {
+            StatusTone.Success => CheckState.Passed,
+            StatusTone.Warning => CheckState.Warning,
+            StatusTone.Error => CheckState.Failed,
+            StatusTone.Info => CheckState.Checking,
+            _ => CheckState.NotChecked,
+        };
     }
 
     private void ResetImmichCheckStatus()
@@ -680,10 +799,10 @@ public sealed class MainWindowViewModel : BindableBase
         RefreshPermissionStatuses(CreatePermissionItems(
             new[]
             {
-                new ImmichPermissionCheckResult { DisplayName = "Asset Upload", PermissionName = "asset.upload", State = CheckState.NotChecked, Message = "Not checked yet.", BlocksConfigVerification = true },
-                new ImmichPermissionCheckResult { DisplayName = "Album Read", PermissionName = "album.read", State = CheckState.NotChecked, Message = "Not checked yet." },
-                new ImmichPermissionCheckResult { DisplayName = "Album Create", PermissionName = "album.create", State = CheckState.NotChecked, Message = "Not checked yet." },
-                new ImmichPermissionCheckResult { DisplayName = "Add Asset To Album", PermissionName = "albumAsset.create", State = CheckState.NotChecked, Message = "Not checked yet." },
+                new ImmichPermissionCheckResult { PermissionName = "asset.upload", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet, BlocksConfigVerification = true },
+                new ImmichPermissionCheckResult { PermissionName = "album.read", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
             }));
     }
 
@@ -718,12 +837,24 @@ public sealed class MainWindowViewModel : BindableBase
     {
         return results.Select(result => new ImmichPermissionStatusItem
         {
-            DisplayName = result.DisplayName,
+            DisplayName = GetPermissionDisplayName(result.PermissionName),
             PermissionName = result.PermissionName,
             StatusText = GetCheckStateText(result.State),
             StatusTone = StatusToneMapper.FromCheckState(result.State),
             Message = result.Message,
         });
+    }
+
+    private static string GetPermissionDisplayName(string permissionName)
+    {
+        return permissionName switch
+        {
+            "asset.upload" => Strings.Permission_AssetUpload,
+            "album.read" => Strings.Permission_AlbumRead,
+            "album.create" => Strings.Permission_AlbumCreate,
+            "albumAsset.create" => Strings.Permission_AddAssetToAlbum,
+            _ => permissionName,
+        };
     }
 
     private static int ParsePositiveInteger(string value, string fieldName, List<string> errors)
@@ -783,7 +914,7 @@ public sealed class MainWindowViewModel : BindableBase
         ShouldMaskImmichApiKey = hasRealKey && !revealPassword;
         ShowPlainImmichApiKeyInput = !ShouldMaskImmichApiKey;
         RevealImmichApiKey = revealPassword;
-        ImmichApiKeyRevealToolTip = revealPassword ? HideApiKeyToolTipText : ShowApiKeyToolTipText;
+        ImmichApiKeyRevealToolTip = revealPassword ? Strings.ApiKey_HideToolTip : Strings.ApiKey_ShowToolTip;
     }
 
     private static bool IsExampleApiKeyPlaceholder(string? value)
@@ -798,11 +929,35 @@ public sealed class MainWindowViewModel : BindableBase
     {
         return state switch
         {
-            CheckState.Passed => "OK",
-            CheckState.Warning => "Warning",
-            CheckState.Failed => "Failed",
-            CheckState.Checking => "Checking",
-            _ => "Not checked",
+            CheckState.Passed => Strings.Check_Ok,
+            CheckState.Warning => Strings.Check_Warning,
+            CheckState.Failed => Strings.Check_Failed,
+            CheckState.Checking => Strings.Check_Checking,
+            _ => Strings.Check_NotChecked,
         };
+    }
+
+    private static IReadOnlyList<LanguageOption> BuildLanguageOptions()
+    {
+        return new LanguageOption[]
+        {
+            new(LocalizationService.LanguageAuto, Strings.Language_Auto),
+            new(LocalizationService.LanguageEnglish, Strings.Language_English),
+            new(LocalizationService.LanguageGerman, Strings.Language_German),
+        };
+    }
+
+    private LanguageOption FindLanguageOption(string code)
+    {
+        var normalized = LocalizationService.NormalizeCode(code);
+        foreach (var option in AvailableLanguages)
+        {
+            if (string.Equals(option.Code, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return option;
+            }
+        }
+
+        return AvailableLanguages[0];
     }
 }

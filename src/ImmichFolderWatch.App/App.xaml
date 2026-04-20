@@ -1,6 +1,7 @@
 <Application x:Class="ImmichFolderWatch.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:ImmichFolderWatch.App.Services"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
     <ResourceDictionary>
@@ -8,6 +9,7 @@
         <ResourceDictionary Source="/Styles/PaletteDark.xaml" />
         <ResourceDictionary Source="/Styles/Styles.xaml" />
       </ResourceDictionary.MergedDictionaries>
+      <services:LocalizationProxy x:Key="Loc" />
     </ResourceDictionary>
   </Application.Resources>
 </Application>

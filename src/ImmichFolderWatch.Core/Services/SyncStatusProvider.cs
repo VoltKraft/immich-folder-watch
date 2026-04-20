@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace ImmichFolderWatch.Core.Services;
@@ -60,13 +59,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     public ServerConnectionState ServerConnection
     {
         get => _serverConnection;
-        private set
-        {
-            if (SetField(ref _serverConnection, value))
-            {
-                OnPropertyChanged(nameof(TooltipText));
-            }
-        }
+        private set => SetField(ref _serverConnection, value);
     }
 
     public string? LastErrorMessage
@@ -79,27 +72,6 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         get => _lastServerCheckUtc;
         private set => SetField(ref _lastServerCheckUtc, value);
-    }
-
-    public string TooltipText
-    {
-        get
-        {
-            var server = ServerConnection switch
-            {
-                ServerConnectionState.Ok => "OK",
-                ServerConnectionState.Error => "Fehler",
-                ServerConnectionState.Checking => "Prüfe…",
-                _ => "Unbekannt",
-            };
-
-            var lastSync = LastSyncCompletedUtc.HasValue
-                ? LastSyncCompletedUtc.Value.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)
-                : "—";
-
-            var line = $"Immich Folder Watch\nServer: {server}\nLetzter Sync: {lastSync}\nWarteschlange: {PendingCount}";
-            return line.Length > 127 ? line[..127] : line;
-        }
     }
 
     public void ReportBatchStarted(int batchSize)
@@ -178,11 +150,6 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
 
         field = value;
         OnPropertyChanged(propertyName);
-        if (propertyName is nameof(LastSyncCompletedUtc) or nameof(PendingCount))
-        {
-            OnPropertyChanged(nameof(TooltipText));
-        }
-
         return true;
     }
 

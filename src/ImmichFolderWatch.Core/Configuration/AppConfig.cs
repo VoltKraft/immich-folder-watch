@@ -9,6 +9,8 @@ public sealed class AppConfig
     public RetrySettings Retry { get; set; } = new();
 
     public LoggingSettings Logging { get; set; } = new();
+
+    public LocalizationSettings Localization { get; set; } = new();
 }
 
 public sealed class ImmichSettings
@@ -59,4 +61,9 @@ public sealed class LoggingSettings
     public string Level { get; set; } = "Information";
 
     public string LogDirectory { get; set; } = "logs";
+}
+
+public sealed class LocalizationSettings
+{
+    public string Language { get; set; } = "auto";
 }
