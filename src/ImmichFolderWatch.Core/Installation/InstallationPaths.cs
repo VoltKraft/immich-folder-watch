@@ -7,7 +7,7 @@ public static class InstallationPaths
     public const string LogsDirectoryName = "logs";
     public const string AutostartShortcutName = "Immich Folder Watch.lnk";
     public const string LegacyServiceName = "ImmichFolderWatch";
-    public const string AppExecutableName = "ImmichFolderWatch.App.exe";
+    public const string AppExecutableName = "ImmichFolderWatch.exe";
 
     public static string GetUserDataRoot()
     {

@@ -1,3 +1,4 @@
+using System.Net;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
@@ -123,16 +124,28 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddSingleton<IFileReadinessChecker, FileReadinessChecker>();
         builder.Services.AddSingleton<IUploadBatchQueue, UploadBatchQueue>();
 
-        builder.Services.AddHttpClient<IImmichAssetClient, ImmichAssetClient>((serviceProvider, client) =>
-        {
-            var appConfig = serviceProvider.GetRequiredService<AppConfig>();
-            var normalizedApiUrl = AppConfigValidator.EnsureTrailingSlash(appConfig.Immich.ServerApiUrl);
+        var normalizedApiUrl = AppConfigValidator.EnsureTrailingSlash(config.Immich.ServerApiUrl);
 
-            client.BaseAddress = new Uri(normalizedApiUrl, UriKind.Absolute);
-            client.Timeout = TimeSpan.FromMinutes(2);
-            client.DefaultRequestHeaders.Add("x-api-key", appConfig.Immich.ApiKey);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd($"immich-folder-watch/{productVersion}");
+        builder.Services.AddSingleton<SocketsHttpHandler>(_ => new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            AutomaticDecompression = DecompressionMethods.All,
         });
+
+        builder.Services.AddSingleton(sp =>
+        {
+            var handler = sp.GetRequiredService<SocketsHttpHandler>();
+            var client = new HttpClient(handler, disposeHandler: false)
+            {
+                BaseAddress = new Uri(normalizedApiUrl, UriKind.Absolute),
+                Timeout = TimeSpan.FromMinutes(2),
+            };
+            client.DefaultRequestHeaders.Add("x-api-key", config.Immich.ApiKey);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"immich-folder-watch/{productVersion}");
+            return client;
+        });
+
+        builder.Services.AddSingleton<IImmichAssetClient, ImmichAssetClient>();
 
         builder.Services.AddHostedService<FolderWatchWorker>();
         builder.Services.AddHostedService<ServerConnectionMonitor>();

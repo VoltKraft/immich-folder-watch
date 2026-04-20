@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using Avalonia.Threading;
+using System.Windows;
 using ImmichFolderWatch.App.Models;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
@@ -569,13 +569,14 @@ public sealed class MainWindowViewModel : BindableBase
 
     private void SyncStatusProvider_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (Dispatcher.UIThread.CheckAccess())
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
         {
             RefreshSyncStatusFromProvider();
         }
         else
         {
-            Dispatcher.UIThread.Post(RefreshSyncStatusFromProvider);
+            dispatcher.BeginInvoke(new Action(RefreshSyncStatusFromProvider));
         }
     }
 

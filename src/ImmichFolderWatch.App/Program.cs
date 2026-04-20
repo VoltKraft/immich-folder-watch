@@ -1,4 +1,3 @@
-using Avalonia;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Installation;
 
@@ -35,23 +34,15 @@ internal static class Program
 
         try
         {
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            var application = new App();
+            application.InitializeComponent();
+            return application.Run();
         }
         finally
         {
             coordinator.Dispose();
             SingleInstance = null;
         }
-
-        return 0;
-    }
-
-    public static AppBuilder BuildAvaloniaApp()
-    {
-        return AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .LogToTrace();
     }
 
     private static int RunLegacyUserMigration()

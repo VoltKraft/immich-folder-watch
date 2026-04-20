@@ -34,7 +34,7 @@
   <Fragment>
     <ComponentGroup Id="PublishedApplicationFiles">
       <Files Directory="BINDIR" Include="$(PublishedAppDir)\**">
-        <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.App.exe" />
+        <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.exe" />
         <Exclude Files="$(PublishedAppDir)\**\*.pdb" />
       </Files>
     </ComponentGroup>
@@ -42,7 +42,7 @@
 
   <Fragment>
     <Component Id="AppExecutableComponent" Directory="BINDIR" Guid="*">
-      <File Id="AppExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.App.exe" KeyPath="yes" />
+      <File Id="AppExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.exe" KeyPath="yes" />
     </Component>
   </Fragment>
 
@@ -53,7 +53,7 @@
           Id="DesktopShortcut"
           Name="Immich Folder Watch"
           Description="Open the Immich Folder Watch configuration UI."
-          Target="[BINDIR]ImmichFolderWatch.App.exe"
+          Target="[BINDIR]ImmichFolderWatch.exe"
           Icon="ImmichFolderWatch.ico"
           IconIndex="0"
           WorkingDirectory="INSTALLFOLDER" />
@@ -97,7 +97,7 @@
 
     <SetProperty
       Id="MigrateLegacyUserConfig"
-      Value='"[BINDIR]ImmichFolderWatch.App.exe" --migrate-legacy-user'
+      Value='"[BINDIR]ImmichFolderWatch.exe" --migrate-legacy-user'
       Before="MigrateLegacyUserConfig"
       Sequence="execute" />
     <CustomAction

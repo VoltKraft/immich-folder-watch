@@ -1,3 +1,4 @@
+using System.Net.Http;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Immich;

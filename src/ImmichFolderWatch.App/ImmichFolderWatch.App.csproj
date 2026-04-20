@@ -2,9 +2,15 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <StartupObject>ImmichFolderWatch.App.Program</StartupObject>
     <RootNamespace>ImmichFolderWatch.App</RootNamespace>
-    <AssemblyName>ImmichFolderWatch.App</AssemblyName>
+    <AssemblyName>ImmichFolderWatch</AssemblyName>
+    <AssemblyTitle>Immich Folder Watch</AssemblyTitle>
+    <Product>Immich Folder Watch</Product>
+    <Company>Immich Folder Watch</Company>
     <BrandProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</BrandProjectRoot>
     <BrandGeneratorProject>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'tools', 'BrandAssetGen', 'BrandAssetGen.csproj'))</BrandGeneratorProject>
     <BrandLogoSvg>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'assets', 'branding', 'logo.svg'))</BrandLogoSvg>
@@ -28,29 +34,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.0" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
+    <Resource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
+  </ItemGroup>
+
   <Target Name="GenerateBrandAssets"
+          BeforeTargets="BeforeBuild;MarkupCompilePass1"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(BrandAssetGeneratorInputs)"
           Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
     <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
-  </Target>
-
-  <Target Name="RegisterBrandAssets"
-          BeforeTargets="BuildAvaloniaResources;AddAvaloniaResources;GenerateAvaloniaResources;CoreCompile"
-          Condition="'$(DesignTimeBuild)' != 'true'"
-          DependsOnTargets="GenerateBrandAssets">
-    <ItemGroup>
-      <AvaloniaResource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
-      <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
-    </ItemGroup>
   </Target>
 </Project>

@@ -1,6 +1,9 @@
 using System.Diagnostics;
-using Avalonia.Controls;
-using Avalonia.Interactivity;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
+using Button = System.Windows.Controls.Button;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Models;
 using ImmichFolderWatch.App.Services;
@@ -14,24 +17,34 @@ namespace ImmichFolderWatch.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const int WM_SETTINGCHANGE = 0x001A;
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
     private readonly AppHost _appHost;
     private readonly SyncStatusProvider _syncStatusProvider;
     private readonly AutostartManager _autostartManager;
     private readonly AppConfigLoader _configLoader;
+    private readonly ThemeWatcher _themeWatcher;
     private readonly ConfigVerificationRunner _verificationRunner;
     private bool _isImmichCheckInProgress;
     private bool _isSaveInProgress;
+    private bool _hasRunInitialLoad;
 
     public MainWindow(
         AppHost appHost,
         SyncStatusProvider syncStatusProvider,
         AutostartManager autostartManager,
-        AppConfigLoader configLoader)
+        AppConfigLoader configLoader,
+        ThemeWatcher themeWatcher)
     {
         _appHost = appHost ?? throw new ArgumentNullException(nameof(appHost));
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
         _configLoader = configLoader ?? throw new ArgumentNullException(nameof(configLoader));
+        _themeWatcher = themeWatcher ?? throw new ArgumentNullException(nameof(themeWatcher));
         _verificationRunner = new ConfigVerificationRunner();
 
         InitializeComponent();
@@ -41,13 +54,64 @@ public sealed partial class MainWindow : Window
             ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}",
         };
         DataContext = ViewModel;
+
+        Loaded += OnLoaded;
+        SourceInitialized += OnSourceInitialized;
+        _themeWatcher.ThemeChanged += OnThemeChanged;
+        Closed += OnClosed;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var source = PresentationSource.FromVisual(this) as HwndSource;
+        source?.AddHook(WndProc);
+        ApplyDarkTitleBar();
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        _themeWatcher.ThemeChanged -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        ApplyDarkTitleBar();
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_SETTINGCHANGE)
+        {
+            _themeWatcher.Refresh();
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private void ApplyDarkTitleBar()
+    {
+        var helper = new WindowInteropHelper(this);
+        var hwnd = helper.Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        int useDark = _themeWatcher.IsDark ? 1 : 0;
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
     }
 
     private MainWindowViewModel ViewModel { get; }
 
-    protected override async void OnOpened(EventArgs e)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        base.OnOpened(e);
+        if (_hasRunInitialLoad)
+        {
+            return;
+        }
+
+        _hasRunInitialLoad = true;
+
         ViewModel.RefreshAutostartFromDisk();
         LoadConfigFromDisk(InstallationPaths.GetConfigPath());
         await RunImmichAccessCheckAsync(updateOperationMessage: false);
@@ -217,22 +281,22 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private async void VerifyImmichButton_Click(object? sender, RoutedEventArgs e)
+    private async void VerifyImmichButton_Click(object sender, RoutedEventArgs e)
     {
         await RunImmichAccessCheckAsync(updateOperationMessage: true);
     }
 
-    private void ToggleApiKeyVisibilityButton_Click(object? sender, RoutedEventArgs e)
+    private void ToggleApiKeyVisibilityButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.ToggleImmichApiKeyVisibility();
     }
 
-    private void AddSourceButton_Click(object? sender, RoutedEventArgs e)
+    private void AddSourceButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.AddSource();
     }
 
-    private void RemoveSourceButton_Click(object? sender, RoutedEventArgs e)
+    private void RemoveSourceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: WatchSourceItem source })
         {
@@ -240,7 +304,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OpenLogsButton_Click(object? sender, RoutedEventArgs e)
+    private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
     {
         var logDirectory = ViewModel.GetEffectiveLogDirectory();
         if (string.IsNullOrWhiteSpace(logDirectory))
@@ -268,13 +332,13 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private void UseDefaultLogDirectoryButton_Click(object? sender, RoutedEventArgs e)
+    private void UseDefaultLogDirectoryButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.LogDirectory = Path.GetFullPath(InstallationPaths.GetLogDirectory());
         ViewModel.OperationMessage = "Log-Verzeichnis auf den Standardpfad zurückgesetzt.";
     }
 
-    private async void SaveActionButton_Click(object? sender, RoutedEventArgs e)
+    private async void SaveActionButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isSaveInProgress)
         {
