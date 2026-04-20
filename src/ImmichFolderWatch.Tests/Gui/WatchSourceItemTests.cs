@@ -1,4 +1,4 @@
-using ImmichFolderWatch.Gui.Models;
+using ImmichFolderWatch.App.Models;
 
 namespace ImmichFolderWatch.Tests.Gui;
 

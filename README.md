@@ -5,12 +5,12 @@
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-1.6.2-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.0.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-`Immich Folder Watch` is a Windows service and desktop app that watches local folders and uploads newly created media to Immich automatically.
+`Immich Folder Watch` is a Windows desktop app that watches local folders and uploads newly created media to Immich automatically.
 
-If screenshots, camera imports, scanner output, or synced files land on a Windows machine before they land in Immich, this fills that gap without writing directly into Immich storage.
+It runs as a per-user tray app — no Windows service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a Windows machine before they land in Immich, this fills that gap without writing directly into Immich storage.
 
 ---
 
@@ -32,12 +32,13 @@ If screenshots, camera imports, scanner output, or synced files land on a Window
 
 That gives you a clean, low-maintenance ingestion path:
 
-- Windows-first setup with a desktop GUI
-- always-on background operation as a Windows service
-- optional per-folder album placement in Immich
+- Windows-first setup with a desktop GUI and tray icon
+- Per-user operation — each Windows user runs their own configuration
+- Autostart on login (toggleable in the GUI)
+- Optional per-folder album placement in Immich
 - API-based uploads instead of storage hacks
 
-It is intentionally not a sync client. It does not mirror deletions, does not backfill files that already existed before the service started, and does not write directly into Immich's storage folders.
+It is intentionally not a two-way sync client. It does not mirror deletions, does not backfill files that already existed before the app started, and does not write directly into Immich's storage folders.
 
 ---
 
@@ -49,8 +50,8 @@ It is intentionally not a sync client. It does not mirror deletions, does not ba
 - Supports optional per-source `albumName`
 - Creates missing albums automatically when album placement is configured
 - Retries transient upload failures automatically
-- Runs as a Windows service for unattended operation
-- Ships with a desktop GUI for config editing and service control
+- Runs as a per-user tray app with live sync status
+- Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
 
 ---
@@ -60,17 +61,22 @@ It is intentionally not a sync client. It does not mirror deletions, does not ba
 ### Recommended: Windows MSI
 
 1. Download the latest MSI from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
-2. Install it with administrative rights.
+2. Install it with administrative rights (per-machine binary install).
 3. Open the `Immich Folder Watch` desktop shortcut.
-4. Enter your Immich URL and API key and review the verification result
+4. Enter your Immich URL and API key and review the verification result.
 5. Select one or more folders and expand **Advanced Watch Options** only when you want to adjust subdirectories, extensions, or exclude filters.
-6. **Save and Start**.
+6. **Save and Apply** — watching starts in-process.
+
+Each Windows user has their own configuration. The app autostarts at login by default.
 
 Installed layout:
 
-- Binaries: `%ProgramFiles%\Immich Folder Watch\bin\`
-- Config: `C:\ProgramData\Immich Folder Watch\config.yaml`
-- Logs: `C:\ProgramData\Immich Folder Watch\logs\` (default)
+- Binaries: `%ProgramFiles%\Immich Folder Watch\bin\` (shared, per-machine)
+- Config: `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (per user)
+- Logs: `%LOCALAPPDATA%\Immich Folder Watch\logs\` (per user)
+- Autostart: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Immich Folder Watch.lnk`
+
+Upgrading from an older service-based install: the legacy service is stopped and removed, and the existing `C:\ProgramData\Immich Folder Watch\config.yaml` is migrated into the installing user's `%LOCALAPPDATA%`.
 
 Detailed guides:
 
@@ -128,7 +134,7 @@ retry:
 
 logging:
   level: "Information"
-  logDirectory: "C:\\ProgramData\\Immich Folder Watch\\logs"
+  logDirectory: "C:\\Users\\YOUR_USER\\AppData\\Local\\Immich Folder Watch\\logs"
 ```
 
 ---

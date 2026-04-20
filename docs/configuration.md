@@ -1,10 +1,16 @@
 # Configuration
 
-The daemon reads YAML configuration from `config.yaml`.
+The app reads YAML configuration from a per-user location:
+
+- `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (Windows)
+
+Each Windows user has an independent config; the MSI does not create one automatically. The GUI writes this file on **Save and Apply**; on first launch without a config the GUI starts with empty fields.
+
+On upgrade from a pre-1.7 service-based install, the legacy `C:\ProgramData\Immich Folder Watch\config.yaml` is copied once into the installing user's `%LOCALAPPDATA%`.
 
 ## Example
 
-See [packaging/windows/config.windows.example.yaml](../packaging/windows/config.windows.example.yaml).
+See [packaging/windows/config.windows.example.yaml](../packaging/windows/config.windows.example.yaml) for a standalone reference file.
 
 ## Schema
 
@@ -54,7 +60,7 @@ retry:
 
 logging:
   level: "Information"
-  logDirectory: "C:\\ProgramData\\Immich Folder Watch\\logs"
+  logDirectory: "C:\\Users\\<user>\\AppData\\Local\\Immich Folder Watch\\logs"
 ```
 
 ## Required Fields

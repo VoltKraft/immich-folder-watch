@@ -3,118 +3,71 @@
 ## Prerequisites
 
 - Windows 10/11 or Windows Server
-- .NET SDK 10.0+ (for source-based run/build)
+- .NET SDK 10.0+ (only for source-based builds / development)
 - Immich server URL and API key
 
-## Console Mode
+## Recommended: MSI Installer
+
+Download the latest `.msi` from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases) and run it with administrative rights. The installer is per-machine (binaries only); each Windows user keeps their own configuration and logs under `%LOCALAPPDATA%`.
+
+After install:
+
+1. Open the `Immich Folder Watch` desktop shortcut (or launch it from the Start menu).
+2. Enter your Immich URL and API key, then review the verification result.
+3. Select one or more folders. Expand **Advanced Watch Options** only if you want to adjust subdirectories, extensions, or exclude filters.
+4. Click **Save and Apply** — the app starts watching in-process and a tray icon appears in the notification area.
+
+### Installed Layout
+
+- `%ProgramFiles%\Immich Folder Watch\bin\` — app binaries (per-machine)
+- `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` — per-user active config
+- `%LOCALAPPDATA%\Immich Folder Watch\logs\` — per-user app logs
+- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Immich Folder Watch.lnk` — autostart shortcut (default on; togglable in the GUI)
+
+### Autostart and Tray Behavior
+
+- Closing the main window hides it to the tray; the app keeps watching in the background.
+- The tray icon's tooltip shows last sync time, queue length, and server connection.
+- The tray context menu provides **Open GUI**, **Restart**, and **Quit**.
+- Disable autostart via the **Start at login** checkbox in the GUI.
+
+### Uninstall
+
+`msiexec /x <package>.msi` (or uninstall from Settings → Apps). The installer removes binaries and the desktop shortcut but **preserves** `%LOCALAPPDATA%\Immich Folder Watch\` so your config and logs stay intact.
+
+The autostart shortcut stays behind as a dead link; delete it manually from `shell:startup` if desired.
+
+## Upgrade From Older Service-Based Installs
+
+Versions ≤ 1.6.x installed a Windows service (`ImmichFolderWatch`) with a shared config under `C:\ProgramData\Immich Folder Watch\`. When you upgrade via the new MSI:
+
+1. The legacy service is stopped and deleted.
+2. The existing `C:\ProgramData\Immich Folder Watch\config.yaml` is copied into the **installing user's** `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (only if that user does not already have one).
+3. The `C:\ProgramData\Immich Folder Watch\` folder is removed.
+4. Autostart is enabled for the installing user.
+
+Other Windows users on the same machine need to launch the app once to seed their own per-user config — they do not inherit the migrated settings.
+
+## Multi-User Setup
+
+Every Windows user can run the app with their own watch folders and Immich credentials. The per-user config isolation means:
+
+- Each user's API key is stored only under their own profile.
+- Logs are not shared across users.
+- Running the app simultaneously under two logged-in accounts is supported (each instance has its own single-instance mutex scoped to the user SID).
+
+## Building From Source
 
 ```powershell
-copy examples\config.example.yaml config.yaml
-# Edit config.yaml
-
 dotnet restore
 dotnet build ImmichFolderWatch.sln -c Release
-dotnet run --project src/ImmichFolderWatch.Daemon -- --config config.yaml
+dotnet run --project src/ImmichFolderWatch.App
 ```
 
-## Windows Service Bundle (Advanced / Internal)
-
-Build a distributable bundle with published binaries plus install scripts:
-
-```powershell
-.\packaging\windows\build-installer.ps1
-```
-
-This creates `artifacts\windows\immich-folder-watch-win-x64\`.
-
-This bundle is mainly for development, recovery, or unattended internal deployment. The supported end-user installation path remains the MSI package.
-
-Installed layout:
-
-- `%ProgramFiles%\Immich Folder Watch\bin\`
-- `C:\ProgramData\Immich Folder Watch\config.yaml`
-- `C:\ProgramData\Immich Folder Watch\logs\`
-
-If an older Windows install still uses `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml`, the bundle installer and MSI migrate that config into `C:\ProgramData\Immich Folder Watch\config.yaml` automatically. Old default logs from `%ProgramFiles%\Immich Folder Watch\logs\` are moved to `C:\ProgramData\Immich Folder Watch\logs\` when the config still used the old default log path.
-
-## Install as a Service
-
-Open an elevated PowerShell prompt inside the generated bundle and run:
-
-```powershell
-.\install-service.ps1
-```
-
-Default behavior:
-
-- registers the service as `Manual`
-- does not start it immediately after installation
-
-Recommended first install:
-
-```powershell
-.\install-service.ps1
-"${env:ProgramFiles}\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
-```
-
-The GUI edits `C:\ProgramData\Immich Folder Watch\config.yaml`, masks real API keys by default while still allowing a reveal toggle, keeps the example placeholder visible in plain text, verifies the config against Immich whenever you save, then starts or restarts the service as needed.
-No separate persistent activation-state file is stored anymore.
-The GUI also refreshes service status automatically and keeps `logging.logDirectory` on an absolute path. Use **Use Install Default** if you want to reset logs to `C:\ProgramData\Immich Folder Watch\logs`. If you change the log directory in the GUI and save successfully, existing logs are migrated into the new location. When files with the same name already exist there, the existing target files win and conflicting old files are left in place.
-
-If you explicitly want the script to leave the service enabled immediately:
-
-```powershell
-.\install-service.ps1 -StartupType Automatic -StartService
-```
-
-On later GUI saves, a running service is restarted automatically so the changed config is applied immediately.
-
-For unattended deployment with a prepared config and immediate first start:
-
-```powershell
-.\install-service.ps1 -StartupType Automatic -StartService
-```
-
-## Uninstall
-
-```powershell
-.\uninstall-service.ps1
-```
-
-By default, `C:\ProgramData\Immich Folder Watch\` is preserved. Pass `-RemoveData` if you want a full cleanup of both the ProgramData data and any remaining legacy default data under `%ProgramFiles%\Immich Folder Watch`.
-The script now waits for the service to actually disappear before removing files, so reinstall after uninstall is more reliable.
-
-The packaging scripts live under `packaging/windows`.
-
-## MSI Installer
-
-Build a Windows Installer package:
+## Building the MSI Locally
 
 ```powershell
 .\packaging\windows\build-msi.ps1
 ```
 
-This creates an `.msi` under `artifacts\windows\msi\`.
-On the first run, `dotnet` restores the WiX SDK from NuGet.
-
-Installer behavior:
-
-- Installs binaries into `%ProgramFiles%\Immich Folder Watch\bin\`
-- Installs the GUI, daemon, and admin helper executables together
-- Creates `C:\ProgramData\Immich Folder Watch\config.yaml` from the Windows installer template on first install
-- Creates `C:\ProgramData\Immich Folder Watch\logs\`
-- Migrates the old default config from `%ProgramFiles%\Immich Folder Watch\config\config.yaml` or `%ProgramFiles%\Immich Folder Watch\config.yaml` into ProgramData when needed
-- Moves old default logs from `%ProgramFiles%\Immich Folder Watch\logs\` into ProgramData when the previous config still used that default path
-- Registers the `ImmichFolderWatch` Windows service as `Manual`
-- Preserves the current service startup mode across upgrades, except that previously disabled installs are normalized to `Manual`
-- On MSI or WinGet upgrades, starts the service again automatically when it was running before the upgrade and the installed `C:\ProgramData\Immich Folder Watch\config.yaml` still validates successfully
-- Creates a desktop shortcut for the GUI
-- Preserves `C:\ProgramData\Immich Folder Watch\` on uninstall
-
-After the MSI install, open the GUI from the desktop shortcut and use **Save and Start**:
-
-```powershell
-"C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.Gui.exe"
-```
-
-The status panel refreshes automatically while the GUI is open, the log-folder field is stored as an absolute path, and successful GUI saves migrate logs when you move `logging.logDirectory` to a new location.
+The MSI is produced under `artifacts\windows\msi\`. On the first run, `dotnet` restores the WiX SDK from NuGet.

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -18,9 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../ImmichFolderWatch.Daemon/ImmichFolderWatch.Daemon.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
-    <ProjectReference Include="../ImmichFolderWatch.Gui/ImmichFolderWatch.Gui.csproj" />
+    <ProjectReference Include="../ImmichFolderWatch.App/ImmichFolderWatch.App.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
   </ItemGroup>
 </Project>

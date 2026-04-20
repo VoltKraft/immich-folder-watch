@@ -1,7 +1,9 @@
-using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.App.Models;
+using ImmichFolderWatch.App.Services;
+using ImmichFolderWatch.App.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
-using ImmichFolderWatch.Gui.Models;
-using ImmichFolderWatch.Gui.ViewModels;
+using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Tests.Gui;
 
@@ -30,39 +32,15 @@ public sealed class MainWindowViewModelTests
         ".webp",
     };
 
-    [Fact]
-    public void ApplyServiceActionVisibility_UsesRestartLabel_WhenServiceIsRunning()
+    private static MainWindowViewModel CreateViewModel()
     {
-        var viewModel = new MainWindowViewModel();
-
-        viewModel.ApplyServiceActionVisibility(new ServiceStatusSnapshot
-        {
-            Exists = true,
-            State = ServiceRunState.Running,
-        });
-
-        Assert.Equal("Save and Restart", viewModel.SaveActionButtonText);
+        return new MainWindowViewModel(new SyncStatusProvider(), new AutostartManager());
     }
-
-    [Fact]
-    public void ApplyServiceActionVisibility_UsesStartLabel_WhenServiceIsStopped()
-    {
-        var viewModel = new MainWindowViewModel();
-
-        viewModel.ApplyServiceActionVisibility(new ServiceStatusSnapshot
-        {
-            Exists = true,
-            State = ServiceRunState.Stopped,
-        });
-
-        Assert.Equal("Save and Start", viewModel.SaveActionButtonText);
-    }
-
 
     [Fact]
     public void Constructor_InitializesImmichChecksAsNeutral()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         Assert.Equal(StatusTone.Neutral, viewModel.ImmichUrlStatusTone);
         Assert.Equal(StatusTone.Neutral, viewModel.ImmichApiKeyStatusTone);
@@ -74,7 +52,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void SetImmichCheckInProgress_UsesInfoToneForChecksAndPermissions()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.SetImmichCheckInProgress();
 
@@ -88,7 +66,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplyImmichCheckResult_MapsCheckStatesToStatusTones()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.ApplyImmichCheckResult(new ImmichAccessCheckResult
         {
@@ -140,20 +118,18 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void StatusToneMapper_MapsServiceStatesToExpectedTones()
+    public void StatusToneMapper_MapsServerConnectionToExpectedTones()
     {
-        Assert.Equal(StatusTone.Neutral, StatusToneMapper.FromServiceStatus(null));
-        Assert.Equal(StatusTone.Neutral, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = false }));
-        Assert.Equal(StatusTone.Success, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.Running }));
-        Assert.Equal(StatusTone.Warning, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.Stopped }));
-        Assert.Equal(StatusTone.Info, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.StartPending }));
-        Assert.Equal(StatusTone.Info, StatusToneMapper.FromServiceStatus(new ServiceStatusSnapshot { Exists = true, State = ServiceRunState.StopPending }));
+        Assert.Equal(StatusTone.Neutral, StatusToneMapper.FromServerConnection(ServerConnectionState.Unknown));
+        Assert.Equal(StatusTone.Info, StatusToneMapper.FromServerConnection(ServerConnectionState.Checking));
+        Assert.Equal(StatusTone.Success, StatusToneMapper.FromServerConnection(ServerConnectionState.Ok));
+        Assert.Equal(StatusTone.Error, StatusToneMapper.FromServerConnection(ServerConnectionState.Error));
     }
 
     [Fact]
     public void ImmichApiKey_UsesMaskedDisplay_ForRealKeyByDefault()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.ImmichApiKey = "demo-key";
 
@@ -167,7 +143,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ImmichApiKey_UsesPlainDisplay_ForPlaceholderValue()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.ImmichApiKey = AppConfigValidator.ExampleApiKeyPlaceholder;
 
@@ -181,10 +157,8 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ToggleImmichApiKeyVisibility_TogglesMasking_ForRealKey()
     {
-        var viewModel = new MainWindowViewModel
-        {
-            ImmichApiKey = "demo-key",
-        };
+        var viewModel = CreateViewModel();
+        viewModel.ImmichApiKey = "demo-key";
 
         viewModel.ToggleImmichApiKeyVisibility();
 
@@ -202,10 +176,8 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ImmichApiKey_SwitchingFromPlaceholderToRealKey_ReenablesMasking()
     {
-        var viewModel = new MainWindowViewModel
-        {
-            ImmichApiKey = AppConfigValidator.ExampleApiKeyPlaceholder,
-        };
+        var viewModel = CreateViewModel();
+        viewModel.ImmichApiKey = AppConfigValidator.ExampleApiKeyPlaceholder;
 
         viewModel.ImmichApiKey = "demo-key";
 
@@ -218,10 +190,8 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Load_ResetsImmichApiKeyVisibility_ForRealKey()
     {
-        var viewModel = new MainWindowViewModel
-        {
-            ImmichApiKey = "demo-key",
-        };
+        var viewModel = CreateViewModel();
+        viewModel.ImmichApiKey = "demo-key";
 
         viewModel.ToggleImmichApiKeyVisibility();
         viewModel.Load(new AppConfig
@@ -242,10 +212,8 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ImmichApiKey_UsesPlainDisplay_WhenEmpty()
     {
-        var viewModel = new MainWindowViewModel
-        {
-            ImmichApiKey = string.Empty,
-        };
+        var viewModel = CreateViewModel();
+        viewModel.ImmichApiKey = string.Empty;
 
         Assert.False(viewModel.ShouldMaskImmichApiKey);
         Assert.False(viewModel.RevealImmichApiKey);
@@ -256,7 +224,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Constructor_CreatesCollapsedDefaultSourceWithOfficialImageExtensions()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         Assert.Single(viewModel.Sources);
         Assert.Equal(JoinLines(ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
@@ -270,7 +238,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void CreateImmichCheckConfig_IncludesCurrentAlbumAssignments()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         viewModel.Sources.Clear();
         viewModel.Sources.Add(new WatchSourceItem
         {
@@ -295,7 +263,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void AddSource_UsesTheSameDefaultValuesAsTheInitialSource()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         viewModel.Sources.Clear();
 
         viewModel.AddSource();
@@ -309,7 +277,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Load_PopulatesPerSourceFilterFields()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.Load(new AppConfig
         {
@@ -341,7 +309,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Load_WithNoSources_CreatesTheDefaultSource()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.Load(new AppConfig());
 
@@ -354,7 +322,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void TryCreateConfig_PreservesHiddenExcludeDirectories()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         viewModel.Sources.Clear();
         viewModel.Sources.Add(new WatchSourceItem
         {

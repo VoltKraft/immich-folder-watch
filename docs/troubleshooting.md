@@ -1,10 +1,10 @@
 # Troubleshooting
 
-## Daemon exits at startup
+## App tray shows "Server offline"
 
 - Check `immich.serverApiUrl` ends with `/api`.
 - Check `immich.apiKey` value is valid.
-- Verify Immich server is reachable from this machine.
+- Verify the Immich server is reachable from this machine. The app keeps retrying in the background and recovers automatically once the server is reachable again.
 
 ## Files are detected but not uploaded
 
@@ -34,4 +34,4 @@
 - Console logs include timestamps and structured fields.
 - File logs are written to `logging.logDirectory`.
 - Configure `logging.logDirectory` as an absolute path.
-- The Windows GUI can reset `logging.logDirectory` back to `C:\ProgramData\Immich Folder Watch\logs` if needed.
+- The Windows GUI can reset `logging.logDirectory` back to `%LOCALAPPDATA%\Immich Folder Watch\logs` if needed.

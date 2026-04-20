@@ -1,0 +1,53 @@
+<UserControl x:Class="ImmichFolderWatch.App.Controls.StatusPill"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Self">
+  <Border x:Name="RootBorder"
+          CornerRadius="999"
+          Padding="10,6">
+    <Border.Style>
+      <Style TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppStatusNeutralBackground}" />
+        <Style.Triggers>
+          <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Info">
+            <Setter Property="Background" Value="{DynamicResource AppStatusInfoBackground}" />
+          </DataTrigger>
+          <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Success">
+            <Setter Property="Background" Value="{DynamicResource AppStatusSuccessBackground}" />
+          </DataTrigger>
+          <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Warning">
+            <Setter Property="Background" Value="{DynamicResource AppStatusWarningBackground}" />
+          </DataTrigger>
+          <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Error">
+            <Setter Property="Background" Value="{DynamicResource AppStatusErrorBackground}" />
+          </DataTrigger>
+        </Style.Triggers>
+      </Style>
+    </Border.Style>
+    <TextBlock x:Name="TextPresenter"
+               Text="{Binding Text, ElementName=Self}"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center">
+      <TextBlock.Style>
+        <Style TargetType="TextBlock">
+          <Setter Property="FontWeight" Value="SemiBold" />
+          <Setter Property="Foreground" Value="{DynamicResource AppStatusNeutralForeground}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Info">
+              <Setter Property="Foreground" Value="{DynamicResource AppStatusInfoForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Success">
+              <Setter Property="Foreground" Value="{DynamicResource AppStatusSuccessForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Warning">
+              <Setter Property="Foreground" Value="{DynamicResource AppStatusWarningForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone, ElementName=Self}" Value="Error">
+              <Setter Property="Foreground" Value="{DynamicResource AppStatusErrorForeground}" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </TextBlock.Style>
+    </TextBlock>
+  </Border>
+</UserControl>

@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot,
-    [string]$Version = "1.6.3",
+    [string]$Version = "2.0.0",
     [switch]$FrameworkDependent
 )
 
@@ -100,11 +100,8 @@ $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 Initialize-DotnetEnvironment -CacheRoot (Join-Path $localAppData "ImmichFolderWatch")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\.."))
-$daemonProject = Join-Path $repoRoot "src\ImmichFolderWatch.Daemon\ImmichFolderWatch.Daemon.csproj"
-$guiProject = Join-Path $repoRoot "src\ImmichFolderWatch.Gui\ImmichFolderWatch.Gui.csproj"
-$adminProject = Join-Path $repoRoot "src\ImmichFolderWatch.Admin\ImmichFolderWatch.Admin.csproj"
+$appProject = Join-Path $repoRoot "src\ImmichFolderWatch.App\ImmichFolderWatch.App.csproj"
 $wixProject = Join-Path $scriptRoot "ImmichFolderWatch.Setup.wixproj"
-$windowsConfigTemplatePath = Join-Path $scriptRoot "config.windows.example.yaml"
 $brandingIconPath = Join-Path $repoRoot "artifacts\branding\windows\app.ico"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
 $publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
@@ -118,8 +115,8 @@ if (-not (Test-Path -LiteralPath $wixProject)) {
     throw "WiX project not found: $wixProject"
 }
 
-if (-not (Test-Path -LiteralPath $windowsConfigTemplatePath)) {
-    throw "Windows config template not found: $windowsConfigTemplatePath"
+if (-not (Test-Path -LiteralPath $appProject)) {
+    throw "App project not found: $appProject"
 }
 
 Reset-Directory -Path $publishRoot
@@ -162,9 +159,7 @@ function Publish-ProjectOutput {
     Copy-Item -Path (Join-Path $projectPublishRoot "*") -Destination $publishRoot -Recurse -Force
 }
 
-Publish-ProjectOutput -ProjectPath $daemonProject -ProjectName "daemon"
-Publish-ProjectOutput -ProjectPath $guiProject -ProjectName "gui"
-Publish-ProjectOutput -ProjectPath $adminProject -ProjectName "admin"
+Publish-ProjectOutput -ProjectPath $appProject -ProjectName "app"
 
 if (-not (Test-Path -LiteralPath $brandingIconPath)) {
     throw "Branding icon not found: $brandingIconPath"
@@ -178,7 +173,6 @@ $buildArgs = @(
     "-p:InstallerVersion=$installerVersion",
     "-p:PublishedAppDir=$publishRoot",
     "-p:BrandingIconPath=$brandingIconPath",
-    "-p:ExampleConfigPath=$windowsConfigTemplatePath",
     "-p:OutputPath=$msiOutputRoot\"
 )
 

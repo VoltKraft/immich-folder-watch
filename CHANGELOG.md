@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-04-20
+
+This release replaces the Windows service model with a tray-based desktop application
+and rewrites the GUI from Avalonia to WPF. The Windows executable is renamed and the
+installer no longer registers a background service; existing installations are
+migrated automatically.
+
+### Added
+- Native Windows tray icon with a right-click menu to open the GUI, restart sync, or
+  quit, implemented on a message-only window via `Shell_NotifyIconW` and
+  `TrackPopupMenuEx` so no extra top-level windows appear in Task Manager.
+- System-synced dark mode for the WPF window chrome via
+  `DWMWA_USE_IMMERSIVE_DARK_MODE`, and dark-aware tray context menus via
+  `SetPreferredAppMode(AllowDark)`.
+- `PasswordBoxHelper` attached property for two-way binding of the Immich API key
+  from a `PasswordBox`, and `WatermarkBehavior` attached property for placeholder
+  text on `TextBox` and `PasswordBox`.
+- Autostart integration that places a shortcut in the per-user Startup folder on
+  first run and launches the app hidden to the tray with `--autostart`.
+- Single-instance coordinator that forwards a second launch to the running instance
+  and shows its window instead of starting a duplicate.
+- Migration of legacy per-machine `ProgramData\Immich Folder Watch\config.yaml` into
+  the new per-user location on upgrade (`--migrate-legacy-user`).
+
+### Changed
+- **Breaking:** the Windows binary is now `ImmichFolderWatch.exe` (previously
+  `ImmichFolderWatch.App.exe`). Shortcuts, scripts, and installer references have
+  been updated; upgrades via MSI handle this automatically, manual launchers must be
+  repointed.
+- **Breaking:** the app now runs as a user-space WPF application with a tray icon
+  instead of a Windows service. The previous `ImmichFolderWatch` service is stopped,
+  removed, and its `ProgramData` directory cleaned up during upgrade.
+- Configuration and logs moved from `C:\ProgramData\Immich Folder Watch\` to
+  `%LOCALAPPDATA%\Immich Folder Watch\`.
+- GUI rewritten from Avalonia 11 to WPF on `net10.0-windows`; Avalonia,
+  `H.NotifyIcon.Avalonia`, Skia, and HarfBuzz dependencies removed, reducing
+  install size and resident memory.
+- Replaced `IHttpClientFactory` with a single `HttpClient` backed by a
+  `SocketsHttpHandler` with `PooledConnectionLifetime = 10 min`, eliminating the
+  2-minute handler rotation that previously caused WMI counter churn visible as
+  stray Task Manager children.
+- Theme changes are now detected by hooking `WM_SETTINGCHANGE` on the main window
+  instead of subscribing to `Microsoft.Win32.SystemEvents`, which had been creating
+  a hidden broadcast window that appeared as a nameless child in Task Manager.
+- Log writer now opens files with `FileShare.ReadWrite` to prevent save-and-apply
+  from racing against the active log handle during restart.
+- Installer (WiX) updated to install only the GUI binary, create a desktop shortcut,
+  clean up the legacy service and its data directory, and wire the user-config
+  migration through `WixQuietExecCmdLine`.
+- Branding asset generation now runs before `MarkupCompilePass1`, and the generated
+  `app-icon.ico` / `header-logo.png` are declared as top-level `<Resource>` items so
+  they are embedded correctly in the WPF resource stream.
+- Project, packaging, and release defaults updated to `2.0.0`.
+
+### Removed
+- Windows service hosting (`ImmichFolderWatch` service) and the related
+  service-control UI in the previous GUI.
+- `Microsoft.Extensions.Http` package reference.
+- Avalonia UI stack (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`,
+  `Avalonia.Svg.Skia`, `Avalonia.Diagnostics`) and `H.NotifyIcon.Avalonia`.
+- `UseWindowsForms` dependency and the WinForms parking window it implied.
+
+### Fixed
+- Save-and-apply no longer fails with a file-in-use error on the active log file
+  during the subsequent restart.
+- Windows Task Manager no longer shows a nameless child process underneath the
+  application entry.
+- MSI upgrade now reliably chains the `QuietExec` custom actions for stopping and
+  removing the legacy service and migrating user config.
+
 ## [1.6.3] - 2026-03-21
 
 ### Changed
