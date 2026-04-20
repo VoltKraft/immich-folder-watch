@@ -17,7 +17,11 @@ public sealed class FileLoggerProvider : ILoggerProvider
         Directory.CreateDirectory(logDirectory);
 
         var filePath = Path.Combine(logDirectory, $"immich-folder-watch-{DateTime.UtcNow:yyyyMMdd}.log");
-        var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+        var stream = new FileStream(
+            filePath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.ReadWrite | FileShare.Delete);
 
         _writer = new StreamWriter(stream)
         {
