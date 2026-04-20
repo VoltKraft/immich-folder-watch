@@ -1,4 +1,5 @@
 using ImmichFolderWatch.App.ViewModels;
+using ImmichFolderWatch.Core.Configuration;
 
 namespace ImmichFolderWatch.App.Models;
 
@@ -14,6 +15,7 @@ public sealed class WatchSourceItem : BindableBase
     private bool _albumNameTouchedByUser;
     private bool _hasAutoFilledAlbumName;
     private bool _isApplyingAlbumSuggestion;
+    private string _syncMode = WatchSourceSyncModes.UploadNew;
 
     public string Path
     {
@@ -73,6 +75,12 @@ public sealed class WatchSourceItem : BindableBase
     {
         get => _showAdvancedOptions;
         set => SetProperty(ref _showAdvancedOptions, value);
+    }
+
+    public string SyncMode
+    {
+        get => _syncMode;
+        set => SetProperty(ref _syncMode, WatchSourceSyncModes.Normalize(value));
     }
 
     public bool ShowExcludeDirectories => IncludeSubdirectories;

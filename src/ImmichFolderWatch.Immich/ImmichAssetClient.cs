@@ -55,6 +55,111 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         throw new HttpRequestException("Immich reachability check failed. No ping endpoint responded successfully.");
     }
 
+    public async Task<AlbumAssetsResult> GetAlbumAssetsAsync(string albumName, CancellationToken cancellationToken)
+    {
+        var normalized = NormalizeAlbumName(albumName);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return AlbumAssetsResult.Missing();
+        }
+
+        var albumsResult = await GetAlbumsAsync(cancellationToken);
+        if (!albumsResult.IsSuccess)
+        {
+            return AlbumAssetsResult.Failure(albumsResult.StatusCode, albumsResult.ErrorMessage);
+        }
+
+        var matches = FindExactAlbumMatches(albumsResult.Albums, normalized);
+        if (matches.Count == 0)
+        {
+            return AlbumAssetsResult.Missing();
+        }
+
+        if (matches.Count > 1)
+        {
+            return AlbumAssetsResult.Failure(null, BuildDuplicateAlbumError(normalized));
+        }
+
+        var albumId = matches[0].Id;
+        var result = await SendAsync(HttpMethod.Get, ImmichApiRoutes.AlbumInfo(albumId), content: null, cancellationToken);
+        if (!result.HasHttpResponse)
+        {
+            return AlbumAssetsResult.Failure(null, result.ErrorMessage);
+        }
+
+        if (!result.IsSuccessStatusCode)
+        {
+            return AlbumAssetsResult.Failure(
+                result.StatusCode,
+                $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
+        }
+
+        if (string.IsNullOrWhiteSpace(result.Body))
+        {
+            return AlbumAssetsResult.Success(Array.Empty<AlbumAssetSummary>());
+        }
+
+        return TryParseAlbumAssets(result.Body, out var assets)
+            ? AlbumAssetsResult.Success(assets)
+            : AlbumAssetsResult.Failure(result.StatusCode, "The album detail response could not be parsed.");
+    }
+
+    public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+
+        var directory = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var tempPath = destinationPath + ".downloading";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, ImmichApiRoutes.AssetOriginalFile(assetId));
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                return DownloadAssetResult.Failure(
+                    response.StatusCode,
+                    $"HTTP {(int)response.StatusCode}: {TrimForLog(body)}");
+            }
+
+            await using (var inputStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var outputStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await inputStream.CopyToAsync(outputStream, cancellationToken);
+            }
+
+            if (File.Exists(destinationPath))
+            {
+                File.Delete(destinationPath);
+            }
+
+            File.Move(tempPath, destinationPath);
+            return DownloadAssetResult.Success();
+        }
+        catch (Exception ex)
+        {
+            if (File.Exists(tempPath))
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
+            _logger.LogError(ex, "Asset download failed for {AssetId}.", assetId);
+            return DownloadAssetResult.Failure(null, ex.Message);
+        }
+    }
+
     public async Task<UploadAssetResult> UploadAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -573,6 +678,54 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
         albumArray = default;
         return false;
+    }
+
+    private static bool TryParseAlbumAssets(string responseBody, out List<AlbumAssetSummary> assets)
+    {
+        assets = new List<AlbumAssetSummary>();
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (!document.RootElement.TryGetProperty("assets", out var assetsElement)
+                || assetsElement.ValueKind != JsonValueKind.Array)
+            {
+                return true;
+            }
+
+            foreach (var element in assetsElement.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!TryExtractString(element, "id", out var id))
+                {
+                    continue;
+                }
+
+                if (!TryExtractString(element, "originalFileName", out var originalFileName)
+                    && !TryExtractString(element, "originalPath", out originalFileName))
+                {
+                    originalFileName = id;
+                }
+
+                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName)));
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            assets = new List<AlbumAssetSummary>();
+            return false;
+        }
     }
 
     private static bool TryExtractAlbum(string responseBody, out AlbumSummary album)

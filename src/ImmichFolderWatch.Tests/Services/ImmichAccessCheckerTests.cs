@@ -15,9 +15,10 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.OK),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
-        var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, requireDownloadPermissions: true, CancellationToken.None);
 
         Assert.Equal(CheckState.Passed, result.UrlState);
         Assert.Equal(CheckState.Passed, result.ApiKeyState);
@@ -50,6 +51,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
@@ -63,6 +65,51 @@ public sealed class ImmichAccessCheckerTests
     }
 
     [Fact]
+    public async Task CheckAsync_ReturnsFailedWhenDownloadPermissionIsMissingAndSyncIsRequired()
+    {
+        var checker = CreateChecker(
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.Forbidden));
+
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, requireDownloadPermissions: true, CancellationToken.None);
+
+        Assert.Equal(CheckState.Passed, result.UrlState);
+        Assert.Equal(CheckState.Passed, result.ApiKeyState);
+        Assert.Equal(CheckState.Failed, result.PermissionsState);
+        var downloadPermission = result.PermissionResults.Single(permission => permission.PermissionName == "asset.download");
+        Assert.Equal(CheckState.Failed, downloadPermission.State);
+        Assert.True(downloadPermission.BlocksConfigVerification);
+        Assert.Contains(result.GetBlockingErrors(), error => error.Contains("Asset Download", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CheckAsync_AllowsMissingDownloadPermission_WhenSyncIsNotRequired()
+    {
+        var checker = CreateChecker(
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.Forbidden));
+
+        var result = await checker.CheckAsync(requireAlbumPermissions: true, requireDownloadPermissions: false, CancellationToken.None);
+
+        Assert.Equal(CheckState.Passed, result.UrlState);
+        Assert.Equal(CheckState.Passed, result.ApiKeyState);
+        var downloadPermission = result.PermissionResults.Single(permission => permission.PermissionName == "asset.download");
+        Assert.Equal(CheckState.Failed, downloadPermission.State);
+        Assert.False(downloadPermission.BlocksConfigVerification);
+        Assert.DoesNotContain(result.GetBlockingErrors(), error => error.Contains("Asset Download", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CheckAsync_ReturnsFailedWhenUploadPermissionIsMissing()
     {
         var checker = CreateChecker(
@@ -70,6 +117,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.OK),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.OK),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
@@ -87,6 +135,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.OK),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden));

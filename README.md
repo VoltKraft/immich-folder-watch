@@ -5,7 +5,7 @@
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-2.2.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.3.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a Windows desktop app that watches local folders and uploads newly created media to Immich automatically.
@@ -38,7 +38,7 @@ That gives you a clean, low-maintenance ingestion path:
 - Optional per-folder album placement in Immich
 - API-based uploads instead of storage hacks
 
-It is intentionally not a two-way sync client. It does not mirror deletions, does not backfill files that already existed before the app started, and does not write directly into Immich's storage folders.
+Each watched folder has its own **sync mode**: upload only new files that appear during runtime (the default, preserving prior behavior), upload everything the folder already contains, or keep the folder bidirectionally in sync with its Immich album (additive — local files missing in the album are uploaded and album assets missing locally are downloaded). Deletions are never mirrored — the app does not remove files locally or remotely, and it does not write directly into Immich's storage folders.
 
 ---
 
@@ -49,6 +49,7 @@ It is intentionally not a two-way sync client. It does not mirror deletions, doe
 - Uploads through the Immich API in configurable batches
 - Supports optional per-source `albumName`
 - Creates missing albums automatically when album placement is configured
+- Per-folder **sync mode**: `Upload new files only` (default), `Upload everything in the folder`, or `Sync folder with album (bidirectional)`
 - Retries transient upload failures automatically
 - Runs as a per-user tray app with live sync status
 - Autostarts on login by default; togglable in the GUI
@@ -100,6 +101,7 @@ watch:
   sources:
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
       albumName: "Screenshots"
+      syncMode: "uploadNew" # uploadNew (default) | uploadAll | sync
       includeSubdirectories: true
       extensions:
         - ".avif"

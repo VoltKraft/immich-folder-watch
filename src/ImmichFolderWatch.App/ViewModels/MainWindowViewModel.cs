@@ -95,6 +95,8 @@ public sealed class MainWindowViewModel : BindableBase
         _statusHeadline = Strings.App_StatusHeadline_Running;
         _immichApiKeyRevealToolTip = Strings.ApiKey_ShowToolTip;
 
+        RefreshSyncModeOptions();
+
         AddSource();
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
@@ -111,6 +113,8 @@ public sealed class MainWindowViewModel : BindableBase
     public ObservableCollection<WatchSourceItem> Sources { get; } = new();
 
     public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
+
+    public ObservableCollection<SyncModeOption> AvailableSyncModes { get; } = new();
 
     public IReadOnlyList<LanguageOption> AvailableLanguages { get; }
 
@@ -435,6 +439,7 @@ public sealed class MainWindowViewModel : BindableBase
                 ExcludeDirectoriesText = string.Join(Environment.NewLine, source.ExcludeDirectories),
                 ExcludeFileNamesText = string.Join(Environment.NewLine, source.ExcludeFileNames),
                 ShowAdvancedOptions = false,
+                SyncMode = source.SyncMode,
             });
         }
 
@@ -495,6 +500,7 @@ public sealed class MainWindowViewModel : BindableBase
                     Extensions = ParseListInput(source.ExtensionsText).ToList(),
                     ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
                     ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
+                    SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
                 }).ToList(),
                 BatchIntervalSeconds = batchIntervalSeconds,
                 MaxBatchSize = maxBatchSize,
@@ -540,6 +546,7 @@ public sealed class MainWindowViewModel : BindableBase
                     Extensions = ParseListInput(source.ExtensionsText).ToList(),
                     ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
                     ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
+                    SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
                 }).ToList(),
             },
             Retry = new RetrySettings
@@ -569,6 +576,7 @@ public sealed class MainWindowViewModel : BindableBase
                 new ImmichPermissionCheckResult { PermissionName = "album.read", State = CheckState.Checking, Message = checkingMessage },
                 new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.Checking, Message = checkingMessage },
                 new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "asset.download", State = CheckState.Checking, Message = checkingMessage },
             }));
     }
 
@@ -655,6 +663,8 @@ public sealed class MainWindowViewModel : BindableBase
         StatusHeadline = Strings.App_StatusHeadline_Running;
         SaveActionButtonText = Strings.App_SaveAndApply;
         ImmichApiKeyRevealToolTip = RevealImmichApiKey ? Strings.ApiKey_HideToolTip : Strings.ApiKey_ShowToolTip;
+
+        RefreshSyncModeOptions();
 
         _suppressLanguageWrite = true;
         try
@@ -803,6 +813,7 @@ public sealed class MainWindowViewModel : BindableBase
                 new ImmichPermissionCheckResult { PermissionName = "album.read", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
                 new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
                 new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "asset.download", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
             }));
     }
 
@@ -853,6 +864,7 @@ public sealed class MainWindowViewModel : BindableBase
             "album.read" => Strings.Permission_AlbumRead,
             "album.create" => Strings.Permission_AlbumCreate,
             "albumAsset.create" => Strings.Permission_AddAssetToAlbum,
+            "asset.download" => Strings.Permission_AssetDownload,
             _ => permissionName,
         };
     }
@@ -889,7 +901,24 @@ public sealed class MainWindowViewModel : BindableBase
             ExcludeDirectoriesText = string.Empty,
             ExcludeFileNamesText = string.Empty,
             ShowAdvancedOptions = false,
+            SyncMode = WatchSourceSyncModes.UploadNew,
         };
+    }
+
+    private void RefreshSyncModeOptions()
+    {
+        var newOptions = new[]
+        {
+            new SyncModeOption(WatchSourceSyncModes.UploadNew, Strings.SyncMode_UploadNew, Strings.SyncMode_UploadNew_Description),
+            new SyncModeOption(WatchSourceSyncModes.UploadAll, Strings.SyncMode_UploadAll, Strings.SyncMode_UploadAll_Description),
+            new SyncModeOption(WatchSourceSyncModes.Sync, Strings.SyncMode_Sync, Strings.SyncMode_Sync_Description),
+        };
+
+        AvailableSyncModes.Clear();
+        foreach (var option in newOptions)
+        {
+            AvailableSyncModes.Add(option);
+        }
     }
 
     private static string GetDefaultLogDirectory()

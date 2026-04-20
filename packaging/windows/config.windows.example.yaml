@@ -6,6 +6,7 @@ watch:
   sources:
     - path: "C:\\Users\\YOUR_USER\\Pictures"
       albumName: "Pictures"
+      syncMode: "uploadNew" # uploadNew (default) | uploadAll | sync
       includeSubdirectories: true
       extensions:
         - ".avif"

@@ -47,6 +47,38 @@ public sealed class WatchSourceSettings
     public List<string> ExcludeDirectories { get; set; } = new();
 
     public List<string> ExcludeFileNames { get; set; } = new();
+
+    public string SyncMode { get; set; } = WatchSourceSyncModes.UploadNew;
+}
+
+public static class WatchSourceSyncModes
+{
+    public const string UploadNew = "uploadNew";
+
+    public const string UploadAll = "uploadAll";
+
+    public const string Sync = "sync";
+
+    public static string Normalize(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return UploadNew;
+        }
+
+        if (string.Equals(trimmed, UploadAll, StringComparison.OrdinalIgnoreCase))
+        {
+            return UploadAll;
+        }
+
+        if (string.Equals(trimmed, Sync, StringComparison.OrdinalIgnoreCase))
+        {
+            return Sync;
+        }
+
+        return UploadNew;
+    }
 }
 
 public sealed class RetrySettings

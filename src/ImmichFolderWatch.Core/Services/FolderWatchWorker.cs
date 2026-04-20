@@ -12,6 +12,8 @@ public sealed class FolderWatchWorker : BackgroundService
 {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(750);
 
+    private static readonly TimeSpan AlbumPullInterval = TimeSpan.FromSeconds(60);
+
     private readonly AppConfig _config;
 
     private readonly IFileReadinessChecker _fileReadinessChecker;
@@ -27,6 +29,8 @@ public sealed class FolderWatchWorker : BackgroundService
     private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly List<FileSystemWatcher> _watchers = new();
+
+    private readonly List<SyncSourceContext> _syncSources = new();
 
     private readonly TimeSpan _batchInterval;
 
@@ -56,8 +60,12 @@ public sealed class FolderWatchWorker : BackgroundService
 
         _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
 
+        SeedExistingFiles(stoppingToken);
+        await InitialAlbumPullAsync(stoppingToken);
+
         using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         var lastFlush = DateTimeOffset.UtcNow;
+        var lastAlbumPull = DateTimeOffset.UtcNow;
 
         try
         {
@@ -72,6 +80,12 @@ public sealed class FolderWatchWorker : BackgroundService
                     await FlushUploadsAsync(stoppingToken);
                     lastFlush = DateTimeOffset.UtcNow;
                     _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+                }
+
+                if (DateTimeOffset.UtcNow - lastAlbumPull >= AlbumPullInterval)
+                {
+                    await PullAlbumsForSyncSourcesAsync(stoppingToken);
+                    lastAlbumPull = DateTimeOffset.UtcNow;
                 }
             }
         }
@@ -100,6 +114,7 @@ public sealed class FolderWatchWorker : BackgroundService
             }
 
             var sourceFilter = new WatchSourceFileFilter(source);
+            var syncMode = WatchSourceSyncModes.Normalize(source.SyncMode);
             var watcher = new FileSystemWatcher(source.Path)
             {
                 IncludeSubdirectories = source.IncludeSubdirectories,
@@ -113,21 +128,237 @@ public sealed class FolderWatchWorker : BackgroundService
             watcher.Created += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
             watcher.Changed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
             watcher.Renamed += (_, e) => OnFileEvent(e.FullPath, source.AlbumName, sourceFilter);
+
+            if (string.Equals(syncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal))
+            {
+                watcher.Deleted += (_, e) => _ = HandleLocalDeletionAsync(e.FullPath, source.AlbumName, sourceFilter);
+                watcher.Renamed += (_, e) => _ = HandleLocalDeletionAsync(e.OldFullPath, source.AlbumName, sourceFilter);
+            }
+
             watcher.Error += (_, e) => _logger.LogError(e.GetException(), "File watcher error for source {Path}", source.Path);
 
             _watchers.Add(watcher);
 
+            if (!string.Equals(syncMode, WatchSourceSyncModes.UploadNew, StringComparison.Ordinal))
+            {
+                _syncSources.Add(new SyncSourceContext(source, sourceFilter, syncMode));
+            }
+
             _logger.LogInformation(
-                "Watching source {Path} (Album: {AlbumName}, IncludeSubdirectories: {IncludeSubdirectories}).",
+                "Watching source {Path} (Album: {AlbumName}, IncludeSubdirectories: {IncludeSubdirectories}, SyncMode: {SyncMode}).",
                 source.Path,
                 source.AlbumName,
-                source.IncludeSubdirectories);
+                source.IncludeSubdirectories,
+                syncMode);
         }
 
         if (_watchers.Count == 0)
         {
             throw new InvalidOperationException("No valid watch source directories are available.");
         }
+    }
+
+    private void SeedExistingFiles(CancellationToken cancellationToken)
+    {
+        foreach (var context in _syncSources)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            int queuedCount = 0;
+            try
+            {
+                var searchOption = context.Source.IncludeSubdirectories
+                    ? SearchOption.AllDirectories
+                    : SearchOption.TopDirectoryOnly;
+
+                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+                {
+                    if (!context.Filter.IsMatch(filePath))
+                    {
+                        continue;
+                    }
+
+                    var normalized = NormalizePath(filePath);
+                    if (_uploadBatchQueue.TryEnqueue(new UploadAssetRequest(normalized, context.Source.AlbumName)))
+                    {
+                        queuedCount++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Initial scan failed for source {Path}.", context.Source.Path);
+                continue;
+            }
+
+            _logger.LogInformation(
+                "Initial scan for {SyncMode} queued {Count} existing file(s) from {Path}.",
+                context.SyncMode,
+                queuedCount,
+                context.Source.Path);
+        }
+
+        _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+    }
+
+    private async Task InitialAlbumPullAsync(CancellationToken cancellationToken)
+    {
+        foreach (var context in _syncSources)
+        {
+            if (!string.Equals(context.SyncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            await PullAlbumForSourceAsync(context, cancellationToken);
+        }
+    }
+
+    private async Task PullAlbumsForSyncSourcesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var context in _syncSources)
+        {
+            if (!string.Equals(context.SyncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            await PullAlbumForSourceAsync(context, cancellationToken);
+        }
+    }
+
+    private async Task PullAlbumForSourceAsync(SyncSourceContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(context.Source.AlbumName))
+        {
+            return;
+        }
+
+        AlbumAssetsResult result;
+        try
+        {
+            result = await _immichAssetClient.GetAlbumAssetsAsync(context.Source.AlbumName, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Listing album '{AlbumName}' for sync pull failed.", context.Source.AlbumName);
+            return;
+        }
+
+        if (result.AlbumMissing)
+        {
+            _logger.LogDebug("Sync pull skipped; album '{AlbumName}' does not exist yet.", context.Source.AlbumName);
+            return;
+        }
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning(
+                "Sync pull failed for album '{AlbumName}': {Error}",
+                context.Source.AlbumName,
+                result.ErrorMessage ?? "unknown");
+            return;
+        }
+
+        var localFileNames = EnumerateLocalFileNames(context);
+        var downloadedCount = 0;
+
+        foreach (var asset in result.Assets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(asset.OriginalFileName))
+            {
+                continue;
+            }
+
+            if (localFileNames.Contains(asset.OriginalFileName))
+            {
+                continue;
+            }
+
+            var destinationPath = Path.Combine(context.Source.Path, asset.OriginalFileName);
+            if (!context.Filter.IsMatch(destinationPath))
+            {
+                continue;
+            }
+
+            if (File.Exists(destinationPath))
+            {
+                continue;
+            }
+
+            var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
+            if (download.IsSuccess)
+            {
+                downloadedCount++;
+                _logger.LogInformation(
+                    "Downloaded asset {AssetId} to {FilePath} from album '{AlbumName}'.",
+                    asset.Id,
+                    destinationPath,
+                    context.Source.AlbumName);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Downloading asset {AssetId} failed: {Error}",
+                    asset.Id,
+                    download.ErrorMessage ?? "unknown");
+            }
+        }
+
+        if (downloadedCount > 0)
+        {
+            _logger.LogInformation(
+                "Sync pull finished for album '{AlbumName}' ({Count} new file(s) downloaded).",
+                context.Source.AlbumName,
+                downloadedCount);
+        }
+    }
+
+    private static HashSet<string> EnumerateLocalFileNames(SyncSourceContext context)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var searchOption = context.Source.IncludeSubdirectories
+                ? SearchOption.AllDirectories
+                : SearchOption.TopDirectoryOnly;
+
+            foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+            {
+                set.Add(Path.GetFileName(filePath));
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        return set;
+    }
+
+    private Task HandleLocalDeletionAsync(string filePath, string albumName, WatchSourceFileFilter sourceFilter)
+    {
+        if (string.IsNullOrWhiteSpace(albumName) || !sourceFilter.IsMatch(filePath))
+        {
+            return Task.CompletedTask;
+        }
+
+        var fileName = Path.GetFileName(filePath);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return Task.CompletedTask;
+        }
+
+        _logger.LogInformation(
+            "Local deletion of {FileName} detected in sync source for album '{AlbumName}'. Remote deletion is not yet implemented and must be performed manually.",
+            fileName,
+            albumName);
+
+        return Task.CompletedTask;
     }
 
     private void OnFileEvent(string filePath, string albumName, WatchSourceFileFilter sourceFilter)
@@ -267,4 +498,6 @@ public sealed class FolderWatchWorker : BackgroundService
     }
 
     private sealed record PendingFile(string AlbumName, DateTimeOffset LastEventUtc);
+
+    private sealed record SyncSourceContext(WatchSourceSettings Source, WatchSourceFileFilter Filter, string SyncMode);
 }

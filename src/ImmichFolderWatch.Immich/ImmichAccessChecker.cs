@@ -16,7 +16,12 @@ public sealed class ImmichAccessChecker
         _httpClient = httpClient;
     }
 
-    public async Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, CancellationToken cancellationToken)
+    public Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, CancellationToken cancellationToken)
+    {
+        return CheckAsync(requireAlbumPermissions, requireDownloadPermissions: false, cancellationToken);
+    }
+
+    public async Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, bool requireDownloadPermissions, CancellationToken cancellationToken)
     {
         var urlProbe = await ProbeUrlAsync(cancellationToken);
         if (urlProbe.Decision != ProbeDecision.Passed)
@@ -29,7 +34,7 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = "Not checked because the URL could not be verified.",
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the URL could not be verified.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified.", requireAlbumPermissions),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified.", requireAlbumPermissions, requireDownloadPermissions),
             };
         }
 
@@ -44,7 +49,7 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = apiKeyProbe.Message,
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the API key was not accepted.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted.", requireAlbumPermissions),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted.", requireAlbumPermissions, requireDownloadPermissions),
             };
         }
 
@@ -54,6 +59,7 @@ public sealed class ImmichAccessChecker
             CreateAlbumReadPermissionResult(await ProbeAlbumReadPermissionAsync(cancellationToken), requireAlbumPermissions),
             CreateAlbumCreatePermissionResult(await ProbeAlbumCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
             CreateAlbumAssetCreatePermissionResult(await ProbeAlbumAssetCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
+            CreateAssetDownloadPermissionResult(await ProbeAssetDownloadPermissionAsync(cancellationToken), requireDownloadPermissions),
         };
 
         return new ImmichAccessCheckResult
@@ -62,8 +68,8 @@ public sealed class ImmichAccessChecker
             UrlMessage = urlProbe.Message,
             ApiKeyState = CheckState.Passed,
             ApiKeyMessage = apiKeyProbe.Message,
-            PermissionsState = DeterminePermissionsOverallState(permissionResults, requireAlbumPermissions),
-            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults, requireAlbumPermissions),
+            PermissionsState = DeterminePermissionsOverallState(permissionResults, requireAlbumPermissions || requireDownloadPermissions),
+            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults, requireAlbumPermissions || requireDownloadPermissions),
             PermissionResults = permissionResults,
         };
     }
@@ -176,6 +182,16 @@ public sealed class ImmichAccessChecker
             successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.Created, HttpStatusCode.BadRequest, HttpStatusCode.Conflict, HttpStatusCode.UnprocessableEntity]);
     }
 
+    private async Task<ProbeResult> ProbeAssetDownloadPermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(() => CreateGetRequest(ImmichApiRoutes.AssetOriginalFile(InvalidId)), cancellationToken);
+        return InterpretPermissionProbe(
+            probe,
+            "Download assets",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
+    }
+
     private async Task<ProbeResult> ProbeAlbumAssetCreatePermissionAsync(CancellationToken cancellationToken)
     {
         var candidates = new[]
@@ -250,7 +266,7 @@ public sealed class ImmichAccessChecker
         return "Album-related permissions are optional until a source uses an album name.";
     }
 
-    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message, bool requireAlbumPermissions)
+    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message, bool requireAlbumPermissions, bool requireDownloadPermissions)
     {
         return new[]
         {
@@ -286,6 +302,14 @@ public sealed class ImmichAccessChecker
                 Message = message,
                 BlocksConfigVerification = requireAlbumPermissions,
             },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "asset.download",
+                DisplayName = "Asset Download",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireDownloadPermissions,
+            },
         };
     }
 
@@ -307,6 +331,11 @@ public sealed class ImmichAccessChecker
     private static ImmichPermissionCheckResult CreateAlbumAssetCreatePermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
         return CreatePermissionResult("albumAsset.create", "Add Asset To Album", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAssetDownloadPermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("asset.download", "Asset Download", blocksConfigVerification, probe);
     }
 
     private static ImmichPermissionCheckResult CreatePermissionResult(string permissionName, string displayName, bool blocksConfigVerification, ProbeResult probe)

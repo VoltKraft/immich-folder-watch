@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-04-20
+
+This release introduces per-folder **sync modes**. Each watched source can now
+choose how it interacts with its Immich album: upload only files that appear
+during runtime (default, matching the previous behavior), upload the full
+folder contents, or keep the folder additively synchronized with its album.
+
+### Added
+- New `watch.sources[].syncMode` YAML setting with three values:
+  - `uploadNew` (default): only new files that appear while the app is running
+    are uploaded; pre-existing files are ignored. Preserves the legacy
+    behavior end-to-end, so pre-2.3 configs load and run unchanged.
+  - `uploadAll`: on start, enqueues every file already in the folder, then
+    continues to upload newly added files. No downloads.
+  - `sync`: additive bidirectional reconciliation with the source's album.
+    On start and every 60 seconds afterwards, local files missing in the
+    album are uploaded and album assets missing locally are downloaded into
+    the watched folder. Requires `albumName`.
+- `IImmichAssetClient.GetAlbumAssetsAsync` and
+  `IImmichAssetClient.DownloadAssetAsync` on top of the new Immich routes
+  `GET /albums/{id}` and `GET /assets/{id}/original`. Downloads stream to a
+  `.downloading` temp file and are moved atomically on completion.
+- New `asset.download` row in the Immich **Verify Access** permission list.
+  `ImmichAccessChecker` probes `GET /assets/not-a-valid-id/original` to
+  confirm the API key can reach the download endpoint, treating `400`,
+  `404`, and `422` as "endpoint reachable, permission ok" and `403` as a
+  denial. The new probe only **blocks** config verification when at least
+  one source uses `syncMode: sync`; for pure upload configs it stays
+  informational (mirrors the existing album-permission gating).
+- New **Sync Mode** dropdown on every watched-folder card in the Windows GUI,
+  with localized labels and an inline description of the selected mode.
+- New localization strings for the sync-mode UI in English and German
+  (`UI_SyncMode`, `SyncMode_UploadNew`, `SyncMode_UploadAll`, `SyncMode_Sync`
+  and their `_Description` counterparts).
+
+### Changed
+- `FolderWatchWorker` now seeds existing files on start for `uploadAll` and
+  `sync` sources (uploads benefit from Immich server-side dedup via the
+  `deviceAssetId` hash, so restarts don't re-upload already-known files),
+  and periodically pulls album assets for `sync` sources.
+- Windows GUI, YAML loader/writer, and config model now round-trip the new
+  `syncMode` field; unknown or missing values normalize to `uploadNew`.
+- Project, packaging, and release defaults updated to `2.3.0`.
+
+### Known Limitations
+- **Deletions are never propagated** in `sync` mode — neither local-to-remote
+  nor remote-to-local. A local delete is logged but will not remove the
+  Immich asset, and an Immich-side delete will not remove the local file.
+  This is intentional for this release to avoid destructive edge cases; file
+  deletions and album removals remain a manual operation.
+
 ## [2.2.0] - 2026-04-20
 
 This release makes the Windows GUI follow the active Windows 11 design system

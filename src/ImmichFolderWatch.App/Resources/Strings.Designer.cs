@@ -82,11 +82,20 @@ public static class Strings
     public static string UI_OpenLogs => Get(nameof(UI_OpenLogs));
     public static string UI_Language => Get(nameof(UI_Language));
     public static string UI_Appearance => Get(nameof(UI_Appearance));
+    public static string UI_SyncMode => Get(nameof(UI_SyncMode));
+
+    public static string SyncMode_UploadNew => Get(nameof(SyncMode_UploadNew));
+    public static string SyncMode_UploadNew_Description => Get(nameof(SyncMode_UploadNew_Description));
+    public static string SyncMode_UploadAll => Get(nameof(SyncMode_UploadAll));
+    public static string SyncMode_UploadAll_Description => Get(nameof(SyncMode_UploadAll_Description));
+    public static string SyncMode_Sync => Get(nameof(SyncMode_Sync));
+    public static string SyncMode_Sync_Description => Get(nameof(SyncMode_Sync_Description));
 
     public static string Permission_AssetUpload => Get(nameof(Permission_AssetUpload));
     public static string Permission_AlbumRead => Get(nameof(Permission_AlbumRead));
     public static string Permission_AlbumCreate => Get(nameof(Permission_AlbumCreate));
     public static string Permission_AddAssetToAlbum => Get(nameof(Permission_AddAssetToAlbum));
+    public static string Permission_AssetDownload => Get(nameof(Permission_AssetDownload));
 
     public static string Check_Ok => Get(nameof(Check_Ok));
     public static string Check_Warning => Get(nameof(Check_Warning));
