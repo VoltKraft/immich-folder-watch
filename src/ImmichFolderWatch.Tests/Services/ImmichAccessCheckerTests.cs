@@ -20,6 +20,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, requireSyncPermissions: true, CancellationToken.None);
@@ -60,6 +61,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
@@ -83,6 +85,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
@@ -113,6 +116,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, requireSyncPermissions: true, CancellationToken.None);
@@ -137,6 +141,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
@@ -163,6 +168,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, requireSyncPermissions: true, CancellationToken.None);
@@ -188,13 +194,14 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
+            CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, requireSyncPermissions: false, CancellationToken.None);
 
         Assert.Equal(CheckState.Passed, result.UrlState);
         Assert.Equal(CheckState.Passed, result.ApiKeyState);
-        foreach (var name in new[] { "asset.download", "asset.read", "asset.delete", "albumAsset.delete", "album.delete" })
+        foreach (var name in new[] { "asset.download", "asset.read", "asset.delete", "albumAsset.delete", "album.delete", "album.update" })
         {
             var permission = result.PermissionResults.Single(p => p.PermissionName == name);
             Assert.Equal(CheckState.Failed, permission.State);
@@ -222,6 +229,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.BadRequest),
             CreateResponse(HttpStatusCode.BadRequest));
 
         var result = await checker.CheckAsync(requireAlbumPermissions: true, CancellationToken.None);
@@ -238,6 +246,7 @@ public sealed class ImmichAccessCheckerTests
             CreateResponse(HttpStatusCode.OK),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.BadRequest),
+            CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),
             CreateResponse(HttpStatusCode.Forbidden),

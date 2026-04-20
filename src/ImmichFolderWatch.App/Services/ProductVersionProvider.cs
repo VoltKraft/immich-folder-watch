@@ -4,7 +4,7 @@ namespace ImmichFolderWatch.App.Services;
 
 internal static class ProductVersionProvider
 {
-    private const string FallbackVersion = "2.3.1";
+    private const string FallbackVersion = "2.3.2";
 
     public static string GetProductVersion()
     {

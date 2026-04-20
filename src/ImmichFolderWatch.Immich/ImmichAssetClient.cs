@@ -412,6 +412,81 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         return DeleteAlbumResult.Success();
     }
 
+    public async Task<RenameAlbumResult> RenameAlbumAsync(string oldAlbumName, string newAlbumName, CancellationToken cancellationToken)
+    {
+        var oldNormalized = NormalizeAlbumName(oldAlbumName);
+        var newNormalized = NormalizeAlbumName(newAlbumName);
+
+        if (string.IsNullOrWhiteSpace(oldNormalized) || string.IsNullOrWhiteSpace(newNormalized))
+        {
+            return RenameAlbumResult.Failure(null, "Both old and new album names are required.");
+        }
+
+        if (string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal))
+        {
+            var current = await GetAlbumsAsync(cancellationToken);
+            if (!current.IsSuccess)
+            {
+                return RenameAlbumResult.Failure(current.StatusCode, current.ErrorMessage);
+            }
+
+            var existing = FindExactAlbumMatches(current.Albums, newNormalized);
+            return existing.Count == 1
+                ? RenameAlbumResult.Success(existing[0].Id)
+                : RenameAlbumResult.Missing();
+        }
+
+        var albumsResult = await GetAlbumsAsync(cancellationToken);
+        if (!albumsResult.IsSuccess)
+        {
+            return RenameAlbumResult.Failure(albumsResult.StatusCode, albumsResult.ErrorMessage);
+        }
+
+        var matches = FindExactAlbumMatches(albumsResult.Albums, oldNormalized);
+        if (matches.Count == 0)
+        {
+            return RenameAlbumResult.Missing();
+        }
+
+        if (matches.Count > 1)
+        {
+            return RenameAlbumResult.Failure(null, BuildDuplicateAlbumError(oldNormalized));
+        }
+
+        if (FindExactAlbumMatches(albumsResult.Albums, newNormalized).Count > 0)
+        {
+            return RenameAlbumResult.Failure(
+                HttpStatusCode.Conflict,
+                $"An album named '{newNormalized}' already exists on Immich; the rename was skipped.");
+        }
+
+        var albumId = matches[0].Id;
+        var result = await SendJsonAsync(
+            HttpMethod.Patch,
+            ImmichApiRoutes.AlbumInfo(albumId),
+            new { albumName = newNormalized },
+            cancellationToken);
+
+        if (!result.HasHttpResponse)
+        {
+            return RenameAlbumResult.Failure(null, result.ErrorMessage);
+        }
+
+        if (result.StatusCode == HttpStatusCode.NotFound)
+        {
+            return RenameAlbumResult.Missing();
+        }
+
+        if (!result.IsSuccessStatusCode)
+        {
+            return RenameAlbumResult.Failure(
+                result.StatusCode,
+                $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
+        }
+
+        return RenameAlbumResult.Success(albumId);
+    }
+
     public async Task<UploadAssetResult> UploadAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

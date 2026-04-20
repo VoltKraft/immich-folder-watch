@@ -25,4 +25,6 @@ public interface IImmichAssetClient
     Task<EnsureAlbumResult> EnsureAlbumAsync(string albumName, CancellationToken cancellationToken);
 
     Task<DeleteAlbumResult> DeleteAlbumAsync(string albumName, CancellationToken cancellationToken);
+
+    Task<RenameAlbumResult> RenameAlbumAsync(string oldAlbumName, string newAlbumName, CancellationToken cancellationToken);
 }

@@ -34,6 +34,8 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly ConcurrentDictionary<string, string> _albumIdToDirName = new(StringComparer.Ordinal);
+
     private readonly List<FileSystemWatcher> _watchers = new();
 
     private readonly List<WatchSourceContext> _sources = new();
@@ -75,7 +77,7 @@ public sealed class FolderWatchWorker : BackgroundService
         if (_immichRealtimeClient is not null)
         {
             _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
-            await _immichRealtimeClient.StartAsync(stoppingToken);
+            _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
         }
 
         using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -330,6 +332,8 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            _albumIdToDirName[album.Id] = sanitized;
+
             var albumDir = Path.Combine(context.NormalizedRoot, sanitized);
             var albumResult = await _immichAssetClient.GetAlbumAssetsAsync(album.Name, cancellationToken);
             if (!albumResult.IsSuccess)
@@ -492,6 +496,16 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 continue;
             }
+
+            if (_albumIdToDirName.TryGetValue(album.Id, out var previousDirName)
+                && !string.Equals(previousDirName, sanitized, StringComparison.Ordinal))
+            {
+                var previousDir = Path.Combine(context.NormalizedRoot, previousDirName);
+                var targetDir = Path.Combine(context.NormalizedRoot, sanitized);
+                TryRenameLocalSubdir(previousDir, targetDir, previousDirName, sanitized);
+            }
+
+            _albumIdToDirName[album.Id] = sanitized;
 
             var albumDir = Path.Combine(context.NormalizedRoot, sanitized);
 
@@ -739,6 +753,11 @@ public sealed class FolderWatchWorker : BackgroundService
             var result = await _immichAssetClient.EnsureAlbumAsync(dirName, CancellationToken.None);
             if (result.IsSuccess)
             {
+                if (!string.IsNullOrWhiteSpace(result.AlbumId))
+                {
+                    _albumIdToDirName[result.AlbumId!] = dirName;
+                }
+
                 _logger.LogInformation("Ensured album '{AlbumName}' after subfolder creation.", dirName);
             }
             else
@@ -814,6 +833,14 @@ public sealed class FolderWatchWorker : BackgroundService
                     dirName,
                     deleteResult.ErrorMessage ?? "unknown");
             }
+
+            foreach (var entry in _albumIdToDirName.ToArray())
+            {
+                if (string.Equals(entry.Value, dirName, StringComparison.Ordinal))
+                {
+                    _albumIdToDirName.TryRemove(entry.Key, out _);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -825,32 +852,135 @@ public sealed class FolderWatchWorker : BackgroundService
     {
         try
         {
-            var oldDirName = Path.GetFileName(NormalizeDirectory(oldFullPath));
-            var newDirName = Path.GetFileName(NormalizeDirectory(newFullPath));
+            var oldNormalizedDir = NormalizeDirectory(oldFullPath);
+            var newNormalizedDir = NormalizeDirectory(newFullPath);
+            var oldDirName = Path.GetFileName(oldNormalizedDir);
+            var newDirName = Path.GetFileName(newNormalizedDir);
 
             if (string.IsNullOrWhiteSpace(newDirName))
             {
                 return;
             }
 
-            var ensure = await _immichAssetClient.EnsureAlbumAsync(newDirName, CancellationToken.None);
-            if (!ensure.IsSuccess)
+            RekeyPathMapPrefix(oldNormalizedDir, newNormalizedDir);
+
+            if (string.IsNullOrWhiteSpace(oldDirName)
+                || string.Equals(oldDirName, newDirName, StringComparison.Ordinal))
             {
-                _logger.LogWarning(
-                    "Failed to ensure album '{AlbumName}' after subfolder rename: {Error}",
-                    newDirName,
-                    ensure.ErrorMessage ?? "unknown");
                 return;
             }
 
-            _logger.LogInformation(
-                "Subfolder renamed from '{OldName}' to '{NewName}'; new album ensured. Album membership for existing files may need a manual resync.",
+            var rename = await _immichAssetClient.RenameAlbumAsync(oldDirName, newDirName, CancellationToken.None);
+            if (rename.IsSuccess && !rename.AlbumMissing)
+            {
+                if (!string.IsNullOrWhiteSpace(rename.AlbumId))
+                {
+                    _albumIdToDirName[rename.AlbumId!] = newDirName;
+                }
+
+                _logger.LogInformation(
+                    "Renamed Immich album '{OldName}' to '{NewName}' after subfolder rename.",
+                    oldDirName,
+                    newDirName);
+                return;
+            }
+
+            if (rename.AlbumMissing)
+            {
+                var ensure = await _immichAssetClient.EnsureAlbumAsync(newDirName, CancellationToken.None);
+                if (ensure.IsSuccess)
+                {
+                    if (!string.IsNullOrWhiteSpace(ensure.AlbumId))
+                    {
+                        _albumIdToDirName[ensure.AlbumId!] = newDirName;
+                    }
+
+                    _logger.LogInformation(
+                        "Subfolder renamed '{OldName}' -> '{NewName}'; target album ensured (no source album existed).",
+                        oldDirName,
+                        newDirName);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Failed to ensure album '{AlbumName}' after subfolder rename: {Error}",
+                        newDirName,
+                        ensure.ErrorMessage ?? "unknown");
+                }
+
+                return;
+            }
+
+            _logger.LogWarning(
+                "Failed to rename Immich album '{OldName}' -> '{NewName}': {Error}",
                 oldDirName,
-                newDirName);
+                newDirName,
+                rename.ErrorMessage ?? "unknown");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle subfolder rename {Old} -> {New}.", oldFullPath, newFullPath);
+        }
+    }
+
+    private void RekeyPathMapPrefix(string oldNormalizedDir, string newNormalizedDir)
+    {
+        if (string.Equals(oldNormalizedDir, newNormalizedDir, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var oldPrefix = oldNormalizedDir + Path.DirectorySeparatorChar;
+        var newPrefix = newNormalizedDir + Path.DirectorySeparatorChar;
+
+        foreach (var entry in _pathToAssetId.ToArray())
+        {
+            if (!entry.Key.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (_pathToAssetId.TryRemove(entry.Key, out var assetId))
+            {
+                var relative = entry.Key[oldPrefix.Length..];
+                _pathToAssetId[newPrefix + relative] = assetId;
+            }
+        }
+    }
+
+    private void TryRenameLocalSubdir(string oldDir, string newDir, string oldName, string newName)
+    {
+        try
+        {
+            if (!Directory.Exists(oldDir))
+            {
+                return;
+            }
+
+            if (Directory.Exists(newDir))
+            {
+                _logger.LogWarning(
+                    "Cannot rename local subfolder '{Old}' -> '{New}' to match renamed Immich album: a folder with the new name already exists.",
+                    oldName,
+                    newName);
+                return;
+            }
+
+            Directory.Move(oldDir, newDir);
+            RekeyPathMapPrefix(oldDir, newDir);
+
+            _logger.LogInformation(
+                "Renamed local subfolder '{Old}' -> '{New}' to match renamed Immich album.",
+                oldName,
+                newName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Renaming local subfolder '{Old}' -> '{New}' after remote album rename failed.",
+                oldName,
+                newName);
         }
     }
 

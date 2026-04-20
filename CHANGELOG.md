@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-04-20
+
+A follow-up to 2.3.1 that closes the last missing symmetry gap in `sync` mode:
+renames now propagate in both directions between local subfolders and Immich
+albums. It also fixes a startup hang where a misbehaving Immich Socket.IO
+endpoint could block the worker loop indefinitely.
+
+### Added
+- **Bidirectional subfolder ↔ album rename in `sync` mode
+  (subfolders-as-albums variant).**
+  - Renaming a first-level local subfolder now renames the matching Immich
+    album via `PATCH /albums/{id}`. The `_pathToAssetId` map is re-keyed from
+    the old to the new prefix so subsequent deletes/moves still target the
+    right assets.
+  - Renaming an album on Immich now renames the corresponding local subfolder.
+    The worker tracks an `album.Id → local-dir-name` map seeded from the
+    initial album list and refreshed on every pull; when an album id reappears
+    under a different (sanitized) name, the local directory is moved to match.
+  - Conflicts (a folder/album with the target name already exists) are logged
+    as warnings and leave the existing state untouched — no clobber.
+  - New `IImmichAssetClient.RenameAlbumAsync` + `RenameAlbumResult` model
+    (404 is idempotently surfaced as `AlbumMissing`, 409 as a conflict
+    warning).
+  - New `album.update` probe in `ImmichAccessChecker` (gated on
+    `requireSyncPermissions`); the GUI's **Verify Immich Access** check now
+    covers it alongside the existing `album.delete` / `album.read` /
+    `album.create` / `albumAsset.*` / `asset.*` probes.
+
+### Fixed
+- **Worker could hang on an unresponsive Socket.IO endpoint.** When the Immich
+  instance did not accept the Socket.IO handshake (wrong reverse-proxy path,
+  WebSocket disabled, etc.), `SocketIOClient.ConnectAsync` — configured with
+  `Reconnection = true` and `ReconnectionAttempts = int.MaxValue` — never
+  returned, which blocked `FolderWatchWorker.ExecuteAsync` before the debounce
+  / flush / poll loop could start. Symptom: files queued by the initial scan
+  and by in-flight `FileSystemWatcher` events never got uploaded, and no
+  `Uploading batch` log line ever appeared. The connect is now fired on a
+  background `Task.Run`, so the polling loop starts immediately and the
+  realtime channel joins in once the socket succeeds (if ever).
+
 ## [2.3.1] - 2026-04-20
 
 A follow-up to 2.3.0 focused on making the new `sync` mode feel like a

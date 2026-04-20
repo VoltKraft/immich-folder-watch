@@ -64,6 +64,7 @@ public sealed class ImmichAccessChecker
             CreateAssetDeletePermissionResult(await ProbeAssetDeletePermissionAsync(cancellationToken), requireSyncPermissions),
             CreateAlbumAssetDeletePermissionResult(await ProbeAlbumAssetDeletePermissionAsync(cancellationToken), requireSyncPermissions),
             CreateAlbumDeletePermissionResult(await ProbeAlbumDeletePermissionAsync(cancellationToken), requireSyncPermissions),
+            CreateAlbumUpdatePermissionResult(await ProbeAlbumUpdatePermissionAsync(cancellationToken), requireSyncPermissions),
         };
 
         return new ImmichAccessCheckResult
@@ -245,6 +246,24 @@ public sealed class ImmichAccessChecker
             successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
     }
 
+    private async Task<ProbeResult> ProbeAlbumUpdatePermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(
+            () =>
+            {
+                var request = CreateRequest(HttpMethod.Patch, ImmichApiRoutes.AlbumInfo(InvalidId));
+                request.Content = CreateJsonContent("{\"albumName\":\"probe\"}");
+                return request;
+            },
+            cancellationToken);
+
+        return InterpretPermissionProbe(
+            probe,
+            "Update albums",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
+    }
+
     private async Task<ProbeResult> ProbeAlbumAssetDeletePermissionAsync(CancellationToken cancellationToken)
     {
         var probe = await SendAsync(
@@ -413,6 +432,14 @@ public sealed class ImmichAccessChecker
                 Message = message,
                 BlocksConfigVerification = requireSyncPermissions,
             },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "album.update",
+                DisplayName = "Album Update",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
         };
     }
 
@@ -459,6 +486,11 @@ public sealed class ImmichAccessChecker
     private static ImmichPermissionCheckResult CreateAlbumDeletePermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
         return CreatePermissionResult("album.delete", "Album Delete", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAlbumUpdatePermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("album.update", "Album Update", blocksConfigVerification, probe);
     }
 
     private static ImmichPermissionCheckResult CreatePermissionResult(string permissionName, string displayName, bool blocksConfigVerification, ProbeResult probe)
