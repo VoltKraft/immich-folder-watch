@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-04-20
+
+This release makes the Windows GUI follow the active Windows 11 design system
+end-to-end: light/dark chrome, the user's accent color, and live updates when
+either setting changes — no restart required.
+
+### Added
+- Live detection of the Windows accent color from
+  `HKCU\Software\Microsoft\Windows\DWM\AccentColor` in `ThemeWatcher`, with
+  programmatic Fluent shades (`AppAccentLight1..3`, `AppAccentDark1..3`)
+  published as dynamic brushes on `Application.Resources`.
+- `WM_DWMCOLORIZATIONCOLORCHANGED` and `WM_THEMECHANGED` are now hooked on the
+  main window alongside `WM_SETTINGCHANGE`, so changing the accent color (or
+  switching light/dark) in Windows Settings updates the UI immediately.
+- New theme-aware header-icon brushes (`AppHeaderIconBackground`,
+  `AppHeaderIconBorder`) so the logo tile stays visible in both light and dark
+  mode instead of relying on a hardcoded white overlay.
+
+### Changed
+- Primary button, focused text-box border, and info status pill now pull from
+  the Windows accent color. In dark mode they use a lighter accent shade with
+  black foreground (Windows 11 convention); in light mode the base accent with
+  white foreground.
+- Light and dark palettes retuned to Windows 11 Fluent chrome values
+  (`#F3F3F3` / `#202020` base, matching card, border, surface, footer, and
+  status tones) so the window chrome aligns with native Windows 11 apps.
+- The header bar is now theme-aware instead of always rendering in a dark navy
+  shade, so it follows the active system theme together with the rest of the
+  window.
+- Project, packaging, and release defaults updated to `2.2.0`.
+
 ## [2.1.0] - 2026-04-20
 
 This release adds full UI localization. The app ships with English as the neutral

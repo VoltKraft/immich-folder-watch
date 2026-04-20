@@ -44,8 +44,8 @@
                   Height="48"
                   Padding="4"
                   CornerRadius="16"
-                  Background="#14FFFFFF"
-                  BorderBrush="#33FFFFFF"
+                  Background="{DynamicResource AppHeaderIconBackground}"
+                  BorderBrush="{DynamicResource AppHeaderIconBorder}"
                   BorderThickness="1">
             <Image Width="40"
                    Height="40"

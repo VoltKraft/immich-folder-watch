@@ -19,6 +19,8 @@ namespace ImmichFolderWatch.App;
 public sealed partial class MainWindow : Window
 {
     private const int WM_SETTINGCHANGE = 0x001A;
+    private const int WM_DWMCOLORIZATIONCOLORCHANGED = 0x0320;
+    private const int WM_THEMECHANGED = 0x031A;
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -84,7 +86,7 @@ public sealed partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_SETTINGCHANGE)
+        if (msg == WM_SETTINGCHANGE || msg == WM_DWMCOLORIZATIONCOLORCHANGED || msg == WM_THEMECHANGED)
         {
             _themeWatcher.Refresh();
         }
