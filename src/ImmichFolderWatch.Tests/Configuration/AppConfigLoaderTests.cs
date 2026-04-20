@@ -257,4 +257,107 @@ logging:
             tempRoot.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public void Load_ReadsLocalizationLanguage()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-locale-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources: []
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "logs"
+localization:
+  language: "de"
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().Load(configPath);
+
+            Assert.Equal("de", config.Localization.Language);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Load_MissingLocalizationSection_DefaultsToAuto()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-locale-default-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources: []
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "logs"
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().Load(configPath);
+
+            Assert.Equal("auto", config.Localization.Language);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Load_BlankLocalizationLanguage_NormalizesToAuto()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-locale-blank-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources: []
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "logs"
+localization:
+  language: "   "
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().Load(configPath);
+
+            Assert.Equal("auto", config.Localization.Language);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
 }

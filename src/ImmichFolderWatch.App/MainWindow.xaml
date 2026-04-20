@@ -98,7 +98,7 @@
       <StackPanel Margin="18">
         <Border Style="{StaticResource CardBorder}">
           <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleText}" Text="Status" />
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_Status, Source={StaticResource Loc}}" />
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
@@ -112,17 +112,17 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
-              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Server-Verbindung" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_ServerConnection, Source={StaticResource Loc}}" />
               <TextBlock Grid.Row="0" Grid.Column="1" Margin="0,0,12,12" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="{Binding ServerConnectionDetail}" />
               <controls:StatusPill Grid.Row="0" Grid.Column="2" Margin="0,0,0,12" VerticalAlignment="Center" Text="{Binding ServerConnectionText}" Tone="{Binding ServerConnectionTone}" />
 
-              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Letzter Sync" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_LastSync, Source={StaticResource Loc}}" />
               <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,12" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="{Binding LastSyncText}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Aktueller Sync" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_CurrentSync, Source={StaticResource Loc}}" />
               <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,12" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="{Binding CurrentUploadText}" TextWrapping="Wrap" />
 
-              <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center" Text="Wartende Dateien" />
+              <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center" Text="{Binding UI_PendingFiles, Source={StaticResource Loc}}" />
               <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="{Binding PendingCountText}" />
             </Grid>
           </StackPanel>
@@ -130,20 +130,20 @@
 
         <Border Margin="0,18,0,0" Style="{StaticResource CardBorder}">
           <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleText}" Text="Autostart" Margin="0" />
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_Autostart, Source={StaticResource Loc}}" Margin="0" />
             <CheckBox Margin="0,10,0,0"
                       IsChecked="{Binding AutostartEnabled}"
-                      Content="Beim Anmelden starten" />
+                      Content="{Binding UI_StartOnLogin, Source={StaticResource Loc}}" />
             <TextBlock Margin="0,10,0,0"
                        Style="{StaticResource MutedText}"
-                       Text="Ein Shortcut im Autostart-Ordner sorgt dafür, dass die Anwendung bei jeder Anmeldung im Hintergrund gestartet wird."
+                       Text="{Binding UI_AutostartDescription, Source={StaticResource Loc}}"
                        TextWrapping="Wrap" />
           </StackPanel>
         </Border>
 
         <Border Margin="0,18,0,0" Style="{StaticResource CardBorder}">
           <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleText}" Text="Immich" />
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_Immich, Source={StaticResource Loc}}" />
 
             <Grid>
               <Grid.ColumnDefinitions>
@@ -159,7 +159,7 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
-              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Server API URL" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_ServerApiUrl, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="0"
                        Grid.Column="1"
                        Margin="0,0,12,12"
@@ -167,7 +167,7 @@
                        services:WatermarkBehavior.Watermark="https://immich.example.com/api" />
               <controls:StatusPill Grid.Row="0" Grid.Column="2" Margin="0,0,0,12" VerticalAlignment="Center" Text="{Binding ImmichUrlStatusText}" Tone="{Binding ImmichUrlStatusTone}" />
 
-              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="API Key" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_ApiKey, Source={StaticResource Loc}}" />
               <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,12,12">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
@@ -196,8 +196,8 @@
               </Grid>
               <controls:StatusPill Grid.Row="1" Grid.Column="2" Margin="0,0,0,12" VerticalAlignment="Center" Text="{Binding ImmichApiKeyStatusText}" Tone="{Binding ImmichApiKeyStatusTone}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Permissions" />
-              <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,12,12" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="Checks the permissions needed for uploads and optional album placement." TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_Permissions, Source={StaticResource Loc}}" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,12,12" Style="{StaticResource MutedText}" VerticalAlignment="Center" Text="{Binding UI_PermissionsDescription, Source={StaticResource Loc}}" TextWrapping="Wrap" />
               <controls:StatusPill Grid.Row="2" Grid.Column="2" Margin="0,0,0,12" VerticalAlignment="Center" Text="{Binding ImmichPermissionsStatusText}" Tone="{Binding ImmichPermissionsStatusTone}" />
 
               <ItemsControl Grid.Row="3"
@@ -247,7 +247,7 @@
                       Style="{StaticResource SecondaryButton}"
                       HorizontalAlignment="Left"
                       Click="VerifyImmichButton_Click"
-                      Content="Verify Immich Access" />
+                      Content="{Binding UI_VerifyImmichAccess, Source={StaticResource Loc}}" />
             </Grid>
           </StackPanel>
         </Border>
@@ -259,8 +259,8 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <TextBlock Grid.Column="0" Style="{StaticResource SectionTitleText}" Text="Watch Sources" Margin="0" />
-              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="AddSourceButton_Click" Content="Add Source" />
+              <TextBlock Grid.Column="0" Style="{StaticResource SectionTitleText}" Text="{Binding UI_WatchSources, Source={StaticResource Loc}}" Margin="0" />
+              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="AddSourceButton_Click" Content="{Binding UI_AddSource, Source={StaticResource Loc}}" />
             </Grid>
 
             <ItemsControl ItemsSource="{Binding Sources}">
@@ -278,13 +278,13 @@
                         <TextBlock Grid.Column="0"
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold"
-                                   Text="Watch Source" />
+                                   Text="{Binding UI_WatchSource, Source={StaticResource Loc}}" />
                         <Button Grid.Column="1"
                                 Margin="10,0,0,0"
                                 Style="{StaticResource SecondaryButton}"
                                 HorizontalAlignment="Right"
                                 Click="RemoveSourceButton_Click"
-                                Content="Remove" />
+                                Content="{Binding UI_Remove, Source={StaticResource Loc}}" />
                       </Grid>
 
                       <Grid Margin="0,10,0,0">
@@ -296,23 +296,23 @@
                           <RowDefinition Height="Auto" />
                           <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,5,0" Text="Folder Path" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Margin="5,0,0,0" Text="Immich Album Name" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,5,0" Text="{Binding UI_FolderPath, Source={StaticResource Loc}}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Margin="5,0,0,0" Text="{Binding UI_ImmichAlbumName, Source={StaticResource Loc}}" />
                         <TextBox Grid.Row="1" Grid.Column="0" Margin="0,6,5,0" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" services:WatermarkBehavior.Watermark="C:\Users\...\Pictures\Screenshots" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Margin="5,6,0,0" Text="{Binding AlbumName, UpdateSourceTrigger=PropertyChanged}" services:WatermarkBehavior.Watermark="Leave empty for no album" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="5,6,0,0" Text="{Binding AlbumName, UpdateSourceTrigger=PropertyChanged}" services:WatermarkBehavior.Watermark="{Binding UI_AlbumNameWatermark, Source={StaticResource Loc}}" />
                       </Grid>
 
                       <Expander Margin="0,10,0,0" IsExpanded="{Binding ShowAdvancedOptions}">
                         <Expander.Header>
-                          <TextBlock FontWeight="SemiBold" Text="Advanced Watch Options" />
+                          <TextBlock FontWeight="SemiBold" Text="{Binding UI_AdvancedWatchOptions, Source={StaticResource Loc}}" />
                         </Expander.Header>
 
                         <StackPanel Margin="0,12,0,0">
                           <CheckBox IsChecked="{Binding IncludeSubdirectories}"
-                                    Content="Include subdirectories" />
+                                    Content="{Binding UI_IncludeSubdirectories, Source={StaticResource Loc}}" />
 
                           <StackPanel Margin="0,10,0,0">
-                            <TextBlock Text="Extensions" />
+                            <TextBlock Text="{Binding UI_Extensions, Source={StaticResource Loc}}" />
                             <TextBox Margin="0,6,0,0"
                                      Height="120"
                                      AcceptsReturn="True"
@@ -324,7 +324,7 @@
 
                           <StackPanel Margin="0,10,0,0"
                                       Visibility="{Binding ShowExcludeDirectories, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Excluded Directories" />
+                            <TextBlock Text="{Binding UI_ExcludedDirectories, Source={StaticResource Loc}}" />
                             <TextBox Margin="0,6,0,0"
                                      Height="120"
                                      AcceptsReturn="True"
@@ -335,7 +335,7 @@
                           </StackPanel>
 
                           <StackPanel Margin="0,10,0,0">
-                            <TextBlock Text="Excluded File Names" />
+                            <TextBlock Text="{Binding UI_ExcludedFileNames, Source={StaticResource Loc}}" />
                             <TextBox Margin="0,6,0,0"
                                      Height="96"
                                      AcceptsReturn="True"
@@ -356,7 +356,7 @@
 
         <Border Margin="0,18,0,0" Style="{StaticResource CardBorder}">
           <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleText}" Text="Watch Behavior" />
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_WatchBehavior, Source={StaticResource Loc}}" />
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
@@ -368,16 +368,16 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
-              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Batch Interval Seconds" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_BatchIntervalSeconds, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,12" Text="{Binding BatchIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" />
 
-              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Max Batch Size" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_MaxBatchSize, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,12" Text="{Binding MaxBatchSize, UpdateSourceTrigger=PropertyChanged}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="File Ready Timeout Seconds" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_FileReadyTimeoutSeconds, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,12" Text="{Binding FileReadyTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
 
-              <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center" Text="Retry Max Attempts" />
+              <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center" Text="{Binding UI_RetryMaxAttempts, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RetryMaxAttempts, UpdateSourceTrigger=PropertyChanged}" />
             </Grid>
           </StackPanel>
@@ -385,7 +385,7 @@
 
         <Border Margin="0,18,0,0" Style="{StaticResource CardBorder}">
           <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitleText}" Text="Logging And Retry" />
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_LoggingAndRetry, Source={StaticResource Loc}}" />
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
@@ -399,10 +399,10 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
-              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Retry Base Delay (ms)" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_RetryBaseDelayMs, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,12" Text="{Binding RetryBaseDelayMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
 
-              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Log Level" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_LogLevel, Source={StaticResource Loc}}" />
               <ComboBox Grid.Row="1"
                         Grid.Column="1"
                         Grid.ColumnSpan="2"
@@ -410,7 +410,7 @@
                         ItemsSource="{Binding AvailableLogLevels}"
                         SelectedItem="{Binding LoggingLevel}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="Log Directory" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_LogDirectory, Source={StaticResource Loc}}" />
               <TextBox Grid.Row="2"
                        Grid.Column="1"
                        Margin="0,0,12,12"
@@ -421,14 +421,35 @@
                       Margin="0,0,0,12"
                       Style="{StaticResource SecondaryButton}"
                       Click="UseDefaultLogDirectoryButton_Click"
-                      Content="Use Default" />
+                      Content="{Binding UI_UseDefault, Source={StaticResource Loc}}" />
 
               <TextBlock Grid.Row="3"
                          Grid.Column="1"
                          Grid.ColumnSpan="2"
                          Style="{StaticResource MutedText}"
-                         Text="Log Directory must be configured as an absolute path."
+                         Text="{Binding UI_LogDirectoryHint, Source={StaticResource Loc}}"
                          TextWrapping="Wrap" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <Border Margin="0,18,0,0" Style="{StaticResource CardBorder}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{Binding UI_Appearance, Source={StaticResource Loc}}" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center" Text="{Binding UI_Language, Source={StaticResource Loc}}" />
+              <ComboBox Grid.Row="0"
+                        Grid.Column="1"
+                        ItemsSource="{Binding AvailableLanguages}"
+                        SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                        DisplayMemberPath="DisplayName" />
             </Grid>
           </StackPanel>
         </Border>
@@ -452,7 +473,7 @@
                 Grid.Column="0"
                 Style="{StaticResource SecondaryButton}"
                 Click="OpenLogsButton_Click"
-                Content="Open Logs" />
+                Content="{Binding UI_OpenLogs, Source={StaticResource Loc}}" />
         <Button Grid.Row="0"
                 Grid.Column="1"
                 Margin="12,0,0,0"

@@ -61,6 +61,9 @@ retry:
 logging:
   level: "Information"
   logDirectory: "C:\\Users\\<user>\\AppData\\Local\\Immich Folder Watch\\logs"
+
+localization:
+  language: "auto" # auto | en | de
 ```
 
 ## Required Fields
@@ -88,3 +91,4 @@ logging:
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
 - Existing relative `logging.logDirectory` values still run after normalization, but the Windows GUI rewrites them to an absolute path on the next successful save.
+- `localization.language` selects the GUI language. `auto` picks German when the Windows UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through the **Appearance → Language** dropdown, which writes the selected value back to this field on the next save.

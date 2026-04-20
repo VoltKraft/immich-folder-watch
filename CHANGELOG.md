@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-04-20
+
+This release adds full UI localization. The app ships with English as the neutral
+fallback and a complete German translation; the active language is detected from
+the operating system by default, can be pinned in the config file, and can be
+changed at runtime through a new dropdown in the GUI without restarting.
+
+### Added
+- .resx-backed localization (`Strings.resx` neutral/English, `Strings.de.resx`
+  German) covering every tray menu entry, window label, watermark, status badge,
+  tooltip, permission display name, and operation message.
+- `LocalizationService` (singleton) that resolves `auto`/`en`/`de` to a
+  `CultureInfo`, applies it to the thread and default thread cultures as well as
+  `Strings.Culture`, and raises `LanguageChanged` on switch.
+- `LocalizationProxy` (`INotifyPropertyChanged`) registered in `App.xaml` as
+  `{StaticResource Loc}`; broadcasts `PropertyChanged(string.Empty)` on language
+  change so every XAML binding refreshes immediately without reopening the
+  window.
+- New **Appearance → Language** dropdown in the GUI with three entries
+  (`Auto (system default)`, `English`, `Deutsch`); the selection is persisted
+  on the next Save.
+- New YAML setting `localization.language` (`auto` | `en` | `de`). Missing,
+  blank, or unknown values normalize to `auto`.
+
+### Changed
+- Tooltip composition moved from `SyncStatusProvider` (Core) to
+  `TrayIconHost` (App) so it can read localized strings; Core no longer depends
+  on App resources and `SyncStatusProvider.TooltipText` was removed.
+- `MainWindowViewModel` now takes a `LocalizationService`, subscribes to
+  `LanguageChanged`, and rebuilds all `Strings.*`-backed fields — including the
+  permission status list — on language change.
+- All previously hardcoded German or English UI literals in `MainWindow.xaml`,
+  `MainWindow.xaml.cs`, `TrayIconHost.cs`, and `MainWindowViewModel.cs` now pull
+  from `Strings.*` (English stays as the neutral fallback).
+
 ## [2.0.0] - 2026-04-20
 
 This release replaces the Windows service model with a tray-based desktop application

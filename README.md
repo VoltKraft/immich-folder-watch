@@ -5,7 +5,7 @@
 # Immich Folder Watch
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-2.0.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.1.0-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a Windows desktop app that watches local folders and uploads newly created media to Immich automatically.
@@ -53,6 +53,7 @@ It is intentionally not a two-way sync client. It does not mirror deletions, doe
 - Runs as a per-user tray app with live sync status
 - Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
+- Localized UI (English, German) with OS auto-detect and live in-app language switching
 
 ---
 

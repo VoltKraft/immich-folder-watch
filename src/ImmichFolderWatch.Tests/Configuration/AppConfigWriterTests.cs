@@ -66,6 +66,10 @@ public sealed class AppConfigWriterTests
                     Level = "Warning",
                     LogDirectory = logDirectory,
                 },
+                Localization = new LocalizationSettings
+                {
+                    Language = "de",
+                },
             };
 
             var writer = new AppConfigWriter();
@@ -91,10 +95,28 @@ public sealed class AppConfigWriterTests
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "watch")), normalized.Watch.Sources[0].Path);
             Assert.Equal([".png", ".jpg"], normalized.Watch.Sources[0].Extensions);
             Assert.Equal(Path.GetFullPath(logDirectory), normalized.Logging.LogDirectory);
+            Assert.Equal("de", roundTrip.Localization.Language);
+            Assert.Contains("language: de", yaml, StringComparison.Ordinal);
         }
         finally
         {
             tempRoot.Delete(recursive: true);
         }
+    }
+
+    [Fact]
+    public void Serialize_MissingLocalization_EmitsAutoDefault()
+    {
+        var config = new AppConfig
+        {
+            Immich = new ImmichSettings { ServerApiUrl = "https://x", ApiKey = "k" },
+            Watch = new WatchSettings(),
+            Retry = new RetrySettings(),
+            Logging = new LoggingSettings { Level = "Information", LogDirectory = "logs" },
+        };
+
+        var yaml = new AppConfigWriter().Serialize(config);
+
+        Assert.Contains("language: auto", yaml, StringComparison.Ordinal);
     }
 }

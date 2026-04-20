@@ -34,7 +34,7 @@ public sealed class MainWindowViewModelTests
 
     private static MainWindowViewModel CreateViewModel()
     {
-        return new MainWindowViewModel(new SyncStatusProvider(), new AutostartManager());
+        return new MainWindowViewModel(new SyncStatusProvider(), new AutostartManager(), LocalizationService.Instance);
     }
 
     [Fact]

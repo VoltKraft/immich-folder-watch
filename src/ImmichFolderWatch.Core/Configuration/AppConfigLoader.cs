@@ -57,6 +57,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
         config.Watch ??= new WatchSettings();
         config.Retry ??= new RetrySettings();
         config.Logging ??= new LoggingSettings();
+        config.Localization ??= new LocalizationSettings();
         config.Watch.Sources ??= new List<WatchSourceSettings>();
         config.Watch.Extensions ??= new List<string>();
 
@@ -96,6 +97,10 @@ public sealed class AppConfigLoader : IAppConfigLoader
                 Level = config.Logging.Level,
                 LogDirectory = config.Logging.LogDirectory,
             },
+            Localization = new LocalizationSettings
+            {
+                Language = config.Localization.Language,
+            },
         };
     }
 
@@ -105,6 +110,12 @@ public sealed class AppConfigLoader : IAppConfigLoader
         config.Watch ??= new WatchSettings();
         config.Retry ??= new RetrySettings();
         config.Logging ??= new LoggingSettings();
+        config.Localization ??= new LocalizationSettings();
+        config.Localization.Language = (config.Localization.Language ?? "auto").Trim();
+        if (string.IsNullOrWhiteSpace(config.Localization.Language))
+        {
+            config.Localization.Language = "auto";
+        }
 
         config.Immich.ServerApiUrl = (config.Immich.ServerApiUrl ?? string.Empty).Trim();
         config.Immich.ApiKey = (config.Immich.ApiKey ?? string.Empty).Trim();

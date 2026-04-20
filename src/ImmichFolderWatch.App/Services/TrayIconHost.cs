@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using ImmichFolderWatch.App.Resources;
 using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.App.Services;
@@ -41,6 +42,7 @@ public sealed class TrayIconHost : IDisposable
     private static readonly Guid IconGuid = new("27A1B1E9-6CD6-4F69-8B69-1D0C41E45C7E");
 
     private readonly SyncStatusProvider _syncStatusProvider;
+    private readonly LocalizationService _localizationService;
     private readonly HwndSource _messageWindow;
     private readonly IntPtr _hIcon;
     private readonly Guid _iconGuid;
@@ -51,10 +53,11 @@ public sealed class TrayIconHost : IDisposable
     public event Action? RestartRequested;
     public event Action? QuitRequested;
 
-    public TrayIconHost(SyncStatusProvider syncStatusProvider, ThemeWatcher themeWatcher)
+    public TrayIconHost(SyncStatusProvider syncStatusProvider, ThemeWatcher themeWatcher, LocalizationService localizationService)
     {
         ArgumentNullException.ThrowIfNull(themeWatcher);
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _iconGuid = IconGuid;
 
         TryEnableDarkMenus();
@@ -74,6 +77,7 @@ public sealed class TrayIconHost : IDisposable
 
         AddTrayIcon();
         _syncStatusProvider.PropertyChanged += OnSyncStatusProviderPropertyChanged;
+        _localizationService.LanguageChanged += OnLanguageChanged;
     }
 
     public void Dispose()
@@ -85,6 +89,7 @@ public sealed class TrayIconHost : IDisposable
 
         _disposed = true;
         _syncStatusProvider.PropertyChanged -= OnSyncStatusProviderPropertyChanged;
+        _localizationService.LanguageChanged -= OnLanguageChanged;
 
         if (_added)
         {
@@ -108,7 +113,7 @@ public sealed class TrayIconHost : IDisposable
         data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         data.uCallbackMessage = WM_TRAYICON;
         data.hIcon = _hIcon;
-        data.szTip = TrimTooltip(_syncStatusProvider.TooltipText);
+        data.szTip = TrimTooltip(ComposeTooltip());
 
         if (!Shell_NotifyIconW(NIM_ADD, ref data))
         {
@@ -175,11 +180,11 @@ public sealed class TrayIconHost : IDisposable
 
         try
         {
-            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdOpen, "GUI öffnen");
+            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdOpen, Strings.Tray_Open);
             AppendMenuW(menu, MF_SEPARATOR, IntPtr.Zero, string.Empty);
-            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdRestart, "Neustart");
+            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdRestart, Strings.Tray_Restart);
             AppendMenuW(menu, MF_SEPARATOR, IntPtr.Zero, string.Empty);
-            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdQuit, "Beenden");
+            AppendMenuW(menu, MF_STRING, (IntPtr)MenuIdQuit, Strings.Tray_Quit);
 
             SetForegroundWindow(_messageWindow.Handle);
 
@@ -212,12 +217,29 @@ public sealed class TrayIconHost : IDisposable
 
     private void OnSyncStatusProviderPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (!string.Equals(e.PropertyName, nameof(SyncStatusProvider.TooltipText), StringComparison.Ordinal))
+        if (!IsTooltipProperty(e.PropertyName))
         {
             return;
         }
 
-        var tooltip = TrimTooltip(_syncStatusProvider.TooltipText);
+        RefreshTooltip();
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        RefreshTooltip();
+    }
+
+    private static bool IsTooltipProperty(string? propertyName)
+    {
+        return propertyName is nameof(SyncStatusProvider.ServerConnection)
+            or nameof(SyncStatusProvider.LastSyncCompletedUtc)
+            or nameof(SyncStatusProvider.PendingCount);
+    }
+
+    private void RefreshTooltip()
+    {
+        var tooltip = TrimTooltip(ComposeTooltip());
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null)
         {
@@ -232,6 +254,24 @@ public sealed class TrayIconHost : IDisposable
                 UpdateTooltip(tooltip);
             }
         }));
+    }
+
+    private string ComposeTooltip()
+    {
+        var server = _syncStatusProvider.ServerConnection switch
+        {
+            ServerConnectionState.Ok => Strings.Server_Ok,
+            ServerConnectionState.Error => Strings.Server_Error,
+            ServerConnectionState.Checking => Strings.Server_Checking,
+            _ => Strings.Server_Unknown,
+        };
+
+        var lastSync = _syncStatusProvider.LastSyncCompletedUtc.HasValue
+            ? _syncStatusProvider.LastSyncCompletedUtc.Value.ToLocalTime().ToString("HH:mm", _localizationService.CurrentCulture)
+            : "—";
+
+        var culture = _localizationService.CurrentCulture;
+        return string.Create(culture, $"Immich Folder Watch\n{Strings.UI_ServerConnection}: {server}\n{Strings.Tooltip_LastSync}: {lastSync}\n{Strings.Tooltip_Queue}: {_syncStatusProvider.PendingCount}");
     }
 
     private void UpdateTooltip(string tooltip)

@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot,
-    [string]$Version = "2.0.0",
+    [string]$Version,
     [switch]$FrameworkDependent
 )
 
@@ -73,6 +73,26 @@ function Get-InstallerVersion {
     throw "Installer version must start with a numeric major.minor.patch value. Example: 1.1.0"
 }
 
+function Get-RepoVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $propsPath = Join-Path $RepoRoot "Directory.Build.props"
+    if (-not (Test-Path -LiteralPath $propsPath)) {
+        throw "Directory.Build.props not found at $propsPath."
+    }
+
+    [xml]$props = Get-Content -LiteralPath $propsPath
+    $node = $props.SelectSingleNode("//Version")
+    if ($null -eq $node -or [string]::IsNullOrWhiteSpace($node.InnerText)) {
+        throw "No <Version> element found in $propsPath."
+    }
+
+    return $node.InnerText.Trim()
+}
+
 function Get-InstallerPlatform {
     param(
         [Parameter(Mandatory = $true)]
@@ -100,6 +120,12 @@ $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 Initialize-DotnetEnvironment -CacheRoot (Join-Path $localAppData "ImmichFolderWatch")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\.."))
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Get-RepoVersion -RepoRoot $repoRoot
+    Write-Host "Using version $Version from Directory.Build.props"
+}
+
 $appProject = Join-Path $repoRoot "src\ImmichFolderWatch.App\ImmichFolderWatch.App.csproj"
 $wixProject = Join-Path $scriptRoot "ImmichFolderWatch.Setup.wixproj"
 $brandingIconPath = Join-Path $repoRoot "artifacts\branding\windows\app.ico"
