@@ -323,6 +323,7 @@
 
                         <StackPanel Margin="0,12,0,0">
                           <CheckBox IsChecked="{Binding IncludeSubdirectories}"
+                                    Visibility="{Binding ShowIncludeSubdirectories, Converter={StaticResource BoolToVis}}"
                                     Content="{Binding UI_IncludeSubdirectories, Source={StaticResource Loc}}" />
 
                           <StackPanel Margin="0,10,0,0">

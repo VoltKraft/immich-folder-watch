@@ -51,6 +51,8 @@ public sealed partial class App : Application
         _mainWindow.Closing += MainWindow_Closing;
         MainWindow = _mainWindow;
 
+        SessionEnding += OnSessionEnding;
+
         _trayIconHost = new TrayIconHost(_syncStatusProvider, _themeWatcher, _localizationService);
         _trayIconHost.OpenGuiRequested += ShowMainWindow;
         _trayIconHost.RestartRequested += () => _ = RestartSyncAsync();
@@ -187,6 +189,11 @@ public sealed partial class App : Application
 
         e.Cancel = true;
         _mainWindow?.Hide();
+    }
+
+    private void OnSessionEnding(object? sender, SessionEndingCancelEventArgs e)
+    {
+        _ = QuitAsync();
     }
 
     private static bool IsFirstRun()

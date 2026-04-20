@@ -28,4 +28,8 @@ internal static class ImmichApiRoutes
     {
         return $"assets/{assetId}/original";
     }
+
+    public const string SearchMetadata = "search/metadata";
+
+    public const string AssetsBulk = "assets";
 }

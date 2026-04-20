@@ -62,6 +62,9 @@
   <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Currently no upload.</value></data>
   <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Last checked: {0}</value></data>
   <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
+  <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
+  <data name="Status_DownloadingPrefix" xml:space="preserve"><value>Download: {0}</value></data>
+  <data name="Status_PullProgressFormat" xml:space="preserve"><value>Pull: {0}/{1}</value></data>
 
   <data name="Server_Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="Server_Error" xml:space="preserve"><value>Error</value></data>
@@ -129,6 +132,9 @@
   <data name="Permission_AlbumCreate" xml:space="preserve"><value>Album Create</value></data>
   <data name="Permission_AddAssetToAlbum" xml:space="preserve"><value>Add Asset To Album</value></data>
   <data name="Permission_AssetDownload" xml:space="preserve"><value>Asset Download</value></data>
+  <data name="Permission_AssetRead" xml:space="preserve"><value>Asset Read</value></data>
+  <data name="Permission_AssetDelete" xml:space="preserve"><value>Asset Delete</value></data>
+  <data name="Permission_RemoveAssetFromAlbum" xml:space="preserve"><value>Remove Asset From Album</value></data>
 
   <data name="Check_Ok" xml:space="preserve"><value>OK</value></data>
   <data name="Check_Warning" xml:space="preserve"><value>Warning</value></data>

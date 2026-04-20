@@ -19,6 +19,9 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     private string? _currentlyUploadingFile;
     private int _uploadedInCurrentBatch;
     private int _currentBatchSize;
+    private string? _currentlyDownloadingFile;
+    private int _downloadedInCurrentPull;
+    private int _currentPullSize;
     private int _pendingCount;
     private ServerConnectionState _serverConnection = ServerConnectionState.Unknown;
     private string? _lastErrorMessage;
@@ -48,6 +51,24 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         get => _currentBatchSize;
         private set => SetField(ref _currentBatchSize, value);
+    }
+
+    public string? CurrentlyDownloadingFile
+    {
+        get => _currentlyDownloadingFile;
+        private set => SetField(ref _currentlyDownloadingFile, value);
+    }
+
+    public int DownloadedInCurrentPull
+    {
+        get => _downloadedInCurrentPull;
+        private set => SetField(ref _downloadedInCurrentPull, value);
+    }
+
+    public int CurrentPullSize
+    {
+        get => _currentPullSize;
+        private set => SetField(ref _currentPullSize, value);
     }
 
     public int PendingCount
@@ -115,6 +136,50 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
             CurrentBatchSize = 0;
             UploadedInCurrentBatch = 0;
             CurrentlyUploadingFile = null;
+        }
+    }
+
+    public void ReportPullStarted(int pullSize)
+    {
+        lock (_gate)
+        {
+            CurrentPullSize = pullSize;
+            DownloadedInCurrentPull = 0;
+            LastErrorMessage = null;
+        }
+    }
+
+    public void ReportDownloadStarted(string filePath)
+    {
+        CurrentlyDownloadingFile = filePath;
+    }
+
+    public void ReportDownloadCompleted(string filePath)
+    {
+        lock (_gate)
+        {
+            DownloadedInCurrentPull++;
+            CurrentlyDownloadingFile = null;
+            LastSyncCompletedUtc = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void ReportDownloadFailed(string filePath, string? errorMessage)
+    {
+        lock (_gate)
+        {
+            CurrentlyDownloadingFile = null;
+            LastErrorMessage = errorMessage;
+        }
+    }
+
+    public void ReportPullCompleted()
+    {
+        lock (_gate)
+        {
+            CurrentPullSize = 0;
+            DownloadedInCurrentPull = 0;
+            CurrentlyDownloadingFile = null;
         }
     }
 

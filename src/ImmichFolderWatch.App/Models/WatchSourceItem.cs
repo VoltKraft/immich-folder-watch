@@ -80,10 +80,21 @@ public sealed class WatchSourceItem : BindableBase
     public string SyncMode
     {
         get => _syncMode;
-        set => SetProperty(ref _syncMode, WatchSourceSyncModes.Normalize(value));
+        set
+        {
+            if (SetProperty(ref _syncMode, WatchSourceSyncModes.Normalize(value)))
+            {
+                RaisePropertyChanged(nameof(ShowIncludeSubdirectories));
+                RaisePropertyChanged(nameof(ShowExcludeDirectories));
+            }
+        }
     }
 
-    public bool ShowExcludeDirectories => IncludeSubdirectories;
+    public bool ShowIncludeSubdirectories =>
+        !string.Equals(_syncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal);
+
+    public bool ShowExcludeDirectories =>
+        ShowIncludeSubdirectories && IncludeSubdirectories;
 
     private void TrySuggestAlbumNameFromPath()
     {

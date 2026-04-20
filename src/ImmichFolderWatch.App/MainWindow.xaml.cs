@@ -123,11 +123,11 @@ public sealed partial class MainWindow : Window
         await RunImmichAccessCheckAsync(updateOperationMessage: false);
     }
 
-    private void LoadConfigFromDisk(string configPath)
+    private void LoadConfigFromDisk(string configPath, bool resetImmichCheckStatus = true)
     {
         if (!File.Exists(configPath))
         {
-            ViewModel.Load(CreateDefaultConfig());
+            ViewModel.Load(CreateDefaultConfig(), resetImmichCheckStatus);
             return;
         }
 
@@ -135,11 +135,11 @@ public sealed partial class MainWindow : Window
         {
             var config = _configLoader.LoadForEditing(configPath);
             NormalizeLogDirectoryForEditing(config, configPath);
-            ViewModel.Load(config);
+            ViewModel.Load(config, resetImmichCheckStatus);
         }
         catch (Exception ex)
         {
-            ViewModel.Load(CreateDefaultConfig());
+            ViewModel.Load(CreateDefaultConfig(), resetImmichCheckStatus);
             ViewModel.OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_ConfigLoadFailedFormat, ex.Message);
         }
     }
@@ -395,7 +395,7 @@ public sealed partial class MainWindow : Window
 
             await _appHost.RestartAsync(draftConfig);
 
-            LoadConfigFromDisk(configPath);
+            LoadConfigFromDisk(configPath, resetImmichCheckStatus: false);
             ViewModel.OperationMessage = Strings.Op_SavedApplied;
         }
         catch (Exception ex)

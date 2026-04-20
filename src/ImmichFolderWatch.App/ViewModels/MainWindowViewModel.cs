@@ -16,25 +16,71 @@ public sealed class MainWindowViewModel : BindableBase
 {
     private static readonly string[] DefaultImageExtensions =
     {
+        ".3fr",
+        ".3gp",
+        ".3gpp",
+        ".ari",
+        ".arw",
+        ".avi",
         ".avif",
         ".bmp",
+        ".cap",
+        ".cin",
+        ".cr2",
+        ".cr3",
+        ".crw",
+        ".dcr",
+        ".dng",
+        ".erf",
+        ".fff",
+        ".flv",
         ".gif",
         ".heic",
         ".heif",
+        ".hif",
+        ".iiq",
+        ".insp",
+        ".insv",
         ".jp2",
         ".jpe",
         ".jpeg",
         ".jpg",
-        ".insp",
         ".jxl",
+        ".k25",
+        ".kdc",
+        ".m2t",
+        ".m2ts",
+        ".m4v",
+        ".mkv",
+        ".mov",
+        ".mp4",
+        ".mpe",
+        ".mpeg",
+        ".mpg",
+        ".mrw",
+        ".mts",
+        ".nef",
+        ".nrw",
+        ".orf",
+        ".ori",
+        ".pef",
         ".png",
         ".psd",
+        ".raf",
         ".raw",
         ".rw2",
+        ".rwl",
+        ".sr2",
+        ".srf",
+        ".srw",
         ".svg",
         ".tif",
         ".tiff",
+        ".vob",
+        ".webm",
         ".webp",
+        ".wmv",
+        ".x3f",
     };
 
     private readonly SyncStatusProvider _syncStatusProvider;
@@ -413,7 +459,7 @@ public sealed class MainWindowViewModel : BindableBase
         Sources.Add(CreateDefaultSource());
     }
 
-    public void Load(AppConfig config)
+    public void Load(AppConfig config, bool resetImmichCheckStatus = true)
     {
         ArgumentNullException.ThrowIfNull(config);
 
@@ -449,7 +495,10 @@ public sealed class MainWindowViewModel : BindableBase
         }
 
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
-        ResetImmichCheckStatus();
+        if (resetImmichCheckStatus)
+        {
+            ResetImmichCheckStatus();
+        }
     }
 
     public void ToggleImmichApiKeyVisibility()
@@ -577,6 +626,9 @@ public sealed class MainWindowViewModel : BindableBase
                 new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.Checking, Message = checkingMessage },
                 new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.Checking, Message = checkingMessage },
                 new ImmichPermissionCheckResult { PermissionName = "asset.download", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "asset.read", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "asset.delete", State = CheckState.Checking, Message = checkingMessage },
+                new ImmichPermissionCheckResult { PermissionName = "albumAsset.delete", State = CheckState.Checking, Message = checkingMessage },
             }));
     }
 
@@ -720,18 +772,36 @@ public sealed class MainWindowViewModel : BindableBase
         if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyUploadingFile))
         {
             var fileName = Path.GetFileName(_syncStatusProvider.CurrentlyUploadingFile);
+            var prefixed = string.Format(_localizationService.CurrentCulture, Strings.Status_UploadingPrefix, fileName);
             if (_syncStatusProvider.CurrentBatchSize > 0)
             {
-                CurrentUploadText = $"{fileName} ({_syncStatusProvider.UploadedInCurrentBatch + 1}/{_syncStatusProvider.CurrentBatchSize})";
+                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.UploadedInCurrentBatch + 1}/{_syncStatusProvider.CurrentBatchSize})";
             }
             else
             {
-                CurrentUploadText = fileName;
+                CurrentUploadText = prefixed;
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyDownloadingFile))
+        {
+            var fileName = Path.GetFileName(_syncStatusProvider.CurrentlyDownloadingFile);
+            var prefixed = string.Format(_localizationService.CurrentCulture, Strings.Status_DownloadingPrefix, fileName);
+            if (_syncStatusProvider.CurrentPullSize > 0)
+            {
+                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.DownloadedInCurrentPull + 1}/{_syncStatusProvider.CurrentPullSize})";
+            }
+            else
+            {
+                CurrentUploadText = prefixed;
             }
         }
         else if (_syncStatusProvider.CurrentBatchSize > 0)
         {
             CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_BatchProgressFormat, _syncStatusProvider.UploadedInCurrentBatch, _syncStatusProvider.CurrentBatchSize);
+        }
+        else if (_syncStatusProvider.CurrentPullSize > 0)
+        {
+            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_PullProgressFormat, _syncStatusProvider.DownloadedInCurrentPull, _syncStatusProvider.CurrentPullSize);
         }
         else
         {
@@ -746,7 +816,9 @@ public sealed class MainWindowViewModel : BindableBase
             SyncStatusBadgeTone = StatusTone.Error;
         }
         else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyUploadingFile)
-                 || _syncStatusProvider.CurrentBatchSize > 0)
+                 || _syncStatusProvider.CurrentBatchSize > 0
+                 || !string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyDownloadingFile)
+                 || _syncStatusProvider.CurrentPullSize > 0)
         {
             SyncStatusBadgeText = Strings.Status_SyncRunning;
             SyncStatusBadgeTone = StatusTone.Info;
@@ -814,6 +886,9 @@ public sealed class MainWindowViewModel : BindableBase
                 new ImmichPermissionCheckResult { PermissionName = "album.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
                 new ImmichPermissionCheckResult { PermissionName = "albumAsset.create", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
                 new ImmichPermissionCheckResult { PermissionName = "asset.download", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "asset.read", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "asset.delete", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
+                new ImmichPermissionCheckResult { PermissionName = "albumAsset.delete", State = CheckState.NotChecked, Message = Strings.Check_NotCheckedYet },
             }));
     }
 
@@ -865,6 +940,9 @@ public sealed class MainWindowViewModel : BindableBase
             "album.create" => Strings.Permission_AlbumCreate,
             "albumAsset.create" => Strings.Permission_AddAssetToAlbum,
             "asset.download" => Strings.Permission_AssetDownload,
+            "asset.read" => Strings.Permission_AssetRead,
+            "asset.delete" => Strings.Permission_AssetDelete,
+            "albumAsset.delete" => Strings.Permission_RemoveAssetFromAlbum,
             _ => permissionName,
         };
     }

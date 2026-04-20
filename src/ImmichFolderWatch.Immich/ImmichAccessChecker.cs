@@ -18,10 +18,10 @@ public sealed class ImmichAccessChecker
 
     public Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, CancellationToken cancellationToken)
     {
-        return CheckAsync(requireAlbumPermissions, requireDownloadPermissions: false, cancellationToken);
+        return CheckAsync(requireAlbumPermissions, requireSyncPermissions: false, cancellationToken);
     }
 
-    public async Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, bool requireDownloadPermissions, CancellationToken cancellationToken)
+    public async Task<ImmichAccessCheckResult> CheckAsync(bool requireAlbumPermissions, bool requireSyncPermissions, CancellationToken cancellationToken)
     {
         var urlProbe = await ProbeUrlAsync(cancellationToken);
         if (urlProbe.Decision != ProbeDecision.Passed)
@@ -34,7 +34,7 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = "Not checked because the URL could not be verified.",
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the URL could not be verified.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified.", requireAlbumPermissions, requireDownloadPermissions),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the URL could not be verified.", requireAlbumPermissions, requireSyncPermissions),
             };
         }
 
@@ -49,7 +49,7 @@ public sealed class ImmichAccessChecker
                 ApiKeyMessage = apiKeyProbe.Message,
                 PermissionsState = CheckState.NotChecked,
                 PermissionsMessage = "Not checked because the API key was not accepted.",
-                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted.", requireAlbumPermissions, requireDownloadPermissions),
+                PermissionResults = CreateNotCheckedPermissionResults("Not checked because the API key was not accepted.", requireAlbumPermissions, requireSyncPermissions),
             };
         }
 
@@ -59,7 +59,11 @@ public sealed class ImmichAccessChecker
             CreateAlbumReadPermissionResult(await ProbeAlbumReadPermissionAsync(cancellationToken), requireAlbumPermissions),
             CreateAlbumCreatePermissionResult(await ProbeAlbumCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
             CreateAlbumAssetCreatePermissionResult(await ProbeAlbumAssetCreatePermissionAsync(cancellationToken), requireAlbumPermissions),
-            CreateAssetDownloadPermissionResult(await ProbeAssetDownloadPermissionAsync(cancellationToken), requireDownloadPermissions),
+            CreateAssetDownloadPermissionResult(await ProbeAssetDownloadPermissionAsync(cancellationToken), requireSyncPermissions),
+            CreateAssetReadPermissionResult(await ProbeAssetReadPermissionAsync(cancellationToken), requireSyncPermissions),
+            CreateAssetDeletePermissionResult(await ProbeAssetDeletePermissionAsync(cancellationToken), requireSyncPermissions),
+            CreateAlbumAssetDeletePermissionResult(await ProbeAlbumAssetDeletePermissionAsync(cancellationToken), requireSyncPermissions),
+            CreateAlbumDeletePermissionResult(await ProbeAlbumDeletePermissionAsync(cancellationToken), requireSyncPermissions),
         };
 
         return new ImmichAccessCheckResult
@@ -68,8 +72,8 @@ public sealed class ImmichAccessChecker
             UrlMessage = urlProbe.Message,
             ApiKeyState = CheckState.Passed,
             ApiKeyMessage = apiKeyProbe.Message,
-            PermissionsState = DeterminePermissionsOverallState(permissionResults, requireAlbumPermissions || requireDownloadPermissions),
-            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults, requireAlbumPermissions || requireDownloadPermissions),
+            PermissionsState = DeterminePermissionsOverallState(permissionResults, requireAlbumPermissions || requireSyncPermissions),
+            PermissionsMessage = DeterminePermissionsOverallMessage(permissionResults, requireAlbumPermissions || requireSyncPermissions),
             PermissionResults = permissionResults,
         };
     }
@@ -192,6 +196,73 @@ public sealed class ImmichAccessChecker
             successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
     }
 
+    private async Task<ProbeResult> ProbeAssetReadPermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(
+            () =>
+            {
+                var request = CreateRequest(HttpMethod.Post, ImmichApiRoutes.SearchMetadata);
+                request.Content = CreateJsonContent("{\"isNotInAlbum\":true,\"size\":1}");
+                return request;
+            },
+            cancellationToken);
+
+        return InterpretPermissionProbe(
+            probe,
+            "Read assets",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.Created, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.UnprocessableEntity]);
+    }
+
+    private async Task<ProbeResult> ProbeAssetDeletePermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(
+            () =>
+            {
+                var request = CreateRequest(HttpMethod.Delete, ImmichApiRoutes.AssetsBulk);
+                request.Content = CreateJsonContent("{\"ids\":[\"not-a-valid-id\"],\"force\":false}");
+                return request;
+            },
+            cancellationToken);
+
+        return InterpretPermissionProbe(
+            probe,
+            "Trash assets",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
+    }
+
+    private async Task<ProbeResult> ProbeAlbumDeletePermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(
+            () => CreateRequest(HttpMethod.Delete, ImmichApiRoutes.AlbumInfo(InvalidId)),
+            cancellationToken);
+
+        return InterpretPermissionProbe(
+            probe,
+            "Delete albums",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
+    }
+
+    private async Task<ProbeResult> ProbeAlbumAssetDeletePermissionAsync(CancellationToken cancellationToken)
+    {
+        var probe = await SendAsync(
+            () =>
+            {
+                var request = CreateRequest(HttpMethod.Delete, ImmichApiRoutes.AlbumAssets(InvalidId));
+                request.Content = CreateJsonContent("{\"ids\":[\"not-a-valid-id\"]}");
+                return request;
+            },
+            cancellationToken);
+
+        return InterpretPermissionProbe(
+            probe,
+            "Remove assets from albums",
+            routeUnavailableIsWarning: true,
+            successStatusCodes: [HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity]);
+    }
+
     private async Task<ProbeResult> ProbeAlbumAssetCreatePermissionAsync(CancellationToken cancellationToken)
     {
         var candidates = new[]
@@ -266,7 +337,7 @@ public sealed class ImmichAccessChecker
         return "Album-related permissions are optional until a source uses an album name.";
     }
 
-    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message, bool requireAlbumPermissions, bool requireDownloadPermissions)
+    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(string message, bool requireAlbumPermissions, bool requireSyncPermissions)
     {
         return new[]
         {
@@ -308,7 +379,39 @@ public sealed class ImmichAccessChecker
                 DisplayName = "Asset Download",
                 State = CheckState.NotChecked,
                 Message = message,
-                BlocksConfigVerification = requireDownloadPermissions,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "asset.read",
+                DisplayName = "Asset Read",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "asset.delete",
+                DisplayName = "Asset Delete",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "albumAsset.delete",
+                DisplayName = "Remove Asset From Album",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                PermissionName = "album.delete",
+                DisplayName = "Album Delete",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
             },
         };
     }
@@ -336,6 +439,26 @@ public sealed class ImmichAccessChecker
     private static ImmichPermissionCheckResult CreateAssetDownloadPermissionResult(ProbeResult probe, bool blocksConfigVerification)
     {
         return CreatePermissionResult("asset.download", "Asset Download", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAssetReadPermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("asset.read", "Asset Read", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAssetDeletePermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("asset.delete", "Asset Delete", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAlbumAssetDeletePermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("albumAsset.delete", "Remove Asset From Album", blocksConfigVerification, probe);
+    }
+
+    private static ImmichPermissionCheckResult CreateAlbumDeletePermissionResult(ProbeResult probe, bool blocksConfigVerification)
+    {
+        return CreatePermissionResult("album.delete", "Album Delete", blocksConfigVerification, probe);
     }
 
     private static ImmichPermissionCheckResult CreatePermissionResult(string permissionName, string displayName, bool blocksConfigVerification, ProbeResult probe)
