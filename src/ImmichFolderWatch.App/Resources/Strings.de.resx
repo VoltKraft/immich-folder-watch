@@ -62,6 +62,9 @@
   <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Aktuell kein Upload.</value></data>
   <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Zuletzt geprüft: {0}</value></data>
   <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
+  <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
+  <data name="Status_DownloadingPrefix" xml:space="preserve"><value>Download: {0}</value></data>
+  <data name="Status_PullProgressFormat" xml:space="preserve"><value>Pull: {0}/{1}</value></data>
 
   <data name="Server_Unknown" xml:space="preserve"><value>Unbekannt</value></data>
   <data name="Server_Error" xml:space="preserve"><value>Fehler</value></data>
@@ -115,11 +118,23 @@
   <data name="UI_OpenLogs" xml:space="preserve"><value>Protokolle öffnen</value></data>
   <data name="UI_Language" xml:space="preserve"><value>Sprache</value></data>
   <data name="UI_Appearance" xml:space="preserve"><value>Darstellung</value></data>
+  <data name="UI_SyncMode" xml:space="preserve"><value>Synchronisationsmodus</value></data>
+
+  <data name="SyncMode_UploadNew" xml:space="preserve"><value>Nur neue Dateien hochladen (Standard)</value></data>
+  <data name="SyncMode_UploadNew_Description" xml:space="preserve"><value>Nur Dateien, die während der Laufzeit neu in den Ordner kommen, werden hochgeladen. Bereits vorhandene Dateien werden ignoriert.</value></data>
+  <data name="SyncMode_UploadAll" xml:space="preserve"><value>Gesamten Ordnerinhalt hochladen</value></data>
+  <data name="SyncMode_UploadAll_Description" xml:space="preserve"><value>Lädt beim Start alle im Ordner vorhandenen Dateien hoch und danach auch alle neu hinzukommenden. Dateien werden nicht aus Immich heruntergeladen.</value></data>
+  <data name="SyncMode_Sync" xml:space="preserve"><value>Ordner mit Album synchronisieren (bidirektional)</value></data>
+  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Lädt lokale Dateien hoch, die im Album fehlen, und lädt Album-Assets herunter, die lokal fehlen. Löschungen werden nicht übernommen.</value></data>
 
   <data name="Permission_AssetUpload" xml:space="preserve"><value>Asset-Upload</value></data>
   <data name="Permission_AlbumRead" xml:space="preserve"><value>Album lesen</value></data>
   <data name="Permission_AlbumCreate" xml:space="preserve"><value>Album erstellen</value></data>
   <data name="Permission_AddAssetToAlbum" xml:space="preserve"><value>Asset zu Album hinzufügen</value></data>
+  <data name="Permission_AssetDownload" xml:space="preserve"><value>Asset-Download</value></data>
+  <data name="Permission_AssetRead" xml:space="preserve"><value>Assets lesen</value></data>
+  <data name="Permission_AssetDelete" xml:space="preserve"><value>Assets löschen</value></data>
+  <data name="Permission_RemoveAssetFromAlbum" xml:space="preserve"><value>Asset aus Album entfernen</value></data>
 
   <data name="Check_Ok" xml:space="preserve"><value>OK</value></data>
   <data name="Check_Warning" xml:space="preserve"><value>Warnung</value></data>

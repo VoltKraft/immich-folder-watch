@@ -7,6 +7,173 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-04-20
+
+A follow-up to 2.3.1 that closes the last missing symmetry gap in `sync` mode:
+renames now propagate in both directions between local subfolders and Immich
+albums. It also fixes a startup hang where a misbehaving Immich Socket.IO
+endpoint could block the worker loop indefinitely.
+
+### Added
+- **Bidirectional subfolder ↔ album rename in `sync` mode
+  (subfolders-as-albums variant).**
+  - Renaming a first-level local subfolder now renames the matching Immich
+    album via `PATCH /albums/{id}`. The `_pathToAssetId` map is re-keyed from
+    the old to the new prefix so subsequent deletes/moves still target the
+    right assets.
+  - Renaming an album on Immich now renames the corresponding local subfolder.
+    The worker tracks an `album.Id → local-dir-name` map seeded from the
+    initial album list and refreshed on every pull; when an album id reappears
+    under a different (sanitized) name, the local directory is moved to match.
+  - Conflicts (a folder/album with the target name already exists) are logged
+    as warnings and leave the existing state untouched — no clobber.
+  - New `IImmichAssetClient.RenameAlbumAsync` + `RenameAlbumResult` model
+    (404 is idempotently surfaced as `AlbumMissing`, 409 as a conflict
+    warning).
+  - New `album.update` probe in `ImmichAccessChecker` (gated on
+    `requireSyncPermissions`); the GUI's **Verify Immich Access** check now
+    covers it alongside the existing `album.delete` / `album.read` /
+    `album.create` / `albumAsset.*` / `asset.*` probes.
+
+### Fixed
+- **Worker could hang on an unresponsive Socket.IO endpoint.** When the Immich
+  instance did not accept the Socket.IO handshake (wrong reverse-proxy path,
+  WebSocket disabled, etc.), `SocketIOClient.ConnectAsync` — configured with
+  `Reconnection = true` and `ReconnectionAttempts = int.MaxValue` — never
+  returned, which blocked `FolderWatchWorker.ExecuteAsync` before the debounce
+  / flush / poll loop could start. Symptom: files queued by the initial scan
+  and by in-flight `FileSystemWatcher` events never got uploaded, and no
+  `Uploading batch` log line ever appeared. The connect is now fired on a
+  background `Task.Run`, so the polling loop starts immediately and the
+  realtime channel joins in once the socket succeeds (if ever).
+
+## [2.3.1] - 2026-04-20
+
+A follow-up to 2.3.0 focused on making the new `sync` mode feel like a
+Nextcloud-grade sync client and on closing the remaining symmetry gaps between
+local subfolders and Immich albums.
+
+### Added
+- **Realtime downstream sync via Immich Socket.IO.**
+  - New `IImmichRealtimeClient` interface (Core) and `ImmichRealtimeClient`
+    implementation (Immich project, built on `SocketIOClient` 3.1.2).
+  - Subscribes to `on_upload_success`, `on_asset_trash`, `on_asset_delete`,
+    `on_asset_update`, `on_asset_restore`, `on_album_create`, `on_album_update`,
+    `on_album_delete`, and `on_album_invite`. Any matching event triggers an
+    immediate pull on the next 1-second tick of the worker loop.
+  - Connects to the Immich root (derived from `ImmichServerApiUrl` by stripping
+    the trailing `/api`), authenticates via the `x-api-key` extra header, and
+    auto-reconnects on disconnect. Connection failures degrade gracefully to
+    the existing polling path.
+- **Subfolder ↔ Album symmetry in `sync` mode (subfolders-as-albums variant).**
+  - Creating a first-level subfolder now creates the matching Immich album.
+  - Deleting a first-level subfolder trashes any assets the app still has
+    tracked under that folder, then deletes the Immich album.
+  - Renaming a first-level subfolder ensures the new album name exists (rename
+    of album membership for existing files is logged as a caveat).
+  - New `IImmichAssetClient.EnsureAlbumAsync` / `DeleteAlbumAsync` and result
+    models `EnsureAlbumResult` / `DeleteAlbumResult` (404 on delete is
+    idempotently treated as success).
+  - New `album.delete` probe in `ImmichAccessChecker` (gated on
+    `requireSyncPermissions`).
+- **Symmetric upload/download status prefix.** Uploads now render as
+  `Upload: <filename>` to match the `Download: <filename>` line
+  (`Strings.Status_UploadingPrefix`).
+
+### Changed
+- **Album pull interval shortened from 60 s to 10 s.** The realtime socket
+  makes this interval a safety net rather than the primary trigger, but 10 s
+  already gives Nextcloud-level perceived latency when the socket is offline.
+- **Default extensions cover Immich's full supported media list.** The
+  bootstrapped list for a new source in the Windows GUI — and the example
+  config at `packaging/windows/config.windows.example.yaml` — now includes
+  all 66 extensions Immich accepts: common images (avif, bmp, gif, heic,
+  heif, hif, insp, jp2, jpe, jpeg, jpg, jxl, png, psd, svg, tif, tiff, webp),
+  RAW formats (3fr, ari, arw, cap, cin, cr2, cr3, crw, dcr, dng, erf, fff,
+  iiq, k25, kdc, mrw, nef, nrw, orf, ori, pef, raf, raw, rw2, rwl, sr2,
+  srf, srw, x3f), and videos (3gp, 3gpp, avi, flv, insv, m2t, m2ts, m4v,
+  mkv, mov, mp4, mpe, mpeg, mpg, mts, vob, webm, wmv).
+
+### Fixed
+- **Permission check state no longer resets on Save.** `MainWindowViewModel.Load`
+  now accepts a `resetImmichCheckStatus` flag, and the save path reloads the
+  config without clearing the last "Verify Access" result — the badge stays
+  where it was before the save.
+- **Installer lifecycle.** Uninstall/upgrade paths close the running app
+  cleanly (WPF `Application.SessionEnding` handler + WiX `util:CloseApplication`
+  with `EndSessionMessage`/`CloseMessage`/`TerminateProcess` fallback), and
+  an `MMajorUpgrade` now relaunches the tray app after `InstallFinalize`
+  via a `WixShellExec` custom action.
+
+### Infrastructure
+- Project, packaging, and release defaults updated to `2.3.1`.
+- New `SocketIOClient` 3.1.2 dependency in `ImmichFolderWatch.Immich`.
+
+## [2.3.0] - 2026-04-20
+
+This release introduces per-folder **sync modes**. Each watched source can now
+choose how it interacts with Immich: upload only files that appear during
+runtime (default, matching the previous behavior), upload the full folder
+contents, or keep the folder bidirectionally synchronized with Immich.
+
+### Added
+- New `watch.sources[].syncMode` YAML setting with three values:
+  - `uploadNew` (default): only new files that appear while the app is running
+    are uploaded; pre-existing files are ignored. Preserves the legacy
+    behavior end-to-end, so pre-2.3 configs load and run unchanged.
+  - `uploadAll`: on start, enqueues every file already in the folder, then
+    continues to upload newly added files. No downloads.
+  - `sync`: full bidirectional reconciliation with Immich. Two shapes are
+    supported based on `albumName`:
+    - `albumName` **set** — flat single-album sync. All files in the source
+      root mirror the named album. Subfolders are ignored
+      (`includeSubdirectories` is forced off).
+    - `albumName` **empty** — subfolders-as-albums sync. The root folder
+      mirrors all Immich assets without an album, each first-level subfolder
+      mirrors the Immich album with the same name, new subfolders become new
+      albums, and new Immich albums become subfolders
+      (`includeSubdirectories` is forced on).
+    Local deletions move the corresponding Immich asset to the trash, and
+    moving a file between the parent folder and a subfolder (or between two
+    subfolders) updates the asset's album membership on Immich to match.
+- `IImmichAssetClient.GetAlbumAssetsAsync` and
+  `IImmichAssetClient.DownloadAssetAsync` on top of the Immich routes
+  `GET /albums/{id}` and `GET /assets/{id}/original`. Downloads stream to a
+  `.downloading` temp file and are moved atomically on completion.
+- `IImmichAssetClient.ListAlbumsAsync`, `GetUnassignedAssetsAsync`
+  (paginated `POST /search/metadata` with `isNotInAlbum:true`),
+  `AddAssetsToAlbumAsync`, `RemoveAssetsFromAlbumAsync`
+  (`DELETE /albums/{id}/assets`), and `TrashAssetsAsync`
+  (`DELETE /assets` with `force:false`) for the new sync semantics.
+- Four new rows in the Immich **Verify Access** permission list:
+  `asset.download`, `asset.read`, `asset.delete`, `albumAsset.delete`.
+  `ImmichAccessChecker` probes each endpoint with a deliberately invalid id
+  and treats `400`, `404`, and `422` as "endpoint reachable, permission ok"
+  and `403` as a denial. These probes only **block** config verification when
+  at least one source uses `syncMode: sync`; for pure upload configs they
+  stay informational (mirrors the existing album-permission gating).
+- New **Sync Mode** dropdown on every watched-folder card in the Windows GUI,
+  with localized labels and an inline description of the selected mode. The
+  `Include subdirectories` checkbox is hidden for `sync` sources.
+- New localization strings for the sync-mode UI and the three new permission
+  rows in English and German (`UI_SyncMode`, `SyncMode_UploadNew`,
+  `SyncMode_UploadAll`, `SyncMode_Sync` and their `_Description` counterparts;
+  `Permission_AssetRead`, `Permission_AssetDelete`,
+  `Permission_RemoveAssetFromAlbum`).
+
+### Changed
+- `FolderWatchWorker` now seeds existing files on start for `uploadAll` and
+  `sync` sources (uploads benefit from Immich server-side dedup via the
+  `deviceAssetId` hash, so restarts don't re-upload already-known files),
+  builds a local-path → Immich-asset-id map on start for `sync` sources, and
+  periodically pulls album and unassigned assets for `sync` sources.
+- Rename/move events on `sync` sources no longer just log; they now update
+  the Immich album membership of the renamed asset, and local deletions
+  trash the corresponding Immich asset instead of being ignored.
+- Windows GUI, YAML loader/writer, and config model now round-trip the new
+  `syncMode` field; unknown or missing values normalize to `uploadNew`.
+- Project, packaging, and release defaults updated to `2.3.0`.
+
 ## [2.2.0] - 2026-04-20
 
 This release makes the Windows GUI follow the active Windows 11 design system

@@ -29,6 +29,9 @@ public static class Strings
     public static string Status_NoCurrentUpload => Get(nameof(Status_NoCurrentUpload));
     public static string Status_LastCheckedFormat => Get(nameof(Status_LastCheckedFormat));
     public static string Status_BatchProgressFormat => Get(nameof(Status_BatchProgressFormat));
+    public static string Status_UploadingPrefix => Get(nameof(Status_UploadingPrefix));
+    public static string Status_DownloadingPrefix => Get(nameof(Status_DownloadingPrefix));
+    public static string Status_PullProgressFormat => Get(nameof(Status_PullProgressFormat));
 
     public static string Server_Unknown => Get(nameof(Server_Unknown));
     public static string Server_Error => Get(nameof(Server_Error));
@@ -82,11 +85,23 @@ public static class Strings
     public static string UI_OpenLogs => Get(nameof(UI_OpenLogs));
     public static string UI_Language => Get(nameof(UI_Language));
     public static string UI_Appearance => Get(nameof(UI_Appearance));
+    public static string UI_SyncMode => Get(nameof(UI_SyncMode));
+
+    public static string SyncMode_UploadNew => Get(nameof(SyncMode_UploadNew));
+    public static string SyncMode_UploadNew_Description => Get(nameof(SyncMode_UploadNew_Description));
+    public static string SyncMode_UploadAll => Get(nameof(SyncMode_UploadAll));
+    public static string SyncMode_UploadAll_Description => Get(nameof(SyncMode_UploadAll_Description));
+    public static string SyncMode_Sync => Get(nameof(SyncMode_Sync));
+    public static string SyncMode_Sync_Description => Get(nameof(SyncMode_Sync_Description));
 
     public static string Permission_AssetUpload => Get(nameof(Permission_AssetUpload));
     public static string Permission_AlbumRead => Get(nameof(Permission_AlbumRead));
     public static string Permission_AlbumCreate => Get(nameof(Permission_AlbumCreate));
     public static string Permission_AddAssetToAlbum => Get(nameof(Permission_AddAssetToAlbum));
+    public static string Permission_AssetDownload => Get(nameof(Permission_AssetDownload));
+    public static string Permission_AssetRead => Get(nameof(Permission_AssetRead));
+    public static string Permission_AssetDelete => Get(nameof(Permission_AssetDelete));
+    public static string Permission_RemoveAssetFromAlbum => Get(nameof(Permission_RemoveAssetFromAlbum));
 
     public static string Check_Ok => Get(nameof(Check_Ok));
     public static string Check_Warning => Get(nameof(Check_Warning));

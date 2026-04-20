@@ -19,6 +19,16 @@
       <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\ImmichFolderWatch" Name="Start" Type="raw" />
     </Property>
 
+    <util:CloseApplication
+      Id="CloseImmichFolderWatch"
+      Target="ImmichFolderWatch.exe"
+      Description="Immich Folder Watch"
+      CloseMessage="yes"
+      EndSessionMessage="yes"
+      TerminateProcess="10"
+      PromptToContinue="no"
+      RebootPrompt="no" />
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch">
         <Directory Id="BINDIR" Name="bin" />
@@ -121,6 +131,19 @@
       Impersonate="no"
       Return="ignore" />
 
+    <SetProperty
+      Id="WixShellExecTarget"
+      Value="[BINDIR]ImmichFolderWatch.exe"
+      Before="RelaunchAppAfterUpgrade"
+      Sequence="execute" />
+    <CustomAction
+      Id="RelaunchAppAfterUpgrade"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixShellExec"
+      Execute="immediate"
+      Impersonate="yes"
+      Return="ignore" />
+
     <InstallExecuteSequence>
       <Custom
         Action="StopLegacyService"
@@ -138,6 +161,10 @@
         Action="RemoveLegacyProgramData"
         After="MigrateLegacyUserConfig"
         Condition="NOT REMOVE AND LEGACYSERVICEINSTALLED" />
+      <Custom
+        Action="RelaunchAppAfterUpgrade"
+        After="InstallFinalize"
+        Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE~=&quot;ALL&quot;" />
     </InstallExecuteSequence>
   </Fragment>
 </Wix>

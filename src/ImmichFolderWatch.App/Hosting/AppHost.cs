@@ -146,6 +146,7 @@ public sealed class AppHost : IAsyncDisposable
         });
 
         builder.Services.AddSingleton<IImmichAssetClient, ImmichAssetClient>();
+        builder.Services.AddSingleton<IImmichRealtimeClient, ImmichRealtimeClient>();
 
         builder.Services.AddHostedService<FolderWatchWorker>();
         builder.Services.AddHostedService<ServerConnectionMonitor>();

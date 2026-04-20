@@ -302,6 +302,20 @@
                         <TextBox Grid.Row="1" Grid.Column="1" Margin="5,6,0,0" Text="{Binding AlbumName, UpdateSourceTrigger=PropertyChanged}" services:WatermarkBehavior.Watermark="{Binding UI_AlbumNameWatermark, Source={StaticResource Loc}}" />
                       </Grid>
 
+                      <StackPanel Margin="0,12,0,0">
+                        <TextBlock Text="{Binding UI_SyncMode, Source={StaticResource Loc}}" />
+                        <ComboBox x:Name="SyncModeComboBox"
+                                  Margin="0,6,0,0"
+                                  ItemsSource="{Binding DataContext.AvailableSyncModes, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="Code"
+                                  SelectedValue="{Binding SyncMode, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Style="{StaticResource MutedText}"
+                                   Text="{Binding SelectedItem.Description, ElementName=SyncModeComboBox}"
+                                   TextWrapping="Wrap" />
+                      </StackPanel>
+
                       <Expander Margin="0,10,0,0" IsExpanded="{Binding ShowAdvancedOptions}">
                         <Expander.Header>
                           <TextBlock FontWeight="SemiBold" Text="{Binding UI_AdvancedWatchOptions, Source={StaticResource Loc}}" />
@@ -309,6 +323,7 @@
 
                         <StackPanel Margin="0,12,0,0">
                           <CheckBox IsChecked="{Binding IncludeSubdirectories}"
+                                    Visibility="{Binding ShowIncludeSubdirectories, Converter={StaticResource BoolToVis}}"
                                     Content="{Binding UI_IncludeSubdirectories, Source={StaticResource Loc}}" />
 
                           <StackPanel Margin="0,10,0,0">

@@ -14,17 +14,18 @@ internal sealed class ConfigVerificationRunner
 
         var normalizedConfig = NormalizeConfig(config, targetConfigPath);
         var requireAlbumPermissions = RequiresAlbumPermissions(normalizedConfig);
+        var requireSyncPermissions = RequiresSyncPermissions(normalizedConfig);
 
         var urlError = AppConfigValidator.ValidateServerApiUrl(normalizedConfig.Immich.ServerApiUrl);
         var apiKeyError = AppConfigValidator.ValidateApiKey(normalizedConfig.Immich.ApiKey);
         if (!string.IsNullOrWhiteSpace(urlError) || !string.IsNullOrWhiteSpace(apiKeyError))
         {
-            return CreateValidationFailureResult(urlError, apiKeyError, requireAlbumPermissions);
+            return CreateValidationFailureResult(urlError, apiKeyError, requireAlbumPermissions, requireSyncPermissions);
         }
 
         using var httpClient = CreateHttpClient(normalizedConfig);
         var accessChecker = new ImmichAccessChecker(httpClient);
-        return await accessChecker.CheckAsync(requireAlbumPermissions, cancellationToken);
+        return await accessChecker.CheckAsync(requireAlbumPermissions, requireSyncPermissions, cancellationToken);
     }
 
     public async Task<VerificationResult> VerifyAsync(AppConfig config, string targetConfigPath, CancellationToken cancellationToken)
@@ -79,8 +80,15 @@ internal sealed class ConfigVerificationRunner
         return config.Watch.Sources.Any(source => !string.IsNullOrWhiteSpace(source.AlbumName));
     }
 
-    private static ImmichAccessCheckResult CreateValidationFailureResult(string? urlError, string? apiKeyError, bool requireAlbumPermissions)
+    private static bool RequiresSyncPermissions(AppConfig config)
     {
+        return config.Watch.Sources.Any(source =>
+            string.Equals(WatchSourceSyncModes.Normalize(source.SyncMode), WatchSourceSyncModes.Sync, StringComparison.Ordinal));
+    }
+
+    private static ImmichAccessCheckResult CreateValidationFailureResult(string? urlError, string? apiKeyError, bool requireAlbumPermissions, bool requireSyncPermissions)
+    {
+        const string Message = "Not checked because the Immich inputs are not valid yet.";
         return new ImmichAccessCheckResult
         {
             UrlState = string.IsNullOrWhiteSpace(urlError) ? CheckState.NotChecked : CheckState.Failed,
@@ -88,7 +96,7 @@ internal sealed class ConfigVerificationRunner
             ApiKeyState = string.IsNullOrWhiteSpace(apiKeyError) ? CheckState.NotChecked : CheckState.Failed,
             ApiKeyMessage = string.IsNullOrWhiteSpace(apiKeyError) ? "Not checked yet." : apiKeyError,
             PermissionsState = CheckState.NotChecked,
-            PermissionsMessage = "Not checked because the Immich inputs are not valid yet.",
+            PermissionsMessage = Message,
             PermissionResults =
             [
                 new ImmichPermissionCheckResult
@@ -96,7 +104,7 @@ internal sealed class ConfigVerificationRunner
                     DisplayName = "Asset Upload",
                     PermissionName = "asset.upload",
                     State = CheckState.NotChecked,
-                    Message = "Not checked because the Immich inputs are not valid yet.",
+                    Message = Message,
                     BlocksConfigVerification = true,
                 },
                 new ImmichPermissionCheckResult
@@ -104,7 +112,7 @@ internal sealed class ConfigVerificationRunner
                     DisplayName = "Album Read",
                     PermissionName = "album.read",
                     State = CheckState.NotChecked,
-                    Message = "Not checked because the Immich inputs are not valid yet.",
+                    Message = Message,
                     BlocksConfigVerification = requireAlbumPermissions,
                 },
                 new ImmichPermissionCheckResult
@@ -112,7 +120,7 @@ internal sealed class ConfigVerificationRunner
                     DisplayName = "Album Create",
                     PermissionName = "album.create",
                     State = CheckState.NotChecked,
-                    Message = "Not checked because the Immich inputs are not valid yet.",
+                    Message = Message,
                     BlocksConfigVerification = requireAlbumPermissions,
                 },
                 new ImmichPermissionCheckResult
@@ -120,8 +128,40 @@ internal sealed class ConfigVerificationRunner
                     DisplayName = "Add Asset To Album",
                     PermissionName = "albumAsset.create",
                     State = CheckState.NotChecked,
-                    Message = "Not checked because the Immich inputs are not valid yet.",
+                    Message = Message,
                     BlocksConfigVerification = requireAlbumPermissions,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Asset Download",
+                    PermissionName = "asset.download",
+                    State = CheckState.NotChecked,
+                    Message = Message,
+                    BlocksConfigVerification = requireSyncPermissions,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Asset Read",
+                    PermissionName = "asset.read",
+                    State = CheckState.NotChecked,
+                    Message = Message,
+                    BlocksConfigVerification = requireSyncPermissions,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Asset Delete",
+                    PermissionName = "asset.delete",
+                    State = CheckState.NotChecked,
+                    Message = Message,
+                    BlocksConfigVerification = requireSyncPermissions,
+                },
+                new ImmichPermissionCheckResult
+                {
+                    DisplayName = "Remove Asset From Album",
+                    PermissionName = "albumAsset.delete",
+                    State = CheckState.NotChecked,
+                    Message = Message,
+                    BlocksConfigVerification = requireSyncPermissions,
                 },
             ],
         };

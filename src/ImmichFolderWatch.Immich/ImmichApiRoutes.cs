@@ -18,4 +18,18 @@ internal static class ImmichApiRoutes
     {
         return $"albums/{albumId}/assets";
     }
+
+    public static string AlbumInfo(string albumId)
+    {
+        return $"albums/{albumId}";
+    }
+
+    public static string AssetOriginalFile(string assetId)
+    {
+        return $"assets/{assetId}/original";
+    }
+
+    public const string SearchMetadata = "search/metadata";
+
+    public const string AssetsBulk = "assets";
 }

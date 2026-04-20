@@ -80,6 +80,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
                         Extensions = (source.Extensions ?? new List<string>()).ToList(),
                         ExcludeDirectories = (source.ExcludeDirectories ?? new List<string>()).ToList(),
                         ExcludeFileNames = (source.ExcludeFileNames ?? new List<string>()).ToList(),
+                        SyncMode = source.SyncMode,
                     })
                     .ToList(),
                 Extensions = config.Watch.Extensions.ToList(),
@@ -134,6 +135,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
                 Extensions = GetSourceExtensions(source, legacyExtensions),
                 ExcludeDirectories = NormalizePatterns(source.ExcludeDirectories),
                 ExcludeFileNames = NormalizePatterns(source.ExcludeFileNames),
+                SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
             })
             .ToList();
 

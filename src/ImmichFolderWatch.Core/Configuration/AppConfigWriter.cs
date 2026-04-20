@@ -38,6 +38,7 @@ public sealed class AppConfigWriter
                             : legacyExtensions.ToList(),
                         ExcludeDirectories = (source.ExcludeDirectories ?? new List<string>()).ToList(),
                         ExcludeFileNames = (source.ExcludeFileNames ?? new List<string>()).ToList(),
+                        SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
                     })
                     .ToList(),
                 BatchIntervalSeconds = config.Watch.BatchIntervalSeconds,
@@ -105,5 +106,7 @@ public sealed class AppConfigWriter
         public List<string> ExcludeDirectories { get; set; } = new();
 
         public List<string> ExcludeFileNames { get; set; } = new();
+
+        public string SyncMode { get; set; } = WatchSourceSyncModes.UploadNew;
     }
 }
