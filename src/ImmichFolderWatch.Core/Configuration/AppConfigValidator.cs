@@ -130,9 +130,14 @@ public static class AppConfigValidator
             errors.Add("logging.level is required.");
         }
 
+        if (!LogTargets.IsFile(config.Logging.Target))
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(config.Logging.LogDirectory))
         {
-            errors.Add("logging.logDirectory is required.");
+            errors.Add("logging.logDirectory is required when logging.target is 'file'.");
         }
         else if (!Path.IsPathFullyQualified(config.Logging.LogDirectory))
         {

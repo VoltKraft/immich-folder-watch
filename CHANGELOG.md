@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-04-27
+
+Adds the **Windows Event Log** as the default log target. The dedicated Event
+Log named "Immich Folder Watch" is registered by the MSI installer; the GUI
+gains a Log Target dropdown and the **Open Logs** button now opens the
+relevant location (Event Viewer for the event log, Explorer for files).
+
+### Added
+- **`logging.target` config field** with values `eventLog` (default) and
+  `file`. Missing or unknown values normalize to `eventLog`, so pre-2.3
+  configs load unchanged and switch to Event Log on next save.
+- **Settings UI: Log Target dropdown.** When `eventLog` is selected, the
+  **Log Directory** field, **Use Default** button and the absolute-path hint
+  are hidden (they are only meaningful for the file target).
+- **MSI: dedicated custom Event Log registered at install time.** The
+  installer creates `HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Immich
+  Folder Watch` and a same-named source under it, so the dedicated log
+  appears in Event Viewer immediately after install. The component is
+  removed on uninstall (entries are kept by Windows convention).
+- **Robust fallback** when the Event Log source is missing (e.g. xcopy or
+  developer install): the app keeps writing to the configured log directory
+  via the existing file appender and surfaces a warning string in the UI.
+
+### Changed
+- **"Open Logs" button** now branches on `logging.target`: Event Log →
+  `eventvwr.exe /c:"Immich Folder Watch"` (opens straight to the dedicated
+  log); File → opens the log directory in Explorer (existing behavior).
+- **`AppConfigValidator`** no longer requires `logging.logDirectory` to be
+  set or absolute when `logging.target` is `eventLog`.
+
+### Fixed
+- **MSI now removes any stale `Immich Folder Watch` source from the standard
+  `Application` log on install.** A pre-existing source there (left over from
+  a previous run, third-party tool, or test) would otherwise hijack our
+  writes: `EventLog.WriteEntry` enforces source/log alignment and throws
+  when they mismatch, and `Microsoft.Extensions.Logging.EventLog` silently
+  swallows that exception — making the dedicated log appear empty even
+  though the provider was active. The MSI's
+  `EventLogRegistrationComponent` now performs a `RemoveOnInstall` of
+  `HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Immich
+  Folder Watch` before writing the canonical registration under the
+  dedicated log.
+- **`EventLogSourceProbe` now verifies log/source alignment**, not just
+  source existence. If the source is registered under a different log,
+  the app falls back to file logging with a localized
+  `Op_EventLogSourceMisalignedFormat` warning that names the wrong log,
+  instead of writes silently disappearing.
+
+### Notes
+- Existing on-disk file logs from previous versions are preserved but no
+  longer appended to once the target switches to `eventLog`. Switch back
+  to **File** in the settings to resume writing to disk.
+- The Event Log target is only available on Windows. The app is
+  Windows-only by TFM, so this is not a behavior change in practice.
+
 ## [2.3.2] - 2026-04-20
 
 A follow-up to 2.3.1 that closes the last missing symmetry gap in `sync` mode:

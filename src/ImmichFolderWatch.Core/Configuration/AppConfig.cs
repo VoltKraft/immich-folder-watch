@@ -92,7 +92,45 @@ public sealed class LoggingSettings
 {
     public string Level { get; set; } = "Information";
 
+    public string Target { get; set; } = LogTargets.EventLog;
+
     public string LogDirectory { get; set; } = "logs";
+}
+
+public static class LogTargets
+{
+    public const string EventLog = "eventLog";
+
+    public const string File = "file";
+
+    public static IReadOnlyList<string> All { get; } = new[] { EventLog, File };
+
+    public static string Normalize(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return EventLog;
+        }
+
+        if (string.Equals(trimmed, EventLog, StringComparison.OrdinalIgnoreCase))
+        {
+            return EventLog;
+        }
+
+        if (string.Equals(trimmed, File, StringComparison.OrdinalIgnoreCase))
+        {
+            return File;
+        }
+
+        return EventLog;
+    }
+
+    public static bool IsEventLog(string? value) =>
+        string.Equals(Normalize(value), EventLog, StringComparison.Ordinal);
+
+    public static bool IsFile(string? value) =>
+        string.Equals(Normalize(value), File, StringComparison.Ordinal);
 }
 
 public sealed class LocalizationSettings

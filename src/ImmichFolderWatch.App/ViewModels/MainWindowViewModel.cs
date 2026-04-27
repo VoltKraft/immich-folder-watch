@@ -97,6 +97,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _retryMaxAttempts = "5";
     private string _retryBaseDelayMilliseconds = "500";
     private string _loggingLevel = "Information";
+    private string _loggingTarget = LogTargets.EventLog;
     private string _logDirectory = GetDefaultLogDirectory();
     private string _statusHeadline = string.Empty;
     private string _statusDetails = string.Empty;
@@ -142,6 +143,7 @@ public sealed class MainWindowViewModel : BindableBase
         _immichApiKeyRevealToolTip = Strings.ApiKey_ShowToolTip;
 
         RefreshSyncModeOptions();
+        RefreshLogTargetOptions();
 
         AddSource();
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
@@ -161,6 +163,8 @@ public sealed class MainWindowViewModel : BindableBase
     public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
 
     public ObservableCollection<SyncModeOption> AvailableSyncModes { get; } = new();
+
+    public ObservableCollection<LogTargetOption> AvailableLogTargets { get; } = new();
 
     public IReadOnlyList<LanguageOption> AvailableLanguages { get; }
 
@@ -278,6 +282,21 @@ public sealed class MainWindowViewModel : BindableBase
         get => _loggingLevel;
         set => SetProperty(ref _loggingLevel, value);
     }
+
+    public string LoggingTarget
+    {
+        get => _loggingTarget;
+        set
+        {
+            var normalized = LogTargets.Normalize(value);
+            if (SetProperty(ref _loggingTarget, normalized))
+            {
+                RaisePropertyChanged(nameof(IsFileLogTarget));
+            }
+        }
+    }
+
+    public bool IsFileLogTarget => LogTargets.IsFile(_loggingTarget);
 
     public string LogDirectory
     {
@@ -471,6 +490,7 @@ public sealed class MainWindowViewModel : BindableBase
         RetryMaxAttempts = config.Retry.MaxAttempts.ToString();
         RetryBaseDelayMilliseconds = config.Retry.BaseDelayMilliseconds.ToString();
         LoggingLevel = string.IsNullOrWhiteSpace(config.Logging.Level) ? "Information" : config.Logging.Level;
+        LoggingTarget = LogTargets.Normalize(config.Logging.Target);
         LogDirectory = string.IsNullOrWhiteSpace(config.Logging.LogDirectory) ? GetDefaultLogDirectory() : config.Logging.LogDirectory;
 
         Sources.Clear();
@@ -521,15 +541,19 @@ public sealed class MainWindowViewModel : BindableBase
         var fileReadyTimeoutSeconds = ParsePositiveInteger(FileReadyTimeoutSeconds, "watch.fileReadyTimeoutSeconds", errorList);
         var retryMaxAttempts = ParsePositiveInteger(RetryMaxAttempts, "retry.maxAttempts", errorList);
         var retryBaseDelayMilliseconds = ParsePositiveInteger(RetryBaseDelayMilliseconds, "retry.baseDelayMilliseconds", errorList);
+        var loggingTarget = LogTargets.Normalize(LoggingTarget);
         var logDirectory = LogDirectory.Trim();
 
-        if (string.IsNullOrWhiteSpace(logDirectory))
+        if (LogTargets.IsFile(loggingTarget))
         {
-            errorList.Add("logging.logDirectory is required.");
-        }
-        else if (!Path.IsPathFullyQualified(logDirectory))
-        {
-            errorList.Add("logging.logDirectory must be an absolute path.");
+            if (string.IsNullOrWhiteSpace(logDirectory))
+            {
+                errorList.Add("logging.logDirectory is required when logging.target is 'file'.");
+            }
+            else if (!Path.IsPathFullyQualified(logDirectory))
+            {
+                errorList.Add("logging.logDirectory must be an absolute path.");
+            }
         }
 
         config = new AppConfig
@@ -563,7 +587,8 @@ public sealed class MainWindowViewModel : BindableBase
             Logging = new LoggingSettings
             {
                 Level = LoggingLevel.Trim(),
-                LogDirectory = logDirectory,
+                Target = loggingTarget,
+                LogDirectory = string.IsNullOrWhiteSpace(logDirectory) ? GetDefaultLogDirectory() : logDirectory,
             },
         };
 
@@ -717,6 +742,7 @@ public sealed class MainWindowViewModel : BindableBase
         ImmichApiKeyRevealToolTip = RevealImmichApiKey ? Strings.ApiKey_HideToolTip : Strings.ApiKey_ShowToolTip;
 
         RefreshSyncModeOptions();
+        RefreshLogTargetOptions();
 
         _suppressLanguageWrite = true;
         try
@@ -996,6 +1022,21 @@ public sealed class MainWindowViewModel : BindableBase
         foreach (var option in newOptions)
         {
             AvailableSyncModes.Add(option);
+        }
+    }
+
+    private void RefreshLogTargetOptions()
+    {
+        var newOptions = new[]
+        {
+            new LogTargetOption(LogTargets.EventLog, Strings.UI_LogTargetEventLog),
+            new LogTargetOption(LogTargets.File, Strings.UI_LogTargetFile),
+        };
+
+        AvailableLogTargets.Clear();
+        foreach (var option in newOptions)
+        {
+            AvailableLogTargets.Add(option);
         }
     }
 

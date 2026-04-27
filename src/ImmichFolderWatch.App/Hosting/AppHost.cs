@@ -1,4 +1,5 @@
 using System.Net;
+using ImmichFolderWatch.App.Logging;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
@@ -8,6 +9,7 @@ using ImmichFolderWatch.Immich;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.EventLog;
 
 namespace ImmichFolderWatch.App.Hosting;
 
@@ -17,6 +19,7 @@ public sealed class AppHost : IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private IHost? _host;
     private AppConfig? _currentConfig;
+    private string? _lastLoggingWarning;
 
     public AppHost(SyncStatusProvider syncStatusProvider)
     {
@@ -26,6 +29,8 @@ public sealed class AppHost : IAsyncDisposable
     public AppConfig? CurrentConfig => _currentConfig;
 
     public bool IsRunning => _host is not null;
+
+    public string? LastLoggingWarning => _lastLoggingWarning;
 
     public async Task StartAsync(AppConfig config, CancellationToken cancellationToken = default)
     {
@@ -42,6 +47,7 @@ public sealed class AppHost : IAsyncDisposable
             _host = BuildHost(config);
             _currentConfig = config;
             await _host.StartAsync(cancellationToken);
+            EmitLoggingWarningIfAny();
         }
         finally
         {
@@ -73,11 +79,23 @@ public sealed class AppHost : IAsyncDisposable
             _host = BuildHost(newConfig);
             _currentConfig = newConfig;
             await _host.StartAsync(cancellationToken);
+            EmitLoggingWarningIfAny();
         }
         finally
         {
             _lifecycleGate.Release();
         }
+    }
+
+    private void EmitLoggingWarningIfAny()
+    {
+        if (_host is null || string.IsNullOrEmpty(_lastLoggingWarning))
+        {
+            return;
+        }
+
+        var loggerFactory = _host.Services.GetService<ILoggerFactory>();
+        loggerFactory?.CreateLogger<AppHost>().LogWarning("{Warning}", _lastLoggingWarning);
     }
 
     private async Task StopInternalAsync(CancellationToken cancellationToken)
@@ -103,7 +121,6 @@ public sealed class AppHost : IAsyncDisposable
 
     private IHost BuildHost(AppConfig config)
     {
-        Directory.CreateDirectory(config.Logging.LogDirectory);
         var logLevel = LogLevelParser.Parse(config.Logging.Level);
         var productVersion = ProductVersionProvider.GetProductVersion();
 
@@ -116,7 +133,26 @@ public sealed class AppHost : IAsyncDisposable
             options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff ";
             options.SingleLine = true;
         });
-        builder.Logging.AddProvider(new FileLoggerProvider(config.Logging.LogDirectory, logLevel));
+
+        _lastLoggingWarning = null;
+        var eventLogActive = false;
+        if (LogTargets.IsEventLog(config.Logging.Target) && OperatingSystem.IsWindows())
+        {
+            if (TryAddEventLogProvider(builder, logLevel, out var probeFailure))
+            {
+                eventLogActive = true;
+            }
+            else
+            {
+                _lastLoggingWarning = probeFailure;
+            }
+        }
+
+        if (!eventLogActive)
+        {
+            Directory.CreateDirectory(config.Logging.LogDirectory);
+            builder.Logging.AddProvider(new FileLoggerProvider(config.Logging.LogDirectory, logLevel));
+        }
 
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(config.Retry);
@@ -152,6 +188,28 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddHostedService<ServerConnectionMonitor>();
 
         return builder.Build();
+    }
+
+    private static bool TryAddEventLogProvider(HostApplicationBuilder builder, LogLevel logLevel, out string? failureReason)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            failureReason = "Windows Event Log target is only supported on Windows.";
+            return false;
+        }
+
+        if (!EventLogSourceProbe.TryEnsureSource(out failureReason))
+        {
+            return false;
+        }
+
+        builder.Logging.AddEventLog(new EventLogSettings
+        {
+            SourceName = EventLogConstants.SourceName,
+            LogName = EventLogConstants.LogName,
+            Filter = (_, lvl) => lvl >= logLevel,
+        });
+        return true;
     }
 
     public async ValueTask DisposeAsync()
