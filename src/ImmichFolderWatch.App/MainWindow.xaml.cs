@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using Button = System.Windows.Controls.Button;
 using ImmichFolderWatch.App.Hosting;
+using ImmichFolderWatch.App.Logging;
 using ImmichFolderWatch.App.Models;
 using ImmichFolderWatch.App.Resources;
 using ImmichFolderWatch.App.Services;
@@ -312,6 +313,12 @@ public sealed partial class MainWindow : Window
 
     private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
     {
+        if (LogTargets.IsEventLog(ViewModel.LoggingTarget))
+        {
+            OpenEventViewerForCustomLog();
+            return;
+        }
+
         var logDirectory = ViewModel.GetEffectiveLogDirectory();
         if (string.IsNullOrWhiteSpace(logDirectory))
         {
@@ -336,6 +343,26 @@ public sealed partial class MainWindow : Window
             FileName = fullPath,
             UseShellExecute = true,
         });
+    }
+
+    private void OpenEventViewerForCustomLog()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "eventvwr.exe",
+                Arguments = $"/c:\"{EventLogConstants.LogName}\"",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            ViewModel.OperationMessage = string.Format(
+                _localizationService.CurrentCulture,
+                Strings.Op_EventViewerLaunchFailedFormat,
+                ex.Message);
+        }
     }
 
     private void UseDefaultLogDirectoryButton_Click(object sender, RoutedEventArgs e)
@@ -396,7 +423,9 @@ public sealed partial class MainWindow : Window
             await _appHost.RestartAsync(draftConfig);
 
             LoadConfigFromDisk(configPath, resetImmichCheckStatus: false);
-            ViewModel.OperationMessage = Strings.Op_SavedApplied;
+            ViewModel.OperationMessage = string.IsNullOrEmpty(_appHost.LastLoggingWarning)
+                ? Strings.Op_SavedApplied
+                : $"{Strings.Op_SavedApplied} — {_appHost.LastLoggingWarning}";
         }
         catch (Exception ex)
         {

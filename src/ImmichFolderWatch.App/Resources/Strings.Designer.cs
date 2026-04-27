@@ -79,6 +79,9 @@ public static class Strings
     public static string UI_LoggingAndRetry => Get(nameof(UI_LoggingAndRetry));
     public static string UI_RetryBaseDelayMs => Get(nameof(UI_RetryBaseDelayMs));
     public static string UI_LogLevel => Get(nameof(UI_LogLevel));
+    public static string UI_LogTarget => Get(nameof(UI_LogTarget));
+    public static string UI_LogTargetEventLog => Get(nameof(UI_LogTargetEventLog));
+    public static string UI_LogTargetFile => Get(nameof(UI_LogTargetFile));
     public static string UI_LogDirectory => Get(nameof(UI_LogDirectory));
     public static string UI_UseDefault => Get(nameof(UI_UseDefault));
     public static string UI_LogDirectoryHint => Get(nameof(UI_LogDirectoryHint));
@@ -121,6 +124,9 @@ public static class Strings
     public static string Op_NoLogDir => Get(nameof(Op_NoLogDir));
     public static string Op_LogDirMissingFormat => Get(nameof(Op_LogDirMissingFormat));
     public static string Op_LogDirReset => Get(nameof(Op_LogDirReset));
+    public static string Op_EventLogSourceMissing => Get(nameof(Op_EventLogSourceMissing));
+    public static string Op_EventLogSourceMisalignedFormat => Get(nameof(Op_EventLogSourceMisalignedFormat));
+    public static string Op_EventViewerLaunchFailedFormat => Get(nameof(Op_EventViewerLaunchFailedFormat));
     public static string Op_CheckingConfig => Get(nameof(Op_CheckingConfig));
     public static string Op_SavingRestarting => Get(nameof(Op_SavingRestarting));
     public static string Op_SavedApplied => Get(nameof(Op_SavedApplied));

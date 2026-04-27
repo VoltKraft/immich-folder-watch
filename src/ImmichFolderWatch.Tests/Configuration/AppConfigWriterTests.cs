@@ -64,6 +64,7 @@ public sealed class AppConfigWriterTests
                 Logging = new LoggingSettings
                 {
                     Level = "Warning",
+                    Target = LogTargets.File,
                     LogDirectory = logDirectory,
                 },
                 Localization = new LocalizationSettings
@@ -91,7 +92,9 @@ public sealed class AppConfigWriterTests
             Assert.Equal(20, roundTrip.Watch.MaxBatchSize);
             Assert.Equal(40, roundTrip.Watch.FileReadyTimeoutSeconds);
             Assert.Equal("Warning", roundTrip.Logging.Level);
+            Assert.Equal(LogTargets.File, roundTrip.Logging.Target);
             Assert.Equal(logDirectory, roundTrip.Logging.LogDirectory);
+            Assert.Contains("target: file", yaml, StringComparison.Ordinal);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "watch")), normalized.Watch.Sources[0].Path);
             Assert.Equal([".png", ".jpg"], normalized.Watch.Sources[0].Extensions);
             Assert.Equal(Path.GetFullPath(logDirectory), normalized.Logging.LogDirectory);
@@ -118,5 +121,21 @@ public sealed class AppConfigWriterTests
         var yaml = new AppConfigWriter().Serialize(config);
 
         Assert.Contains("language: auto", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Serialize_DefaultLoggingSettings_EmitsEventLogTarget()
+    {
+        var config = new AppConfig
+        {
+            Immich = new ImmichSettings { ServerApiUrl = "https://x", ApiKey = "k" },
+            Watch = new WatchSettings(),
+            Retry = new RetrySettings(),
+            Logging = new LoggingSettings { Level = "Information", LogDirectory = "logs" },
+        };
+
+        var yaml = new AppConfigWriter().Serialize(config);
+
+        Assert.Contains("target: eventLog", yaml, StringComparison.Ordinal);
     }
 }

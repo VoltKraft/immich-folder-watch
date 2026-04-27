@@ -360,4 +360,75 @@ localization:
             tempRoot.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public void Load_MissingLoggingTarget_DefaultsToEventLog()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-target-default-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources: []
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  logDirectory: "logs"
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().Load(configPath);
+
+            Assert.Equal(LogTargets.EventLog, config.Logging.Target);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("file", "file")]
+    [InlineData("FILE", "file")]
+    [InlineData("eventLog", "eventLog")]
+    [InlineData("bogus", "eventLog")]
+    public void Load_LoggingTarget_NormalizesValue(string yamlValue, string expected)
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-target-normalize-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = $"""
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources: []
+retry:
+  maxAttempts: 4
+  baseDelayMilliseconds: 250
+logging:
+  level: "Information"
+  target: "{yamlValue}"
+  logDirectory: "logs"
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().Load(configPath);
+
+            Assert.Equal(expected, config.Logging.Target);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
 }

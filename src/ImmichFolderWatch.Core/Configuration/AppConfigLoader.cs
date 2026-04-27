@@ -96,6 +96,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
             Logging = new LoggingSettings
             {
                 Level = config.Logging.Level,
+                Target = config.Logging.Target,
                 LogDirectory = config.Logging.LogDirectory,
             },
             Localization = new LocalizationSettings
@@ -142,6 +143,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
         config.Watch.Extensions = new List<string>();
 
         config.Logging.Level = (config.Logging.Level ?? "Information").Trim();
+        config.Logging.Target = LogTargets.Normalize(config.Logging.Target);
         config.Logging.LogDirectory = NormalizePath(
             string.IsNullOrWhiteSpace(config.Logging.LogDirectory) ? "logs" : config.Logging.LogDirectory,
             configDirectory,

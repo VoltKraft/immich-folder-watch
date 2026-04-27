@@ -412,6 +412,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
               <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_RetryBaseDelayMs, Source={StaticResource Loc}}" />
@@ -425,25 +426,40 @@
                         ItemsSource="{Binding AvailableLogLevels}"
                         SelectedItem="{Binding LoggingLevel}" />
 
-              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_LogDirectory, Source={StaticResource Loc}}" />
-              <TextBox Grid.Row="2"
+              <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center" Text="{Binding UI_LogTarget, Source={StaticResource Loc}}" />
+              <ComboBox Grid.Row="2"
+                        Grid.Column="1"
+                        Grid.ColumnSpan="2"
+                        Margin="0,0,0,12"
+                        ItemsSource="{Binding AvailableLogTargets}"
+                        DisplayMemberPath="DisplayName"
+                        SelectedValuePath="Value"
+                        SelectedValue="{Binding LoggingTarget}" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,12" VerticalAlignment="Center"
+                         Text="{Binding UI_LogDirectory, Source={StaticResource Loc}}"
+                         Visibility="{Binding IsFileLogTarget, Converter={StaticResource BoolToVis}}" />
+              <TextBox Grid.Row="3"
                        Grid.Column="1"
                        Margin="0,0,12,12"
                        Text="{Binding LogDirectory, UpdateSourceTrigger=PropertyChanged}"
-                       services:WatermarkBehavior.Watermark="%LOCALAPPDATA%\Immich Folder Watch\logs" />
-              <Button Grid.Row="2"
+                       services:WatermarkBehavior.Watermark="%LOCALAPPDATA%\Immich Folder Watch\logs"
+                       Visibility="{Binding IsFileLogTarget, Converter={StaticResource BoolToVis}}" />
+              <Button Grid.Row="3"
                       Grid.Column="2"
                       Margin="0,0,0,12"
                       Style="{StaticResource SecondaryButton}"
                       Click="UseDefaultLogDirectoryButton_Click"
-                      Content="{Binding UI_UseDefault, Source={StaticResource Loc}}" />
+                      Content="{Binding UI_UseDefault, Source={StaticResource Loc}}"
+                      Visibility="{Binding IsFileLogTarget, Converter={StaticResource BoolToVis}}" />
 
-              <TextBlock Grid.Row="3"
+              <TextBlock Grid.Row="4"
                          Grid.Column="1"
                          Grid.ColumnSpan="2"
                          Style="{StaticResource MutedText}"
                          Text="{Binding UI_LogDirectoryHint, Source={StaticResource Loc}}"
-                         TextWrapping="Wrap" />
+                         TextWrapping="Wrap"
+                         Visibility="{Binding IsFileLogTarget, Converter={StaticResource BoolToVis}}" />
             </Grid>
           </StackPanel>
         </Border>

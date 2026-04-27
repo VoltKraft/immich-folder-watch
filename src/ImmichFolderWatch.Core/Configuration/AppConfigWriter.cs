@@ -53,6 +53,7 @@ public sealed class AppConfigWriter
             Logging = new LoggingSettings
             {
                 Level = config.Logging.Level,
+                Target = LogTargets.Normalize(config.Logging.Target),
                 LogDirectory = config.Logging.LogDirectory,
             },
             Localization = new LocalizationSettings

@@ -61,6 +61,7 @@ retry:
 
 logging:
   level: "Information"
+  target: "eventLog" # eventLog | file
   logDirectory: "C:\\Users\\<user>\\AppData\\Local\\Immich Folder Watch\\logs"
 
 localization:
@@ -74,7 +75,7 @@ localization:
 - `watch.sources` must include at least one source.
 - `watch.sources[].extensions` must include at least one extension for each source.
 - Numeric settings must be positive integers.
-- `logging.logDirectory` must be an absolute filesystem path.
+- `logging.logDirectory` must be an absolute filesystem path when `logging.target` is `file`.
 
 ## Notes
 
@@ -86,6 +87,11 @@ localization:
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
 - In the Windows GUI, new sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos) and keep the advanced watch options collapsed by default.
 - In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
+- `logging.target` controls where logs are written. Valid values:
+  - `eventLog` (default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
+  - `file`: writes to a daily-rotated text file under `logging.logDirectory`. The GUI's **Open Logs** button opens the directory in Explorer.
+  - Missing, blank, or unknown values normalize to `eventLog`. Pre-2.3 configs therefore load unchanged but switch to Event Log on next save.
+  - If the Event Log source is not registered (e.g. xcopy or developer install), the app falls back to file logging and surfaces a warning in the UI.
 - `watch.sources[].albumName` is optional. Leave it empty to upload files without assigning them to an Immich album.
 - If `watch.sources[].albumName` is set, uploads are added to that album and the daemon creates the album automatically if it does not exist yet.
 - `watch.sources[].syncMode` controls how the folder interacts with Immich. Valid values:

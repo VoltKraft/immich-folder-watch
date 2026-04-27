@@ -38,6 +38,7 @@
       <ComponentGroupRef Id="PublishedApplicationFiles" />
       <ComponentRef Id="AppExecutableComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
+      <ComponentRef Id="EventLogRegistrationComponent" />
     </Feature>
   </Package>
 
@@ -53,6 +54,34 @@
   <Fragment>
     <Component Id="AppExecutableComponent" Directory="BINDIR" Guid="*">
       <File Id="AppExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.exe" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="EventLogRegistrationComponent" Directory="BINDIR" Guid="A2F6C5E1-3DB0-4F8A-9C7B-2D8B1C1F4E40">
+      <!--
+        Remove any pre-existing source registration under the standard Application log
+        before we write our own. Without this, a stale "Immich Folder Watch" source
+        under Application would route writes to Application instead of our dedicated log
+        (the .NET EventLog API enforces source/log alignment and throws otherwise; the
+        underlying logger provider silently swallows the exception, which makes the
+        dedicated log appear empty). RemoveOnInstall ensures fresh and upgrade installs
+        leave the registry in a clean, correctly-mapped state.
+      -->
+      <RemoveRegistryKey
+        Id="RemoveStaleApplicationSource"
+        Action="removeOnInstall"
+        Root="HKLM"
+        Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\Immich Folder Watch" />
+      <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Immich Folder Watch">
+        <RegistryValue Name="MaxSize" Type="integer" Value="1048576" />
+        <RegistryValue Name="Retention" Type="integer" Value="0" />
+        <RegistryValue Name="(Default)" Type="string" Value="" KeyPath="yes" />
+      </RegistryKey>
+      <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Immich Folder Watch\Immich Folder Watch">
+        <RegistryValue Name="EventMessageFile" Type="expandable" Value="%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll" />
+        <RegistryValue Name="TypesSupported" Type="integer" Value="7" />
+      </RegistryKey>
     </Component>
   </Fragment>
 
