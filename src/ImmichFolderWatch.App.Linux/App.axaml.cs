@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ImmichFolderWatch.App.Linux.Platform;
@@ -11,6 +12,9 @@ namespace ImmichFolderWatch.App.Linux;
 
 public sealed partial class App : Application
 {
+    private MainWindow? _mainWindow;
+    private AvaloniaTrayHost? _trayHost;
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -18,17 +22,62 @@ public sealed partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<DBusSession>();
             services.AddSingleton<IPlatformPaths, XdgPlatformPaths>();
-            services.AddSingleton<IAutoStartManager, StubAutoStartManager>();
-            services.AddSingleton<IThemeProvider, StubThemeProvider>();
-            services.AddSingleton<INotifier, StubNotifier>();
-            services.AddSingleton<ISingleInstanceCoordinator, StubSingleInstanceCoordinator>();
+            services.AddSingleton<IAutoStartManager, PortalAutostartManager>();
+            services.AddSingleton<IThemeProvider, PortalThemeProvider>();
+            services.AddSingleton<INotifier, DBusNotifier>();
+            services.AddSingleton<ISingleInstanceCoordinator, UnixSingleInstanceCoordinator>();
+            services.AddSingleton<AvaloniaTrayHost>();
+            services.AddSingleton<PortalFolderPicker>(sp =>
+                new PortalFolderPicker(() => _mainWindow));
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
 
-            desktop.MainWindow = new MainWindow
+            var single = provider.GetRequiredService<ISingleInstanceCoordinator>();
+            if (!single.IsPrimaryInstance)
+            {
+                single.TrySignalShowGui(TimeSpan.FromSeconds(2));
+                desktop.Shutdown(0);
+                return;
+            }
+
+            _mainWindow = new MainWindow
             {
                 DataContext = provider.GetRequiredService<ShellViewModel>(),
+            };
+
+            single.StartListening(() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                _mainWindow?.Show();
+                _mainWindow?.Activate();
+            }));
+
+            var theme = provider.GetRequiredService<IThemeProvider>();
+            theme.Initialize();
+
+            _trayHost = provider.GetRequiredService<AvaloniaTrayHost>();
+            _trayHost.OpenRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                _mainWindow?.Show();
+                _mainWindow?.Activate();
+            });
+            _trayHost.QuitRequested += (_, _) => desktop.Shutdown(0);
+            _ = _trayHost.StartAsync(this);
+
+            desktop.MainWindow = _mainWindow;
+            desktop.Exit += async (_, _) =>
+            {
+                _trayHost?.Dispose();
+                if (provider is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else if (provider is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             };
         }
 

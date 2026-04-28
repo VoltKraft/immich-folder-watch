@@ -5,7 +5,7 @@
         x:DataType="vm:ShellViewModel"
         Title="Immich Folder Watch"
         Width="900"
-        Height="600"
+        Height="640"
         MinWidth="640"
         MinHeight="480"
         WindowStartupLocation="CenterScreen">
@@ -19,7 +19,7 @@
                  Opacity="0.7"
                  HorizontalAlignment="Center" />
       <Border Padding="16,12" Background="#22FFD54F" CornerRadius="6">
-        <TextBlock Text="Linux port — work in progress (Phase 2b scaffold)"
+        <TextBlock Text="Linux port — Phase 3 platform-services scaffold"
                    FontWeight="Medium"
                    HorizontalAlignment="Center" />
       </Border>
@@ -28,6 +28,23 @@
         <TextBlock Text="{Binding ConfigPath}" FontFamily="monospace" Opacity="0.75" TextWrapping="Wrap" />
         <TextBlock Text="{Binding LogDirectory}" FontFamily="monospace" Opacity="0.75" TextWrapping="Wrap" />
       </StackPanel>
+      <StackPanel Spacing="8" Margin="0,12,0,0">
+        <TextBlock Text="Demo platform calls" FontWeight="SemiBold" Opacity="0.8" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Pick folder…" Command="{Binding PickFolderCommand}" />
+          <Button Content="Show notification" Command="{Binding ShowNotificationCommand}" />
+        </StackPanel>
+        <TextBlock Text="{Binding PickedFolderPath}"
+                   FontFamily="monospace"
+                   Opacity="0.7"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding PickedFolderPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+      <TextBlock Text="{Binding TrayStatusText}"
+                 Opacity="0.65"
+                 FontStyle="Italic"
+                 TextWrapping="Wrap"
+                 Margin="0,12,0,0" />
     </StackPanel>
   </Grid>
 </Window>
