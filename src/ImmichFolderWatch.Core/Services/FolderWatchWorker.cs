@@ -141,12 +141,43 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private void RegisterWatchers()
     {
+        var inotifyLimit = InotifyLimits.GetMaxUserWatches();
+        var inotifyConsumed = 0L;
+        var inotifyWarned = false;
+
         foreach (var source in _config.Watch.Sources)
         {
             if (!Directory.Exists(source.Path))
             {
                 _logger.LogWarning("Watch source directory does not exist and was skipped: {Path}", source.Path);
                 continue;
+            }
+
+            if (inotifyLimit.HasValue)
+            {
+                var estimated = InotifyLimits.CountWatchedDirectories(source.Path, source.IncludeSubdirectories);
+                var projected = inotifyConsumed + estimated;
+                if (projected > inotifyLimit.Value * InotifyLimits.RefuseFraction)
+                {
+                    _logger.LogError(
+                        "Skipping source {Path}: registering ~{Estimated} inotify watches would push the user total to {Projected}, exceeding 95% of fs.inotify.max_user_watches={Limit}. Increase the limit (e.g. sysctl fs.inotify.max_user_watches=524288) or remove sources.",
+                        source.Path,
+                        estimated,
+                        projected,
+                        inotifyLimit.Value);
+                    continue;
+                }
+
+                if (!inotifyWarned && projected > inotifyLimit.Value * InotifyLimits.WarnFraction)
+                {
+                    _logger.LogWarning(
+                        "Configured watch tree consumes {Projected} of {Limit} inotify watches (>50% of fs.inotify.max_user_watches). Increase the limit if you plan to add more sources.",
+                        projected,
+                        inotifyLimit.Value);
+                    inotifyWarned = true;
+                }
+
+                inotifyConsumed = projected;
             }
 
             var syncMode = WatchSourceSyncModes.Normalize(source.SyncMode);

@@ -17,6 +17,7 @@ public sealed class PortalThemeProvider : IThemeProvider
     private readonly ILogger<PortalThemeProvider> _logger;
     private bool _isDark;
     private bool _disposed;
+    private IDisposable? _signalSubscription;
 
     public PortalThemeProvider(DBusSession session)
         : this(session, NullLogger<PortalThemeProvider>.Instance)
@@ -35,9 +36,68 @@ public sealed class PortalThemeProvider : IThemeProvider
 
     public event EventHandler? ThemeChanged;
 
-    public void Initialize() => _ = RefreshAsync();
+    public void Initialize() => _ = InitializeAsync();
 
     public void Refresh() => _ = RefreshAsync();
+
+    private async Task InitializeAsync()
+    {
+        await RefreshAsync().ConfigureAwait(false);
+        await SubscribeAsync().ConfigureAwait(false);
+    }
+
+    private async Task SubscribeAsync()
+    {
+        if (_signalSubscription is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var connection = await _session.GetAsync().ConfigureAwait(false);
+            var subscription = await connection.WatchSignalAsync(
+                PortalService,
+                PortalPath,
+                SettingsIface,
+                "SettingChanged",
+                (MessageValueReader<uint>)ReadSettingChangedSignal,
+                (Action<Exception?, uint>)HandleSettingChanged,
+                this,
+                false,
+                ObserverFlags.None).ConfigureAwait(false);
+            _signalSubscription = subscription;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to subscribe to Settings portal SettingChanged signal");
+        }
+    }
+
+    private static uint ReadSettingChangedSignal(Message message, object? state)
+    {
+        var reader = message.GetBodyReader();
+        var ns = reader.ReadString();
+        var key = reader.ReadString();
+        if (!string.Equals(ns, AppearanceNamespace, StringComparison.Ordinal)
+            || !string.Equals(key, ColorSchemeKey, StringComparison.Ordinal))
+        {
+            return uint.MaxValue;
+        }
+
+        var variant = reader.ReadVariantValue();
+        return variant.GetUInt32();
+    }
+
+    private void HandleSettingChanged(Exception? exception, uint scheme)
+    {
+        if (exception is not null || scheme == uint.MaxValue)
+        {
+            return;
+        }
+
+        ApplyColorScheme(scheme);
+    }
 
     private async Task RefreshAsync()
     {
@@ -92,5 +152,7 @@ public sealed class PortalThemeProvider : IThemeProvider
         }
 
         _disposed = true;
+        _signalSubscription?.Dispose();
+        _signalSubscription = null;
     }
 }

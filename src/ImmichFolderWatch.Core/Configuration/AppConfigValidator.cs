@@ -1,8 +1,17 @@
+using System.Text.RegularExpressions;
+
 namespace ImmichFolderWatch.Core.Configuration;
 
 public static class AppConfigValidator
 {
     public const string ExampleApiKeyPlaceholder = "REPLACE_WITH_IMMICH_API_KEY";
+
+    private static readonly Regex WindowsDriveLetterPath = new(
+        @"^[A-Za-z]:[\\/]",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    public static bool LooksLikeWindowsPath(string? path)
+        => !string.IsNullOrEmpty(path) && WindowsDriveLetterPath.IsMatch(path);
 
     public static IReadOnlyList<string> Validate(AppConfig config)
     {
@@ -82,6 +91,11 @@ public static class AppConfigValidator
             if (string.IsNullOrWhiteSpace(source.Path))
             {
                 errors.Add($"watch.sources[{i}].path is required.");
+            }
+            else if (!OperatingSystem.IsWindows() && LooksLikeWindowsPath(source.Path))
+            {
+                errors.Add(
+                    $"watch.sources[{i}].path looks like a Windows path ({source.Path}). This config was probably copied from a Windows install — re-pick the folders for this host. Configs are not portable across operating systems.");
             }
             else if (!Directory.Exists(source.Path))
             {
