@@ -1,6 +1,6 @@
 using ImmichFolderWatch.Core.Services;
 
-namespace ImmichFolderWatch.Tests.Daemon;
+namespace ImmichFolderWatch.Tests.Core.Daemon;
 
 public sealed class WatchSourceFileFilterTests
 {

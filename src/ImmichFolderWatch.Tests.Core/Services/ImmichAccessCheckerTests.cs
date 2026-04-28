@@ -2,7 +2,7 @@ using System.Net;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Immich;
 
-namespace ImmichFolderWatch.Tests.Services;
+namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class ImmichAccessCheckerTests
 {

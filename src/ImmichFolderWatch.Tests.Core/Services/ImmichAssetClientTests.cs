@@ -5,7 +5,7 @@ using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Immich;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace ImmichFolderWatch.Tests.Services;
+namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class ImmichAssetClientTests
 {

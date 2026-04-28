@@ -1,6 +1,6 @@
 using ImmichFolderWatch.Core.Configuration;
 
-namespace ImmichFolderWatch.Tests.Configuration;
+namespace ImmichFolderWatch.Tests.Core.Configuration;
 
 public sealed class LogTargetsTests
 {

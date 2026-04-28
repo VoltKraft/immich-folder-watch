@@ -1,6 +1,6 @@
 using ImmichFolderWatch.Core.Services;
 
-namespace ImmichFolderWatch.Tests.Services;
+namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class FileReadinessCheckerTests
 {
