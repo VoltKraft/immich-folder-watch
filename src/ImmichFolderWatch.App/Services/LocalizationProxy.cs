@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
-using ImmichFolderWatch.App.Resources;
+using ImmichFolderWatch.App.Shared.Resources;
+using ImmichFolderWatch.App.Shared.Services;
 
 namespace ImmichFolderWatch.App.Services;
 

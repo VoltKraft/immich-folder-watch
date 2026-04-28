@@ -1,7 +1,7 @@
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Services;
 
-namespace ImmichFolderWatch.App.Models;
+namespace ImmichFolderWatch.App.Shared.Models;
 
 public static class StatusToneMapper
 {

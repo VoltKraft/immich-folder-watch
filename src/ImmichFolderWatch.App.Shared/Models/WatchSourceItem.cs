@@ -1,7 +1,7 @@
-using ImmichFolderWatch.App.ViewModels;
+using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 
-namespace ImmichFolderWatch.App.Models;
+namespace ImmichFolderWatch.App.Shared.Models;
 
 public sealed class WatchSourceItem : BindableBase
 {

@@ -1,4 +1,4 @@
-namespace ImmichFolderWatch.App.Models;
+namespace ImmichFolderWatch.App.Shared.Models;
 
 public sealed class SyncModeOption
 {

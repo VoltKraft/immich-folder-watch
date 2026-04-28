@@ -2,12 +2,12 @@
 using System.Globalization;
 using System.Resources;
 
-namespace ImmichFolderWatch.App.Resources;
+namespace ImmichFolderWatch.App.Shared.Resources;
 
 public static class Strings
 {
     private static readonly ResourceManager Manager =
-        new("ImmichFolderWatch.App.Resources.Strings", typeof(Strings).Assembly);
+        new("ImmichFolderWatch.App.Shared.Resources.Strings", typeof(Strings).Assembly);
 
     public static CultureInfo? Culture { get; set; }
 

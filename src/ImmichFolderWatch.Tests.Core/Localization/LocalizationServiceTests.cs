@@ -1,7 +1,7 @@
 using System.Globalization;
-using ImmichFolderWatch.App.Services;
+using ImmichFolderWatch.App.Shared.Services;
 
-namespace ImmichFolderWatch.Tests.Services;
+namespace ImmichFolderWatch.Tests.Core.Localization;
 
 public sealed class LocalizationServiceTests
 {

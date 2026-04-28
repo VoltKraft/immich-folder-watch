@@ -1,4 +1,4 @@
-namespace ImmichFolderWatch.App.Models;
+namespace ImmichFolderWatch.App.Shared.Models;
 
 /// <summary>
 /// Represents the semantic tone to use for status indicators and short feedback messages in the UI.

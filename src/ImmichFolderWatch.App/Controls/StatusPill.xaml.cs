@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using ImmichFolderWatch.App.Models;
+using ImmichFolderWatch.App.Shared.Models;
 
 namespace ImmichFolderWatch.App.Controls;
 

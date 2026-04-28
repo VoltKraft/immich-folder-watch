@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
+    <ProjectReference Include="../ImmichFolderWatch.App.Shared/ImmichFolderWatch.App.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,20 +43,6 @@
   <ItemGroup>
     <Resource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
     <Resource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <NeutralLanguage>en</NeutralLanguage>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Resources\Strings.resx">
-      <Generator></Generator>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Resources\Strings.de.resx">
-      <Generator></Generator>
-      <DependentUpon>Strings.resx</DependentUpon>
-    </EmbeddedResource>
   </ItemGroup>
 
   <Target Name="GenerateBrandAssets"

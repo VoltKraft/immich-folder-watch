@@ -1,5 +1,5 @@
-using ImmichFolderWatch.App.Models;
-using ImmichFolderWatch.App.Services;
+using ImmichFolderWatch.App.Shared.Models;
+using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;

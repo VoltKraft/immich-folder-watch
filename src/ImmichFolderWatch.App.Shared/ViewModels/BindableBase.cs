@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace ImmichFolderWatch.App.ViewModels;
+namespace ImmichFolderWatch.App.Shared.ViewModels;
 
 public abstract class BindableBase : INotifyPropertyChanged
 {

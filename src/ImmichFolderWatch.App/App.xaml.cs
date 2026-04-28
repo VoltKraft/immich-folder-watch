@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Services;
+using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
 using ImmichFolderWatch.Core.Services;

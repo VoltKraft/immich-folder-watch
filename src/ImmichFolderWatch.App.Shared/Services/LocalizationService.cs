@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Threading;
-using ImmichFolderWatch.App.Resources;
+using ImmichFolderWatch.App.Shared.Resources;
 
-namespace ImmichFolderWatch.App.Services;
+namespace ImmichFolderWatch.App.Shared.Services;
 
 public sealed class LocalizationService
 {

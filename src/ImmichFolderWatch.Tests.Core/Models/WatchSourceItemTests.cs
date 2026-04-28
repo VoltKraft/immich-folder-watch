@@ -1,6 +1,6 @@
-using ImmichFolderWatch.App.Models;
+using ImmichFolderWatch.App.Shared.Models;
 
-namespace ImmichFolderWatch.Tests.Gui;
+namespace ImmichFolderWatch.Tests.Core.Models;
 
 public sealed class WatchSourceItemTests
 {

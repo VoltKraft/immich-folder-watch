@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using ImmichFolderWatch.App.Resources;
+using ImmichFolderWatch.App.Shared.Resources;
 
 namespace ImmichFolderWatch.App.Logging;
 
