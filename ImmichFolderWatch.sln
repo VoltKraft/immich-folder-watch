@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.App", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.App.Shared", "src/ImmichFolderWatch.App.Shared/ImmichFolderWatch.App.Shared.csproj", "{AAAC3434-021F-4438-881E-2352C3DA4A1B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.App.Linux", "src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj", "{A3352CB7-FF4F-4910-AAC6-429DFB0D2D29}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.Tests", "src/ImmichFolderWatch.Tests/ImmichFolderWatch.Tests.csproj", "{68F9DFD0-1383-4868-9C2A-AD4BB5546022}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImmichFolderWatch.Tests.Core", "src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj", "{4502DB4F-83BB-45C3-9999-72C6237D8D04}"
@@ -36,6 +38,10 @@ Global
 		{AAAC3434-021F-4438-881E-2352C3DA4A1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AAAC3434-021F-4438-881E-2352C3DA4A1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AAAC3434-021F-4438-881E-2352C3DA4A1B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A3352CB7-FF4F-4910-AAC6-429DFB0D2D29}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3352CB7-FF4F-4910-AAC6-429DFB0D2D29}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3352CB7-FF4F-4910-AAC6-429DFB0D2D29}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3352CB7-FF4F-4910-AAC6-429DFB0D2D29}.Release|Any CPU.Build.0 = Release|Any CPU
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68F9DFD0-1383-4868-9C2A-AD4BB5546022}.Release|Any CPU.ActiveCfg = Release|Any CPU

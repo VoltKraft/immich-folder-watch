@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ImmichFolderWatch.App.Linux.ViewModels"
+        x:Class="ImmichFolderWatch.App.Linux.Views.MainWindow"
+        x:DataType="vm:ShellViewModel"
+        Title="Immich Folder Watch"
+        Width="900"
+        Height="600"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+  <Grid Margin="32">
+    <StackPanel Spacing="14" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="640">
+      <TextBlock Text="Immich Folder Watch"
+                 FontSize="32"
+                 FontWeight="SemiBold"
+                 HorizontalAlignment="Center" />
+      <TextBlock Text="{Binding VersionText}"
+                 Opacity="0.7"
+                 HorizontalAlignment="Center" />
+      <Border Padding="16,12" Background="#22FFD54F" CornerRadius="6">
+        <TextBlock Text="Linux port — work in progress (Phase 2b scaffold)"
+                   FontWeight="Medium"
+                   HorizontalAlignment="Center" />
+      </Border>
+      <StackPanel Spacing="6" Margin="0,12,0,0">
+        <TextBlock Text="Resolved per-user paths" FontWeight="SemiBold" Opacity="0.8" />
+        <TextBlock Text="{Binding ConfigPath}" FontFamily="monospace" Opacity="0.75" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding LogDirectory}" FontFamily="monospace" Opacity="0.75" TextWrapping="Wrap" />
+      </StackPanel>
+    </StackPanel>
+  </Grid>
+</Window>
