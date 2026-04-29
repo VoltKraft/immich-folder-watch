@@ -27,7 +27,22 @@ require() {
   fi
 }
 
-require dotnet  "Install .NET 10 SDK (e.g. via https://dot.net/v1/dotnet-install.sh)."
+# .NET SDK path resolution:
+# - prefer dotnet on PATH
+# - else fall back to the default dotnet-install.sh per-user location at $HOME/.dotnet
+# - else honour an explicit DOTNET_ROOT
+if ! command -v dotnet >/dev/null 2>&1; then
+  for candidate in "${DOTNET_ROOT:-}" "${HOME}/.dotnet" "/usr/share/dotnet" "/opt/dotnet"; do
+    if [[ -n "${candidate}" && -x "${candidate}/dotnet" ]]; then
+      export DOTNET_ROOT="${candidate}"
+      export PATH="${candidate}:${PATH}"
+      echo "Using dotnet from ${candidate} (auto-detected)."
+      break
+    fi
+  done
+fi
+
+require dotnet  "Install .NET 10 SDK (e.g. via https://dot.net/v1/dotnet-install.sh) or set DOTNET_ROOT to its install dir."
 require python3 "Install Python 3 (most distributions ship it as 'python3')."
 require git     "Install git."
 
@@ -49,6 +64,10 @@ fi
 mkdir -p "$(dirname "${OUTPUT}")"
 
 echo "Running flatpak-dotnet-generator.py against ${PROJECT}…"
-python3 "${GENERATOR}" --dotnet 10 --runtime-version 10.0 "${OUTPUT}" "${PROJECT}"
+python3 "${GENERATOR}" \
+  --dotnet 10 \
+  --freedesktop 24.08 \
+  --runtime=linux-x64 \
+  "${OUTPUT}" "${PROJECT}"
 
 echo "Wrote ${OUTPUT}"
