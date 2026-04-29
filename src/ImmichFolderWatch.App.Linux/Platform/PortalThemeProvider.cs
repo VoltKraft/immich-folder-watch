@@ -85,8 +85,7 @@ public sealed class PortalThemeProvider : IThemeProvider
             return uint.MaxValue;
         }
 
-        var variant = reader.ReadVariantValue();
-        return variant.GetUInt32();
+        return UnwrapNestedUInt32(reader.ReadVariantValue());
     }
 
     private void HandleSettingChanged(Exception? exception, uint scheme)
@@ -126,10 +125,22 @@ public sealed class PortalThemeProvider : IThemeProvider
     }
 
     private static uint ReadColorSchemeReply(Message message, object? state)
+        => UnwrapNestedUInt32(message.GetBodyReader().ReadVariantValue());
+
+    private static uint UnwrapNestedUInt32(VariantValue variant)
     {
-        var reader = message.GetBodyReader();
-        var variant = reader.ReadVariantValue();
-        return variant.GetUInt32();
+        // xdg-desktop-portal Settings.Read returns a `v` whose payload is
+        // itself a variant on most backends (dconf, GSettings) — so the
+        // outer ReadVariantValue gives us a Variant-typed VariantValue
+        // that we have to unwrap once more before the actual UInt32.
+        while (variant.Type == VariantValueType.Variant)
+        {
+            variant = variant.GetVariantValue();
+        }
+
+        return variant.Type == VariantValueType.UInt32
+            ? variant.GetUInt32()
+            : uint.MaxValue;
     }
 
     private void ApplyColorScheme(uint scheme)

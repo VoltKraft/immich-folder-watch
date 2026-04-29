@@ -27,13 +27,26 @@ public sealed partial class App : Application
             services.AddLogging(builder =>
             {
                 builder.SetMinimumLevel(LogLevel.Information);
-                builder.AddSimpleConsole(options =>
+                if (JournaldLoggingExtensions.IsJournaldDetected())
                 {
-                    options.SingleLine = true;
-                    options.IncludeScopes = false;
-                    options.TimestampFormat = "HH:mm:ss ";
-                });
-                builder.AddJournaldConsoleIfDetected();
+                    // systemd / journald style for autostart + Flathub launches
+                    // (one provider only — stacking SimpleConsole + Systemd
+                    // collides on the FormatterName, last one wins).
+                    builder.AddSystemdConsole(options =>
+                    {
+                        options.IncludeScopes = false;
+                        options.UseUtcTimestamp = true;
+                    });
+                }
+                else
+                {
+                    builder.AddSimpleConsole(options =>
+                    {
+                        options.SingleLine = true;
+                        options.IncludeScopes = false;
+                        options.TimestampFormat = "HH:mm:ss ";
+                    });
+                }
             });
             services.AddSingleton<DBusSession>();
             services.AddSingleton<IPlatformPaths, XdgPlatformPaths>();
@@ -43,7 +56,9 @@ public sealed partial class App : Application
             services.AddSingleton<ISingleInstanceCoordinator, UnixSingleInstanceCoordinator>();
             services.AddSingleton<AvaloniaTrayHost>();
             services.AddSingleton<PortalFolderPicker>(sp =>
-                new PortalFolderPicker(() => _mainWindow));
+                new PortalFolderPicker(
+                    () => _mainWindow,
+                    sp.GetRequiredService<ILogger<PortalFolderPicker>>()));
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
 

@@ -87,7 +87,20 @@ public sealed class AvaloniaTrayHost : IDisposable
             writer.WriteString(SniWatcherName);
             var message = writer.CreateMessage();
 
-            return await connection.CallMethodAsync(message, ReadBoolReply, this).ConfigureAwait(false);
+            // The Flatpak D-Bus proxy can stall on filtered NameHasOwner
+            // queries instead of returning AccessDenied; cap the wait so
+            // the tray UI never sits on "pending probe" indefinitely.
+            var probeTask = connection.CallMethodAsync(message, ReadBoolReply, this);
+            var winner = await Task.WhenAny(probeTask, Task.Delay(TimeSpan.FromSeconds(3), cancellationToken))
+                .ConfigureAwait(false);
+            if (winner != probeTask)
+            {
+                _logger.LogInformation(
+                    "SNI watcher probe timed out after 3s — assuming no tray host (typical on bare GNOME).");
+                return false;
+            }
+
+            return await probeTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
