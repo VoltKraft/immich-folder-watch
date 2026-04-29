@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tmds.DBus.Protocol;
@@ -15,7 +14,6 @@ public sealed class AvaloniaTrayHost : IDisposable
 
     private readonly DBusSession _session;
     private readonly ILogger<AvaloniaTrayHost> _logger;
-    private TrayIcon? _trayIcon;
     private bool _disposed;
 
     public AvaloniaTrayHost(DBusSession session)
@@ -31,9 +29,13 @@ public sealed class AvaloniaTrayHost : IDisposable
 
     public bool IsTrayAvailable { get; private set; }
 
+    // OpenRequested + QuitRequested are reserved for the Phase 6 tray
+    // re-activation; suppress the "never invoked" warning until then.
+#pragma warning disable CS0067
     public event EventHandler? OpenRequested;
 
     public event EventHandler? QuitRequested;
+#pragma warning restore CS0067
 
     public event EventHandler? TrayUnavailable;
 
@@ -41,34 +43,28 @@ public sealed class AvaloniaTrayHost : IDisposable
     {
         ArgumentNullException.ThrowIfNull(application);
 
+        // Phase 4 ships the tray-less default per Plan §4 / Decision #3.
+        // Avalonia 11.3.x's TrayIcon registration crashes the process with
+        // org.freedesktop.DBus.Error.ServiceUnknown on bare-GNOME / Flatpak
+        // setups where the SNI watcher claims to exist but the actual
+        // registration fails downstream. The probe below is purely
+        // informational so the QA log shows whether SNI was detected;
+        // the icon itself stays unregistered until Phase 6 QA on KDE
+        // Plasma can validate the proper registration path with full
+        // error handling around it.
         IsTrayAvailable = await ProbeSniWatcherAsync(cancellationToken).ConfigureAwait(false);
-        if (!IsTrayAvailable)
+        if (IsTrayAvailable)
+        {
+            _logger.LogInformation(
+                "StatusNotifierWatcher detected on the session bus — tray icon registration is intentionally deferred to Phase 6 QA. Running in window-only mode for now.");
+        }
+        else
         {
             _logger.LogInformation(
                 "No StatusNotifierWatcher on the session bus — running in window-only mode (GNOME without AppIndicator extension is the typical case).");
-            TrayUnavailable?.Invoke(this, EventArgs.Empty);
-            return;
         }
 
-        var menu = new NativeMenu
-        {
-            Items =
-            {
-                new NativeMenuItem("Open") { Command = new RelayCommand(() => OpenRequested?.Invoke(this, EventArgs.Empty)) },
-                new NativeMenuItemSeparator(),
-                new NativeMenuItem("Quit") { Command = new RelayCommand(() => QuitRequested?.Invoke(this, EventArgs.Empty)) },
-            },
-        };
-
-        _trayIcon = new TrayIcon
-        {
-            ToolTipText = "Immich Folder Watch",
-            Menu = menu,
-            IsVisible = true,
-        };
-        _trayIcon.Clicked += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
-
-        TrayIcon.SetIcons(application, new TrayIcons { _trayIcon });
+        TrayUnavailable?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task<bool> ProbeSniWatcherAsync(CancellationToken cancellationToken)
@@ -96,7 +92,7 @@ public sealed class AvaloniaTrayHost : IDisposable
             if (winner != probeTask)
             {
                 _logger.LogInformation(
-                    "SNI watcher probe timed out after 3s — assuming no tray host (typical on bare GNOME).");
+                    "SNI watcher probe timed out after 3s — assuming no tray host.");
                 return false;
             }
 
@@ -123,27 +119,5 @@ public sealed class AvaloniaTrayHost : IDisposable
         }
 
         _disposed = true;
-        _trayIcon?.Dispose();
-        _trayIcon = null;
-    }
-
-    private sealed class RelayCommand : System.Windows.Input.ICommand
-    {
-        private readonly Action _action;
-
-        public RelayCommand(Action action)
-        {
-            _action = action;
-        }
-
-        public event EventHandler? CanExecuteChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public bool CanExecute(object? parameter) => true;
-
-        public void Execute(object? parameter) => _action();
     }
 }

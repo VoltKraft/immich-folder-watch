@@ -23,6 +23,15 @@ public sealed partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Avalonia 11.3.x lets unobserved task exceptions reach the
+            // dispatcher and kill the process; route them to the logger
+            // instead so background D-Bus failures don't take the GUI down.
+            TaskScheduler.UnobservedTaskException += static (sender, args) =>
+            {
+                Console.Error.WriteLine($"[unobserved-task] {args.Exception}");
+                args.SetObserved();
+            };
+
             var services = new ServiceCollection();
             services.AddLogging(builder =>
             {
