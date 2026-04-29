@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Immich Folder Watch
+GenericName=Folder Watcher
+Comment=Watch folders and upload new media to your Immich server
+Exec=immich-folder-watch %U
+Icon=io.github.voltkraft.ImmichFolderWatch
+Categories=Graphics;Photography;
+Keywords=immich;photo;photos;backup;upload;watch;sync;
+Terminal=false
+StartupNotify=true
+StartupWMClass=immich-folder-watch

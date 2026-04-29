@@ -1,0 +1,67 @@
+app-id: io.github.voltkraft.ImmichFolderWatch
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.dotnet10
+command: immich-folder-watch
+
+build-options:
+  append-path: /usr/lib/sdk/dotnet10/bin
+  env:
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    DOTNET_NOLOGO: "1"
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+
+finish-args:
+  # X11/Wayland shared memory
+  - --share=ipc
+  # Primary display server
+  - --socket=wayland
+  # XWayland / X11 fallback
+  - --socket=fallback-x11
+  # Immich API + Socket.IO realtime
+  - --share=network
+  # Avalonia GPU compositor
+  - --device=dri
+  # Toasts
+  - --talk-name=org.freedesktop.Notifications
+  # Tray on KDE Plasma + AppIndicator-extended GNOME
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # FileChooser, Settings, Notification portals
+  - --talk-name=org.freedesktop.portal.Desktop
+  # Autostart consent + run-in-background
+  - --talk-name=org.freedesktop.portal.Background
+  # Browse-only fallback so the FileChooser portal can preview thumbnails
+  # — actual watch I/O goes through doc-portal handles, not these grants.
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-videos:ro
+
+modules:
+  - name: immich-folder-watch
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: ../..
+      - nuget-sources.json
+    build-commands:
+      - >-
+        dotnet publish
+        src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj
+        --configuration Release
+        --runtime linux-x64
+        --self-contained true
+        --source ./flatpak-node/nuget
+        -p:PublishSingleFile=false
+        -p:UseAppHost=true
+        --output ${FLATPAK_DEST}/lib/immich-folder-watch
+      - install -dm755 ${FLATPAK_DEST}/bin
+      - ln -sf /app/lib/immich-folder-watch/immich-folder-watch ${FLATPAK_DEST}/bin/immich-folder-watch
+      - install -Dm644 packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
+          ${FLATPAK_DEST}/share/applications/io.github.voltkraft.ImmichFolderWatch.desktop
+      - install -Dm644 packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+          ${FLATPAK_DEST}/share/metainfo/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+      - install -Dm644 packaging/flatpak/icons/scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg
+          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg
+      - install -Dm644 packaging/flatpak/icons/512x512/apps/io.github.voltkraft.ImmichFolderWatch.png
+          ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.voltkraft.ImmichFolderWatch.png
