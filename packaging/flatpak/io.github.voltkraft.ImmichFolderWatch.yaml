@@ -51,7 +51,7 @@ modules:
         --configuration Release
         --runtime linux-x64
         --self-contained true
-        --source ./flatpak-node/nuget
+        --source ./nuget-sources
         -p:PublishSingleFile=false
         -p:UseAppHost=true
         --output ${FLATPAK_DEST}/lib/immich-folder-watch
