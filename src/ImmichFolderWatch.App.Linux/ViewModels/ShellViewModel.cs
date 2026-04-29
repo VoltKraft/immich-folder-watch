@@ -34,8 +34,8 @@ public sealed class ShellViewModel : BindableBase
         ConfigPath = $"Config: {paths.GetConfigPath()}";
         LogDirectory = $"Logs:   {paths.GetLogDirectory()}";
 
-        PickFolderCommand = new ActionCommand(async () => await PickFolderAsync().ConfigureAwait(false));
-        ShowNotificationCommand = new ActionCommand(async () => await ShowNotificationAsync().ConfigureAwait(false));
+        PickFolderCommand = new ActionCommand(PickFolderAsync);
+        ShowNotificationCommand = new ActionCommand(ShowNotificationAsync);
 
         trayHost.TrayUnavailable += (_, _) => TrayStatusText =
             "Tray unavailable — running window-only (install the AppIndicator extension on GNOME for a tray icon).";
@@ -67,7 +67,7 @@ public sealed class ShellViewModel : BindableBase
 
     private async Task PickFolderAsync()
     {
-        var picked = await _folderPicker.PickFolderAsync("Pick a folder to watch").ConfigureAwait(false);
+        var picked = await _folderPicker.PickFolderAsync("Pick a folder to watch");
         if (!string.IsNullOrEmpty(picked))
         {
             PickedFolderPath = picked;
@@ -79,7 +79,7 @@ public sealed class ShellViewModel : BindableBase
         await _notifier.ShowAsync(
             "Immich Folder Watch",
             "Hello from the Linux scaffold — D-Bus reachable.",
-            NotificationKind.Info).ConfigureAwait(false);
+            NotificationKind.Info);
     }
 
     private sealed class ActionCommand : ICommand

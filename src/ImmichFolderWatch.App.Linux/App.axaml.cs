@@ -5,8 +5,10 @@ using Avalonia.Markup.Xaml;
 using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Linux.ViewModels;
 using ImmichFolderWatch.App.Linux.Views;
+using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Platform;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.App.Linux;
 
@@ -22,7 +24,17 @@ public sealed partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = new ServiceCollection();
-            services.AddLogging();
+            services.AddLogging(builder =>
+            {
+                builder.SetMinimumLevel(LogLevel.Information);
+                builder.AddSimpleConsole(options =>
+                {
+                    options.SingleLine = true;
+                    options.IncludeScopes = false;
+                    options.TimestampFormat = "HH:mm:ss ";
+                });
+                builder.AddJournaldConsoleIfDetected();
+            });
             services.AddSingleton<DBusSession>();
             services.AddSingleton<IPlatformPaths, XdgPlatformPaths>();
             services.AddSingleton<IAutoStartManager, PortalAutostartManager>();

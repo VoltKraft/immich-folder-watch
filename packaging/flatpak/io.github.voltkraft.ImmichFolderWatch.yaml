@@ -32,6 +32,10 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   # FileChooser, Settings, Notification portals
   - --talk-name=org.freedesktop.portal.Desktop
+  # Resolve doc-portal handles returned by the FileChooser portal —
+  # without this, Avalonia's TryGetLocalPath() blocks on a D-Bus call
+  # the Flatpak proxy refuses, freezing the UI thread.
+  - --talk-name=org.freedesktop.portal.Documents
   # Autostart consent + run-in-background
   - --talk-name=org.freedesktop.portal.Background
   # Browse-only fallback so the FileChooser portal can preview thumbnails
