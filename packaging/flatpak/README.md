@@ -45,7 +45,7 @@ The manifest declares only the portals the app actually needs:
 
 | `finish-args` | What it enables |
 |---|---|
-| `--share=ipc` + `--socket=wayland` + `--socket=fallback-x11` | Display server access (Avalonia) |
+| `--share=ipc` + `--socket=wayland` + `--socket=x11` | Display server access (Avalonia 11.2.x's `UsePlatformDetect()` always uses X11/XWayland; Wayland socket reserved for the eventual native backend) |
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |

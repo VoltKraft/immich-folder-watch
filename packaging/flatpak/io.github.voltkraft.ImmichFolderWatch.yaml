@@ -18,8 +18,10 @@ finish-args:
   - --share=ipc
   # Primary display server
   - --socket=wayland
-  # XWayland / X11 fallback
-  - --socket=fallback-x11
+  # XWayland — required as well as Wayland because Avalonia 11.2.x's
+  # UsePlatformDetect() still chooses the X11 backend on Linux. Drop
+  # this back to fallback-x11 once Avalonia ships stable Wayland-native.
+  - --socket=x11
   # Immich API + Socket.IO realtime
   - --share=network
   # Avalonia GPU compositor
