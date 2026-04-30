@@ -23,7 +23,13 @@ flatpak install --user flathub \
 Then, from the repo root:
 
 ```bash
-# 1) Pre-generate the offline NuGet feed (Flathub forbids network in-build)
+# 1) Pre-generate the offline NuGet feed (Flathub forbids network during the
+#    build, so flatpak-builder hands dotnet a frozen package list).
+#    Run this once on the first build, AND every time anything under src/
+#    changes its NuGet dependencies — most commonly an Avalonia or .NET
+#    package version bump in src/ImmichFolderWatch.App.Linux/*.csproj.
+#    A stale nuget-sources.json silently re-installs the OLD packages,
+#    which has burned us repeatedly. If in doubt, regenerate.
 ./tools/generate-nuget-sources.sh
 
 # 2) Build + install into the user Flatpak repo
@@ -31,7 +37,7 @@ flatpak-builder --user --install --force-clean \
     packaging/flatpak/build-dir \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
 
-# 3) Run it
+# 3) Run it (from a terminal so log output is visible)
 flatpak run io.github.voltkraft.ImmichFolderWatch
 ```
 
@@ -39,13 +45,27 @@ flatpak run io.github.voltkraft.ImmichFolderWatch
 `packaging/flatpak/nuget-sources.json` and `packaging/flatpak/repo/` are
 gitignored — they are regenerated on every build.
 
+> **If a previous build is misbehaving in unexpected ways**, nuke the
+> caches and start fresh. flatpak-builder happily reuses partial state
+> from the last run, so a stale offline feed or an incremental cache hit
+> can hide a real change:
+>
+> ```bash
+> rm -f packaging/flatpak/nuget-sources.json
+> rm -rf .flatpak-builder packaging/flatpak/build-dir
+> ./tools/generate-nuget-sources.sh
+> flatpak-builder --user --install --force-clean \
+>     packaging/flatpak/build-dir \
+>     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+> ```
+
 ## Sandbox permissions
 
 The manifest declares only the portals the app actually needs:
 
 | `finish-args` | What it enables |
 |---|---|
-| `--share=ipc` + `--socket=wayland` + `--socket=x11` | Display server access (Avalonia 11.2.x's `UsePlatformDetect()` always uses X11/XWayland; Wayland socket reserved for the eventual native backend) |
+| `--share=ipc` + `--socket=wayland` + `--socket=x11` | Display server access. Avalonia 11.3.x renders over XWayland on Wayland sessions; the `--socket=wayland` line is reserved for the future Wayland-native backend. |
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |
