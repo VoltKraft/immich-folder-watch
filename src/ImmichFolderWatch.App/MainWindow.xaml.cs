@@ -10,10 +10,11 @@ using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Services;
-using ImmichFolderWatch.App.ViewModels;
+using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.App;
@@ -30,7 +31,7 @@ public sealed partial class MainWindow : Window
 
     private readonly AppHost _appHost;
     private readonly SyncStatusProvider _syncStatusProvider;
-    private readonly AutostartManager _autostartManager;
+    private readonly IAutoStartManager _autostartManager;
     private readonly AppConfigLoader _configLoader;
     private readonly ThemeWatcher _themeWatcher;
     private readonly LocalizationService _localizationService;
@@ -42,7 +43,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(
         AppHost appHost,
         SyncStatusProvider syncStatusProvider,
-        AutostartManager autostartManager,
+        IAutoStartManager autostartManager,
         AppConfigLoader configLoader,
         ThemeWatcher themeWatcher,
         LocalizationService localizationService)
@@ -57,7 +58,7 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
 
-        ViewModel = new MainWindowViewModel(_syncStatusProvider, _autostartManager, _localizationService)
+        ViewModel = new MainWindowViewModel(_syncStatusProvider, _autostartManager, _localizationService, new WpfUiDispatcher())
         {
             ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}",
         };

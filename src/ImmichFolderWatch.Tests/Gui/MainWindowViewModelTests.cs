@@ -1,9 +1,10 @@
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Services;
-using ImmichFolderWatch.App.ViewModels;
+using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Tests.Gui;
@@ -81,7 +82,22 @@ public sealed class MainWindowViewModelTests
 
     private static MainWindowViewModel CreateViewModel()
     {
-        return new MainWindowViewModel(new SyncStatusProvider(), new AutostartManager(), LocalizationService.Instance);
+        return new MainWindowViewModel(
+            new SyncStatusProvider(),
+            new AutostartManager(),
+            LocalizationService.Instance,
+            new SyncTestUiDispatcher());
+    }
+
+    private sealed class SyncTestUiDispatcher : IUiDispatcher
+    {
+        public bool IsOnUiThread => true;
+
+        public void Post(Action action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+            action();
+        }
     }
 
     [Fact]

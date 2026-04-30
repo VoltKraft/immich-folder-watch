@@ -1,18 +1,16 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Windows;
-using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Shared.Services;
-using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 
-namespace ImmichFolderWatch.App.ViewModels;
+namespace ImmichFolderWatch.App.Shared.ViewModels;
 
 public sealed class MainWindowViewModel : BindableBase
 {
@@ -86,8 +84,9 @@ public sealed class MainWindowViewModel : BindableBase
     };
 
     private readonly SyncStatusProvider _syncStatusProvider;
-    private readonly AutostartManager _autostartManager;
+    private readonly IAutoStartManager _autostartManager;
     private readonly LocalizationService _localizationService;
+    private readonly IUiDispatcher _uiDispatcher;
     private bool _suppressAutostartWrite;
     private bool _suppressLanguageWrite;
 
@@ -131,12 +130,14 @@ public sealed class MainWindowViewModel : BindableBase
 
     public MainWindowViewModel(
         SyncStatusProvider syncStatusProvider,
-        AutostartManager autostartManager,
-        LocalizationService localizationService)
+        IAutoStartManager autostartManager,
+        LocalizationService localizationService,
+        IUiDispatcher uiDispatcher)
     {
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
         _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
+        _uiDispatcher = uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher));
 
         AvailableLanguages = BuildLanguageOptions();
         _selectedLanguage = FindLanguageOption(_localizationService.CurrentLanguage);
@@ -152,7 +153,7 @@ public sealed class MainWindowViewModel : BindableBase
         ResetImmichCheckStatus();
 
         _suppressAutostartWrite = true;
-        AutostartEnabled = _autostartManager.IsEnabled();
+        AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
         _suppressAutostartWrite = false;
 
         RefreshSyncStatusFromProvider();
@@ -675,7 +676,7 @@ public sealed class MainWindowViewModel : BindableBase
         _suppressAutostartWrite = true;
         try
         {
-            AutostartEnabled = _autostartManager.IsEnabled();
+            AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
         }
         finally
         {
@@ -689,11 +690,11 @@ public sealed class MainWindowViewModel : BindableBase
         {
             if (enabled)
             {
-                _autostartManager.Enable();
+                _autostartManager.EnableAsync().GetAwaiter().GetResult();
             }
             else
             {
-                _autostartManager.Disable();
+                _autostartManager.DisableAsync().GetAwaiter().GetResult();
             }
         }
         catch (Exception ex)
@@ -702,7 +703,7 @@ public sealed class MainWindowViewModel : BindableBase
             _suppressAutostartWrite = true;
             try
             {
-                AutostartEnabled = _autostartManager.IsEnabled();
+                AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
             }
             finally
             {
@@ -713,27 +714,25 @@ public sealed class MainWindowViewModel : BindableBase
 
     private void SyncStatusProvider_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_uiDispatcher.IsOnUiThread)
         {
             RefreshSyncStatusFromProvider();
         }
         else
         {
-            dispatcher.BeginInvoke(new Action(RefreshSyncStatusFromProvider));
+            _uiDispatcher.Post(RefreshSyncStatusFromProvider);
         }
     }
 
     private void LocalizationService_LanguageChanged(object? sender, EventArgs e)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_uiDispatcher.IsOnUiThread)
         {
             ApplyLocalizedStrings();
         }
         else
         {
-            dispatcher.BeginInvoke(new Action(ApplyLocalizedStrings));
+            _uiDispatcher.Post(ApplyLocalizedStrings);
         }
     }
 
