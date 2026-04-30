@@ -1,19 +1,27 @@
 using System.ComponentModel;
-using System.Windows;
 using ImmichFolderWatch.App.Shared.Resources;
-using ImmichFolderWatch.App.Shared.Services;
+using ImmichFolderWatch.Core.Platform;
 
-namespace ImmichFolderWatch.App.Services;
+namespace ImmichFolderWatch.App.Shared.Services;
 
 public sealed class LocalizationProxy : INotifyPropertyChanged
 {
+    private readonly IUiDispatcher? _uiDispatcher;
+
     public LocalizationProxy()
-        : this(LocalizationService.Instance)
+        : this(LocalizationService.Instance, null)
     {
     }
 
     public LocalizationProxy(LocalizationService localizationService)
+        : this(localizationService, null)
     {
+    }
+
+    public LocalizationProxy(LocalizationService localizationService, IUiDispatcher? uiDispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(localizationService);
+        _uiDispatcher = uiDispatcher;
         localizationService.LanguageChanged += OnLanguageChanged;
     }
 
@@ -130,14 +138,13 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
             handler.Invoke(this, new PropertyChangedEventArgs(string.Empty));
         }
 
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (_uiDispatcher is null || _uiDispatcher.IsOnUiThread)
         {
-            dispatcher.Invoke(Raise);
+            Raise();
         }
         else
         {
-            Raise();
+            _uiDispatcher.Post(Raise);
         }
     }
 }

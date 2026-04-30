@@ -1,7 +1,11 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImmichFolderWatch.App.Shared.Services;assembly=ImmichFolderWatch.App.Shared"
              x:Class="ImmichFolderWatch.App.Linux.App"
              RequestedThemeVariant="Default">
+  <Application.Resources>
+    <loc:LocalizationProxy x:Key="Loc" />
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>

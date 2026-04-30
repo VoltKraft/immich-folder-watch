@@ -5,8 +5,11 @@ using Avalonia.Markup.Xaml;
 using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Linux.ViewModels;
 using ImmichFolderWatch.App.Linux.Views;
+using ImmichFolderWatch.App.Shared.Services;
+using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Platform;
+using ImmichFolderWatch.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -63,11 +66,19 @@ public sealed partial class App : Application
             services.AddSingleton<IThemeProvider, PortalThemeProvider>();
             services.AddSingleton<INotifier, DBusNotifier>();
             services.AddSingleton<ISingleInstanceCoordinator, UnixSingleInstanceCoordinator>();
+            services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
             services.AddSingleton<AvaloniaTrayHost>();
             services.AddSingleton<PortalFolderPicker>(sp =>
                 new PortalFolderPicker(
                     () => _mainWindow,
                     sp.GetRequiredService<ILogger<PortalFolderPicker>>()));
+            services.AddSingleton(LocalizationService.Instance);
+            services.AddSingleton<LocalizationProxy>(sp =>
+                new LocalizationProxy(
+                    sp.GetRequiredService<LocalizationService>(),
+                    sp.GetRequiredService<IUiDispatcher>()));
+            services.AddSingleton<SyncStatusProvider>();
+            services.AddSingleton<MainWindowViewModel>();
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
 
@@ -85,9 +96,18 @@ public sealed partial class App : Application
                 return;
             }
 
+            // The Avalonia MainWindow expects MainWindowViewModel as its
+            // DataContext (mirrors the WPF head); the LocalizationProxy is
+            // resolved here purely for its side-effect of subscribing to
+            // LocalizationService.LanguageChanged so the {StaticResource Loc}
+            // bindings refresh when the language switches.
+            _ = provider.GetRequiredService<LocalizationProxy>();
+            var viewModel = provider.GetRequiredService<MainWindowViewModel>();
+            viewModel.ProductVersionText =
+                $"v{typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
             _mainWindow = new MainWindow
             {
-                DataContext = provider.GetRequiredService<ShellViewModel>(),
+                DataContext = viewModel,
             };
 
             single.StartListening(() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
