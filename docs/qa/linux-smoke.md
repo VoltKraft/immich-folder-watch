@@ -167,14 +167,21 @@ Notes: if the picker hangs, check the log for
 `org.freedesktop.portal.Documents` errors — see
 `phase4_lessons.md` rule (FileChooser portal Documents talk-name).
 
-#### SMK-07 — Picker rejects no-permission paths gracefully  `M`
+#### SMK-07 — Picker rejects truly inaccessible paths gracefully  `M`
 
 Steps:
-1. Try to pick `/etc/` via the picker (nav by typing the path or
-   keyboard-walking).
+1. Try to pick `/root/` via the picker (Ctrl-L → type `/root/` →
+   Enter). Choose `/root/` itself if listed, or any path inside.
 
 Expected: the picker either disallows the navigation (portal-side
-ACL) or returns no doc handle. App stays responsive; no crash.
+ACL: directory not readable to the user) or returns no doc handle.
+App stays responsive; no crash.
+
+Notes: do NOT use `/etc/` as the test target — most of /etc is
+user-readable so the portal correctly grants a doc handle, and the
+app then accepts a path that's nonsensical as a watch source. That
+is a real but non-blocking gap (app should validate system paths
+itself); track it as a follow-up rather than calling SMK-07 a fail.
 
 #### SMK-08 — First-time API key + URL save without freezing  `H`
 
