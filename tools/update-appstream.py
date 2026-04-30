@@ -9,6 +9,13 @@ trailing tag itself is stripped.
 
 Usage:
     tools/update-appstream.py <version> [path/to/CHANGELOG.md]
+        Emit the release block to stdout.
+
+    tools/update-appstream.py <version> --metainfo <metainfo.xml>
+    tools/update-appstream.py <version> <CHANGELOG.md> --metainfo <metainfo.xml>
+        Replace the entire <releases>...</releases> body of <metainfo.xml>
+        with this single release block, in place. The placeholder
+        ``2.5.0-dev`` entry is overwritten on first real release.
 """
 
 from __future__ import annotations
@@ -25,15 +32,33 @@ LIST_ITEM_RE = re.compile(r"^\s*[-*+]\s+(?P<text>.*)$")
 PLATFORM_TAG_RE = re.compile(r"\s*\((?P<tag>Windows|Linux|Both)\)\s*$", re.IGNORECASE)
 
 
+USAGE = (
+    f"Usage: update-appstream.py <version> [CHANGELOG.md] "
+    f"[--metainfo <metainfo.xml>]\n"
+)
+
+
 def main() -> int:
-    if len(sys.argv) < 2:
-        sys.stderr.write(f"Usage: {sys.argv[0]} <version> [CHANGELOG.md]\n")
+    args = list(sys.argv[1:])
+
+    metainfo_path: Path | None = None
+    if "--metainfo" in args:
+        idx = args.index("--metainfo")
+        if idx + 1 >= len(args):
+            sys.stderr.write("--metainfo requires a path argument\n")
+            sys.stderr.write(USAGE)
+            return 2
+        metainfo_path = Path(args[idx + 1])
+        del args[idx : idx + 2]
+
+    if not args:
+        sys.stderr.write(USAGE)
         return 2
 
-    version = sys.argv[1]
+    version = args[0]
     changelog = Path(
-        sys.argv[2]
-        if len(sys.argv) > 2
+        args[1]
+        if len(args) > 1
         else Path(__file__).resolve().parent.parent / "CHANGELOG.md"
     )
 
@@ -46,8 +71,43 @@ def main() -> int:
         sys.stderr.write(f"No '## [{version}]' section in {changelog}\n")
         return 1
 
-    print(_to_release_block(version, date, body))
+    block = _to_release_block(version, date, body)
+
+    if metainfo_path is None:
+        print(block)
+        return 0
+
+    return _inject_into_metainfo(metainfo_path, block)
+
+
+def _inject_into_metainfo(path: Path, block: str) -> int:
+    if not path.is_file():
+        sys.stderr.write(f"metainfo not found: {path}\n")
+        return 1
+
+    indented = "\n".join(("    " + line if line else line) for line in block.splitlines())
+    replacement = f"<releases>\n{indented}\n  </releases>"
+
+    original = path.read_text(encoding="utf-8")
+    new, count = re.subn(
+        r"<releases\b[^>]*>.*?</releases>",
+        lambda _: replacement,
+        original,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if count == 0:
+        sys.stderr.write(f"no <releases>...</releases> block in {path}\n")
+        return 1
+
+    path.write_text(new, encoding="utf-8")
+    sys.stderr.write(f"Updated {path} with <release version=\"{_block_version(block)}\">\n")
     return 0
+
+
+def _block_version(block: str) -> str:
+    match = re.search(r'<release version="([^"]+)"', block)
+    return match.group(1) if match else ""
 
 
 def _extract_section(text: str, target_version: str) -> tuple[str | None, str | None]:
