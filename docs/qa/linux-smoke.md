@@ -87,18 +87,32 @@ the regenerate-nuget-sources reminder in `packaging/flatpak/README.md`.
 #### SMK-02 — Sandbox permissions match the manifest  `H`
 
 Steps:
-1. `flatpak info -m io.github.voltkraft.ImmichFolderWatch | grep -E
-   '^(--share|--socket|--talk-name|--filesystem|--device)'`
+1. `flatpak info -m io.github.voltkraft.ImmichFolderWatch | sed -n
+   '/^\[Context\]/,/^$/p; /^\[Session Bus Policy\]/,/^$/p'`
 
-Expected: output matches exactly the `finish-args:` block in the
-manifest (`--share=ipc`, `--share=network`, `--socket=wayland`,
-`--socket=x11`, `--device=dri`, four `--talk-name=...` for
-Notifications/SNI/portal.Desktop/portal.Documents/portal.Background,
-two `--filesystem=xdg-{pictures,videos}:ro`).
+Expected: output is the INI translation of the manifest's
+`finish-args:` block —
 
-Forbidden lines (must NOT appear): `--filesystem=host`,
-`--socket=session-bus`, `--talk-name=org.freedesktop.systemd1`,
-`--share=cgroup`, anything `:rw` other than the implicit XDG dirs.
+```
+[Context]
+shared=ipc;network;
+sockets=wayland;x11;
+devices=dri;
+filesystems=xdg-pictures:ro;xdg-videos:ro;
+
+[Session Bus Policy]
+org.freedesktop.Notifications=talk
+org.kde.StatusNotifierWatcher=talk
+org.freedesktop.portal.Desktop=talk
+org.freedesktop.portal.Documents=talk
+org.freedesktop.portal.Background=talk
+```
+
+(The order of bus-policy lines is not deterministic.)
+
+Forbidden lines (must NOT appear): `host` in `filesystems=`,
+`session-bus` in `sockets=`, `org.freedesktop.systemd1=talk`,
+anything `=own`, anything `:rw` other than the implicit XDG dirs.
 
 #### SMK-03 — Cold launch from a terminal  `H`
 
