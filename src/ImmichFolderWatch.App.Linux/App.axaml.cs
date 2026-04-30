@@ -2,11 +2,14 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using ImmichFolderWatch.App.Linux.Hosting;
 using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Linux.ViewModels;
 using ImmichFolderWatch.App.Linux.Views;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.Shared.ViewModels;
+using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
@@ -19,6 +22,15 @@ public sealed partial class App : Application
 {
     private MainWindow? _mainWindow;
     private AvaloniaTrayHost? _trayHost;
+
+    /// <summary>
+    /// Service-locator handle for code-behind click handlers in
+    /// <see cref="MainWindow"/>. Avalonia's XAML loader requires a
+    /// parameterless ctor on Window subclasses, so DI cannot inject
+    /// dependencies through the View ctor; the handlers reach into
+    /// this provider instead.
+    /// </summary>
+    public static IServiceProvider? Services { get; private set; }
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -78,9 +90,14 @@ public sealed partial class App : Application
                     sp.GetRequiredService<LocalizationService>(),
                     sp.GetRequiredService<IUiDispatcher>()));
             services.AddSingleton<SyncStatusProvider>();
+            services.AddSingleton<IAppConfigLoader, AppConfigLoader>();
+            services.AddSingleton<AppConfigLoader>();
+            services.AddSingleton<AppHost>();
+            services.AddSingleton<ConfigVerificationRunner>();
             services.AddSingleton<MainWindowViewModel>();
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
+            Services = provider;
 
             var single = provider.GetRequiredService<ISingleInstanceCoordinator>();
             if (!single.IsPrimaryInstance)

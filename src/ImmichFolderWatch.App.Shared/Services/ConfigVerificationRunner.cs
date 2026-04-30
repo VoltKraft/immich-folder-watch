@@ -3,9 +3,9 @@ using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Immich;
 
-namespace ImmichFolderWatch.App.Services;
+namespace ImmichFolderWatch.App.Shared.Services;
 
-internal sealed class ConfigVerificationRunner
+public sealed class ConfigVerificationRunner
 {
     public async Task<ImmichAccessCheckResult> CheckImmichAccessAsync(AppConfig config, string targetConfigPath, CancellationToken cancellationToken)
     {
@@ -65,7 +65,8 @@ internal sealed class ConfigVerificationRunner
         };
 
         httpClient.DefaultRequestHeaders.Add("x-api-key", normalizedConfig.Immich.ApiKey);
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"immich-folder-watch-gui/{ProductVersionProvider.GetProductVersion()}");
+        var version = typeof(ConfigVerificationRunner).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"immich-folder-watch-gui/{version}");
         return httpClient;
     }
 
