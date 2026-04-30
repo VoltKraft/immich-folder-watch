@@ -75,7 +75,13 @@ public sealed partial class App : Application
             if (!single.IsPrimaryInstance)
             {
                 single.TrySignalShowGui(TimeSpan.FromSeconds(2));
-                desktop.Shutdown(0);
+                // Defer Shutdown until the dispatcher loop is running. Calling
+                // it directly here races with StartCore→MainLoop→PushFrame and
+                // surfaces as "Cannot perform requested operation because the
+                // Dispatcher shut down" in the second instance. Queuing it via
+                // UIThread.Post lets the main loop spin up first and then
+                // process the shutdown gracefully.
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => desktop.Shutdown(0));
                 return;
             }
 
