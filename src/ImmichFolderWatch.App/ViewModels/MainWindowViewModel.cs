@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
+using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Shared.Services;
