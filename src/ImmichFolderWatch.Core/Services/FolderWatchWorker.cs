@@ -14,6 +14,21 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private static readonly TimeSpan AlbumPullInterval = TimeSpan.FromSeconds(10);
 
+    // Periodic polling sweep alongside FileSystemWatcher. FSW is reliable
+    // on native NTFS / ext4 / btrfs, but inotify on FUSE mounts (notably
+    // the Flatpak xdg-document-portal at /run/user/$UID/doc/<token>/...)
+    // does not propagate file changes that originate outside the mount.
+    // The sweep diff-scans the source trees against a known-paths
+    // baseline and replays new files into OnFileEvent; on platforms
+    // where FSW already saw them, this is a cheap no-op because
+    // OnFileEvent debounces against _debouncedFiles.
+    private static readonly TimeSpan PollingSweepInterval = TimeSpan.FromSeconds(5);
+
+    private readonly Dictionary<string, HashSet<string>> _pollingBaseline =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private DateTimeOffset _lastPollingSweep = DateTimeOffset.MinValue;
+
     private readonly AppConfig _config;
 
     private readonly IFileReadinessChecker _fileReadinessChecker;
@@ -88,6 +103,12 @@ public sealed class FolderWatchWorker : BackgroundService
         {
             while (await loopTimer.WaitForNextTickAsync(stoppingToken))
             {
+                if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
+                {
+                    PollDirectoriesForNewFiles();
+                    _lastPollingSweep = DateTimeOffset.UtcNow;
+                }
+
                 await PromoteDebouncedFilesAsync(stoppingToken);
                 _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
 
@@ -225,6 +246,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
             _watchers.Add(watcher);
             _sources.Add(context);
+            _pollingBaseline[NormalizePath(source.Path)] = SnapshotExistingFiles(context);
 
             if (useSubdirsAsAlbums)
             {
@@ -438,6 +460,68 @@ public sealed class FolderWatchWorker : BackgroundService
         }
 
         _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+    }
+
+    private HashSet<string> SnapshotExistingFiles(WatchSourceContext context)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var searchOption = context.EffectiveIncludeSubdirectories
+            ? SearchOption.AllDirectories
+            : SearchOption.TopDirectoryOnly;
+        try
+        {
+            foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+            {
+                set.Add(NormalizePath(filePath));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Polling baseline scan failed for {Path}", context.Source.Path);
+        }
+        return set;
+    }
+
+    private void PollDirectoriesForNewFiles()
+    {
+        foreach (var context in _sources)
+        {
+            var sourceKey = NormalizePath(context.Source.Path);
+            if (!_pollingBaseline.TryGetValue(sourceKey, out var known))
+            {
+                continue;
+            }
+
+            var searchOption = context.EffectiveIncludeSubdirectories
+                ? SearchOption.AllDirectories
+                : SearchOption.TopDirectoryOnly;
+
+            try
+            {
+                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+                {
+                    var normalized = NormalizePath(filePath);
+                    // HashSet.Add returns false if the path was already
+                    // known — skip it. New paths fall through to
+                    // OnFileEvent, which itself debounces against
+                    // _debouncedFiles so a parallel FSW Created event
+                    // does not double-enqueue.
+                    if (!known.Add(normalized))
+                    {
+                        continue;
+                    }
+                    if (!context.Filter.IsMatch(normalized))
+                    {
+                        continue;
+                    }
+                    OnFileEvent(context, normalized);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Polling sweep failed for {Path}", context.Source.Path);
+            }
+        }
     }
 
     private async Task PullFromImmichAsync(CancellationToken cancellationToken)
