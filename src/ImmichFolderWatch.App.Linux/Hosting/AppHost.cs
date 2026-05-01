@@ -2,6 +2,7 @@ using System.Net;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Logging;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 using ImmichFolderWatch.Immich;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,14 +22,17 @@ namespace ImmichFolderWatch.App.Linux.Hosting;
 public sealed class AppHost : IAsyncDisposable
 {
     private readonly SyncStatusProvider _syncStatusProvider;
+    private readonly IPlatformPaths _platformPaths;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private IHost? _host;
     private AppConfig? _currentConfig;
 
-    public AppHost(SyncStatusProvider syncStatusProvider)
+    public AppHost(SyncStatusProvider syncStatusProvider, IPlatformPaths platformPaths)
     {
         ArgumentNullException.ThrowIfNull(syncStatusProvider);
+        ArgumentNullException.ThrowIfNull(platformPaths);
         _syncStatusProvider = syncStatusProvider;
+        _platformPaths = platformPaths;
     }
 
     public AppConfig? CurrentConfig => _currentConfig;
@@ -138,12 +142,25 @@ public sealed class AppHost : IAsyncDisposable
             });
         }
 
-        if (LogTargets.IsFile(config.Logging.Target)
-            && !string.IsNullOrWhiteSpace(config.Logging.LogDirectory))
+        // Linux-specific: always wire the FileLoggerProvider, regardless
+        // of whether a stale config still says target=eventLog (the WPF
+        // default that surfaces in YAMLs saved before the Linux UI gained
+        // platform-aware defaults). Fall back to IPlatformPaths.GetLog
+        // Directory when config.Logging.LogDirectory is unset, so the
+        // Open Logs button always resolves to a real directory.
+        var logDirectory = !string.IsNullOrWhiteSpace(config.Logging.LogDirectory)
+            ? config.Logging.LogDirectory
+            : _platformPaths.GetLogDirectory();
+        try
         {
-            Directory.CreateDirectory(config.Logging.LogDirectory);
-            builder.Logging.AddProvider(
-                new FileLoggerProvider(config.Logging.LogDirectory, logLevel));
+            Directory.CreateDirectory(logDirectory);
+            builder.Logging.AddProvider(new FileLoggerProvider(logDirectory, logLevel));
+        }
+        catch
+        {
+            // If the directory can't be created (read-only fs, missing
+            // parent), fall back to console-only logging — this should
+            // be rare under XDG_STATE_HOME inside the Flatpak sandbox.
         }
 
         builder.Services.AddSingleton(config);

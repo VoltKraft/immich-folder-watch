@@ -50,8 +50,8 @@
     </Border>
 
     <!-- Content -->
-    <ScrollViewer Grid.Row="1" Padding="18,18,18,32" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="18">
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="18,18,18,32" Spacing="18">
 
         <!-- Section: Status -->
         <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
