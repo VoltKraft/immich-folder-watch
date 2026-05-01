@@ -246,7 +246,13 @@ public sealed class FolderWatchWorker : BackgroundService
 
             _watchers.Add(watcher);
             _sources.Add(context);
-            _pollingBaseline[NormalizePath(source.Path)] = SnapshotExistingFiles(context);
+            var baseline = SnapshotExistingFiles(context);
+            _pollingBaseline[NormalizePath(source.Path)] = baseline;
+            _logger.LogInformation(
+                "Polling baseline established for {Path}: {Count} pre-existing file(s) snapshotted; sweep interval = {SweepSeconds}s.",
+                source.Path,
+                baseline.Count,
+                (int)PollingSweepInterval.TotalSeconds);
 
             if (useSubdirsAsAlbums)
             {
@@ -512,8 +518,10 @@ public sealed class FolderWatchWorker : BackgroundService
                     }
                     if (!context.Filter.IsMatch(normalized))
                     {
+                        _logger.LogDebug("Polling sweep saw new file but filter rejected it: {Path}", normalized);
                         continue;
                     }
+                    _logger.LogInformation("Polling sweep detected new file: {Path}", normalized);
                     OnFileEvent(context, normalized);
                 }
             }
