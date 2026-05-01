@@ -56,15 +56,12 @@ public sealed class PortalFolderPicker
             // TryGetLocalPath requires Documents portal access for doc-handle
             // URIs (/run/user/$UID/doc/<id>/...). Ran on the UI thread on
             // purpose — the StorageItem is bound to Avalonia's main loop.
+            var uri = first.Path;
             var path = first.TryGetLocalPath();
-            if (string.IsNullOrEmpty(path))
-            {
-                _logger.LogWarning("Picked folder has no local path; URI was {Uri}", first.Path);
-            }
-            else
-            {
-                _logger.LogInformation("Folder picker returned {Path}", path);
-            }
+            _logger.LogInformation(
+                "Folder picker returned URI {Uri} → local path {Path}",
+                uri,
+                string.IsNullOrEmpty(path) ? "(none)" : path);
             return path;
         }
         catch (Exception ex)

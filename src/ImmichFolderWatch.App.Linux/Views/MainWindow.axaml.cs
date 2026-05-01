@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using ImmichFolderWatch.App.Linux.Hosting;
+using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
@@ -133,9 +134,24 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void AddSourceButton_Click(object? sender, RoutedEventArgs e)
+    private async void AddSourceButton_Click(object? sender, RoutedEventArgs e)
     {
-        ViewModel?.AddSource();
+        if (App.Services is null || ViewModel is null)
+        {
+            return;
+        }
+
+        var picker = App.Services.GetRequiredService<PortalFolderPicker>();
+        var picked = await picker.PickFolderAsync("Pick a folder to watch");
+        if (string.IsNullOrWhiteSpace(picked))
+        {
+            // User dismissed the picker — do not append an empty source.
+            return;
+        }
+
+        ViewModel.AddSource();
+        var newItem = ViewModel.Sources[^1];
+        newItem.Path = picked;
     }
 
     private void RemoveSourceButton_Click(object? sender, RoutedEventArgs e)
