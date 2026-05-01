@@ -60,6 +60,21 @@ public sealed partial class MainWindow : Window
             }
         }
 
+        // The portable VM default is LogTargets.EventLog (Windows). Linux
+        // has no Windows Event Log; force the file target on first run
+        // and seed the log directory from IPlatformPaths so the FileLogger
+        // actually writes somewhere visible. The user can still switch
+        // back to file target manually — this only fires when the value
+        // would otherwise be the Windows default.
+        if (ViewModel.LoggingTarget != LogTargets.File)
+        {
+            ViewModel.LoggingTarget = LogTargets.File;
+        }
+        if (string.IsNullOrWhiteSpace(ViewModel.LogDirectory))
+        {
+            ViewModel.LogDirectory = paths.GetLogDirectory();
+        }
+
         if (loadedConfig is not null)
         {
             try
@@ -153,20 +168,26 @@ public sealed partial class MainWindow : Window
         var dir = ViewModel.GetEffectiveLogDirectory();
         if (string.IsNullOrWhiteSpace(dir))
         {
+            ViewModel.OperationMessage =
+                "Log directory is empty (logging target may be set to a non-file target).";
             return;
         }
 
         try
         {
             Directory.CreateDirectory(dir);
-            Process.Start(new ProcessStartInfo("xdg-open", dir)
+            var proc = Process.Start(new ProcessStartInfo("xdg-open", dir)
             {
                 UseShellExecute = false,
             });
+            if (proc is null)
+            {
+                ViewModel.OperationMessage = $"Could not start xdg-open for {dir}.";
+            }
         }
         catch (Exception ex)
         {
-            ViewModel.OperationMessage = ex.Message;
+            ViewModel.OperationMessage = $"Open Logs failed: {ex.Message}";
         }
     }
 

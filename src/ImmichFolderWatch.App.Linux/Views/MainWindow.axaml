@@ -50,7 +50,7 @@
     </Border>
 
     <!-- Content -->
-    <ScrollViewer Grid.Row="1" Padding="18" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Grid.Row="1" Padding="18,18,18,32" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="18">
 
         <!-- Section: Status -->
@@ -225,7 +225,7 @@
 
                       <StackPanel Spacing="6">
                         <TextBlock Text="{Binding UI_SyncMode, Source={StaticResource Loc}}" />
-                        <ComboBox ItemsSource="{Binding AvailableSyncModes}"
+                        <ComboBox ItemsSource="{Binding $parent[Window].DataContext.AvailableSyncModes}"
                                   SelectedValueBinding="{Binding Code}"
                                   SelectedValue="{Binding SyncMode}">
                           <ComboBox.ItemTemplate>
