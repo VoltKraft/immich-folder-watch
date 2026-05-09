@@ -19,10 +19,8 @@
         <StackPanel Grid.RowSpan="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
           <Border Width="48" Height="48" Padding="4" CornerRadius="16"
                   Background="{DynamicResource SystemAccentColorLight2Brush}">
-            <TextBlock Text="🗂"
-                       FontSize="28"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center" />
+            <Image Width="40" Height="40" Stretch="Uniform"
+                   Source="avares://immich-folder-watch/Assets/header-logo.png" />
           </Border>
           <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal">

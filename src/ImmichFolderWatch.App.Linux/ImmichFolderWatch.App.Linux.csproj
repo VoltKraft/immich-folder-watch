@@ -7,6 +7,13 @@
     <RootNamespace>ImmichFolderWatch.App.Linux</RootNamespace>
     <AssemblyName>immich-folder-watch</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BrandProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</BrandProjectRoot>
+    <BrandGeneratorProject>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'tools', 'BrandAssetGen', 'BrandAssetGen.csproj'))</BrandGeneratorProject>
+    <BrandLogoSvg>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'assets', 'branding', 'logo.svg'))</BrandLogoSvg>
+    <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
+    <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,4 +32,22 @@
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.App.Shared/ImmichFolderWatch.App.Shared.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
+    <BrandAssetGeneratorInputs Include="$(BrandProjectRoot)/tools/BrandAssetGen/**/*.cs;$(BrandProjectRoot)/tools/BrandAssetGen/**/*.csproj"
+                               Exclude="$(BrandProjectRoot)/tools/BrandAssetGen/bin/**/*;$(BrandProjectRoot)/tools/BrandAssetGen/obj/**/*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
+  </ItemGroup>
+
+  <Target Name="GenerateBrandAssets"
+          BeforeTargets="BeforeBuild;BuildAvaloniaResources"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(BrandAssetGeneratorInputs)"
+          Outputs="$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
+    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+  </Target>
 </Project>
