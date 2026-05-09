@@ -20,6 +20,7 @@ public sealed class AvaloniaTrayHost : IDisposable
     private readonly DBusSession _session;
     private readonly ILogger<AvaloniaTrayHost> _logger;
     private TrayIcon? _trayIcon;
+    private DispatcherUnhandledExceptionEventHandler? _dispatcherFilter;
     private bool _disposed;
 
     public AvaloniaTrayHost(DBusSession session)
@@ -113,11 +114,77 @@ public sealed class AvaloniaTrayHost : IDisposable
         };
         trayIcon.Clicked += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
 
+        // Avalonia 11.3.x's DBusTrayIconImpl.CreateTrayIcon does the
+        // actual SNI registration on a continuation off SetIcons; on
+        // GNOME-with-AppIndicator setups where the watcher claims the
+        // name but the AppIndicator backend is half-broken, that
+        // continuation surfaces ServiceUnknown via Task.ThrowAsync —
+        // bypassing the synchronous try/catch around SetIcons AND the
+        // TaskScheduler.UnobservedTaskException net in App.axaml.cs
+        // (because ThrowAsync is "explicitly rethrown", not orphaned).
+        // Catch that specific class of failure on the dispatcher so the
+        // GUI degrades to window-only mode instead of dying.
+        InstallDispatcherFilter();
+
         var trayIcons = new TrayIcons { trayIcon };
         TrayIcon.SetIcons(application, trayIcons);
 
         _trayIcon = trayIcon;
         IsTrayIconRegistered = true;
+    }
+
+    private void InstallDispatcherFilter()
+    {
+        if (_dispatcherFilter is not null)
+        {
+            return;
+        }
+
+        _dispatcherFilter = (sender, args) =>
+        {
+            var stack = args.Exception.ToString();
+            if (!stack.Contains("Avalonia.FreeDesktop", StringComparison.Ordinal)
+                && !stack.Contains("DBusTrayIcon", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            args.Handled = true;
+            _logger.LogWarning(args.Exception,
+                "Avalonia tray-icon background registration faulted (likely AppIndicator/SNI implementation mismatch); falling back to window-only mode.");
+
+            IsTrayIconRegistered = false;
+            var icon = _trayIcon;
+            _trayIcon = null;
+            if (icon is not null)
+            {
+                try
+                {
+                    icon.IsVisible = false;
+                    icon.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Tray icon dispose failed during fallback; ignoring.");
+                }
+            }
+
+            UninstallDispatcherFilter();
+            TrayUnavailable?.Invoke(this, EventArgs.Empty);
+        };
+
+        Dispatcher.UIThread.UnhandledException += _dispatcherFilter;
+    }
+
+    private void UninstallDispatcherFilter()
+    {
+        if (_dispatcherFilter is null)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.UnhandledException -= _dispatcherFilter;
+        _dispatcherFilter = null;
     }
 
     private async Task<bool> ProbeSniWatcherAsync(CancellationToken cancellationToken)
@@ -172,6 +239,7 @@ public sealed class AvaloniaTrayHost : IDisposable
         }
 
         _disposed = true;
+        UninstallDispatcherFilter();
 
         if (_trayIcon is null)
         {
