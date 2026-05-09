@@ -1,3 +1,7 @@
+using Avalonia.Controls;
+using Avalonia.Platform;
+using Avalonia.Threading;
+using ImmichFolderWatch.App.Shared.Resources;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tmds.DBus.Protocol;
@@ -11,9 +15,11 @@ public sealed class AvaloniaTrayHost : IDisposable
     private const string DBusPath = "/org/freedesktop/DBus";
     private const string DBusInterface = "org.freedesktop.DBus";
     private const string SniWatcherName = "org.kde.StatusNotifierWatcher";
+    private const string IconAssetUri = "avares://immich-folder-watch/Assets/header-logo.png";
 
     private readonly DBusSession _session;
     private readonly ILogger<AvaloniaTrayHost> _logger;
+    private TrayIcon? _trayIcon;
     private bool _disposed;
 
     public AvaloniaTrayHost(DBusSession session)
@@ -33,19 +39,13 @@ public sealed class AvaloniaTrayHost : IDisposable
     /// True only after a TrayIcon has actually been registered and is
     /// expected to be visible to the user. The MainWindow predicates
     /// "close = hide" on this so the user is never stranded with a
-    /// hidden window and no tray icon to bring it back. 3.8.D sets
-    /// this true when the SNI registration succeeds; 3.8.C ships it
-    /// as always-false so close keeps exiting until the tray is real.
+    /// hidden window and no tray icon to bring it back.
     /// </summary>
     public bool IsTrayIconRegistered { get; private set; }
 
-    // OpenRequested + QuitRequested are reserved for the Phase 6 tray
-    // re-activation; suppress the "never invoked" warning until then.
-#pragma warning disable CS0067
     public event EventHandler? OpenRequested;
 
     public event EventHandler? QuitRequested;
-#pragma warning restore CS0067
 
     public event EventHandler? TrayUnavailable;
 
@@ -53,28 +53,71 @@ public sealed class AvaloniaTrayHost : IDisposable
     {
         ArgumentNullException.ThrowIfNull(application);
 
-        // Phase 4 ships the tray-less default per Plan §4 / Decision #3.
-        // Avalonia 11.3.x's TrayIcon registration crashes the process with
-        // org.freedesktop.DBus.Error.ServiceUnknown on bare-GNOME / Flatpak
-        // setups where the SNI watcher claims to exist but the actual
-        // registration fails downstream. The probe below is purely
-        // informational so the QA log shows whether SNI was detected;
-        // the icon itself stays unregistered until Phase 6 QA on KDE
-        // Plasma can validate the proper registration path with full
-        // error handling around it.
         IsTrayAvailable = await ProbeSniWatcherAsync(cancellationToken).ConfigureAwait(false);
-        if (IsTrayAvailable)
-        {
-            _logger.LogInformation(
-                "StatusNotifierWatcher detected on the session bus — tray icon registration is intentionally deferred to Phase 6 QA. Running in window-only mode for now.");
-        }
-        else
+        if (!IsTrayAvailable)
         {
             _logger.LogInformation(
                 "No StatusNotifierWatcher on the session bus — running in window-only mode (GNOME without AppIndicator extension is the typical case).");
+            TrayUnavailable?.Invoke(this, EventArgs.Empty);
+            return;
         }
 
-        TrayUnavailable?.Invoke(this, EventArgs.Empty);
+        // SNI watcher present (KDE Plasma, GNOME with AppIndicator
+        // extension, etc.) — register the TrayIcon. Wrap the whole
+        // construction in try/catch so a half-broken AppIndicator
+        // implementation that surfaces as ServiceUnknown / Wayland
+        // protocol fault degrades to the existing tray-less banner
+        // instead of taking the GUI down with it.
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => RegisterTrayIcon(application));
+            _logger.LogInformation(
+                "Tray icon registered via StatusNotifierWatcher.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Tray icon registration failed despite SNI watcher detection — falling back to window-only mode.");
+            IsTrayIconRegistered = false;
+            _trayIcon = null;
+            TrayUnavailable?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void RegisterTrayIcon(AvaloniaApplication application)
+    {
+        WindowIcon icon;
+        using (var iconStream = AssetLoader.Open(new Uri(IconAssetUri)))
+        {
+            icon = new WindowIcon(iconStream);
+        }
+
+        var menu = new NativeMenu();
+
+        var openItem = new NativeMenuItem(Strings.Tray_Open);
+        openItem.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(openItem);
+
+        menu.Items.Add(new NativeMenuItemSeparator());
+
+        var quitItem = new NativeMenuItem(Strings.Tray_Quit);
+        quitItem.Click += (_, _) => QuitRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(quitItem);
+
+        var trayIcon = new TrayIcon
+        {
+            Icon = icon,
+            ToolTipText = "Immich Folder Watch",
+            Menu = menu,
+            IsVisible = true,
+        };
+        trayIcon.Clicked += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
+
+        var trayIcons = new TrayIcons { trayIcon };
+        TrayIcon.SetIcons(application, trayIcons);
+
+        _trayIcon = trayIcon;
+        IsTrayIconRegistered = true;
     }
 
     private async Task<bool> ProbeSniWatcherAsync(CancellationToken cancellationToken)
@@ -129,5 +172,22 @@ public sealed class AvaloniaTrayHost : IDisposable
         }
 
         _disposed = true;
+
+        if (_trayIcon is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _trayIcon.IsVisible = false;
+            _trayIcon.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Tray icon dispose failed; ignoring during shutdown.");
+        }
+
+        _trayIcon = null;
     }
 }
