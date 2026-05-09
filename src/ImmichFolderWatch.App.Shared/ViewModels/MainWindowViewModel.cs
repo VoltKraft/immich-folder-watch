@@ -6,6 +6,7 @@ using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
+using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
@@ -87,6 +88,7 @@ public sealed class MainWindowViewModel : BindableBase
     private readonly IAutoStartManager _autostartManager;
     private readonly LocalizationService _localizationService;
     private readonly IUiDispatcher _uiDispatcher;
+    private readonly IPlatformLoggingCapabilities _loggingCapabilities;
     private bool _suppressAutostartWrite;
     private bool _suppressLanguageWrite;
 
@@ -132,12 +134,15 @@ public sealed class MainWindowViewModel : BindableBase
         SyncStatusProvider syncStatusProvider,
         IAutoStartManager autostartManager,
         LocalizationService localizationService,
-        IUiDispatcher uiDispatcher)
+        IUiDispatcher uiDispatcher,
+        IPlatformLoggingCapabilities loggingCapabilities)
     {
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
         _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _uiDispatcher = uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher));
+        _loggingCapabilities = loggingCapabilities ?? throw new ArgumentNullException(nameof(loggingCapabilities));
+        _loggingTarget = _loggingCapabilities.DefaultTarget;
 
         AvailableLanguages = BuildLanguageOptions();
         _selectedLanguage = FindLanguageOption(_localizationService.CurrentLanguage);
@@ -291,8 +296,8 @@ public sealed class MainWindowViewModel : BindableBase
         get => _loggingTarget;
         set
         {
-            var normalized = LogTargets.Normalize(value);
-            if (SetProperty(ref _loggingTarget, normalized))
+            var coerced = _loggingCapabilities.CoerceToSupported(value);
+            if (SetProperty(ref _loggingTarget, coerced))
             {
                 RaisePropertyChanged(nameof(IsFileLogTarget));
             }
@@ -1028,18 +1033,20 @@ public sealed class MainWindowViewModel : BindableBase
 
     private void RefreshLogTargetOptions()
     {
-        var newOptions = new[]
-        {
-            new LogTargetOption(LogTargets.EventLog, Strings.UI_LogTargetEventLog),
-            new LogTargetOption(LogTargets.File, Strings.UI_LogTargetFile),
-        };
-
         AvailableLogTargets.Clear();
-        foreach (var option in newOptions)
+        foreach (var target in _loggingCapabilities.SupportedTargets)
         {
-            AvailableLogTargets.Add(option);
+            AvailableLogTargets.Add(new LogTargetOption(target, GetLogTargetDisplayName(target)));
         }
     }
+
+    private static string GetLogTargetDisplayName(string target) => target switch
+    {
+        LogTargets.EventLog => Strings.UI_LogTargetEventLog,
+        LogTargets.File => Strings.UI_LogTargetFile,
+        LogTargets.Journald => Strings.UI_LogTargetJournald,
+        _ => target,
+    };
 
     private static string GetDefaultLogDirectory()
     {

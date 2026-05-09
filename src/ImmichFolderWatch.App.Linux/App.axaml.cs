@@ -79,6 +79,7 @@ public sealed partial class App : Application
             services.AddSingleton<INotifier, DBusNotifier>();
             services.AddSingleton<ISingleInstanceCoordinator, UnixSingleInstanceCoordinator>();
             services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
+            services.AddSingleton<IPlatformLoggingCapabilities, LinuxLoggingCapabilities>();
             services.AddSingleton<AvaloniaTrayHost>();
             services.AddSingleton<PortalFolderPicker>(sp =>
                 new PortalFolderPicker(

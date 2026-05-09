@@ -33,6 +33,15 @@ public sealed class LogTargetsTests
         Assert.Equal(LogTargets.File, LogTargets.Normalize(value));
     }
 
+    [Theory]
+    [InlineData("journald")]
+    [InlineData("JOURNALD")]
+    [InlineData(" Journald ")]
+    public void Normalize_JournaldVariants_Normalize(string value)
+    {
+        Assert.Equal(LogTargets.Journald, LogTargets.Normalize(value));
+    }
+
     [Fact]
     public void Helpers_ReportCorrectTarget()
     {
@@ -43,12 +52,17 @@ public sealed class LogTargetsTests
         Assert.True(LogTargets.IsFile("file"));
         Assert.False(LogTargets.IsFile("eventLog"));
         Assert.False(LogTargets.IsFile(null));
+
+        Assert.True(LogTargets.IsJournald("journald"));
+        Assert.False(LogTargets.IsJournald("file"));
+        Assert.False(LogTargets.IsJournald(null));
     }
 
     [Fact]
-    public void All_ContainsBothCanonicalValues()
+    public void All_ContainsAllCanonicalValues()
     {
         Assert.Contains(LogTargets.EventLog, LogTargets.All);
         Assert.Contains(LogTargets.File, LogTargets.All);
+        Assert.Contains(LogTargets.Journald, LogTargets.All);
     }
 }

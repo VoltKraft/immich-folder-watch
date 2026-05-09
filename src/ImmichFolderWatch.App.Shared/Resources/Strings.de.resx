@@ -115,6 +115,7 @@
   <data name="UI_LogTarget" xml:space="preserve"><value>Log-Ziel</value></data>
   <data name="UI_LogTargetEventLog" xml:space="preserve"><value>Windows-Ereignisprotokoll</value></data>
   <data name="UI_LogTargetFile" xml:space="preserve"><value>Datei</value></data>
+  <data name="UI_LogTargetJournald" xml:space="preserve"><value>Journald (systemd)</value></data>
   <data name="UI_LogDirectory" xml:space="preserve"><value>Protokollverzeichnis</value></data>
   <data name="UI_UseDefault" xml:space="preserve"><value>Standard verwenden</value></data>
   <data name="UI_LogDirectoryHint" xml:space="preserve"><value>Das Protokollverzeichnis muss als absoluter Pfad angegeben werden.</value></data>

@@ -13,6 +13,7 @@ using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Installation;
+using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
@@ -58,7 +59,12 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
 
-        ViewModel = new MainWindowViewModel(_syncStatusProvider, _autostartManager, _localizationService, new WpfUiDispatcher())
+        ViewModel = new MainWindowViewModel(
+            _syncStatusProvider,
+            _autostartManager,
+            _localizationService,
+            new WpfUiDispatcher(),
+            new WindowsLoggingCapabilities())
         {
             ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}",
         };

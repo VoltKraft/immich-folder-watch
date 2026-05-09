@@ -14,25 +14,31 @@ namespace ImmichFolderWatch.App.Linux.Hosting;
 /// <summary>
 /// Linux-side wrapper around Microsoft.Extensions.Hosting that starts +
 /// stops + restarts the FolderWatchWorker / ServerConnectionMonitor
-/// pipeline against an AppConfig. Mirrors the WPF AppHost but skips the
-/// Windows EventLog target — the Linux head logs to journald (when
-/// FLATPAK_ID/INVOCATION_ID is detected) or to the file logger,
-/// configured by the FileLoggerProvider against config.Logging.LogDirectory.
+/// pipeline against an AppConfig. Mirrors the WPF AppHost but routes
+/// logs to journald or to the FileLoggerProvider depending on
+/// config.Logging.Target — coerced through IPlatformLoggingCapabilities
+/// so a stale target=eventLog (saved by the WPF head) becomes journald.
 /// </summary>
 public sealed class AppHost : IAsyncDisposable
 {
     private readonly SyncStatusProvider _syncStatusProvider;
     private readonly IPlatformPaths _platformPaths;
+    private readonly IPlatformLoggingCapabilities _loggingCapabilities;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private IHost? _host;
     private AppConfig? _currentConfig;
 
-    public AppHost(SyncStatusProvider syncStatusProvider, IPlatformPaths platformPaths)
+    public AppHost(
+        SyncStatusProvider syncStatusProvider,
+        IPlatformPaths platformPaths,
+        IPlatformLoggingCapabilities loggingCapabilities)
     {
         ArgumentNullException.ThrowIfNull(syncStatusProvider);
         ArgumentNullException.ThrowIfNull(platformPaths);
+        ArgumentNullException.ThrowIfNull(loggingCapabilities);
         _syncStatusProvider = syncStatusProvider;
         _platformPaths = platformPaths;
+        _loggingCapabilities = loggingCapabilities;
     }
 
     public AppConfig? CurrentConfig => _currentConfig;
@@ -125,7 +131,8 @@ public sealed class AppHost : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.Logging.SetMinimumLevel(logLevel);
 
-        if (JournaldLoggingExtensions.IsJournaldDetected())
+        var effectiveTarget = _loggingCapabilities.CoerceToSupported(config.Logging.Target);
+        if (LogTargets.IsJournald(effectiveTarget))
         {
             builder.Logging.AddSystemdConsole(options =>
             {
@@ -135,32 +142,29 @@ public sealed class AppHost : IAsyncDisposable
         }
         else
         {
+            // target=File: SimpleConsole for dev visibility + FileLoggerProvider
+            // against config.Logging.LogDirectory (defaulting to
+            // IPlatformPaths.GetLogDirectory when unset, so the Open Logs
+            // button always resolves to a real directory).
             builder.Logging.AddSimpleConsole(options =>
             {
                 options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff ";
                 options.SingleLine = true;
             });
-        }
 
-        // Linux-specific: always wire the FileLoggerProvider, regardless
-        // of whether a stale config still says target=eventLog (the WPF
-        // default that surfaces in YAMLs saved before the Linux UI gained
-        // platform-aware defaults). Fall back to IPlatformPaths.GetLog
-        // Directory when config.Logging.LogDirectory is unset, so the
-        // Open Logs button always resolves to a real directory.
-        var logDirectory = !string.IsNullOrWhiteSpace(config.Logging.LogDirectory)
-            ? config.Logging.LogDirectory
-            : _platformPaths.GetLogDirectory();
-        try
-        {
-            Directory.CreateDirectory(logDirectory);
-            builder.Logging.AddProvider(new FileLoggerProvider(logDirectory, logLevel));
-        }
-        catch
-        {
-            // If the directory can't be created (read-only fs, missing
-            // parent), fall back to console-only logging — this should
-            // be rare under XDG_STATE_HOME inside the Flatpak sandbox.
+            var logDirectory = !string.IsNullOrWhiteSpace(config.Logging.LogDirectory)
+                ? config.Logging.LogDirectory
+                : _platformPaths.GetLogDirectory();
+            try
+            {
+                Directory.CreateDirectory(logDirectory);
+                builder.Logging.AddProvider(new FileLoggerProvider(logDirectory, logLevel));
+            }
+            catch
+            {
+                // Read-only fs / missing parent — degrade to console-only
+                // logging. Rare under XDG_STATE_HOME inside the Flatpak sandbox.
+            }
         }
 
         builder.Services.AddSingleton(config);

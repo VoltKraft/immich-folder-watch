@@ -82,6 +82,7 @@ public static class Strings
     public static string UI_LogTarget => Get(nameof(UI_LogTarget));
     public static string UI_LogTargetEventLog => Get(nameof(UI_LogTargetEventLog));
     public static string UI_LogTargetFile => Get(nameof(UI_LogTargetFile));
+    public static string UI_LogTargetJournald => Get(nameof(UI_LogTargetJournald));
     public static string UI_LogDirectory => Get(nameof(UI_LogDirectory));
     public static string UI_UseDefault => Get(nameof(UI_UseDefault));
     public static string UI_LogDirectoryHint => Get(nameof(UI_LogDirectoryHint));
