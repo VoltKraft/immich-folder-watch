@@ -61,16 +61,11 @@ public sealed partial class MainWindow : Window
             }
         }
 
-        // The portable VM default is LogTargets.EventLog (Windows). Linux
-        // has no Windows Event Log; force the file target on first run
-        // and seed the log directory from IPlatformPaths so the FileLogger
-        // actually writes somewhere visible. The user can still switch
-        // back to file target manually — this only fires when the value
-        // would otherwise be the Windows default.
-        if (ViewModel.LoggingTarget != LogTargets.File)
-        {
-            ViewModel.LoggingTarget = LogTargets.File;
-        }
+        // Seed the log directory from IPlatformPaths when unset, so the
+        // FileLogger writes somewhere the Open Logs button can resolve.
+        // The platform-aware LoggingTarget default (Journald on Linux)
+        // is set in the VM ctor + coerced by IPlatformLoggingCapabilities
+        // when loading a stale YAML; nothing to force here anymore.
         if (string.IsNullOrWhiteSpace(ViewModel.LogDirectory))
         {
             ViewModel.LogDirectory = paths.GetLogDirectory();
