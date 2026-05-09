@@ -6,6 +6,7 @@ namespace ImmichFolderWatch.App.Shared.Models;
 public sealed class WatchSourceItem : BindableBase
 {
     private string _path = string.Empty;
+    private string _displayPath = string.Empty;
     private string _albumName = string.Empty;
     private string _extensionsText = string.Empty;
     private string _excludeDirectoriesText = string.Empty;
@@ -25,7 +26,58 @@ public sealed class WatchSourceItem : BindableBase
             if (SetProperty(ref _path, value))
             {
                 TrySuggestAlbumNameFromPath();
+                if (!string.IsNullOrEmpty(_displayPath))
+                {
+                    RaisePropertyChanged(nameof(DisplayPath));
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// Transient, non-persisted "user-friendly" view on <see cref="Path"/>.
+    /// On Linux, when the FileChooser portal hands us a doc-portal FUSE
+    /// mount path (<c>/run/user/$UID/doc/&lt;token&gt;/...</c>), the UI
+    /// binds to this so the user sees their original path
+    /// (<c>~/Immich/Photos</c>) while <see cref="Path"/> keeps the mount
+    /// the FolderWatchWorker actually reads from. Defaults to
+    /// <see cref="Path"/> when no override is set, so the WPF head and
+    /// any platform without doc-portal handling sees identical
+    /// behaviour. User edits flow back into <see cref="Path"/> verbatim
+    /// (treated as a manual host-path override). Use
+    /// <see cref="SetPortalPath"/> from the portal-pick flow to set the
+    /// two values independently.
+    /// </summary>
+    public string DisplayPath
+    {
+        get => string.IsNullOrEmpty(_displayPath) ? _path : _displayPath;
+        set
+        {
+            if (SetProperty(ref _displayPath, value))
+            {
+                if (!string.Equals(_path, value, StringComparison.Ordinal))
+                {
+                    Path = value;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets <see cref="Path"/> to the FUSE mount path the FolderWatch
+    /// Worker has to read AND <see cref="DisplayPath"/> to the host
+    /// path the user picked, without the user-edit mirror that would
+    /// otherwise clobber the mount path back to the host path.
+    /// </summary>
+    public void SetPortalPath(string mountPath, string hostPath)
+    {
+        Path = mountPath ?? string.Empty;
+
+        var resolved = string.IsNullOrEmpty(hostPath) ? string.Empty : hostPath;
+        if (!string.Equals(_displayPath, resolved, StringComparison.Ordinal))
+        {
+            _displayPath = resolved;
+            RaisePropertyChanged(nameof(DisplayPath));
         }
     }
 

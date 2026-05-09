@@ -65,6 +65,32 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task ResolveSourceDisplayPathsAsync(IServiceProvider services)
+    {
+        if (ViewModel is null)
+        {
+            return;
+        }
+
+        var docClient = services.GetService<DocumentPortalClient>();
+        if (docClient is null)
+        {
+            return;
+        }
+
+        // Walk a snapshot of the Sources collection so user-driven
+        // mutations during the async resolves don't trip the iterator.
+        var snapshot = ViewModel.Sources.ToList();
+        foreach (var source in snapshot)
+        {
+            var hostPath = await docClient.ResolveHostPathAsync(source.Path);
+            if (!string.IsNullOrEmpty(hostPath))
+            {
+                source.SetPortalPath(source.Path, hostPath);
+            }
+        }
+    }
+
     private async void OnOpened(object? sender, EventArgs e)
     {
         if (_initialLoadDone)
@@ -90,6 +116,7 @@ public sealed partial class MainWindow : Window
             {
                 loadedConfig = loader.LoadForEditing(configPath);
                 ViewModel.Load(loadedConfig);
+                await ResolveSourceDisplayPathsAsync(services);
             }
             catch (Exception ex)
             {
@@ -184,7 +211,14 @@ public sealed partial class MainWindow : Window
 
         ViewModel.AddSource();
         var newItem = ViewModel.Sources[^1];
-        newItem.Path = picked;
+
+        // The picker hands us /run/user/$UID/doc/<token>/... — opaque
+        // to the user but what the FolderWatchWorker has to read inside
+        // the sandbox. Resolve the original host path via the Documents
+        // portal so the TextBox can show "~/Pictures/Photos" instead.
+        var docClient = App.Services.GetRequiredService<DocumentPortalClient>();
+        var hostPath = await docClient.ResolveHostPathAsync(picked);
+        newItem.SetPortalPath(picked, hostPath ?? picked);
     }
 
     private void RemoveSourceButton_Click(object? sender, RoutedEventArgs e)

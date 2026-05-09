@@ -60,4 +60,70 @@ public sealed class WatchSourceItemTests
 
         Assert.Equal(string.Empty, item.AlbumName);
     }
+
+    [Fact]
+    public void DisplayPath_FallsBackToPath_WhenNotOverridden()
+    {
+        var item = new WatchSourceItem
+        {
+            Path = "/home/user/Pictures/Photos",
+        };
+
+        Assert.Equal("/home/user/Pictures/Photos", item.DisplayPath);
+    }
+
+    [Fact]
+    public void DisplayPath_UserEditMirrorsBackIntoPath()
+    {
+        var item = new WatchSourceItem
+        {
+            Path = "/home/user/Pictures/Photos",
+        };
+
+        item.DisplayPath = "/home/user/Pictures/Vacation";
+
+        Assert.Equal("/home/user/Pictures/Vacation", item.DisplayPath);
+        Assert.Equal("/home/user/Pictures/Vacation", item.Path);
+    }
+
+    [Fact]
+    public void SetPortalPath_KeepsMountInPath_AndShowsHostInDisplayPath()
+    {
+        var item = new WatchSourceItem();
+
+        item.SetPortalPath(
+            mountPath: "/run/user/1000/doc/abc123/Photos",
+            hostPath: "/home/user/Pictures/Photos");
+
+        Assert.Equal("/run/user/1000/doc/abc123/Photos", item.Path);
+        Assert.Equal("/home/user/Pictures/Photos", item.DisplayPath);
+    }
+
+    [Fact]
+    public void SetPortalPath_AlbumNameSuggestionUsesPath_LastSegmentMatchesHostPath()
+    {
+        var item = new WatchSourceItem();
+
+        item.SetPortalPath(
+            mountPath: "/run/user/1000/doc/abc123/Photos",
+            hostPath: "/home/user/Pictures/Photos");
+
+        // Album auto-fill reads Path; the mount's last segment ("Photos")
+        // matches the host path's basename — same suggestion either way.
+        Assert.Equal("Photos", item.AlbumName);
+    }
+
+    [Fact]
+    public void DisplayPath_UserEditAfterPortalPick_ClobbersPathToHostPath()
+    {
+        var item = new WatchSourceItem();
+        item.SetPortalPath(
+            mountPath: "/run/user/1000/doc/abc123/Photos",
+            hostPath: "/home/user/Pictures/Photos");
+
+        item.DisplayPath = "/home/user/Pictures/Vacation";
+
+        Assert.Equal("/home/user/Pictures/Vacation", item.Path);
+        Assert.Equal("/home/user/Pictures/Vacation", item.DisplayPath);
+    }
 }
