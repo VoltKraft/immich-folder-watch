@@ -167,6 +167,19 @@ public sealed class AppHost : IAsyncDisposable
             }
         }
 
+        // Default BackgroundServiceExceptionBehavior is StopHost, which
+        // tears down the whole IHost (and the Avalonia GUI alongside it
+        // via the App.axaml.cs Exit hook) the moment FolderWatchWorker
+        // throws — e.g. when every configured watch source is a stale
+        // doc-portal mount the user can no longer reach. Switch to
+        // Ignore so the worker just stops, the user sees the warning
+        // log + can fix the source via Save & Apply, and the GUI stays
+        // up to receive that fix.
+        builder.Services.Configure<HostOptions>(options =>
+        {
+            options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+        });
+
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(config.Retry);
         builder.Services.AddSingleton(_syncStatusProvider);
