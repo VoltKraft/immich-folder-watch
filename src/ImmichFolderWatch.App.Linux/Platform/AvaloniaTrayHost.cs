@@ -29,6 +29,16 @@ public sealed class AvaloniaTrayHost : IDisposable
 
     public bool IsTrayAvailable { get; private set; }
 
+    /// <summary>
+    /// True only after a TrayIcon has actually been registered and is
+    /// expected to be visible to the user. The MainWindow predicates
+    /// "close = hide" on this so the user is never stranded with a
+    /// hidden window and no tray icon to bring it back. 3.8.D sets
+    /// this true when the SNI registration succeeds; 3.8.C ships it
+    /// as always-false so close keeps exiting until the tray is real.
+    /// </summary>
+    public bool IsTrayIconRegistered { get; private set; }
+
     // OpenRequested + QuitRequested are reserved for the Phase 6 tray
     // re-activation; suppress the "never invoked" warning until then.
 #pragma warning disable CS0067

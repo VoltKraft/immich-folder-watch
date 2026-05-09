@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using ImmichFolderWatch.App.Linux.Hosting;
@@ -25,6 +27,42 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Opened += OnOpened;
+    }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel)
+        {
+            return;
+        }
+
+        var trayHost = App.Services?.GetService<AvaloniaTrayHost>();
+        if (trayHost?.IsTrayIconRegistered == true)
+        {
+            // Tray icon keeps the app reachable — hide instead of closing
+            // so the FolderWatchWorker keeps running in the background.
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
+        // No tray icon: closing the only window is the user's exit cue.
+        // Under ShutdownMode.OnExplicitShutdown the dispatcher would
+        // otherwise outlive the window; post the shutdown instead of
+        // calling it inline so the close finishes first.
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            Dispatcher.UIThread.Post(() => desktop.Shutdown(0));
+        }
+    }
+
+    private void QuitButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown(0);
+        }
     }
 
     private async void OnOpened(object? sender, EventArgs e)

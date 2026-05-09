@@ -38,6 +38,14 @@ public sealed partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Mirror the WPF App.xaml's ShutdownMode="OnExplicitShutdown".
+            // Closing the main window then no longer terminates the
+            // process — MainWindow.OnClosing decides hide-vs-exit based
+            // on whether a tray icon is registered, and explicit Quit
+            // paths (footer button, tray context menu in 3.8.D, second
+            // instance handoff) call desktop.Shutdown(0) themselves.
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             // Avalonia 11.3.x lets unobserved task exceptions reach the
             // dispatcher and kill the process; route them to the logger
             // instead so background D-Bus failures don't take the GUI down.
