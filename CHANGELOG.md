@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-05-10
+
+The first **Linux release** of Immich Folder Watch. Ships as a Flathub Flatpak
+(also available as a `.flatpak` sideload bundle on GitHub Releases) with full
+feature parity to the Windows tray app: watch sources, batch upload, per-folder
+sync modes, album rename propagation, Socket.IO realtime, English/German UI
+with auto-detect. Windows behavior is unchanged — same MSI, same Event Log
+integration, same upgrade path from 2.4.x.
+
+### Added
+- **Linux Flatpak head** (`io.github.voltkraft.ImmichFolderWatch`) — Avalonia
+  GUI on Wayland and X11, freedesktop runtime 24.08, .NET 10 SDK extension.
+  Self-contained `linux-x64` publish.
+- **D-Bus FileChooser portal** for picking watch sources. Returns doc-portal
+  handles (`/run/user/<uid>/doc/<id>/...`) the watcher resolves into the host
+  path via `org.freedesktop.portal.Documents.Info`. The settings window shows
+  the host path while the watcher reads the FUSE mount.
+- **Doc-portal handle persistence** — sources survive app restart and host
+  reboot via tokens stored in `config.yaml` and re-resolved through
+  `Documents.Lookup` on startup. Invalid tokens surface a "Re-pick folder"
+  banner per source rather than crashing.
+- **Polling sweep alongside `FileSystemWatcher`** — inotify events do not
+  propagate through the Flatpak xdg-document-portal FUSE mount, so a 5-second
+  polling sweep detects new files and deletions on watched sources. Required
+  for both upload-on-create and bidirectional-sync delete propagation.
+- **Background portal opt-in** (GNOME 46+). Closing the window keeps the
+  worker running; the app appears in Quick Settings → Background Apps.
+- **StatusNotifierItem (SNI) tray icon** on KDE Plasma and on GNOME with the
+  AppIndicator extension. Open / Quit menu. Falls back to a window-only
+  banner with Background-Apps guidance if the SNI watcher is missing.
+- **journald log target** as the Linux default, mirroring EventLog on Windows.
+  Uses the .NET systemd console formatter (priority-prefixed lines visible
+  via `journalctl --user -t io.github.voltkraft.ImmichFolderWatch.desktop`).
+  File target available too with rolling logs under
+  `~/.var/app/<id>/data/Immich Folder Watch/logs/`.
+- **inotify pre-flight + Windows-config guard.** Clear startup errors when
+  `fs.inotify.max_user_watches` is exhausted, or when a config carrying a
+  Windows-style absolute path (e.g. `C:\Users\...`) is loaded on Linux.
+- **Live theme + language switching.** GNOME color-scheme propagates into
+  the Avalonia FluentTheme; the language dropdown switches the UI without
+  a restart. New `auto` value picks the OS locale via SystemCultureSnapshot.
+- **Hidden-window autostart.** The Background-portal autostart toggle launches
+  the app with `--background`; the GUI stays hidden but the worker bootstraps
+  immediately (`AppHost.EnsureBootstrappedAsync` runs even when the window
+  is suppressed).
+
+### Changed
+- **Cross-platform refactor.** New `App.Shared` project hosts the portable
+  MVVM (MainWindowViewModel, Localization, ConfigVerificationRunner) used by
+  both the WPF and Avalonia heads. Core gains `IPlatformPaths`,
+  `IPlatformLoggingCapabilities`, and a journald-aware logging pipeline.
+  Windows code paths are mechanical-only renames; the WPF app and MSI build
+  the same as 2.4.0.
+- **Sync-mode dropdown binds via `SelectedItem`** to a per-row
+  `SelectedSyncModeOption` instance (Avalonia 11.3.x's
+  `SelectedValueBinding` doesn't reliably reflect saved values inside an
+  `ItemsControl` data template). The saved sync mode now sticks across
+  restarts on Linux.
+
+### Fixed
+- **Bidirectional sync, both directions.** Local deletes propagate to Immich
+  even on FUSE doc-portal mounts (the polling sweep replaces the missing
+  inotify delete event). Immich-side deletes propagate locally via a new
+  `PropagateRemoteDeletes` pass that diffs the remote asset-id set against
+  the local `_pathToAssetId` map.
+- **Re-download race.** Deleting a file locally no longer caused Immich's
+  next pull to download it back. Two fixes: a 120 s asset-id tombstone set
+  before the trash call (with rollback on failure), and a path-level
+  tombstone for unmapped deletes. A polling sweep is forced before each
+  pull so local deletes always reach Immich first.
+- **Tray-init crash.** `Avalonia.FreeDesktop.DBusTrayIconImpl.CreateTrayIcon`
+  raised `org.freedesktop.DBus.Error.ServiceUnknown` from a fire-and-forget
+  Task that bypassed the synchronous try/catch and unobserved-task net.
+  A scoped `Dispatcher.UnhandledException` filter now catches it and falls
+  back to the Background-Apps banner.
+
+### Notes
+- **App ID**: `io.github.voltkraft.ImmichFolderWatch`. Flathub listing
+  follows separately via the maintainer-review process — until then,
+  install the `.flatpak` bundle from this release with
+  `flatpak install --user immich-folder-watch-2.5.0.flatpak`.
+- **Tested on**: Fedora 44 + GNOME 46 + AppIndicator extension. KDE Plasma 6
+  pass deferred; flagged on the Flathub submission for community feedback.
+- **Windows MSI** ships from the same release. No Windows-side changes vs.
+  2.4.0.
+
 ## [2.4.0] - 2026-04-27
 
 Adds the **Windows Event Log** as the default log target. The dedicated Event

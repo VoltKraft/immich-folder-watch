@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="App_StatusHeadline_Running" xml:space="preserve"><value>Immich Folder Watch läuft im Hintergrund.</value></data>
+  <data name="App_SaveAndApply" xml:space="preserve"><value>Speichern und Anwenden</value></data>
+
+  <data name="Status_Ready" xml:space="preserve"><value>Bereit</value></data>
+  <data name="Status_ServerOffline" xml:space="preserve"><value>Server offline</value></data>
+  <data name="Status_SyncRunning" xml:space="preserve"><value>Sync läuft</value></data>
+  <data name="Status_Queue" xml:space="preserve"><value>Warteschlange</value></data>
+  <data name="Status_NoSyncYet" xml:space="preserve"><value>Noch kein Sync durchgeführt.</value></data>
+  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Aktuell kein Upload.</value></data>
+  <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Zuletzt geprüft: {0}</value></data>
+  <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
+  <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
+  <data name="Status_DownloadingPrefix" xml:space="preserve"><value>Download: {0}</value></data>
+  <data name="Status_PullProgressFormat" xml:space="preserve"><value>Pull: {0}/{1}</value></data>
+
+  <data name="Server_Unknown" xml:space="preserve"><value>Unbekannt</value></data>
+  <data name="Server_Error" xml:space="preserve"><value>Fehler</value></data>
+  <data name="Server_Checking" xml:space="preserve"><value>Prüfe…</value></data>
+  <data name="Server_Ok" xml:space="preserve"><value>OK</value></data>
+
+  <data name="Tooltip_LastSync" xml:space="preserve"><value>Letzter Sync</value></data>
+  <data name="Tooltip_Queue" xml:space="preserve"><value>Warteschlange</value></data>
+
+  <data name="Tray_Open" xml:space="preserve"><value>GUI öffnen</value></data>
+  <data name="Tray_Unavailable" xml:space="preserve"><value>Kein Tray-Icon verfügbar — beim Schließen des Fensters wird es nur ausgeblendet; der Watcher läuft im Hintergrund weiter. Wiederherstellen über den App-Launcher (Aktivitäten, Dock oder unter GNOME 46+ Schnelleinstellungen → Hintergrund-Apps). Zum tatsächlichen Beenden den Quit-Button verwenden. Unter KDE Plasma funktioniert der Tray out-of-the-box; unter GNOME ergänzt die Erweiterung "AppIndicator and KStatusNotifierItem Support" ein klassisches Tray-Icon.</value></data>
+  <data name="Tray_Restart" xml:space="preserve"><value>Neustart</value></data>
+  <data name="Tray_Quit" xml:space="preserve"><value>Beenden</value></data>
+
+  <data name="UI_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="UI_ServerConnection" xml:space="preserve"><value>Server-Verbindung</value></data>
+  <data name="UI_LastSync" xml:space="preserve"><value>Letzter Sync</value></data>
+  <data name="UI_CurrentSync" xml:space="preserve"><value>Aktueller Sync</value></data>
+  <data name="UI_PendingFiles" xml:space="preserve"><value>Wartende Dateien</value></data>
+  <data name="UI_Autostart" xml:space="preserve"><value>Autostart</value></data>
+  <data name="UI_StartOnLogin" xml:space="preserve"><value>Beim Anmelden starten</value></data>
+  <data name="UI_AutostartDescription" xml:space="preserve"><value>Ein Shortcut im Autostart-Ordner sorgt dafür, dass die Anwendung bei jeder Anmeldung im Hintergrund gestartet wird.</value></data>
+  <data name="UI_Immich" xml:space="preserve"><value>Immich</value></data>
+  <data name="UI_ServerApiUrl" xml:space="preserve"><value>Server-API-URL</value></data>
+  <data name="UI_ApiKey" xml:space="preserve"><value>API-Schlüssel</value></data>
+  <data name="UI_Permissions" xml:space="preserve"><value>Berechtigungen</value></data>
+  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Prüft die Berechtigungen, die für Uploads und die optionale Albenzuordnung benötigt werden.</value></data>
+  <data name="UI_VerifyImmichAccess" xml:space="preserve"><value>Immich-Zugang prüfen</value></data>
+  <data name="UI_WatchSources" xml:space="preserve"><value>Überwachte Ordner</value></data>
+  <data name="UI_AddSource" xml:space="preserve"><value>Ordner hinzufügen</value></data>
+  <data name="UI_WatchSource" xml:space="preserve"><value>Überwachter Ordner</value></data>
+  <data name="UI_Remove" xml:space="preserve"><value>Entfernen</value></data>
+  <data name="UI_FolderPath" xml:space="preserve"><value>Ordnerpfad</value></data>
+  <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich-Albumname</value></data>
+  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leer lassen, um kein Album zu verwenden</value></data>
+  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Erweiterte Überwachungsoptionen</value></data>
+  <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Unterordner einbeziehen</value></data>
+  <data name="UI_Extensions" xml:space="preserve"><value>Dateiendungen</value></data>
+  <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Ausgeschlossene Verzeichnisse</value></data>
+  <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Ausgeschlossene Dateinamen</value></data>
+  <data name="UI_WatchBehavior" xml:space="preserve"><value>Überwachungsverhalten</value></data>
+  <data name="UI_BatchIntervalSeconds" xml:space="preserve"><value>Batch-Intervall (Sekunden)</value></data>
+  <data name="UI_MaxBatchSize" xml:space="preserve"><value>Maximale Batch-Größe</value></data>
+  <data name="UI_FileReadyTimeoutSeconds" xml:space="preserve"><value>Datei-Bereit-Timeout (Sekunden)</value></data>
+  <data name="UI_RetryMaxAttempts" xml:space="preserve"><value>Maximale Wiederholungsversuche</value></data>
+  <data name="UI_LoggingAndRetry" xml:space="preserve"><value>Protokollierung und Wiederholung</value></data>
+  <data name="UI_RetryBaseDelayMs" xml:space="preserve"><value>Basisverzögerung (ms)</value></data>
+  <data name="UI_LogLevel" xml:space="preserve"><value>Protokollierungsstufe</value></data>
+  <data name="UI_LogTarget" xml:space="preserve"><value>Log-Ziel</value></data>
+  <data name="UI_LogTargetEventLog" xml:space="preserve"><value>Windows-Ereignisprotokoll</value></data>
+  <data name="UI_LogTargetFile" xml:space="preserve"><value>Datei</value></data>
+  <data name="UI_LogTargetJournald" xml:space="preserve"><value>Journald (systemd)</value></data>
+  <data name="UI_LogDirectory" xml:space="preserve"><value>Protokollverzeichnis</value></data>
+  <data name="UI_UseDefault" xml:space="preserve"><value>Standard verwenden</value></data>
+  <data name="UI_LogDirectoryHint" xml:space="preserve"><value>Das Protokollverzeichnis muss als absoluter Pfad angegeben werden.</value></data>
+  <data name="UI_OpenLogs" xml:space="preserve"><value>Protokolle öffnen</value></data>
+  <data name="UI_Language" xml:space="preserve"><value>Sprache</value></data>
+  <data name="UI_Appearance" xml:space="preserve"><value>Darstellung</value></data>
+  <data name="UI_SyncMode" xml:space="preserve"><value>Synchronisationsmodus</value></data>
+
+  <data name="SyncMode_UploadNew" xml:space="preserve"><value>Nur neue Dateien hochladen (Standard)</value></data>
+  <data name="SyncMode_UploadNew_Description" xml:space="preserve"><value>Nur Dateien, die während der Laufzeit neu in den Ordner kommen, werden hochgeladen. Bereits vorhandene Dateien werden ignoriert.</value></data>
+  <data name="SyncMode_UploadAll" xml:space="preserve"><value>Gesamten Ordnerinhalt hochladen</value></data>
+  <data name="SyncMode_UploadAll_Description" xml:space="preserve"><value>Lädt beim Start alle im Ordner vorhandenen Dateien hoch und danach auch alle neu hinzukommenden. Dateien werden nicht aus Immich heruntergeladen.</value></data>
+  <data name="SyncMode_Sync" xml:space="preserve"><value>Ordner mit Album synchronisieren (bidirektional)</value></data>
+  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Lädt lokale Dateien hoch, die im Album fehlen, und lädt Album-Assets herunter, die lokal fehlen. Löschungen werden nicht übernommen.</value></data>
+
+  <data name="Permission_AssetUpload" xml:space="preserve"><value>Asset-Upload</value></data>
+  <data name="Permission_AlbumRead" xml:space="preserve"><value>Album lesen</value></data>
+  <data name="Permission_AlbumCreate" xml:space="preserve"><value>Album erstellen</value></data>
+  <data name="Permission_AddAssetToAlbum" xml:space="preserve"><value>Asset zu Album hinzufügen</value></data>
+  <data name="Permission_AssetDownload" xml:space="preserve"><value>Asset-Download</value></data>
+  <data name="Permission_AssetRead" xml:space="preserve"><value>Assets lesen</value></data>
+  <data name="Permission_AssetDelete" xml:space="preserve"><value>Assets löschen</value></data>
+  <data name="Permission_RemoveAssetFromAlbum" xml:space="preserve"><value>Asset aus Album entfernen</value></data>
+
+  <data name="Check_Ok" xml:space="preserve"><value>OK</value></data>
+  <data name="Check_Warning" xml:space="preserve"><value>Warnung</value></data>
+  <data name="Check_Failed" xml:space="preserve"><value>Fehlgeschlagen</value></data>
+  <data name="Check_Checking" xml:space="preserve"><value>Prüfe</value></data>
+  <data name="Check_NotChecked" xml:space="preserve"><value>Nicht geprüft</value></data>
+  <data name="Check_NotCheckedYet" xml:space="preserve"><value>Noch nicht geprüft.</value></data>
+
+  <data name="ApiKey_ShowToolTip" xml:space="preserve"><value>API-Schlüssel anzeigen</value></data>
+  <data name="ApiKey_HideToolTip" xml:space="preserve"><value>API-Schlüssel verbergen</value></data>
+
+  <data name="Op_ConfigLoadFailedFormat" xml:space="preserve"><value>Die bestehende Konfiguration konnte nicht geladen werden. Standardwerte wurden geöffnet: {0}</value></data>
+  <data name="Op_CheckingImmich" xml:space="preserve"><value>Prüfe Immich-URL, API-Schlüssel und Berechtigungen…</value></data>
+  <data name="Op_ImmichCheckFailedFormat" xml:space="preserve"><value>Immich-Prüfung ist fehlgeschlagen: {0}</value></data>
+  <data name="Op_ImmichCheckOk" xml:space="preserve"><value>Immich-Zugangsprüfung erfolgreich abgeschlossen.</value></data>
+  <data name="Op_ImmichCheckDone" xml:space="preserve"><value>Immich-Zugangsprüfung abgeschlossen.</value></data>
+  <data name="Op_NoLogDir" xml:space="preserve"><value>Kein Protokollverzeichnis konfiguriert.</value></data>
+  <data name="Op_LogDirMissingFormat" xml:space="preserve"><value>Das Protokollverzeichnis existiert nicht: {0}</value></data>
+  <data name="Op_LogDirReset" xml:space="preserve"><value>Protokollverzeichnis auf den Standardpfad zurückgesetzt.</value></data>
+  <data name="Op_EventLogSourceMissing" xml:space="preserve"><value>Windows-Ereignisprotokoll-Quelle ist nicht registriert. MSI-Installer als Administrator erneut ausführen, um das Ereignisprotokoll-Ziel zu aktivieren. Fallback auf Datei-Protokollierung.</value></data>
+  <data name="Op_EventLogSourceMisalignedFormat" xml:space="preserve"><value>Ereignisprotokoll-Quelle '{0}' ist unter '{1}' statt unter '{2}' registriert. MSI-Installer als Administrator erneut ausführen, um zu reparieren. Fallback auf Datei-Protokollierung.</value></data>
+  <data name="Op_EventViewerLaunchFailedFormat" xml:space="preserve"><value>Ereignisanzeige konnte nicht geöffnet werden: {0}</value></data>
+  <data name="Op_CheckingConfig" xml:space="preserve"><value>Prüfe Konfiguration gegen Immich…</value></data>
+  <data name="Op_SavingRestarting" xml:space="preserve"><value>Speichere Konfiguration und starte Sync neu…</value></data>
+  <data name="Op_SavedApplied" xml:space="preserve"><value>Konfiguration gespeichert und angewendet.</value></data>
+  <data name="Op_SaveFailedFormat" xml:space="preserve"><value>Speichern fehlgeschlagen: {0}</value></data>
+  <data name="Op_AutostartFailedFormat" xml:space="preserve"><value>Autostart konnte nicht aktualisiert werden: {0}</value></data>
+
+  <data name="Language_Auto" xml:space="preserve"><value>Automatisch (Systemeinstellung)</value></data>
+  <data name="Language_English" xml:space="preserve"><value>Englisch</value></data>
+  <data name="Language_German" xml:space="preserve"><value>Deutsch</value></data>
+</root>

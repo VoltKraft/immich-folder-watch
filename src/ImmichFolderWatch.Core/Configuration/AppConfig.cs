@@ -103,7 +103,9 @@ public static class LogTargets
 
     public const string File = "file";
 
-    public static IReadOnlyList<string> All { get; } = new[] { EventLog, File };
+    public const string Journald = "journald";
+
+    public static IReadOnlyList<string> All { get; } = new[] { EventLog, File, Journald };
 
     public static string Normalize(string? value)
     {
@@ -123,6 +125,11 @@ public static class LogTargets
             return File;
         }
 
+        if (string.Equals(trimmed, Journald, StringComparison.OrdinalIgnoreCase))
+        {
+            return Journald;
+        }
+
         return EventLog;
     }
 
@@ -131,6 +138,9 @@ public static class LogTargets
 
     public static bool IsFile(string? value) =>
         string.Equals(Normalize(value), File, StringComparison.Ordinal);
+
+    public static bool IsJournald(string? value) =>
+        string.Equals(Normalize(value), Journald, StringComparison.Ordinal);
 }
 
 public sealed class LocalizationSettings

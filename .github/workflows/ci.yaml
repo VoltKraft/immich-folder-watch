@@ -5,13 +5,21 @@ on:
     branches:
       - main
       - develop
+      - Flatpak
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  build-windows:
     name: Build and Test (windows-latest)
     runs-on: windows-latest
 
@@ -32,3 +40,58 @@ jobs:
 
       - name: Test
         run: dotnet test ImmichFolderWatch.sln --configuration Release --no-build
+
+  build-linux:
+    name: Build and Test (ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Linux-portable projects
+        run: |
+          dotnet restore src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj
+          dotnet restore src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj
+
+      - name: Build
+        run: |
+          dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj --configuration Release --no-restore
+          dotnet build src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-build
+
+  lint-flatpak:
+    name: Lint Flatpak packaging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            appstream \
+            desktop-file-utils \
+            flatpak-builder
+
+      - name: Validate AppStream metainfo
+        # `--no-net` keeps the lint passing on PR/dev pushes where the
+        # release-tag-pinned screenshot URL isn't live yet. Flathub's
+        # own pipeline fetches screenshots at build time, when the
+        # v<N> tag exists.
+        run: appstreamcli validate --no-net packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+
+      - name: Validate desktop entry
+        run: desktop-file-validate packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
+
+      - name: Dry-parse Flatpak manifest
+        run: flatpak-builder --show-manifest packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml > /dev/null

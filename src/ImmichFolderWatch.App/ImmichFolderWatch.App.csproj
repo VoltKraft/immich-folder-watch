@@ -17,20 +17,27 @@
     <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
     <BrandWindowsIcon>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'windows', 'app.ico'))</BrandWindowsIcon>
     <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
-    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.immich_folder_watch.svg'))</BrandFlatpakSvg>
-    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.immich_folder_watch.png'))</BrandFlatpakPng>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
     <ApplicationIcon>$(BrandWindowsIcon)</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
-    <BrandAssetGeneratorInputs Include="$(BrandProjectRoot)/tools/BrandAssetGen/**/*.cs;$(BrandProjectRoot)/tools/BrandAssetGen/**/*.csproj"
-                               Exclude="$(BrandProjectRoot)/tools/BrandAssetGen/bin/**/*;$(BrandProjectRoot)/tools/BrandAssetGen/obj/**/*" />
+    <ProjectReference Include="../ImmichFolderWatch.App.Shared/ImmichFolderWatch.App.Shared.csproj" />
+    <!--
+      Build-order-only dependency on BrandAssetGen so the solution
+      doesn't compile the tool concurrently from both App.csproj and
+      App.Linux.csproj's GenerateBrandAssets targets (post-3.8.A both
+      heads invoke the generator). The parallel compile races on
+      tools/BrandAssetGen/obj/.../AssemblyInfoInputs.cache and breaks
+      the Windows CI build with MSB3491. ReferenceOutputAssembly=false
+      keeps the tool out of our publish output.
+    -->
+    <ProjectReference Include="$(BrandGeneratorProject)"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,26 +50,4 @@
     <Resource Include="$(BrandWindowsIcon)" Link="Assets/app-icon.ico" />
     <Resource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <NeutralLanguage>en</NeutralLanguage>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Resources\Strings.resx">
-      <Generator></Generator>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Resources\Strings.de.resx">
-      <Generator></Generator>
-      <DependentUpon>Strings.resx</DependentUpon>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <Target Name="GenerateBrandAssets"
-          BeforeTargets="BeforeBuild;MarkupCompilePass1"
-          Condition="'$(DesignTimeBuild)' != 'true'"
-          Inputs="@(BrandAssetGeneratorInputs)"
-          Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
-    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
-  </Target>
 </Project>

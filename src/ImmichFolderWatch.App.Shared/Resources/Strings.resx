@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="App_StatusHeadline_Running" xml:space="preserve"><value>Immich Folder Watch is running in the background.</value></data>
+  <data name="App_SaveAndApply" xml:space="preserve"><value>Save and Apply</value></data>
+
+  <data name="Status_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Status_ServerOffline" xml:space="preserve"><value>Server offline</value></data>
+  <data name="Status_SyncRunning" xml:space="preserve"><value>Sync running</value></data>
+  <data name="Status_Queue" xml:space="preserve"><value>Queue</value></data>
+  <data name="Status_NoSyncYet" xml:space="preserve"><value>No sync performed yet.</value></data>
+  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Currently no upload.</value></data>
+  <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Last checked: {0}</value></data>
+  <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
+  <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
+  <data name="Status_DownloadingPrefix" xml:space="preserve"><value>Download: {0}</value></data>
+  <data name="Status_PullProgressFormat" xml:space="preserve"><value>Pull: {0}/{1}</value></data>
+
+  <data name="Server_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Server_Error" xml:space="preserve"><value>Error</value></data>
+  <data name="Server_Checking" xml:space="preserve"><value>Checking…</value></data>
+  <data name="Server_Ok" xml:space="preserve"><value>OK</value></data>
+
+  <data name="Tooltip_LastSync" xml:space="preserve"><value>Last Sync</value></data>
+  <data name="Tooltip_Queue" xml:space="preserve"><value>Queue</value></data>
+
+  <data name="Tray_Open" xml:space="preserve"><value>Open GUI</value></data>
+  <data name="Tray_Unavailable" xml:space="preserve"><value>No system tray icon — closing the window only hides it; the watcher keeps running in the background. Re-open via the app launcher (Activities, dock, or GNOME 46+ Quick Settings → Background Apps). Use the Quit button to actually exit. On KDE Plasma the tray works out of the box; on GNOME, the AppIndicator and KStatusNotifierItem Support extension adds a classic tray icon.</value></data>
+  <data name="Tray_Restart" xml:space="preserve"><value>Restart</value></data>
+  <data name="Tray_Quit" xml:space="preserve"><value>Quit</value></data>
+
+  <data name="UI_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="UI_ServerConnection" xml:space="preserve"><value>Server Connection</value></data>
+  <data name="UI_LastSync" xml:space="preserve"><value>Last Sync</value></data>
+  <data name="UI_CurrentSync" xml:space="preserve"><value>Current Sync</value></data>
+  <data name="UI_PendingFiles" xml:space="preserve"><value>Pending Files</value></data>
+  <data name="UI_Autostart" xml:space="preserve"><value>Autostart</value></data>
+  <data name="UI_StartOnLogin" xml:space="preserve"><value>Start on login</value></data>
+  <data name="UI_AutostartDescription" xml:space="preserve"><value>A shortcut in the autostart folder ensures the application is started in the background at every login.</value></data>
+  <data name="UI_Immich" xml:space="preserve"><value>Immich</value></data>
+  <data name="UI_ServerApiUrl" xml:space="preserve"><value>Server API URL</value></data>
+  <data name="UI_ApiKey" xml:space="preserve"><value>API Key</value></data>
+  <data name="UI_Permissions" xml:space="preserve"><value>Permissions</value></data>
+  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Checks the permissions needed for uploads and optional album placement.</value></data>
+  <data name="UI_VerifyImmichAccess" xml:space="preserve"><value>Verify Immich Access</value></data>
+  <data name="UI_WatchSources" xml:space="preserve"><value>Watch Sources</value></data>
+  <data name="UI_AddSource" xml:space="preserve"><value>Add Source</value></data>
+  <data name="UI_WatchSource" xml:space="preserve"><value>Watch Source</value></data>
+  <data name="UI_Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="UI_FolderPath" xml:space="preserve"><value>Folder Path</value></data>
+  <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich Album Name</value></data>
+  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leave empty for no album</value></data>
+  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Advanced Watch Options</value></data>
+  <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Include subdirectories</value></data>
+  <data name="UI_Extensions" xml:space="preserve"><value>Extensions</value></data>
+  <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Excluded Directories</value></data>
+  <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Excluded File Names</value></data>
+  <data name="UI_WatchBehavior" xml:space="preserve"><value>Watch Behavior</value></data>
+  <data name="UI_BatchIntervalSeconds" xml:space="preserve"><value>Batch Interval Seconds</value></data>
+  <data name="UI_MaxBatchSize" xml:space="preserve"><value>Max Batch Size</value></data>
+  <data name="UI_FileReadyTimeoutSeconds" xml:space="preserve"><value>File Ready Timeout Seconds</value></data>
+  <data name="UI_RetryMaxAttempts" xml:space="preserve"><value>Retry Max Attempts</value></data>
+  <data name="UI_LoggingAndRetry" xml:space="preserve"><value>Logging And Retry</value></data>
+  <data name="UI_RetryBaseDelayMs" xml:space="preserve"><value>Retry Base Delay (ms)</value></data>
+  <data name="UI_LogLevel" xml:space="preserve"><value>Log Level</value></data>
+  <data name="UI_LogTarget" xml:space="preserve"><value>Log Target</value></data>
+  <data name="UI_LogTargetEventLog" xml:space="preserve"><value>Windows Event Log</value></data>
+  <data name="UI_LogTargetFile" xml:space="preserve"><value>File</value></data>
+  <data name="UI_LogTargetJournald" xml:space="preserve"><value>Journald (systemd)</value></data>
+  <data name="UI_LogDirectory" xml:space="preserve"><value>Log Directory</value></data>
+  <data name="UI_UseDefault" xml:space="preserve"><value>Use Default</value></data>
+  <data name="UI_LogDirectoryHint" xml:space="preserve"><value>Log Directory must be configured as an absolute path.</value></data>
+  <data name="UI_OpenLogs" xml:space="preserve"><value>Open Logs</value></data>
+  <data name="UI_Language" xml:space="preserve"><value>Language</value></data>
+  <data name="UI_Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="UI_SyncMode" xml:space="preserve"><value>Sync Mode</value></data>
+
+  <data name="SyncMode_UploadNew" xml:space="preserve"><value>Upload new files only (default)</value></data>
+  <data name="SyncMode_UploadNew_Description" xml:space="preserve"><value>Only new files that appear in the folder while the app is running are uploaded. Existing files are ignored.</value></data>
+  <data name="SyncMode_UploadAll" xml:space="preserve"><value>Upload everything in the folder</value></data>
+  <data name="SyncMode_UploadAll_Description" xml:space="preserve"><value>Uploads all files currently in the folder on start and keeps uploading new files added later. Files are never downloaded from Immich.</value></data>
+  <data name="SyncMode_Sync" xml:space="preserve"><value>Sync folder with album (bidirectional)</value></data>
+  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Uploads local files that are missing in the album and downloads album assets that are missing locally. Deletions are not propagated.</value></data>
+
+  <data name="Permission_AssetUpload" xml:space="preserve"><value>Asset Upload</value></data>
+  <data name="Permission_AlbumRead" xml:space="preserve"><value>Album Read</value></data>
+  <data name="Permission_AlbumCreate" xml:space="preserve"><value>Album Create</value></data>
+  <data name="Permission_AddAssetToAlbum" xml:space="preserve"><value>Add Asset To Album</value></data>
+  <data name="Permission_AssetDownload" xml:space="preserve"><value>Asset Download</value></data>
+  <data name="Permission_AssetRead" xml:space="preserve"><value>Asset Read</value></data>
+  <data name="Permission_AssetDelete" xml:space="preserve"><value>Asset Delete</value></data>
+  <data name="Permission_RemoveAssetFromAlbum" xml:space="preserve"><value>Remove Asset From Album</value></data>
+
+  <data name="Check_Ok" xml:space="preserve"><value>OK</value></data>
+  <data name="Check_Warning" xml:space="preserve"><value>Warning</value></data>
+  <data name="Check_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Check_Checking" xml:space="preserve"><value>Checking</value></data>
+  <data name="Check_NotChecked" xml:space="preserve"><value>Not checked</value></data>
+  <data name="Check_NotCheckedYet" xml:space="preserve"><value>Not checked yet.</value></data>
+
+  <data name="ApiKey_ShowToolTip" xml:space="preserve"><value>Show API key</value></data>
+  <data name="ApiKey_HideToolTip" xml:space="preserve"><value>Hide API key</value></data>
+
+  <data name="Op_ConfigLoadFailedFormat" xml:space="preserve"><value>The existing configuration could not be loaded. Default values have been opened: {0}</value></data>
+  <data name="Op_CheckingImmich" xml:space="preserve"><value>Checking Immich URL, API key, and permissions…</value></data>
+  <data name="Op_ImmichCheckFailedFormat" xml:space="preserve"><value>Immich check failed: {0}</value></data>
+  <data name="Op_ImmichCheckOk" xml:space="preserve"><value>Immich access verification completed successfully.</value></data>
+  <data name="Op_ImmichCheckDone" xml:space="preserve"><value>Immich access verification completed.</value></data>
+  <data name="Op_NoLogDir" xml:space="preserve"><value>No log directory configured.</value></data>
+  <data name="Op_LogDirMissingFormat" xml:space="preserve"><value>The log directory does not exist: {0}</value></data>
+  <data name="Op_LogDirReset" xml:space="preserve"><value>Log directory reset to default path.</value></data>
+  <data name="Op_EventLogSourceMissing" xml:space="preserve"><value>Windows Event Log source is not registered. Reinstall via the MSI installer (administrator) to enable the Event Log target. Falling back to file logging.</value></data>
+  <data name="Op_EventLogSourceMisalignedFormat" xml:space="preserve"><value>Event Log source '{0}' is registered under '{1}' instead of '{2}'. Reinstall via the MSI installer (administrator) to repair. Falling back to file logging.</value></data>
+  <data name="Op_EventViewerLaunchFailedFormat" xml:space="preserve"><value>Failed to open Event Viewer: {0}</value></data>
+  <data name="Op_CheckingConfig" xml:space="preserve"><value>Checking configuration against Immich…</value></data>
+  <data name="Op_SavingRestarting" xml:space="preserve"><value>Saving configuration and restarting sync…</value></data>
+  <data name="Op_SavedApplied" xml:space="preserve"><value>Configuration saved and applied.</value></data>
+  <data name="Op_SaveFailedFormat" xml:space="preserve"><value>Save failed: {0}</value></data>
+  <data name="Op_AutostartFailedFormat" xml:space="preserve"><value>Autostart could not be updated: {0}</value></data>
+
+  <data name="Language_Auto" xml:space="preserve"><value>Auto (system default)</value></data>
+  <data name="Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Language_German" xml:space="preserve"><value>German</value></data>
+</root>

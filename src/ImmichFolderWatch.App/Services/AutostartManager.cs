@@ -1,15 +1,31 @@
 using System.Runtime.InteropServices;
 using ImmichFolderWatch.Core.Installation;
+using ImmichFolderWatch.Core.Platform;
 
 namespace ImmichFolderWatch.App.Services;
 
-public sealed class AutostartManager
+public sealed class AutostartManager : IAutoStartManager
 {
     public const string AutostartArgument = "--autostart";
 
     public bool IsEnabled()
     {
         return File.Exists(InstallationPaths.GetStartupShortcutPath());
+    }
+
+    Task<bool> IAutoStartManager.IsEnabledAsync(CancellationToken cancellationToken)
+        => Task.FromResult(IsEnabled());
+
+    Task IAutoStartManager.EnableAsync(CancellationToken cancellationToken)
+    {
+        Enable();
+        return Task.CompletedTask;
+    }
+
+    Task IAutoStartManager.DisableAsync(CancellationToken cancellationToken)
+    {
+        Disable();
+        return Task.CompletedTask;
     }
 
     public void Enable()

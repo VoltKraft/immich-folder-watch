@@ -1,13 +1,21 @@
 <Project>
   <PropertyGroup>
-    <Version>2.4.0</Version>
-    <AssemblyVersion>2.4.0.0</AssemblyVersion>
-    <FileVersion>2.4.0.0</FileVersion>
+    <Version>2.5.0</Version>
+    <AssemblyVersion>2.5.0.0</AssemblyVersion>
+    <FileVersion>2.5.0.0</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!--
+      Always true so external tooling running on Linux (CodeQL default
+      setup, Dependabot, IDE indexers) can `dotnet restore` the WPF
+      App.csproj without erroring NETSDK1100. The actual `dotnet build`
+      of the WPF App still requires Windows-resident WPF runtime
+      bits at runtime; ci.yaml's build-linux job intentionally builds
+      only App.Linux + Tests.Core, never App.csproj or the WPF Tests.
+    -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 </Project>

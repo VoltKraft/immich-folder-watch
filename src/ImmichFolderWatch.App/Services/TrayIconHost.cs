@@ -2,7 +2,8 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using ImmichFolderWatch.App.Resources;
+using ImmichFolderWatch.App.Shared.Resources;
+using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.App.Services;

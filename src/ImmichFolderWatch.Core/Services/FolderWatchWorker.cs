@@ -14,6 +14,24 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private static readonly TimeSpan AlbumPullInterval = TimeSpan.FromSeconds(10);
 
+    // Periodic polling sweep alongside FileSystemWatcher. FSW is reliable
+    // on native NTFS / ext4 / btrfs, but inotify on FUSE mounts (notably
+    // the Flatpak xdg-document-portal at /run/user/$UID/doc/<token>/...)
+    // does not propagate file changes that originate outside the mount.
+    // The sweep diff-scans the source trees against a known-paths
+    // baseline: new files replay into OnFileEvent; missing files
+    // replay into HandleDeleteInSyncAsync (sync mode only — non-sync
+    // modes have no delete propagation anyway). On platforms where
+    // FSW already fired the events, OnFileEvent debounces against
+    // _debouncedFiles and HandleDeleteInSyncAsync no-ops on the
+    // already-removed _pathToAssetId entry, so the sweep is cheap.
+    private static readonly TimeSpan PollingSweepInterval = TimeSpan.FromSeconds(5);
+
+    private readonly Dictionary<string, HashSet<string>> _pollingBaseline =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private DateTimeOffset _lastPollingSweep = DateTimeOffset.MinValue;
+
     private readonly AppConfig _config;
 
     private readonly IFileReadinessChecker _fileReadinessChecker;
@@ -33,6 +51,31 @@ public sealed class FolderWatchWorker : BackgroundService
     private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Asset ids we just trashed locally — tombstone so a subsequent
+    /// pull that still sees the asset (race against Immich's trash
+    /// propagation) does not re-download it. Set OPTIMISTICALLY in
+    /// the synchronous prefix of HandleDeleteInSyncAsync so a pull
+    /// that fires on the same loop tick as the sweep already sees
+    /// the tombstone. Rolled back if TrashAssetsAsync fails. Entries
+    /// expire after <see cref="TombstoneTtl"/>.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyTrashedAssetIds =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Local paths whose file the user just deleted. Tombstoned even
+    /// when no asset id was mapped (rare, but happens if the file was
+    /// hand-copied into the watch dir without going through the upload
+    /// pipeline) so DownloadAssetsAsync still skips re-creating the
+    /// path. Asset stays on Immich in that case — the warn log tells
+    /// the user.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyDeletedPaths =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly TimeSpan TombstoneTtl = TimeSpan.FromSeconds(120);
 
     private readonly ConcurrentDictionary<string, string> _albumIdToDirName = new(StringComparer.Ordinal);
 
@@ -88,6 +131,12 @@ public sealed class FolderWatchWorker : BackgroundService
         {
             while (await loopTimer.WaitForNextTickAsync(stoppingToken))
             {
+                if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
+                {
+                    PollDirectoriesForChanges();
+                    _lastPollingSweep = DateTimeOffset.UtcNow;
+                }
+
                 await PromoteDebouncedFilesAsync(stoppingToken);
                 _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
 
@@ -102,6 +151,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 var pullRequested = Interlocked.Exchange(ref _pullRequested, 0) == 1;
                 if (pullRequested || DateTimeOffset.UtcNow - lastAlbumPull >= AlbumPullInterval)
                 {
+                    // Always sweep right before pulling: an Immich-side
+                    // realtime event can fire pullRequested within
+                    // milliseconds of a local delete, racing ahead of
+                    // the regular 5 s sweep gate. Running the sweep
+                    // here guarantees HandleDeleteInSyncAsync sets the
+                    // asset-id + path tombstones (synchronously, before
+                    // its first await) before the pull's
+                    // DownloadAssetsAsync iterates assets.
+                    PollDirectoriesForChanges();
+                    _lastPollingSweep = DateTimeOffset.UtcNow;
+
                     await PullFromImmichAsync(stoppingToken);
                     lastAlbumPull = DateTimeOffset.UtcNow;
                 }
@@ -141,12 +201,43 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private void RegisterWatchers()
     {
+        var inotifyLimit = InotifyLimits.GetMaxUserWatches();
+        var inotifyConsumed = 0L;
+        var inotifyWarned = false;
+
         foreach (var source in _config.Watch.Sources)
         {
             if (!Directory.Exists(source.Path))
             {
                 _logger.LogWarning("Watch source directory does not exist and was skipped: {Path}", source.Path);
                 continue;
+            }
+
+            if (inotifyLimit.HasValue)
+            {
+                var estimated = InotifyLimits.CountWatchedDirectories(source.Path, source.IncludeSubdirectories);
+                var projected = inotifyConsumed + estimated;
+                if (projected > inotifyLimit.Value * InotifyLimits.RefuseFraction)
+                {
+                    _logger.LogError(
+                        "Skipping source {Path}: registering ~{Estimated} inotify watches would push the user total to {Projected}, exceeding 95% of fs.inotify.max_user_watches={Limit}. Increase the limit (e.g. sysctl fs.inotify.max_user_watches=524288) or remove sources.",
+                        source.Path,
+                        estimated,
+                        projected,
+                        inotifyLimit.Value);
+                    continue;
+                }
+
+                if (!inotifyWarned && projected > inotifyLimit.Value * InotifyLimits.WarnFraction)
+                {
+                    _logger.LogWarning(
+                        "Configured watch tree consumes {Projected} of {Limit} inotify watches (>50% of fs.inotify.max_user_watches). Increase the limit if you plan to add more sources.",
+                        projected,
+                        inotifyLimit.Value);
+                    inotifyWarned = true;
+                }
+
+                inotifyConsumed = projected;
             }
 
             var syncMode = WatchSourceSyncModes.Normalize(source.SyncMode);
@@ -194,6 +285,13 @@ public sealed class FolderWatchWorker : BackgroundService
 
             _watchers.Add(watcher);
             _sources.Add(context);
+            var baseline = SnapshotExistingFiles(context);
+            _pollingBaseline[NormalizePath(source.Path)] = baseline;
+            _logger.LogInformation(
+                "Polling baseline established for {Path}: {Count} pre-existing file(s) snapshotted; sweep interval = {SweepSeconds}s.",
+                source.Path,
+                baseline.Count,
+                (int)PollingSweepInterval.TotalSeconds);
 
             if (useSubdirsAsAlbums)
             {
@@ -409,6 +507,104 @@ public sealed class FolderWatchWorker : BackgroundService
         _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
     }
 
+    private HashSet<string> SnapshotExistingFiles(WatchSourceContext context)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var searchOption = context.EffectiveIncludeSubdirectories
+            ? SearchOption.AllDirectories
+            : SearchOption.TopDirectoryOnly;
+        try
+        {
+            foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+            {
+                set.Add(NormalizePath(filePath));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Polling baseline scan failed for {Path}", context.Source.Path);
+        }
+        return set;
+    }
+
+    private void PollDirectoriesForChanges()
+    {
+        foreach (var context in _sources)
+        {
+            var sourceKey = NormalizePath(context.Source.Path);
+            if (!_pollingBaseline.TryGetValue(sourceKey, out var known))
+            {
+                continue;
+            }
+
+            var searchOption = context.EffectiveIncludeSubdirectories
+                ? SearchOption.AllDirectories
+                : SearchOption.TopDirectoryOnly;
+
+            HashSet<string> seenThisSweep;
+            try
+            {
+                seenThisSweep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+                {
+                    var normalized = NormalizePath(filePath);
+                    seenThisSweep.Add(normalized);
+
+                    // HashSet.Add returns false if the path was already
+                    // known — skip it. New paths fall through to
+                    // OnFileEvent, which itself debounces against
+                    // _debouncedFiles so a parallel FSW Created event
+                    // does not double-enqueue.
+                    if (!known.Add(normalized))
+                    {
+                        continue;
+                    }
+                    if (!context.Filter.IsMatch(normalized))
+                    {
+                        _logger.LogDebug("Polling sweep saw new file but filter rejected it: {Path}", normalized);
+                        continue;
+                    }
+                    _logger.LogInformation("Polling sweep detected new file: {Path}", normalized);
+                    OnFileEvent(context, normalized);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Polling sweep failed for {Path}", context.Source.Path);
+                continue;
+            }
+
+            // Detect deletions: paths in the known baseline that the
+            // current scan didn't see. Mostly relevant on FUSE mounts
+            // (Flatpak xdg-document-portal) where FSW.Deleted does not
+            // fire; on native filesystems FSW already fired for these
+            // and HandleDeleteInSyncAsync's _pathToAssetId.TryRemove
+            // returns false, making the second call a cheap no-op.
+            var disappeared = known.Where(p => !seenThisSweep.Contains(p)).ToList();
+            foreach (var path in disappeared)
+            {
+                known.Remove(path);
+                if (!context.Filter.IsMatch(path))
+                {
+                    continue;
+                }
+                _logger.LogInformation("Polling sweep detected removed file: {Path}", path);
+                if (context.IsSyncMode)
+                {
+                    _ = HandleDeleteInSyncAsync(context, path);
+                }
+                else
+                {
+                    // Non-sync modes don't propagate deletes upward, but
+                    // we still drop the asset-id mapping so a re-add of
+                    // the same path later isn't mis-identified.
+                    _debouncedFiles.TryRemove(path, out _);
+                    _pathToAssetId.TryRemove(path, out _);
+                }
+            }
+        }
+    }
+
     private async Task PullFromImmichAsync(CancellationToken cancellationToken)
     {
         foreach (var context in _sources)
@@ -418,15 +614,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
+            var pullSucceeded = false;
             try
             {
                 if (context.UseFlatAlbum)
                 {
-                    await PullFlatAlbumAsync(context, cancellationToken);
+                    pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
                 }
                 else if (context.UseSubdirsAsAlbums)
                 {
-                    await PullSubdirsAsAlbumsAsync(context, cancellationToken);
+                    pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -437,16 +635,82 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
             }
+
+            if (pullSucceeded)
+            {
+                PropagateRemoteDeletes(context, remoteAssetIds);
+            }
         }
     }
 
-    private async Task PullFlatAlbumAsync(WatchSourceContext context, CancellationToken cancellationToken)
+    /// <summary>
+    /// Removes local files whose <see cref="_pathToAssetId"/> mapping
+    /// references an Immich asset id that the latest pull no longer
+    /// reports — i.e. the user trashed the asset on Immich. Only runs
+    /// when the pull as a whole succeeded; partial failures abort
+    /// (we don't want to delete every local file because a transient
+    /// API error returned an empty asset list).
+    /// </summary>
+    private void PropagateRemoteDeletes(WatchSourceContext context, HashSet<string> remoteAssetIds)
+    {
+        var rootPrefix = context.NormalizedRoot + Path.DirectorySeparatorChar;
+        var sourceKey = NormalizePath(context.Source.Path);
+        _pollingBaseline.TryGetValue(sourceKey, out var baseline);
+
+        var stale = _pathToAssetId
+            .Where(entry =>
+                entry.Key.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+                && !remoteAssetIds.Contains(entry.Value))
+            .ToList();
+
+        foreach (var entry in stale)
+        {
+            if (!_pathToAssetId.TryRemove(entry.Key, out _))
+            {
+                continue;
+            }
+
+            // Drop from polling baseline so the next sweep doesn't
+            // re-fire HandleDeleteInSyncAsync against an asset id we
+            // already cleaned up.
+            baseline?.Remove(entry.Key);
+            _debouncedFiles.TryRemove(entry.Key, out _);
+
+            try
+            {
+                if (File.Exists(entry.Key))
+                {
+                    File.Delete(entry.Key);
+                    _logger.LogInformation(
+                        "Removed local file after remote delete (asset {AssetId} no longer on Immich): {Path}",
+                        entry.Value,
+                        entry.Key);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to remove local file after remote delete: {Path}",
+                    entry.Key);
+            }
+        }
+    }
+
+    private async Task<bool> PullFlatAlbumAsync(
+        WatchSourceContext context,
+        HashSet<string> remoteAssetIds,
+        CancellationToken cancellationToken)
     {
         var result = await _immichAssetClient.GetAlbumAssetsAsync(context.Source.AlbumName, cancellationToken);
         if (result.AlbumMissing)
         {
+            // We can't tell "album never existed" from "album was just
+            // deleted by the user". Skip delete propagation either way
+            // — a fresh upload re-creates the album, and the next pull
+            // sees the new state.
             _logger.LogDebug("Sync pull skipped; album '{AlbumName}' does not exist yet.", context.Source.AlbumName);
-            return;
+            return false;
         }
 
         if (!result.IsSuccess)
@@ -455,17 +719,38 @@ public sealed class FolderWatchWorker : BackgroundService
                 "Sync pull failed for album '{AlbumName}': {Error}",
                 context.Source.AlbumName,
                 result.ErrorMessage ?? "unknown");
-            return;
+            return false;
+        }
+
+        foreach (var asset in result.Assets)
+        {
+            if (!string.IsNullOrWhiteSpace(asset.Id))
+            {
+                remoteAssetIds.Add(asset.Id);
+            }
         }
 
         await DownloadAssetsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken);
+        return true;
     }
 
-    private async Task PullSubdirsAsAlbumsAsync(WatchSourceContext context, CancellationToken cancellationToken)
+    private async Task<bool> PullSubdirsAsAlbumsAsync(
+        WatchSourceContext context,
+        HashSet<string> remoteAssetIds,
+        CancellationToken cancellationToken)
     {
+        var allOk = true;
+
         var unassigned = await _immichAssetClient.GetUnassignedAssetsAsync(cancellationToken);
         if (unassigned.IsSuccess)
         {
+            foreach (var asset in unassigned.Assets)
+            {
+                if (!string.IsNullOrWhiteSpace(asset.Id))
+                {
+                    remoteAssetIds.Add(asset.Id);
+                }
+            }
             await DownloadAssetsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken);
         }
         else
@@ -473,13 +758,14 @@ public sealed class FolderWatchWorker : BackgroundService
             _logger.LogWarning(
                 "Listing unassigned assets failed during sync pull: {Error}",
                 unassigned.ErrorMessage ?? "unknown");
+            allOk = false;
         }
 
         var albums = await _immichAssetClient.ListAlbumsAsync(cancellationToken);
         if (!albums.IsSuccess)
         {
             _logger.LogWarning("Listing albums failed during sync pull: {Error}", albums.ErrorMessage ?? "unknown");
-            return;
+            return false;
         }
 
         foreach (var album in albums.Albums)
@@ -518,13 +804,24 @@ public sealed class FolderWatchWorker : BackgroundService
                         "Sync pull failed for album '{AlbumName}': {Error}",
                         album.Name,
                         albumResult.ErrorMessage ?? "unknown");
+                    allOk = false;
                 }
 
                 continue;
             }
 
+            foreach (var asset in albumResult.Assets)
+            {
+                if (!string.IsNullOrWhiteSpace(asset.Id))
+                {
+                    remoteAssetIds.Add(asset.Id);
+                }
+            }
+
             await DownloadAssetsAsync(context, albumDir, albumResult.Assets, cancellationToken);
         }
+
+        return allOk;
     }
 
     private async Task DownloadAssetsAsync(
@@ -544,8 +841,31 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            // Tombstone: a local delete just trashed this asset and the
+            // pull is still seeing it. Don't recreate the path mapping
+            // and don't re-download — let the trash propagate on Immich.
+            if (IsRecentlyTrashed(asset.Id))
+            {
+                _logger.LogDebug(
+                    "Skipping recently-trashed asset {AssetId} during sync pull.",
+                    asset.Id);
+                continue;
+            }
+
             var destinationPath = Path.Combine(targetDirectory, asset.OriginalFileName);
             var normalized = NormalizePath(destinationPath);
+
+            // Path-level tombstone catches the rare case where the
+            // sweep fired but the asset id wasn't mapped — pull would
+            // otherwise re-create a file the user just deleted.
+            if (IsPathRecentlyDeleted(normalized))
+            {
+                _logger.LogDebug(
+                    "Skipping recently-deleted local path during sync pull: {Path}",
+                    normalized);
+                continue;
+            }
+
             _pathToAssetId[normalized] = asset.Id;
 
             if (!context.Filter.IsMatch(destinationPath))
@@ -726,11 +1046,25 @@ public sealed class FolderWatchWorker : BackgroundService
             var normalized = NormalizePath(oldFullPath);
             _debouncedFiles.TryRemove(normalized, out _);
 
+            // Path-level tombstone fires regardless of whether we have
+            // an asset id — protects against a pull that races ahead
+            // of the sweep (e.g. realtime trigger right after delete)
+            // re-creating the file at the same path.
+            _recentlyDeletedPaths[normalized] = DateTimeOffset.UtcNow;
+
             if (!_pathToAssetId.TryRemove(normalized, out var assetId))
             {
-                _logger.LogDebug("Local deletion without known asset id for {FilePath}.", normalized);
+                _logger.LogWarning(
+                    "Local delete detected but no Immich asset id was mapped for {FilePath}; the asset (if any) was NOT trashed on Immich. Re-download is suppressed for {Ttl}s.",
+                    normalized,
+                    (int)TombstoneTtl.TotalSeconds);
                 return;
             }
+
+            // Optimistic asset-id tombstone BEFORE the network call so
+            // a concurrent pull (same loop tick as the sweep that fired
+            // us) sees the tombstone and skips the asset.
+            _recentlyTrashedAssetIds[assetId] = DateTimeOffset.UtcNow;
 
             await TrashAssetAsync(assetId, normalized);
         }
@@ -986,6 +1320,10 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task TrashAssetAsync(string assetId, string filePath)
     {
+        // Tombstone is set by the caller (HandleDeleteInSyncAsync) BEFORE
+        // we run, so a pull racing on the same loop tick already sees
+        // the asset id as recently-trashed. Roll the tombstone back if
+        // the network call fails so a future retry can still propagate.
         var result = await _immichAssetClient.TrashAssetsAsync(new[] { assetId }, CancellationToken.None);
         if (result.IsSuccess)
         {
@@ -993,11 +1331,63 @@ public sealed class FolderWatchWorker : BackgroundService
         }
         else
         {
+            _recentlyTrashedAssetIds.TryRemove(assetId, out _);
             _logger.LogWarning(
                 "Failed to trash asset {AssetId}: {Error}",
                 assetId,
                 result.ErrorMessage ?? "unknown");
         }
+    }
+
+    /// <summary>
+    /// True iff the asset id was just trashed locally and the tombstone
+    /// hasn't expired yet. Lazy-prunes the entry on read.
+    /// </summary>
+    private bool IsRecentlyTrashed(string assetId)
+    {
+        if (string.IsNullOrEmpty(assetId))
+        {
+            return false;
+        }
+
+        if (!_recentlyTrashedAssetIds.TryGetValue(assetId, out var trashedAt))
+        {
+            return false;
+        }
+
+        if (DateTimeOffset.UtcNow - trashedAt > TombstoneTtl)
+        {
+            _recentlyTrashedAssetIds.TryRemove(assetId, out _);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// True iff the local file at <paramref name="path"/> was just
+    /// deleted by the user and the tombstone hasn't expired yet.
+    /// Lazy-prunes the entry on read.
+    /// </summary>
+    private bool IsPathRecentlyDeleted(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        if (!_recentlyDeletedPaths.TryGetValue(path, out var deletedAt))
+        {
+            return false;
+        }
+
+        if (DateTimeOffset.UtcNow - deletedAt > TombstoneTtl)
+        {
+            _recentlyDeletedPaths.TryRemove(path, out _);
+            return false;
+        }
+
+        return true;
     }
 
     private async Task PromoteDebouncedFilesAsync(CancellationToken cancellationToken)
