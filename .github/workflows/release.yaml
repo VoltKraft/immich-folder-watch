@@ -177,15 +177,23 @@ jobs:
             "${{ needs.prepare-release.outputs.version }}" \
             --metainfo packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
 
+      - name: Pre-resolve manifest (inline external nuget-sources fragment)
+        # flatpak-builder 1.4.4 (the container's version) silently fails
+        # to deserialize the manifest's `sources` array when it mixes a
+        # string entry (`- nuget-sources.json`, the external-fragment
+        # shorthand) with structured source objects. The build proceeds
+        # but the `type: dir` entry doesn't materialize, so dotnet
+        # publish later hits "MSBUILD : error MSB1009: Project file does
+        # not exist". `--show-manifest` resolves the fragment in-place
+        # and emits a JSON manifest with only structured entries — the
+        # builder is happy with that. flatpak-builder 1.4.8 locally
+        # accepts either form, but the container is what matters here.
+        run: |
+          flatpak-builder --show-manifest \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+
       - name: Build + bundle Flatpak
-        # Calling flatpak-builder + flatpak build-bundle directly instead
-        # of going through flatpak/flatpak-github-actions/flatpak-builder.
-        # That action rewrites the manifest before running, and the
-        # rewriter dropped our `type: dir, path: ../..` source entry on
-        # the floor so dotnet publish hit "Project file does not exist".
-        # The container already ships flatpak-builder + ostree + xvfb;
-        # we don't gain anything from the wrapper and lose less by
-        # invoking the CLI ourselves.
         env:
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
@@ -201,7 +209,7 @@ jobs:
             --verbose \
             --state-dir .flatpak-builder \
             flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
           flatpak build-bundle \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             repo \
