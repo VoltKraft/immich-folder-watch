@@ -99,6 +99,21 @@ public sealed partial class MainWindow : Window
 
     private async void OnOpened(object? sender, EventArgs e)
     {
+        await EnsureBootstrappedAsync();
+    }
+
+    /// <summary>
+    /// Runs the initial config load + AppHost start exactly once, regardless
+    /// of whether the window has ever been shown. Called from
+    /// <see cref="OnOpened"/> on the first window open AND directly from
+    /// <see cref="App.OnFrameworkInitializationCompleted"/> when the app
+    /// launches with --background (autostart): in that path the window
+    /// stays hidden, so the Opened event never fires and the
+    /// FolderWatchWorker would otherwise never start. Guarded by
+    /// <see cref="_initialLoadDone"/> to keep both call sites idempotent.
+    /// </summary>
+    internal async Task EnsureBootstrappedAsync()
+    {
         if (_initialLoadDone)
         {
             return;

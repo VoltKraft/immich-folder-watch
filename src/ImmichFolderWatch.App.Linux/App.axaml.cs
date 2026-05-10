@@ -193,6 +193,15 @@ public sealed partial class App : Application
             {
                 desktop.MainWindow = _mainWindow;
             }
+            else
+            {
+                // Window stays hidden, so MainWindow.Opened never fires —
+                // and OnOpened is what normally loads the config + starts
+                // AppHost (FolderWatchWorker, ServerConnectionMonitor,
+                // ImmichRealtimeClient). Bootstrap directly here so the
+                // background watcher actually runs without a visible UI.
+                _ = _mainWindow.EnsureBootstrappedAsync();
+            }
             desktop.Exit += async (_, _) =>
             {
                 _trayHost?.Dispose();
