@@ -138,17 +138,32 @@ jobs:
     needs:
       - prepare-release
     if: needs.prepare-release.outputs.tag_exists != 'true'
-    # The official flatpak/flatpak-github-actions image — Fedora-based,
-    # ships flatpak + flatpak-builder + ostree + xvfb-run, and has the
-    # freedesktop runtime/sdk/dotnet10 extension pre-cached. Running
-    # inside this container with --privileged sidesteps the polkit
-    # `Deploy not allowed for user` failure we hit on bare ubuntu-latest
-    # when flatpak-builder did `flatpak --system install` of the runtime.
+    # Plain Fedora container instead of bilelmoussaoui/flatpak-github-
+    # actions:freedesktop-24.08. The bilelmoussaoui image ships
+    # flatpak-builder 1.4.4 which silently refuses to materialize our
+    # source — eight build attempts (type:dir + type:archive, various
+    # state-dir layouts, --show-manifest pre-resolution) all produced
+    # an empty build dir. Fedora's package repository tracks the latest
+    # flatpak-builder; we install it explicitly + add the flathub
+    # remote ourselves. --privileged is still required for ostree's
+    # bind mounts.
     container:
-      image: bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+      image: fedora:latest
       options: --privileged
 
     steps:
+      - name: Install flatpak toolchain
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            flatpak flatpak-builder ostree git tar gzip xz which
+          flatpak-builder --version
+          flatpak remote-add --system --if-not-exists \
+            flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system -y --noninteractive flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Sdk.Extension.dotnet10//24.08
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
