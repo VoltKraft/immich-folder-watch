@@ -70,6 +70,7 @@ The manifest declares only the portals the app actually needs:
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |
 | `--talk-name=org.kde.StatusNotifierWatcher` | Tray on KDE Plasma + AppIndicator-extended GNOME |
+| `--own-name=org.kde.StatusNotifierItem-*` | Lets the SNI client claim its own `org.kde.StatusNotifierItem-<pid>-<id>` bus name so the Watcher can call back for icon / menu / activate; without this Avalonia's tray registration faults with ServiceUnknown |
 | `--talk-name=org.freedesktop.portal.Desktop` | FileChooser, Settings, Notification portals |
 | `--talk-name=org.freedesktop.portal.Background` | Autostart consent + run-in-background |
 | `--filesystem=xdg-pictures:ro` + `--filesystem=xdg-videos:ro` | Picker preview only — actual watch I/O goes through doc-portal handles |

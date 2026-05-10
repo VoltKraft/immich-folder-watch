@@ -30,6 +30,13 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
   # Tray on KDE Plasma + AppIndicator-extended GNOME
   - --talk-name=org.kde.StatusNotifierWatcher
+  # SNI clients have to claim their own well-known bus name in the
+  # form org.kde.StatusNotifierItem-<pid>-<id> so the Watcher can
+  # call back into them for icon / menu / activation. Without this
+  # own-name grant the Flatpak D-Bus proxy refuses the registration,
+  # the Watcher's callback fails with ServiceUnknown, and Avalonia
+  # quietly drops the tray icon.
+  - --own-name=org.kde.StatusNotifierItem-*
   # FileChooser, Settings, Notification portals
   - --talk-name=org.freedesktop.portal.Desktop
   # Resolve doc-portal handles returned by the FileChooser portal —
