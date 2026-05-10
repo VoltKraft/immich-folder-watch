@@ -59,6 +59,21 @@ modules:
     sources:
       - type: dir
         path: ../..
+        # Skip the build/state directories. flatpak-builder 1.4.4
+        # (the bilelmoussaoui/freedesktop-24.08 container's version)
+        # quietly aborts the source copy when path: ../.. recurses
+        # into the active --state-dir, so the build dir ends up empty
+        # and dotnet publish bails with MSB1009. 1.4.8 locally is
+        # unaffected. Skipping the recursion-prone dirs makes the
+        # copy deterministic across both versions.
+        skip:
+          - .flatpak-builder
+          - .git
+          - flatpak_app
+          - packaging/flatpak/build-dir
+          - packaging/flatpak/repo
+          - repo
+          - artifacts
       - nuget-sources.json
     build-commands:
       - >-

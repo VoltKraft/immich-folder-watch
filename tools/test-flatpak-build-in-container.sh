@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Reproduce the CI Flatpak build locally inside the same container the
+# release workflow uses, so we can iterate on packaging/flatpak/...yaml
+# (and the workflow itself) without a push-to-main round-trip.
+#
+# Requires: docker (or podman aliased to docker), the offline NuGet
+# feed at packaging/flatpak/nuget-sources.json (run
+# tools/generate-nuget-sources.sh once before this script).
+#
+# Usage:
+#   tools/test-flatpak-build-in-container.sh
+#
+# Behavior:
+#   - Pulls bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+#   - Mounts the repo into /workspace
+#   - Runs the same flatpak-builder + flatpak build-bundle commands
+#     release.yaml runs, against the resolved JSON manifest
+#   - Leaves the .flatpak bundle at ./immich-folder-watch-<VERSION>.flatpak
+#
+# Exit code matches the build's; useful for `git bisect` runs.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+manifest_yaml="packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml"
+nuget_sources="packaging/flatpak/nuget-sources.json"
+
+if [ ! -f "${repo_root}/${nuget_sources}" ]; then
+    echo "ERROR: ${nuget_sources} is missing. Run tools/generate-nuget-sources.sh first." >&2
+    exit 2
+fi
+
+# Read version straight from Directory.Build.props (same as release.yaml).
+version=$(grep -oP '(?<=<Version>)[^<]+' "${repo_root}/Directory.Build.props" | head -1)
+if [ -z "${version}" ]; then
+    echo "ERROR: could not read <Version> from Directory.Build.props" >&2
+    exit 2
+fi
+
+container="${IMMICH_FW_FLATPAK_TEST_IMAGE:-bilelmoussaoui/flatpak-github-actions:freedesktop-24.08}"
+runtime="${IMMICH_FW_CONTAINER_RUNTIME:-docker}"
+
+echo "=== Local CI-equivalent flatpak build ==="
+echo "Repo:       ${repo_root}"
+echo "Version:    ${version}"
+echo "Container:  ${container}"
+echo "Runtime:    ${runtime}"
+echo
+
+"${runtime}" run --rm --privileged \
+    -v "${repo_root}:/workspace" \
+    -w /workspace \
+    -e VERSION="${version}" \
+    "${container}" \
+    bash -c '
+        set -euo pipefail
+        flatpak-builder --show-manifest \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+        flatpak-builder \
+            --repo=repo \
+            --disable-rofiles-fuse \
+            --install-deps-from=flathub \
+            --force-clean \
+            --default-branch=master \
+            --arch=x86_64 \
+            --ccache \
+            --verbose \
+            --state-dir .flatpak-builder \
+            flatpak_app \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+        flatpak build-bundle \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            repo \
+            "immich-folder-watch-${VERSION}.flatpak" \
+            io.github.voltkraft.ImmichFolderWatch \
+            master
+    '
+
+echo
+echo "=== Done. Bundle: immich-folder-watch-${version}.flatpak ==="
