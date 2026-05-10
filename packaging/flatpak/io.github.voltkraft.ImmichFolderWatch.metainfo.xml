@@ -54,6 +54,21 @@
   <url type="bugtracker">https://github.com/VoltKraft/immich-folder-watch/issues</url>
   <url type="vcs-browser">https://github.com/VoltKraft/immich-folder-watch</url>
 
+  <screenshots>
+    <screenshot type="default">
+      <caption>Configure the Immich server and watched folders</caption>
+      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/v2.5.0/packaging/flatpak/screenshots/main-window.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Pick a per-folder sync mode</caption>
+      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/v2.5.0/packaging/flatpak/screenshots/sync-modes.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Logging via journald or rolling files</caption>
+      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/v2.5.0/packaging/flatpak/screenshots/logging.png</image>
+    </screenshot>
+  </screenshots>
+
   <content_rating type="oars-1.1" />
 
   <provides>
