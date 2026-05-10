@@ -35,13 +35,7 @@ modules:
       - type: git
         url: https://github.com/VoltKraft/immich-folder-watch.git
         tag: v2.5.0
-        # commit pinned at submission time; must match the SHA the
-        # tag points at. Fill in before opening the flathub PR via
-        # `git rev-parse v2.5.0` (or via the GitHub release page).
-        # Each subsequent release update replaces tag + commit
-        # together. flatpak-external-data-checker handles the
-        # automation once the per-app repo exists.
-        commit: "REPLACE_WITH_v2.5.0_COMMIT_SHA"
+        commit: 7aef3905fd8eac6dd0128db0b70ad30be7a17e37
         x-checker-data:
           type: json
           url: https://api.github.com/repos/VoltKraft/immich-folder-watch/releases/latest

@@ -138,9 +138,6 @@ jobs:
     needs:
       - prepare-release
     if: needs.prepare-release.outputs.tag_exists != 'true'
-    # v1.0 only: a Flatpak failure must not block the Windows MSI release.
-    # Flip back to the default once the Linux pipeline has shipped reliably.
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -158,12 +155,18 @@ jobs:
         # ubuntu-latest doesn't ship these; the
         # flatpak/flatpak-github-actions/flatpak-builder action below
         # uses the `flatpak` CLI to install the runtime + sdk + dotnet
-        # extension before flatpak-builder runs.
+        # extension before flatpak-builder runs. We also add the
+        # flathub remote system-wide — flatpak-builder calls
+        # `flatpak --system install` to fetch the freedesktop runtime
+        # + sdk + dotnet10 extension and fails with
+        # "No remote refs found for 'flathub'" otherwise.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             flatpak \
             flatpak-builder
+          sudo flatpak remote-add --if-not-exists \
+            flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Cache NuGet packages
         uses: actions/cache@v4
@@ -213,7 +216,8 @@ jobs:
       always() &&
       needs.prepare-release.result == 'success' &&
       needs.prepare-release.outputs.tag_exists != 'true' &&
-      needs.build-windows.result == 'success'
+      needs.build-windows.result == 'success' &&
+      needs.build-flatpak.result == 'success'
 
     steps:
       - name: Checkout
@@ -230,7 +234,6 @@ jobs:
 
       - name: Download Flatpak artifacts
         uses: actions/download-artifact@v7
-        continue-on-error: true
         with:
           name: immich-folder-watch-flatpak-assets
           path: artifacts/release
