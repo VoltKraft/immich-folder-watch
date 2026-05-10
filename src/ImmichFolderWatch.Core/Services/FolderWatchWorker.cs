@@ -53,14 +53,27 @@ public sealed class FolderWatchWorker : BackgroundService
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Asset ids we just trashed locally — used as a tombstone so a
-    /// subsequent pull that still sees the asset (race against Immich's
-    /// trash propagation, or a missing asset.delete permission causing
-    /// the trash call to silently fail) does not re-download it. Entries
+    /// Asset ids we just trashed locally — tombstone so a subsequent
+    /// pull that still sees the asset (race against Immich's trash
+    /// propagation) does not re-download it. Set OPTIMISTICALLY in
+    /// the synchronous prefix of HandleDeleteInSyncAsync so a pull
+    /// that fires on the same loop tick as the sweep already sees
+    /// the tombstone. Rolled back if TrashAssetsAsync fails. Entries
     /// expire after <see cref="TombstoneTtl"/>.
     /// </summary>
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyTrashedAssetIds =
         new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Local paths whose file the user just deleted. Tombstoned even
+    /// when no asset id was mapped (rare, but happens if the file was
+    /// hand-copied into the watch dir without going through the upload
+    /// pipeline) so DownloadAssetsAsync still skips re-creating the
+    /// path. Asset stays on Immich in that case — the warn log tells
+    /// the user.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyDeletedPaths =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly TimeSpan TombstoneTtl = TimeSpan.FromSeconds(120);
 
@@ -138,6 +151,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 var pullRequested = Interlocked.Exchange(ref _pullRequested, 0) == 1;
                 if (pullRequested || DateTimeOffset.UtcNow - lastAlbumPull >= AlbumPullInterval)
                 {
+                    // Always sweep right before pulling: an Immich-side
+                    // realtime event can fire pullRequested within
+                    // milliseconds of a local delete, racing ahead of
+                    // the regular 5 s sweep gate. Running the sweep
+                    // here guarantees HandleDeleteInSyncAsync sets the
+                    // asset-id + path tombstones (synchronously, before
+                    // its first await) before the pull's
+                    // DownloadAssetsAsync iterates assets.
+                    PollDirectoriesForChanges();
+                    _lastPollingSweep = DateTimeOffset.UtcNow;
+
                     await PullFromImmichAsync(stoppingToken);
                     lastAlbumPull = DateTimeOffset.UtcNow;
                 }
@@ -830,6 +854,18 @@ public sealed class FolderWatchWorker : BackgroundService
 
             var destinationPath = Path.Combine(targetDirectory, asset.OriginalFileName);
             var normalized = NormalizePath(destinationPath);
+
+            // Path-level tombstone catches the rare case where the
+            // sweep fired but the asset id wasn't mapped — pull would
+            // otherwise re-create a file the user just deleted.
+            if (IsPathRecentlyDeleted(normalized))
+            {
+                _logger.LogDebug(
+                    "Skipping recently-deleted local path during sync pull: {Path}",
+                    normalized);
+                continue;
+            }
+
             _pathToAssetId[normalized] = asset.Id;
 
             if (!context.Filter.IsMatch(destinationPath))
@@ -1010,11 +1046,25 @@ public sealed class FolderWatchWorker : BackgroundService
             var normalized = NormalizePath(oldFullPath);
             _debouncedFiles.TryRemove(normalized, out _);
 
+            // Path-level tombstone fires regardless of whether we have
+            // an asset id — protects against a pull that races ahead
+            // of the sweep (e.g. realtime trigger right after delete)
+            // re-creating the file at the same path.
+            _recentlyDeletedPaths[normalized] = DateTimeOffset.UtcNow;
+
             if (!_pathToAssetId.TryRemove(normalized, out var assetId))
             {
-                _logger.LogDebug("Local deletion without known asset id for {FilePath}.", normalized);
+                _logger.LogWarning(
+                    "Local delete detected but no Immich asset id was mapped for {FilePath}; the asset (if any) was NOT trashed on Immich. Re-download is suppressed for {Ttl}s.",
+                    normalized,
+                    (int)TombstoneTtl.TotalSeconds);
                 return;
             }
+
+            // Optimistic asset-id tombstone BEFORE the network call so
+            // a concurrent pull (same loop tick as the sweep that fired
+            // us) sees the tombstone and skips the asset.
+            _recentlyTrashedAssetIds[assetId] = DateTimeOffset.UtcNow;
 
             await TrashAssetAsync(assetId, normalized);
         }
@@ -1270,14 +1320,18 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task TrashAssetAsync(string assetId, string filePath)
     {
+        // Tombstone is set by the caller (HandleDeleteInSyncAsync) BEFORE
+        // we run, so a pull racing on the same loop tick already sees
+        // the asset id as recently-trashed. Roll the tombstone back if
+        // the network call fails so a future retry can still propagate.
         var result = await _immichAssetClient.TrashAssetsAsync(new[] { assetId }, CancellationToken.None);
         if (result.IsSuccess)
         {
-            _recentlyTrashedAssetIds[assetId] = DateTimeOffset.UtcNow;
             _logger.LogInformation("Trashed asset {AssetId} on Immich (local {FilePath} removed).", assetId, filePath);
         }
         else
         {
+            _recentlyTrashedAssetIds.TryRemove(assetId, out _);
             _logger.LogWarning(
                 "Failed to trash asset {AssetId}: {Error}",
                 assetId,
@@ -1304,6 +1358,32 @@ public sealed class FolderWatchWorker : BackgroundService
         if (DateTimeOffset.UtcNow - trashedAt > TombstoneTtl)
         {
             _recentlyTrashedAssetIds.TryRemove(assetId, out _);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// True iff the local file at <paramref name="path"/> was just
+    /// deleted by the user and the tombstone hasn't expired yet.
+    /// Lazy-prunes the entry on read.
+    /// </summary>
+    private bool IsPathRecentlyDeleted(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        if (!_recentlyDeletedPaths.TryGetValue(path, out var deletedAt))
+        {
+            return false;
+        }
+
+        if (DateTimeOffset.UtcNow - deletedAt > TombstoneTtl)
+        {
+            _recentlyDeletedPaths.TryRemove(path, out _);
             return false;
         }
 
