@@ -536,6 +536,24 @@ public sealed class MainWindowViewModel : BindableBase
             AddSource();
         }
 
+        // Avalonia 11.3.x's ComboBox + SelectedValueBinding inside an
+        // ItemsControl-DataTemplate doesn't reliably pick up the initial
+        // SelectedValue when the WatchSourceItem is constructed via the
+        // object initializer above (PropertyChanged fires before the
+        // ComboBox subscribes; the ComboBox's first read happens before
+        // items materialize). Posting a delayed PropertyChanged refresh
+        // forces the ComboBox to re-evaluate after layout — making the
+        // SyncMode dropdown actually display the saved value instead of
+        // sticking on UploadNew.
+        var sourcesSnapshot = Sources.ToList();
+        _uiDispatcher.Post(() =>
+        {
+            foreach (var source in sourcesSnapshot)
+            {
+                source.RaiseSyncModeChangedForBindingRefresh();
+            }
+        });
+
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
         if (resetImmichCheckStatus)
         {

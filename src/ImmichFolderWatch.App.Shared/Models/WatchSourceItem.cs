@@ -81,6 +81,21 @@ public sealed class WatchSourceItem : BindableBase
         }
     }
 
+    /// <summary>
+    /// Re-raises <see cref="INotifyPropertyChanged"/> for
+    /// <see cref="SyncMode"/>. Workaround for an Avalonia 11.3.x
+    /// timing gap where a ComboBox in an ItemsControl-DataTemplate
+    /// evaluates its SelectedValue before the bound ItemsSource has
+    /// fully materialized — leaving the dropdown stuck on the
+    /// default option even though the underlying value is correct.
+    /// Called by MainWindowViewModel.Load() via the UI dispatcher
+    /// once the items are realized.
+    /// </summary>
+    public void RaiseSyncModeChangedForBindingRefresh()
+    {
+        RaisePropertyChanged(nameof(SyncMode));
+    }
+
     public string AlbumName
     {
         get => _albumName;
