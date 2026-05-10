@@ -50,6 +50,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string Tray_Open => Strings.Tray_Open;
     public string Tray_Restart => Strings.Tray_Restart;
     public string Tray_Quit => Strings.Tray_Quit;
+    public string Tray_Unavailable => Strings.Tray_Unavailable;
 
     public string UI_Status => Strings.UI_Status;
     public string UI_ServerConnection => Strings.UI_ServerConnection;

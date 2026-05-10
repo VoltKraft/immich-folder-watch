@@ -75,6 +75,7 @@
   <data name="Tooltip_Queue" xml:space="preserve"><value>Queue</value></data>
 
   <data name="Tray_Open" xml:space="preserve"><value>Open GUI</value></data>
+  <data name="Tray_Unavailable" xml:space="preserve"><value>No system tray icon — closing the window will exit the app. On GNOME, install the AppIndicator and KStatusNotifierItem Support extension; on KDE Plasma the tray works out of the box.</value></data>
   <data name="Tray_Restart" xml:space="preserve"><value>Restart</value></data>
   <data name="Tray_Quit" xml:space="preserve"><value>Quit</value></data>
 

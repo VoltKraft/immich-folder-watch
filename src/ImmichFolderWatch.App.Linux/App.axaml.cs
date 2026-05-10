@@ -153,6 +153,10 @@ public sealed partial class App : Application
                 _mainWindow?.Activate();
             });
             _trayHost.QuitRequested += (_, _) => desktop.Shutdown(0);
+            _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+            });
             _ = _trayHost.StartAsync(this);
 
             desktop.MainWindow = _mainWindow;

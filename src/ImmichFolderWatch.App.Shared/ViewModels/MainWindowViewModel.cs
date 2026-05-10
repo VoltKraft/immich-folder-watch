@@ -104,6 +104,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _logDirectory = GetDefaultLogDirectory();
     private string _statusHeadline = string.Empty;
     private string _statusDetails = string.Empty;
+    private string _trayStatusMessage = string.Empty;
     private string _syncStatusBadgeText = string.Empty;
     private StatusTone _syncStatusBadgeTone = StatusTone.Neutral;
     private string _serverConnectionText = string.Empty;
@@ -310,6 +311,19 @@ public sealed class MainWindowViewModel : BindableBase
     {
         get => _logDirectory;
         set => SetProperty(ref _logDirectory, value);
+    }
+
+    /// <summary>
+    /// Set by the Linux head when AvaloniaTrayHost can't actually show a
+    /// tray icon (probe failure or async ServiceUnknown from the SNI
+    /// backend). Empty when the tray works or when the platform never
+    /// uses a tray (WPF). The MainWindow shows it as a banner so the
+    /// user knows closing the window will exit the process.
+    /// </summary>
+    public string TrayStatusMessage
+    {
+        get => _trayStatusMessage;
+        set => SetProperty(ref _trayStatusMessage, value);
     }
 
     public string StatusHeadline

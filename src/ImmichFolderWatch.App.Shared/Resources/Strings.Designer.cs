@@ -44,6 +44,7 @@ public static class Strings
     public static string Tray_Open => Get(nameof(Tray_Open));
     public static string Tray_Restart => Get(nameof(Tray_Restart));
     public static string Tray_Quit => Get(nameof(Tray_Quit));
+    public static string Tray_Unavailable => Get(nameof(Tray_Unavailable));
 
     public static string UI_Status => Get(nameof(UI_Status));
     public static string UI_ServerConnection => Get(nameof(UI_ServerConnection));
