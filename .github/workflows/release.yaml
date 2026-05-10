@@ -198,6 +198,13 @@ jobs:
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           set -euo pipefail
+          # state-dir outside the source path. With it inside (the
+          # default `.flatpak-builder` next to the YAML), 1.4.4 in the
+          # container silently failed to materialize any of the 70
+          # sources into the build dir and the dotnet publish hit
+          # MSB1009. Pulling state out of the recursion path makes the
+          # source copy deterministic. /tmp also has the right
+          # filesystem semantics for ostree's atomic operations.
           flatpak-builder \
             --repo=repo \
             --disable-rofiles-fuse \
@@ -207,7 +214,7 @@ jobs:
             --arch=x86_64 \
             --ccache \
             --verbose \
-            --state-dir .flatpak-builder \
+            --state-dir /tmp/flatpak-builder-state \
             flatpak_app \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
           flatpak build-bundle \
