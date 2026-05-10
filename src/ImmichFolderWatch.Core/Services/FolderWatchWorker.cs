@@ -578,15 +578,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
+            var pullSucceeded = false;
             try
             {
                 if (context.UseFlatAlbum)
                 {
-                    await PullFlatAlbumAsync(context, cancellationToken);
+                    pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
                 }
                 else if (context.UseSubdirsAsAlbums)
                 {
-                    await PullSubdirsAsAlbumsAsync(context, cancellationToken);
+                    pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -597,16 +599,82 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
             }
+
+            if (pullSucceeded)
+            {
+                PropagateRemoteDeletes(context, remoteAssetIds);
+            }
         }
     }
 
-    private async Task PullFlatAlbumAsync(WatchSourceContext context, CancellationToken cancellationToken)
+    /// <summary>
+    /// Removes local files whose <see cref="_pathToAssetId"/> mapping
+    /// references an Immich asset id that the latest pull no longer
+    /// reports — i.e. the user trashed the asset on Immich. Only runs
+    /// when the pull as a whole succeeded; partial failures abort
+    /// (we don't want to delete every local file because a transient
+    /// API error returned an empty asset list).
+    /// </summary>
+    private void PropagateRemoteDeletes(WatchSourceContext context, HashSet<string> remoteAssetIds)
+    {
+        var rootPrefix = context.NormalizedRoot + Path.DirectorySeparatorChar;
+        var sourceKey = NormalizePath(context.Source.Path);
+        _pollingBaseline.TryGetValue(sourceKey, out var baseline);
+
+        var stale = _pathToAssetId
+            .Where(entry =>
+                entry.Key.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+                && !remoteAssetIds.Contains(entry.Value))
+            .ToList();
+
+        foreach (var entry in stale)
+        {
+            if (!_pathToAssetId.TryRemove(entry.Key, out _))
+            {
+                continue;
+            }
+
+            // Drop from polling baseline so the next sweep doesn't
+            // re-fire HandleDeleteInSyncAsync against an asset id we
+            // already cleaned up.
+            baseline?.Remove(entry.Key);
+            _debouncedFiles.TryRemove(entry.Key, out _);
+
+            try
+            {
+                if (File.Exists(entry.Key))
+                {
+                    File.Delete(entry.Key);
+                    _logger.LogInformation(
+                        "Removed local file after remote delete (asset {AssetId} no longer on Immich): {Path}",
+                        entry.Value,
+                        entry.Key);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to remove local file after remote delete: {Path}",
+                    entry.Key);
+            }
+        }
+    }
+
+    private async Task<bool> PullFlatAlbumAsync(
+        WatchSourceContext context,
+        HashSet<string> remoteAssetIds,
+        CancellationToken cancellationToken)
     {
         var result = await _immichAssetClient.GetAlbumAssetsAsync(context.Source.AlbumName, cancellationToken);
         if (result.AlbumMissing)
         {
+            // We can't tell "album never existed" from "album was just
+            // deleted by the user". Skip delete propagation either way
+            // — a fresh upload re-creates the album, and the next pull
+            // sees the new state.
             _logger.LogDebug("Sync pull skipped; album '{AlbumName}' does not exist yet.", context.Source.AlbumName);
-            return;
+            return false;
         }
 
         if (!result.IsSuccess)
@@ -615,17 +683,38 @@ public sealed class FolderWatchWorker : BackgroundService
                 "Sync pull failed for album '{AlbumName}': {Error}",
                 context.Source.AlbumName,
                 result.ErrorMessage ?? "unknown");
-            return;
+            return false;
+        }
+
+        foreach (var asset in result.Assets)
+        {
+            if (!string.IsNullOrWhiteSpace(asset.Id))
+            {
+                remoteAssetIds.Add(asset.Id);
+            }
         }
 
         await DownloadAssetsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken);
+        return true;
     }
 
-    private async Task PullSubdirsAsAlbumsAsync(WatchSourceContext context, CancellationToken cancellationToken)
+    private async Task<bool> PullSubdirsAsAlbumsAsync(
+        WatchSourceContext context,
+        HashSet<string> remoteAssetIds,
+        CancellationToken cancellationToken)
     {
+        var allOk = true;
+
         var unassigned = await _immichAssetClient.GetUnassignedAssetsAsync(cancellationToken);
         if (unassigned.IsSuccess)
         {
+            foreach (var asset in unassigned.Assets)
+            {
+                if (!string.IsNullOrWhiteSpace(asset.Id))
+                {
+                    remoteAssetIds.Add(asset.Id);
+                }
+            }
             await DownloadAssetsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken);
         }
         else
@@ -633,13 +722,14 @@ public sealed class FolderWatchWorker : BackgroundService
             _logger.LogWarning(
                 "Listing unassigned assets failed during sync pull: {Error}",
                 unassigned.ErrorMessage ?? "unknown");
+            allOk = false;
         }
 
         var albums = await _immichAssetClient.ListAlbumsAsync(cancellationToken);
         if (!albums.IsSuccess)
         {
             _logger.LogWarning("Listing albums failed during sync pull: {Error}", albums.ErrorMessage ?? "unknown");
-            return;
+            return false;
         }
 
         foreach (var album in albums.Albums)
@@ -678,13 +768,24 @@ public sealed class FolderWatchWorker : BackgroundService
                         "Sync pull failed for album '{AlbumName}': {Error}",
                         album.Name,
                         albumResult.ErrorMessage ?? "unknown");
+                    allOk = false;
                 }
 
                 continue;
             }
 
+            foreach (var asset in albumResult.Assets)
+            {
+                if (!string.IsNullOrWhiteSpace(asset.Id))
+                {
+                    remoteAssetIds.Add(asset.Id);
+                }
+            }
+
             await DownloadAssetsAsync(context, albumDir, albumResult.Assets, cancellationToken);
         }
+
+        return allOk;
     }
 
     private async Task DownloadAssetsAsync(
