@@ -177,19 +177,45 @@ jobs:
             "${{ needs.prepare-release.outputs.version }}" \
             --metainfo packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
 
-      - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: immich-folder-watch-${{ needs.prepare-release.outputs.version }}.flatpak
-          manifest-path: packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
-          cache-key: flatpak-builder-${{ hashFiles('packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml', 'packaging/flatpak/nuget-sources.json') }}
-          verbose: true
+      - name: Build + bundle Flatpak
+        # Calling flatpak-builder + flatpak build-bundle directly instead
+        # of going through flatpak/flatpak-github-actions/flatpak-builder.
+        # That action rewrites the manifest before running, and the
+        # rewriter dropped our `type: dir, path: ../..` source entry on
+        # the floor so dotnet publish hit "Project file does not exist".
+        # The container already ships flatpak-builder + ostree + xvfb;
+        # we don't gain anything from the wrapper and lose less by
+        # invoking the CLI ourselves.
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          flatpak-builder \
+            --repo=repo \
+            --disable-rofiles-fuse \
+            --install-deps-from=flathub \
+            --force-clean \
+            --default-branch=master \
+            --arch=x86_64 \
+            --ccache \
+            --verbose \
+            --state-dir .flatpak-builder \
+            flatpak_app \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+          flatpak build-bundle \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            repo \
+            "immich-folder-watch-${VERSION}.flatpak" \
+            io.github.voltkraft.ImmichFolderWatch \
+            master
 
       - name: Stage release asset
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           mkdir -p artifacts/release
-          mv "immich-folder-watch-${{ needs.prepare-release.outputs.version }}.flatpak" \
-             "artifacts/release/immich-folder-watch-${{ needs.prepare-release.outputs.version }}.flatpak"
+          mv "immich-folder-watch-${VERSION}.flatpak" \
+             "artifacts/release/immich-folder-watch-${VERSION}.flatpak"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
