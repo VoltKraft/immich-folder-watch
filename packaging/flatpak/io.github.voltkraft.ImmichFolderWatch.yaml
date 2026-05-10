@@ -35,8 +35,11 @@ finish-args:
   # call back into them for icon / menu / activation. Without this
   # own-name grant the Flatpak D-Bus proxy refuses the registration,
   # the Watcher's callback fails with ServiceUnknown, and Avalonia
-  # quietly drops the tray icon.
-  - --own-name=org.kde.StatusNotifierItem-*
+  # quietly drops the tray icon. xdg-dbus-proxy only honours
+  # subtree wildcards (`.*` after a full segment), not in-segment
+  # patterns like `StatusNotifierItem-*`, so the org.kde.* form is
+  # the narrowest grant that actually covers the suffixed name.
+  - --own-name=org.kde.*
   # FileChooser, Settings, Notification portals
   - --talk-name=org.freedesktop.portal.Desktop
   # Resolve doc-portal handles returned by the FileChooser portal —
