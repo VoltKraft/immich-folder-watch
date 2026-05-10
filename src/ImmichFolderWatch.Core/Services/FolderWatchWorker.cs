@@ -19,9 +19,12 @@ public sealed class FolderWatchWorker : BackgroundService
     // the Flatpak xdg-document-portal at /run/user/$UID/doc/<token>/...)
     // does not propagate file changes that originate outside the mount.
     // The sweep diff-scans the source trees against a known-paths
-    // baseline and replays new files into OnFileEvent; on platforms
-    // where FSW already saw them, this is a cheap no-op because
-    // OnFileEvent debounces against _debouncedFiles.
+    // baseline: new files replay into OnFileEvent; missing files
+    // replay into HandleDeleteInSyncAsync (sync mode only — non-sync
+    // modes have no delete propagation anyway). On platforms where
+    // FSW already fired the events, OnFileEvent debounces against
+    // _debouncedFiles and HandleDeleteInSyncAsync no-ops on the
+    // already-removed _pathToAssetId entry, so the sweep is cheap.
     private static readonly TimeSpan PollingSweepInterval = TimeSpan.FromSeconds(5);
 
     private readonly Dictionary<string, HashSet<string>> _pollingBaseline =
@@ -105,7 +108,7 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
                 {
-                    PollDirectoriesForNewFiles();
+                    PollDirectoriesForChanges();
                     _lastPollingSweep = DateTimeOffset.UtcNow;
                 }
 
@@ -488,7 +491,7 @@ public sealed class FolderWatchWorker : BackgroundService
         return set;
     }
 
-    private void PollDirectoriesForNewFiles()
+    private void PollDirectoriesForChanges()
     {
         foreach (var context in _sources)
         {
@@ -502,11 +505,15 @@ public sealed class FolderWatchWorker : BackgroundService
                 ? SearchOption.AllDirectories
                 : SearchOption.TopDirectoryOnly;
 
+            HashSet<string> seenThisSweep;
             try
             {
+                seenThisSweep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
                 {
                     var normalized = NormalizePath(filePath);
+                    seenThisSweep.Add(normalized);
+
                     // HashSet.Add returns false if the path was already
                     // known — skip it. New paths fall through to
                     // OnFileEvent, which itself debounces against
@@ -528,6 +535,36 @@ public sealed class FolderWatchWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Polling sweep failed for {Path}", context.Source.Path);
+                continue;
+            }
+
+            // Detect deletions: paths in the known baseline that the
+            // current scan didn't see. Mostly relevant on FUSE mounts
+            // (Flatpak xdg-document-portal) where FSW.Deleted does not
+            // fire; on native filesystems FSW already fired for these
+            // and HandleDeleteInSyncAsync's _pathToAssetId.TryRemove
+            // returns false, making the second call a cheap no-op.
+            var disappeared = known.Where(p => !seenThisSweep.Contains(p)).ToList();
+            foreach (var path in disappeared)
+            {
+                known.Remove(path);
+                if (!context.Filter.IsMatch(path))
+                {
+                    continue;
+                }
+                _logger.LogInformation("Polling sweep detected removed file: {Path}", path);
+                if (context.IsSyncMode)
+                {
+                    _ = HandleDeleteInSyncAsync(context, path);
+                }
+                else
+                {
+                    // Non-sync modes don't propagate deletes upward, but
+                    // we still drop the asset-id mapping so a re-add of
+                    // the same path later isn't mis-identified.
+                    _debouncedFiles.TryRemove(path, out _);
+                    _pathToAssetId.TryRemove(path, out _);
+                }
             }
         }
     }
