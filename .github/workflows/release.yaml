@@ -154,6 +154,17 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Install flatpak + flatpak-builder
+        # ubuntu-latest doesn't ship these; the
+        # flatpak/flatpak-github-actions/flatpak-builder action below
+        # uses the `flatpak` CLI to install the runtime + sdk + dotnet
+        # extension before flatpak-builder runs.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            flatpak \
+            flatpak-builder
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
