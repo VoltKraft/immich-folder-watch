@@ -83,12 +83,32 @@
   </branding>
 
   <releases>
-    <release version="2.5.0-dev" date="2026-04-29">
+    <release version="2.5.0" date="2026-05-10">
       <description>
         <p>
-          Pre-release Linux scaffold. The first user-facing release will
-          replace this entry — generate the real block from CHANGELOG.md
-          via tools/update-appstream.py at release time.
+          The first Linux release of Immich Folder Watch. Avalonia GUI on
+          Wayland and X11, full feature parity with the Windows tray app:
+          watch sources, batch upload, per-folder sync modes, album-rename
+          propagation, Socket.IO realtime, and English/German UI with
+          OS auto-detect.
+        </p>
+        <p>Linux highlights:</p>
+        <ul>
+          <li>D-Bus FileChooser portal for picking watch sources, with
+              host-path resolution via the Documents portal.</li>
+          <li>Polling sweep alongside FileSystemWatcher so inotify-blind
+              FUSE doc-portal mounts still detect new files and deletions.</li>
+          <li>StatusNotifierItem tray on KDE Plasma and on GNOME with the
+              AppIndicator extension; window-only banner fallback otherwise.</li>
+          <li>Background-portal opt-in (GNOME 46+) so closing the window
+              keeps the worker running.</li>
+          <li>journald log target as the Linux default, with a File option
+              for rolling on-disk logs.</li>
+          <li>Hidden-window autostart and a clean uninstall path.</li>
+        </ul>
+        <p>
+          Windows MSI behavior is unchanged from 2.4.0 — same installer,
+          same Event Log integration, same upgrade path.
         </p>
       </description>
     </release>
