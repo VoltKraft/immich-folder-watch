@@ -4,13 +4,14 @@
 
 # Immich Folder Watch
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Version](https://img.shields.io/badge/Version-2.4.0-blue)](./CHANGELOG.md)
+[![Platform Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
+[![Platform Linux](https://img.shields.io/badge/Platform-Linux%20(Flatpak)-FCC624?logo=linux&logoColor=black)](./packaging/flatpak/README.md)
+[![Version](https://img.shields.io/badge/Version-2.5.1-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-`Immich Folder Watch` is a Windows desktop app that watches local folders and uploads newly created media to Immich automatically.
+`Immich Folder Watch` is a desktop app for **Windows and Linux** that watches local folders and uploads newly created media to Immich automatically.
 
-It runs as a per-user tray app — no Windows service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a Windows machine before they land in Immich, this fills that gap without writing directly into Immich storage.
+It runs as a per-user tray app — no system service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a desktop before they land in Immich, this fills that gap without writing directly into Immich storage.
 
 ---
 
@@ -22,6 +23,7 @@ It runs as a per-user tray app — no Windows service, no elevation on every cha
 - Pick up files dropped by another tool into a staging folder
 - Run a small always-on system that feeds Immich in the background
 - Separate sources by album, for example `Screenshots`, `Camera Imports`, or `Receipts`
+- Same configuration shape and feature set on Windows and Linux
 
 
 ---
@@ -32,9 +34,9 @@ It runs as a per-user tray app — no Windows service, no elevation on every cha
 
 That gives you a clean, low-maintenance ingestion path:
 
-- Windows-first setup with a desktop GUI and tray icon
-- Per-user operation — each Windows user runs their own configuration
-- Autostart on login (toggleable in the GUI)
+- Desktop GUI and (where the desktop supports it) a tray icon
+- Per-user operation — each user runs their own configuration
+- Autostart on login (toggleable in the GUI; uses the Background portal on Linux)
 - Optional per-folder album placement in Immich
 - API-based uploads instead of storage hacks
 
@@ -55,12 +57,13 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 - Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
 - Localized UI (English, German) with OS auto-detect and live in-app language switching
+- Cross-platform: Windows MSI and Linux Flatpak built from the same Core; Windows logs to the Event Log by default, Linux to journald
 
 ---
 
 ## Installation
 
-### Recommended: Windows MSI
+### Windows (MSI)
 
 1. Download the latest MSI from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
 2. Install it with administrative rights (per-machine binary install).
@@ -75,14 +78,37 @@ Installed layout:
 
 - Binaries: `%ProgramFiles%\Immich Folder Watch\bin\` (shared, per-machine)
 - Config: `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (per user)
-- Logs: `%LOCALAPPDATA%\Immich Folder Watch\logs\` (per user)
+- Logs: Windows Event Log (`Immich Folder Watch` source, default) or `%LOCALAPPDATA%\Immich Folder Watch\logs\` when File logging is selected
 - Autostart: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Immich Folder Watch.lnk`
 
 Upgrading from an older service-based install: the legacy service is stopped and removed, and the existing `C:\ProgramData\Immich Folder Watch\config.yaml` is migrated into the installing user's `%LOCALAPPDATA%`.
 
+### Linux (Flatpak)
+
+The Flathub listing is in submission. Until it's live, install the Flatpak bundle attached to each [GitHub Release](https://github.com/VoltKraft/immich-folder-watch/releases):
+
+```bash
+flatpak install --user immich-folder-watch-2.5.1.flatpak
+flatpak run io.github.voltkraft.ImmichFolderWatch
+```
+
+Or build from source per [`packaging/flatpak/README.md`](./packaging/flatpak/README.md).
+
+Tested live on Fedora 44 + GNOME 46 with the AppIndicator extension; other GNOME-based desktops and KDE Plasma 6 should work but the tray-icon path uses StatusNotifierItem and falls back to a Background-Apps banner where no SNI watcher is installed. Wayland and X11 are both supported.
+
+Sandbox layout:
+
+- App ID: `io.github.voltkraft.ImmichFolderWatch`
+- Config: `~/.var/app/io.github.voltkraft.ImmichFolderWatch/config/immich-folder-watch/config.yaml`
+- Logs: journald (default — `journalctl --user -t io.github.voltkraft.ImmichFolderWatch.desktop`) or `~/.var/app/io.github.voltkraft.ImmichFolderWatch/data/Immich Folder Watch/logs/` when File logging is selected
+- Autostart: managed via the desktop's Background portal — toggle inside the GUI
+
+Folder picking goes through the FreeDesktop FileChooser portal so the app only sees the folders you explicitly grant. The watcher resolves the doc-portal handles back to host paths via `org.freedesktop.portal.Documents`, and inotify-blind FUSE mounts are covered by a 5-second polling sweep.
+
 Detailed guides:
 
 - [Windows Installation](./docs/installation-windows.md)
+- [Linux Flatpak packaging](./packaging/flatpak/README.md)
 - [Configuration](./docs/configuration.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 
@@ -144,10 +170,11 @@ logging:
 
 ## Documentation
 
-The Windows GUI now keeps these per-source watch options collapsed by default and only shows `Excluded Directories` when `Include subdirectories` is enabled.
+The GUI keeps per-source watch options collapsed by default and only shows `Excluded Directories` when `Include subdirectories` is enabled.
 
 - [Configuration](./docs/configuration.md)
 - [Windows Installation](./docs/installation-windows.md)
+- [Linux Flatpak packaging](./packaging/flatpak/README.md)
 - [Architecture](./docs/architecture.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Development](./docs/development.md)

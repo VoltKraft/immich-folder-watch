@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-05-10
+
+Release-infrastructure cut: 2.5.0 shipped Windows-only because the
+release runner couldn't build the Flatpak (missing system `flathub`
+remote on `ubuntu-latest`, and the build-flatpak job was tagged
+`continue-on-error` so the failure didn't block the GitHub Release).
+2.5.1 is the first symmetric release with both `.msi` and `.flatpak`
+attached.
+
+### Fixed
+- **Flatpak build on `ubuntu-latest`.** The release workflow now
+  installs `flatpak` + `flatpak-builder` and adds the system-wide
+  `flathub` remote before running the
+  `flatpak/flatpak-github-actions/flatpak-builder@v6` action.
+  Without the remote, `flatpak-builder` failed at runtime install
+  with `error: No remote refs found for 'flathub'`.
+- **`tools/BrandAssetGen/BrandAssetGen.csproj` GenerateBrandAssets target.**
+  Replaced `dotnet run --no-build` with a direct `dotnet "$(TargetPath)"`
+  invocation so the brand-asset generator runs cleanly when App.csproj
+  / App.Linux.csproj propagate `--runtime <RID>` into the
+  `ProjectReference` (the previous form looked at `bin/Release/net10.0/`
+  but outputs landed at `bin/Release/net10.0/<rid>/`).
+
+### Changed
+- **Release gating.** `publish-release` now requires both
+  `build-windows` and `build-flatpak` to succeed. A future Linux
+  build failure stops the release rather than shipping Windows-only.
+- **`README.md`** updated to reflect Linux availability — Linux
+  platform badge, version bump, cross-platform description, and a
+  Flatpak install section.
+- **`metainfo.xml`** release block hand-curated to replace the
+  Markdown-leaky output of `tools/update-appstream.py` for 2.5.0.
+
+No app-level changes; the Windows MSI and Linux Flatpak both behave
+identically to 2.5.0 — only the release pipeline changed.
+
 ## [2.5.0] - 2026-05-10
 
 The first **Linux release** of Immich Folder Watch. Ships as a Flathub Flatpak
