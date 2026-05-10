@@ -45,35 +45,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
-    <BrandAssetGeneratorInputs Include="$(BrandProjectRoot)/tools/BrandAssetGen/**/*.cs;$(BrandProjectRoot)/tools/BrandAssetGen/**/*.csproj"
-                               Exclude="$(BrandProjectRoot)/tools/BrandAssetGen/bin/**/*;$(BrandProjectRoot)/tools/BrandAssetGen/obj/**/*" />
-  </ItemGroup>
-
-  <ItemGroup>
     <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
   </ItemGroup>
-
-  <Target Name="GenerateBrandAssets"
-          BeforeTargets="BeforeBuild;BuildAvaloniaResources"
-          Condition="'$(DesignTimeBuild)' != 'true'"
-          Inputs="@(BrandAssetGeneratorInputs)"
-          Outputs="$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
-    <!--
-      Explicit MSBuild invocation on BrandAssetGen.csproj before the
-      Exec, instead of trusting the ProjectReference + dotnet run
-      combination that worked locally but failed on CI (the runner
-      hit the no-build flag with no compiled binary in
-      tools/BrandAssetGen/bin/Release/net10.0/, so dotnet run errored
-      with "No such file or directory" before producing any output).
-      MSBuild's own project cache makes a parallel App.csproj
-      invocation fold into the same in-memory build, so the
-      cache-file race that motivated the no-build flag is also
-      avoided. The Exec then just runs the freshly-built binary.
-    -->
-    <MSBuild Projects="$(BrandGeneratorProject)"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)" />
-    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) --no-build -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
-  </Target>
 </Project>

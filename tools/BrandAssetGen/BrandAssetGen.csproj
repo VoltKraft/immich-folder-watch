@@ -5,6 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <BrandProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</BrandProjectRoot>
+    <BrandLogoSvg>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'assets', 'branding', 'logo.svg'))</BrandLogoSvg>
+    <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
+    <BrandWindowsIcon>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'windows', 'app.ico'))</BrandWindowsIcon>
+    <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,4 +19,31 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
     <PackageReference Include="Svg.Skia" Version="3.6.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <BrandAssetGeneratorInputs Include="$(BrandLogoSvg)" />
+    <BrandAssetGeneratorInputs Include="$(MSBuildProjectDirectory)/**/*.cs;$(MSBuildProjectDirectory)/**/*.csproj"
+                               Exclude="$(MSBuildProjectDirectory)/bin/**/*;$(MSBuildProjectDirectory)/obj/**/*" />
+  </ItemGroup>
+
+  <!--
+    Run the freshly-built generator once, right after this project's
+    own build. App.csproj and App.Linux.csproj reference us via
+    ProjectReference only for build ordering — they don't invoke the
+    generator themselves anymore. MSBuild's project cache keeps a
+    single in-memory build of this csproj per (Configuration), so
+    both heads of the solution build observe one execution and the
+    artifacts/branding/* outputs aren't written concurrently.
+
+    Inputs/Outputs make the target a no-op once the artifacts are
+    fresh; touching logo.svg or any of the generator sources
+    re-triggers it.
+  -->
+  <Target Name="GenerateBrandAssets"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(BrandAssetGeneratorInputs)"
+          Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectFullPath)&quot; --configuration $(Configuration) --no-build -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+  </Target>
 </Project>
