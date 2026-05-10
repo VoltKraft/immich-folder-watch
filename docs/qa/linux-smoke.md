@@ -299,13 +299,32 @@ explains the mismatch with a "Reconcile" button. Specify which.
 
 ### E. Notifications + tray
 
-#### SMK-16 — Toast on upload completion  `H`
+#### SMK-16 — No toast on success; failure surfaces in UI / log  `M`
 
-Steps: SMK-10 (drop a file).
+Per user preference (2026-05-10): no notification on every upload
+completion — that was the original Phase-1 sketch but in production
+becomes notification-spam. Only persistent failures should surface
+via toast, because those need user attention.
 
-Expected: a freedesktop notification (top-right on GNOME, system tray
-on Plasma) shows "Uploaded 1 file" (or localized equivalent). Toast
-auto-dismisses after the system default.
+Steps:
+1. SMK-10 (drop a file). Confirm NO toast appears on success.
+2. Force a failure: temporarily wrong API key OR offline server.
+3. Drop another file.
+
+Expected:
+- Step 1: silent. Status row + log show the upload, but the
+  notification daemon doesn't get a Notify call for the success
+  path. Verified by `dbus-monitor --session "interface='org.freedesktop.Notifications'"`
+  (no traffic during step 1).
+- Step 3: failure-toast surfaces (NOT IMPLEMENTED YET — tracked as
+  a follow-up; for now mark as `[NOTE: failure-toast deferred]`).
+
+Notes: INotifier / DBusNotifier infrastructure is wired and the
+Flatpak manifest grants `--talk-name=org.freedesktop.Notifications`,
+but the FolderWatchWorker's upload-failure path doesn't call
+ShowAsync yet. Hooking it up to FlushUploadsAsync's else-branch
+("Upload failed for {FilePath}") plus a dedup window (one toast
+per asset+error class per minute) is a small follow-up commit.
 
 #### SMK-17 — Tray on KDE Plasma 6 + GNOME-w-AppIndicator  `H`
 
