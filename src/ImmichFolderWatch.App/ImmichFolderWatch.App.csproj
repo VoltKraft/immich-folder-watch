@@ -37,8 +37,7 @@
     -->
     <ProjectReference Include="$(BrandGeneratorProject)"
                       ReferenceOutputAssembly="false"
-                      Private="false"
-                      SkipGetTargetFrameworkProperties="true" />
+                      Private="false" />
   </ItemGroup>
 
   <ItemGroup>
