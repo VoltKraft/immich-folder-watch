@@ -549,12 +549,22 @@ sandbox log path. The path may be displayed verbatim (e.g.
 #### SMK-31 — Journald sees the structured stderr stream  `M`
 
 Steps:
-1. `journalctl --user -t immich-folder-watch -n 30` shortly after the
-   app has performed an upload.
+1. Open the app, switch `Logging → Target` to `Journald`,
+   `Save & Apply` (the AppHost restarts and 3.8.B's per-target
+   gating swaps `FileLoggerProvider` for `AddSystemdConsole`).
+2. Drop a test file into a watched source so an upload fires.
+3. `journalctl --user --since "2 min ago" -t io.github.voltkraft.ImmichFolderWatch.desktop --no-pager`
+   (under Flatpak's portal-launcher the `_SYSLOG_IDENTIFIER` is the
+   .desktop filename, not the project's short name — `-t
+   immich-folder-watch` returns "No entries").
+4. Switch `Logging → Target` back to `File`, `Save & Apply`.
 
-Expected: log lines visible (FLATPAK_ID is set, so the journald
-console formatter is active per `JournaldConsoleProvider`). Severity
-levels and message content match the file log.
+Expected: lines from step 3 carry the `<6>` / `<7>` priority prefix
+that the systemd console formatter prepends, severity levels match
+the message content (e.g. `<6>` for `info`, `<7>` for `dbug`,
+`<4>` for `warn`). Plain `YYYY-MM-DD … info: …` lines from before
+the restart should also be visible — those are the previous
+`FileLoggerProvider` writes that journald captured via stdout.
 
 ### L. Quit + cleanup
 
