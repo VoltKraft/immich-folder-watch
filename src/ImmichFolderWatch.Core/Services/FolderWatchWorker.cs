@@ -52,6 +52,18 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Asset ids we just trashed locally — used as a tombstone so a
+    /// subsequent pull that still sees the asset (race against Immich's
+    /// trash propagation, or a missing asset.delete permission causing
+    /// the trash call to silently fail) does not re-download it. Entries
+    /// expire after <see cref="TombstoneTtl"/>.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyTrashedAssetIds =
+        new(StringComparer.Ordinal);
+
+    private static readonly TimeSpan TombstoneTtl = TimeSpan.FromSeconds(120);
+
     private readonly ConcurrentDictionary<string, string> _albumIdToDirName = new(StringComparer.Ordinal);
 
     private readonly List<FileSystemWatcher> _watchers = new();
@@ -805,6 +817,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            // Tombstone: a local delete just trashed this asset and the
+            // pull is still seeing it. Don't recreate the path mapping
+            // and don't re-download — let the trash propagate on Immich.
+            if (IsRecentlyTrashed(asset.Id))
+            {
+                _logger.LogDebug(
+                    "Skipping recently-trashed asset {AssetId} during sync pull.",
+                    asset.Id);
+                continue;
+            }
+
             var destinationPath = Path.Combine(targetDirectory, asset.OriginalFileName);
             var normalized = NormalizePath(destinationPath);
             _pathToAssetId[normalized] = asset.Id;
@@ -1250,6 +1273,7 @@ public sealed class FolderWatchWorker : BackgroundService
         var result = await _immichAssetClient.TrashAssetsAsync(new[] { assetId }, CancellationToken.None);
         if (result.IsSuccess)
         {
+            _recentlyTrashedAssetIds[assetId] = DateTimeOffset.UtcNow;
             _logger.LogInformation("Trashed asset {AssetId} on Immich (local {FilePath} removed).", assetId, filePath);
         }
         else
@@ -1259,6 +1283,31 @@ public sealed class FolderWatchWorker : BackgroundService
                 assetId,
                 result.ErrorMessage ?? "unknown");
         }
+    }
+
+    /// <summary>
+    /// True iff the asset id was just trashed locally and the tombstone
+    /// hasn't expired yet. Lazy-prunes the entry on read.
+    /// </summary>
+    private bool IsRecentlyTrashed(string assetId)
+    {
+        if (string.IsNullOrEmpty(assetId))
+        {
+            return false;
+        }
+
+        if (!_recentlyTrashedAssetIds.TryGetValue(assetId, out var trashedAt))
+        {
+            return false;
+        }
+
+        if (DateTimeOffset.UtcNow - trashedAt > TombstoneTtl)
+        {
+            _recentlyTrashedAssetIds.TryRemove(assetId, out _);
+            return false;
+        }
+
+        return true;
     }
 
     private async Task PromoteDebouncedFilesAsync(CancellationToken cancellationToken)
