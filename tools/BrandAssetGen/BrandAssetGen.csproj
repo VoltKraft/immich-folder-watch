@@ -45,13 +45,14 @@
           Inputs="@(BrandAssetGeneratorInputs)"
           Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
     <!--
-      Invoke via $(TargetPath) directly rather than `dotnet run --no-build`.
-      When App.csproj or App.Linux.csproj publishes with --runtime win-x64
-      / linux-x64, MSBuild propagates the RID into our ProjectReference
-      and our outputs land at bin/Release/net10.0/<rid>/. `dotnet run
-      --no-build` (without a matching -r flag) looks at the non-RID
-      bin/Release/net10.0/ and fails with "system cannot find the file".
-      $(TargetPath) is the actual compiled DLL path, RID-subdir-aware.
+      Invoke via $(TargetPath) directly. The previous `dotnet run` form
+      with the no-build flag broke when App.csproj or App.Linux.csproj
+      published with a runtime identifier: MSBuild propagates the RID
+      into this ProjectReference, our outputs land at
+      bin/Release/net10.0/<rid>/, and dotnet run without a matching
+      -r flag looked at the non-RID bin/Release/net10.0/ and failed
+      with "system cannot find the file". $(TargetPath) resolves to
+      the actual compiled DLL path, RID-subdir-aware.
     -->
     <Exec Command="dotnet &quot;$(TargetPath)&quot; --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
   </Target>
