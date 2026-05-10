@@ -94,6 +94,7 @@ public sealed partial class App : Application
                     () => _mainWindow,
                     sp.GetRequiredService<ILogger<PortalFolderPicker>>()));
             services.AddSingleton<DocumentPortalClient>();
+            services.AddSingleton<BackgroundPortalClient>();
             services.AddSingleton(LocalizationService.Instance);
             services.AddSingleton<LocalizationProxy>(sp =>
                 new LocalizationProxy(

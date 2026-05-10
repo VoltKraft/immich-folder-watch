@@ -37,23 +37,29 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var trayHost = App.Services?.GetService<AvaloniaTrayHost>();
-        if (trayHost?.IsTrayIconRegistered == true)
-        {
-            // Tray icon keeps the app reachable — hide instead of closing
-            // so the FolderWatchWorker keeps running in the background.
-            e.Cancel = true;
-            Hide();
-            return;
-        }
+        // Always hide on close: the FolderWatchWorker keeps running in
+        // the background. Re-open paths:
+        // - System tray icon (KDE, GNOME with AppIndicator extension).
+        // - Click the .desktop launcher again — UnixSingleInstance
+        //   Coordinator catches the second-instance signal and shows
+        //   the window.
+        // - GNOME 46+ Background Apps panel (Quick Settings) once
+        //   BackgroundPortalClient.RequestBackgroundAsync has confirmed
+        //   our background-mode opt-in.
+        // The footer Quit button (and the tray Quit menu item where
+        // available) is the explicit exit path.
+        e.Cancel = true;
+        Hide();
 
-        // No tray icon: closing the only window is the user's exit cue.
-        // Under ShutdownMode.OnExplicitShutdown the dispatcher would
-        // otherwise outlive the window; post the shutdown instead of
-        // calling it inline so the close finishes first.
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        // Lazy: ask the Background portal for permission the first time
+        // the window is hidden. Fire-and-forget — RequestBackground
+        // surfaces a one-time GNOME dialog; later hides see the cached
+        // grant and no-op. KDE / non-portal sessions get a silent
+        // fallback inside the client.
+        var bgClient = App.Services?.GetService<BackgroundPortalClient>();
+        if (bgClient is not null)
         {
-            Dispatcher.UIThread.Post(() => desktop.Shutdown(0));
+            _ = bgClient.RequestBackgroundAsync();
         }
     }
 

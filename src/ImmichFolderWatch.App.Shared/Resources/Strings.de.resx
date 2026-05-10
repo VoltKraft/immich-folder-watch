@@ -75,7 +75,7 @@
   <data name="Tooltip_Queue" xml:space="preserve"><value>Warteschlange</value></data>
 
   <data name="Tray_Open" xml:space="preserve"><value>GUI öffnen</value></data>
-  <data name="Tray_Unavailable" xml:space="preserve"><value>Kein Tray-Icon verfügbar — beim Schließen des Fensters wird die Anwendung beendet. Unter GNOME die Erweiterung "AppIndicator and KStatusNotifierItem Support" installieren; unter KDE Plasma funktioniert der Tray out-of-the-box.</value></data>
+  <data name="Tray_Unavailable" xml:space="preserve"><value>Kein Tray-Icon verfügbar — beim Schließen des Fensters wird es nur ausgeblendet; der Watcher läuft im Hintergrund weiter. Wiederherstellen über den App-Launcher (Aktivitäten, Dock oder unter GNOME 46+ Schnelleinstellungen → Hintergrund-Apps). Zum tatsächlichen Beenden den Quit-Button verwenden. Unter KDE Plasma funktioniert der Tray out-of-the-box; unter GNOME ergänzt die Erweiterung "AppIndicator and KStatusNotifierItem Support" ein klassisches Tray-Icon.</value></data>
   <data name="Tray_Restart" xml:space="preserve"><value>Neustart</value></data>
   <data name="Tray_Quit" xml:space="preserve"><value>Beenden</value></data>
 
