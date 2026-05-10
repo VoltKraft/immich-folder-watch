@@ -44,33 +44,32 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
-    public void ResolveCulture_AutoPicksGerman_WhenOsUiCultureIsGerman()
+    public void ResolveCultureForSystem_AutoPicksGerman_WhenSystemCultureIsGerman()
     {
-        var previous = CultureInfo.CurrentUICulture;
-        try
-        {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
-            Assert.Equal("de-DE", LocalizationService.ResolveCulture("auto").Name);
-        }
-        finally
-        {
-            CultureInfo.CurrentUICulture = previous;
-        }
+        var resolved = LocalizationService.ResolveCultureForSystem(
+            CultureInfo.GetCultureInfo("de-DE"),
+            "auto");
+        Assert.Equal("de-DE", resolved.Name);
     }
 
     [Fact]
-    public void ResolveCulture_AutoPicksEnglish_WhenOsUiCultureIsNotGerman()
+    public void ResolveCultureForSystem_AutoPicksEnglish_WhenSystemCultureIsNotGerman()
     {
-        var previous = CultureInfo.CurrentUICulture;
-        try
-        {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
-            Assert.Equal("en-US", LocalizationService.ResolveCulture("auto").Name);
-        }
-        finally
-        {
-            CultureInfo.CurrentUICulture = previous;
-        }
+        var resolved = LocalizationService.ResolveCultureForSystem(
+            CultureInfo.GetCultureInfo("fr-FR"),
+            "auto");
+        Assert.Equal("en-US", resolved.Name);
+    }
+
+    [Fact]
+    public void ResolveCultureForSystem_ExplicitCodeIgnoresSystemCulture()
+    {
+        // Manual selection beats system detection — picking "en" on a
+        // German system still yields English.
+        var resolved = LocalizationService.ResolveCultureForSystem(
+            CultureInfo.GetCultureInfo("de-DE"),
+            "en");
+        Assert.Equal("en-US", resolved.Name);
     }
 
     [Theory]
