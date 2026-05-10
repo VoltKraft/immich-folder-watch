@@ -518,14 +518,24 @@ single-device behaviour.
 
 ### K. Logging path + Open Log Folder
 
-#### SMK-29 — Logs land at the sandbox state path  `H`
+#### SMK-29 — Logs land in the sandbox  `H`
 
 Steps:
 1. Run the app for a minute with some uploads.
-2. `ls ~/.var/app/io.github.voltkraft.ImmichFolderWatch/.local/state/immich-folder-watch/logs/`
+2. `ls "~/.var/app/io.github.voltkraft.ImmichFolderWatch/data/Immich Folder Watch/logs/"`
 
 Expected: at least one rolling log file present, recent timestamp,
 non-empty content. Format matches the file logger from `Core`.
+
+Note: the path uses XDG_DATA_HOME with the WPF-era folder name
+"Immich Folder Watch" because `MainWindowViewModel._logDirectory`
+seeds itself from `InstallationPaths.GetLogDirectory()` (a constant
+shared with WPF) before the Linux MainWindow's `XdgPlatformPaths`
+seed branch runs. Functionally fine — sandbox-internal,
+`Open log folder` resolves it, deleting it on uninstall is covered
+by SMK-33. A future cleanup can route the default through
+`IPlatformPaths` to land at the spec-compliant
+`.local/state/immich-folder-watch/logs/`.
 
 #### SMK-30 — `Open log folder` button uses xdg-open inside the sandbox  `M`
 
