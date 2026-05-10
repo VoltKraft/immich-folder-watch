@@ -31,6 +31,18 @@
     <ProjectReference Include="../ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.Immich/ImmichFolderWatch.Immich.csproj" />
     <ProjectReference Include="../ImmichFolderWatch.App.Shared/ImmichFolderWatch.App.Shared.csproj" />
+    <!--
+      Build-order-only dependency on BrandAssetGen so the solution
+      doesn't compile the tool concurrently from both App.csproj and
+      App.Linux.csproj's GenerateBrandAssets targets — the parallel
+      compile races on tools/BrandAssetGen/obj/.../AssemblyInfoInputs
+      .cache and breaks the Windows CI build (MSB3491). Reference
+      OutputAssembly=false keeps the tool out of our publish output.
+    -->
+    <ProjectReference Include="$(BrandGeneratorProject)"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,6 +60,13 @@
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(BrandAssetGeneratorInputs)"
           Outputs="$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
-    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+    <!--
+      The no-build flag below skips an incremental rebuild that
+      `dotnet run` would otherwise trigger; the ProjectReference on
+      BrandAssetGen above ensures the binary already exists in the
+      Configuration directory, and skipping the rebuild prevents a
+      cache-file race with the parallel App.csproj invocation.
+    -->
+    <Exec Command="dotnet run --project &quot;$(BrandGeneratorProject)&quot; --configuration $(Configuration) --no-build -- --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
   </Target>
 </Project>

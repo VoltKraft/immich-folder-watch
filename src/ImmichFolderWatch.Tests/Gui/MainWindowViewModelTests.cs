@@ -3,6 +3,7 @@ using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
@@ -86,7 +87,8 @@ public sealed class MainWindowViewModelTests
             new SyncStatusProvider(),
             new AutostartManager(),
             LocalizationService.Instance,
-            new SyncTestUiDispatcher());
+            new SyncTestUiDispatcher(),
+            new WindowsLoggingCapabilities());
     }
 
     private sealed class SyncTestUiDispatcher : IUiDispatcher
