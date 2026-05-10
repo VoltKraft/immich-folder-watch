@@ -46,6 +46,19 @@ public sealed partial class App : Application
             // instance handoff) call desktop.Shutdown(0) themselves.
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+            // PortalAutostartManager hands the Background portal a
+            // commandline of ["immich-folder-watch", "--background"];
+            // that is the autostart entry GNOME executes after login.
+            // Detect the flag here (and accept --autostart for parity
+            // with the WPF AutostartManager.AutostartArgument) so we
+            // know to skip the implicit MainWindow.Show() and let the
+            // user discover the running app via the tray icon /
+            // Background Apps panel instead of having a window pop up
+            // in their face on every login.
+            var startHidden = (desktop.Args ?? Array.Empty<string>()).Any(a =>
+                string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase));
+
             // Avalonia 11.3.x lets unobserved task exceptions reach the
             // dispatcher and kill the process; route them to the logger
             // instead so background D-Bus failures don't take the GUI down.
@@ -157,10 +170,29 @@ public sealed partial class App : Application
             _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+                // If we started hidden (autostart) but the tray fails,
+                // surface the GUI so the user can see the app is alive
+                // — otherwise it'd be running invisibly with no entry
+                // point until they relaunched the .desktop file.
+                if (startHidden && _mainWindow is { IsVisible: false })
+                {
+                    _mainWindow.Show();
+                    _mainWindow.Activate();
+                }
             });
             _ = _trayHost.StartAsync(this);
 
-            desktop.MainWindow = _mainWindow;
+            // ClassicDesktopStyleApplicationLifetime.Start() auto-Show()s
+            // whatever is assigned to MainWindow once we return from
+            // OnFrameworkInitializationCompleted. To honour --background
+            // we simply leave it unassigned: ShutdownMode.OnExplicitShutdown
+            // keeps the dispatcher loop alive, and the tray-click /
+            // second-instance-handoff callbacks above will Show() the
+            // window when the user actually wants it.
+            if (!startHidden)
+            {
+                desktop.MainWindow = _mainWindow;
+            }
             desktop.Exit += async (_, _) =>
             {
                 _trayHost?.Dispose();
