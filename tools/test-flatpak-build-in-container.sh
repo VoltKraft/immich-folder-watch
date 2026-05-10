@@ -54,6 +54,21 @@ if [ ! -x "$(command -v flatpak-builder)" ]; then
     echo "ERROR: flatpak-builder not found on the host. Install it (Fedora: 'sudo dnf install flatpak-builder')." >&2
     exit 2
 fi
+
+# Manifest expects source.tar.gz next to itself (CI tarballs at release
+# time; locally we do the same). Excludes mirror what release.yaml does.
+echo "Creating source tarball..."
+tar czf "${repo_root}/packaging/flatpak/source.tar.gz" \
+    -C "${repo_root}" \
+    --exclude=./.flatpak-builder \
+    --exclude=./.git \
+    --exclude=./flatpak_app \
+    --exclude=./repo \
+    --exclude=./artifacts \
+    --exclude=./packaging/flatpak/source.tar.gz \
+    --exclude=./packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+    .
+
 flatpak-builder --show-manifest \
     "${repo_root}/${manifest_yaml}" \
     > "${repo_root}/packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json"

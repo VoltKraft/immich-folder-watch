@@ -35,6 +35,7 @@ config.local.yml
 packaging/flatpak/nuget-sources.json
 packaging/flatpak/flathub/nuget-sources.json
 packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+packaging/flatpak/source.tar.gz
 packaging/flatpak/.flatpak-builder/
 packaging/flatpak/build-dir/
 packaging/flatpak/repo/
