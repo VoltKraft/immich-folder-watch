@@ -79,12 +79,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            appstream-util \
+            appstream \
             desktop-file-utils \
             flatpak-builder
 
       - name: Validate AppStream metainfo
-        run: appstream-util validate-relax packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+        # `--no-net` keeps the lint passing on PR/dev pushes where the
+        # release-tag-pinned screenshot URL isn't live yet. Flathub's
+        # own pipeline fetches screenshots at build time, when the
+        # v<N> tag exists.
+        run: appstreamcli validate --no-net packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
 
       - name: Validate desktop entry
         run: desktop-file-validate packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
