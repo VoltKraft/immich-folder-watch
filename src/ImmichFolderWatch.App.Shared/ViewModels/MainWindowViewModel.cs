@@ -1056,10 +1056,23 @@ public sealed class MainWindowViewModel : BindableBase
             new SyncModeOption(WatchSourceSyncModes.Sync, Strings.SyncMode_Sync, Strings.SyncMode_Sync_Description),
         };
 
+        // Catalog must hold the SAME instances as AvailableSyncModes —
+        // ComboBox.SelectedItem matching is reference-based.
+        SyncModeCatalog.SetOptions(newOptions);
+
         AvailableSyncModes.Clear();
         foreach (var option in newOptions)
         {
             AvailableSyncModes.Add(option);
+        }
+
+        // Existing WatchSourceItems point at the OLD option instances
+        // through their SelectedSyncModeOption getter — re-fetch by
+        // raising PropertyChanged so each ComboBox picks the new
+        // (post-language-change) instance from the new ItemsSource.
+        foreach (var source in Sources)
+        {
+            source.RaiseSyncModeChangedForBindingRefresh();
         }
     }
 

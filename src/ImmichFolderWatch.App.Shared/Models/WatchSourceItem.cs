@@ -83,17 +83,20 @@ public sealed class WatchSourceItem : BindableBase
 
     /// <summary>
     /// Re-raises <see cref="INotifyPropertyChanged"/> for
-    /// <see cref="SyncMode"/>. Workaround for an Avalonia 11.3.x
-    /// timing gap where a ComboBox in an ItemsControl-DataTemplate
-    /// evaluates its SelectedValue before the bound ItemsSource has
-    /// fully materialized — leaving the dropdown stuck on the
-    /// default option even though the underlying value is correct.
-    /// Called by MainWindowViewModel.Load() via the UI dispatcher
-    /// once the items are realized.
+    /// <see cref="SyncMode"/> AND
+    /// <see cref="SelectedSyncModeOption"/>. Workaround for an
+    /// Avalonia 11.3.x timing gap where a ComboBox in an
+    /// ItemsControl-DataTemplate doesn't reliably reflect its bound
+    /// value the first time the item is realized. Called by
+    /// MainWindowViewModel.Load() via the UI dispatcher once the
+    /// items are in Sources, and again whenever the localized option
+    /// catalog changes (RefreshSyncModeOptions) so the SelectedItem
+    /// binding picks up the freshly-created option instances.
     /// </summary>
     public void RaiseSyncModeChangedForBindingRefresh()
     {
         RaisePropertyChanged(nameof(SyncMode));
+        RaisePropertyChanged(nameof(SelectedSyncModeOption));
     }
 
     public string AlbumName
@@ -153,7 +156,32 @@ public sealed class WatchSourceItem : BindableBase
             {
                 RaisePropertyChanged(nameof(ShowIncludeSubdirectories));
                 RaisePropertyChanged(nameof(ShowExcludeDirectories));
+                RaisePropertyChanged(nameof(SelectedSyncModeOption));
             }
+        }
+    }
+
+    /// <summary>
+    /// SelectedItem-friendly view on <see cref="SyncMode"/> — looked up
+    /// in <see cref="SyncModeCatalog"/> so it returns the SAME instance
+    /// that <c>MainWindowViewModel.AvailableSyncModes</c> exposes (the
+    /// catalog and the VM collection share the same array). Avalonia
+    /// 11.3.x's ComboBox + SelectedValueBinding inside an
+    /// ItemsControl-DataTemplate doesn't reliably reflect a saved
+    /// SelectedValue after Load; binding SelectedItem to this property
+    /// works around that. WPF still uses SelectedValuePath="Code" +
+    /// SelectedValue="{Binding SyncMode}" and is unaffected.
+    /// </summary>
+    public SyncModeOption? SelectedSyncModeOption
+    {
+        get => SyncModeCatalog.FindByCode(_syncMode);
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+            SyncMode = value.Code;
         }
     }
 
