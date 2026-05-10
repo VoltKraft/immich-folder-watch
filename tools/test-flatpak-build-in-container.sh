@@ -37,7 +37,7 @@ if [ -z "${version}" ]; then
     exit 2
 fi
 
-container="${IMMICH_FW_FLATPAK_TEST_IMAGE:-bilelmoussaoui/flatpak-github-actions:freedesktop-24.08}"
+container="${IMMICH_FW_FLATPAK_TEST_IMAGE:-docker.io/bilelmoussaoui/flatpak-github-actions:freedesktop-24.08}"
 runtime="${IMMICH_FW_CONTAINER_RUNTIME:-docker}"
 
 echo "=== Local CI-equivalent flatpak build ==="
@@ -47,6 +47,21 @@ echo "Container:  ${container}"
 echo "Runtime:    ${runtime}"
 echo
 
+# Pre-resolve the manifest on the host (uses the local flatpak-builder)
+# so the container only consumes it. Side-steps the podman-userns
+# write-permission dance for files generated inside the bind mount.
+if [ ! -x "$(command -v flatpak-builder)" ]; then
+    echo "ERROR: flatpak-builder not found on the host. Install it (Fedora: 'sudo dnf install flatpak-builder')." >&2
+    exit 2
+fi
+flatpak-builder --show-manifest \
+    "${repo_root}/${manifest_yaml}" \
+    > "${repo_root}/packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json"
+
+# Build runs as root inside the container — needed for flatpak --system
+# ops. The bind-mounted workspace ends up with root-owned build
+# artifacts which the host user can still read; cleanup with sudo if
+# needed.
 "${runtime}" run --rm --privileged \
     -v "${repo_root}:/workspace" \
     -w /workspace \
@@ -54,9 +69,6 @@ echo
     "${container}" \
     bash -c '
         set -euo pipefail
-        flatpak-builder --show-manifest \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
         flatpak-builder \
             --repo=repo \
             --disable-rofiles-fuse \
