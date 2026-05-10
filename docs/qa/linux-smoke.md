@@ -103,6 +103,7 @@ filesystems=xdg-pictures:ro;xdg-videos:ro;
 [Session Bus Policy]
 org.freedesktop.Notifications=talk
 org.kde.StatusNotifierWatcher=talk
+org.kde.*=own
 org.freedesktop.portal.Desktop=talk
 org.freedesktop.portal.Documents=talk
 org.freedesktop.portal.Background=talk
@@ -110,9 +111,16 @@ org.freedesktop.portal.Background=talk
 
 (The order of bus-policy lines is not deterministic.)
 
+`org.kde.*=own` is required so the SNI client can claim its own
+`org.kde.StatusNotifierItem-<pid>-<id>` bus name; xdg-dbus-proxy
+doesn't honour in-segment wildcards (`StatusNotifierItem-*` is not
+a valid pattern), so the broader `org.kde.*` namespace is the
+narrowest grant that actually matches.
+
 Forbidden lines (must NOT appear): `host` in `filesystems=`,
 `session-bus` in `sockets=`, `org.freedesktop.systemd1=talk`,
-anything `=own`, anything `:rw` other than the implicit XDG dirs.
+anything else `=own` outside `org.kde.*`, anything `:rw` other than
+the implicit XDG dirs.
 
 #### SMK-03 — Cold launch from a terminal  `H`
 
@@ -299,37 +307,73 @@ Expected: a freedesktop notification (top-right on GNOME, system tray
 on Plasma) shows "Uploaded 1 file" (or localized equivalent). Toast
 auto-dismisses after the system default.
 
-#### SMK-17 — Tray on KDE Plasma 6  `M`
+#### SMK-17 — Tray on KDE Plasma 6 + GNOME-w-AppIndicator  `H`
 
-Setup: KDE Plasma 6.
+Setup: either KDE Plasma 6, OR GNOME 46+ with the
+"AppIndicator and KStatusNotifierItem Support" extension enabled.
 
-Steps: launch app; observe system tray.
+Steps:
+1. Launch app, wait for the StatusNotifierWatcher probe + tray
+   registration to settle (≤2 s).
+2. Look for an SNI tray icon in the system area (top-right on
+   GNOME, system tray on KDE).
+3. Left-click the icon → main window shows + activates.
+4. Close the window via the X button → window hides; the icon
+   remains.
+5. Left-click again → window re-appears.
+6. Right-click → context menu shows `Open` / `Quit` (separator
+   between them is fine).
+7. `Quit` → process exits; `pgrep -f immich-folder-watch` returns
+   nothing.
 
-Expected: **Two acceptable outcomes for v1.0** —
-(a) SNI tray icon present, left-click toggles window, right-click
-shows context menu (Open, Pause/Resume, Quit). PASS.
-(b) Tray icon absent + non-blocking banner inside the app. PASS but
-file a follow-up.
+Expected: the tray icon is registered and behaves as above. Banner
+inside the app is silent (no "tray unavailable" text).
 
-Anything between (e.g. icon appears then crashes) is a FAIL.
+Notes: the post-3.8 stack (`3.8.D` + `a17bbab` dispatcher filter +
+`254bdae` `--own-name=org.kde.*`) registers a real `Avalonia.Controls
+.TrayIcon` against the SNI watcher. On bare GNOME (no AppIndicator
+extension) the registration faults asynchronously with
+`ServiceUnknown`; the dispatcher filter catches it, IsTrayIconRegistered
+falls back to false, and SMK-18's banner path takes over. Watching
+this code path on a real KDE Plasma 6 session for the first time is
+explicitly part of the smoke pass.
 
-Notes: the current build (Phase 4 fix `7e78a24`) intentionally does
-NOT call `TrayIcon.SetIcons` — Avalonia 11.3.x's registration crashed
-with `ServiceUnknown` on bare GNOME / Flatpak. KDE has a real SNI
-watcher and *might* now succeed. If you're testing on KDE for the
-first time, see if re-enabling `SetIcons` works; that's a candidate
-follow-up commit before tagging v2.5.0.
+#### SMK-18 — Background mode on bare GNOME (no AppIndicator)  `H`
 
-#### SMK-18 — Window-only banner on bare GNOME  `H`
+Setup: GNOME 46+ without the AppIndicator and KStatusNotifierItem
+Support extension. Confirm with
+`gnome-extensions list | grep -i appindicator` returning nothing.
 
-Setup: GNOME 46 without the AppIndicator extension.
+Steps:
+1. Launch app.
+2. Observe the banner under the header card.
+3. Close the window via the X button.
+4. Confirm the process keeps running: `pgrep -f immich-folder-watch`.
+5. Open GNOME Quick Settings (top-right click) → expand
+   "Background Apps" → look for "Immich Folder Watch".
+6. Click the launcher icon in Activities again.
+7. Use the footer Quit button (or the Background-Apps panel's Quit
+   action) to actually exit.
 
-Steps: launch.
+Expected at each step:
+- (2) Banner reads roughly "No system tray icon — closing the
+  window only hides it; the watcher keeps running in the
+  background. Re-open via the app launcher (Activities, dock, or
+  GNOME 46+ Quick Settings → Background Apps). Use the Quit
+  button to actually exit."
+- (3) Window disappears; process stays alive.
+- (4) `pgrep` lists the immich-folder-watch process.
+- (5) "Background Apps" lists "Immich Folder Watch" with a Quit
+  action. First time the window is hidden after a fresh install,
+  GNOME may surface a one-time consent dialog from xdg-desktop-
+  portal-Background — accept it.
+- (6) Window re-appears via the existing single-instance handoff
+  (UnixSingleInstanceCoordinator over a Unix socket).
+- (7) Process exits cleanly.
 
-Expected: non-blocking banner (or status-bar notice) reads roughly
-"Tray not available — running in window-only mode". Closing the
-window minimises to the GNOME taskbar / dash (does NOT hide entirely;
-that would orphan the app).
+Notes: this is the e5bd528 + tray-banner UX. The
+BackgroundPortalClient.RequestBackgroundAsync call fires once per
+session at the first hide; later hides skip the call.
 
 ### F. Theme + i18n
 
