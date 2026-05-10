@@ -76,6 +76,13 @@ modules:
           - artifacts
       - nuget-sources.json
     build-commands:
+      # TEMP debug: log what flatpak-builder actually staged in the
+      # build dir before dotnet publish runs. Remove once the v2.5.1
+      # build is green.
+      - 'echo "=== build dir cwd ===" && pwd'
+      - 'echo "=== top-level contents ===" && ls -la'
+      - 'echo "=== src/ contents ===" && (ls -la src/ || echo "src/ MISSING")'
+      - 'echo "=== nuget-sources/ count ===" && (ls nuget-sources/ | wc -l || echo "nuget-sources/ MISSING")'
       - >-
         dotnet publish
         src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj
