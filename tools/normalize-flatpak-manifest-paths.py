@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize local source paths in a resolved Flatpak manifest."""
+"""Normalize local source handling in a resolved Flatpak manifest."""
 
 from __future__ import annotations
 
@@ -9,12 +9,7 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Make relative source.path entries in a resolved Flatpak "
-            "manifest absolute, using the original manifest directory."
-        )
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resolved_manifest", type=Path)
     parser.add_argument(
         "--manifest-dir",
@@ -34,9 +29,12 @@ def main() -> int:
     missing_paths: list[Path] = []
 
     for module in data.get("modules", []):
+        normalized_sources = []
+
         for source in module.get("sources", []):
             source_path = source.get("path")
             if not source_path:
+                normalized_sources.append(source)
                 continue
 
             normalized = Path(source_path)
@@ -46,7 +44,27 @@ def main() -> int:
             if not normalized.exists():
                 missing_paths.append(normalized)
 
+            if normalized.name == "source.tar.gz":
+                build_options = module.setdefault("build-options", {})
+                build_args = build_options.setdefault("build-args", [])
+                source_mount = f"--filesystem={normalized.parent}:ro"
+                if source_mount not in build_args:
+                    build_args.append(source_mount)
+
+                commands = module.get("build-commands", [])
+                module["build-commands"] = [
+                    command.replace(
+                        "tar -xzf source.tar.gz && rm source.tar.gz",
+                        f"tar -xzf {normalized}",
+                    )
+                    for command in commands
+                ]
+                continue
+
             source["path"] = str(normalized)
+            normalized_sources.append(source)
+
+        module["sources"] = normalized_sources
 
     if missing_paths:
         missing = "\n".join(f"  - {path}" for path in missing_paths)

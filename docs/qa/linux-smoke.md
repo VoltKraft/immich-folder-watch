@@ -1,5 +1,5 @@
 # Linux Smoke Tests — v2.5.0 Pre-Flathub QA
-
+fix(release): mount Flatpak source archive during build
 This is the manual checklist that gates v2.5.0. Phases 0–5 brought the
 Flatpak build to "compiles + packages cleanly + CI green"; Phase 6
 proves it actually works on real desktops. Run **every** test here on
