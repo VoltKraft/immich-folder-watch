@@ -72,7 +72,9 @@ Record outcome inline as `[PASS]`, `[FAIL: <one-line reason>]`, or
 Steps:
 1. From the repo root: `tools/generate-nuget-sources.sh` (regenerates
    the offline NuGet feed if csproj graph changed).
-2. `flatpak-builder --user --install --force-clean
+2. `git ls-files -z | tar --create --gzip --file
+   packaging/flatpak/source.tar.gz --null --files-from -`
+3. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml`
 

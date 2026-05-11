@@ -138,15 +138,10 @@ jobs:
     needs:
       - prepare-release
     if: needs.prepare-release.outputs.tag_exists != 'true'
-    # Plain Fedora container instead of bilelmoussaoui/flatpak-github-
-    # actions:freedesktop-24.08. The bilelmoussaoui image ships
-    # flatpak-builder 1.4.4 which silently refuses to materialize our
-    # source — eight build attempts (type:dir + type:archive, various
-    # state-dir layouts, --show-manifest pre-resolution) all produced
-    # an empty build dir. Fedora's package repository tracks the latest
-    # flatpak-builder; we install it explicitly + add the flathub
-    # remote ourselves. --privileged is still required for ostree's
-    # bind mounts.
+    # Plain Fedora container instead of the flatpak-github-actions image:
+    # Fedora tracks a recent flatpak-builder and lets this workflow install
+    # the exact runtime/sdk/extension set it needs. --privileged is still
+    # required for flatpak-builder's sandbox and ostree bind mounts.
     container:
       image: fedora:latest
       options: --privileged
@@ -193,42 +188,25 @@ jobs:
             --metainfo packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
 
       - name: Tarball source for type:archive
-        # flatpak-builder 1.4.4 (the container's version) silently
-        # refuses to materialize a `type: dir, path: ../..` source —
-        # debug output (commit 0ebbad9) confirmed the build dir stays
-        # completely empty even with state-dir relocated. Working
-        # around it with a tarball + `type: archive`, which is a
-        # different (well-trodden) code path inside flatpak-builder
-        # and matches how most Flathub-hosted apps stage their source.
+        shell: bash
         run: |
-          tar czf packaging/flatpak/source.tar.gz \
-            --exclude=./.flatpak-builder \
-            --exclude=./.git \
-            --exclude=./flatpak_app \
-            --exclude=./repo \
-            --exclude=./artifacts \
-            --exclude=./packaging/flatpak/source.tar.gz \
-            --exclude=./packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
-            .
+          set -euo pipefail
+          git ls-files -z \
+            | tar --create --gzip --file packaging/flatpak/source.tar.gz \
+                --null --files-from -
 
-      - name: Pre-resolve manifest (inline external nuget-sources fragment)
-        run: |
-          flatpak-builder --show-manifest \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+          tar --list --gzip --file packaging/flatpak/source.tar.gz \
+            | grep -qx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
 
       - name: Build + bundle Flatpak
+        shell: bash
         env:
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           set -euo pipefail
-          # state-dir must be on the same filesystem as the workspace
-          # (flatpak-builder enforces this for ostree hardlinks) but
-          # outside the source path the type:dir entry copies — that
-          # combination is what 1.4.4 needs to actually materialize all
-          # 70 sources into the build dir. `/__w/fb-state` is on the
-          # same FS as `/__w/<repo>/<repo>` (the GHA workspace) without
-          # being a child of it.
+          # Keep flatpak-builder state on the same filesystem as the
+          # workspace for ostree hardlinks, but outside the checkout so
+          # generated state can never be packed into the app source.
           mkdir -p /__w/fb-state
           flatpak-builder \
             --repo=repo \
@@ -241,7 +219,7 @@ jobs:
             --verbose \
             --state-dir /__w/fb-state \
             flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
           flatpak build-bundle \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             repo \

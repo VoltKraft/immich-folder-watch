@@ -57,31 +57,18 @@ modules:
   - name: immich-folder-watch
     buildsystem: simple
     sources:
-      # CI builds tarball the source at release time and reference it
-      # via type:archive — a different flatpak-builder source code path
-      # than type:dir, which 1.4.4 (the bilelmoussaoui/freedesktop-24.08
-      # container's version) silently refuses to materialize. The
-      # tarball lives next to the manifest at build time only and is
-      # gitignored.
-      #
-      # Local builds from the dev shell rebuild the tarball on demand
-      # before invoking flatpak-builder; see packaging/flatpak/README.md
-      # for the updated developer flow.
+      # Release and local builds create this from tracked source files
+      # immediately before invoking flatpak-builder. The generated archive
+      # is gitignored and lives next to the manifest only at build time.
       - type: archive
         path: source.tar.gz
-        # Tarball is created with `tar czf ... .` from the repo root,
-        # so contents already sit at the top level. Default of 1 would
-        # eat the src/ prefix.
+        # The archive stores repo-relative paths, so contents already sit
+        # at the top level. Default of 1 would eat the src/ prefix.
         strip-components: 0
       - nuget-sources.json
     build-commands:
-      # TEMP debug: log what flatpak-builder actually staged in the
-      # build dir before dotnet publish runs. Remove once the v2.5.1
-      # build is green.
-      - 'echo "=== build dir cwd ===" && pwd'
-      - 'echo "=== top-level contents ===" && ls -la'
-      - 'echo "=== src/ contents ===" && (ls -la src/ || echo "src/ MISSING")'
-      - 'echo "=== nuget-sources/ count ===" && (ls nuget-sources/ | wc -l || echo "nuget-sources/ MISSING")'
+      - 'test -f src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
+      - 'test -d nuget-sources'
       - >-
         dotnet publish
         src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj

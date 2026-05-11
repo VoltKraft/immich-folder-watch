@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Reproduce the CI Flatpak build locally inside the same container the
-# release workflow uses, so we can iterate on packaging/flatpak/...yaml
-# (and the workflow itself) without a push-to-main round-trip.
+# Reproduce the CI Flatpak build locally inside the same base container
+# the release workflow uses, so packaging/flatpak/...yaml and release
+# workflow changes can be tested without a push-to-main round-trip.
 #
 # Requires: docker (or podman aliased to docker), the offline NuGet
 # feed at packaging/flatpak/nuget-sources.json (run
@@ -11,10 +11,11 @@
 #   tools/test-flatpak-build-in-container.sh
 #
 # Behavior:
-#   - Pulls bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+#   - Pulls Fedora
 #   - Mounts the repo into /workspace
+#   - Installs flatpak-builder plus the freedesktop runtime/sdk/dotnet10
 #   - Runs the same flatpak-builder + flatpak build-bundle commands
-#     release.yaml runs, against the resolved JSON manifest
+#     release.yaml runs, against the YAML manifest
 #   - Leaves the .flatpak bundle at ./immich-folder-watch-<VERSION>.flatpak
 #
 # Exit code matches the build's; useful for `git bisect` runs.
@@ -37,7 +38,7 @@ if [ -z "${version}" ]; then
     exit 2
 fi
 
-container="${IMMICH_FW_FLATPAK_TEST_IMAGE:-docker.io/bilelmoussaoui/flatpak-github-actions:freedesktop-24.08}"
+container="${IMMICH_FW_FLATPAK_TEST_IMAGE:-docker.io/fedora:latest}"
 runtime="${IMMICH_FW_CONTAINER_RUNTIME:-docker}"
 
 echo "=== Local CI-equivalent flatpak build ==="
@@ -47,31 +48,16 @@ echo "Container:  ${container}"
 echo "Runtime:    ${runtime}"
 echo
 
-# Pre-resolve the manifest on the host (uses the local flatpak-builder)
-# so the container only consumes it. Side-steps the podman-userns
-# write-permission dance for files generated inside the bind mount.
-if [ ! -x "$(command -v flatpak-builder)" ]; then
-    echo "ERROR: flatpak-builder not found on the host. Install it (Fedora: 'sudo dnf install flatpak-builder')." >&2
-    exit 2
-fi
-
 # Manifest expects source.tar.gz next to itself (CI tarballs at release
-# time; locally we do the same). Excludes mirror what release.yaml does.
+# time; locally we do the same). Use tracked files so ignored build output
+# never enters the app source.
 echo "Creating source tarball..."
-tar czf "${repo_root}/packaging/flatpak/source.tar.gz" \
-    -C "${repo_root}" \
-    --exclude=./.flatpak-builder \
-    --exclude=./.git \
-    --exclude=./flatpak_app \
-    --exclude=./repo \
-    --exclude=./artifacts \
-    --exclude=./packaging/flatpak/source.tar.gz \
-    --exclude=./packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
-    .
+git -C "${repo_root}" ls-files -z \
+    | tar --create --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
+        --directory "${repo_root}" --null --files-from -
 
-flatpak-builder --show-manifest \
-    "${repo_root}/${manifest_yaml}" \
-    > "${repo_root}/packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json"
+tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
+    | grep -qx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
 
 # Build runs as root inside the container — needed for flatpak --system
 # ops. The bind-mounted workspace ends up with root-owned build
@@ -84,6 +70,16 @@ flatpak-builder --show-manifest \
     "${container}" \
     bash -c '
         set -euo pipefail
+        dnf install -y --setopt=install_weak_deps=False \
+            flatpak flatpak-builder ostree git tar gzip xz which
+        flatpak-builder --version
+        flatpak remote-add --system --if-not-exists \
+            flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --system -y --noninteractive flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Sdk.Extension.dotnet10//24.08
+
         flatpak-builder \
             --repo=repo \
             --disable-rofiles-fuse \
@@ -95,7 +91,7 @@ flatpak-builder --show-manifest \
             --verbose \
             --state-dir .flatpak-builder \
             flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
         flatpak build-bundle \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             repo \

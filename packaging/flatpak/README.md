@@ -32,18 +32,26 @@ Then, from the repo root:
 #    which has burned us repeatedly. If in doubt, regenerate.
 ./tools/generate-nuget-sources.sh
 
-# 2) Build + install into the user Flatpak repo
+# 2) Create the local source archive consumed by the Flatpak manifest.
+#    This uses tracked files from the working tree, so local edits to
+#    tracked files are included while ignored build output stays out.
+git ls-files -z \
+  | tar --create --gzip --file packaging/flatpak/source.tar.gz \
+      --null --files-from -
+
+# 3) Build + install into the user Flatpak repo
 flatpak-builder --user --install --force-clean \
     packaging/flatpak/build-dir \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
 
-# 3) Run it (from a terminal so log output is visible)
+# 4) Run it (from a terminal so log output is visible)
 flatpak run io.github.voltkraft.ImmichFolderWatch
 ```
 
 `packaging/flatpak/build-dir/`, `packaging/flatpak/.flatpak-builder/`,
-`packaging/flatpak/nuget-sources.json` and `packaging/flatpak/repo/` are
-gitignored — they are regenerated on every build.
+`packaging/flatpak/nuget-sources.json`, `packaging/flatpak/source.tar.gz`
+and `packaging/flatpak/repo/` are gitignored — they are regenerated on
+every build.
 
 > **If a previous build is misbehaving in unexpected ways**, nuke the
 > caches and start fresh. flatpak-builder happily reuses partial state
@@ -51,9 +59,12 @@ gitignored — they are regenerated on every build.
 > can hide a real change:
 >
 > ```bash
-> rm -f packaging/flatpak/nuget-sources.json
+> rm -f packaging/flatpak/nuget-sources.json packaging/flatpak/source.tar.gz
 > rm -rf .flatpak-builder packaging/flatpak/build-dir
 > ./tools/generate-nuget-sources.sh
+> git ls-files -z \
+>   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
+>       --null --files-from -
 > flatpak-builder --user --install --force-clean \
 >     packaging/flatpak/build-dir \
 >     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
@@ -120,7 +131,7 @@ python3 tools/update-appstream.py 2.5.0
 
 ## Flathub submission
 
-Phase 4 ships a manifest that uses `type: dir` for fast iteration. For the
-Flathub submission (Phase 7) the source flips to `type: git` + a pinned
-`tag: vX.Y.Z`. Until then, distribution is via single-file `.flatpak`
-bundles attached to GitHub Releases (Phase 5 CI lane).
+The in-repo release manifest uses a local `type: archive` source generated
+from `git ls-files` immediately before each build. For Flathub, use the
+separate manifest under `packaging/flatpak/flathub/`, which already uses
+`type: git` plus a pinned tag/commit and a sibling `nuget-sources.json`.
