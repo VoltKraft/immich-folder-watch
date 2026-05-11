@@ -58,15 +58,16 @@ modules:
     buildsystem: simple
     sources:
       # Release and local builds create this from tracked source files
-      # immediately before invoking flatpak-builder. The generated archive
-      # is gitignored and lives next to the manifest only at build time.
-      - type: archive
+      # immediately before invoking flatpak-builder. Keep it as a file
+      # source and unpack it explicitly below; CI has repeatedly shown
+      # flatpak-builder's automatic archive extraction leaving an empty
+      # build dir for this manifest shape.
+      - type: file
         path: source.tar.gz
-        # The archive stores repo-relative paths, so contents already sit
-        # at the top level. Default of 1 would eat the src/ prefix.
-        strip-components: 0
+        dest-filename: source.tar.gz
       - nuget-sources.json
     build-commands:
+      - 'tar -xzf source.tar.gz && rm source.tar.gz'
       - 'test -f src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
       - 'test -d nuget-sources'
       - >-

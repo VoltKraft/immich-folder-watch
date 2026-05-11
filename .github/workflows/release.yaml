@@ -190,7 +190,7 @@ jobs:
             "${{ needs.prepare-release.outputs.version }}" \
             --metainfo packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
 
-      - name: Tarball source for type:archive
+      - name: Create Flatpak source archive
         shell: bash
         run: |
           set -euo pipefail

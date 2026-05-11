@@ -141,7 +141,8 @@ python3 tools/update-appstream.py 2.5.0
 
 ## Flathub submission
 
-The in-repo release manifest uses a local `type: archive` source generated
-from `git ls-files` immediately before each build. For Flathub, use the
-separate manifest under `packaging/flatpak/flathub/`, which already uses
-`type: git` plus a pinned tag/commit and a sibling `nuget-sources.json`.
+The in-repo release manifest uses a local `source.tar.gz` file generated
+from `git ls-files` immediately before each build and unpacks it inside the
+build sandbox. For Flathub, use the separate manifest under
+`packaging/flatpak/flathub/`, which already uses `type: git` plus a pinned
+tag/commit and a sibling `nuget-sources.json`.
