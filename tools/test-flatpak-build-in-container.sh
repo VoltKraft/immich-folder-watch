@@ -57,7 +57,7 @@ git -C "${repo_root}" ls-files -z \
         --directory "${repo_root}" --null --files-from -
 
 tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
-    | grep -qx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
+    | grep -Fx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj' >/dev/null
 
 # Build runs as root inside the container — needed for flatpak --system
 # ops. The bind-mounted workspace ends up with root-owned build

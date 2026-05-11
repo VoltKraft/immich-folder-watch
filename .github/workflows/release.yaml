@@ -199,7 +199,7 @@ jobs:
                 --null --files-from -
 
           tar --list --gzip --file packaging/flatpak/source.tar.gz \
-            | grep -qx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj'
+            | grep -Fx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj' >/dev/null
 
       - name: Build + bundle Flatpak
         shell: bash
