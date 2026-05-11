@@ -33,6 +33,9 @@ Then, from the repo root:
 #    A stale nuget-sources.json silently re-installs the OLD packages,
 #    which has burned us repeatedly. If in doubt, regenerate.
 ./tools/generate-nuget-sources.sh
+python3 tools/stage-flatpak-nuget-sources.py \
+    packaging/flatpak/nuget-sources.json \
+    packaging/flatpak/nuget-sources
 
 # 2) Create the local source archive consumed by the Flatpak manifest.
 #    This uses tracked files from the working tree, so local edits to
@@ -62,9 +65,9 @@ flatpak run io.github.voltkraft.ImmichFolderWatch
 ```
 
 `packaging/flatpak/build-dir/`, `packaging/flatpak/.flatpak-builder/`,
-`packaging/flatpak/nuget-sources.json`, `packaging/flatpak/source.tar.gz`
-and `packaging/flatpak/repo/` are gitignored — they are regenerated on
-every build.
+`packaging/flatpak/nuget-sources.json`, `packaging/flatpak/nuget-sources/`,
+`packaging/flatpak/source.tar.gz` and `packaging/flatpak/repo/` are
+gitignored — they are regenerated on every build.
 
 > **If a previous build is misbehaving in unexpected ways**, nuke the
 > caches and start fresh. flatpak-builder happily reuses partial state
@@ -73,8 +76,11 @@ every build.
 >
 > ```bash
 > rm -f packaging/flatpak/nuget-sources.json packaging/flatpak/source.tar.gz
-> rm -rf .flatpak-builder packaging/flatpak/build-dir
+> rm -rf .flatpak-builder packaging/flatpak/build-dir packaging/flatpak/nuget-sources
 > ./tools/generate-nuget-sources.sh
+> python3 tools/stage-flatpak-nuget-sources.py \
+>     packaging/flatpak/nuget-sources.json \
+>     packaging/flatpak/nuget-sources
 > git ls-files -z \
 >   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
 >       --null --files-from -

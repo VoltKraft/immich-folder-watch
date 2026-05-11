@@ -82,6 +82,9 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
             org.freedesktop.Sdk//24.08 \
             org.freedesktop.Sdk.Extension.dotnet10//24.08
 
+        python3 tools/stage-flatpak-nuget-sources.py \
+            packaging/flatpak/nuget-sources.json \
+            packaging/flatpak/nuget-sources
         python3 tools/resolve-flatpak-manifest.py \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json

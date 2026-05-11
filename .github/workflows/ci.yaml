@@ -98,6 +98,7 @@ jobs:
         run: |
           printf '[]\n' > packaging/flatpak/nuget-sources.json
           tar --create --gzip --file packaging/flatpak/source.tar.gz --files-from /dev/null
+          mkdir -p packaging/flatpak/nuget-sources
           python3 tools/resolve-flatpak-manifest.py \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json

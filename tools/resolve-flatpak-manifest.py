@@ -40,7 +40,16 @@ def expand_module_sources(module: dict[str, Any], manifest_dir: Path) -> None:
     expanded_sources: list[dict[str, Any]] = []
     for source in sources:
         if isinstance(source, str):
-            expanded_sources.extend(load_source_fragment(manifest_dir / source))
+            if source == "nuget-sources.json":
+                expanded_sources.append(
+                    {
+                        "type": "dir",
+                        "path": "nuget-sources",
+                        "dest": "nuget-sources",
+                    }
+                )
+            else:
+                expanded_sources.extend(load_source_fragment(manifest_dir / source))
         elif isinstance(source, dict):
             expanded_sources.append(source)
         else:

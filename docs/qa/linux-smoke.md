@@ -72,15 +72,18 @@ Record outcome inline as `[PASS]`, `[FAIL: <one-line reason>]`, or
 Steps:
 1. From the repo root: `tools/generate-nuget-sources.sh` (regenerates
    the offline NuGet feed if csproj graph changed).
-2. `git ls-files -z | tar --create --gzip --file
+2. `python3 tools/stage-flatpak-nuget-sources.py
+   packaging/flatpak/nuget-sources.json
+   packaging/flatpak/nuget-sources`
+3. `git ls-files -z | tar --create --gzip --file
    packaging/flatpak/source.tar.gz --null --files-from -`
-3. `python3 tools/resolve-flatpak-manifest.py
+4. `python3 tools/resolve-flatpak-manifest.py
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
-4. `python3 tools/normalize-flatpak-manifest-paths.py
+5. `python3 tools/normalize-flatpak-manifest-paths.py
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
    --manifest-dir packaging/flatpak`
-5. `flatpak-builder --user --install --force-clean
+6. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
 

@@ -185,6 +185,12 @@ jobs:
       - name: Generate offline NuGet feed
         run: tools/generate-nuget-sources.sh
 
+      - name: Stage offline NuGet packages
+        run: |
+          python3 tools/stage-flatpak-nuget-sources.py \
+            packaging/flatpak/nuget-sources.json \
+            packaging/flatpak/nuget-sources
+
       - name: Inject AppStream release block
         run: |
           tools/update-appstream.py \
@@ -234,6 +240,8 @@ jobs:
               raise SystemExit("Resolved manifest does not unpack source.tar.gz from an absolute mounted path.")
           if not any(arg.startswith("--filesystem=/") and arg.endswith("/packaging/flatpak:ro") for arg in build_args):
               raise SystemExit("Resolved manifest does not mount packaging/flatpak into the build sandbox.")
+          if not any(command.startswith("rm -rf nuget-sources && cp -a /") for command in commands):
+              raise SystemExit("Resolved manifest does not copy mounted NuGet sources into the build dir.")
           PY
           # Keep flatpak-builder state on the same filesystem as the
           # workspace for ostree hardlinks, but outside the checkout so

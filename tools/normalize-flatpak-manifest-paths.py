@@ -20,6 +20,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def add_build_arg(module: dict, build_arg: str) -> None:
+    build_options = module.setdefault("build-options", {})
+    build_args = build_options.setdefault("build-args", [])
+    if build_arg not in build_args:
+        build_args.append(build_arg)
+
+
 def main() -> int:
     args = parse_args()
     manifest_dir = args.manifest_dir.resolve()
@@ -28,6 +35,7 @@ def main() -> int:
 
     missing_paths: list[Path] = []
     mounted_source_archive: Path | None = None
+    mounted_nuget_sources: Path | None = None
 
     for module in data.get("modules", []):
         normalized_sources = []
@@ -46,11 +54,7 @@ def main() -> int:
                 missing_paths.append(normalized)
 
             if normalized.name == "source.tar.gz":
-                build_options = module.setdefault("build-options", {})
-                build_args = build_options.setdefault("build-args", [])
-                source_mount = f"--filesystem={normalized.parent}:ro"
-                if source_mount not in build_args:
-                    build_args.append(source_mount)
+                add_build_arg(module, f"--filesystem={normalized.parent}:ro")
 
                 replaced_command = False
                 commands = module.get("build-commands", [])
@@ -74,6 +78,17 @@ def main() -> int:
                 mounted_source_archive = normalized
                 continue
 
+            if normalized.name == "nuget-sources":
+                add_build_arg(module, f"--filesystem={normalized}:ro")
+                commands = module.get("build-commands", [])
+                copy_command = f"rm -rf nuget-sources && cp -a {normalized} nuget-sources"
+                if copy_command not in commands:
+                    insert_at = 1 if commands and commands[0].startswith("tar -xzf ") else 0
+                    commands.insert(insert_at, copy_command)
+                module["build-commands"] = commands
+                mounted_nuget_sources = normalized
+                continue
+
             source["path"] = str(normalized)
             normalized_sources.append(source)
 
@@ -82,12 +97,16 @@ def main() -> int:
     if mounted_source_archive is None:
         raise SystemExit("Resolved Flatpak manifest does not contain source.tar.gz.")
 
+    if mounted_nuget_sources is None:
+        raise SystemExit("Resolved Flatpak manifest does not contain nuget-sources.")
+
     if missing_paths:
         missing = "\n".join(f"  - {path}" for path in missing_paths)
         raise SystemExit(f"Resolved Flatpak source path does not exist:\n{missing}")
 
     resolved_manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     print(f"Mounted Flatpak source archive: {mounted_source_archive}")
+    print(f"Mounted Flatpak NuGet sources: {mounted_nuget_sources}")
     return 0
 
 
