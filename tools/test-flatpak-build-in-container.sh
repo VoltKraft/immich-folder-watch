@@ -14,8 +14,9 @@
 #   - Pulls Fedora
 #   - Mounts the repo into /workspace
 #   - Installs flatpak-builder plus the freedesktop runtime/sdk/dotnet10
+#   - Resolves the manifest's external nuget-sources fragment
 #   - Runs the same flatpak-builder + flatpak build-bundle commands
-#     release.yaml runs, against the YAML manifest
+#     release.yaml runs, against the resolved JSON manifest
 #   - Leaves the .flatpak bundle at ./immich-folder-watch-<VERSION>.flatpak
 #
 # Exit code matches the build's; useful for `git bisect` runs.
@@ -80,6 +81,10 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
             org.freedesktop.Sdk//24.08 \
             org.freedesktop.Sdk.Extension.dotnet10//24.08
 
+        flatpak-builder --show-manifest \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+
         flatpak-builder \
             --repo=repo \
             --disable-rofiles-fuse \
@@ -91,7 +96,7 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
             --verbose \
             --state-dir .flatpak-builder \
             flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
         flatpak build-bundle \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             repo \

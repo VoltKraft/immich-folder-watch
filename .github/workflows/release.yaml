@@ -201,6 +201,12 @@ jobs:
           tar --list --gzip --file packaging/flatpak/source.tar.gz \
             | grep -Fx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj' >/dev/null
 
+      - name: Pre-resolve manifest
+        run: |
+          flatpak-builder --show-manifest \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+
       - name: Build + bundle Flatpak
         shell: bash
         env:
@@ -222,7 +228,7 @@ jobs:
             --verbose \
             --state-dir /__w/fb-state \
             flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
           flatpak build-bundle \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             repo \

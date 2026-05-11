@@ -39,12 +39,19 @@ git ls-files -z \
   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
       --null --files-from -
 
-# 3) Build + install into the user Flatpak repo
+# 3) Resolve the generated NuGet source fragment into a buildable JSON
+#    manifest. Directly building the YAML can leave sources unstaged with
+#    flatpak-builder versions that reject mixed object/string sources.
+flatpak-builder --show-manifest \
+    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+    > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+
+# 4) Build + install into the user Flatpak repo
 flatpak-builder --user --install --force-clean \
     packaging/flatpak/build-dir \
-    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
 
-# 4) Run it (from a terminal so log output is visible)
+# 5) Run it (from a terminal so log output is visible)
 flatpak run io.github.voltkraft.ImmichFolderWatch
 ```
 
@@ -65,9 +72,12 @@ every build.
 > git ls-files -z \
 >   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
 >       --null --files-from -
+> flatpak-builder --show-manifest \
+>     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+>     > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
 > flatpak-builder --user --install --force-clean \
 >     packaging/flatpak/build-dir \
->     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+>     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
 > ```
 
 ## Sandbox permissions

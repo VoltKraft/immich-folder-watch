@@ -74,9 +74,12 @@ Steps:
    the offline NuGet feed if csproj graph changed).
 2. `git ls-files -z | tar --create --gzip --file
    packaging/flatpak/source.tar.gz --null --files-from -`
-3. `flatpak-builder --user --install --force-clean
+3. `flatpak-builder --show-manifest
+   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
+   > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
+4. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
-   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml`
+   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
 
 Expected: build finishes without error, `flatpak list --user` lists
 `io.github.voltkraft.ImmichFolderWatch` at version 2.5.0. The bundle
