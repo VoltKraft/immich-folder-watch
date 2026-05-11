@@ -165,6 +165,9 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_ref }}
 
+      - name: Trust checkout directory for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
