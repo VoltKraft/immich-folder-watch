@@ -27,6 +27,7 @@ def main() -> int:
     data = json.loads(resolved_manifest.read_text(encoding="utf-8"))
 
     missing_paths: list[Path] = []
+    mounted_source_archive: Path | None = None
 
     for module in data.get("modules", []):
         normalized_sources = []
@@ -51,14 +52,26 @@ def main() -> int:
                 if source_mount not in build_args:
                     build_args.append(source_mount)
 
+                replaced_command = False
                 commands = module.get("build-commands", [])
-                module["build-commands"] = [
-                    command.replace(
+                rewritten_commands = []
+                for command in commands:
+                    rewritten = command.replace(
                         "tar -xzf source.tar.gz && rm source.tar.gz",
                         f"tar -xzf {normalized}",
                     )
-                    for command in commands
-                ]
+                    if rewritten != command:
+                        replaced_command = True
+                    rewritten_commands.append(rewritten)
+
+                if not replaced_command:
+                    raise SystemExit(
+                        "Resolved Flatpak manifest did not contain the expected "
+                        "'tar -xzf source.tar.gz && rm source.tar.gz' command."
+                    )
+
+                module["build-commands"] = rewritten_commands
+                mounted_source_archive = normalized
                 continue
 
             source["path"] = str(normalized)
@@ -66,11 +79,15 @@ def main() -> int:
 
         module["sources"] = normalized_sources
 
+    if mounted_source_archive is None:
+        raise SystemExit("Resolved Flatpak manifest does not contain source.tar.gz.")
+
     if missing_paths:
         missing = "\n".join(f"  - {path}" for path in missing_paths)
         raise SystemExit(f"Resolved Flatpak source path does not exist:\n{missing}")
 
     resolved_manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    print(f"Mounted Flatpak source archive: {mounted_source_archive}")
     return 0
 
 

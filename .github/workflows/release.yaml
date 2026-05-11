@@ -218,6 +218,22 @@ jobs:
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path("packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json").read_text(encoding="utf-8"))
+          module = next(module for module in data["modules"] if module["name"] == "immich-folder-watch")
+          commands = module["build-commands"]
+          build_args = module.get("build-options", {}).get("build-args", [])
+
+          if any(command == "tar -xzf source.tar.gz && rm source.tar.gz" for command in commands):
+              raise SystemExit("Resolved manifest still contains the unmounted source archive command.")
+          if not any(command.startswith("tar -xzf /") and command.endswith("/source.tar.gz") for command in commands):
+              raise SystemExit("Resolved manifest does not unpack source.tar.gz from an absolute mounted path.")
+          if not any(arg.startswith("--filesystem=/") and arg.endswith("/packaging/flatpak:ro") for arg in build_args):
+              raise SystemExit("Resolved manifest does not mount packaging/flatpak into the build sandbox.")
+          PY
           # Keep flatpak-builder state on the same filesystem as the
           # workspace for ostree hardlinks, but outside the checkout so
           # generated state can never be packed into the app source.
