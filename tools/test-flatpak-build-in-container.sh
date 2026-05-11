@@ -84,6 +84,9 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
         flatpak-builder --show-manifest \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
             > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+        python3 tools/normalize-flatpak-manifest-paths.py \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+            --manifest-dir packaging/flatpak
 
         flatpak-builder \
             --repo=repo \

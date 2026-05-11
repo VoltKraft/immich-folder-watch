@@ -45,6 +45,9 @@ git ls-files -z \
 flatpak-builder --show-manifest \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
     > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+python3 tools/normalize-flatpak-manifest-paths.py \
+    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+    --manifest-dir packaging/flatpak
 
 # 4) Build + install into the user Flatpak repo
 flatpak-builder --user --install --force-clean \
@@ -75,6 +78,9 @@ every build.
 > flatpak-builder --show-manifest \
 >     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
 >     > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+> python3 tools/normalize-flatpak-manifest-paths.py \
+>     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+>     --manifest-dir packaging/flatpak
 > flatpak-builder --user --install --force-clean \
 >     packaging/flatpak/build-dir \
 >     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json

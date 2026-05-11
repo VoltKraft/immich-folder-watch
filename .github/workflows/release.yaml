@@ -202,10 +202,15 @@ jobs:
             | grep -Fx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj' >/dev/null
 
       - name: Pre-resolve manifest
+        shell: bash
         run: |
+          set -euo pipefail
           flatpak-builder --show-manifest \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
             > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+          python3 tools/normalize-flatpak-manifest-paths.py \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+            --manifest-dir packaging/flatpak
 
       - name: Build + bundle Flatpak
         shell: bash

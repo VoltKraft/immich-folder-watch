@@ -77,7 +77,10 @@ Steps:
 3. `flatpak-builder --show-manifest
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
    > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
-4. `flatpak-builder --user --install --force-clean
+4. `python3 tools/normalize-flatpak-manifest-paths.py
+   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+   --manifest-dir packaging/flatpak`
+5. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
 
