@@ -57,14 +57,10 @@ modules:
   - name: immich-folder-watch
     buildsystem: simple
     sources:
-      # Release and local builds create this from tracked source files
-      # immediately before invoking flatpak-builder. The resolved manifest
-      # is normalized before build: this marker source is replaced with a
-      # read-only build sandbox mount, avoiding Flatpak source staging for
-      # the application tree while NuGet packages still use normal sources.
-      - type: file
-        path: source.tar.gz
-        dest-filename: source.tar.gz
+      # Keep sources as external fragments only. flatpak-builder 1.17.x
+      # warns and drops the entire sources list when structured source
+      # objects are mixed with string fragment imports here.
+      - source-archive-sources.json
       - nuget-sources.json
     build-commands:
       # Rewritten by tools/normalize-flatpak-manifest-paths.py to unpack

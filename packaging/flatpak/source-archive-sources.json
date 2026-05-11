@@ -1,0 +1,7 @@
+[
+  {
+    "type": "file",
+    "path": "source.tar.gz",
+    "dest-filename": "source.tar.gz"
+  }
+]

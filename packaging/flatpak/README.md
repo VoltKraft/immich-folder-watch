@@ -41,9 +41,9 @@ git ls-files -z \
 
 # 3) Resolve the generated NuGet source fragment into a buildable JSON
 #    manifest and normalize the local source archive into an explicit
-#    read-only build sandbox mount. Directly building the YAML can leave
-#    sources unstaged with flatpak-builder versions that reject mixed
-#    object/string sources or local archive sources.
+#    read-only build sandbox mount. The YAML keeps sources as fragment
+#    imports only because some flatpak-builder versions drop mixed
+#    object/string source lists.
 flatpak-builder --show-manifest \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
     > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
@@ -152,6 +152,10 @@ python3 tools/update-appstream.py 2.5.0
 The in-repo release manifest uses a local `source.tar.gz` file generated
 from `git ls-files` immediately before each build. The resolved manifest
 normalization mounts that archive read-only into the build sandbox and
-unpacks it there. For Flathub, use the separate manifest under
+unpacks it there. The archive marker lives in
+`source-archive-sources.json`, separate from generated `nuget-sources.json`,
+so `flatpak-builder --show-manifest` can expand both source fragments
+without mixed source-list deserialization issues. For Flathub, use the
+separate manifest under
 `packaging/flatpak/flathub/`, which already uses `type: git` plus a pinned
 tag/commit and a sibling `nuget-sources.json`.
