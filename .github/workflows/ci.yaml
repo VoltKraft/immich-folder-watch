@@ -81,7 +81,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             appstream \
             desktop-file-utils \
-            flatpak-builder
+            flatpak-builder \
+            python3-yaml
 
       - name: Validate AppStream metainfo
         # `--no-net` keeps the lint passing on PR/dev pushes where the
@@ -94,4 +95,12 @@ jobs:
         run: desktop-file-validate packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
 
       - name: Dry-parse Flatpak manifest
-        run: flatpak-builder --show-manifest packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml > /dev/null
+        run: |
+          printf '[]\n' > packaging/flatpak/nuget-sources.json
+          tar --create --gzip --file packaging/flatpak/source.tar.gz --files-from /dev/null
+          python3 tools/resolve-flatpak-manifest.py \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+          flatpak-builder --show-manifest \
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+            > /dev/null

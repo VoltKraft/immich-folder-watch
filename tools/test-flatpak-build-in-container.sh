@@ -72,7 +72,8 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
     bash -c '
         set -euo pipefail
         dnf install -y --setopt=install_weak_deps=False \
-            flatpak flatpak-builder ostree git tar gzip xz which
+            flatpak flatpak-builder ostree git tar gzip xz which \
+            python3 python3-pyyaml
         flatpak-builder --version
         flatpak remote-add --system --if-not-exists \
             flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -81,9 +82,9 @@ tar --list --gzip --file "${repo_root}/packaging/flatpak/source.tar.gz" \
             org.freedesktop.Sdk//24.08 \
             org.freedesktop.Sdk.Extension.dotnet10//24.08
 
-        flatpak-builder --show-manifest \
+        python3 tools/resolve-flatpak-manifest.py \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-            > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
         python3 tools/normalize-flatpak-manifest-paths.py \
             packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
             --manifest-dir packaging/flatpak

@@ -13,6 +13,8 @@ Prerequisites on the dev machine:
 ```bash
 sudo dnf install flatpak flatpak-builder           # Fedora
 # or: sudo apt install flatpak flatpak-builder     # Debian/Ubuntu
+sudo dnf install python3-pyyaml                    # Fedora
+# or: sudo apt install python3-yaml                # Debian/Ubuntu
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub \
   org.freedesktop.Platform//24.08 \
@@ -39,14 +41,13 @@ git ls-files -z \
   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
       --null --files-from -
 
-# 3) Resolve the generated NuGet source fragment into a buildable JSON
-#    manifest and normalize the local source archive into an explicit
-#    read-only build sandbox mount. The YAML keeps sources as fragment
-#    imports only because some flatpak-builder versions drop mixed
-#    object/string source lists.
-flatpak-builder --show-manifest \
+# 3) Resolve source fragments into a buildable JSON manifest and normalize
+#    the local source archive into an explicit read-only build sandbox
+#    mount. Avoid flatpak-builder --show-manifest here: some versions drop
+#    the sources list before our source fragments can be expanded.
+python3 tools/resolve-flatpak-manifest.py \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-    > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
 python3 tools/normalize-flatpak-manifest-paths.py \
     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
     --manifest-dir packaging/flatpak
@@ -77,9 +78,9 @@ every build.
 > git ls-files -z \
 >   | tar --create --gzip --file packaging/flatpak/source.tar.gz \
 >       --null --files-from -
-> flatpak-builder --show-manifest \
+> python3 tools/resolve-flatpak-manifest.py \
 >     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
->     > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+>     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
 > python3 tools/normalize-flatpak-manifest-paths.py \
 >     packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
 >     --manifest-dir packaging/flatpak

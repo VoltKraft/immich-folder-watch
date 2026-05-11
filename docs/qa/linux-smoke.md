@@ -74,9 +74,9 @@ Steps:
    the offline NuGet feed if csproj graph changed).
 2. `git ls-files -z | tar --create --gzip --file
    packaging/flatpak/source.tar.gz --null --files-from -`
-3. `flatpak-builder --show-manifest
+3. `python3 tools/resolve-flatpak-manifest.py
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
-   > packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
+   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
 4. `python3 tools/normalize-flatpak-manifest-paths.py
    packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
    --manifest-dir packaging/flatpak`
