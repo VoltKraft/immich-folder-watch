@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Regenerate packaging/flatpak/nuget-sources.json from the .NET projects.
+# Regenerate packaging/flatpak/flathub/nuget-sources.json from the .NET projects.
 #
 # Flathub forbids network access during the Flatpak build, so the
 # manifest cannot run `dotnet restore` itself. Instead we pre-collect
 # every NuGet package URL + sha512 into nuget-sources.json and reference
-# it as an additional source list inside the manifest. This script
-# (re)generates that file from the live solution; it is gitignored.
+# it as a sibling source list next to the Flathub manifest. This script
+# (re)generates that file from the live solution; it is gitignored here
+# and committed only into the per-app Flathub repo.
 #
 # Run from a Linux dev machine with .NET 10 SDK + python3 + git on PATH.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT="${REPO_ROOT}/packaging/flatpak/nuget-sources.json"
+OUTPUT="${REPO_ROOT}/packaging/flatpak/flathub/nuget-sources.json"
 PROJECT="${REPO_ROOT}/src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj"
 
 CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/immich-folder-watch"

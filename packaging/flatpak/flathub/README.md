@@ -1,13 +1,14 @@
 # Flathub submission + maintenance
 
-This directory holds the **Flathub-flavored** Flatpak manifest — the
-one that lives in the per-app `flathub/io.github.voltkraft.ImmichFolderWatch`
-repo Flathub creates on submission approval. It differs from
-`../io.github.voltkraft.ImmichFolderWatch.yaml` (the internal manifest)
-in two places:
+This directory holds the **Flathub** Flatpak manifest — the one that
+lives in the per-app `flathub/io.github.voltkraft.ImmichFolderWatch`
+repo Flathub creates on submission approval, and that Flathub builds on
+its own infrastructure. It is the only Flatpak manifest in the project.
 
-1. The source is `type: git` pinned to a release tag + commit SHA,
-   not `path: ../..`. Flathub builds offline from a stable ref.
+Key properties:
+
+1. The source is `type: git` pinned to a release tag + commit SHA.
+   Flathub builds offline from a stable ref.
 2. `nuget-sources.json` is expected as a sibling file (regenerated
    per release from the matching tag and committed into the per-app
    Flathub repo). Locally gitignored to avoid two copies drifting.

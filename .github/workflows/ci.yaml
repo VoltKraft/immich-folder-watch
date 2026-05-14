@@ -81,8 +81,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             appstream \
             desktop-file-utils \
-            flatpak-builder \
-            python3-yaml
+            flatpak-builder
 
       - name: Validate AppStream metainfo
         # `--no-net` keeps the lint passing on PR/dev pushes where the
@@ -94,14 +93,12 @@ jobs:
       - name: Validate desktop entry
         run: desktop-file-validate packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
 
-      - name: Dry-parse Flatpak manifest
+      - name: Dry-parse Flathub manifest
+        # The Flathub manifest is the only Flatpak manifest now — Flathub
+        # builds it on its own infrastructure. We do not build a .flatpak
+        # in CI; this step just confirms the manifest still parses.
         run: |
-          printf '[]\n' > packaging/flatpak/nuget-sources.json
-          tar --create --gzip --file packaging/flatpak/source.tar.gz --files-from /dev/null
-          mkdir -p packaging/flatpak/nuget-sources
-          python3 tools/resolve-flatpak-manifest.py \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
+          printf '[]\n' > packaging/flatpak/flathub/nuget-sources.json
           flatpak-builder --show-manifest \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
+            packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml \
             > /dev/null

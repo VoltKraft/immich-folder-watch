@@ -132,167 +132,17 @@ jobs:
           name: immich-folder-watch-windows-assets
           path: artifacts/release
 
-  build-flatpak:
-    name: Build Linux Flatpak Bundle
-    runs-on: ubuntu-latest
-    needs:
-      - prepare-release
-    if: needs.prepare-release.outputs.tag_exists != 'true'
-    # Plain Fedora container instead of the flatpak-github-actions image:
-    # Fedora tracks a recent flatpak-builder and lets this workflow install
-    # the exact runtime/sdk/extension set it needs. --privileged is still
-    # required for flatpak-builder's sandbox and ostree bind mounts.
-    container:
-      image: fedora:latest
-      options: --privileged
-
-    steps:
-      - name: Install flatpak toolchain
-        run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            flatpak flatpak-builder ostree git tar gzip xz which \
-            python3 python3-pyyaml
-          flatpak-builder --version
-          flatpak remote-add --system --if-not-exists \
-            flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --system -y --noninteractive flathub \
-            org.freedesktop.Platform//24.08 \
-            org.freedesktop.Sdk//24.08 \
-            org.freedesktop.Sdk.Extension.dotnet10//24.08
-
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.prepare-release.outputs.target_ref }}
-
-      - name: Trust checkout directory for Git
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props', 'global.json') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-
-      - name: Generate offline NuGet feed
-        run: tools/generate-nuget-sources.sh
-
-      - name: Stage offline NuGet packages
-        run: |
-          python3 tools/stage-flatpak-nuget-sources.py \
-            packaging/flatpak/nuget-sources.json \
-            packaging/flatpak/nuget-sources
-
-      - name: Inject AppStream release block
-        run: |
-          tools/update-appstream.py \
-            "${{ needs.prepare-release.outputs.version }}" \
-            --metainfo packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
-
-      - name: Create Flatpak source archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          git ls-files -z \
-            | tar --create --gzip --file packaging/flatpak/source.tar.gz \
-                --null --files-from -
-
-          tar --list --gzip --file packaging/flatpak/source.tar.gz \
-            | grep -Fx 'src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj' >/dev/null
-
-      - name: Pre-resolve manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/resolve-flatpak-manifest.py \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
-          python3 tools/normalize-flatpak-manifest-paths.py \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json \
-            --manifest-dir packaging/flatpak
-
-      - name: Build + bundle Flatpak
-        shell: bash
-        env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          data = json.loads(Path("packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json").read_text(encoding="utf-8"))
-          module = next(module for module in data["modules"] if module["name"] == "immich-folder-watch")
-          commands = module["build-commands"]
-          build_args = module.get("build-options", {}).get("build-args", [])
-
-          if any(command == "tar -xzf source.tar.gz && rm source.tar.gz" for command in commands):
-              raise SystemExit("Resolved manifest still contains the unmounted source archive command.")
-          if not any(command.startswith("tar -xzf /") and command.endswith("/source.tar.gz") for command in commands):
-              raise SystemExit("Resolved manifest does not unpack source.tar.gz from an absolute mounted path.")
-          if not any(arg.startswith("--filesystem=/") and arg.endswith("/packaging/flatpak:ro") for arg in build_args):
-              raise SystemExit("Resolved manifest does not mount packaging/flatpak into the build sandbox.")
-          if not any(command.startswith("rm -rf nuget-sources && cp -a /") for command in commands):
-              raise SystemExit("Resolved manifest does not copy mounted NuGet sources into the build dir.")
-          PY
-          # Keep flatpak-builder state on the same filesystem as the
-          # workspace for ostree hardlinks, but outside the checkout so
-          # generated state can never be packed into the app source.
-          mkdir -p /__w/fb-state
-          flatpak-builder \
-            --repo=repo \
-            --disable-rofiles-fuse \
-            --install-deps-from=flathub \
-            --force-clean \
-            --default-branch=master \
-            --arch=x86_64 \
-            --ccache \
-            --verbose \
-            --state-dir /__w/fb-state \
-            flatpak_app \
-            packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
-          flatpak build-bundle \
-            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
-            repo \
-            "immich-folder-watch-${VERSION}.flatpak" \
-            io.github.voltkraft.ImmichFolderWatch \
-            master
-
-      - name: Stage release asset
-        env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
-        run: |
-          mkdir -p artifacts/release
-          mv "immich-folder-watch-${VERSION}.flatpak" \
-             "artifacts/release/immich-folder-watch-${VERSION}.flatpak"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: immich-folder-watch-flatpak-assets
-          path: artifacts/release
-
   publish-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs:
       - prepare-release
       - build-windows
-      - build-flatpak
     if: |
       always() &&
       needs.prepare-release.result == 'success' &&
       needs.prepare-release.outputs.tag_exists != 'true' &&
-      needs.build-windows.result == 'success' &&
-      needs.build-flatpak.result == 'success'
+      needs.build-windows.result == 'success'
 
     steps:
       - name: Checkout
@@ -305,12 +155,6 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: immich-folder-watch-windows-assets
-          path: artifacts/release
-
-      - name: Download Flatpak artifacts
-        uses: actions/download-artifact@v7
-        with:
-          name: immich-folder-watch-flatpak-assets
           path: artifacts/release
 
       - name: Extract changelog entry

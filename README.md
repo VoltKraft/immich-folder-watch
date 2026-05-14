@@ -85,14 +85,21 @@ Upgrading from an older service-based install: the legacy service is stopped and
 
 ### Linux (Flatpak)
 
-The Flathub listing is in submission. Until it's live, install the Flatpak bundle attached to each [GitHub Release](https://github.com/VoltKraft/immich-folder-watch/releases):
+The Flathub listing is in submission. Once it's live, installation will be a single command:
 
 ```bash
-flatpak install --user immich-folder-watch-2.5.1.flatpak
-flatpak run io.github.voltkraft.ImmichFolderWatch
+flatpak install flathub io.github.voltkraft.ImmichFolderWatch
 ```
 
-Or build from source per [`packaging/flatpak/README.md`](./packaging/flatpak/README.md).
+Until then, build and install the Flatpak from source per [`packaging/flatpak/README.md`](./packaging/flatpak/README.md):
+
+```bash
+./tools/generate-nuget-sources.sh
+flatpak-builder --user --install --force-clean \
+    packaging/flatpak/build-dir \
+    packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml
+flatpak run io.github.voltkraft.ImmichFolderWatch
+```
 
 Tested live on Fedora 44 + GNOME 46 with the AppIndicator extension; other GNOME-based desktops and KDE Plasma 6 should work but the tray-icon path uses StatusNotifierItem and falls back to a Background-Apps banner where no SNI watcher is installed. Wayland and X11 are both supported.
 

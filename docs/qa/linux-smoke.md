@@ -1,5 +1,5 @@
 # Linux Smoke Tests — v2.5.0 Pre-Flathub QA
-fix(release): mount Flatpak source archive during build
+
 This is the manual checklist that gates v2.5.0. Phases 0–5 brought the
 Flatpak build to "compiles + packages cleanly + CI green"; Phase 6
 proves it actually works on real desktops. Run **every** test here on
@@ -71,29 +71,21 @@ Record outcome inline as `[PASS]`, `[FAIL: <one-line reason>]`, or
 
 Steps:
 1. From the repo root: `tools/generate-nuget-sources.sh` (regenerates
-   the offline NuGet feed if csproj graph changed).
-2. `python3 tools/stage-flatpak-nuget-sources.py
-   packaging/flatpak/nuget-sources.json
-   packaging/flatpak/nuget-sources`
-3. `git ls-files -z | tar --create --gzip --file
-   packaging/flatpak/source.tar.gz --null --files-from -`
-4. `python3 tools/resolve-flatpak-manifest.py
-   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.yaml
-   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
-5. `python3 tools/normalize-flatpak-manifest-paths.py
-   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json
-   --manifest-dir packaging/flatpak`
-6. `flatpak-builder --user --install --force-clean
+   the offline NuGet feed; writes
+   `packaging/flatpak/flathub/nuget-sources.json`).
+2. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
-   packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.resolved.json`
+   packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml`
 
 Expected: build finishes without error, `flatpak list --user` lists
-`io.github.voltkraft.ImmichFolderWatch` at version 2.5.0. The bundle
-size should be in the 80–200 MB range.
+`io.github.voltkraft.ImmichFolderWatch`. The bundle size should be in
+the 80–200 MB range.
 
-Notes: if NuGet feed is stale, build can mysteriously revert to old
-package versions — see `phase4_lessons.md` rule 1 (in chat memory) or
-the regenerate-nuget-sources reminder in `packaging/flatpak/README.md`.
+Notes: the manifest source is `type: git` pinned to a release tag, so
+this builds the tagged release — to smoke-test un-pushed changes, use
+the local-iteration note in `packaging/flatpak/README.md`. If the NuGet
+feed is stale, the build can mysteriously revert to old package
+versions — regenerate it (step 1).
 
 #### SMK-02 — Sandbox permissions match the manifest  `H`
 

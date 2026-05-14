@@ -1,21 +1,19 @@
 # Flatpak Notes
 
-Flatpak support is planned for a future milestone.
+`immich-folder-watch` is packaged as a Flatpak and distributed via
+**Flathub** (app ID `io.github.voltkraft.ImmichFolderWatch`).
 
-Current repository state:
+All Flatpak packaging lives under `packaging/flatpak/`:
 
-- Placeholder manifest at `packaging/flatpak/io.github.immich_folder_watch.yaml`
-- No active Flatpak workflow is currently wired into GitHub Actions
-- App-ID-aligned icon assets are generated into `artifacts/branding/flatpak/`
-  from the central `assets/branding/logo.svg`
+- [`packaging/flatpak/README.md`](../packaging/flatpak/README.md) —
+  building the Flatpak locally, the sandbox permission set, and branding
+  assets.
+- [`packaging/flatpak/flathub/README.md`](../packaging/flatpak/flathub/README.md)
+  — the Flathub submission and continuous-publishing flow.
 
-## Goals
-
-- Nextcloud-client style desktop integration
-- Sandboxed packaging and distribution via Flathub
-- Managed permissions for local folder access
-
-## Current Limitation
-
-The manifest is intentionally incomplete and marked as placeholder until runtime
-dependencies and packaging strategy are finalized.
+The app builds against the freedesktop runtime 24.08 + the .NET 10 SDK
+extension, runs entirely per-user (no daemon, no root), and accesses
+watch folders through the FileChooser / Documents portals. Flathub builds
+the app on its own infrastructure from the manifest under
+`packaging/flatpak/flathub/`; the project does not build a `.flatpak`
+bundle in CI.
