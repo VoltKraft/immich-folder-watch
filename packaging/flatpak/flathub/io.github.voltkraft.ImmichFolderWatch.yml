@@ -34,8 +34,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/VoltKraft/immich-folder-watch.git
-        tag: v2.5.0
-        commit: 7aef3905fd8eac6dd0128db0b70ad30be7a17e37
+        tag: v2.5.1
+        commit: 376c1ff603383591f57f762890bed0f1fd4ab987
         x-checker-data:
           type: json
           url: https://api.github.com/repos/VoltKraft/immich-folder-watch/releases/latest
