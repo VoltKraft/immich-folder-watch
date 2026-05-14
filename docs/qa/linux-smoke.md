@@ -639,10 +639,14 @@ list, not the blocker list.
 
 ## 6. After signing off
 
-1. Bump `Directory.Build.props` to 2.5.0 via
-   `tools/release/bump-version.sh 2.5.0`.
+1. Bump `Directory.Build.props` via
+   `tools/release/bump-version.sh <version>`.
 2. Fill in CHANGELOG.md release notes under the new heading.
-3. `git commit -m "release: v2.5.0"` on `main`.
-4. Push — `release.yaml` builds both `.msi` and `.flatpak` and
-   attaches to a GitHub Release tagged `v2.5.0`.
-5. Phase 7: open the Flathub PR with `tag: v2.5.0`.
+3. `python3 tools/update-appstream.py <version>` to refresh the
+   metainfo `<release>` block.
+4. `git commit -m "release: v<version>"` on `main`.
+5. Push — `release.yaml` builds the Windows MSI and attaches it to a
+   GitHub Release tagged `v<version>`.
+6. Linux ships via Flathub — see
+   `packaging/flatpak/flathub/README.md` for the submission and
+   continuous-publishing flow.

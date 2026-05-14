@@ -7,12 +7,14 @@
 # After running, fill in release notes under the new CHANGELOG heading,
 # review the diff, then commit on `main`. The release pipeline
 # (.github/workflows/release.yaml) picks up the new version on push to
-# main, builds .msi + .flatpak, and tags v<version>.
+# main, builds the Windows MSI, and tags v<version>. Linux ships via
+# Flathub (see packaging/flatpak/flathub/README.md), not this pipeline.
 #
-# This script does NOT touch packaging/flatpak/*.metainfo.xml. The
-# AppStream <release> block is regenerated from CHANGELOG.md at release
-# time by tools/update-appstream.py --metainfo, so a stale placeholder
-# in the metainfo on the working tree is harmless.
+# This script does NOT touch packaging/flatpak/*.metainfo.xml. After
+# filling in the CHANGELOG notes, run
+#   python3 tools/update-appstream.py <new-version>
+# to refresh the AppStream <release> block so the tagged release carries
+# accurate Flathub "What's New" metadata.
 
 set -euo pipefail
 
@@ -82,6 +84,7 @@ echo "Inserted '## [${NEW}] - ${TODAY}' below '## [Unreleased]' in CHANGELOG.md.
 echo
 echo "Next steps:"
 echo "  1. Fill in release notes under the new CHANGELOG heading."
-echo "  2. git diff Directory.Build.props CHANGELOG.md   # review"
-echo "  3. git commit -m \"release: v${NEW}\""
-echo "  4. git push origin main                           # triggers release.yaml"
+echo "  2. python3 tools/update-appstream.py ${NEW}   # refresh metainfo <release> block"
+echo "  3. git diff Directory.Build.props CHANGELOG.md packaging/flatpak/*.metainfo.xml"
+echo "  4. git commit -m \"release: v${NEW}\""
+echo "  5. git push origin main                       # triggers release.yaml (Windows MSI)"
