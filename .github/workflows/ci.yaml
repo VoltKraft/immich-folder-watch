@@ -88,10 +88,10 @@ jobs:
         # release-tag-pinned screenshot URL isn't live yet. Flathub's
         # own pipeline fetches screenshots at build time, when the
         # v<N> tag exists.
-        run: appstreamcli validate --no-net packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+        run: appstreamcli validate --no-net packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
 
       - name: Validate desktop entry
-        run: desktop-file-validate packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
+        run: desktop-file-validate packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop
 
       - name: Dry-parse Flathub manifest
         # The Flathub manifest is the only Flatpak manifest now — Flathub
@@ -100,5 +100,5 @@ jobs:
         run: |
           printf '[]\n' > packaging/flatpak/flathub/nuget-sources.json
           flatpak-builder --show-manifest \
-            packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml \
+            packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml \
             > /dev/null
