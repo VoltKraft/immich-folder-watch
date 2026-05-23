@@ -1,12 +1,12 @@
-# Linux Smoke Tests — v2.5.0 Pre-Flathub QA
+# Linux Smoke Tests — Pre-Flathub QA
 
-This is the manual checklist that gates v2.5.0. Phases 0–5 brought the
+This is the manual checklist that gates the Flathub submission. Phases 0–5 brought the
 Flatpak build to "compiles + packages cleanly + CI green"; Phase 6
 proves it actually works on real desktops. Run **every** test here on
-**both** target environments before tagging v2.5.0 and submitting to
+**both** target environments before tagging the release and submitting to
 Flathub.
 
-**High-severity failures block v1.0.** Medium-severity failures are
+**High-severity failures block Flathub submission.** Medium-severity failures are
 recorded but do not block.
 
 ## 1. Target environments
@@ -44,8 +44,8 @@ Once, before starting:
 
 3. **Sandbox-config sanity:**
    ```bash
-   flatpak --user uninstall io.github.voltkraft.ImmichFolderWatch 2>/dev/null
-   rm -rf ~/.var/app/io.github.voltkraft.ImmichFolderWatch
+   flatpak --user uninstall io.github.voltkraft.immich-folder-watch 2>/dev/null
+   rm -rf ~/.var/app/io.github.voltkraft.immich-folder-watch
    ```
    Each environment should start from zero so the "fresh install"
    path is genuinely fresh.
@@ -75,10 +75,10 @@ Steps:
    `packaging/flatpak/flathub/nuget-sources.json`).
 2. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
-   packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml`
+   packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml`
 
 Expected: build finishes without error, `flatpak list --user` lists
-`io.github.voltkraft.ImmichFolderWatch`. The bundle size should be in
+`io.github.voltkraft.immich-folder-watch`. The bundle size should be in
 the 80–200 MB range.
 
 Notes: the manifest source is `type: git` pinned to a release tag, so
@@ -90,7 +90,7 @@ versions — regenerate it (step 1).
 #### SMK-02 — Sandbox permissions match the manifest  `H`
 
 Steps:
-1. `flatpak info -m io.github.voltkraft.ImmichFolderWatch | sed -n
+1. `flatpak info -m io.github.voltkraft.immich-folder-watch | sed -n
    '/^\[Context\]/,/^$/p; /^\[Session Bus Policy\]/,/^$/p'`
 
 Expected: output is the INI translation of the manifest's
@@ -99,7 +99,7 @@ Expected: output is the INI translation of the manifest's
 ```
 [Context]
 shared=ipc;network;
-sockets=wayland;x11;
+sockets=x11;
 devices=dri;
 filesystems=xdg-pictures:ro;xdg-videos:ro;
 
@@ -107,28 +107,19 @@ filesystems=xdg-pictures:ro;xdg-videos:ro;
 org.freedesktop.Notifications=talk
 org.kde.StatusNotifierWatcher=talk
 org.kde.*=own
-org.freedesktop.portal.Desktop=talk
-org.freedesktop.portal.Documents=talk
-org.freedesktop.portal.Background=talk
 ```
 
 (The order of bus-policy lines is not deterministic.)
 
-`org.kde.*=own` is required so the SNI client can claim its own
-`org.kde.StatusNotifierItem-<pid>-<id>` bus name; xdg-dbus-proxy
-doesn't honour in-segment wildcards (`StatusNotifierItem-*` is not
-a valid pattern), so the broader `org.kde.*` namespace is the
-narrowest grant that actually matches.
-
 Forbidden lines (must NOT appear): `host` in `filesystems=`,
 `session-bus` in `sockets=`, `org.freedesktop.systemd1=talk`,
-anything else `=own` outside `org.kde.*`, anything `:rw` other than
-the implicit XDG dirs.
+anything else `=own`, `wayland` in `sockets=`, or anything `:rw` other
+than the implicit XDG dirs.
 
 #### SMK-03 — Cold launch from a terminal  `H`
 
 Steps:
-1. `flatpak run io.github.voltkraft.ImmichFolderWatch 2>&1 | tee /tmp/cold-launch.log`
+1. `flatpak run io.github.voltkraft.immich-folder-watch 2>&1 | tee /tmp/cold-launch.log`
 
 Expected: main window appears within ~3 s; the log shows portal
 probes and "App ready" but no exception. Closing the window leaves
@@ -152,8 +143,8 @@ the bundled Flatpak icon (not a generic gear).
 
 Steps:
 1. With the app already running, run `flatpak run
-   io.github.voltkraft.ImmichFolderWatch` from a second terminal.
-2. Inspect `~/.var/app/io.github.voltkraft.ImmichFolderWatch/.local/state/immich-folder-watch/logs/`
+   io.github.voltkraft.immich-folder-watch` from a second terminal.
+2. Inspect `~/.var/app/io.github.voltkraft.immich-folder-watch/.local/state/immich-folder-watch/logs/`
    for a "second instance handed off" line.
 
 Expected: the second invocation exits within ~1 s without opening a
@@ -210,7 +201,7 @@ persists; restart the app and confirm the values are still there
 
 Steps:
 1. Quit the app.
-2. Edit `~/.var/app/io.github.voltkraft.ImmichFolderWatch/config/immich-folder-watch/config.yaml`,
+2. Edit `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/config.yaml`,
    change a watch source path to `C:\Users\foo\Pictures`.
 3. Launch the app.
 
@@ -351,14 +342,9 @@ Steps:
 Expected: the tray icon is registered and behaves as above. Banner
 inside the app is silent (no "tray unavailable" text).
 
-Notes: the post-3.8 stack (`3.8.D` + `a17bbab` dispatcher filter +
-`254bdae` `--own-name=org.kde.*`) registers a real `Avalonia.Controls
-.TrayIcon` against the SNI watcher. On bare GNOME (no AppIndicator
-extension) the registration faults asynchronously with
-`ServiceUnknown`; the dispatcher filter catches it, IsTrayIconRegistered
-falls back to false, and SMK-18's banner path takes over. Watching
-this code path on a real KDE Plasma 6 session for the first time is
-explicitly part of the smoke pass.
+Notes: the Flathub manifest intentionally grants the broad KDE D-Bus own-name
+permission that Avalonia's SNI tray registration needs. This requires the
+`finish-args-own-name-wildcard-org.kde` linter exception before publication.
 
 #### SMK-18 — Background mode on bare GNOME (no AppIndicator)  `H`
 
@@ -421,7 +407,7 @@ context-menu items refresh too.
 
 Steps:
 1. Set system locale to `de_DE.UTF-8` (or the inverse if already DE).
-2. Wipe `~/.var/app/io.github.voltkraft.ImmichFolderWatch/`.
+2. Wipe `~/.var/app/io.github.voltkraft.immich-folder-watch/`.
 3. Launch.
 
 Expected: the app starts in the system's language by default; user
@@ -525,7 +511,7 @@ single-device behaviour.
 
 Steps:
 1. Run the app for a minute with some uploads.
-2. `ls "~/.var/app/io.github.voltkraft.ImmichFolderWatch/data/Immich Folder Watch/logs/"`
+2. `ls "~/.var/app/io.github.voltkraft.immich-folder-watch/data/Immich Folder Watch/logs/"`
 
 Expected: at least one rolling log file present, recent timestamp,
 non-empty content. Format matches the file logger from `Core`.
@@ -556,7 +542,7 @@ Steps:
    `Save & Apply` (the AppHost restarts and 3.8.B's per-target
    gating swaps `FileLoggerProvider` for `AddSystemdConsole`).
 2. Drop a test file into a watched source so an upload fires.
-3. `journalctl --user --since "2 min ago" -t io.github.voltkraft.ImmichFolderWatch.desktop --no-pager`
+3. `journalctl --user --since "2 min ago" -t io.github.voltkraft.immich-folder-watch.desktop --no-pager`
    (under Flatpak's portal-launcher the `_SYSLOG_IDENTIFIER` is the
    .desktop filename, not the project's short name — `-t
    immich-folder-watch` returns "No entries").
@@ -585,8 +571,8 @@ want to be thorough — should be empty).
 #### SMK-33 — Sandbox uninstall is clean  `H`
 
 Steps:
-1. `flatpak --user uninstall io.github.voltkraft.ImmichFolderWatch`
-2. `ls ~/.var/app/io.github.voltkraft.ImmichFolderWatch/`
+1. `flatpak --user uninstall io.github.voltkraft.immich-folder-watch`
+2. `ls ~/.var/app/io.github.voltkraft.immich-folder-watch/`
 
 Expected: uninstall succeeds; the data directory remains (Flatpak's
 default, intentional — user data is preserved across reinstalls).

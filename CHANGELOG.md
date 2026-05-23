@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-05-23
+
+### Changed
+- Renamed the Flatpak app ID to `io.github.voltkraft.immich-folder-watch`
+  so Flathub's GitHub app-ID URL check resolves to the upstream repository.
+- Updated the Flathub manifest to freedesktop runtime 25.08 and the .NET 10
+  SDK extension for 25.08.
+- Moved the Linux Flatpak packaging to X11/XWayland display access after
+  validating that the current Avalonia Linux backend still initializes X11,
+  and removed linter-blocked portal bus-name grants.
+- Restored the StatusNotifierItem tray permissions. The broad KDE D-Bus
+  own-name grant is required by Avalonia's current SNI implementation and
+  must be reviewed as a Flathub linter exception before publication.
+- Updated the Linux UI package set to Avalonia 12.0.3.
+
 ## [2.5.1] - 2026-05-14
 
 Release-infrastructure cut. 2.5.0 shipped Windows-only: the release
@@ -54,7 +69,7 @@ with auto-detect. Windows behavior is unchanged — same MSI, same Event Log
 integration, same upgrade path from 2.4.x.
 
 ### Added
-- **Linux Flatpak head** (`io.github.voltkraft.ImmichFolderWatch`) — Avalonia
+- **Linux Flatpak head** (`io.github.voltkraft.immich-folder-watch`) — Avalonia
   GUI on Wayland and X11, freedesktop runtime 24.08, .NET 10 SDK extension.
   Self-contained `linux-x64` publish.
 - **D-Bus FileChooser portal** for picking watch sources. Returns doc-portal
@@ -76,7 +91,7 @@ integration, same upgrade path from 2.4.x.
   banner with Background-Apps guidance if the SNI watcher is missing.
 - **journald log target** as the Linux default, mirroring EventLog on Windows.
   Uses the .NET systemd console formatter (priority-prefixed lines visible
-  via `journalctl --user -t io.github.voltkraft.ImmichFolderWatch.desktop`).
+  via `journalctl --user -t io.github.voltkraft.immich-folder-watch.desktop`).
   File target available too with rolling logs under
   `~/.var/app/<id>/data/Immich Folder Watch/logs/`.
 - **inotify pre-flight + Windows-config guard.** Clear startup errors when
@@ -121,7 +136,7 @@ integration, same upgrade path from 2.4.x.
   back to the Background-Apps banner.
 
 ### Notes
-- **App ID**: `io.github.voltkraft.ImmichFolderWatch`. Flathub listing
+- **App ID**: `io.github.voltkraft.immich-folder-watch`. Flathub listing
   follows separately via the maintainer-review process — until then,
   install the `.flatpak` bundle from this release with
   `flatpak install --user immich-folder-watch-2.5.0.flatpak`.

@@ -17,8 +17,8 @@
     <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
     <BrandWindowsIcon>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'windows', 'app.ico'))</BrandWindowsIcon>
     <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
-    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
-    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.png'))</BrandFlatpakPng>
     <ApplicationIcon>$(BrandWindowsIcon)</ApplicationIcon>
   </PropertyGroup>
 

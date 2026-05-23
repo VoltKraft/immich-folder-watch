@@ -10,8 +10,11 @@
     <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
     <BrandWindowsIcon>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'windows', 'app.ico'))</BrandWindowsIcon>
     <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
-    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
-    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.png'))</BrandFlatpakPng>
+    <BrandDotNetHost Condition="'$(DotNetHostPath)' != ''">$(DotNetHostPath)</BrandDotNetHost>
+    <BrandDotNetHost Condition="'$(BrandDotNetHost)' == '' and '$(OS)' == 'Windows_NT'">$([System.IO.Path]::GetFullPath('$(MSBuildBinPath)\..\..\dotnet.exe'))</BrandDotNetHost>
+    <BrandDotNetHost Condition="'$(BrandDotNetHost)' == '' and '$(OS)' != 'Windows_NT'">$([System.IO.Path]::GetFullPath('$(MSBuildBinPath)/../../dotnet'))</BrandDotNetHost>
   </PropertyGroup>
 
   <ItemGroup>
@@ -54,6 +57,6 @@
       with "system cannot find the file". $(TargetPath) resolves to
       the actual compiled DLL path, RID-subdir-aware.
     -->
-    <Exec Command="dotnet &quot;$(TargetPath)&quot; --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
+    <Exec Command="&quot;$(BrandDotNetHost)&quot; &quot;$(TargetPath)&quot; --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
   </Target>
 </Project>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.voltkraft.ImmichFolderWatch</id>
+  <id>io.github.voltkraft.immich-folder-watch</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-only</project_license>
 
@@ -15,7 +15,7 @@
     <p>
       Immich Folder Watch monitors local folders and automatically uploads
       new photos and videos to your Immich server. It runs as a per-user
-      desktop app with full Wayland and X11 support, talking to Immich over
+      desktop app with X11 and XWayland support, talking to Immich over
       its public HTTP API rather than touching the server's storage directly.
     </p>
     <p>Use cases:</p>
@@ -30,12 +30,12 @@
       <li>Per-folder sync modes: upload only new files, upload everything in the folder, or keep the folder bidirectionally in sync with its Immich album (additive — local files are never deleted).</li>
       <li>Optional per-folder album placement; missing albums are created automatically.</li>
       <li>Waits until files are fully written before upload; retries transient failures.</li>
-      <li>Realtime status via Socket.IO; live tray status (where the desktop supports it).</li>
+      <li>Realtime status via Socket.IO and desktop notifications.</li>
       <li>English and German UI with OS auto-detection and live language switching.</li>
     </ul>
   </description>
 
-  <launchable type="desktop-id">io.github.voltkraft.ImmichFolderWatch.desktop</launchable>
+  <launchable type="desktop-id">io.github.voltkraft.immich-folder-watch.desktop</launchable>
 
   <categories>
     <category>Graphics</category>
@@ -83,11 +83,28 @@
   </branding>
 
   <releases>
+    <release version="2.5.2" date="2026-05-23">
+      <description>
+        <p>
+          Updates the Flatpak packaging for Flathub submission: the app ID now
+          matches the GitHub repository URL, the manifest targets the
+          freedesktop 25.08 runtime, and the Linux UI is built with Avalonia 12.
+        </p>
+        <p>Packaging changes:</p>
+        <ul>
+          <li>Renamed the Flatpak ID to io.github.voltkraft.immich-folder-watch.</li>
+          <li>Removed static portal D-Bus permissions while keeping the
+              StatusNotifierItem permissions needed for tray integration.</li>
+          <li>Configured X11/XWayland display access, matching Avalonia's
+              current Linux backend.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.5.0" date="2026-05-10">
       <description>
         <p>
           The first Linux release of Immich Folder Watch. Avalonia GUI on
-          Wayland and X11, full feature parity with the Windows tray app:
+          X11 and XWayland, full feature parity with the Windows tray app:
           watch sources, batch upload, per-folder sync modes, album-rename
           propagation, Socket.IO realtime, and English/German UI with
           OS auto-detect.

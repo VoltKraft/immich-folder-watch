@@ -44,6 +44,7 @@ if ! command -v dotnet >/dev/null 2>&1; then
 fi
 
 require dotnet  "Install .NET 10 SDK (e.g. via https://dot.net/v1/dotnet-install.sh) or set DOTNET_ROOT to its install dir."
+require flatpak "Install Flatpak and the org.freedesktop.Sdk.Extension.dotnet10//25.08 runtime extension."
 require python3 "Install Python 3 (most distributions ship it as 'python3')."
 require git     "Install git."
 
@@ -67,8 +68,24 @@ mkdir -p "$(dirname "${OUTPUT}")"
 echo "Running flatpak-dotnet-generator.py against ${PROJECT}…"
 python3 "${GENERATOR}" \
   --dotnet 10 \
-  --freedesktop 24.08 \
+  --freedesktop 25.08 \
   --runtime=linux-x64 \
   "${OUTPUT}" "${PROJECT}"
+
+python3 - "${OUTPUT}" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fp:
+    sources = json.load(fp)
+
+if not sources:
+    raise SystemExit(
+        "ERROR: generated nuget-sources.json is empty. "
+        "Make sure flatpak, org.freedesktop.Sdk//25.08 and "
+        "org.freedesktop.Sdk.Extension.dotnet10//25.08 are installed."
+    )
+PY
 
 echo "Wrote ${OUTPUT}"

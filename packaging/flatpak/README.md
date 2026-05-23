@@ -1,20 +1,20 @@
 # Flatpak Packaging
 
 `immich-folder-watch` ships to Linux desktops as a Flatpak on **Flathub**.
-The app builds against the freedesktop runtime 24.08 + the .NET 10 SDK
+The app builds against the freedesktop runtime 25.08 + the .NET 10 SDK
 extension and installs the Avalonia head as a self-contained `linux-x64`
 publish.
 
-App ID: `io.github.voltkraft.ImmichFolderWatch`
+App ID: `io.github.voltkraft.immich-folder-watch`
 
 ## Manifest
 
 There is one Flatpak manifest, the Flathub one:
 
-- `flathub/io.github.voltkraft.ImmichFolderWatch.yml` — the source of
+- `flathub/io.github.voltkraft.immich-folder-watch.yml` — the source of
   truth. Its source is `type: git` pinned to a release tag + commit.
   This is the file that lives in the per-app
-  `flathub/io.github.voltkraft.ImmichFolderWatch` repo, which **Flathub
+  `flathub/io.github.voltkraft.immich-folder-watch` repo, which **Flathub
   builds on its own infrastructure**.
 
 We do **not** build a `.flatpak` bundle in CI — Flathub does the build.
@@ -29,9 +29,9 @@ Prerequisites on the dev machine (Fedora shown; Debian/Ubuntu in parens):
 sudo dnf install flatpak flatpak-builder    # apt install flatpak flatpak-builder
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub \
-  org.freedesktop.Platform//24.08 \
-  org.freedesktop.Sdk//24.08 \
-  org.freedesktop.Sdk.Extension.dotnet10//24.08
+  org.freedesktop.Platform//25.08 \
+  org.freedesktop.Sdk//25.08 \
+  org.freedesktop.Sdk.Extension.dotnet10//25.08
 ```
 
 Then, from the repo root:
@@ -51,10 +51,10 @@ Then, from the repo root:
 # 2) Build + install into the user Flatpak repo.
 flatpak-builder --user --install --force-clean \
     packaging/flatpak/build-dir \
-    packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml
+    packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml
 
 # 3) Run it (from a terminal so log output is visible).
-flatpak run io.github.voltkraft.ImmichFolderWatch
+flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
 Because the manifest source is `type: git` pinned to a release tag,
@@ -65,7 +65,7 @@ verify a release before submitting it to Flathub.
 
 To build your working tree instead of a pushed tag, temporarily replace
 the `type: git` source block in
-`flathub/io.github.voltkraft.ImmichFolderWatch.yml` with a local-dir
+`flathub/io.github.voltkraft.immich-folder-watch.yml` with a local-dir
 source, then build as above:
 
 ```yaml
@@ -95,7 +95,7 @@ regenerated on every build.
 > ./tools/generate-nuget-sources.sh
 > flatpak-builder --user --install --force-clean \
 >     packaging/flatpak/build-dir \
->     packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml
+>     packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml
 > ```
 
 ## Sandbox permissions
@@ -104,25 +104,29 @@ The manifest declares only the portals the app actually needs:
 
 | `finish-args` | What it enables |
 |---|---|
-| `--share=ipc` + `--socket=wayland` + `--socket=x11` | Display server access. Avalonia 11.3.x renders over XWayland on Wayland sessions; the `--socket=wayland` line is reserved for the future Wayland-native backend. |
+| `--share=ipc` + `--socket=x11` | X11/XWayland display access. Avalonia's current Linux backend initializes X11. |
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |
-| `--talk-name=org.kde.StatusNotifierWatcher` | Tray on KDE Plasma + AppIndicator-extended GNOME |
-| `--own-name=org.kde.*` | Lets the SNI client claim its own `org.kde.StatusNotifierItem-<pid>-<id>` bus name so the Watcher can call back for icon / menu / activate; without this Avalonia's tray registration faults with ServiceUnknown. xdg-dbus-proxy only honours subtree wildcards (`.*` after a full segment), so we have to grant the whole `org.kde.*` namespace — the narrowest pattern that actually matches the runtime-suffixed SNI name. |
-| `--talk-name=org.freedesktop.portal.Desktop` | FileChooser, Settings, Notification portals |
-| `--talk-name=org.freedesktop.portal.Documents` | Resolve doc-portal handles returned by the FileChooser portal; without it Avalonia's `TryGetLocalPath()` blocks on a D-Bus call the proxy refuses, freezing the UI thread |
-| `--talk-name=org.freedesktop.portal.Background` | Autostart consent + run-in-background |
+| `--talk-name=org.kde.StatusNotifierWatcher` | Detects and talks to the desktop StatusNotifierItem watcher for tray support |
+| `--own-name=org.kde.*` | Lets Avalonia's SNI client claim its runtime-generated `org.kde.StatusNotifierItem-<pid>-<id>` bus name |
 | `--filesystem=xdg-pictures:ro` + `--filesystem=xdg-videos:ro` | Picker preview only — actual watch I/O goes through doc-portal handles |
 
 Notably **not** granted: `--filesystem=host`, `flatpak-spawn --host`,
-`--talk-name=org.freedesktop.systemd1`, raw `--socket=session-bus`.
+`--talk-name=org.freedesktop.systemd1`, raw `--socket=session-bus`,
+or `--socket=wayland`.
+
+The `org.kde.*` own-name grant is intentionally broad and requires a
+Flathub linter exception (`finish-args-own-name-wildcard-org.kde`). Avalonia's
+current tray implementation generates SNI bus names dynamically and Flatpak's
+D-Bus proxy only supports subtree wildcards, so a narrower in-segment wildcard
+does not match the runtime name.
 
 Verify at runtime with:
 
 ```bash
-flatpak permissions io.github.voltkraft.ImmichFolderWatch
-flatpak info -M io.github.voltkraft.ImmichFolderWatch
+flatpak permissions io.github.voltkraft.immich-folder-watch
+flatpak info -M io.github.voltkraft.immich-folder-watch
 ```
 
 ## Branding assets
@@ -130,8 +134,8 @@ flatpak info -M io.github.voltkraft.ImmichFolderWatch
 `packaging/flatpak/icons/` holds the committed icons that get installed
 into `/app/share/icons/hicolor/`:
 
-- `scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg` — copy of `assets/branding/logo.svg`
-- `512x512/apps/io.github.voltkraft.ImmichFolderWatch.png` — 512px raster fallback
+- `scalable/apps/io.github.voltkraft.immich-folder-watch.svg` — copy of `assets/branding/logo.svg`
+- `512x512/apps/io.github.voltkraft.immich-folder-watch.png` — 512px raster fallback
 
 Both are produced by `tools/BrandAssetGen` from `assets/branding/logo.svg`;
 the artefacts under `artifacts/branding/flatpak/` are intermediate. Regenerate
@@ -141,21 +145,21 @@ after a logo change:
 ~/.dotnet/dotnet run --project tools/BrandAssetGen --configuration Release -- \
     --project-root "$(pwd)"
 cp assets/branding/logo.svg \
-   packaging/flatpak/icons/scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg
-cp artifacts/branding/flatpak/io.github.voltkraft.ImmichFolderWatch.png \
-   packaging/flatpak/icons/512x512/apps/io.github.voltkraft.ImmichFolderWatch.png
+   packaging/flatpak/icons/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
+cp artifacts/branding/flatpak/io.github.voltkraft.immich-folder-watch.png \
+   packaging/flatpak/icons/512x512/apps/io.github.voltkraft.immich-folder-watch.png
 ```
 
 ## Release-time AppStream block
 
 `tools/update-appstream.py <version>` reads the matching `## [<version>]`
 section from `CHANGELOG.md` and emits an AppStream `<release>` block into
-`io.github.voltkraft.ImmichFolderWatch.metainfo.xml`, filtering out items
+`io.github.voltkraft.immich-folder-watch.metainfo.xml`, filtering out items
 tagged `(Windows)` so the Linux-facing metadata only documents what Linux
 users will see. Run it before tagging a release:
 
 ```bash
-python3 tools/update-appstream.py 2.5.1
+python3 tools/update-appstream.py 2.5.2
 ```
 
 ## Flathub submission

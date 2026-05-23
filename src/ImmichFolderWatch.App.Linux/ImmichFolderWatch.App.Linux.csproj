@@ -12,15 +12,15 @@
     <BrandLogoSvg>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'assets', 'branding', 'logo.svg'))</BrandLogoSvg>
     <BrandOutputRoot>$([System.IO.Path]::Combine('$(BrandProjectRoot)', 'artifacts', 'branding'))</BrandOutputRoot>
     <BrandHeaderLogo>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'gui', 'header-logo.png'))</BrandHeaderLogo>
-    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.svg'))</BrandFlatpakSvg>
-    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.ImmichFolderWatch.png'))</BrandFlatpakPng>
+    <BrandFlatpakSvg>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.svg'))</BrandFlatpakSvg>
+    <BrandFlatpakPng>$([System.IO.Path]::Combine('$(BrandOutputRoot)', 'flatpak', 'io.github.voltkraft.immich-folder-watch.png'))</BrandFlatpakPng>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.14" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.14" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.14" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.14" />
+    <PackageReference Include="Avalonia" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3" />
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />

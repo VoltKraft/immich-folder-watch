@@ -11,9 +11,8 @@ namespace ImmichFolderWatch.App.Linux.Platform;
 /// (<c>/run/user/$UID/doc/&lt;token&gt;/...</c>) back to the original host
 /// path the token was issued against, by calling
 /// <c>org.freedesktop.portal.Documents.Info(token) → ay path, a{sa{u}} apps</c>.
-/// The Flatpak manifest already grants
-/// <c>--talk-name=org.freedesktop.portal.Documents</c>, so this works
-/// out of the box inside the sandbox.
+/// The document portal is available through Flatpak's portal handling; the
+/// manifest does not need a static D-Bus talk-name grant for it.
 /// </summary>
 public sealed class DocumentPortalClient
 {

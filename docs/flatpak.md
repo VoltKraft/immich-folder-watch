@@ -1,7 +1,7 @@
 # Flatpak Notes
 
 `immich-folder-watch` is packaged as a Flatpak and distributed via
-**Flathub** (app ID `io.github.voltkraft.ImmichFolderWatch`).
+**Flathub** (app ID `io.github.voltkraft.immich-folder-watch`).
 
 All Flatpak packaging lives under `packaging/flatpak/`:
 
@@ -11,7 +11,7 @@ All Flatpak packaging lives under `packaging/flatpak/`:
 - [`packaging/flatpak/flathub/README.md`](../packaging/flatpak/flathub/README.md)
   — the Flathub submission and continuous-publishing flow.
 
-The app builds against the freedesktop runtime 24.08 + the .NET 10 SDK
+The app builds against the freedesktop runtime 25.08 + the .NET 10 SDK
 extension, runs entirely per-user (no daemon, no root), and accesses
 watch folders through the FileChooser / Documents portals. Flathub builds
 the app on its own infrastructure from the manifest under

@@ -1,7 +1,7 @@
 # Flathub submission + maintenance
 
 This directory holds the **Flathub** Flatpak manifest — the one that
-lives in the per-app `flathub/io.github.voltkraft.ImmichFolderWatch`
+lives in the per-app `flathub/io.github.voltkraft.immich-folder-watch`
 repo Flathub creates on submission approval, and that Flathub builds on
 its own infrastructure. It is the only Flatpak manifest in the project.
 
@@ -15,13 +15,26 @@ Key properties:
 
 ## Pre-submission checklist (Phase 7.A)
 
-- [x] `appstreamcli validate --pedantic ../io.github.voltkraft.ImmichFolderWatch.metainfo.xml` — only the `cid-contains-uppercase-letter` pedantic note remains; Flathub tolerates it.
-- [x] `desktop-file-validate ../io.github.voltkraft.ImmichFolderWatch.desktop` — no warnings.
-- [x] `flatpak-builder --show-manifest io.github.voltkraft.ImmichFolderWatch.yml` parses cleanly when a sibling `nuget-sources.json` is present.
-- [x] Manifest `finish-args` reviewed against Flathub's "Permissions" guidance — every grant has a comment in the internal manifest explaining why we need it.
-- [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora 44 + GNOME 46.
-- [ ] `v2.5.0` tag pushed; `commit:` placeholder in the manifest replaced with the SHA `git rev-parse v2.5.0` reports.
-- [ ] Fresh `nuget-sources.json` generated against the v2.5.0 tag (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
+- [x] `appstreamcli validate --pedantic ../io.github.voltkraft.immich-folder-watch.metainfo.xml` — only the `cid-contains-uppercase-letter` pedantic note remains; Flathub tolerates it.
+- [x] `desktop-file-validate ../io.github.voltkraft.immich-folder-watch.desktop` — no warnings.
+- [x] `flatpak-builder --show-manifest io.github.voltkraft.immich-folder-watch.yml` parses cleanly when a sibling `nuget-sources.json` is present.
+- [x] Manifest `finish-args` reviewed against Flathub's "Permissions" guidance.
+- [ ] Flathub linter exception requested or approved for
+  `finish-args-own-name-wildcard-org.kde`; the tray requires Avalonia's
+  runtime-generated StatusNotifierItem bus name.
+  Suggested exception entry for Flathub's exception file:
+  ```json
+  {
+    "io.github.voltkraft.immich-folder-watch": {
+      "stable": {
+        "finish-args-own-name-wildcard-org.kde": "Avalonia's StatusNotifierItem tray integration owns a runtime-generated org.kde.StatusNotifierItem-<pid>-<id> bus name. The Flatpak D-Bus proxy only supports subtree wildcards, so org.kde.* is the narrowest pattern that matches the generated SNI name."
+      }
+    }
+  }
+  ```
+- [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
+- [ ] `v2.5.2` tag pushed; `commit:` in the submission manifest replaced with the SHA `git rev-parse v2.5.2` reports.
+- [ ] Fresh `nuget-sources.json` generated against the v2.5.2 tag (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
 
 ## Submission steps (Phase 7.B — user-action)
 
@@ -29,15 +42,13 @@ Key properties:
    GitHub. The first PR you open against `flathub/flathub` is gated
    on accepting the publisher agreement.
 2. **Fork** <https://github.com/flathub/flathub>.
-3. **Branch.** `git switch -c new-pr/io.github.voltkraft.ImmichFolderWatch`
-4. **Add the manifest + nuget-sources.** Place both files at:
-   - `apps/io.github.voltkraft.ImmichFolderWatch.yml` (or the
-     directory form `apps/io.github.voltkraft.ImmichFolderWatch/`
-     if Flathub's reviewer prefers — recent .NET app PRs use the
-     directory form to keep `nuget-sources.json` out of the apps
-     index root).
+3. **Branch.** `git switch -c add-io.github.voltkraft.immich-folder-watch`
+4. **Add the manifest + nuget-sources.** Place both files at the root of
+   the submission branch:
+   - `io.github.voltkraft.immich-folder-watch.yml`
+   - `nuget-sources.json`
 5. **Open the PR** against `flathub/flathub:new-pr`. Title format:
-   `Add io.github.voltkraft.ImmichFolderWatch`.
+   `Add io.github.voltkraft.immich-folder-watch`.
 6. **Review.** A Flathub maintainer (typically @razzeee, @bbhtt, or a
    bot) reviews within a few days. Common asks:
    - Tighten `finish-args` further (drop a permission, justify
@@ -45,7 +56,7 @@ Key properties:
    - Re-spell metainfo categories or drop redundant keywords.
    - Move screenshots out of the upstream repo to a CDN they prefer.
 7. **Merge.** After approval Flathub creates
-   `flathub/io.github.voltkraft.ImmichFolderWatch` automatically and
+   `flathub/io.github.voltkraft.immich-folder-watch` automatically and
    adds the submitter as a maintainer. Initial build runs immediately;
    the listing appears on flathub.org within an hour.
 
@@ -55,7 +66,7 @@ The manifest already declares `x-checker-data` against the GitHub
 Releases API. Once Flathub installs `flatpak-external-data-checker`
 on the per-app repo (it ships with their stock CI), each new tag we
 push to `VoltKraft/immich-folder-watch` will produce an auto-PR on
-`flathub/io.github.voltkraft.ImmichFolderWatch` updating `tag` +
+`flathub/io.github.voltkraft.immich-folder-watch` updating `tag` +
 `commit`.
 
 `nuget-sources.json` is not auto-updated by external-data-checker.
@@ -81,7 +92,7 @@ If the bot's PR breaks (e.g., GitHub Releases API schema change,
 expired GitHub Action token):
 
 1. Branch in the flathub-app repo.
-2. Edit `io.github.voltkraft.ImmichFolderWatch.yml`:
+2. Edit `io.github.voltkraft.immich-folder-watch.yml`:
    - `tag: v<NEW>`
    - `commit: <SHA from `git rev-parse v<NEW>`>`
 3. Replace `nuget-sources.json` per the steps above.
@@ -89,7 +100,7 @@ expired GitHub Action token):
 
 ## Files in this directory
 
-- `io.github.voltkraft.ImmichFolderWatch.yml` — Flathub manifest
+- `io.github.voltkraft.immich-folder-watch.yml` — Flathub manifest
   (committed; this file is the source of truth that flows to the
   flathub-app repo at submission time).
 - `nuget-sources.json` — gitignored; regenerated per release from

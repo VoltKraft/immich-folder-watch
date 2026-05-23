@@ -14,7 +14,7 @@ listing.
 Adding more is optional — Flathub allows up to 5-6 useful shots.
 For each new file:
 1. Drop the PNG into this directory.
-2. Add a `<screenshot>` block in `../io.github.voltkraft.ImmichFolderWatch.metainfo.xml`
+2. Add a `<screenshot>` block in `../io.github.voltkraft.immich-folder-watch.metainfo.xml`
    (only one entry should carry `type="default"`).
 3. Re-tag (or, before the first tag, just commit alongside the
    release).
@@ -45,9 +45,9 @@ spectacle --window --output=GUI.png
 ## Tagged URLs
 
 `metainfo.xml` references screenshots via
-`raw.githubusercontent.com/.../v<VERSION>/...`. After the v2.5.0 tag
-is pushed, the URLs resolve automatically — no CDN, no separate
-hosting.
+`raw.githubusercontent.com/.../v<VERSION>/...`. Use a tag whose
+screenshot URL already resolves before running the Flathub repo linter —
+no CDN, no separate hosting.
 
 ## Verifying
 
@@ -55,7 +55,7 @@ After PNGs are in place AND the matching tag is pushed:
 
 ```bash
 appstreamcli validate \
-    ../io.github.voltkraft.ImmichFolderWatch.metainfo.xml
+    ../io.github.voltkraft.immich-folder-watch.metainfo.xml
 ```
 
 `screenshot-image-not-found` warnings should disappear.

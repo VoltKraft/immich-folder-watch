@@ -88,7 +88,7 @@ Upgrading from an older service-based install: the legacy service is stopped and
 The Flathub listing is in submission. Once it's live, installation will be a single command:
 
 ```bash
-flatpak install flathub io.github.voltkraft.ImmichFolderWatch
+flatpak install flathub io.github.voltkraft.immich-folder-watch
 ```
 
 Until then, build and install the Flatpak from source per [`packaging/flatpak/README.md`](./packaging/flatpak/README.md):
@@ -97,17 +97,19 @@ Until then, build and install the Flatpak from source per [`packaging/flatpak/RE
 ./tools/generate-nuget-sources.sh
 flatpak-builder --user --install --force-clean \
     packaging/flatpak/build-dir \
-    packaging/flatpak/flathub/io.github.voltkraft.ImmichFolderWatch.yml
-flatpak run io.github.voltkraft.ImmichFolderWatch
+    packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml
+flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
-Tested live on Fedora 44 + GNOME 46 with the AppIndicator extension; other GNOME-based desktops and KDE Plasma 6 should work but the tray-icon path uses StatusNotifierItem and falls back to a Background-Apps banner where no SNI watcher is installed. Wayland and X11 are both supported.
+The Flatpak package runs through X11/XWayland because the current Avalonia
+Linux backend initializes X11. It falls back to the window and Background Apps
+flow where a tray icon is not available.
 
 Sandbox layout:
 
-- App ID: `io.github.voltkraft.ImmichFolderWatch`
-- Config: `~/.var/app/io.github.voltkraft.ImmichFolderWatch/config/immich-folder-watch/config.yaml`
-- Logs: journald (default — `journalctl --user -t io.github.voltkraft.ImmichFolderWatch.desktop`) or `~/.var/app/io.github.voltkraft.ImmichFolderWatch/data/Immich Folder Watch/logs/` when File logging is selected
+- App ID: `io.github.voltkraft.immich-folder-watch`
+- Config: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/config.yaml`
+- Logs: journald (default — `journalctl --user -t io.github.voltkraft.immich-folder-watch.desktop`) or `~/.var/app/io.github.voltkraft.immich-folder-watch/data/Immich Folder Watch/logs/` when File logging is selected
 - Autostart: managed via the desktop's Background portal — toggle inside the GUI
 
 Folder picking goes through the FreeDesktop FileChooser portal so the app only sees the folders you explicitly grant. The watcher resolves the doc-portal handles back to host paths via `org.freedesktop.portal.Documents`, and inotify-blind FUSE mounts are covered by a 5-second polling sweep.

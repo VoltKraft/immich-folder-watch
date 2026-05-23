@@ -2,7 +2,7 @@ using System.Reflection;
 using SkiaSharp;
 using Svg.Skia;
 
-const string FlatpakAppId = "io.github.voltkraft.ImmichFolderWatch";
+const string FlatpakAppId = "io.github.voltkraft.immich-folder-watch";
 ReadOnlySpan<int> iconSizes = [16, 24, 32, 48, 64, 128, 256];
 
 var options = Options.Parse(args);

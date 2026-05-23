@@ -1,6 +1,6 @@
-app-id: io.github.voltkraft.ImmichFolderWatch
+app-id: io.github.voltkraft.immich-folder-watch
 runtime: org.freedesktop.Platform
-runtime-version: "24.08"
+runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.dotnet10
@@ -15,16 +15,12 @@ build-options:
 
 finish-args:
   - --share=ipc
-  - --socket=wayland
   - --socket=x11
   - --share=network
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.*
-  - --talk-name=org.freedesktop.portal.Desktop
-  - --talk-name=org.freedesktop.portal.Documents
-  - --talk-name=org.freedesktop.portal.Background
   - --filesystem=xdg-pictures:ro
   - --filesystem=xdg-videos:ro
 
@@ -34,8 +30,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/VoltKraft/immich-folder-watch.git
-        tag: v2.5.1
-        commit: 376c1ff603383591f57f762890bed0f1fd4ab987
+        tag: v2.5.2
+        commit: REPLACE_WITH_V2_5_2_COMMIT_SHA
         x-checker-data:
           type: json
           url: https://api.github.com/repos/VoltKraft/immich-folder-watch/releases/latest
@@ -58,11 +54,11 @@ modules:
         --output ${FLATPAK_DEST}/lib/immich-folder-watch
       - install -dm755 ${FLATPAK_DEST}/bin
       - ln -sf /app/lib/immich-folder-watch/immich-folder-watch ${FLATPAK_DEST}/bin/immich-folder-watch
-      - install -Dm644 packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.desktop
-          ${FLATPAK_DEST}/share/applications/io.github.voltkraft.ImmichFolderWatch.desktop
-      - install -Dm644 packaging/flatpak/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
-          ${FLATPAK_DEST}/share/metainfo/io.github.voltkraft.ImmichFolderWatch.metainfo.xml
-      - install -Dm644 packaging/flatpak/icons/scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg
-          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.voltkraft.ImmichFolderWatch.svg
-      - install -Dm644 packaging/flatpak/icons/512x512/apps/io.github.voltkraft.ImmichFolderWatch.png
-          ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.voltkraft.ImmichFolderWatch.png
+      - install -Dm644 packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop
+          ${FLATPAK_DEST}/share/applications/io.github.voltkraft.immich-folder-watch.desktop
+      - install -Dm644 packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
+          ${FLATPAK_DEST}/share/metainfo/io.github.voltkraft.immich-folder-watch.metainfo.xml
+      - install -Dm644 packaging/flatpak/icons/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
+          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
+      - install -Dm644 packaging/flatpak/icons/512x512/apps/io.github.voltkraft.immich-folder-watch.png
+          ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.voltkraft.immich-folder-watch.png
