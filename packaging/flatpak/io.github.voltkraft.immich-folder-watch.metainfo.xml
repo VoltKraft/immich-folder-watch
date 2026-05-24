@@ -83,6 +83,20 @@
   </branding>
 
   <releases>
+    <release version="2.5.3" date="2026-05-24">
+      <description>
+        <p>
+          Disables the Avalonia StatusNotifierItem tray inside the Flathub
+          build after Flathub rejected the broad KDE D-Bus own-name grant
+          required by the current tray implementation.
+        </p>
+        <p>
+          The app now starts in window-only background mode and shows an
+          in-app banner explaining that tray support will return once a
+          Flatpak-safe tray backend is available.
+        </p>
+      </description>
+    </release>
     <release version="2.5.2" date="2026-05-23">
       <description>
         <p>
@@ -93,8 +107,9 @@
         <p>Packaging changes:</p>
         <ul>
           <li>Renamed the Flatpak ID to io.github.voltkraft.immich-folder-watch.</li>
-          <li>Removed static portal D-Bus permissions while keeping the
-              StatusNotifierItem permissions needed for tray integration.</li>
+          <li>Removed static portal D-Bus permissions and disabled the
+              StatusNotifierItem tray inside the Flathub build until a
+              Flatpak-safe tray backend is available.</li>
           <li>Configured X11/XWayland display access, matching Avalonia's
               current Linux backend.</li>
         </ul>

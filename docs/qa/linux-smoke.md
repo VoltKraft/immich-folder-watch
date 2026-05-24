@@ -101,20 +101,18 @@ Expected: output is the INI translation of the manifest's
 shared=ipc;network;
 sockets=x11;
 devices=dri;
-filesystems=xdg-pictures:ro;xdg-videos:ro;
 
 [Session Bus Policy]
 org.freedesktop.Notifications=talk
-org.kde.StatusNotifierWatcher=talk
-org.kde.*=own
 ```
 
 (The order of bus-policy lines is not deterministic.)
 
 Forbidden lines (must NOT appear): `host` in `filesystems=`,
 `session-bus` in `sockets=`, `org.freedesktop.systemd1=talk`,
-anything else `=own`, `wayland` in `sockets=`, or anything `:rw` other
-than the implicit XDG dirs.
+any `org.kde.*` StatusNotifierItem policy, anything `=own`, `wayland` in
+`sockets=`, `xdg-pictures`, `xdg-videos`, `home`, or any other static
+filesystem grant beyond Flatpak's implicit app-private XDG dirs.
 
 #### SMK-03 — Cold launch from a terminal  `H`
 
@@ -291,7 +289,7 @@ Reverse direction:
 Expected: the local folder either renames (preferred) OR a banner
 explains the mismatch with a "Reconcile" button. Specify which.
 
-### E. Notifications + tray
+### E. Notifications + background mode
 
 #### SMK-16 — No toast on success; failure surfaces in UI / log  `M`
 
@@ -320,31 +318,28 @@ ShowAsync yet. Hooking it up to FlushUploadsAsync's else-branch
 ("Upload failed for {FilePath}") plus a dedup window (one toast
 per asset+error class per minute) is a small follow-up commit.
 
-#### SMK-17 — Tray on KDE Plasma 6 + GNOME-w-AppIndicator  `H`
+#### SMK-17 — Flatpak tray-disabled banner  `H`
 
-Setup: either KDE Plasma 6, OR GNOME 46+ with the
-"AppIndicator and KStatusNotifierItem Support" extension enabled.
+Setup: any supported Flatpak desktop session.
 
 Steps:
-1. Launch app, wait for the StatusNotifierWatcher probe + tray
-   registration to settle (≤2 s).
-2. Look for an SNI tray icon in the system area (top-right on
-   GNOME, system tray on KDE).
-3. Left-click the icon → main window shows + activates.
-4. Close the window via the X button → window hides; the icon
-   remains.
-5. Left-click again → window re-appears.
-6. Right-click → context menu shows `Open` / `Quit` (separator
-   between them is fine).
-7. `Quit` → process exits; `pgrep -f immich-folder-watch` returns
+1. Launch app.
+2. Confirm the main window shows a banner explaining that tray
+   integration is disabled in the current Flathub build.
+3. Close the window via the X button; the process remains running.
+4. Launch the app again from the desktop launcher or terminal.
+5. Confirm the existing instance shows and activates the same window.
+6. Use the footer `Quit` button; `pgrep -f immich-folder-watch` returns
    nothing.
 
-Expected: the tray icon is registered and behaves as above. Banner
-inside the app is silent (no "tray unavailable" text).
+Expected: no tray icon is registered and there is no
+`StatusNotifierWatcher`/`org.kde.*` D-Bus policy in the installed Flatpak
+metadata. The banner keeps the close-to-background behavior discoverable
+until a Flatpak-safe tray backend is available.
 
-Notes: the Flathub manifest intentionally grants the broad KDE D-Bus own-name
-permission that Avalonia's SNI tray registration needs. This requires the
-`finish-args-own-name-wildcard-org.kde` linter exception before publication.
+Notes: Flathub no longer accepts the broad KDE D-Bus own-name grant required
+by Avalonia's current SNI backend for new apps, so the first Flathub release
+ships without tray support.
 
 #### SMK-18 — Background mode on bare GNOME (no AppIndicator)  `H`
 

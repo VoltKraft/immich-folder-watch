@@ -40,10 +40,9 @@ public sealed partial class App : Application
         {
             // Mirror the WPF App.xaml's ShutdownMode="OnExplicitShutdown".
             // Closing the main window then no longer terminates the
-            // process — MainWindow.OnClosing decides hide-vs-exit based
-            // on whether a tray icon is registered, and explicit Quit
-            // paths (footer button, tray context menu in 3.8.D, second
-            // instance handoff) call desktop.Shutdown(0) themselves.
+            // process; explicit Quit paths (footer button, tray context
+            // menu where enabled, second-instance handoff) call
+            // desktop.Shutdown(0) themselves.
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
             // PortalAutostartManager hands the Background portal a
@@ -51,13 +50,12 @@ public sealed partial class App : Application
             // that is the autostart entry GNOME executes after login.
             // Detect the flag here (and accept --autostart for parity
             // with the WPF AutostartManager.AutostartArgument) so we
-            // know to skip the implicit MainWindow.Show() and let the
-            // user discover the running app via the tray icon /
-            // Background Apps panel instead of having a window pop up
-            // in their face on every login.
+            // know to skip the implicit MainWindow.Show() when a tray
+            // entry point is available.
             var startHidden = (desktop.Args ?? Array.Empty<string>()).Any(a =>
                 string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase));
+            var isFlatpak = File.Exists("/.flatpak-info");
 
             // Avalonia 11.3.x lets unobserved task exceptions reach the
             // dispatcher and kill the process; route them to the logger
@@ -160,36 +158,46 @@ public sealed partial class App : Application
             var theme = provider.GetRequiredService<IThemeProvider>();
             theme.Initialize();
 
-            _trayHost = provider.GetRequiredService<AvaloniaTrayHost>();
-            _trayHost.OpenRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            var trayDisabledForFlatpak = isFlatpak;
+            if (trayDisabledForFlatpak)
             {
-                _mainWindow?.Show();
-                _mainWindow?.Activate();
-            });
-            _trayHost.QuitRequested += (_, _) => desktop.Shutdown(0);
-            _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                viewModel.TrayStatusMessage =
+                    ImmichFolderWatch.App.Shared.Resources.Strings.Tray_FlatpakUnsupported;
+            }
+            else
             {
-                viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
-                // If we started hidden (autostart) but the tray fails,
-                // surface the GUI so the user can see the app is alive
-                // — otherwise it'd be running invisibly with no entry
-                // point until they relaunched the .desktop file.
-                if (startHidden && _mainWindow is { IsVisible: false })
+                _trayHost = provider.GetRequiredService<AvaloniaTrayHost>();
+                _trayHost.OpenRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    _mainWindow.Show();
-                    _mainWindow.Activate();
-                }
-            });
-            _ = _trayHost.StartAsync(this);
+                    _mainWindow?.Show();
+                    _mainWindow?.Activate();
+                });
+                _trayHost.QuitRequested += (_, _) => desktop.Shutdown(0);
+                _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+                    // If we started hidden (autostart) but the tray fails,
+                    // surface the GUI so the user can see the app is alive
+                    // — otherwise it'd be running invisibly with no entry
+                    // point until they relaunched the .desktop file.
+                    if (startHidden && _mainWindow is { IsVisible: false })
+                    {
+                        _mainWindow.Show();
+                        _mainWindow.Activate();
+                    }
+                });
+                _ = _trayHost.StartAsync(this);
+            }
 
             // ClassicDesktopStyleApplicationLifetime.Start() auto-Show()s
             // whatever is assigned to MainWindow once we return from
             // OnFrameworkInitializationCompleted. To honour --background
-            // we simply leave it unassigned: ShutdownMode.OnExplicitShutdown
-            // keeps the dispatcher loop alive, and the tray-click /
-            // second-instance-handoff callbacks above will Show() the
-            // window when the user actually wants it.
-            if (!startHidden)
+            // we leave it unassigned only when a tray entry point can
+            // bring it back. The Flathub build currently disables the
+            // tray, so autostart launches visibly instead of stranding
+            // the process without a GUI entry point.
+            var shouldStartHidden = startHidden && !trayDisabledForFlatpak;
+            if (!shouldStartHidden)
             {
                 desktop.MainWindow = _mainWindow;
             }

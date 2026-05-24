@@ -19,22 +19,12 @@ Key properties:
 - [x] `desktop-file-validate ../io.github.voltkraft.immich-folder-watch.desktop` — no warnings.
 - [x] `flatpak-builder --show-manifest io.github.voltkraft.immich-folder-watch.yml` parses cleanly when a sibling `nuget-sources.json` is present.
 - [x] Manifest `finish-args` reviewed against Flathub's "Permissions" guidance.
-- [ ] Flathub linter exception requested or approved for
-  `finish-args-own-name-wildcard-org.kde`; the tray requires Avalonia's
-  runtime-generated StatusNotifierItem bus name.
-  Suggested exception entry for Flathub's exception file:
-  ```json
-  {
-    "io.github.voltkraft.immich-folder-watch": {
-      "stable": {
-        "finish-args-own-name-wildcard-org.kde": "Avalonia's StatusNotifierItem tray integration owns a runtime-generated org.kde.StatusNotifierItem-<pid>-<id> bus name. The Flatpak D-Bus proxy only supports subtree wildcards, so org.kde.* is the narrowest pattern that matches the generated SNI name."
-      }
-    }
-  }
-  ```
+- [x] StatusNotifierItem tray disabled for the Flathub build; the current
+  Avalonia tray backend requires a broad KDE D-Bus own-name grant that Flathub
+  no longer accepts for new apps.
 - [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
-- [ ] `v2.5.2` tag pushed; `commit:` in the submission manifest replaced with the SHA `git rev-parse v2.5.2` reports.
-- [ ] Fresh `nuget-sources.json` generated against the v2.5.2 tag (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
+- [ ] `v2.5.3` tag pushed; `commit:` in the submission manifest replaced with the SHA `git rev-parse v2.5.3` reports.
+- [ ] Fresh `nuget-sources.json` generated against the v2.5.3 tag (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
 
 ## Submission steps (Phase 7.B — user-action)
 

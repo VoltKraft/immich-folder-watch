@@ -39,7 +39,7 @@ public sealed partial class MainWindow : Window
 
         // Always hide on close: the FolderWatchWorker keeps running in
         // the background. Re-open paths:
-        // - System tray icon (KDE, GNOME with AppIndicator extension).
+        // - System tray icon where enabled outside the Flathub sandbox.
         // - Click the .desktop launcher again — UnixSingleInstance
         //   Coordinator catches the second-instance signal and shows
         //   the window.
@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
         //   BackgroundPortalClient.RequestBackgroundAsync has confirmed
         //   our background-mode opt-in.
         // The footer Quit button (and the tray Quit menu item where
-        // available) is the explicit exit path.
+        // available outside Flatpak) is the explicit exit path.
         e.Cancel = true;
         Hide();
 

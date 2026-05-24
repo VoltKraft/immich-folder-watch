@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.3] - 2026-05-24
+
+### Changed
+- Disabled the Avalonia StatusNotifierItem tray inside the Flathub build after Flathub rejected the broad KDE D-Bus own-name grant required by the current implementation; the app now shows a window banner explaining that tray support will return once a Flatpak-safe tray backend is available.
+
 ## [2.5.2] - 2026-05-23
 
 ### Changed

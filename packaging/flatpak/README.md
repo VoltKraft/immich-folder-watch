@@ -108,19 +108,16 @@ The manifest declares only the portals the app actually needs:
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |
-| `--talk-name=org.kde.StatusNotifierWatcher` | Detects and talks to the desktop StatusNotifierItem watcher for tray support |
-| `--own-name=org.kde.*` | Lets Avalonia's SNI client claim its runtime-generated `org.kde.StatusNotifierItem-<pid>-<id>` bus name |
-| `--filesystem=xdg-pictures:ro` + `--filesystem=xdg-videos:ro` | Picker preview only — actual watch I/O goes through doc-portal handles |
 
 Notably **not** granted: `--filesystem=host`, `flatpak-spawn --host`,
-`--talk-name=org.freedesktop.systemd1`, raw `--socket=session-bus`,
-or `--socket=wayland`.
-
-The `org.kde.*` own-name grant is intentionally broad and requires a
-Flathub linter exception (`finish-args-own-name-wildcard-org.kde`). Avalonia's
-current tray implementation generates SNI bus names dynamically and Flatpak's
-D-Bus proxy only supports subtree wildcards, so a narrower in-segment wildcard
-does not match the runtime name.
+`--filesystem=home`, `--filesystem=xdg-pictures`,
+`--filesystem=xdg-videos`, `--talk-name=org.freedesktop.systemd1`, raw
+`--socket=session-bus`, `--socket=wayland`, or StatusNotifierItem permissions.
+Folder access is intentionally portal-based for the first Flathub release. The
+current Avalonia tray backend needs a broad KDE D-Bus own-name grant that
+Flathub no longer accepts for new apps, so the Flathub build starts in
+window-only mode and shows an in-app banner until a Flatpak-safe tray backend
+is available.
 
 Verify at runtime with:
 
@@ -159,7 +156,7 @@ tagged `(Windows)` so the Linux-facing metadata only documents what Linux
 users will see. Run it before tagging a release:
 
 ```bash
-python3 tools/update-appstream.py 2.5.2
+python3 tools/update-appstream.py 2.5.3
 ```
 
 ## Flathub submission

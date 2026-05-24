@@ -11,7 +11,7 @@
 
 `Immich Folder Watch` is a desktop app for **Windows and Linux** that watches local folders and uploads newly created media to Immich automatically.
 
-It runs as a per-user tray app — no system service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a desktop before they land in Immich, this fills that gap without writing directly into Immich storage.
+It runs as a per-user desktop app — no system service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a desktop before they land in Immich, this fills that gap without writing directly into Immich storage.
 
 ---
 
@@ -34,7 +34,9 @@ It runs as a per-user tray app — no system service, no elevation on every chan
 
 That gives you a clean, low-maintenance ingestion path:
 
-- Desktop GUI and (where the desktop supports it) a tray icon
+- Desktop GUI with background operation; the Windows build includes a tray icon,
+  while the first Flathub build shows an in-app banner until a Flatpak-safe tray
+  backend is available
 - Per-user operation — each user runs their own configuration
 - Autostart on login (toggleable in the GUI; uses the Background portal on Linux)
 - Optional per-folder album placement in Immich
@@ -53,7 +55,7 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 - Creates missing albums automatically when album placement is configured
 - Per-folder **sync mode**: `Upload new files only` (default), `Upload everything in the folder`, or `Sync folder with album (bidirectional)`
 - Retries transient upload failures automatically
-- Runs as a per-user tray app with live sync status
+- Runs as a per-user desktop app with live sync status
 - Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
 - Localized UI (English, German) with OS auto-detect and live in-app language switching
@@ -102,8 +104,10 @@ flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
 The Flatpak package runs through X11/XWayland because the current Avalonia
-Linux backend initializes X11. It falls back to the window and Background Apps
-flow where a tray icon is not available.
+Linux backend initializes X11. The current Flathub build disables Avalonia's
+StatusNotifierItem tray backend because it requires a broad KDE D-Bus own-name
+permission that Flathub no longer grants to new apps; the app shows a window
+banner and can be reopened from the launcher or Background Apps.
 
 Sandbox layout:
 

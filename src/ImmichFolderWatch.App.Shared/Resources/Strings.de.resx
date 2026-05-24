@@ -76,6 +76,7 @@
 
   <data name="Tray_Open" xml:space="preserve"><value>GUI öffnen</value></data>
   <data name="Tray_Unavailable" xml:space="preserve"><value>Kein Tray-Icon verfügbar — beim Schließen des Fensters wird es nur ausgeblendet; der Watcher läuft im Hintergrund weiter. Wiederherstellen über den App-Launcher (Aktivitäten, Dock oder unter GNOME 46+ Schnelleinstellungen → Hintergrund-Apps). Zum tatsächlichen Beenden den Quit-Button verwenden. Unter KDE Plasma funktioniert der Tray out-of-the-box; unter GNOME ergänzt die Erweiterung "AppIndicator and KStatusNotifierItem Support" ein klassisches Tray-Icon.</value></data>
+  <data name="Tray_FlatpakUnsupported" xml:space="preserve"><value>Die Tray-Integration ist in dieser Flathub-Version deaktiviert, bis eine Flatpak-kompatible Tray-Implementierung verfügbar ist. Beim Schließen des Fensters wird es ausgeblendet; öffne es erneut über den App-Launcher oder GNOME Hintergrund-Apps. Zum Beenden den Quit-Button verwenden.</value></data>
   <data name="Tray_Restart" xml:space="preserve"><value>Neustart</value></data>
   <data name="Tray_Quit" xml:space="preserve"><value>Beenden</value></data>
 
