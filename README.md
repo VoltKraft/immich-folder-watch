@@ -6,7 +6,6 @@
 
 [![Platform Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
 [![Platform Linux](https://img.shields.io/badge/Platform-Linux%20(Flatpak)-FCC624?logo=linux&logoColor=black)](./packaging/flatpak/README.md)
-[![Version](https://img.shields.io/badge/Version-2.5.1-blue)](./CHANGELOG.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a desktop app for **Windows and Linux** that watches local folders and uploads newly created media to Immich automatically.
