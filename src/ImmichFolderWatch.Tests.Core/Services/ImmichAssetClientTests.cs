@@ -30,6 +30,10 @@ public sealed class ImmichAssetClientTests
                 {
                     Assert.Equal(HttpMethod.Post, request.Method);
                     Assert.EndsWith("/api/assets", request.PathAndQuery, StringComparison.Ordinal);
+                    Assert.Contains("filename", request.Body, StringComparison.Ordinal);
+                    Assert.DoesNotContain("deviceAssetId", request.Body, StringComparison.Ordinal);
+                    Assert.DoesNotContain("deviceId", request.Body, StringComparison.Ordinal);
+                    Assert.DoesNotContain("isArchived", request.Body, StringComparison.Ordinal);
                 },
                 request =>
                 {
@@ -98,6 +102,55 @@ public sealed class ImmichAssetClientTests
     }
 
     [Fact]
+    public async Task UploadAssetAsync_RetriesWithLegacyIdentifiersWhenModernUploadPayloadIsRejected()
+    {
+        var filePath = CreateTempFile();
+        try
+        {
+            var (client, handler) = CreateClient(
+                _ => CreateJsonResponse(HttpStatusCode.UnprocessableEntity, "{\"message\":[\"deviceAssetId must be a string\",\"deviceId must be a string\"]}"),
+                _ => CreateJsonResponse(HttpStatusCode.Created, "{\"id\":\"asset-1\"}"));
+
+            var result = await client.UploadAssetAsync(new UploadAssetRequest(filePath, "   "), CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal("asset-1", result.AssetId);
+            Assert.Equal(2, handler.Requests.Count);
+            Assert.All(handler.Requests, request => Assert.EndsWith("/api/assets", request.PathAndQuery, StringComparison.Ordinal));
+            Assert.DoesNotContain("deviceAssetId", handler.Requests[0].Body, StringComparison.Ordinal);
+            Assert.DoesNotContain("deviceId", handler.Requests[0].Body, StringComparison.Ordinal);
+            Assert.Contains("deviceAssetId", handler.Requests[1].Body, StringComparison.Ordinal);
+            Assert.Contains("deviceId", handler.Requests[1].Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAssetAsync_DoesNotRetryWithLegacyIdentifiersForUnrelatedValidationErrors()
+    {
+        var filePath = CreateTempFile();
+        try
+        {
+            var (client, handler) = CreateClient(
+                _ => CreateJsonResponse(HttpStatusCode.UnprocessableEntity, "{\"message\":\"Validation failed\"}"));
+
+            var result = await client.UploadAssetAsync(new UploadAssetRequest(filePath, "   "), CancellationToken.None);
+
+            Assert.False(result.IsSuccess);
+            Assert.Single(handler.Requests);
+            Assert.DoesNotContain("deviceAssetId", handler.Requests[0].Body, StringComparison.Ordinal);
+            Assert.DoesNotContain("deviceId", handler.Requests[0].Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task UploadAssetAsync_FailsWhenDuplicateAlbumNamesExist()
     {
         var filePath = CreateTempFile();
@@ -143,6 +196,40 @@ public sealed class ImmichAssetClientTests
         {
             File.Delete(filePath);
         }
+    }
+
+    [Fact]
+    public async Task GetAlbumAssetsAsync_UsesMetadataSearchBecauseV3AlbumResponsesDoNotContainAssets()
+    {
+        var (client, handler) = CreateClient(
+            _ => CreateJsonResponse(HttpStatusCode.OK, "[{\"id\":\"album-1\",\"albumName\":\"Screenshots\"}]"),
+            _ => CreateJsonResponse(HttpStatusCode.OK, "{\"assets\":{\"items\":[{\"id\":\"asset-1\",\"originalFileName\":\"photo.jpg\"}],\"nextPage\":null}}"));
+
+        var result = await client.GetAlbumAssetsAsync("Screenshots", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Collection(
+            result.Assets,
+            asset =>
+            {
+                Assert.Equal("asset-1", asset.Id);
+                Assert.Equal("photo.jpg", asset.OriginalFileName);
+            });
+        Assert.Collection(
+            handler.Requests,
+            request =>
+            {
+                Assert.Equal(HttpMethod.Get, request.Method);
+                Assert.EndsWith("/api/albums", request.PathAndQuery, StringComparison.Ordinal);
+            },
+            request =>
+            {
+                Assert.Equal(HttpMethod.Post, request.Method);
+                Assert.EndsWith("/api/search/metadata", request.PathAndQuery, StringComparison.Ordinal);
+                Assert.Contains("\"albumIds\":[\"album-1\"]", request.Body, StringComparison.Ordinal);
+                Assert.Contains("\"page\":1", request.Body, StringComparison.Ordinal);
+                Assert.Contains("\"size\":250", request.Body, StringComparison.Ordinal);
+            });
     }
 
     [Fact]

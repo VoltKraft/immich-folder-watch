@@ -80,28 +80,19 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
             return AlbumAssetsResult.Failure(null, BuildDuplicateAlbumError(normalized));
         }
 
-        var albumId = matches[0].Id;
-        var result = await SendAsync(HttpMethod.Get, ImmichApiRoutes.AlbumInfo(albumId), content: null, cancellationToken);
-        if (!result.HasHttpResponse)
-        {
-            return AlbumAssetsResult.Failure(null, result.ErrorMessage);
-        }
+        var searchResult = await SearchAssetsAsync(
+            page => new
+            {
+                albumIds = new[] { matches[0].Id },
+                page,
+                size = 250,
+            },
+            "The album asset search response could not be parsed.",
+            cancellationToken);
 
-        if (!result.IsSuccessStatusCode)
-        {
-            return AlbumAssetsResult.Failure(
-                result.StatusCode,
-                $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
-        }
-
-        if (string.IsNullOrWhiteSpace(result.Body))
-        {
-            return AlbumAssetsResult.Success(Array.Empty<AlbumAssetSummary>());
-        }
-
-        return TryParseAlbumAssets(result.Body, out var assets)
-            ? AlbumAssetsResult.Success(assets)
-            : AlbumAssetsResult.Failure(result.StatusCode, "The album detail response could not be parsed.");
+        return searchResult.IsSuccess
+            ? AlbumAssetsResult.Success(searchResult.Assets)
+            : AlbumAssetsResult.Failure(searchResult.StatusCode, searchResult.ErrorMessage);
     }
 
     public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken)
@@ -176,56 +167,19 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
     public async Task<UnassignedAssetsResult> GetUnassignedAssetsAsync(CancellationToken cancellationToken)
     {
-        var collected = new List<AlbumAssetSummary>();
-        var page = 1;
-
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var result = await SendJsonAsync(
-                HttpMethod.Post,
-                ImmichApiRoutes.SearchMetadata,
-                new
-                {
-                    isNotInAlbum = true,
-                    page,
-                    size = 250,
-                },
-                cancellationToken);
-
-            if (!result.HasHttpResponse)
+        var searchResult = await SearchAssetsAsync(
+            page => new
             {
-                return UnassignedAssetsResult.Failure(null, result.ErrorMessage);
-            }
+                isNotInAlbum = true,
+                page,
+                size = 250,
+            },
+            "The unassigned asset response could not be parsed.",
+            cancellationToken);
 
-            if (!result.IsSuccessStatusCode)
-            {
-                return UnassignedAssetsResult.Failure(
-                    result.StatusCode,
-                    $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
-            }
-
-            if (!TryParseSearchAssets(result.Body, out var pageAssets, out var hasNextPage))
-            {
-                return UnassignedAssetsResult.Failure(result.StatusCode, "The unassigned asset response could not be parsed.");
-            }
-
-            collected.AddRange(pageAssets);
-
-            if (!hasNextPage || pageAssets.Count == 0)
-            {
-                break;
-            }
-
-            page++;
-            if (page > 500)
-            {
-                break;
-            }
-        }
-
-        return UnassignedAssetsResult.Success(collected);
+        return searchResult.IsSuccess
+            ? UnassignedAssetsResult.Success(searchResult.Assets)
+            : UnassignedAssetsResult.Failure(searchResult.StatusCode, searchResult.ErrorMessage);
     }
 
     public async Task<AlbumMembershipUpdateResult> AddAssetsToAlbumAsync(string albumName, IReadOnlyList<string> assetIds, CancellationToken cancellationToken)
@@ -536,26 +490,32 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         {
             try
             {
-                using var content = CreateUploadContent(request);
-                using var response = await _httpClient.PostAsync(ImmichApiRoutes.AssetUpload, content, cancellationToken);
-                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-                if (response.IsSuccessStatusCode)
+                var uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: false, cancellationToken);
+                if (ShouldRetryUploadWithLegacyIdentifiers(uploadResponse.StatusCode, uploadResponse.Body))
                 {
-                    var assetId = TryExtractId(responseBody);
+                    _logger.LogDebug(
+                        "Upload without legacy Immich device identifiers failed with HTTP {StatusCode}. Retrying with legacy identifiers for older Immich servers.",
+                        (int)uploadResponse.StatusCode);
+
+                    uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: true, cancellationToken);
+                }
+
+                if (uploadResponse.IsSuccessStatusCode)
+                {
+                    var assetId = TryExtractId(uploadResponse.Body);
                     return UploadAssetResult.Success(assetId);
                 }
 
-                LogKnownHttpErrors(response.StatusCode, request.FilePath);
+                LogKnownHttpErrors(uploadResponse.StatusCode, request.FilePath);
 
-                if (IsTransientStatusCode(response.StatusCode) && attempt < _retrySettings.MaxAttempts)
+                if (IsTransientStatusCode(uploadResponse.StatusCode) && attempt < _retrySettings.MaxAttempts)
                 {
                     var delay = CalculateBackoff(attempt, _retrySettings.BaseDelayMilliseconds);
                     _logger.LogWarning(
                         "Upload attempt {Attempt}/{MaxAttempts} failed with HTTP {StatusCode}. Retrying in {DelayMs} ms for file {FilePath}.",
                         attempt,
                         _retrySettings.MaxAttempts,
-                        (int)response.StatusCode,
+                        (int)uploadResponse.StatusCode,
                         delay.TotalMilliseconds,
                         request.FilePath);
 
@@ -564,8 +524,8 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 }
 
                 return UploadAssetResult.Failure(
-                    response.StatusCode,
-                    $"HTTP {(int)response.StatusCode}: {TrimForLog(responseBody)}");
+                    uploadResponse.StatusCode,
+                    $"HTTP {(int)uploadResponse.StatusCode}: {TrimForLog(uploadResponse.Body)}");
             }
             catch (HttpRequestException ex) when (attempt < _retrySettings.MaxAttempts)
             {
@@ -601,6 +561,58 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         }
 
         return UploadAssetResult.Failure(null, "Upload failed after maximum retry attempts.");
+    }
+
+    private async Task<AssetSearchResult> SearchAssetsAsync(
+        Func<int, object> createPayload,
+        string parseErrorMessage,
+        CancellationToken cancellationToken)
+    {
+        var collected = new List<AlbumAssetSummary>();
+        var page = 1;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var result = await SendJsonAsync(
+                HttpMethod.Post,
+                ImmichApiRoutes.SearchMetadata,
+                createPayload(page),
+                cancellationToken);
+
+            if (!result.HasHttpResponse)
+            {
+                return AssetSearchResult.Failure(null, result.ErrorMessage);
+            }
+
+            if (!result.IsSuccessStatusCode)
+            {
+                return AssetSearchResult.Failure(
+                    result.StatusCode,
+                    $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
+            }
+
+            if (!TryParseSearchAssets(result.Body, out var pageAssets, out var hasNextPage))
+            {
+                return AssetSearchResult.Failure(result.StatusCode, parseErrorMessage);
+            }
+
+            collected.AddRange(pageAssets);
+
+            if (!hasNextPage || pageAssets.Count == 0)
+            {
+                break;
+            }
+
+            page++;
+            if (page > 500)
+            {
+                break;
+            }
+        }
+
+        return AssetSearchResult.Success(collected);
     }
 
     private async Task<AlbumResolutionResult> ResolveOrCreateAlbumAsync(string albumName, CancellationToken cancellationToken)
@@ -879,7 +891,25 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         }
     }
 
-    private static MultipartFormDataContent CreateUploadContent(UploadAssetRequest request)
+    private async Task<UploadHttpResult> SendUploadRequestAsync(
+        UploadAssetRequest request,
+        bool includeLegacyIdentifiers,
+        CancellationToken cancellationToken)
+    {
+        using var content = CreateUploadContent(request, includeLegacyIdentifiers);
+        using var response = await _httpClient.PostAsync(ImmichApiRoutes.AssetUpload, content, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        return new UploadHttpResult(response.StatusCode, responseBody);
+    }
+
+    private static bool ShouldRetryUploadWithLegacyIdentifiers(HttpStatusCode statusCode, string responseBody)
+    {
+        return statusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity
+            && (responseBody.Contains("deviceAssetId", StringComparison.OrdinalIgnoreCase)
+                || responseBody.Contains("deviceId", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static MultipartFormDataContent CreateUploadContent(UploadAssetRequest request, bool includeLegacyIdentifiers)
     {
         var fileInfo = new FileInfo(request.FilePath);
         var multipart = new MultipartFormDataContent();
@@ -894,12 +924,16 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
         multipart.Add(fileContent, "assetData", fileInfo.Name);
-        multipart.Add(new StringContent(CreateDeviceAssetId(fileInfo)), "deviceAssetId");
-        multipart.Add(new StringContent("immich-folder-watch"), "deviceId");
+        multipart.Add(new StringContent(fileInfo.Name), "filename");
+        if (includeLegacyIdentifiers)
+        {
+            multipart.Add(new StringContent(CreateDeviceAssetId(fileInfo)), "deviceAssetId");
+            multipart.Add(new StringContent("immich-folder-watch"), "deviceId");
+        }
+
         multipart.Add(new StringContent(fileInfo.CreationTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileCreatedAt");
         multipart.Add(new StringContent(fileInfo.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileModifiedAt");
         multipart.Add(new StringContent("false"), "isFavorite");
-        multipart.Add(new StringContent("false"), "isArchived");
 
         return multipart;
     }
@@ -1010,54 +1044,6 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
         albumArray = default;
         return false;
-    }
-
-    private static bool TryParseAlbumAssets(string responseBody, out List<AlbumAssetSummary> assets)
-    {
-        assets = new List<AlbumAssetSummary>();
-
-        try
-        {
-            using var document = JsonDocument.Parse(responseBody);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            if (!document.RootElement.TryGetProperty("assets", out var assetsElement)
-                || assetsElement.ValueKind != JsonValueKind.Array)
-            {
-                return true;
-            }
-
-            foreach (var element in assetsElement.EnumerateArray())
-            {
-                if (element.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                if (!TryExtractString(element, "id", out var id))
-                {
-                    continue;
-                }
-
-                if (!TryExtractString(element, "originalFileName", out var originalFileName)
-                    && !TryExtractString(element, "originalPath", out originalFileName))
-                {
-                    originalFileName = id;
-                }
-
-                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName)));
-            }
-
-            return true;
-        }
-        catch (JsonException)
-        {
-            assets = new List<AlbumAssetSummary>();
-            return false;
-        }
     }
 
     private static bool TryParseSearchAssets(string responseBody, out List<AlbumAssetSummary> assets, out bool hasNextPage)
@@ -1291,6 +1277,19 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
     private readonly record struct AlbumAssetRouteCandidate(HttpMethod Method, string Route, object Payload);
 
+    private readonly record struct AssetSearchResult(bool IsSuccess, IReadOnlyList<AlbumAssetSummary> Assets, HttpStatusCode? StatusCode, string ErrorMessage)
+    {
+        public static AssetSearchResult Success(IReadOnlyList<AlbumAssetSummary> assets)
+        {
+            return new AssetSearchResult(true, assets, null, string.Empty);
+        }
+
+        public static AssetSearchResult Failure(HttpStatusCode? statusCode, string errorMessage)
+        {
+            return new AssetSearchResult(false, Array.Empty<AlbumAssetSummary>(), statusCode, errorMessage);
+        }
+    }
+
     private readonly record struct AlbumsResult(bool IsSuccess, IReadOnlyList<AlbumSummary> Albums, HttpStatusCode? StatusCode, string ErrorMessage)
     {
         public static AlbumsResult Success(IReadOnlyList<AlbumSummary> albums)
@@ -1345,5 +1344,10 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         {
             return new ApiCallResult(null, string.Empty, errorMessage);
         }
+    }
+
+    private readonly record struct UploadHttpResult(HttpStatusCode StatusCode, string Body)
+    {
+        public bool IsSuccessStatusCode => StatusCode is >= HttpStatusCode.OK and < HttpStatusCode.MultipleChoices;
     }
 }
