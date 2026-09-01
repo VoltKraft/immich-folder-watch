@@ -4,6 +4,7 @@ public static class InstallationPaths
 {
     public const string ProductFolderName = "Immich Folder Watch";
     public const string ConfigFileName = "config.yaml";
+    public const string SyncDatabaseFileName = "sync-state.db";
     public const string LogsDirectoryName = "logs";
     public const string AutostartShortcutName = "Immich Folder Watch.lnk";
     public const string LegacyServiceName = "ImmichFolderWatch";
@@ -24,6 +25,8 @@ public static class InstallationPaths
     }
 
     public static string GetConfigPath() => Path.Combine(GetUserDataRoot(), ConfigFileName);
+
+    public static string GetSyncDatabasePath() => Path.Combine(GetUserDataRoot(), SyncDatabaseFileName);
 
     public static string GetLogDirectory() => Path.Combine(GetUserDataRoot(), LogsDirectoryName);
 

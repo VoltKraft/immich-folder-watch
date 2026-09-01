@@ -6,9 +6,13 @@ namespace ImmichFolderWatch.Core.Services;
 
 public sealed class UploadBatchQueue : IUploadBatchQueue
 {
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
+
     private readonly ConcurrentQueue<UploadAssetRequest> _queue = new();
 
-    private readonly ConcurrentDictionary<string, byte> _queuedPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _queuedPaths = new(PathComparer);
 
     public int Count => _queuedPaths.Count;
 
@@ -17,7 +21,14 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
         ArgumentNullException.ThrowIfNull(request);
 
         var normalizedPath = NormalizePath(request.FilePath);
-        var normalizedRequest = request with { FilePath = normalizedPath };
+        var normalizedSourcePath = string.IsNullOrWhiteSpace(request.SourcePath)
+            ? string.Empty
+            : NormalizePath(request.SourcePath);
+        var normalizedRequest = request with
+        {
+            FilePath = normalizedPath,
+            SourcePath = normalizedSourcePath,
+        };
 
         if (!_queuedPaths.TryAdd(normalizedPath, 0))
         {

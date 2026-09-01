@@ -3,10 +3,37 @@
 The app reads YAML configuration from a per-user location:
 
 - `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (Windows)
+- `$XDG_CONFIG_HOME/immich-folder-watch/config.yaml` (Linux), falling back to `~/.config/immich-folder-watch/config.yaml`
 
 Each Windows user has an independent config; the MSI does not create one automatically. The GUI writes this file on **Save and Apply**; on first launch without a config the GUI starts with empty fields.
 
 On upgrade from a pre-1.7 service-based install, the legacy `C:\ProgramData\Immich Folder Watch\config.yaml` is copied once into the installing user's `%LOCALAPPDATA%`.
+
+## Persistent Sync State
+
+The app automatically creates one `sync-state.db` beside `config.yaml`. This is
+a single per-user SQLite database shared by every entry in `watch.sources`; it is
+not created inside any watched folder and does not require a YAML setting.
+
+- Windows: `%LOCALAPPDATA%\Immich Folder Watch\sync-state.db`
+- Linux: `$XDG_CONFIG_HOME/immich-folder-watch/sync-state.db`, falling back to `~/.config/immich-folder-watch/sync-state.db`
+- Flatpak: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db`
+
+The database separates records by Immich account context and watched source so
+the same relative file name can safely exist in multiple sources. It stores file
+metadata, transfer results, Immich asset and album identifiers, and persistent
+deletion/move markers. It does not store the API key; account separation uses a
+SHA-256 identifier derived from the API URL and key.
+
+With an empty database, the first start performs the reconciliation required by
+each source's sync mode and records only confirmed results. Subsequent starts
+activate watching before reconciling local metadata in the background. Files
+whose size and UTC modification time still match are not hashed, uploaded, or
+downloaded. Changing an API URL or API key creates a different account context
+and therefore requires a new bootstrap for that context.
+
+Do not edit or copy the database while the app is running. Include it with the
+configuration in per-user backups if retaining transfer history is important.
 
 ## Example
 

@@ -83,65 +83,20 @@
   </branding>
 
   <releases>
-    <release version="2.5.3" date="2026-05-24">
+    <release version="2.6.0" date="2026-09-01">
       <description>
-        <p>
-          Disables the Avalonia StatusNotifierItem tray inside the Flathub
-          build after Flathub rejected the broad KDE D-Bus own-name grant
-          required by the current tray implementation.
-        </p>
-        <p>
-          The app now starts in window-only background mode and shows an
-          in-app banner explaining that tray support will return once a
-          Flatpak-safe tray backend is available.
-        </p>
-      </description>
-    </release>
-    <release version="2.5.2" date="2026-05-23">
-      <description>
-        <p>
-          Updates the Flatpak packaging for Flathub submission: the app ID now
-          matches the GitHub repository URL, the manifest targets the
-          freedesktop 25.08 runtime, and the Linux UI is built with Avalonia 12.
-        </p>
-        <p>Packaging changes:</p>
+        <p>Added:</p>
         <ul>
-          <li>Renamed the Flatpak ID to io.github.voltkraft.immich-folder-watch.</li>
-          <li>Removed static portal D-Bus permissions and disabled the
-              StatusNotifierItem tray inside the Flathub build until a
-              Flatpak-safe tray backend is available.</li>
-          <li>Configured X11/XWayland display access, matching Avalonia's
-              current Linux backend.</li>
+          <li>Added one shared, per-user SQLite synchronization database for all watched folders. The database is stored beside `config.yaml` and keeps account-, source-, and relative-path-specific transfer state without storing API keys.</li>
+          <li>Added background startup reconciliation using file size and UTC modification time so unchanged files are skipped without hashing or transfer.</li>
+          <li>Added persistent tombstones and move state so local and remote deletions or renames remain consistent across application restarts.</li>
         </ul>
-      </description>
-    </release>
-    <release version="2.5.0" date="2026-05-10">
-      <description>
-        <p>
-          The first Linux release of Immich Folder Watch. Avalonia GUI on
-          X11 and XWayland, full feature parity with the Windows tray app:
-          watch sources, batch upload, per-folder sync modes, album-rename
-          propagation, Socket.IO realtime, and English/German UI with
-          OS auto-detect.
-        </p>
-        <p>Linux highlights:</p>
+        <p>Changed:</p>
         <ul>
-          <li>D-Bus FileChooser portal for picking watch sources, with
-              host-path resolution via the Documents portal.</li>
-          <li>Polling sweep alongside FileSystemWatcher so inotify-blind
-              FUSE doc-portal mounts still detect new files and deletions.</li>
-          <li>StatusNotifierItem tray on KDE Plasma and on GNOME with the
-              AppIndicator extension; window-only banner fallback otherwise.</li>
-          <li>Background-portal opt-in (GNOME 46+) so closing the window
-              keeps the worker running.</li>
-          <li>journald log target as the Linux default, with a File option
-              for rolling on-disk logs.</li>
-          <li>Hidden-window autostart and a clean uninstall path.</li>
+          <li>Uploads are recorded only after the transfer, album assignment, and a final unchanged-file check succeed. Downloads are recorded only after the temporary file has been atomically renamed into place.</li>
+          <li>Corrupt synchronization databases are quarantined with a timestamp and replaced by a fresh database for a safe bootstrap.</li>
+          <li>Updated the SQLite dependency set to use the current SQLitePCLRaw native bundle explicitly.</li>
         </ul>
-        <p>
-          Windows MSI behavior is unchanged from 2.4.0 — same installer,
-          same Event Log integration, same upgrade path.
-        </p>
       </description>
     </release>
   </releases>

@@ -183,8 +183,10 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(config.Retry);
         builder.Services.AddSingleton(_syncStatusProvider);
+        builder.Services.AddSingleton<IPlatformPaths>(_platformPaths);
         builder.Services.AddSingleton<IFileReadinessChecker, FileReadinessChecker>();
         builder.Services.AddSingleton<IUploadBatchQueue, UploadBatchQueue>();
+        builder.Services.AddSingleton<ISyncStateStore, SqliteSyncStateStore>();
 
         var normalizedApiUrl = AppConfigValidator.EnsureTrailingSlash(config.Immich.ServerApiUrl);
 

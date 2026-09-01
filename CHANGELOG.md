@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-09-01
+
+### Added
+- Added one shared, per-user SQLite synchronization database for all watched folders. The database is stored beside `config.yaml` and keeps account-, source-, and relative-path-specific transfer state without storing API keys.
+- Added background startup reconciliation using file size and UTC modification time so unchanged files are skipped without hashing or transfer.
+- Added persistent tombstones and move state so local and remote deletions or renames remain consistent across application restarts.
+
+### Changed
+- Uploads are recorded only after the transfer, album assignment, and a final unchanged-file check succeed. Downloads are recorded only after the temporary file has been atomically renamed into place.
+- Corrupt synchronization databases are quarantined with a timestamp and replaced by a fresh database for a safe bootstrap.
+- Updated the SQLite dependency set to use the current SQLitePCLRaw native bundle explicitly.
+
 ## [2.5.3] - 2026-05-24
 
 ### Changed

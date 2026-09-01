@@ -4,6 +4,7 @@ using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Logging;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 using ImmichFolderWatch.Immich;
 using Microsoft.Extensions.DependencyInjection;
@@ -157,8 +158,10 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(config.Retry);
         builder.Services.AddSingleton(_syncStatusProvider);
+        builder.Services.AddSingleton<IPlatformPaths, WindowsPlatformPaths>();
         builder.Services.AddSingleton<IFileReadinessChecker, FileReadinessChecker>();
         builder.Services.AddSingleton<IUploadBatchQueue, UploadBatchQueue>();
+        builder.Services.AddSingleton<ISyncStateStore, SqliteSyncStateStore>();
 
         var normalizedApiUrl = AppConfigValidator.EnsureTrailingSlash(config.Immich.ServerApiUrl);
 
