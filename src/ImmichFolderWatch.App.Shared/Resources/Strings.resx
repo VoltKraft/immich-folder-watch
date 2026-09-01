@@ -103,6 +103,8 @@
   <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leave empty for no album</value></data>
   <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Advanced Watch Options</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Include subdirectories</value></data>
+  <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Permanently delete local files after successful upload</value></data>
+  <data name="UI_DeleteAfterUploadDescription" xml:space="preserve"><value>After Immich confirms the upload and album assignment, the local file is permanently deleted. This also removes previously verified uploads whose file has not changed.</value></data>
   <data name="UI_Extensions" xml:space="preserve"><value>Extensions</value></data>
   <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Excluded Directories</value></data>
   <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Excluded File Names</value></data>

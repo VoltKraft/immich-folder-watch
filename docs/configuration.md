@@ -51,6 +51,7 @@ watch:
     - path: "C:\\Users\\<user>\\Pictures\\Screenshots"
       albumName: "Screenshots" # optional; leave empty to upload without album placement
       syncMode: "uploadNew" # uploadNew (default) | uploadAll | sync
+      deleteAfterUpload: false # uploadNew/uploadAll only; permanent local deletion
       includeSubdirectories: true
       extensions:
         - ".avif"
@@ -135,6 +136,12 @@ localization:
   - Missing, blank, or unknown values normalize to `uploadNew`. Pre-2.3 configs therefore load unchanged and keep the previous upload-only behavior.
   - The mode is configurable per source in the Windows GUI (**Sync Mode** dropdown on each watched-folder card). The `Include subdirectories` checkbox is hidden when `sync` is selected, since the behavior is dictated by whether `albumName` is set.
   - When any source uses `syncMode: sync`, the GUI's **Verify Immich Access** check additionally requires the `asset.download`, `asset.read`, `asset.delete`, `albumAsset.delete`, `album.delete`, and `album.update` permissions on the API key (for pull, move, trash, remove-from-album, subfolder-delete → album-delete, and subfolder-rename → album-rename respectively). Upload-only configurations (`uploadNew` / `uploadAll`) do not need them.
+- `watch.sources[].deleteAfterUpload` is an opt-in inbox mode for upload-only sources:
+  - The default is `false`. When `true` with `uploadNew` or `uploadAll`, a local file is permanently deleted only after Immich confirms the upload and any requested album assignment, the file's size and UTC modification time are still unchanged, and the successful upload state has been written to `sync-state.db`.
+  - Enabling it also cleans up older verified uploads from the shared state database when their current fingerprint still matches. Existing `uploadNew` files without a verified database entry and files changed after upload are never deleted.
+  - A failed local deletion leaves the verified database entry intact. The worker retries during its five-second polling sweeps and after application restarts without uploading the file again.
+  - The setting is ignored for `sync`, even if manually set to `true` in YAML. It deletes only the local file and never removes the Immich asset.
+  - Deletion is permanent and does not use the operating system's recycle bin or trash.
 - In the Windows GUI, a newly added source suggests the folder name as the album name once; if you clear the field afterwards, it stays empty.
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.

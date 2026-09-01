@@ -295,6 +295,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(JoinLines(ExpectedDefaultImageExtensions), viewModel.Sources[0].ExtensionsText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.False(viewModel.Sources[0].IncludeSubdirectories);
+        Assert.False(viewModel.Sources[0].DeleteAfterUpload);
         Assert.False(viewModel.Sources[0].ShowExcludeDirectories);
         Assert.Equal(string.Empty, viewModel.Sources[0].ExcludeDirectoriesText);
         Assert.Equal(string.Empty, viewModel.Sources[0].ExcludeFileNamesText);
@@ -355,6 +356,7 @@ public sealed class MainWindowViewModelTests
                         Path = @"C:\Users\jan\Pictures\Screenshots",
                         AlbumName = "Screenshots",
                         IncludeSubdirectories = true,
+                        DeleteAfterUpload = true,
                         Extensions = [".png", ".jpg"],
                         ExcludeDirectories = ["private", "**/cache"],
                         ExcludeFileNames = ["Thumbs.db", "*.tmp"],
@@ -369,6 +371,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(JoinLines("Thumbs.db", "*.tmp"), viewModel.Sources[0].ExcludeFileNamesText);
         Assert.False(viewModel.Sources[0].ShowAdvancedOptions);
         Assert.True(viewModel.Sources[0].ShowExcludeDirectories);
+        Assert.True(viewModel.Sources[0].DeleteAfterUpload);
     }
 
     [Fact]
@@ -394,6 +397,7 @@ public sealed class MainWindowViewModelTests
             Path = @"C:\Users\jan\Pictures\Camera",
             AlbumName = "Camera",
             IncludeSubdirectories = false,
+            DeleteAfterUpload = true,
             ExtensionsText = ".heic\r\n.jpeg",
             ExcludeDirectoriesText = "**/cache",
             ExcludeFileNamesText = "*.tmp",
@@ -407,6 +411,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal([".heic", ".jpeg"], config.Watch.Sources[0].Extensions);
         Assert.Equal(["**/cache"], config.Watch.Sources[0].ExcludeDirectories);
         Assert.Equal(["*.tmp"], config.Watch.Sources[0].ExcludeFileNames);
+        Assert.True(config.Watch.Sources[0].DeleteAfterUpload);
     }
 
     [Fact]

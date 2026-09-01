@@ -81,6 +81,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
                         ExcludeDirectories = (source.ExcludeDirectories ?? new List<string>()).ToList(),
                         ExcludeFileNames = (source.ExcludeFileNames ?? new List<string>()).ToList(),
                         SyncMode = source.SyncMode,
+                        DeleteAfterUpload = source.DeleteAfterUpload,
                     })
                     .ToList(),
                 Extensions = config.Watch.Extensions.ToList(),
@@ -137,6 +138,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
                 ExcludeDirectories = NormalizePatterns(source.ExcludeDirectories),
                 ExcludeFileNames = NormalizePatterns(source.ExcludeFileNames),
                 SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
+                DeleteAfterUpload = source.DeleteAfterUpload,
             })
             .ToList();
 

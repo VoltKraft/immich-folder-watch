@@ -44,6 +44,8 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private readonly IFileReadinessChecker _fileReadinessChecker;
 
+    private readonly ILocalFileDeletionService _localFileDeletionService;
+
     private readonly IUploadBatchQueue _uploadBatchQueue;
 
     private readonly IImmichAssetClient _immichAssetClient;
@@ -65,6 +67,8 @@ public sealed class FolderWatchWorker : BackgroundService
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(PathComparer);
 
     private readonly ConcurrentDictionary<string, SyncStateEntry> _stateByPath = new(PathComparer);
+
+    private readonly ConcurrentDictionary<string, byte> _localDeleteFailures = new(PathComparer);
 
     private readonly ConcurrentDictionary<string, byte> _downloadsInProgress = new(PathComparer);
 
@@ -108,6 +112,7 @@ public sealed class FolderWatchWorker : BackgroundService
     public FolderWatchWorker(
         AppConfig config,
         IFileReadinessChecker fileReadinessChecker,
+        ILocalFileDeletionService localFileDeletionService,
         IUploadBatchQueue uploadBatchQueue,
         IImmichAssetClient immichAssetClient,
         ISyncStateStore syncStateStore,
@@ -117,6 +122,7 @@ public sealed class FolderWatchWorker : BackgroundService
     {
         _config = config;
         _fileReadinessChecker = fileReadinessChecker;
+        _localFileDeletionService = localFileDeletionService;
         _uploadBatchQueue = uploadBatchQueue;
         _immichAssetClient = immichAssetClient;
         _syncStateStore = syncStateStore;
@@ -350,11 +356,12 @@ public sealed class FolderWatchWorker : BackgroundService
             }
 
             _logger.LogInformation(
-                "Watching source {Path} (Album: '{AlbumName}', SyncMode: {SyncMode}, IncludeSubdirectories: {IncludeSubdirectories}).",
+                "Watching source {Path} (Album: '{AlbumName}', SyncMode: {SyncMode}, IncludeSubdirectories: {IncludeSubdirectories}, DeleteAfterUpload: {DeleteAfterUpload}).",
                 source.Path,
                 source.AlbumName,
                 syncMode,
-                effectiveIncludeSubdirectories);
+                effectiveIncludeSubdirectories,
+                context.DeleteAfterUpload);
         }
 
         if (_watchers.Count == 0)
@@ -568,9 +575,25 @@ public sealed class FolderWatchWorker : BackgroundService
                         && existing.Status == SyncEntryStatus.Synchronized
                         && fingerprint.Matches(existing))
                     {
+                        var albumReconciled = true;
                         if (!string.Equals(existing.AlbumName, albumName, StringComparison.Ordinal))
                         {
-                            await ReconcileAlbumAsync(context, normalized, albumName, existing, cancellationToken);
+                            albumReconciled = await ReconcileAlbumAsync(
+                                context,
+                                normalized,
+                                albumName,
+                                existing,
+                                cancellationToken);
+                        }
+
+                        if (albumReconciled
+                            && await TryDeleteVerifiedLocalFileAsync(
+                                context,
+                                normalized,
+                                existing,
+                                cancellationToken))
+                        {
+                            snapshot.Remove(normalized);
                         }
 
                         continue;
@@ -629,7 +652,7 @@ public sealed class FolderWatchWorker : BackgroundService
         _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
     }
 
-    private async Task ReconcileAlbumAsync(
+    private async Task<bool> ReconcileAlbumAsync(
         WatchSourceContext context,
         string fullPath,
         string albumName,
@@ -649,7 +672,7 @@ public sealed class FolderWatchWorker : BackgroundService
                     "Album-only reconciliation failed for {FilePath}: {Error}",
                     fullPath,
                     result.ErrorMessage ?? "unknown");
-                return;
+                return false;
             }
         }
 
@@ -660,6 +683,7 @@ public sealed class FolderWatchWorker : BackgroundService
         };
         await _syncStateStore.UpsertAsync(updated, cancellationToken);
         _stateByPath[fullPath] = updated;
+        return true;
     }
 
     private async Task PollDirectoriesForChangesAsync(CancellationToken cancellationToken)
@@ -674,6 +698,8 @@ public sealed class FolderWatchWorker : BackgroundService
 
         foreach (var context in _sources)
         {
+            await RetryPendingLocalDeletesAsync(context, cancellationToken);
+
             var sourceKey = NormalizePath(context.Source.Path);
             if (!_pollingBaseline.TryGetValue(sourceKey, out var known))
             {
@@ -1792,6 +1818,12 @@ public sealed class FolderWatchWorker : BackgroundService
                         {
                             _pathToAssetId[normalizedPath] = result.AssetId!;
                         }
+
+                        await TryDeleteVerifiedLocalFileAsync(
+                            context,
+                            normalizedPath,
+                            entry,
+                            cancellationToken);
                     }
 
                     _syncStatusProvider.ReportUploadCompleted(request.FilePath);
@@ -1918,6 +1950,92 @@ public sealed class FolderWatchWorker : BackgroundService
             SyncEntryStatus.Tombstone,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow + TombstoneTtl);
+
+    private async Task RetryPendingLocalDeletesAsync(
+        WatchSourceContext context,
+        CancellationToken cancellationToken)
+    {
+        if (!context.DeleteAfterUpload)
+        {
+            return;
+        }
+
+        var candidates = _stateByPath
+            .Where(entry => IsPathCoveredByContext(context, entry.Key))
+            .ToList();
+
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await TryDeleteVerifiedLocalFileAsync(
+                context,
+                candidate.Key,
+                candidate.Value,
+                cancellationToken);
+        }
+    }
+
+    private async Task<bool> TryDeleteVerifiedLocalFileAsync(
+        WatchSourceContext context,
+        string fullPath,
+        SyncStateEntry entry,
+        CancellationToken cancellationToken)
+    {
+        if (!context.DeleteAfterUpload
+            || entry.Direction != SyncTransferDirection.Upload
+            || entry.Status != SyncEntryStatus.Synchronized
+            || !TryGetFingerprint(fullPath, out var fingerprint)
+            || !fingerprint.Matches(entry))
+        {
+            return false;
+        }
+
+        try
+        {
+            _localFileDeletionService.Delete(fullPath);
+        }
+        catch (Exception ex)
+        {
+            if (_localDeleteFailures.TryAdd(fullPath, 0))
+            {
+                _logger.LogWarning(
+                    ex,
+                    "The verified upload succeeded, but the local file could not be deleted. Deletion will be retried: {FilePath}",
+                    fullPath);
+            }
+            else
+            {
+                _logger.LogDebug(
+                    ex,
+                    "Retrying deletion of a verified local upload failed: {FilePath}",
+                    fullPath);
+            }
+
+            return false;
+        }
+
+        await _syncStateStore.DeleteAsync(
+            _accountScope,
+            context.NormalizedRoot,
+            entry.RelativePath,
+            cancellationToken);
+
+        _pathToAssetId.TryRemove(fullPath, out _);
+        _stateByPath.TryRemove(fullPath, out _);
+        _debouncedFiles.TryRemove(fullPath, out _);
+        _localDeleteFailures.TryRemove(fullPath, out _);
+
+        var sourceKey = NormalizePath(context.Source.Path);
+        if (_pollingBaseline.TryGetValue(sourceKey, out var baseline))
+        {
+            baseline.Remove(fullPath);
+        }
+
+        _logger.LogInformation(
+            "Permanently deleted local file after its upload was verified: {FilePath}",
+            fullPath);
+        return true;
+    }
 
     private static string GetRelativePath(WatchSourceContext context, string fullPath)
     {
@@ -2112,6 +2230,8 @@ public sealed class FolderWatchWorker : BackgroundService
         public bool EffectiveIncludeSubdirectories { get; }
 
         public bool IsSyncMode => string.Equals(SyncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal);
+
+        public bool DeleteAfterUpload => !IsSyncMode && Source.DeleteAfterUpload;
 
         public bool RemoteDeleteSafe { get; set; } = true;
     }

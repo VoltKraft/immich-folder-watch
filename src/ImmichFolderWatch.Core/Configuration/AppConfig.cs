@@ -49,6 +49,8 @@ public sealed class WatchSourceSettings
     public List<string> ExcludeFileNames { get; set; } = new();
 
     public string SyncMode { get; set; } = WatchSourceSyncModes.UploadNew;
+
+    public bool DeleteAfterUpload { get; set; }
 }
 
 public static class WatchSourceSyncModes

@@ -31,6 +31,7 @@ public sealed class AppConfigWriterTests
                             Path = "../watch",
                             AlbumName = "Screenshots",
                             IncludeSubdirectories = true,
+                            DeleteAfterUpload = true,
                             Extensions =
                             {
                                 ".png",
@@ -84,6 +85,7 @@ public sealed class AppConfigWriterTests
             Assert.Equal("../watch", roundTrip.Watch.Sources[0].Path);
             Assert.Equal("Screenshots", roundTrip.Watch.Sources[0].AlbumName);
             Assert.True(roundTrip.Watch.Sources[0].IncludeSubdirectories);
+            Assert.True(roundTrip.Watch.Sources[0].DeleteAfterUpload);
             Assert.Equal([".png", ".jpg"], roundTrip.Watch.Sources[0].Extensions);
             Assert.Equal(["private", "**/cache"], roundTrip.Watch.Sources[0].ExcludeDirectories);
             Assert.Equal(["Thumbs.db", "*.tmp"], roundTrip.Watch.Sources[0].ExcludeFileNames);
@@ -95,6 +97,7 @@ public sealed class AppConfigWriterTests
             Assert.Equal(LogTargets.File, roundTrip.Logging.Target);
             Assert.Equal(logDirectory, roundTrip.Logging.LogDirectory);
             Assert.Contains("target: file", yaml, StringComparison.Ordinal);
+            Assert.Contains("deleteAfterUpload: true", yaml, StringComparison.Ordinal);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "watch")), normalized.Watch.Sources[0].Path);
             Assert.Equal([".png", ".jpg"], normalized.Watch.Sources[0].Extensions);
             Assert.Equal(Path.GetFullPath(logDirectory), normalized.Logging.LogDirectory);

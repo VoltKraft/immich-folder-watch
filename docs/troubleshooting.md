@@ -45,6 +45,14 @@
 - Windows path: `%LOCALAPPDATA%\Immich Folder Watch\sync-state.db`.
 - Linux path: `$XDG_CONFIG_HOME/immich-folder-watch/sync-state.db`, or `~/.config/immich-folder-watch/sync-state.db` when `XDG_CONFIG_HOME` is unset. Flatpak maps this to `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db` on the host.
 
+## Verified uploads are not deleted locally
+
+- Confirm `watch.sources[].deleteAfterUpload` is `true` and the source uses `uploadNew` or `uploadAll`. The option is intentionally ignored for `sync` sources.
+- Deletion happens only after upload and album assignment succeed, the successful state is persisted, and the current file size and UTC modification time still match. A file changed during or after upload is preserved.
+- Files that already existed in an `uploadNew` source but have no verified upload entry in `sync-state.db` are preserved.
+- Check write/delete permissions on the watched folder. A deletion failure keeps the verified state and is retried during five-second polling sweeps and after restart without another upload.
+- Local deletion is permanent; the file is not moved to the desktop recycle bin or trash. The corresponding Immich asset is not deleted.
+
 ## Logs
 
 - Console logs include timestamps and structured fields.

@@ -156,7 +156,8 @@ tagged `(Windows)` so the Linux-facing metadata only documents what Linux
 users will see. Run it before tagging a release:
 
 ```bash
-python3 tools/update-appstream.py 2.6.1
+python3 tools/update-appstream.py 2.7.0 \
+    --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
 ```
 
 ## Flathub submission

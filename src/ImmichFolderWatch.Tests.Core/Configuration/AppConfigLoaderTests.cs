@@ -48,6 +48,7 @@ logging:
             Assert.Single(config.Watch.Sources);
             Assert.Equal("Screenshots", config.Watch.Sources[0].AlbumName);
             Assert.True(config.Watch.Sources[0].IncludeSubdirectories);
+            Assert.False(config.Watch.Sources[0].DeleteAfterUpload);
             Assert.Contains(".png", config.Watch.Sources[0].Extensions);
             Assert.Contains(".jpg", config.Watch.Sources[0].Extensions);
             Assert.Empty(config.Watch.Extensions);
@@ -58,6 +59,43 @@ logging:
             Assert.Equal(250, config.Retry.BaseDelayMilliseconds);
             Assert.Equal("Debug", config.Logging.Level);
             Assert.Equal(Path.GetFullPath(Path.Combine(tempRoot.FullName, "logs")), config.Logging.LogDirectory);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Load_PreservesDeleteAfterUpload()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-delete-after-upload-");
+
+        try
+        {
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            var yaml = """
+immich:
+  serverApiUrl: "https://immich.example.com/api"
+  apiKey: "demo-key"
+watch:
+  sources:
+    - path: "watch"
+      syncMode: "uploadAll"
+      deleteAfterUpload: true
+      extensions:
+        - ".jpg"
+logging:
+  level: "Information"
+  logDirectory: "logs"
+""";
+            File.WriteAllText(configPath, yaml);
+
+            var config = new AppConfigLoader().LoadForEditing(configPath);
+            var runtime = AppConfigLoader.NormalizeForRuntime(config, tempRoot.FullName);
+
+            Assert.True(config.Watch.Sources[0].DeleteAfterUpload);
+            Assert.True(runtime.Watch.Sources[0].DeleteAfterUpload);
         }
         finally
         {

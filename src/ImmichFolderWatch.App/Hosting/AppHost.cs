@@ -160,6 +160,7 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddSingleton(_syncStatusProvider);
         builder.Services.AddSingleton<IPlatformPaths, WindowsPlatformPaths>();
         builder.Services.AddSingleton<IFileReadinessChecker, FileReadinessChecker>();
+        builder.Services.AddSingleton<ILocalFileDeletionService, LocalFileDeletionService>();
         builder.Services.AddSingleton<IUploadBatchQueue, UploadBatchQueue>();
         builder.Services.AddSingleton<ISyncStateStore, SqliteSyncStateStore>();
 
