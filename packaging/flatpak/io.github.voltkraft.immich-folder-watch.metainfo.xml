@@ -83,19 +83,12 @@
   </branding>
 
   <releases>
-    <release version="2.6.0" date="2026-09-01">
+    <release version="2.6.1" date="2026-09-01">
       <description>
-        <p>Added:</p>
+        <p>Fixed:</p>
         <ul>
-          <li>Added one shared, per-user SQLite synchronization database for all watched folders. The database is stored beside `config.yaml` and keeps account-, source-, and relative-path-specific transfer state without storing API keys.</li>
-          <li>Added background startup reconciliation using file size and UTC modification time so unchanged files are skipped without hashing or transfer.</li>
-          <li>Added persistent tombstones and move state so local and remote deletions or renames remain consistent across application restarts.</li>
-        </ul>
-        <p>Changed:</p>
-        <ul>
-          <li>Uploads are recorded only after the transfer, album assignment, and a final unchanged-file check succeed. Downloads are recorded only after the temporary file has been atomically renamed into place.</li>
-          <li>Corrupt synchronization databases are quarantined with a timestamp and replaced by a fresh database for a safe bootstrap.</li>
-          <li>Updated the SQLite dependency set to use the current SQLitePCLRaw native bundle explicitly.</li>
+          <li>Fixed Windows MSI ICE60 validation warnings by assigning an explicit language to the native SQLite library packaged by WiX.</li>
+          <li>Updated the GitHub release action to `softprops/action-gh-release@v3`, which runs on the supported Node 24 runtime.</li>
         </ul>
       </description>
     </release>

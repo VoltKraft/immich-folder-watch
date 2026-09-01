@@ -37,6 +37,7 @@
     <Feature Id="MainFeature" Title="Immich Folder Watch" Level="1">
       <ComponentGroupRef Id="PublishedApplicationFiles" />
       <ComponentRef Id="AppExecutableComponent" />
+      <ComponentRef Id="SqliteNativeComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
       <ComponentRef Id="EventLogRegistrationComponent" />
     </Feature>
@@ -46,6 +47,7 @@
     <ComponentGroup Id="PublishedApplicationFiles">
       <Files Directory="BINDIR" Include="$(PublishedAppDir)\**">
         <Exclude Files="$(PublishedAppDir)\ImmichFolderWatch.exe" />
+        <Exclude Files="$(PublishedAppDir)\e_sqlite3.dll" />
         <Exclude Files="$(PublishedAppDir)\**\*.pdb" />
       </Files>
     </ComponentGroup>
@@ -54,6 +56,14 @@
   <Fragment>
     <Component Id="AppExecutableComponent" Directory="BINDIR" Guid="*">
       <File Id="AppExecutableFile" Source="$(PublishedAppDir)\ImmichFolderWatch.exe" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <Fragment>
+    <Component Id="SqliteNativeComponent" Directory="BINDIR" Guid="*">
+      <!-- The SQLite native library has no embedded language resource. Explicitly
+           author one so MSI validation does not emit ICE60 for this non-versioned file. -->
+      <File Id="SqliteNativeFile" Source="$(PublishedAppDir)\e_sqlite3.dll" DefaultLanguage="1033" />
     </Component>
   </Fragment>
 

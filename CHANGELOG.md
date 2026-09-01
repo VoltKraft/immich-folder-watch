@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-09-01
+
+### Fixed
+- Fixed Windows MSI ICE60 validation warnings by assigning an explicit language to the native SQLite library packaged by WiX.
+- Updated the GitHub release action to `softprops/action-gh-release@v3`, which runs on the supported Node 24 runtime.
+
 ## [2.6.0] - 2026-09-01
 
 ### Added
