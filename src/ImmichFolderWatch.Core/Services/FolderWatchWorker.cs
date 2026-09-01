@@ -10,6 +10,14 @@ namespace ImmichFolderWatch.Core.Services;
 
 public sealed class FolderWatchWorker : BackgroundService
 {
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
+
+    private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
+
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(750);
 
     private static readonly TimeSpan AlbumPullInterval = TimeSpan.FromSeconds(10);
@@ -27,8 +35,8 @@ public sealed class FolderWatchWorker : BackgroundService
     // already-removed _pathToAssetId entry, so the sweep is cheap.
     private static readonly TimeSpan PollingSweepInterval = TimeSpan.FromSeconds(5);
 
-    private readonly Dictionary<string, HashSet<string>> _pollingBaseline =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, FileFingerprint>> _pollingBaseline =
+        new(PathComparer);
 
     private DateTimeOffset _lastPollingSweep = DateTimeOffset.MinValue;
 
@@ -40,6 +48,10 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private readonly IImmichAssetClient _immichAssetClient;
 
+    private readonly ISyncStateStore _syncStateStore;
+
+    private readonly string _accountScope;
+
     private readonly IImmichRealtimeClient? _immichRealtimeClient;
 
     private readonly SyncStatusProvider _syncStatusProvider;
@@ -48,9 +60,15 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private volatile int _pullRequested;
 
-    private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(PathComparer);
 
-    private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(PathComparer);
+
+    private readonly ConcurrentDictionary<string, SyncStateEntry> _stateByPath = new(PathComparer);
+
+    private readonly ConcurrentDictionary<string, byte> _downloadsInProgress = new(PathComparer);
+
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _remoteDeletesInProgress = new(PathComparer);
 
     /// <summary>
     /// Asset ids we just trashed locally — tombstone so a subsequent
@@ -73,7 +91,7 @@ public sealed class FolderWatchWorker : BackgroundService
     /// the user.
     /// </summary>
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyDeletedPaths =
-        new(StringComparer.OrdinalIgnoreCase);
+        new(PathComparer);
 
     private static readonly TimeSpan TombstoneTtl = TimeSpan.FromSeconds(120);
 
@@ -92,6 +110,7 @@ public sealed class FolderWatchWorker : BackgroundService
         IFileReadinessChecker fileReadinessChecker,
         IUploadBatchQueue uploadBatchQueue,
         IImmichAssetClient immichAssetClient,
+        ISyncStateStore syncStateStore,
         SyncStatusProvider syncStatusProvider,
         ILogger<FolderWatchWorker> logger,
         IImmichRealtimeClient? immichRealtimeClient = null)
@@ -100,6 +119,8 @@ public sealed class FolderWatchWorker : BackgroundService
         _fileReadinessChecker = fileReadinessChecker;
         _uploadBatchQueue = uploadBatchQueue;
         _immichAssetClient = immichAssetClient;
+        _syncStateStore = syncStateStore;
+        _accountScope = SyncAccountScope.Create(config.Immich.ServerApiUrl, config.Immich.ApiKey);
         _immichRealtimeClient = immichRealtimeClient;
         _syncStatusProvider = syncStatusProvider;
         _logger = logger;
@@ -109,19 +130,38 @@ public sealed class FolderWatchWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        try
+        {
+            await _syncStateStore.InitializeAsync(stoppingToken);
+            await _syncStateStore.DeleteExpiredTombstonesAsync(DateTimeOffset.UtcNow, stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(
+                ex,
+                "Synchronization is disabled because the state database could not be opened: {DatabasePath}",
+                _syncStateStore.DatabasePath);
+            return;
+        }
+
         RegisterWatchers();
 
         _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
-
-        await BuildInitialAssetMapAsync(stoppingToken);
-        SeedExistingFiles(stoppingToken);
-        await PullFromImmichAsync(stoppingToken);
 
         if (_immichRealtimeClient is not null)
         {
             _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
             _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
         }
+
+        await LoadPersistedStateAsync(stoppingToken);
+        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: true);
+        await PullFromImmichAsync(stoppingToken);
+        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: false);
 
         using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         var lastFlush = DateTimeOffset.UtcNow;
@@ -133,7 +173,7 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
                 {
-                    PollDirectoriesForChanges();
+                    await PollDirectoriesForChangesAsync(stoppingToken);
                     _lastPollingSweep = DateTimeOffset.UtcNow;
                 }
 
@@ -159,7 +199,7 @@ public sealed class FolderWatchWorker : BackgroundService
                     // asset-id + path tombstones (synchronously, before
                     // its first await) before the pull's
                     // DownloadAssetsAsync iterates assets.
-                    PollDirectoriesForChanges();
+                    await PollDirectoriesForChangesAsync(stoppingToken);
                     _lastPollingSweep = DateTimeOffset.UtcNow;
 
                     await PullFromImmichAsync(stoppingToken);
@@ -265,7 +305,7 @@ public sealed class FolderWatchWorker : BackgroundService
                     | NotifyFilters.CreationTime
                     | NotifyFilters.LastWrite
                     | NotifyFilters.Size,
-                EnableRaisingEvents = true,
+                EnableRaisingEvents = false,
             };
 
             watcher.Created += (_, e) => OnFileEvent(context, e.FullPath);
@@ -285,12 +325,11 @@ public sealed class FolderWatchWorker : BackgroundService
 
             _watchers.Add(watcher);
             _sources.Add(context);
-            var baseline = SnapshotExistingFiles(context);
-            _pollingBaseline[NormalizePath(source.Path)] = baseline;
+            _pollingBaseline[NormalizePath(source.Path)] = new Dictionary<string, FileFingerprint>(PathComparer);
+            watcher.EnableRaisingEvents = true;
             _logger.LogInformation(
-                "Polling baseline established for {Path}: {Count} pre-existing file(s) snapshotted; sweep interval = {SweepSeconds}s.",
+                "Polling watcher registered for {Path}; the persistent baseline will be reconciled in the background (sweep interval = {SweepSeconds}s).",
                 source.Path,
-                baseline.Count,
                 (int)PollingSweepInterval.TotalSeconds);
 
             if (useSubdirsAsAlbums)
@@ -452,16 +491,51 @@ public sealed class FolderWatchWorker : BackgroundService
         }
     }
 
-    private void SeedExistingFiles(CancellationToken cancellationToken)
+    private async Task LoadPersistedStateAsync(CancellationToken cancellationToken)
     {
         foreach (var context in _sources)
         {
-            if (string.Equals(context.SyncMode, WatchSourceSyncModes.UploadNew, StringComparison.Ordinal))
-            {
-                continue;
-            }
+            var entries = await _syncStateStore.GetSourceEntriesAsync(
+                _accountScope,
+                context.NormalizedRoot,
+                cancellationToken);
 
+            foreach (var entry in entries)
+            {
+                var fullPath = NormalizePath(Path.Combine(context.NormalizedRoot, entry.RelativePath));
+                if (entry.Status == SyncEntryStatus.Tombstone)
+                {
+                    if (entry.TombstoneExpiresAtUtc > DateTimeOffset.UtcNow)
+                    {
+                        _recentlyDeletedPaths[fullPath] = entry.LastSynchronizedAtUtc;
+                        if (!string.IsNullOrWhiteSpace(entry.AssetId))
+                        {
+                            _recentlyTrashedAssetIds[entry.AssetId] = entry.LastSynchronizedAtUtc;
+                        }
+                    }
+
+                    continue;
+                }
+
+                _stateByPath[fullPath] = entry;
+                if (!string.IsNullOrWhiteSpace(entry.AssetId))
+                {
+                    _pathToAssetId[fullPath] = entry.AssetId;
+                }
+            }
+        }
+    }
+
+    private async Task ReconcileExistingFilesAsync(
+        CancellationToken cancellationToken,
+        bool deferUnknownSyncFiles)
+    {
+        foreach (var context in _sources)
+        {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var snapshot = new Dictionary<string, FileFingerprint>(PathComparer);
+            var seen = new HashSet<string>(PathComparer);
 
             var queuedCount = 0;
             try
@@ -472,20 +546,48 @@ public sealed class FolderWatchWorker : BackgroundService
 
                 foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
                 {
+                    var normalized = NormalizePath(filePath);
+                    seen.Add(normalized);
                     if (!context.Filter.IsMatch(filePath))
                     {
                         continue;
                     }
 
-                    var normalized = NormalizePath(filePath);
-
-                    if (context.IsSyncMode && _pathToAssetId.ContainsKey(normalized))
+                    if (!TryGetFingerprint(normalized, out var fingerprint))
                     {
                         continue;
                     }
 
+                    snapshot[normalized] = fingerprint;
+                    seen.Add(normalized);
                     var albumName = GetEffectiveAlbum(context, normalized);
-                    if (_uploadBatchQueue.TryEnqueue(new UploadAssetRequest(normalized, albumName)))
+
+                    var hasPersistedState = _stateByPath.TryGetValue(normalized, out var existing);
+                    if (hasPersistedState
+                        && existing is not null
+                        && existing.Status == SyncEntryStatus.Synchronized
+                        && fingerprint.Matches(existing))
+                    {
+                        if (!string.Equals(existing.AlbumName, albumName, StringComparison.Ordinal))
+                        {
+                            await ReconcileAlbumAsync(context, normalized, albumName, existing, cancellationToken);
+                        }
+
+                        continue;
+                    }
+
+                    if (context.IsSyncMode && deferUnknownSyncFiles && !hasPersistedState)
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(context.SyncMode, WatchSourceSyncModes.UploadNew, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (_uploadBatchQueue.TryEnqueue(
+                        new UploadAssetRequest(normalized, albumName, context.NormalizedRoot)))
                     {
                         queuedCount++;
                     }
@@ -493,12 +595,32 @@ public sealed class FolderWatchWorker : BackgroundService
             }
             catch (Exception ex)
             {
+                context.RemoteDeleteSafe = false;
                 _logger.LogWarning(ex, "Initial scan failed for source {Path}.", context.Source.Path);
                 continue;
             }
 
+            _pollingBaseline[NormalizePath(context.Source.Path)] = snapshot;
+
+            var persisted = _stateByPath
+                .Where(pair => IsPathCoveredByContext(context, pair.Key))
+                .Select(pair => pair.Key)
+                .Where(path => !seen.Contains(path))
+                .ToList();
+            foreach (var missingPath in persisted)
+            {
+                if (context.IsSyncMode)
+                {
+                    await HandleDeleteInSyncAsync(context, missingPath);
+                }
+                else
+                {
+                    await DeletePersistedStateAsync(context, missingPath, cancellationToken);
+                }
+            }
+
             _logger.LogInformation(
-                "Initial scan for {SyncMode} queued {Count} existing file(s) from {Path}.",
+                "Persistent reconciliation for {SyncMode} queued {Count} changed file(s) from {Path}.",
                 context.SyncMode,
                 queuedCount,
                 context.Source.Path);
@@ -507,28 +629,49 @@ public sealed class FolderWatchWorker : BackgroundService
         _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
     }
 
-    private HashSet<string> SnapshotExistingFiles(WatchSourceContext context)
+    private async Task ReconcileAlbumAsync(
+        WatchSourceContext context,
+        string fullPath,
+        string albumName,
+        SyncStateEntry existing,
+        CancellationToken cancellationToken)
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var searchOption = context.EffectiveIncludeSubdirectories
-            ? SearchOption.AllDirectories
-            : SearchOption.TopDirectoryOnly;
-        try
+        if (!string.IsNullOrWhiteSpace(albumName) && !string.IsNullOrWhiteSpace(existing.AssetId))
         {
-            foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+            var result = await _immichAssetClient.AddAssetsToAlbumAsync(
+                albumName,
+                new[] { existing.AssetId },
+                cancellationToken);
+            if (!result.IsSuccess)
             {
-                set.Add(NormalizePath(filePath));
+                context.RemoteDeleteSafe = false;
+                _logger.LogWarning(
+                    "Album-only reconciliation failed for {FilePath}: {Error}",
+                    fullPath,
+                    result.ErrorMessage ?? "unknown");
+                return;
             }
         }
-        catch (Exception ex)
+
+        var updated = existing with
         {
-            _logger.LogDebug(ex, "Polling baseline scan failed for {Path}", context.Source.Path);
-        }
-        return set;
+            AlbumName = albumName,
+            LastSynchronizedAtUtc = DateTimeOffset.UtcNow,
+        };
+        await _syncStateStore.UpsertAsync(updated, cancellationToken);
+        _stateByPath[fullPath] = updated;
     }
 
-    private void PollDirectoriesForChanges()
+    private async Task PollDirectoriesForChangesAsync(CancellationToken cancellationToken)
     {
+        foreach (var marker in _remoteDeletesInProgress.ToArray())
+        {
+            if (DateTimeOffset.UtcNow - marker.Value > TombstoneTtl)
+            {
+                _remoteDeletesInProgress.TryRemove(marker.Key, out _);
+            }
+        }
+
         foreach (var context in _sources)
         {
             var sourceKey = NormalizePath(context.Source.Path);
@@ -541,30 +684,30 @@ public sealed class FolderWatchWorker : BackgroundService
                 ? SearchOption.AllDirectories
                 : SearchOption.TopDirectoryOnly;
 
-            HashSet<string> seenThisSweep;
+            Dictionary<string, FileFingerprint> current;
             try
             {
-                seenThisSweep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                current = new Dictionary<string, FileFingerprint>(PathComparer);
                 foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
                 {
                     var normalized = NormalizePath(filePath);
-                    seenThisSweep.Add(normalized);
-
-                    // HashSet.Add returns false if the path was already
-                    // known — skip it. New paths fall through to
-                    // OnFileEvent, which itself debounces against
-                    // _debouncedFiles so a parallel FSW Created event
-                    // does not double-enqueue.
-                    if (!known.Add(normalized))
+                    if (!TryGetFingerprint(normalized, out var fingerprint))
                     {
                         continue;
                     }
+
+                    current[normalized] = fingerprint;
+                    if (known.TryGetValue(normalized, out var previous) && previous == fingerprint)
+                    {
+                        continue;
+                    }
+
                     if (!context.Filter.IsMatch(normalized))
                     {
-                        _logger.LogDebug("Polling sweep saw new file but filter rejected it: {Path}", normalized);
                         continue;
                     }
-                    _logger.LogInformation("Polling sweep detected new file: {Path}", normalized);
+
+                    _logger.LogInformation("Polling sweep detected new or changed file: {Path}", normalized);
                     OnFileEvent(context, normalized);
                 }
             }
@@ -580,10 +723,9 @@ public sealed class FolderWatchWorker : BackgroundService
             // fire; on native filesystems FSW already fired for these
             // and HandleDeleteInSyncAsync's _pathToAssetId.TryRemove
             // returns false, making the second call a cheap no-op.
-            var disappeared = known.Where(p => !seenThisSweep.Contains(p)).ToList();
+            var disappeared = known.Keys.Where(path => !current.ContainsKey(path)).ToList();
             foreach (var path in disappeared)
             {
-                known.Remove(path);
                 if (!context.Filter.IsMatch(path))
                 {
                     continue;
@@ -591,17 +733,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 _logger.LogInformation("Polling sweep detected removed file: {Path}", path);
                 if (context.IsSyncMode)
                 {
-                    _ = HandleDeleteInSyncAsync(context, path);
+                    await HandleDeleteInSyncAsync(context, path);
                 }
                 else
                 {
-                    // Non-sync modes don't propagate deletes upward, but
-                    // we still drop the asset-id mapping so a re-add of
-                    // the same path later isn't mis-identified.
                     _debouncedFiles.TryRemove(path, out _);
                     _pathToAssetId.TryRemove(path, out _);
+                    await DeletePersistedStateAsync(context, path, cancellationToken);
                 }
             }
+
+            _pollingBaseline[sourceKey] = current;
         }
     }
 
@@ -636,9 +778,9 @@ public sealed class FolderWatchWorker : BackgroundService
                 _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
             }
 
-            if (pullSucceeded)
+            if (pullSucceeded && context.RemoteDeleteSafe)
             {
-                PropagateRemoteDeletes(context, remoteAssetIds);
+                await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
             }
         }
     }
@@ -651,41 +793,53 @@ public sealed class FolderWatchWorker : BackgroundService
     /// (we don't want to delete every local file because a transient
     /// API error returned an empty asset list).
     /// </summary>
-    private void PropagateRemoteDeletes(WatchSourceContext context, HashSet<string> remoteAssetIds)
+    private async Task PropagateRemoteDeletesAsync(
+        WatchSourceContext context,
+        HashSet<string> remoteAssetIds,
+        CancellationToken cancellationToken)
     {
-        var rootPrefix = context.NormalizedRoot + Path.DirectorySeparatorChar;
         var sourceKey = NormalizePath(context.Source.Path);
         _pollingBaseline.TryGetValue(sourceKey, out var baseline);
 
-        var stale = _pathToAssetId
+        var stale = _stateByPath
             .Where(entry =>
-                entry.Key.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
-                && !remoteAssetIds.Contains(entry.Value))
+                IsPathWithinSource(context, entry.Key)
+                && entry.Value.Status == SyncEntryStatus.Synchronized
+                && !string.IsNullOrWhiteSpace(entry.Value.AssetId)
+                && !remoteAssetIds.Contains(entry.Value.AssetId))
             .ToList();
 
         foreach (var entry in stale)
         {
-            if (!_pathToAssetId.TryRemove(entry.Key, out _))
-            {
-                continue;
-            }
-
-            // Drop from polling baseline so the next sweep doesn't
-            // re-fire HandleDeleteInSyncAsync against an asset id we
-            // already cleaned up.
-            baseline?.Remove(entry.Key);
-            _debouncedFiles.TryRemove(entry.Key, out _);
-
             try
             {
+                var tombstone = entry.Value with
+                {
+                    Status = SyncEntryStatus.Tombstone,
+                    LastSynchronizedAtUtc = DateTimeOffset.UtcNow,
+                    TombstoneExpiresAtUtc = DateTimeOffset.UtcNow + TombstoneTtl,
+                };
+                await _syncStateStore.UpsertAsync(tombstone, cancellationToken);
+
                 if (File.Exists(entry.Key))
                 {
+                    _remoteDeletesInProgress[entry.Key] = DateTimeOffset.UtcNow;
                     File.Delete(entry.Key);
                     _logger.LogInformation(
                         "Removed local file after remote delete (asset {AssetId} no longer on Immich): {Path}",
-                        entry.Value,
+                        entry.Value.AssetId,
                         entry.Key);
                 }
+
+                _pathToAssetId.TryRemove(entry.Key, out _);
+                _stateByPath.TryRemove(entry.Key, out _);
+                baseline?.Remove(entry.Key);
+                _debouncedFiles.TryRemove(entry.Key, out _);
+                await _syncStateStore.DeleteAsync(
+                    _accountScope,
+                    context.NormalizedRoot,
+                    entry.Value.RelativePath,
+                    cancellationToken);
             }
             catch (Exception ex)
             {
@@ -788,7 +942,7 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 var previousDir = Path.Combine(context.NormalizedRoot, previousDirName);
                 var targetDir = Path.Combine(context.NormalizedRoot, sanitized);
-                TryRenameLocalSubdir(previousDir, targetDir, previousDirName, sanitized);
+                await TryRenameLocalSubdirAsync(context, previousDir, targetDir, previousDirName, sanitized, cancellationToken);
             }
 
             _albumIdToDirName[album.Id] = sanitized;
@@ -866,8 +1020,6 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
-            _pathToAssetId[normalized] = asset.Id;
-
             if (!context.Filter.IsMatch(destinationPath))
             {
                 continue;
@@ -875,6 +1027,48 @@ public sealed class FolderWatchWorker : BackgroundService
 
             if (File.Exists(destinationPath))
             {
+                if (TryGetFingerprint(normalized, out var existingFingerprint))
+                {
+                    var effectiveAlbum = GetEffectiveAlbum(context, normalized);
+                    if (_stateByPath.TryGetValue(normalized, out var currentState)
+                        && currentState.Status == SyncEntryStatus.Synchronized)
+                    {
+                        if (!existingFingerprint.Matches(currentState))
+                        {
+                            // The local file changed while the app was stopped.
+                            // Keep the old fingerprint so the queued local change
+                            // remains distinguishable from the remote asset.
+                            continue;
+                        }
+
+                        if (!string.Equals(currentState.AssetId, asset.Id, StringComparison.Ordinal))
+                        {
+                            // Multiple Immich assets can have the same original
+                            // file name. Keep the mapping that was confirmed for
+                            // this local file instead of replacing it according to
+                            // the server's enumeration order.
+                            continue;
+                        }
+
+                        _pathToAssetId[normalized] = asset.Id;
+                        if (string.Equals(currentState.AlbumName, effectiveAlbum, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                    }
+
+                    var entry = CreateSynchronizedEntry(
+                        context,
+                        normalized,
+                        asset.Id,
+                        effectiveAlbum,
+                        existingFingerprint,
+                        SyncTransferDirection.Download);
+                    await _syncStateStore.UpsertAsync(entry, cancellationToken);
+                    _stateByPath[normalized] = entry;
+                    _pathToAssetId[normalized] = asset.Id;
+                }
+
                 continue;
             }
 
@@ -895,23 +1089,42 @@ public sealed class FolderWatchWorker : BackgroundService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _syncStatusProvider.ReportDownloadStarted(destinationPath);
-                var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
-                if (download.IsSuccess)
+                var normalized = NormalizePath(destinationPath);
+                _downloadsInProgress[normalized] = 0;
+                try
                 {
-                    downloadedCount++;
-                    _syncStatusProvider.ReportDownloadCompleted(destinationPath);
-                    _logger.LogInformation(
-                        "Downloaded asset {AssetId} to {FilePath}.",
-                        asset.Id,
-                        destinationPath);
+                    var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
+                    if (download.IsSuccess && TryGetFingerprint(normalized, out var fingerprint))
+                    {
+                        var entry = CreateSynchronizedEntry(
+                            context,
+                            normalized,
+                            asset.Id,
+                            GetEffectiveAlbum(context, normalized),
+                            fingerprint,
+                            SyncTransferDirection.Download);
+                        await _syncStateStore.UpsertAsync(entry, cancellationToken);
+                        _stateByPath[normalized] = entry;
+                        _pathToAssetId[normalized] = asset.Id;
+                        downloadedCount++;
+                        _syncStatusProvider.ReportDownloadCompleted(destinationPath);
+                        _logger.LogInformation(
+                            "Downloaded asset {AssetId} to {FilePath}.",
+                            asset.Id,
+                            destinationPath);
+                    }
+                    else
+                    {
+                        _syncStatusProvider.ReportDownloadFailed(destinationPath, download.ErrorMessage);
+                        _logger.LogWarning(
+                            "Downloading asset {AssetId} failed: {Error}",
+                            asset.Id,
+                            download.ErrorMessage ?? "download completed without a readable destination file");
+                    }
                 }
-                else
+                finally
                 {
-                    _syncStatusProvider.ReportDownloadFailed(destinationPath, download.ErrorMessage);
-                    _logger.LogWarning(
-                        "Downloading asset {AssetId} failed: {Error}",
-                        asset.Id,
-                        download.ErrorMessage ?? "unknown");
+                    _downloadsInProgress.TryRemove(normalized, out _);
                 }
             }
 
@@ -954,13 +1167,26 @@ public sealed class FolderWatchWorker : BackgroundService
         }
 
         var normalizedPath = NormalizePath(filePath);
+        if (_downloadsInProgress.ContainsKey(normalizedPath))
+        {
+            return;
+        }
+
+        if (_stateByPath.TryGetValue(normalizedPath, out var synchronized)
+            && synchronized.Status == SyncEntryStatus.Synchronized
+            && TryGetFingerprint(normalizedPath, out var fingerprint)
+            && fingerprint.Matches(synchronized))
+        {
+            return;
+        }
+
         var albumName = GetEffectiveAlbum(context, normalizedPath);
         var timestamp = DateTimeOffset.UtcNow;
 
         _debouncedFiles.AddOrUpdate(
             normalizedPath,
-            _ => new PendingFile(albumName, timestamp),
-            (_, _) => new PendingFile(albumName, timestamp));
+            _ => new PendingFile(albumName, context.NormalizedRoot, timestamp),
+            (_, _) => new PendingFile(albumName, context.NormalizedRoot, timestamp));
 
         _logger.LogDebug("File event captured for {FilePath}; waiting for debounce.", normalizedPath);
     }
@@ -993,32 +1219,41 @@ public sealed class FolderWatchWorker : BackgroundService
                                 assetId,
                                 newAlbum,
                                 add.ErrorMessage ?? "unknown");
-                        }
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(oldAlbum))
-                    {
-                        var remove = await _immichAssetClient.RemoveAssetsFromAlbumAsync(oldAlbum, ids, CancellationToken.None);
-                        if (!remove.IsSuccess)
-                        {
-                            _logger.LogWarning(
-                                "Failed to remove asset {AssetId} from album '{AlbumName}': {Error}",
-                                assetId,
-                                oldAlbum,
-                                remove.ErrorMessage ?? "unknown");
+                            _pathToAssetId[oldNormalized] = assetId!;
+                            return;
                         }
                     }
 
                     _logger.LogInformation(
-                        "Asset {AssetId} moved from album '{OldAlbum}' to '{NewAlbum}' ({OldPath} -> {NewPath}).",
+                        "Asset {AssetId} was added to album '{NewAlbum}' after local move ({OldPath} -> {NewPath}); existing album memberships were preserved.",
                         assetId,
-                        string.IsNullOrWhiteSpace(oldAlbum) ? "(unassigned)" : oldAlbum,
                         string.IsNullOrWhiteSpace(newAlbum) ? "(unassigned)" : newAlbum,
                         oldNormalized,
                         newNormalized);
                 }
 
                 _pathToAssetId[newNormalized] = assetId!;
+                if (TryGetFingerprint(newNormalized, out var renamedFingerprint))
+                {
+                    if (_stateByPath.TryRemove(oldNormalized, out var oldState))
+                    {
+                        await _syncStateStore.DeleteAsync(
+                            _accountScope,
+                            context.NormalizedRoot,
+                            oldState.RelativePath,
+                            CancellationToken.None);
+                    }
+
+                    var renamedState = CreateSynchronizedEntry(
+                        context,
+                        newNormalized,
+                        assetId,
+                        newAlbum,
+                        renamedFingerprint,
+                        oldState?.Direction ?? SyncTransferDirection.Upload);
+                    await _syncStateStore.UpsertAsync(renamedState, CancellationToken.None);
+                    _stateByPath[newNormalized] = renamedState;
+                }
                 return;
             }
 
@@ -1046,13 +1281,36 @@ public sealed class FolderWatchWorker : BackgroundService
             var normalized = NormalizePath(oldFullPath);
             _debouncedFiles.TryRemove(normalized, out _);
 
+            if (_remoteDeletesInProgress.TryRemove(normalized, out _))
+            {
+                return;
+            }
+
             // Path-level tombstone fires regardless of whether we have
             // an asset id — protects against a pull that races ahead
             // of the sweep (e.g. realtime trigger right after delete)
             // re-creating the file at the same path.
             _recentlyDeletedPaths[normalized] = DateTimeOffset.UtcNow;
 
-            if (!_pathToAssetId.TryRemove(normalized, out var assetId))
+            _stateByPath.TryGetValue(normalized, out var previousState);
+            var hadAssetId = _pathToAssetId.TryGetValue(normalized, out var assetId);
+            if (hadAssetId)
+            {
+                _recentlyTrashedAssetIds[assetId!] = DateTimeOffset.UtcNow;
+            }
+
+            var tombstone = (previousState ?? CreateTombstoneEntry(context, normalized, assetId)) with
+            {
+                AssetId = assetId ?? previousState?.AssetId,
+                Status = SyncEntryStatus.Tombstone,
+                LastSynchronizedAtUtc = DateTimeOffset.UtcNow,
+                TombstoneExpiresAtUtc = DateTimeOffset.UtcNow + TombstoneTtl,
+            };
+            await _syncStateStore.UpsertAsync(tombstone, CancellationToken.None);
+            _stateByPath.TryRemove(normalized, out _);
+            _pathToAssetId.TryRemove(normalized, out _);
+
+            if (!hadAssetId)
             {
                 _logger.LogWarning(
                     "Local delete detected but no Immich asset id was mapped for {FilePath}; the asset (if any) was NOT trashed on Immich. Re-download is suppressed for {Ttl}s.",
@@ -1061,12 +1319,13 @@ public sealed class FolderWatchWorker : BackgroundService
                 return;
             }
 
-            // Optimistic asset-id tombstone BEFORE the network call so
-            // a concurrent pull (same loop tick as the sweep that fired
-            // us) sees the tombstone and skips the asset.
-            _recentlyTrashedAssetIds[assetId] = DateTimeOffset.UtcNow;
-
-            await TrashAssetAsync(assetId, normalized);
+            var trashed = await TrashAssetAsync(assetId!, normalized);
+            if (!trashed && previousState is not null)
+            {
+                await _syncStateStore.UpsertAsync(previousState, CancellationToken.None);
+                _stateByPath[normalized] = previousState;
+                _pathToAssetId[normalized] = assetId!;
+            }
         }
         catch (Exception ex)
         {
@@ -1119,11 +1378,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 return;
             }
 
+            var sourceContext = FindSourceContext(string.Empty, normalizedDir);
+            if (sourceContext is not null)
+            {
+                await TombstonePersistedStatePrefixAsync(sourceContext, normalizedDir, CancellationToken.None);
+            }
+
             var prefix = normalizedDir + Path.DirectorySeparatorChar;
             var toTrash = new List<string>();
             foreach (var entry in _pathToAssetId.ToArray())
             {
-                if (!entry.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                if (!entry.Key.StartsWith(prefix, PathComparison))
                 {
                     continue;
                 }
@@ -1197,6 +1462,15 @@ public sealed class FolderWatchWorker : BackgroundService
             }
 
             RekeyPathMapPrefix(oldNormalizedDir, newNormalizedDir);
+            var sourceContext = FindSourceContext(string.Empty, newNormalizedDir);
+            if (sourceContext is not null)
+            {
+                await RekeyPersistedStatePrefixAsync(
+                    sourceContext,
+                    oldNormalizedDir,
+                    newNormalizedDir,
+                    CancellationToken.None);
+            }
 
             if (string.IsNullOrWhiteSpace(oldDirName)
                 || string.Equals(oldDirName, newDirName, StringComparison.Ordinal))
@@ -1259,7 +1533,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private void RekeyPathMapPrefix(string oldNormalizedDir, string newNormalizedDir)
     {
-        if (string.Equals(oldNormalizedDir, newNormalizedDir, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(oldNormalizedDir, newNormalizedDir, PathComparison))
         {
             return;
         }
@@ -1269,7 +1543,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
         foreach (var entry in _pathToAssetId.ToArray())
         {
-            if (!entry.Key.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+            if (!entry.Key.StartsWith(oldPrefix, PathComparison))
             {
                 continue;
             }
@@ -1282,7 +1556,13 @@ public sealed class FolderWatchWorker : BackgroundService
         }
     }
 
-    private void TryRenameLocalSubdir(string oldDir, string newDir, string oldName, string newName)
+    private async Task TryRenameLocalSubdirAsync(
+        WatchSourceContext context,
+        string oldDir,
+        string newDir,
+        string oldName,
+        string newName,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -1302,6 +1582,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
             Directory.Move(oldDir, newDir);
             RekeyPathMapPrefix(oldDir, newDir);
+            await RekeyPersistedStatePrefixAsync(context, oldDir, newDir, cancellationToken);
 
             _logger.LogInformation(
                 "Renamed local subfolder '{Old}' -> '{New}' to match renamed Immich album.",
@@ -1318,7 +1599,7 @@ public sealed class FolderWatchWorker : BackgroundService
         }
     }
 
-    private async Task TrashAssetAsync(string assetId, string filePath)
+    private async Task<bool> TrashAssetAsync(string assetId, string filePath)
     {
         // Tombstone is set by the caller (HandleDeleteInSyncAsync) BEFORE
         // we run, so a pull racing on the same loop tick already sees
@@ -1328,15 +1609,15 @@ public sealed class FolderWatchWorker : BackgroundService
         if (result.IsSuccess)
         {
             _logger.LogInformation("Trashed asset {AssetId} on Immich (local {FilePath} removed).", assetId, filePath);
+            return true;
         }
-        else
-        {
-            _recentlyTrashedAssetIds.TryRemove(assetId, out _);
-            _logger.LogWarning(
-                "Failed to trash asset {AssetId}: {Error}",
-                assetId,
-                result.ErrorMessage ?? "unknown");
-        }
+
+        _recentlyTrashedAssetIds.TryRemove(assetId, out _);
+        _logger.LogWarning(
+            "Failed to trash asset {AssetId}: {Error}",
+            assetId,
+            result.ErrorMessage ?? "unknown");
+        return false;
     }
 
     /// <summary>
@@ -1418,10 +1699,24 @@ public sealed class FolderWatchWorker : BackgroundService
                     "File was not ready before timeout ({TimeoutSeconds}s): {FilePath}",
                     _config.Watch.FileReadyTimeoutSeconds,
                     path);
+                var context = FindSourceContext(pendingFile.SourcePath, path);
+                if (context is not null)
+                {
+                    OnFileEvent(context, path);
+                }
                 continue;
             }
 
-            var queued = _uploadBatchQueue.TryEnqueue(new UploadAssetRequest(path, pendingFile.AlbumName));
+            if (_stateByPath.TryGetValue(path, out var synchronized)
+                && synchronized.Status == SyncEntryStatus.Synchronized
+                && TryGetFingerprint(path, out var fingerprint)
+                && fingerprint.Matches(synchronized))
+            {
+                continue;
+            }
+
+            var queued = _uploadBatchQueue.TryEnqueue(
+                new UploadAssetRequest(path, pendingFile.AlbumName, pendingFile.SourcePath));
             if (queued)
             {
                 _logger.LogInformation("Queued file {FilePath} for upload (Album: {AlbumName}).", path, pendingFile.AlbumName);
@@ -1456,6 +1751,13 @@ public sealed class FolderWatchWorker : BackgroundService
                     continue;
                 }
 
+                var context = FindSourceContext(request.SourcePath, request.FilePath);
+                if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
+                {
+                    _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
+                    continue;
+                }
+
                 _syncStatusProvider.ReportUploadStarted(request.FilePath);
                 var result = await _immichAssetClient.UploadAssetAsync(request, cancellationToken);
                 if (result.IsSuccess)
@@ -1466,9 +1768,30 @@ public sealed class FolderWatchWorker : BackgroundService
                         request.AlbumName,
                         result.AssetId ?? "n/a");
 
-                    if (!string.IsNullOrWhiteSpace(result.AssetId))
+                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
+                        || currentFingerprint != uploadedFingerprint)
                     {
-                        _pathToAssetId[NormalizePath(request.FilePath)] = result.AssetId!;
+                        _logger.LogInformation(
+                            "File changed while it was being uploaded and will be queued again: {FilePath}",
+                            request.FilePath);
+                        OnFileEvent(context, request.FilePath);
+                    }
+                    else
+                    {
+                        var normalizedPath = NormalizePath(request.FilePath);
+                        var entry = CreateSynchronizedEntry(
+                            context,
+                            normalizedPath,
+                            result.AssetId,
+                            request.AlbumName,
+                            currentFingerprint,
+                            SyncTransferDirection.Upload);
+                        await _syncStateStore.UpsertAsync(entry, cancellationToken);
+                        _stateByPath[normalizedPath] = entry;
+                        if (!string.IsNullOrWhiteSpace(result.AssetId))
+                        {
+                            _pathToAssetId[normalizedPath] = result.AssetId!;
+                        }
                     }
 
                     _syncStatusProvider.ReportUploadCompleted(request.FilePath);
@@ -1485,6 +1808,7 @@ public sealed class FolderWatchWorker : BackgroundService
                             : "n/a",
                         result.ErrorMessage ?? "unknown error");
                     _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
+                    OnFileEvent(context, request.FilePath);
                 }
             }
 
@@ -1509,7 +1833,10 @@ public sealed class FolderWatchWorker : BackgroundService
         try
         {
             var full = Path.GetFullPath(path);
-            return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var root = Path.GetPathRoot(full);
+            return string.Equals(full, root, PathComparison)
+                ? full
+                : full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
         catch (Exception)
         {
@@ -1534,6 +1861,203 @@ public sealed class FolderWatchWorker : BackgroundService
         return new string(buffer).Trim();
     }
 
+    private static bool TryGetFingerprint(string path, out FileFingerprint fingerprint)
+    {
+        try
+        {
+            var file = new FileInfo(path);
+            file.Refresh();
+            if (!file.Exists)
+            {
+                fingerprint = default;
+                return false;
+            }
+
+            fingerprint = new FileFingerprint(file.Length, file.LastWriteTimeUtc.Ticks);
+            return true;
+        }
+        catch (Exception)
+        {
+            fingerprint = default;
+            return false;
+        }
+    }
+
+    private SyncStateEntry CreateSynchronizedEntry(
+        WatchSourceContext context,
+        string fullPath,
+        string? assetId,
+        string albumName,
+        FileFingerprint fingerprint,
+        SyncTransferDirection direction) =>
+        new(
+            _accountScope,
+            context.NormalizedRoot,
+            GetRelativePath(context, fullPath),
+            assetId,
+            albumName,
+            fingerprint.FileSize,
+            new DateTimeOffset(fingerprint.LastWriteTimeUtcTicks, TimeSpan.Zero),
+            direction,
+            SyncEntryStatus.Synchronized,
+            DateTimeOffset.UtcNow);
+
+    private SyncStateEntry CreateTombstoneEntry(
+        WatchSourceContext context,
+        string fullPath,
+        string? assetId) =>
+        new(
+            _accountScope,
+            context.NormalizedRoot,
+            GetRelativePath(context, fullPath),
+            assetId,
+            GetEffectiveAlbum(context, fullPath),
+            0,
+            DateTimeOffset.UnixEpoch,
+            SyncTransferDirection.Upload,
+            SyncEntryStatus.Tombstone,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow + TombstoneTtl);
+
+    private static string GetRelativePath(WatchSourceContext context, string fullPath)
+    {
+        var relative = Path.GetRelativePath(context.NormalizedRoot, fullPath);
+        if (Path.IsPathRooted(relative)
+            || string.Equals(relative, "..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"File '{fullPath}' is outside watch source '{context.NormalizedRoot}'.");
+        }
+
+        return relative;
+    }
+
+    private static bool IsPathWithinSource(WatchSourceContext context, string fullPath)
+    {
+        if (string.Equals(fullPath, context.NormalizedRoot, PathComparison))
+        {
+            return true;
+        }
+
+        var prefix = Path.EndsInDirectorySeparator(context.NormalizedRoot)
+            ? context.NormalizedRoot
+            : context.NormalizedRoot + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(prefix, PathComparison);
+    }
+
+    private static bool IsPathCoveredByContext(WatchSourceContext context, string fullPath)
+    {
+        if (!IsPathWithinSource(context, fullPath))
+        {
+            return false;
+        }
+
+        if (context.EffectiveIncludeSubdirectories)
+        {
+            return true;
+        }
+
+        var directory = Path.GetDirectoryName(fullPath);
+        return string.Equals(directory, context.NormalizedRoot, PathComparison);
+    }
+
+    private WatchSourceContext? FindSourceContext(string sourcePath, string filePath)
+    {
+        if (!string.IsNullOrWhiteSpace(sourcePath))
+        {
+            var normalizedSource = NormalizeDirectory(sourcePath);
+            var exact = _sources.FirstOrDefault(source =>
+                string.Equals(source.NormalizedRoot, normalizedSource, PathComparison));
+            if (exact is not null)
+            {
+                return exact;
+            }
+        }
+
+        var normalizedFile = NormalizePath(filePath);
+        return _sources
+            .Where(source => IsPathWithinSource(source, normalizedFile))
+            .OrderByDescending(source => source.NormalizedRoot.Length)
+            .FirstOrDefault();
+    }
+
+    private async Task DeletePersistedStateAsync(
+        WatchSourceContext context,
+        string fullPath,
+        CancellationToken cancellationToken)
+    {
+        if (_stateByPath.TryRemove(fullPath, out var existing))
+        {
+            await _syncStateStore.DeleteAsync(
+                _accountScope,
+                context.NormalizedRoot,
+                existing.RelativePath,
+                cancellationToken);
+        }
+    }
+
+    private async Task RekeyPersistedStatePrefixAsync(
+        WatchSourceContext context,
+        string oldDirectory,
+        string newDirectory,
+        CancellationToken cancellationToken)
+    {
+        var oldPrefix = NormalizeDirectory(oldDirectory) + Path.DirectorySeparatorChar;
+        var newPrefix = NormalizeDirectory(newDirectory) + Path.DirectorySeparatorChar;
+        var affected = _stateByPath
+            .Where(entry => entry.Key.StartsWith(oldPrefix, PathComparison))
+            .ToList();
+
+        foreach (var entry in affected)
+        {
+            var suffix = entry.Key[oldPrefix.Length..];
+            var newPath = NormalizePath(newPrefix + suffix);
+            await _syncStateStore.DeleteAsync(
+                _accountScope,
+                context.NormalizedRoot,
+                entry.Value.RelativePath,
+                cancellationToken);
+            var updated = entry.Value with
+            {
+                RelativePath = GetRelativePath(context, newPath),
+                AlbumName = GetEffectiveAlbum(context, newPath),
+                LastSynchronizedAtUtc = DateTimeOffset.UtcNow,
+            };
+            await _syncStateStore.UpsertAsync(updated, cancellationToken);
+            _stateByPath.TryRemove(entry.Key, out _);
+            _stateByPath[newPath] = updated;
+        }
+    }
+
+    private async Task TombstonePersistedStatePrefixAsync(
+        WatchSourceContext context,
+        string directory,
+        CancellationToken cancellationToken)
+    {
+        var prefix = NormalizeDirectory(directory) + Path.DirectorySeparatorChar;
+        var affected = _stateByPath
+            .Where(entry => entry.Key.StartsWith(prefix, PathComparison))
+            .ToList();
+
+        foreach (var entry in affected)
+        {
+            var tombstone = entry.Value with
+            {
+                Status = SyncEntryStatus.Tombstone,
+                LastSynchronizedAtUtc = DateTimeOffset.UtcNow,
+                TombstoneExpiresAtUtc = DateTimeOffset.UtcNow + TombstoneTtl,
+            };
+            await _syncStateStore.UpsertAsync(tombstone, cancellationToken);
+            _stateByPath.TryRemove(entry.Key, out _);
+            _recentlyDeletedPaths[entry.Key] = tombstone.LastSynchronizedAtUtc;
+            if (!string.IsNullOrWhiteSpace(tombstone.AssetId))
+            {
+                _recentlyTrashedAssetIds[tombstone.AssetId] = tombstone.LastSynchronizedAtUtc;
+            }
+        }
+    }
+
     private void DisposeWatchers()
     {
         foreach (var watcher in _watchers)
@@ -1544,7 +2068,14 @@ public sealed class FolderWatchWorker : BackgroundService
         _watchers.Clear();
     }
 
-    private sealed record PendingFile(string AlbumName, DateTimeOffset LastEventUtc);
+    private sealed record PendingFile(string AlbumName, string SourcePath, DateTimeOffset LastEventUtc);
+
+    private readonly record struct FileFingerprint(long FileSize, long LastWriteTimeUtcTicks)
+    {
+        public bool Matches(SyncStateEntry entry) =>
+            FileSize == entry.FileSize
+            && LastWriteTimeUtcTicks == entry.LastWriteTimeUtc.UtcDateTime.Ticks;
+    }
 
     private sealed class WatchSourceContext
     {
@@ -1581,5 +2112,7 @@ public sealed class FolderWatchWorker : BackgroundService
         public bool EffectiveIncludeSubdirectories { get; }
 
         public bool IsSyncMode => string.Equals(SyncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal);
+
+        public bool RemoteDeleteSafe { get; set; } = true;
     }
 }

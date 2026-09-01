@@ -2,6 +2,7 @@ using ImmichFolderWatch.Core.Platform;
 
 namespace ImmichFolderWatch.Tests.Core.Platform;
 
+[Collection("Environment variables")]
 public sealed class XdgPlatformPathsTests
 {
     [Fact]
@@ -35,6 +36,19 @@ public sealed class XdgPlatformPathsTests
         Assert.Equal(
             Path.Combine("/home/tester", ".config", "immich-folder-watch", "config.yaml"),
             paths.GetConfigPath());
+    }
+
+    [Fact]
+    public void GetSyncDatabasePath_IsBesideConfigFile()
+    {
+        using var scope = new EnvVarScope("XDG_CONFIG_HOME", "/tmp/xdg-cfg");
+
+        var paths = new XdgPlatformPaths();
+
+        Assert.Equal(
+            Path.GetDirectoryName(paths.GetConfigPath()),
+            Path.GetDirectoryName(paths.GetSyncDatabasePath()));
+        Assert.Equal("sync-state.db", Path.GetFileName(paths.GetSyncDatabasePath()));
     }
 
     [Fact]

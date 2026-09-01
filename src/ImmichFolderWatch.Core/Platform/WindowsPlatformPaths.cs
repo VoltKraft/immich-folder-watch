@@ -10,5 +10,7 @@ public sealed class WindowsPlatformPaths : IPlatformPaths
 
     public string GetConfigPath() => InstallationPaths.GetConfigPath();
 
+    public string GetSyncDatabasePath() => InstallationPaths.GetSyncDatabasePath();
+
     public string GetLogDirectory() => InstallationPaths.GetLogDirectory();
 }

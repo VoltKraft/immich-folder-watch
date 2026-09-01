@@ -8,5 +8,7 @@ public interface IPlatformPaths
 
     string GetConfigPath();
 
+    string GetSyncDatabasePath();
+
     string GetLogDirectory();
 }

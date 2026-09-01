@@ -21,6 +21,8 @@ public sealed class XdgPlatformPaths : IPlatformPaths
 
     public string GetConfigPath() => Path.Combine(GetUserDataRoot(), "config.yaml");
 
+    public string GetSyncDatabasePath() => Path.Combine(GetUserDataRoot(), "sync-state.db");
+
     public string GetLogDirectory() => Path.Combine(ResolveXdgDir("XDG_STATE_HOME", Path.Combine(".local", "state")), ProductFolderName, "logs");
 
     private static string ResolveXdgDir(string envVar, string fallbackBelowHome)

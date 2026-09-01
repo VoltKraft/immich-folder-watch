@@ -53,6 +53,7 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 - Supports optional per-source `albumName`
 - Creates missing albums automatically when album placement is configured
 - Per-folder **sync mode**: `Upload new files only` (default), `Upload everything in the folder`, or `Sync folder with album (bidirectional)`
+- Persistent sync state shared by all watched folders, so unchanged files do not generate uploads or downloads after a restart
 - Retries transient upload failures automatically
 - Runs as a per-user desktop app with live sync status
 - Autostarts on login by default; togglable in the GUI
@@ -79,6 +80,7 @@ Installed layout:
 
 - Binaries: `%ProgramFiles%\Immich Folder Watch\bin\` (shared, per-machine)
 - Config: `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (per user)
+- Sync state: `%LOCALAPPDATA%\Immich Folder Watch\sync-state.db` (one shared database per user)
 - Logs: Windows Event Log (`Immich Folder Watch` source, default) or `%LOCALAPPDATA%\Immich Folder Watch\logs\` when File logging is selected
 - Autostart: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Immich Folder Watch.lnk`
 
@@ -112,10 +114,17 @@ Sandbox layout:
 
 - App ID: `io.github.voltkraft.immich-folder-watch`
 - Config: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/config.yaml`
+- Sync state: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db`
 - Logs: journald (default — `journalctl --user -t io.github.voltkraft.immich-folder-watch.desktop`) or `~/.var/app/io.github.voltkraft.immich-folder-watch/data/Immich Folder Watch/logs/` when File logging is selected
 - Autostart: managed via the desktop's Background portal — toggle inside the GUI
 
 Folder picking goes through the FreeDesktop FileChooser portal so the app only sees the folders you explicitly grant. The watcher resolves the doc-portal handles back to host paths via `org.freedesktop.portal.Documents`, and inotify-blind FUSE mounts are covered by a 5-second polling sweep.
+
+The app keeps one automatically managed `sync-state.db` beside `config.yaml` for
+all watched folders. On the first start after this database is introduced, it
+performs a mode-appropriate reconciliation and records confirmed transfers.
+Later starts reconcile file metadata in the background; files whose size and UTC
+modification time are unchanged are not hashed, uploaded, or downloaded.
 
 Detailed guides:
 

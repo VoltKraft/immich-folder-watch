@@ -3,6 +3,7 @@ using ImmichFolderWatch.Core.Platform;
 
 namespace ImmichFolderWatch.Tests.Core.Platform;
 
+[Collection("Environment variables")]
 public sealed class WindowsPlatformPathsTests
 {
     [Fact]
@@ -38,12 +39,25 @@ public sealed class WindowsPlatformPathsTests
     }
 
     [Fact]
+    public void GetSyncDatabasePath_DelegatesToInstallationPaths_AndIsBesideConfigFile()
+    {
+        var paths = new WindowsPlatformPaths();
+
+        Assert.Equal(InstallationPaths.GetSyncDatabasePath(), paths.GetSyncDatabasePath());
+        Assert.Equal(
+            Path.GetDirectoryName(paths.GetConfigPath()),
+            Path.GetDirectoryName(paths.GetSyncDatabasePath()));
+        Assert.Equal(InstallationPaths.SyncDatabaseFileName, Path.GetFileName(paths.GetSyncDatabasePath()));
+    }
+
+    [Fact]
     public void Implements_IPlatformPaths()
     {
         IPlatformPaths paths = new WindowsPlatformPaths();
 
         Assert.NotNull(paths);
         Assert.False(string.IsNullOrWhiteSpace(paths.GetConfigPath()));
+        Assert.False(string.IsNullOrWhiteSpace(paths.GetSyncDatabasePath()));
         Assert.False(string.IsNullOrWhiteSpace(paths.GetLogDirectory()));
     }
 }

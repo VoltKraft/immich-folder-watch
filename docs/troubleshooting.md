@@ -29,6 +29,22 @@
 - Increase `retry.baseDelayMilliseconds` and `retry.maxAttempts` if needed.
 - Inspect server logs on the Immich side.
 
+## Files are reconsidered after every restart
+
+- Confirm that `sync-state.db` exists beside `config.yaml` and that the current user can read and write both the file and its directory.
+- The first start with an empty state database performs a one-time, mode-appropriate bootstrap. Large source trees can take time to enumerate, but this reconciliation runs in the background.
+- Later starts still inspect path, size, and UTC modification time to detect changes made while the app was stopped. Unchanged files are not hashed and do not generate Immich API transfers.
+- Changing the Immich API URL or API key intentionally selects a new account context. The new context must be bootstrapped even when the watched folders did not change.
+- Do not delete `sync-state.db` to clear an individual error: deleting it discards the transfer history for every watched folder and causes a new bootstrap.
+
+## Sync state database cannot be opened
+
+- Stop other tools that may have opened or locked `sync-state.db`, then verify write permission on the configuration directory and available disk space.
+- If SQLite reports corruption, the app quarantines the damaged database beside the original using a timestamp and creates a new database. The next start performs a safe bootstrap; the quarantined file is retained for diagnosis or recovery.
+- If the database cannot be opened or written, the app stops transfers rather than uploading or downloading without durable state. Check the application logs for the underlying filesystem or SQLite error.
+- Windows path: `%LOCALAPPDATA%\Immich Folder Watch\sync-state.db`.
+- Linux path: `$XDG_CONFIG_HOME/immich-folder-watch/sync-state.db`, or `~/.config/immich-folder-watch/sync-state.db` when `XDG_CONFIG_HOME` is unset. Flatpak maps this to `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db` on the host.
+
 ## Logs
 
 - Console logs include timestamps and structured fields.
