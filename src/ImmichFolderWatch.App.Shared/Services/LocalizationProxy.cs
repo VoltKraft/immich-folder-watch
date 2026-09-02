@@ -75,6 +75,8 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_AlbumNameWatermark => Strings.UI_AlbumNameWatermark;
     public string UI_AdvancedWatchOptions => Strings.UI_AdvancedWatchOptions;
     public string UI_IncludeSubdirectories => Strings.UI_IncludeSubdirectories;
+    public string UI_DeleteAfterUpload => Strings.UI_DeleteAfterUpload;
+    public string UI_DeleteAfterUploadDescription => Strings.UI_DeleteAfterUploadDescription;
     public string UI_Extensions => Strings.UI_Extensions;
     public string UI_ExcludedDirectories => Strings.UI_ExcludedDirectories;
     public string UI_ExcludedFileNames => Strings.UI_ExcludedFileNames;
