@@ -239,6 +239,10 @@
                             </DataTemplate>
                           </ComboBox.ItemTemplate>
                         </ComboBox>
+                        <CheckBox IsChecked="{Binding DeleteAfterUpload}"
+                                  IsVisible="{Binding ShowDeleteAfterUpload}"
+                                  Content="{Binding UI_DeleteAfterUpload, Source={StaticResource Loc}}"
+                                  ToolTip.Tip="{Binding UI_DeleteAfterUploadDescription, Source={StaticResource Loc}}" />
                       </StackPanel>
 
                       <Expander IsExpanded="{Binding ShowAdvancedOptions}"

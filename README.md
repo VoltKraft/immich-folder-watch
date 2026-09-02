@@ -149,6 +149,7 @@ watch:
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
       albumName: "Screenshots"
       syncMode: "uploadNew" # uploadNew (default) | uploadAll | sync
+      deleteAfterUpload: false # upload modes only; permanently deletes verified local uploads
       includeSubdirectories: true
       extensions:
         - ".avif"
@@ -192,6 +193,8 @@ logging:
 ## Documentation
 
 The GUI keeps per-source watch options collapsed by default and only shows `Excluded Directories` when `Include subdirectories` is enabled.
+
+Upload-only sources can optionally act as an inbox by permanently deleting local files after Immich confirms the upload and album assignment. The option is disabled by default and never applies to bidirectional `sync` sources.
 
 - [Configuration](./docs/configuration.md)
 - [Windows Installation](./docs/installation-windows.md)

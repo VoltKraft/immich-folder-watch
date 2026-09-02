@@ -12,6 +12,7 @@ public sealed class WatchSourceItem : BindableBase
     private string _excludeDirectoriesText = string.Empty;
     private string _excludeFileNamesText = string.Empty;
     private bool _includeSubdirectories;
+    private bool _deleteAfterUpload;
     private bool _showAdvancedOptions;
     private bool _albumNameTouchedByUser;
     private bool _hasAutoFilledAlbumName;
@@ -156,6 +157,7 @@ public sealed class WatchSourceItem : BindableBase
             {
                 RaisePropertyChanged(nameof(ShowIncludeSubdirectories));
                 RaisePropertyChanged(nameof(ShowExcludeDirectories));
+                RaisePropertyChanged(nameof(ShowDeleteAfterUpload));
                 RaisePropertyChanged(nameof(SelectedSyncModeOption));
             }
         }
@@ -186,6 +188,15 @@ public sealed class WatchSourceItem : BindableBase
     }
 
     public bool ShowIncludeSubdirectories =>
+        !string.Equals(_syncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal);
+
+    public bool DeleteAfterUpload
+    {
+        get => _deleteAfterUpload;
+        set => SetProperty(ref _deleteAfterUpload, value);
+    }
+
+    public bool ShowDeleteAfterUpload =>
         !string.Equals(_syncMode, WatchSourceSyncModes.Sync, StringComparison.Ordinal);
 
     public bool ShowExcludeDirectories =>

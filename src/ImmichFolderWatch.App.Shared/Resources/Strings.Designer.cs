@@ -70,6 +70,8 @@ public static class Strings
     public static string UI_AlbumNameWatermark => Get(nameof(UI_AlbumNameWatermark));
     public static string UI_AdvancedWatchOptions => Get(nameof(UI_AdvancedWatchOptions));
     public static string UI_IncludeSubdirectories => Get(nameof(UI_IncludeSubdirectories));
+    public static string UI_DeleteAfterUpload => Get(nameof(UI_DeleteAfterUpload));
+    public static string UI_DeleteAfterUploadDescription => Get(nameof(UI_DeleteAfterUploadDescription));
     public static string UI_Extensions => Get(nameof(UI_Extensions));
     public static string UI_ExcludedDirectories => Get(nameof(UI_ExcludedDirectories));
     public static string UI_ExcludedFileNames => Get(nameof(UI_ExcludedFileNames));

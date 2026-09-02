@@ -528,6 +528,7 @@ public sealed class MainWindowViewModel : BindableBase
                 ExcludeFileNamesText = string.Join(Environment.NewLine, source.ExcludeFileNames),
                 ShowAdvancedOptions = false,
                 SyncMode = source.SyncMode,
+                DeleteAfterUpload = source.DeleteAfterUpload,
             });
         }
 
@@ -614,6 +615,7 @@ public sealed class MainWindowViewModel : BindableBase
                     ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
                     ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
                     SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
+                    DeleteAfterUpload = source.DeleteAfterUpload,
                 }).ToList(),
                 BatchIntervalSeconds = batchIntervalSeconds,
                 MaxBatchSize = maxBatchSize,
@@ -661,6 +663,7 @@ public sealed class MainWindowViewModel : BindableBase
                     ExcludeDirectories = ParseListInput(source.ExcludeDirectoriesText).ToList(),
                     ExcludeFileNames = ParseListInput(source.ExcludeFileNamesText).ToList(),
                     SyncMode = WatchSourceSyncModes.Normalize(source.SyncMode),
+                    DeleteAfterUpload = source.DeleteAfterUpload,
                 }).ToList(),
             },
             Retry = new RetrySettings
@@ -1044,6 +1047,7 @@ public sealed class MainWindowViewModel : BindableBase
             ExcludeFileNamesText = string.Empty,
             ShowAdvancedOptions = false,
             SyncMode = WatchSourceSyncModes.UploadNew,
+            DeleteAfterUpload = false,
         };
     }
 

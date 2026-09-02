@@ -1,9 +1,35 @@
 using ImmichFolderWatch.App.Shared.Models;
+using ImmichFolderWatch.Core.Configuration;
 
 namespace ImmichFolderWatch.Tests.Core.Models;
 
 public sealed class WatchSourceItemTests
 {
+    [Fact]
+    public void DeleteAfterUpload_IsVisibleOnlyForUploadModes_AndPreservesValue()
+    {
+        var item = new WatchSourceItem();
+
+        Assert.False(item.DeleteAfterUpload);
+        Assert.True(item.ShowDeleteAfterUpload);
+
+        item.DeleteAfterUpload = true;
+        item.SyncMode = WatchSourceSyncModes.UploadAll;
+
+        Assert.True(item.ShowDeleteAfterUpload);
+        Assert.True(item.DeleteAfterUpload);
+
+        item.SyncMode = WatchSourceSyncModes.Sync;
+
+        Assert.False(item.ShowDeleteAfterUpload);
+        Assert.True(item.DeleteAfterUpload);
+
+        item.SyncMode = WatchSourceSyncModes.UploadNew;
+
+        Assert.True(item.ShowDeleteAfterUpload);
+        Assert.True(item.DeleteAfterUpload);
+    }
+
     [Fact]
     public void Path_PrefillsAlbumNameOnce_FromFolderName()
     {

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-09-01
+
+### Added
+- Added a per-source `deleteAfterUpload` option for `uploadNew` and `uploadAll` folders. When enabled, verified local uploads are permanently deleted, allowing a watched folder to act as an Immich inbox.
+
+### Changed
+- Previously verified uploads are also cleaned up after the option is enabled, but only while their size and UTC modification time still match the persisted upload state.
+- Local deletion failures retain their synchronization state and are retried without uploading the file again. The option is always ignored for bidirectional `sync` sources.
+
 ## [2.6.1] - 2026-09-01
 
 ### Fixed

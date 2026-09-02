@@ -103,6 +103,8 @@
   <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leer lassen, um kein Album zu verwenden</value></data>
   <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Erweiterte Überwachungsoptionen</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Unterordner einbeziehen</value></data>
+  <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Lokale Dateien nach erfolgreichem Upload dauerhaft löschen</value></data>
+  <data name="UI_DeleteAfterUploadDescription" xml:space="preserve"><value>Nachdem Immich den Upload und die Albumzuordnung bestätigt hat, wird die lokale Datei dauerhaft gelöscht. Dies bereinigt auch bereits verifizierte Uploads, deren Datei unverändert ist.</value></data>
   <data name="UI_Extensions" xml:space="preserve"><value>Dateiendungen</value></data>
   <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Ausgeschlossene Verzeichnisse</value></data>
   <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Ausgeschlossene Dateinamen</value></data>

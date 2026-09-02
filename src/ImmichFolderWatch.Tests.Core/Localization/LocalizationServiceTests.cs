@@ -1,10 +1,20 @@
 using System.Globalization;
+using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Shared.Services;
 
 namespace ImmichFolderWatch.Tests.Core.Localization;
 
 public sealed class LocalizationServiceTests
 {
+    [Fact]
+    public void LocalizationProxy_DeleteAfterUploadProperties_ReturnResourceValues()
+    {
+        var proxy = new LocalizationProxy();
+
+        Assert.Equal(Strings.UI_DeleteAfterUpload, proxy.UI_DeleteAfterUpload);
+        Assert.Equal(Strings.UI_DeleteAfterUploadDescription, proxy.UI_DeleteAfterUploadDescription);
+    }
+
     [Fact]
     public void ResolveCulture_EnglishCode_ReturnsEnUs()
     {
