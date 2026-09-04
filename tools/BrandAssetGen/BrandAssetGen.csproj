@@ -48,14 +48,11 @@
           Inputs="@(BrandAssetGeneratorInputs)"
           Outputs="$(BrandWindowsIcon);$(BrandHeaderLogo);$(BrandFlatpakSvg);$(BrandFlatpakPng)">
     <!--
-      Invoke via $(TargetPath) directly. The previous `dotnet run` form
-      with the no-build flag broke when App.csproj or App.Linux.csproj
-      published with a runtime identifier: MSBuild propagates the RID
-      into this ProjectReference, our outputs land at
-      bin/Release/net10.0/<rid>/, and dotnet run without a matching
-      -r flag looked at the non-RID bin/Release/net10.0/ and failed
-      with "system cannot find the file". $(TargetPath) resolves to
-      the actual compiled DLL path, RID-subdir-aware.
+      Invoke via $(TargetPath) directly so this target always runs the
+      generator built by its ProjectReference. The application projects
+      remove target RuntimeIdentifier and SelfContained properties from
+      this host tool: a cross-published ARM64 application must not try to
+      execute an ARM64 generator on an x64 build runner.
     -->
     <Exec Command="&quot;$(BrandDotNetHost)&quot; &quot;$(TargetPath)&quot; --project-root &quot;$(BrandProjectRoot)&quot; --logo &quot;$(BrandLogoSvg)&quot; --output-root &quot;$(BrandOutputRoot)&quot;" />
   </Target>

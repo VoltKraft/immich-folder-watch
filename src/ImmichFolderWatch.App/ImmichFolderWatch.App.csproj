@@ -37,6 +37,7 @@
     -->
     <ProjectReference Include="$(BrandGeneratorProject)"
                       ReferenceOutputAssembly="false"
+                      GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained"
                       Private="false" />
   </ItemGroup>
 
