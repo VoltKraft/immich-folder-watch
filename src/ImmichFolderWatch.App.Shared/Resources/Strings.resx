@@ -76,7 +76,7 @@
 
   <data name="Tray_Open" xml:space="preserve"><value>Open GUI</value></data>
   <data name="Tray_Unavailable" xml:space="preserve"><value>No system tray icon — closing the window only hides it; the watcher keeps running in the background. Re-open via the app launcher (Activities, dock, or GNOME 46+ Quick Settings → Background Apps). Use the Quit button to actually exit. On KDE Plasma the tray works out of the box; on GNOME, the AppIndicator and KStatusNotifierItem Support extension adds a classic tray icon.</value></data>
-  <data name="Tray_FlatpakUnsupported" xml:space="preserve"><value>System tray integration is disabled in this Flathub version while a Flatpak-safe tray implementation is prepared. Closing the window hides it; re-open it from the app launcher or GNOME Background Apps. Use the Quit button to exit.</value></data>
+  <data name="Tray_FlatpakUnsupported" xml:space="preserve"><value>System tray integration is disabled in this Flatpak package while a Flatpak-safe tray implementation is prepared. Closing the window hides it; re-open it from the app launcher or GNOME Background Apps. Use the Quit button to exit.</value></data>
   <data name="Tray_Restart" xml:space="preserve"><value>Restart</value></data>
   <data name="Tray_Quit" xml:space="preserve"><value>Quit</value></data>
 

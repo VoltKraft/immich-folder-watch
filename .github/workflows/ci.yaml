@@ -93,12 +93,14 @@ jobs:
       - name: Validate desktop entry
         run: desktop-file-validate packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop
 
-      - name: Dry-parse Flathub manifest
-        # The Flathub manifest is the only Flatpak manifest now — Flathub
-        # builds it on its own infrastructure. We do not build a .flatpak
-        # in CI; this step just confirms the manifest still parses.
+      - name: Dry-parse shared Flatpak manifest
+        # The same manifest feeds future Flathub submission and the
+        # commit-pinned GitHub release bundle.
         run: |
           printf '[]\n' > packaging/flatpak/flathub/nuget-sources.json
           flatpak-builder --show-manifest \
             packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml \
             > /dev/null
+
+      - name: Test Flatpak release tooling
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py' -v

@@ -7,14 +7,14 @@
 # After running, fill in release notes under the new CHANGELOG heading,
 # review the diff, then commit on `main`. The release pipeline
 # (.github/workflows/release.yaml) picks up the new version on push to
-# main, builds the Windows MSI, and tags v<version>. Linux ships via
-# Flathub (see packaging/flatpak/flathub/README.md), not this pipeline.
+# main, builds the Windows MSI and Linux Flatpak from the same commit,
+# and tags v<version> only after both artifacts succeed.
 #
 # This script does NOT touch packaging/flatpak/*.metainfo.xml. After
 # filling in the CHANGELOG notes, run
 #   python3 tools/update-appstream.py <new-version>
 # to refresh the AppStream <release> block so the tagged release carries
-# accurate Flathub "What's New" metadata.
+# accurate Linux "What's New" metadata.
 
 set -euo pipefail
 
@@ -87,4 +87,4 @@ echo "  1. Fill in release notes under the new CHANGELOG heading."
 echo "  2. python3 tools/update-appstream.py ${NEW}   # refresh metainfo <release> block"
 echo "  3. git diff Directory.Build.props CHANGELOG.md packaging/flatpak/*.metainfo.xml"
 echo "  4. git commit -m \"release: v${NEW}\""
-echo "  5. git push origin main                       # triggers release.yaml (Windows MSI)"
+echo "  5. git push origin main                       # triggers release.yaml (MSI + Flatpak)"

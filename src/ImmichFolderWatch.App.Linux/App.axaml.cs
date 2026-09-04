@@ -72,7 +72,7 @@ public sealed partial class App : Application
                 builder.SetMinimumLevel(LogLevel.Information);
                 if (JournaldLoggingExtensions.IsJournaldDetected())
                 {
-                    // systemd / journald style for autostart + Flathub launches
+                    // systemd / journald style for autostart + Flatpak launches
                     // (one provider only — stacking SimpleConsole + Systemd
                     // collides on the FormatterName, last one wins).
                     builder.AddSystemdConsole(options =>
@@ -193,7 +193,7 @@ public sealed partial class App : Application
             // whatever is assigned to MainWindow once we return from
             // OnFrameworkInitializationCompleted. To honour --background
             // we leave it unassigned only when a tray entry point can
-            // bring it back. The Flathub build currently disables the
+            // bring it back. The Flatpak package currently disables the
             // tray, so autostart launches visibly instead of stranding
             // the process without a GUI entry point.
             var shouldStartHidden = startHidden && !trayDisabledForFlatpak;

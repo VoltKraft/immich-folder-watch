@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Regenerate packaging/flatpak/flathub/nuget-sources.json from the .NET projects.
 #
-# Flathub forbids network access during the Flatpak build, so the
-# manifest cannot run `dotnet restore` itself. Instead we pre-collect
+# Flatpak release builds run without network access inside the build sandbox,
+# so the manifest cannot run `dotnet restore` itself. Instead we pre-collect
 # every NuGet package URL + sha512 into nuget-sources.json and reference
-# it as a sibling source list next to the Flathub manifest. This script
-# (re)generates that file from the live solution; it is gitignored here
-# and committed only into the per-app Flathub repo.
+# it as a sibling source list next to the manifest. This script regenerates
+# that file from the live solution. It is gitignored upstream, copied beside
+# the temporary GitHub release manifest in CI, and would be committed only in
+# a future per-app Flathub repository.
 #
 # Run from a Linux dev machine with .NET 10 SDK + python3 + git on PATH.
 

@@ -34,7 +34,7 @@ It runs as a per-user desktop app — no system service, no elevation on every c
 That gives you a clean, low-maintenance ingestion path:
 
 - Desktop GUI with background operation; the Windows build includes a tray icon,
-  while the first Flathub build shows an in-app banner until a Flatpak-safe tray
+  while the Flatpak package shows an in-app banner until a Flatpak-safe tray
   backend is available
 - Per-user operation — each user runs their own configuration
 - Autostart on login (toggleable in the GUI; uses the Background portal on Linux)
@@ -88,24 +88,27 @@ Upgrading from an older service-based install: the legacy service is stopped and
 
 ### Linux (Flatpak)
 
-The Flathub listing is in submission. Once it's live, installation will be a single command:
+1. Download `immich-folder-watch-<version>.flatpak` from
+   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
+2. Install and launch it for the current user:
 
 ```bash
-flatpak install flathub io.github.voltkraft.immich-folder-watch
-```
-
-Until then, build and install the Flatpak from source per [`packaging/flatpak/README.md`](./packaging/flatpak/README.md):
-
-```bash
-./tools/generate-nuget-sources.sh
-flatpak-builder --user --install --force-clean \
-    packaging/flatpak/build-dir \
-    packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml
+flatpak install --user ./immich-folder-watch-<version>.flatpak
 flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
+Flatpak assets are published by the current release workflow; `v2.7.0` and
+earlier releases are not backfilled.
+
+GitHub's single-file bundle records Flathub as the source for its Freedesktop
+runtime dependency, but it does not configure an application repository.
+Download each new application version manually and install it with
+`flatpak install --user --or-update ./immich-folder-watch-<version>.flatpak`.
+The planned Flathub publication is currently postponed. See
+[`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
+
 The Flatpak package runs through X11/XWayland because the current Avalonia
-Linux backend initializes X11. The current Flathub build disables Avalonia's
+Linux backend initializes X11. The Flatpak package disables Avalonia's
 StatusNotifierItem tray backend because it requires a broad KDE D-Bus own-name
 permission that Flathub no longer grants to new apps; the app shows a window
 banner and can be reopened from the launcher or Background Apps.
@@ -129,6 +132,7 @@ modification time are unchanged are not hashed, uploaded, or downloaded.
 Detailed guides:
 
 - [Windows Installation](./docs/installation-windows.md)
+- [Linux Installation](./docs/installation-linux.md)
 - [Linux Flatpak packaging](./packaging/flatpak/README.md)
 - [Configuration](./docs/configuration.md)
 - [Troubleshooting](./docs/troubleshooting.md)

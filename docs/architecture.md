@@ -6,7 +6,7 @@
 - Upload files through the Immich HTTP API.
 - Keep upload and HTTP behavior isolated from watcher orchestration.
 - Run as a per-user desktop app (GUI + sync worker in a single process; tray
-  support is available on Windows and disabled in the first Flathub build).
+  support is available on Windows and disabled in the Flatpak package).
 
 ## Solution Layout
 
@@ -39,7 +39,7 @@
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
-2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed on a build with tray support, the main window stays hidden and only the tray icon is shown; the Flathub build shows the window because its current tray backend is disabled.
+2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed on a build with tray support, the main window stays hidden and only the tray icon is shown; the Flatpak package shows the window because its current tray backend is disabled.
 3. `AppHost` constructs an `IHost` that wires:
    - `AppConfig` (loaded from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`)
    - the shared sync-state store (`sync-state.db` beside `config.yaml`)

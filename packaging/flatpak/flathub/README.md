@@ -1,9 +1,13 @@
 # Flathub submission + maintenance
 
-This directory holds the **Flathub** Flatpak manifest — the one that
-lives in the per-app `flathub/io.github.voltkraft.immich-folder-watch`
-repo Flathub creates on submission approval, and that Flathub builds on
-its own infrastructure. It is the only Flatpak manifest in the project.
+> **Status:** Flathub publication is postponed. GitHub Releases is the active
+> Linux distribution channel. Keep this material for a future submission, but
+> do not advertise the app as currently available from Flathub.
+
+This directory holds the shared Flatpak manifest intended for the future
+`flathub/io.github.voltkraft.immich-folder-watch` repository. The upstream
+release workflow also derives its commit-pinned GitHub bundle manifest from
+this file, so packaging permissions and build commands remain in one place.
 
 Key properties:
 
@@ -23,8 +27,10 @@ Key properties:
   Avalonia tray backend requires a broad KDE D-Bus own-name grant that Flathub
   no longer accepts for new apps.
 - [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
-- [ ] `v2.5.3` tag pushed; `commit:` in the submission manifest replaced with the SHA `git rev-parse v2.5.3` reports.
-- [ ] Fresh `nuget-sources.json` generated against the v2.5.3 tag (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
+- [ ] Release tag pushed; `tag:` and `commit:` in the submission manifest match
+  the version and SHA reported by `git rev-parse v<version>`.
+- [ ] Fresh `nuget-sources.json` generated against that tag
+  (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
 
 ## Submission steps (Phase 7.B — user-action)
 
@@ -65,7 +71,7 @@ For each release, after the bot's PR appears we (the maintainer):
 1. Check out the bot's branch in our flathub-app fork.
 2. From a clean upstream checkout of the new tag, run
    `./tools/generate-nuget-sources.sh`.
-3. Copy `packaging/flatpak/nuget-sources.json` into the bot's PR
+3. Copy `packaging/flatpak/flathub/nuget-sources.json` into the bot's PR
    working tree, replacing the existing one.
 4. Push to the bot's branch; the PR re-runs Flathub's CI, which
    builds offline against the new feed.
@@ -90,9 +96,9 @@ expired GitHub Action token):
 
 ## Files in this directory
 
-- `io.github.voltkraft.immich-folder-watch.yml` — Flathub manifest
-  (committed; this file is the source of truth that flows to the
-  flathub-app repo at submission time).
+- `io.github.voltkraft.immich-folder-watch.yml` — shared source manifest
+  (committed; it feeds GitHub bundle builds now and the Flathub app repo after
+  a future submission).
 - `nuget-sources.json` — gitignored; regenerated per release from
   the matching tag and only ever lives in the flathub-app repo
   long-term.

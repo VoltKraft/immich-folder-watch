@@ -1,13 +1,12 @@
-# Linux Smoke Tests — Pre-Flathub QA
+# Linux Flatpak Smoke Tests
 
-This is the manual checklist that gates the Flathub submission. Phases 0–5 brought the
-Flatpak build to "compiles + packages cleanly + CI green"; Phase 6
-proves it actually works on real desktops. Run **every** test here on
-**both** target environments before tagging the release and submitting to
-Flathub.
+This manual checklist gates the Linux bundle attached to GitHub Releases.
+Phases 0–5 brought the Flatpak build to "compiles + packages cleanly + CI
+green"; Phase 6 proves it actually works on real desktops. Run **every** test
+here on **both** target environments before tagging the release.
 
-**High-severity failures block Flathub submission.** Medium-severity failures are
-recorded but do not block.
+**High-severity failures block the GitHub release.** Medium-severity failures
+are recorded but do not block.
 
 ## 1. Target environments
 
@@ -325,7 +324,7 @@ Setup: any supported Flatpak desktop session.
 Steps:
 1. Launch app.
 2. Confirm the main window shows a banner explaining that tray
-   integration is disabled in the current Flathub build.
+   integration is disabled in the current Flatpak package.
 3. Close the window via the X button; the process remains running.
 4. Launch the app again from the desktop launcher or terminal.
 5. Confirm the existing instance shows and activates the same window.
@@ -338,7 +337,7 @@ metadata. The banner keeps the close-to-background behavior discoverable
 until a Flatpak-safe tray backend is available.
 
 Notes: Flathub no longer accepts the broad KDE D-Bus own-name grant required
-by Avalonia's current SNI backend for new apps, so the first Flathub release
+by Avalonia's current SNI backend for new apps, so the shared Flatpak package
 ships without tray support.
 
 #### SMK-18 — Background mode on bare GNOME (no AppIndicator)  `H`
@@ -613,7 +612,7 @@ Fill in for each environment:
 | SMK-32 | quit cleanup | H | | |
 | SMK-33 | uninstall clean | H | | |
 
-**v1.0 is shippable when:** every `H` row is `PASS` on **at least
+**The Linux release is shippable when:** every `H` row is `PASS` on **at least
 GNOME**, AND every `H` row except SMK-17 is `PASS` on KDE if KDE
 testing happened. Outstanding `M` rows go on the Phase-7 follow-up
 list, not the blocker list.
@@ -626,8 +625,9 @@ list, not the blocker list.
 3. `python3 tools/update-appstream.py <version>` to refresh the
    metainfo `<release>` block.
 4. `git commit -m "release: v<version>"` on `main`.
-5. Push — `release.yaml` builds the Windows MSI and attaches it to a
-   GitHub Release tagged `v<version>`.
-6. Linux ships via Flathub — see
-   `packaging/flatpak/flathub/README.md` for the submission and
-   continuous-publishing flow.
+5. Push — `release.yaml` builds the Windows MSI and Linux `x86_64` Flatpak
+   from the same commit. It creates `v<version>` and the GitHub Release only
+   after both artifacts succeed.
+6. Confirm the release contains both
+   `immich-folder-watch-<version>-win-x64.msi` and
+   `immich-folder-watch-<version>.flatpak`.

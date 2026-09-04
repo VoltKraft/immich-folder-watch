@@ -39,7 +39,7 @@ public sealed partial class MainWindow : Window
 
         // Always hide on close: the FolderWatchWorker keeps running in
         // the background. Re-open paths:
-        // - System tray icon where enabled outside the Flathub sandbox.
+        // - System tray icon where enabled outside the Flatpak sandbox.
         // - Click the .desktop launcher again — UnixSingleInstance
         //   Coordinator catches the second-instance signal and shows
         //   the window.
