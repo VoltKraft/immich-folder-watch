@@ -92,6 +92,10 @@ require flatpak "Install Flatpak and the org.freedesktop.Sdk.Extension.dotnet10/
 require python3 "Install Python 3 (most distributions ship it as 'python3')."
 require git     "Install git."
 
+# The upstream generator launches dotnet inside a Flatpak sandbox. GitHub's
+# container HOME is not writable there, while /tmp is private and writable.
+export DOTNET_CLI_HOME="/tmp/immich-folder-watch-dotnet-cli"
+
 mkdir -p "${CACHE_DIR}"
 
 if [[ ! -d "${TOOLS_DIR}" ]]; then
