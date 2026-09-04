@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-09-04
+
+### Added
+- Added a best-effort startup update check that links to a newer stable GitHub release from the version display without interrupting application startup when the check fails.
+
 ### Changed
 - GitHub releases now publish x64 and ARM64 Windows MSIs and Linux Flatpak bundles atomically from the same commit, and WinGet submissions include both Windows architectures. Linux distribution uses the GitHub sideload bundles while Flathub publication remains postponed.
 

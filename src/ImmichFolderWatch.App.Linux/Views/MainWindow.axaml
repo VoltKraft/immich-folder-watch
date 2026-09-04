@@ -41,7 +41,14 @@
         </StackPanel>
 
         <StackPanel Grid.Column="1" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-          <TextBlock Text="{Binding ProductVersionText}" FontWeight="SemiBold" TextAlignment="Right" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <TextBlock Text="{Binding ProductVersionText}" FontWeight="SemiBold" TextAlignment="Right" />
+            <HyperlinkButton Content="{Binding UpdateAvailableText}"
+                             IsVisible="{Binding IsUpdateAvailable}"
+                             Padding="0"
+                             VerticalAlignment="Center"
+                             Click="UpdateHyperlinkButton_Click" />
+          </StackPanel>
           <TextBlock Margin="0,6,0,0" Text="{Binding StatusDetails}" Opacity="0.7" TextAlignment="Right" />
         </StackPanel>
       </Grid>

@@ -182,7 +182,7 @@ users will see on GitHub Releases and, in the future, Flathub. Run it before
 tagging a release:
 
 ```bash
-python3 tools/update-appstream.py 2.7.0 \
+python3 tools/update-appstream.py 2.8.0 \
     --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
 ```
 

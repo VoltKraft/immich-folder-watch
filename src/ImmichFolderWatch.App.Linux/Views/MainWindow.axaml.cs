@@ -12,6 +12,7 @@ using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.App.Linux.Views;
 
@@ -68,6 +69,32 @@ public sealed partial class MainWindow : Window
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Shutdown(0);
+        }
+    }
+
+    private void UpdateHyperlinkButton_Click(object? sender, RoutedEventArgs e)
+    {
+        var downloadUri = ViewModel?.UpdateDownloadUri;
+        if (downloadUri is null)
+        {
+            return;
+        }
+
+        var logger = App.Services?.GetService<ILogger<MainWindow>>();
+        try
+        {
+            var process = Process.Start(new ProcessStartInfo("xdg-open", downloadUri.AbsoluteUri)
+            {
+                UseShellExecute = false,
+            });
+            if (process is null)
+            {
+                logger?.LogWarning("Could not start xdg-open for the update download page {UpdateDownloadUri}.", downloadUri);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Could not open the update download page {UpdateDownloadUri}.", downloadUri);
         }
     }
 

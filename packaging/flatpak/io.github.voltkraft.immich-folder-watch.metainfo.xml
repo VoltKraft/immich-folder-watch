@@ -83,16 +83,15 @@
   </branding>
 
   <releases>
-    <release version="2.7.0" date="2026-09-01">
+    <release version="2.8.0" date="2026-09-04">
       <description>
         <p>Added:</p>
         <ul>
-          <li>Added a per-source `deleteAfterUpload` option for `uploadNew` and `uploadAll` folders. When enabled, verified local uploads are permanently deleted, allowing a watched folder to act as an Immich inbox.</li>
+          <li>Added a best-effort startup update check that links to a newer stable GitHub release from the version display without interrupting application startup when the check fails.</li>
         </ul>
         <p>Changed:</p>
         <ul>
-          <li>Previously verified uploads are also cleaned up after the option is enabled, but only while their size and UTC modification time still match the persisted upload state.</li>
-          <li>Local deletion failures retain their synchronization state and are retried without uploading the file again. The option is always ignored for bidirectional `sync` sources.</li>
+          <li>GitHub releases now publish x64 and ARM64 Windows MSIs and Linux Flatpak bundles atomically from the same commit, and WinGet submissions include both Windows architectures. Linux distribution uses the GitHub sideload bundles while Flathub publication remains postponed.</li>
         </ul>
       </description>
     </release>

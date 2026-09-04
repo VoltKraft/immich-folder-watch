@@ -78,12 +78,23 @@
                     Grid.Column="1"
                     HorizontalAlignment="Right"
                     Margin="24,0,0,0">
-          <TextBlock Style="{StaticResource HeaderTitleText}"
-                     Text="{Binding ProductVersionText}"
-                     FontWeight="SemiBold"
-                     TextAlignment="Right"
-                     TextWrapping="NoWrap"
-                     TextTrimming="CharacterEllipsis" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <TextBlock Style="{StaticResource HeaderTitleText}"
+                       Text="{Binding ProductVersionText}"
+                       FontWeight="SemiBold"
+                       TextAlignment="Right"
+                       TextWrapping="NoWrap"
+                       TextTrimming="CharacterEllipsis" />
+            <TextBlock Margin="8,0,0,0"
+                       Style="{StaticResource HeaderTitleText}"
+                       FontWeight="SemiBold"
+                       Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVis}}">
+              <Hyperlink NavigateUri="{Binding UpdateDownloadUri}"
+                         RequestNavigate="UpdateHyperlink_RequestNavigate">
+                <Run Text="{Binding UpdateAvailableText}" />
+              </Hyperlink>
+            </TextBlock>
+          </StackPanel>
           <TextBlock Margin="0,6,0,0"
                      Style="{StaticResource HeaderMetaText}"
                      Text="{Binding StatusDetails}"

@@ -2,11 +2,14 @@ using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.Shared.ViewModels;
+using System.Reflection;
+using System.Reflection.Emit;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
+using SharedProductVersionProvider = ImmichFolderWatch.App.Shared.Services.ProductVersionProvider;
 
 namespace ImmichFolderWatch.Tests.Gui;
 
@@ -81,13 +84,15 @@ public sealed class MainWindowViewModelTests
         ".x3f",
     };
 
-    private static MainWindowViewModel CreateViewModel()
+    private static MainWindowViewModel CreateViewModel(
+        LocalizationService? localizationService = null,
+        IUiDispatcher? uiDispatcher = null)
     {
         return new MainWindowViewModel(
             new SyncStatusProvider(),
             new AutostartManager(),
-            LocalizationService.Instance,
-            new SyncTestUiDispatcher(),
+            localizationService ?? LocalizationService.Instance,
+            uiDispatcher ?? new SyncTestUiDispatcher(),
             new WindowsLoggingCapabilities());
     }
 
@@ -100,6 +105,133 @@ public sealed class MainWindowViewModelTests
             ArgumentNullException.ThrowIfNull(action);
             action();
         }
+    }
+
+    private sealed class DeferredTestUiDispatcher : IUiDispatcher
+    {
+        public bool IsOnUiThread => false;
+
+        public Action? PostedAction { get; private set; }
+
+        public void Post(Action action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+            PostedAction = action;
+        }
+    }
+
+    [Fact]
+    public void ApplyUpdateInfo_SetsLocalizedBindableStateAtomically()
+    {
+        var localizationService = new LocalizationService();
+        localizationService.SetLanguage(LocalizationService.LanguageEnglish);
+        var viewModel = CreateViewModel(localizationService);
+        var changedProperties = new List<string?>();
+        var stateWasConsistentDuringNotifications = true;
+        var downloadUri = new Uri("https://github.com/VoltKraft/immich-folder-watch/releases/tag/v2.8.0");
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            changedProperties.Add(args.PropertyName);
+            stateWasConsistentDuringNotifications &= viewModel.IsUpdateAvailable
+                && viewModel.UpdateAvailableText == "Update v2.8.0 available"
+                && viewModel.UpdateDownloadUri == downloadUri;
+        };
+
+        viewModel.ApplyUpdateInfo(new UpdateInfo(new Version(2, 8, 0), downloadUri));
+
+        Assert.True(viewModel.IsUpdateAvailable);
+        Assert.Equal("Update v2.8.0 available", viewModel.UpdateAvailableText);
+        Assert.Equal(downloadUri, viewModel.UpdateDownloadUri);
+        Assert.True(stateWasConsistentDuringNotifications);
+        Assert.Equal(
+            [nameof(MainWindowViewModel.IsUpdateAvailable), nameof(MainWindowViewModel.UpdateAvailableText), nameof(MainWindowViewModel.UpdateDownloadUri)],
+            changedProperties);
+    }
+
+    [Fact]
+    public void ApplyUpdateInfo_WithNull_ClearsBindableState()
+    {
+        var localizationService = new LocalizationService();
+        localizationService.SetLanguage(LocalizationService.LanguageEnglish);
+        var viewModel = CreateViewModel(localizationService);
+        viewModel.ApplyUpdateInfo(new UpdateInfo(
+            new Version(2, 8, 0),
+            new Uri("https://github.com/VoltKraft/immich-folder-watch/releases/tag/v2.8.0")));
+
+        viewModel.ApplyUpdateInfo(null);
+
+        Assert.False(viewModel.IsUpdateAvailable);
+        Assert.Empty(viewModel.UpdateAvailableText);
+        Assert.Null(viewModel.UpdateDownloadUri);
+    }
+
+    [Fact]
+    public void ApplyUpdateInfo_UsesUiDispatcher_WhenCalledOffUiThread()
+    {
+        var dispatcher = new DeferredTestUiDispatcher();
+        var viewModel = CreateViewModel(uiDispatcher: dispatcher);
+        var updateInfo = new UpdateInfo(
+            new Version(2, 8, 0),
+            new Uri("https://github.com/VoltKraft/immich-folder-watch/releases/tag/v2.8.0"));
+
+        viewModel.ApplyUpdateInfo(updateInfo);
+
+        Assert.False(viewModel.IsUpdateAvailable);
+        Assert.NotNull(dispatcher.PostedAction);
+
+        dispatcher.PostedAction();
+
+        Assert.True(viewModel.IsUpdateAvailable);
+        Assert.Equal(updateInfo.DownloadUri, viewModel.UpdateDownloadUri);
+    }
+
+    [Fact]
+    public void LanguageChange_ReformatsAvailableUpdateText()
+    {
+        var localizationService = new LocalizationService();
+        localizationService.SetLanguage(LocalizationService.LanguageEnglish);
+        var viewModel = CreateViewModel(localizationService);
+        viewModel.ApplyUpdateInfo(new UpdateInfo(
+            new Version(2, 8, 0),
+            new Uri("https://github.com/VoltKraft/immich-folder-watch/releases/tag/v2.8.0")));
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        try
+        {
+            localizationService.SetLanguage(LocalizationService.LanguageGerman);
+
+            Assert.Equal("Update v2.8.0 verfügbar", viewModel.UpdateAvailableText);
+            Assert.Contains(nameof(MainWindowViewModel.UpdateAvailableText), changedProperties);
+        }
+        finally
+        {
+            localizationService.SetLanguage(LocalizationService.LanguageEnglish);
+        }
+    }
+
+    [Fact]
+    public void ProductVersionProvider_UsesInformationalVersionWithoutBuildMetadata()
+    {
+        var assembly = CreateDynamicAssembly(
+            new Version(9, 8, 7, 6),
+            informationalVersion: "2.8.0+build.42");
+
+        var version = SharedProductVersionProvider.GetProductVersion(assembly);
+
+        Assert.Equal(new Version(2, 8, 0), version);
+    }
+
+    [Fact]
+    public void ProductVersionProvider_FallsBackToThreeComponentAssemblyVersion()
+    {
+        var assembly = CreateDynamicAssembly(
+            new Version(9, 8, 7, 6),
+            informationalVersion: "not-a-version");
+
+        var version = SharedProductVersionProvider.GetProductVersion(assembly);
+
+        Assert.Equal(new Version(9, 8, 7), version);
     }
 
     [Fact]
@@ -437,5 +569,18 @@ public sealed class MainWindowViewModelTests
     private static string JoinLines(params string[] values)
     {
         return string.Join(Environment.NewLine, values);
+    }
+
+    private static Assembly CreateDynamicAssembly(Version assemblyVersion, string informationalVersion)
+    {
+        var assemblyName = new AssemblyName($"ProductVersionProviderTests.{Guid.NewGuid():N}")
+        {
+            Version = assemblyVersion,
+        };
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+        var attributeConstructor = typeof(AssemblyInformationalVersionAttribute)
+            .GetConstructor([typeof(string)])!;
+        assembly.SetCustomAttribute(new CustomAttributeBuilder(attributeConstructor, [informationalVersion]));
+        return assembly;
     }
 }

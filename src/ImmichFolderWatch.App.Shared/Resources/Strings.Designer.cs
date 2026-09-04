@@ -94,6 +94,7 @@ public static class Strings
     public static string UI_Language => Get(nameof(UI_Language));
     public static string UI_Appearance => Get(nameof(UI_Appearance));
     public static string UI_SyncMode => Get(nameof(UI_SyncMode));
+    public static string Update_AvailableFormat => Get(nameof(Update_AvailableFormat));
 
     public static string SyncMode_UploadNew => Get(nameof(SyncMode_UploadNew));
     public static string SyncMode_UploadNew_Description => Get(nameof(SyncMode_UploadNew_Description));

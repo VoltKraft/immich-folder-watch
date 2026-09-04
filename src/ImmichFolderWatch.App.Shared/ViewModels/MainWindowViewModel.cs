@@ -115,6 +115,10 @@ public sealed class MainWindowViewModel : BindableBase
     private string _pendingCountText = "0";
     private bool _autostartEnabled;
     private string _productVersionText = string.Empty;
+    private bool _isUpdateAvailable;
+    private string _updateAvailableText = string.Empty;
+    private Uri? _updateDownloadUri;
+    private UpdateInfo? _availableUpdate;
     private string _operationMessage = string.Empty;
     private string _saveActionButtonText = string.Empty;
     private string _immichUrlStatusText = string.Empty;
@@ -416,6 +420,12 @@ public sealed class MainWindowViewModel : BindableBase
         get => _productVersionText;
         set => SetProperty(ref _productVersionText, value);
     }
+
+    public bool IsUpdateAvailable => _isUpdateAvailable;
+
+    public string UpdateAvailableText => _updateAvailableText;
+
+    public Uri? UpdateDownloadUri => _updateDownloadUri;
 
     public string SaveActionButtonText
     {
@@ -724,6 +734,21 @@ public sealed class MainWindowViewModel : BindableBase
         }
     }
 
+    /// <summary>
+    /// Applies or clears the available update notification on the UI thread.
+    /// </summary>
+    public void ApplyUpdateInfo(UpdateInfo? updateInfo)
+    {
+        if (_uiDispatcher.IsOnUiThread)
+        {
+            ApplyUpdateInfoOnUiThread(updateInfo);
+        }
+        else
+        {
+            _uiDispatcher.Post(() => ApplyUpdateInfoOnUiThread(updateInfo));
+        }
+    }
+
     private void ApplyAutostartChange(bool enabled)
     {
         try
@@ -802,6 +827,57 @@ public sealed class MainWindowViewModel : BindableBase
 
         RefreshSyncStatusFromProvider();
         RefreshPermissionStatusTexts();
+        RefreshUpdateAvailableText();
+    }
+
+    private void ApplyUpdateInfoOnUiThread(UpdateInfo? updateInfo)
+    {
+        var isUpdateAvailable = updateInfo is not null;
+        var updateAvailableText = updateInfo is null
+            ? string.Empty
+            : string.Format(
+                _localizationService.CurrentCulture,
+                Strings.Update_AvailableFormat,
+                updateInfo.Version.ToString(3));
+        var updateDownloadUri = updateInfo?.DownloadUri;
+
+        var visibilityChanged = _isUpdateAvailable != isUpdateAvailable;
+        var textChanged = !string.Equals(_updateAvailableText, updateAvailableText, StringComparison.Ordinal);
+        var uriChanged = _updateDownloadUri != updateDownloadUri;
+
+        _availableUpdate = updateInfo;
+        _isUpdateAvailable = isUpdateAvailable;
+        _updateAvailableText = updateAvailableText;
+        _updateDownloadUri = updateDownloadUri;
+
+        if (visibilityChanged)
+        {
+            RaisePropertyChanged(nameof(IsUpdateAvailable));
+        }
+
+        if (textChanged)
+        {
+            RaisePropertyChanged(nameof(UpdateAvailableText));
+        }
+
+        if (uriChanged)
+        {
+            RaisePropertyChanged(nameof(UpdateDownloadUri));
+        }
+    }
+
+    private void RefreshUpdateAvailableText()
+    {
+        if (_availableUpdate is null)
+        {
+            return;
+        }
+
+        var localizedText = string.Format(
+            _localizationService.CurrentCulture,
+            Strings.Update_AvailableFormat,
+            _availableUpdate.Version.ToString(3));
+        SetProperty(ref _updateAvailableText, localizedText, nameof(UpdateAvailableText));
     }
 
     private void RefreshSyncStatusFromProvider()

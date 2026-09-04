@@ -20,8 +20,10 @@ namespace ImmichFolderWatch.App.Linux;
 
 public sealed partial class App : Application
 {
+    private readonly CancellationTokenSource _shutdown = new();
     private MainWindow? _mainWindow;
     private AvaloniaTrayHost? _trayHost;
+    private Task? _updateCheckTask;
 
     /// <summary>
     /// Service-locator handle for code-behind click handlers in
@@ -116,6 +118,14 @@ public sealed partial class App : Application
             services.AddSingleton<AppConfigLoader>();
             services.AddSingleton<AppHost>();
             services.AddSingleton<ConfigVerificationRunner>();
+            services.AddSingleton(_ => new HttpClient(new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+            })
+            {
+                Timeout = TimeSpan.FromSeconds(5),
+            });
+            services.AddSingleton<IUpdateChecker, GitHubUpdateChecker>();
             services.AddSingleton<MainWindowViewModel>();
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
@@ -142,8 +152,9 @@ public sealed partial class App : Application
             // bindings refresh when the language switches.
             _ = provider.GetRequiredService<LocalizationProxy>();
             var viewModel = provider.GetRequiredService<MainWindowViewModel>();
-            viewModel.ProductVersionText =
-                $"v{typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+            var productVersion = ProductVersionProvider.GetProductVersion(typeof(App).Assembly);
+            viewModel.ProductVersionText = $"Version {productVersion?.ToString(3) ?? "unknown"}";
+            _updateCheckTask = CheckForUpdatesAsync(provider, viewModel, productVersion, _shutdown.Token);
             _mainWindow = new MainWindow
             {
                 DataContext = viewModel,
@@ -212,6 +223,18 @@ public sealed partial class App : Application
             }
             desktop.Exit += async (_, _) =>
             {
+                _shutdown.Cancel();
+                if (_updateCheckTask is not null)
+                {
+                    try
+                    {
+                        await _updateCheckTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+
                 _trayHost?.Dispose();
                 if (provider is IAsyncDisposable asyncDisposable)
                 {
@@ -221,9 +244,41 @@ public sealed partial class App : Application
                 {
                     disposable.Dispose();
                 }
+
+                _shutdown.Dispose();
             };
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task CheckForUpdatesAsync(
+        IServiceProvider services,
+        MainWindowViewModel viewModel,
+        Version? productVersion,
+        CancellationToken cancellationToken)
+    {
+        var logger = services.GetRequiredService<ILogger<App>>();
+        if (productVersion is null)
+        {
+            logger.LogWarning("The installed product version could not be determined; skipping the update check.");
+            return;
+        }
+
+        try
+        {
+            var updateInfo = await services
+                .GetRequiredService<IUpdateChecker>()
+                .CheckAsync(productVersion, cancellationToken)
+                .ConfigureAwait(false);
+            viewModel.ApplyUpdateInfo(updateInfo);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The update check failed and will be ignored.");
+        }
     }
 }
