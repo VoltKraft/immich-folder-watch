@@ -38,16 +38,21 @@ modules:
       # future Flathub submission, committed in the per-app Flathub repo.
       - nuget-sources.json
     build-commands:
-      - >-
-        dotnet publish
-        src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj
-        --configuration Release
-        --runtime linux-x64
-        --self-contained true
-        --source ./nuget-sources
-        -p:PublishSingleFile=false
-        -p:UseAppHost=true
-        --output ${FLATPAK_DEST}/lib/immich-folder-watch
+      - |
+        case "${FLATPAK_ARCH}" in
+          x86_64) dotnet_runtime=linux-x64 ;;
+          aarch64) dotnet_runtime=linux-arm64 ;;
+          *) echo "Unsupported Flatpak architecture: ${FLATPAK_ARCH}" >&2; exit 1 ;;
+        esac
+        dotnet publish \
+          src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj \
+          --configuration Release \
+          --runtime "${dotnet_runtime}" \
+          --self-contained true \
+          --source ./nuget-sources \
+          -p:PublishSingleFile=false \
+          -p:UseAppHost=true \
+          --output ${FLATPAK_DEST}/lib/immich-folder-watch
       - install -dm755 ${FLATPAK_DEST}/bin
       - ln -sf /app/lib/immich-folder-watch/immich-folder-watch ${FLATPAK_DEST}/bin/immich-folder-watch
       - install -Dm644 packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop

@@ -27,10 +27,11 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 ## CI
 
 - `ci.yaml`: cross-platform build + test coverage for the codebase
-- `release.yaml`: build the Windows MSI and Linux `x86_64` Flatpak from the
-  same immutable commit, then publish both only after successful CI on `main`
-  and only when the version tag does not already exist
-- `winget.yaml`: submit WinGet package updates for published releases after the initial manual bootstrap has been completed
+- `release.yaml`: build x64 and ARM64 Windows MSIs and Linux Flatpaks from the
+  same immutable commit, then publish all four only after successful CI on
+  `main` and only when the version tag does not already exist
+- `winget.yaml`: generate and submit the two-architecture WinGet manifest after
+  the GitHub Release has been published
 - `packaging/flatpak/`: the shared Flatpak manifest, metadata, local-build
   instructions, and postponed Flathub submission material
 

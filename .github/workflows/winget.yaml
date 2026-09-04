@@ -31,7 +31,7 @@ jobs:
               $releaseTag = $targetRef
           }
           elseif (-not [string]::IsNullOrWhiteSpace($manualTag)) {
-              $targetRef = "main"
+              $targetRef = $manualTag
               $releaseTag = $manualTag
           }
           else {
@@ -55,11 +55,6 @@ jobs:
           $metadata = Get-Content packaging/winget/package.metadata.json -Raw | ConvertFrom-Json
           $automationEnabled = ([string]$metadata.automationEnabled).ToLowerInvariant()
           "package_identifier=$($metadata.packageIdentifier)" >> $env:GITHUB_OUTPUT
-          "package_name=$($metadata.packageName)" >> $env:GITHUB_OUTPUT
-          "publisher=$($metadata.publisher)" >> $env:GITHUB_OUTPUT
-          "moniker=$($metadata.moniker)" >> $env:GITHUB_OUTPUT
-          "short_description=$($metadata.shortDescription)" >> $env:GITHUB_OUTPUT
-          "release_asset_name_template=$($metadata.releaseAssetNameTemplate)" >> $env:GITHUB_OUTPUT
           "automation_enabled=$automationEnabled" >> $env:GITHUB_OUTPUT
 
       - name: Stop if WinGet automation is not enabled yet
@@ -93,27 +88,185 @@ jobs:
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Build release MSI URL
+      - name: Download release MSIs and collect installer metadata
         if: steps.metadata.outputs.automation_enabled == 'true'
-        id: msi
+        id: installers
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $template = "${{ steps.metadata.outputs.release_asset_name_template }}"
+          $ErrorActionPreference = "Stop"
           $version = "${{ steps.version.outputs.version }}"
-          $assetName = $template.Replace("{version}", $version)
-          $msiUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/$assetName"
+          $releaseTag = "v$version"
+          $metadata = Get-Content packaging/winget/package.metadata.json -Raw | ConvertFrom-Json
+          $headers = @{
+              Accept = "application/vnd.github+json"
+              Authorization = "Bearer $env:GH_TOKEN"
+              "User-Agent" = "immich-folder-watch-winget-release"
+              "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $releaseUrl = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$releaseTag"
+          $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
 
-          "asset_name=$assetName" >> $env:GITHUB_OUTPUT
-          "msi_url=$msiUrl" >> $env:GITHUB_OUTPUT
+          if ($release.draft -or $release.tag_name -ne $releaseTag) {
+              throw "Release $releaseTag is missing, a draft, or returned an unexpected tag."
+          }
+          if ([string]::IsNullOrWhiteSpace([string]$release.published_at)) {
+              throw "Release $releaseTag has no publication date."
+          }
 
-      - name: Verify release MSI URL
+          $downloadRoot = Join-Path $PWD "artifacts\winget-msi"
+          New-Item -ItemType Directory -Path $downloadRoot -Force | Out-Null
+          $installerMetadata = @()
+
+          function Get-MsiProperty {
+              param(
+                  [Parameter(Mandatory = $true)]
+                  [string]$Path,
+                  [Parameter(Mandatory = $true)]
+                  [string]$Property
+              )
+
+              $installer = New-Object -ComObject WindowsInstaller.Installer
+              try {
+                  $database = $installer.GetType().InvokeMember(
+                      "OpenDatabase",
+                      "InvokeMethod",
+                      $null,
+                      $installer,
+                      @($Path, 0)
+                  )
+                  $query = "SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = '$Property'"
+                  $view = $database.GetType().InvokeMember(
+                      "OpenView",
+                      "InvokeMethod",
+                      $null,
+                      $database,
+                      @($query)
+                  )
+                  $view.GetType().InvokeMember(
+                      "Execute",
+                      "InvokeMethod",
+                      $null,
+                      $view,
+                      $null
+                  ) | Out-Null
+                  $record = $view.GetType().InvokeMember(
+                      "Fetch",
+                      "InvokeMethod",
+                      $null,
+                      $view,
+                      $null
+                  )
+                  if ($null -eq $record) {
+                      throw "MSI property '$Property' was not found in $Path."
+                  }
+                  return [string]$record.GetType().InvokeMember(
+                      "StringData",
+                      "GetProperty",
+                      $null,
+                      $record,
+                      1
+                  )
+              }
+              finally {
+                  if ($null -ne $record) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($record) }
+                  if ($null -ne $view) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($view) }
+                  if ($null -ne $database) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($database) }
+                  [void][Runtime.InteropServices.Marshal]::ReleaseComObject($installer)
+              }
+          }
+
+          function Get-MsiTemplate {
+              param(
+                  [Parameter(Mandatory = $true)]
+                  [string]$Path
+              )
+
+              $installer = New-Object -ComObject WindowsInstaller.Installer
+              try {
+                  $database = $installer.GetType().InvokeMember(
+                      "OpenDatabase",
+                      "InvokeMethod",
+                      $null,
+                      $installer,
+                      @($Path, 0)
+                  )
+                  $summary = $database.GetType().InvokeMember(
+                      "SummaryInformation",
+                      "GetProperty",
+                      $null,
+                      $database,
+                      @(0)
+                  )
+                  return [string]$summary.GetType().InvokeMember(
+                      "Property",
+                      "GetProperty",
+                      $null,
+                      $summary,
+                      7
+                  )
+              }
+              finally {
+                  if ($null -ne $summary) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($summary) }
+                  if ($null -ne $database) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($database) }
+                  [void][Runtime.InteropServices.Marshal]::ReleaseComObject($installer)
+              }
+          }
+
+          foreach ($architecture in @("x64", "arm64")) {
+              $template = [string]$metadata.releaseAssetNameTemplates.$architecture
+              if ([string]::IsNullOrWhiteSpace($template)) {
+                  throw "Missing release asset template for $architecture."
+              }
+              $assetName = $template.Replace("{version}", $version)
+              $assets = @($release.assets | Where-Object { $_.name -eq $assetName })
+              if ($assets.Count -ne 1) {
+                  throw "Expected exactly one release asset named '$assetName'; found $($assets.Count)."
+              }
+
+              $msiPath = Join-Path $downloadRoot $assetName
+              Invoke-WebRequest `
+                  -Uri $assets[0].browser_download_url `
+                  -Headers $headers `
+                  -OutFile $msiPath
+
+              $productVersion = Get-MsiProperty -Path $msiPath -Property "ProductVersion"
+              if ($productVersion -ne $version) {
+                  throw "MSI '$assetName' has ProductVersion '$productVersion', expected '$version'."
+              }
+              $expectedTemplate = if ($architecture -eq "arm64") { "Arm64" } else { "x64" }
+              $actualTemplate = Get-MsiTemplate -Path $msiPath
+              if ($actualTemplate -notmatch "^$expectedTemplate;") {
+                  throw "MSI '$assetName' has template '$actualTemplate', expected '$expectedTemplate'."
+              }
+
+              $installerMetadata += [ordered]@{
+                  architecture = $architecture
+                  url = [string]$assets[0].browser_download_url
+                  sha256 = (Get-FileHash -LiteralPath $msiPath -Algorithm SHA256).Hash
+                  productCode = (Get-MsiProperty -Path $msiPath -Property "ProductCode")
+              }
+          }
+
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          $installerMetadata |
+              ConvertTo-Json -Depth 3 |
+              Set-Content artifacts\winget-installers.json -Encoding utf8
+
+          $releaseDate = ([DateTimeOffset]$release.published_at).UtcDateTime.ToString("yyyy-MM-dd")
+          "release_date=$releaseDate" >> $env:GITHUB_OUTPUT
+
+      - name: Generate multi-architecture WinGet manifests
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
         run: |
-          $response = Invoke-WebRequest -Uri "${{ steps.msi.outputs.msi_url }}" -Method Head
-          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
-              throw "Release MSI URL is not reachable: ${{ steps.msi.outputs.msi_url }}"
-          }
+          python tools\prepare-winget-release-manifests.py `
+            --metadata packaging\winget\package.metadata.json `
+            --installers artifacts\winget-installers.json `
+            --output-dir artifacts\winget-manifests `
+            --version "${{ steps.version.outputs.version }}" `
+            --release-date "${{ steps.installers.outputs.release_date }}"
 
       - name: Ensure WinGet token is available
         if: steps.metadata.outputs.automation_enabled == 'true'
@@ -143,9 +296,8 @@ jobs:
         env:
           WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN || secrets.WINGET }}
         run: |
-          .\wingetcreate.exe update `
-            "${{ steps.metadata.outputs.package_identifier }}" `
-            -u "${{ steps.msi.outputs.msi_url }}" `
-            -v "${{ steps.version.outputs.version }}" `
-            -t "$env:WINGETCREATE_TOKEN" `
-            --submit
+          .\wingetcreate.exe submit `
+            artifacts\winget-manifests `
+            --prtitle "New version: ${{ steps.metadata.outputs.package_identifier }} version ${{ steps.version.outputs.version }}" `
+            --token "$env:WINGETCREATE_TOKEN" `
+            --no-open

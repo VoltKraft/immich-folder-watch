@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- GitHub releases now publish the Windows MSI and Linux `x86_64` Flatpak bundle atomically from the same commit; Linux distribution uses the GitHub sideload bundle while Flathub publication remains postponed.
+- GitHub releases now publish x64 and ARM64 Windows MSIs and Linux Flatpak bundles atomically from the same commit, and WinGet submissions include both Windows architectures. Linux distribution uses the GitHub sideload bundles while Flathub publication remains postponed.
 
 ## [2.7.0] - 2026-09-01
 

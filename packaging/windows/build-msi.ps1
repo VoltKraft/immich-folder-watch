@@ -106,6 +106,70 @@ function Get-InstallerPlatform {
     }
 }
 
+function Get-PeMachine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    $reader = [System.IO.BinaryReader]::new($stream)
+    try {
+        if ($reader.ReadUInt16() -ne 0x5A4D) {
+            throw "File is not a PE binary: $Path"
+        }
+
+        $stream.Position = 0x3C
+        $peOffset = $reader.ReadInt32()
+        if ($peOffset -lt 0 -or $peOffset -gt ($stream.Length - 6)) {
+            throw "File has an invalid PE header offset: $Path"
+        }
+
+        $stream.Position = $peOffset
+        if ($reader.ReadUInt32() -ne 0x00004550) {
+            throw "File has an invalid PE signature: $Path"
+        }
+
+        return $reader.ReadUInt16()
+    }
+    finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Assert-PublishedArchitecture {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PublishDirectory,
+        [Parameter(Mandatory = $true)]
+        [string]$Runtime
+    )
+
+    $expectedMachine = switch ($Runtime) {
+        "win-x64" { 0x8664 }
+        "win-arm64" { 0xAA64 }
+        default { throw "Unsupported runtime '$Runtime'." }
+    }
+
+    foreach ($fileName in @("ImmichFolderWatch.exe", "e_sqlite3.dll")) {
+        $path = Join-Path $PublishDirectory $fileName
+        if (-not (Test-Path -LiteralPath $path)) {
+            throw "Required native publish output was not found: $path"
+        }
+
+        $actualMachine = Get-PeMachine -Path $path
+        if ($actualMachine -ne $expectedMachine) {
+            throw (
+                "Unexpected PE machine for {0}: expected 0x{1:X4}, got 0x{2:X4}." -f
+                $path,
+                $expectedMachine,
+                $actualMachine
+            )
+        }
+    }
+}
+
 $scriptRoot = Get-ScriptRoot
 $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
 if ([string]::IsNullOrWhiteSpace($localAppData)) {
@@ -186,6 +250,7 @@ function Publish-ProjectOutput {
 }
 
 Publish-ProjectOutput -ProjectPath $appProject -ProjectName "app"
+Assert-PublishedArchitecture -PublishDirectory $publishRoot -Runtime $Runtime
 
 if (-not (Test-Path -LiteralPath $brandingIconPath)) {
     throw "Branding icon not found: $brandingIconPath"

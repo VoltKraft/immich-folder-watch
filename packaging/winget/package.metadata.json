@@ -1,10 +1,25 @@
 {
   "packageIdentifier": "VoltKraft.ImmichFolderWatch",
   "packageName": "Immich Folder Watch",
+  "packageLocale": "en-US",
   "publisher": "VoltKraft",
+  "publisherUrl": "https://github.com/VoltKraft",
+  "publisherSupportUrl": "https://github.com/VoltKraft/immich-folder-watch/issues",
+  "packageUrl": "https://github.com/VoltKraft/immich-folder-watch",
+  "repository": "VoltKraft/immich-folder-watch",
+  "license": "AGPL-3.0",
   "moniker": "immich-folder-watch",
-  "shortDescription": "Windows service that watches local folders and uploads newly appearing files to Immich.",
+  "shortDescription": "A folder watcher and uploader for Immich that ingests new media files via the Immich HTTP API, built for automated, real-time media import on Windows and Linux.",
+  "tags": [
+    "immich",
+    "immich-api"
+  ],
+  "installerLocale": "en-US",
   "installerType": "wix",
-  "releaseAssetNameTemplate": "immich-folder-watch-{version}-win-x64.msi",
+  "manifestVersion": "1.12.0",
+  "releaseAssetNameTemplates": {
+    "x64": "immich-folder-watch-{version}-win-x64.msi",
+    "arm64": "immich-folder-watch-{version}-win-arm64.msi"
+  },
   "automationEnabled": true
 }

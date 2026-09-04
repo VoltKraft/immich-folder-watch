@@ -8,7 +8,12 @@
 
 ## Recommended: MSI Installer
 
-Download the latest `.msi` from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases) and run it with administrative rights. The installer is per-machine (binaries only); each Windows user keeps their own configuration and logs under `%LOCALAPPDATA%`.
+Download the matching `.msi` from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases): use `immich-folder-watch-<version>-win-x64.msi` for Intel/AMD Windows and `immich-folder-watch-<version>-win-arm64.msi` for Windows on Arm. Run it with administrative rights. The installer is per-machine (binaries only); each Windows user keeps their own configuration and logs under `%LOCALAPPDATA%`.
+
+Alternatively, `winget install VoltKraft.ImmichFolderWatch` automatically
+selects the installer matching the Windows architecture once a
+multi-architecture release is published. Releases through `v2.7.0` remain
+x64-only and are not backfilled.
 
 After install:
 
@@ -67,7 +72,9 @@ dotnet run --project src/ImmichFolderWatch.App
 ## Building the MSI Locally
 
 ```powershell
-.\packaging\windows\build-msi.ps1
+.\packaging\windows\build-msi.ps1 -Runtime win-x64
+.\packaging\windows\build-msi.ps1 -Runtime win-arm64
 ```
 
-The MSI is produced under `artifacts\windows\msi\`. On the first run, `dotnet` restores the WiX SDK from NuGet.
+The architecture-specific MSIs are produced under `artifacts\windows\msi\`.
+On the first run, `dotnet` restores the WiX SDK from NuGet.

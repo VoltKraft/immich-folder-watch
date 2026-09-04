@@ -102,5 +102,14 @@ jobs:
             packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml \
             > /dev/null
 
-      - name: Test Flatpak release tooling
+      - name: Check Flatpak NuGet generator arguments
+        run: |
+          bash -n tools/generate-nuget-sources.sh
+          tools/generate-nuget-sources.sh --help
+          if tools/generate-nuget-sources.sh --runtime linux-riscv64; then
+            echo "Unsupported Flatpak runtime was accepted." >&2
+            exit 1
+          fi
+
+      - name: Test release tooling
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py' -v

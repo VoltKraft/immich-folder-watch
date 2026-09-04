@@ -92,11 +92,17 @@ jobs:
           fi
 
   build-windows:
-    name: Build Windows Release Artifacts
+    name: Build Windows ${{ matrix.runtime }} MSI
     runs-on: windows-latest
     needs:
       - prepare-release
     if: needs.prepare-release.outputs.tag_exists != 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        runtime:
+          - win-x64
+          - win-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -114,7 +120,7 @@ jobs:
 
       - name: Build Windows MSI
         shell: pwsh
-        run: .\packaging\windows\build-msi.ps1 -Runtime win-x64 -Version ${{ needs.prepare-release.outputs.version }}
+        run: .\packaging\windows\build-msi.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare-release.outputs.version }}
 
       - name: Collect release assets
         shell: pwsh
@@ -123,21 +129,33 @@ jobs:
           New-Item -ItemType Directory -Path $assetRoot -Force | Out-Null
 
           Copy-Item `
-            -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ needs.prepare-release.outputs.version }}-win-x64.msi") `
-            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ needs.prepare-release.outputs.version }}-win-x64.msi")
+            -LiteralPath (Join-Path $PWD "artifacts\windows\msi\immich-folder-watch-${{ needs.prepare-release.outputs.version }}-${{ matrix.runtime }}.msi") `
+            -Destination (Join-Path $assetRoot "immich-folder-watch-${{ needs.prepare-release.outputs.version }}-${{ matrix.runtime }}.msi")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: immich-folder-watch-windows-assets
+          name: immich-folder-watch-windows-${{ matrix.runtime }}
           path: artifacts/release
 
   build-flatpak:
-    name: Build Linux Flatpak Bundle
-    runs-on: ubuntu-latest
+    name: Build Linux ${{ matrix.flatpak_arch }} Flatpak
+    runs-on: ${{ matrix.runner }}
     needs:
       - prepare-release
     if: needs.prepare-release.outputs.tag_exists != 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            flatpak_arch: x86_64
+            dotnet_runtime: linux-x64
+            asset_arch: linux-x64
+          - runner: ubuntu-24.04-arm
+            flatpak_arch: aarch64
+            dotnet_runtime: linux-arm64
+            asset_arch: linux-arm64
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
@@ -162,7 +180,7 @@ jobs:
             org.freedesktop.Sdk.Extension.dotnet10//25.08
 
       - name: Generate offline NuGet sources
-        run: tools/generate-nuget-sources.sh
+        run: tools/generate-nuget-sources.sh --runtime ${{ matrix.dotnet_runtime }}
 
       - name: Prepare commit-pinned release manifest
         env:
@@ -180,9 +198,9 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           manifest-path: artifacts/flatpak-release/io.github.voltkraft.immich-folder-watch.yml
-          bundle: immich-folder-watch-${{ needs.prepare-release.outputs.version }}.flatpak
-          artifact-name: immich-folder-watch-flatpak-assets
-          arch: x86_64
+          bundle: immich-folder-watch-${{ needs.prepare-release.outputs.version }}-${{ matrix.asset_arch }}.flatpak
+          artifact-name: immich-folder-watch-flatpak-${{ matrix.flatpak_arch }}
+          arch: ${{ matrix.flatpak_arch }}
           repository-name: flathub
           repository-url: https://flathub.org/repo/flathub.flatpakrepo
 
@@ -210,14 +228,39 @@ jobs:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v7
         with:
-          name: immich-folder-watch-windows-assets
+          pattern: immich-folder-watch-windows-*
           path: artifacts/release
+          merge-multiple: true
 
       - name: Download Flatpak artifacts
         uses: actions/download-artifact@v7
         with:
-          name: immich-folder-watch-flatpak-assets
+          pattern: immich-folder-watch-flatpak-*
           path: artifacts/release
+          merge-multiple: true
+
+      - name: Verify complete release asset set
+        shell: bash
+        run: |
+          version='${{ needs.prepare-release.outputs.version }}'
+          expected=(
+            "immich-folder-watch-${version}-win-x64.msi"
+            "immich-folder-watch-${version}-win-arm64.msi"
+            "immich-folder-watch-${version}-linux-x64.flatpak"
+            "immich-folder-watch-${version}-linux-arm64.flatpak"
+          )
+
+          mapfile -t actual < <(
+            find artifacts/release -maxdepth 1 -type f -printf '%f\n' | sort
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+
+          if [[ "${actual[*]}" != "${expected_sorted[*]}" ]]; then
+            echo "Release asset set is incomplete or contains unexpected files." >&2
+            printf 'Expected: %s\n' "${expected_sorted[*]}" >&2
+            printf 'Actual:   %s\n' "${actual[*]}" >&2
+            exit 1
+          fi
 
       - name: Extract changelog entry
         shell: bash

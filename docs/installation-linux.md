@@ -1,28 +1,32 @@
 # Installation on Linux
 
-The supported Linux package is the `x86_64` Flatpak bundle attached to future
-GitHub Releases created by the current workflow. Releases through `v2.7.0` are
-not backfilled. The package runs per user and does not install a system service
-or need root privileges at runtime.
+The supported Linux packages are the `x86_64` and `aarch64` Flatpak bundles
+attached to future GitHub Releases created by the current workflow. Releases
+through `v2.7.0` are not backfilled. The package runs per user and does not
+install a system service or need root privileges at runtime.
 
 ## Install from GitHub Releases
 
 1. Install Flatpak using your distribution's package manager.
-2. Download `immich-folder-watch-<version>.flatpak` from
-   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
+2. Download the bundle matching `flatpak --default-arch` from
+   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases):
+   - `x86_64`: `immich-folder-watch-<version>-linux-x64.flatpak`
+   - `aarch64`: `immich-folder-watch-<version>-linux-arm64.flatpak`
 3. Install and launch the bundle:
 
 ```bash
-flatpak install --user ./immich-folder-watch-<version>.flatpak
+flatpak install --user ./immich-folder-watch-<version>-linux-<architecture>.flatpak
 flatpak run io.github.voltkraft.immich-folder-watch
 ```
+
+Replace `<architecture>` with `x64` or `arm64` according to the mapping above.
 
 The bundle records Flathub as the source for its Freedesktop runtime dependency.
 It does not add an update source for Immich Folder Watch itself. Download each
 new application version manually and install it with:
 
 ```bash
-flatpak install --user --or-update ./immich-folder-watch-<version>.flatpak
+flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak
 ```
 
 The Flathub publication is currently postponed. Do not use

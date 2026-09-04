@@ -69,8 +69,10 @@ Record outcome inline as `[PASS]`, `[FAIL: <one-line reason>]`, or
 #### SMK-01 — Fresh `flatpak-builder --user --install` succeeds  `H`
 
 Steps:
-1. From the repo root: `tools/generate-nuget-sources.sh` (regenerates
-   the offline NuGet feed; writes
+1. From the repo root, run
+   `tools/generate-nuget-sources.sh --runtime <runtime>` with `linux-x64` on
+   `x86_64` or `linux-arm64` on `aarch64` (regenerates the offline NuGet feed;
+   writes
    `packaging/flatpak/flathub/nuget-sources.json`).
 2. `flatpak-builder --user --install --force-clean
    packaging/flatpak/build-dir
@@ -625,9 +627,19 @@ list, not the blocker list.
 3. `python3 tools/update-appstream.py <version>` to refresh the
    metainfo `<release>` block.
 4. `git commit -m "release: v<version>"` on `main`.
-5. Push — `release.yaml` builds the Windows MSI and Linux `x86_64` Flatpak
+5. Push — `release.yaml` builds x64 and ARM64 Windows MSIs and Linux Flatpaks
    from the same commit. It creates `v<version>` and the GitHub Release only
-   after both artifacts succeed.
-6. Confirm the release contains both
-   `immich-folder-watch-<version>-win-x64.msi` and
-   `immich-folder-watch-<version>.flatpak`.
+   after all four artifacts succeed.
+6. Confirm the release contains:
+   - `immich-folder-watch-<version>-win-x64.msi`
+   - `immich-folder-watch-<version>-win-arm64.msi`
+   - `immich-folder-watch-<version>-linux-x64.flatpak`
+   - `immich-folder-watch-<version>-linux-arm64.flatpak`
+7. Import each Flatpak bundle into a temporary repository and confirm the refs
+   `app/io.github.voltkraft.immich-folder-watch/x86_64/master` and
+   `app/io.github.voltkraft.immich-folder-watch/aarch64/master`.
+8. Confirm the submitted WinGet manifest contains one `x64` and one `arm64`
+   installer entry for the same release version.
+9. Before the first production multi-architecture release, exercise a copy of
+   the workflow in a fork with one ARM64 matrix entry forced to fail. Confirm
+   that no tag, GitHub Release, or WinGet workflow is created.

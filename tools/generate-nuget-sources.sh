@@ -10,8 +10,51 @@
 # a future per-app Flathub repository.
 #
 # Run from a Linux dev machine with .NET 10 SDK + python3 + git on PATH.
+# Use --runtime linux-x64 or --runtime linux-arm64 to select the target
+# architecture. The default remains linux-x64 for local compatibility.
 
 set -euo pipefail
+
+RUNTIME="linux-x64"
+
+usage() {
+  echo "Usage: $0 [--runtime linux-x64|linux-arm64]" >&2
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --runtime)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --runtime requires a value." >&2
+        usage
+        exit 1
+      fi
+      RUNTIME="$2"
+      shift 2
+      ;;
+    --runtime=*)
+      RUNTIME="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument '$1'." >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+case "${RUNTIME}" in
+  linux-x64|linux-arm64) ;;
+  *)
+    echo "ERROR: unsupported runtime '${RUNTIME}'. Expected linux-x64 or linux-arm64." >&2
+    exit 1
+    ;;
+esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT="${REPO_ROOT}/packaging/flatpak/flathub/nuget-sources.json"
@@ -70,7 +113,7 @@ echo "Running flatpak-dotnet-generator.py against ${PROJECT}…"
 python3 "${GENERATOR}" \
   --dotnet 10 \
   --freedesktop 25.08 \
-  --runtime=linux-x64 \
+  --runtime="${RUNTIME}" \
   "${OUTPUT}" "${PROJECT}"
 
 python3 - "${OUTPUT}" <<'PY'
@@ -89,4 +132,4 @@ if not sources:
     )
 PY
 
-echo "Wrote ${OUTPUT}"
+echo "Wrote ${OUTPUT} for ${RUNTIME}"

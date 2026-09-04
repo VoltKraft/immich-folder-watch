@@ -1,9 +1,9 @@
 # Flatpak Notes
 
-`immich-folder-watch` is packaged as an `x86_64` Flatpak and distributed as a
-single-file bundle through future **GitHub Releases** created by the current
-workflow (app ID `io.github.voltkraft.immich-folder-watch`). Releases through
-`v2.7.0` are not backfilled.
+`immich-folder-watch` is packaged as `x86_64` and `aarch64` Flatpak bundles and
+distributed through future **GitHub Releases** created by the current workflow
+(app ID `io.github.voltkraft.immich-folder-watch`). Releases through `v2.7.0`
+are not backfilled.
 
 All Flatpak packaging lives under `packaging/flatpak/`:
 
@@ -16,8 +16,7 @@ All Flatpak packaging lives under `packaging/flatpak/`:
 The app builds against the freedesktop runtime 25.08 + the .NET 10 SDK
 extension, runs entirely per-user (no daemon, no root), and accesses
 watch folders through the FileChooser / Documents portals. The release
-workflow builds the bundle from the manifest under
+workflow builds both bundles from the manifest under
 `packaging/flatpak/flathub/`, temporarily pinning its Git source to the same
-commit used for the Windows MSI. The GitHub bundle must be reinstalled manually
-for each application update. Publication through Flathub is currently
-postponed.
+commit used for both Windows MSIs. GitHub bundles must be reinstalled manually
+for each application update. Publication through Flathub is currently postponed.

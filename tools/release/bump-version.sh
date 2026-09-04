@@ -7,8 +7,8 @@
 # After running, fill in release notes under the new CHANGELOG heading,
 # review the diff, then commit on `main`. The release pipeline
 # (.github/workflows/release.yaml) picks up the new version on push to
-# main, builds the Windows MSI and Linux Flatpak from the same commit,
-# and tags v<version> only after both artifacts succeed.
+# main, builds the x64 and ARM64 Windows MSIs and Linux Flatpaks from the same
+# commit, and tags v<version> only after all four artifacts succeed.
 #
 # This script does NOT touch packaging/flatpak/*.metainfo.xml. After
 # filling in the CHANGELOG notes, run

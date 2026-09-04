@@ -16,6 +16,9 @@ Key properties:
 2. `nuget-sources.json` is expected as a sibling file (regenerated
    per release from the matching tag and committed into the per-app
    Flathub repo). Locally gitignored to avoid two copies drifting.
+3. The manifest maps Flatpak `x86_64` and `aarch64` to the self-contained .NET
+   runtimes `linux-x64` and `linux-arm64`. A future Flathub submission must
+   provide an offline source list covering both builds.
 
 ## Pre-submission checklist (Phase 7.A)
 
@@ -29,8 +32,9 @@ Key properties:
 - [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
 - [ ] Release tag pushed; `tag:` and `commit:` in the submission manifest match
   the version and SHA reported by `git rev-parse v<version>`.
-- [ ] Fresh `nuget-sources.json` generated against that tag
-  (`tools/generate-nuget-sources.sh` from a clean checkout of the tag).
+- [ ] Fresh architecture-complete `nuget-sources.json` generated against that
+  tag from a clean checkout. GitHub release jobs currently generate isolated
+  source lists with `tools/generate-nuget-sources.sh --runtime <runtime>`.
 
 ## Submission steps (Phase 7.B — user-action)
 
@@ -69,10 +73,12 @@ push to `VoltKraft/immich-folder-watch` will produce an auto-PR on
 For each release, after the bot's PR appears we (the maintainer):
 
 1. Check out the bot's branch in our flathub-app fork.
-2. From a clean upstream checkout of the new tag, run
-   `./tools/generate-nuget-sources.sh`.
+2. From clean `x86_64` and `aarch64` upstream checkouts of the new tag,
+   generate the corresponding source lists with
+   `./tools/generate-nuget-sources.sh --runtime linux-x64` and
+   `./tools/generate-nuget-sources.sh --runtime linux-arm64`.
 3. Copy `packaging/flatpak/flathub/nuget-sources.json` into the bot's PR
-   working tree, replacing the existing one.
+   working tree after combining the two lists without duplicate sources.
 4. Push to the bot's branch; the PR re-runs Flathub's CI, which
    builds offline against the new feed.
 5. Merge after CI passes.

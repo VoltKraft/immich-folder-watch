@@ -67,7 +67,9 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 
 ### Windows (MSI)
 
-1. Download the latest MSI from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
+1. Download the matching MSI from [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases):
+   `immich-folder-watch-<version>-win-x64.msi` for Intel/AMD Windows or
+   `immich-folder-watch-<version>-win-arm64.msi` for Windows on Arm.
 2. Install it with administrative rights (per-machine binary install).
 3. Open the `Immich Folder Watch` desktop shortcut.
 4. Enter your Immich URL and API key and review the verification result.
@@ -75,6 +77,9 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 6. **Save and Apply** — watching starts in-process.
 
 Each Windows user has their own configuration. The app autostarts at login by default.
+`winget install VoltKraft.ImmichFolderWatch` selects the matching x64 or ARM64
+installer automatically once a multi-architecture release is published. Releases
+through `v2.7.0` remain x64-only and are not backfilled.
 
 Installed layout:
 
@@ -88,12 +93,14 @@ Upgrading from an older service-based install: the legacy service is stopped and
 
 ### Linux (Flatpak)
 
-1. Download `immich-folder-watch-<version>.flatpak` from
-   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases).
+1. Download the matching bundle from
+   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases):
+   `immich-folder-watch-<version>-linux-x64.flatpak` on `x86_64` or
+   `immich-folder-watch-<version>-linux-arm64.flatpak` on `aarch64`.
 2. Install and launch it for the current user:
 
 ```bash
-flatpak install --user ./immich-folder-watch-<version>.flatpak
+flatpak install --user ./immich-folder-watch-<version>-linux-<architecture>.flatpak
 flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
@@ -103,7 +110,7 @@ earlier releases are not backfilled.
 GitHub's single-file bundle records Flathub as the source for its Freedesktop
 runtime dependency, but it does not configure an application repository.
 Download each new application version manually and install it with
-`flatpak install --user --or-update ./immich-folder-watch-<version>.flatpak`.
+`flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak`.
 The planned Flathub publication is currently postponed. See
 [`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
 

@@ -1,9 +1,9 @@
 # Flatpak Packaging
 
-`immich-folder-watch` ships to Linux desktops as an `x86_64` Flatpak bundle on
-**GitHub Releases**. The app builds against the freedesktop runtime 25.08 + the
-.NET 10 SDK extension and installs the Avalonia head as a self-contained
-`linux-x64` publish.
+`immich-folder-watch` ships to Linux desktops as `x86_64` and `aarch64` Flatpak
+bundles on **GitHub Releases**. The app builds against the freedesktop runtime
+25.08 + the .NET 10 SDK extension and installs the Avalonia head as a
+self-contained `linux-x64` or `linux-arm64` publish.
 
 App ID: `io.github.voltkraft.immich-folder-watch`
 
@@ -20,24 +20,27 @@ There is one shared Flatpak manifest:
   to an ignored build directory, removes the not-yet-created tag, and pins the
   Git source to the exact commit used by the Windows MSI.
 
-The release workflow builds `immich-folder-watch-<version>.flatpak` and the MSI
-in parallel, then publishes neither unless both builds succeed. The separate
-Flathub submission is currently postponed; see
+The release workflow builds architecture-specific Windows and Linux packages in
+parallel, then publishes none unless all four builds succeed. The Flatpak names
+are `immich-folder-watch-<version>-linux-x64.flatpak` and
+`immich-folder-watch-<version>-linux-arm64.flatpak`. The separate Flathub
+submission is currently postponed; see
 [`flathub/README.md`](flathub/README.md) for the retained plan.
 
 ## Install a published bundle
 
-Download the `.flatpak` file from GitHub Releases, then install it for the
-current user:
+Download the bundle matching `flatpak --default-arch` from GitHub Releases:
+use the `linux-x64` file for `x86_64` and the `linux-arm64` file for `aarch64`.
+Then install it for the current user:
 
 ```bash
-flatpak install --user ./immich-folder-watch-<version>.flatpak
+flatpak install --user ./immich-folder-watch-<version>-linux-<architecture>.flatpak
 flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
 The bundle resolves its Freedesktop runtime from Flathub but does not configure
 application updates. Download each new version manually and install it with
-`flatpak install --user --or-update ./immich-folder-watch-<version>.flatpak`.
+`flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak`.
 
 ## Local build
 
@@ -63,7 +66,7 @@ Then, from the repo root:
 #    A stale feed silently re-installs the OLD packages; when in doubt,
 #    regenerate. The script reads the csproj graph from your working
 #    tree, so make sure it matches the tag the manifest is pinned to.
-./tools/generate-nuget-sources.sh
+./tools/generate-nuget-sources.sh --runtime linux-x64
 #    -> writes packaging/flatpak/flathub/nuget-sources.json
 
 # 2) Create a manifest pinned to the current commit. The commit must
@@ -87,6 +90,9 @@ flatpak run io.github.voltkraft.immich-folder-watch
 
 The generated manifest builds **exactly the selected commit**, matching the
 GitHub release job without requiring the release tag to exist first.
+For an ARM64 build, run the same steps on an `aarch64` host and pass
+`--runtime linux-arm64` when generating the NuGet source list. The manifest
+maps the Flatpak architecture to the corresponding .NET runtime automatically.
 
 ### Iterating on local (un-pushed) changes
 
@@ -113,7 +119,7 @@ The committed source manifest must remain `type: git`.
 > ```bash
 > rm -rf .flatpak-builder artifacts/flatpak-local
 > rm -f packaging/flatpak/flathub/nuget-sources.json
-> ./tools/generate-nuget-sources.sh
+> ./tools/generate-nuget-sources.sh --runtime linux-x64
 > # Repeat steps 2-4 above.
 > ```
 

@@ -11,8 +11,20 @@ This directory contains the automation-friendly Windows packaging flow.
 
 ## Current Status
 
-- MSI packaging is the supported end-user installation path.
+- Native x64 and ARM64 MSI packages are the supported end-user installation
+  paths. GitHub Releases publishes both, and the shared WinGet package selects
+  the matching architecture.
 - A bootstrapper `.exe` is still planned.
+
+Build either package from Windows with:
+
+```powershell
+.\packaging\windows\build-msi.ps1 -Runtime win-x64
+.\packaging\windows\build-msi.ps1 -Runtime win-arm64
+```
+
+The resulting names are `immich-folder-watch-<version>-win-x64.msi` and
+`immich-folder-watch-<version>-win-arm64.msi`.
 
 ## Default Layout
 
