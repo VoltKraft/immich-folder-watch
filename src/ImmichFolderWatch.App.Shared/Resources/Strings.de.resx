@@ -127,6 +127,7 @@
   <data name="UI_Language" xml:space="preserve"><value>Sprache</value></data>
   <data name="UI_Appearance" xml:space="preserve"><value>Darstellung</value></data>
   <data name="UI_SyncMode" xml:space="preserve"><value>Synchronisationsmodus</value></data>
+  <data name="Update_AvailableFormat" xml:space="preserve"><value>Update v{0} verfügbar</value></data>
 
   <data name="SyncMode_UploadNew" xml:space="preserve"><value>Nur neue Dateien hochladen (Standard)</value></data>
   <data name="SyncMode_UploadNew_Description" xml:space="preserve"><value>Nur Dateien, die während der Laufzeit neu in den Ordner kommen, werden hochgeladen. Bereits vorhandene Dateien werden ignoriert.</value></data>

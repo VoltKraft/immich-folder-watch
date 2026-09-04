@@ -1,11 +1,16 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Installation;
+using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.App;
 
@@ -15,15 +20,27 @@ public sealed partial class App : Application
     private readonly AutostartManager _autostartManager = new();
     private readonly AppConfigLoader _configLoader = new();
     private readonly LocalizationService _localizationService = LocalizationService.Instance;
+    private readonly ILoggerFactory _startupLoggerFactory;
+    private readonly HttpClient _updateHttpClient;
+    private readonly IUpdateChecker _updateChecker;
+    private readonly Version? _productVersion;
+    private readonly CancellationTokenSource _shutdown = new();
     private readonly AppHost _appHost;
     private readonly ThemeWatcher _themeWatcher;
 
     private TrayIconHost? _trayIconHost;
     private MainWindow? _mainWindow;
     private bool _explicitQuitRequested;
+    private Task? _updateCheckTask;
 
     public App()
     {
+        _startupLoggerFactory = CreateStartupLoggerFactory();
+        _updateHttpClient = CreateUpdateHttpClient();
+        _updateChecker = new GitHubUpdateChecker(
+            _updateHttpClient,
+            _startupLoggerFactory.CreateLogger<GitHubUpdateChecker>());
+        _productVersion = ProductVersionProvider.GetProductVersion(typeof(App).Assembly);
         _appHost = new AppHost(_syncStatusProvider);
         _themeWatcher = new ThemeWatcher(this);
     }
@@ -48,7 +65,15 @@ public sealed partial class App : Application
 
         _themeWatcher.Initialize();
 
-        _mainWindow = new MainWindow(_appHost, _syncStatusProvider, _autostartManager, _configLoader, _themeWatcher, _localizationService);
+        _mainWindow = new MainWindow(
+            _appHost,
+            _syncStatusProvider,
+            _autostartManager,
+            _configLoader,
+            _themeWatcher,
+            _localizationService,
+            _startupLoggerFactory.CreateLogger<MainWindow>(),
+            $"Version {_productVersion?.ToString(3) ?? "unknown"}");
         _mainWindow.Closing += MainWindow_Closing;
         MainWindow = _mainWindow;
 
@@ -67,6 +92,7 @@ public sealed partial class App : Application
         Program.SingleInstance?.StartListening(ShowMainWindow);
 
         _ = StartAppHostAsync();
+        _updateCheckTask = CheckForUpdatesAsync(_shutdown.Token);
 
         if (!_autostartManager.IsEnabled() && IsFirstRun())
         {
@@ -82,6 +108,8 @@ public sealed partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _shutdown.Cancel();
+
         if (_trayIconHost is not null)
         {
             _trayIconHost.Dispose();
@@ -96,7 +124,79 @@ public sealed partial class App : Application
         {
         }
 
+        var updateCheckCompleted = false;
+        try
+        {
+            updateCheckCompleted = _updateCheckTask?.Wait(TimeSpan.FromSeconds(1)) ?? true;
+        }
+        catch (Exception)
+        {
+            updateCheckCompleted = true;
+        }
+
+        if (updateCheckCompleted)
+        {
+            _updateHttpClient.Dispose();
+            _startupLoggerFactory.Dispose();
+            _shutdown.Dispose();
+        }
+
         base.OnExit(e);
+    }
+
+    private async Task CheckForUpdatesAsync(CancellationToken cancellationToken)
+    {
+        var logger = _startupLoggerFactory.CreateLogger<App>();
+        if (_productVersion is null)
+        {
+            logger.LogWarning("The installed product version could not be determined; skipping the update check.");
+            return;
+        }
+
+        try
+        {
+            var updateInfo = await _updateChecker
+                .CheckAsync(_productVersion, cancellationToken)
+                .ConfigureAwait(false);
+            _mainWindow?.ViewModel.ApplyUpdateInfo(updateInfo);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The update check failed and will be ignored.");
+        }
+    }
+
+    private static HttpClient CreateUpdateHttpClient()
+    {
+        return new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(5),
+        };
+    }
+
+    private static ILoggerFactory CreateStartupLoggerFactory()
+    {
+        try
+        {
+            return LoggerFactory.Create(builder =>
+            {
+                builder.SetMinimumLevel(LogLevel.Information);
+                builder.AddProvider(new FileLoggerProvider(
+                    InstallationPaths.GetLogDirectory(),
+                    LogLevel.Information));
+            });
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Could not initialize startup file logging: {ex}");
+            return NullLoggerFactory.Instance;
+        }
     }
 
     private async Task StartAppHostAsync()

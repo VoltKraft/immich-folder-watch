@@ -56,6 +56,7 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 - Persistent sync state shared by all watched folders, so unchanged files do not generate uploads or downloads after a restart
 - Retries transient upload failures automatically
 - Runs as a per-user desktop app with live sync status
+- Checks GitHub Releases on startup and links to the release page when an update is available
 - Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
 - Localized UI (English, German) with OS auto-detect and live in-app language switching

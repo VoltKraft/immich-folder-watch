@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using ImmichFolderWatch.App.Linux.Platform;
+using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Platform;
 
@@ -30,7 +31,7 @@ public sealed class ShellViewModel : BindableBase
         _folderPicker = folderPicker;
         _theme = theme;
 
-        VersionText = $"v{typeof(ShellViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+        VersionText = $"v{ProductVersionProvider.GetProductVersion(typeof(ShellViewModel).Assembly)?.ToString(3) ?? "unknown"}";
         ConfigPath = $"Config: {paths.GetConfigPath()}";
         LogDirectory = $"Logs:   {paths.GetLogDirectory()}";
 

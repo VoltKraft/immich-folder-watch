@@ -1,4 +1,5 @@
 using System.Net;
+using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Logging;
@@ -124,7 +125,7 @@ public sealed class AppHost : IAsyncDisposable
     {
         var logLevel = LogLevelParser.Parse(config.Logging.Level);
         var productVersion =
-            typeof(AppHost).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+            ProductVersionProvider.GetProductVersion(typeof(AppHost).Assembly)?.ToString(3) ?? "0.0.0";
 
         var builder = Host.CreateApplicationBuilder();
 

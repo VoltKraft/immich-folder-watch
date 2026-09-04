@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Navigation;
 using Button = System.Windows.Controls.Button;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Logging;
@@ -17,6 +18,7 @@ using ImmichFolderWatch.Core.Logging;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.App;
 
@@ -37,6 +39,7 @@ public sealed partial class MainWindow : Window
     private readonly ThemeWatcher _themeWatcher;
     private readonly LocalizationService _localizationService;
     private readonly ConfigVerificationRunner _verificationRunner;
+    private readonly ILogger<MainWindow> _logger;
     private bool _isImmichCheckInProgress;
     private bool _isSaveInProgress;
     private bool _hasRunInitialLoad;
@@ -47,7 +50,9 @@ public sealed partial class MainWindow : Window
         IAutoStartManager autostartManager,
         AppConfigLoader configLoader,
         ThemeWatcher themeWatcher,
-        LocalizationService localizationService)
+        LocalizationService localizationService,
+        ILogger<MainWindow> logger,
+        string productVersionText)
     {
         _appHost = appHost ?? throw new ArgumentNullException(nameof(appHost));
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
@@ -55,6 +60,8 @@ public sealed partial class MainWindow : Window
         _configLoader = configLoader ?? throw new ArgumentNullException(nameof(configLoader));
         _themeWatcher = themeWatcher ?? throw new ArgumentNullException(nameof(themeWatcher));
         _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentException.ThrowIfNullOrWhiteSpace(productVersionText);
         _verificationRunner = new ConfigVerificationRunner();
 
         InitializeComponent();
@@ -66,7 +73,7 @@ public sealed partial class MainWindow : Window
             new WpfUiDispatcher(),
             new WindowsLoggingCapabilities())
         {
-            ProductVersionText = $"Version {ProductVersionProvider.GetProductVersion()}",
+            ProductVersionText = productVersionText,
         };
         DataContext = ViewModel;
 
@@ -93,6 +100,27 @@ public sealed partial class MainWindow : Window
         ApplyDarkTitleBar();
     }
 
+    private void UpdateHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        if (e.Uri is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri)
+            {
+                UseShellExecute = true,
+            });
+            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not open the update download page {UpdateDownloadUri}.", e.Uri);
+        }
+    }
+
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_SETTINGCHANGE || msg == WM_DWMCOLORIZATIONCOLORCHANGED || msg == WM_THEMECHANGED)
@@ -116,7 +144,7 @@ public sealed partial class MainWindow : Window
         DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
     }
 
-    private MainWindowViewModel ViewModel { get; }
+    internal MainWindowViewModel ViewModel { get; }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
