@@ -25,17 +25,18 @@ jobs:
         shell: pwsh
         run: |
           $manualTag = "${{ inputs.release_tag }}".Trim()
+          $workflowRef = "${{ github.sha }}"
 
           if ("${{ github.event_name }}" -eq "release") {
               $targetRef = "${{ github.event.release.tag_name }}"
               $releaseTag = $targetRef
           }
           elseif (-not [string]::IsNullOrWhiteSpace($manualTag)) {
-              $targetRef = $manualTag
+              $targetRef = $workflowRef
               $releaseTag = $manualTag
           }
           else {
-              $targetRef = "main"
+              $targetRef = $workflowRef
               $releaseTag = ""
           }
 

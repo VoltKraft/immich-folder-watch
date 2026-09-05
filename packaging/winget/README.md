@@ -55,8 +55,9 @@ manifest is written.
 ## Manual Resubmission
 
 Open the `WinGet` workflow and supply an existing published `release_tag`, for
-example `v2.8.0`. The workflow checks out that tag and regenerates both
-architecture entries from the release assets.
+example `v2.8.0`. Run the workflow from `main` so it uses the latest packaging
+tooling while resolving version and installer data from the immutable release
+tag. It then regenerates both architecture entries from the release assets.
 
 Do not use this to backfill `v2.7.0` or earlier releases because those releases
 do not contain the required ARM64 MSI.

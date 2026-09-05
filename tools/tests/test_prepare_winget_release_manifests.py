@@ -101,6 +101,12 @@ class PrepareWinGetReleaseManifestsTests(unittest.TestCase):
         installer_manifest = (
             self.output_dir / "VoltKraft.ImmichFolderWatch.installer.yaml"
         ).read_text(encoding="utf-8")
+        self.assertTrue(
+            installer_manifest.startswith(
+                "# yaml-language-server: $schema=https://aka.ms/"
+                "winget-manifest.installer.1.12.0.schema.json\n\n"
+            )
+        )
         self.assertEqual(1, installer_manifest.count('Architecture: "x64"'))
         self.assertEqual(1, installer_manifest.count('Architecture: "arm64"'))
         self.assertLess(
@@ -119,12 +125,28 @@ class PrepareWinGetReleaseManifestsTests(unittest.TestCase):
             self.output_dir
             / "VoltKraft.ImmichFolderWatch.locale.en-US.yaml"
         ).read_text(encoding="utf-8")
+        self.assertTrue(
+            locale_manifest.startswith(
+                "# yaml-language-server: $schema=https://aka.ms/"
+                "winget-manifest.defaultLocale.1.12.0.schema.json\n\n"
+            )
+        )
         self.assertIn('Publisher: "VoltKraft"', locale_manifest)
         self.assertIn('Moniker: "immich-folder-watch"', locale_manifest)
         self.assertIn('  - "immich-api"', locale_manifest)
         self.assertIn(
             f'ReleaseNotesUrl: "https://github.com/VoltKraft/immich-folder-watch/releases/tag/v{self.version}"',
             locale_manifest,
+        )
+
+        version_manifest = (
+            self.output_dir / "VoltKraft.ImmichFolderWatch.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(
+            version_manifest.startswith(
+                "# yaml-language-server: $schema=https://aka.ms/"
+                "winget-manifest.version.1.12.0.schema.json\n\n"
+            )
         )
 
     def test_rejects_missing_architecture(self) -> None:

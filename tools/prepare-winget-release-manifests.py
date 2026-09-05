@@ -31,6 +31,15 @@ def yaml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def schema_header(metadata: dict[str, object], manifest_type: str) -> str:
+    """Return the WinGet schema header for a manifest type."""
+    manifest_version = str(metadata["manifestVersion"])
+    return (
+        "# yaml-language-server: $schema=https://aka.ms/"
+        f"winget-manifest.{manifest_type}.{manifest_version}.schema.json"
+    )
+
+
 def read_json_object(path: Path, description: str) -> dict[str, object]:
     """Read *path* and require a JSON object."""
     try:
@@ -197,6 +206,8 @@ def render_version_manifest(metadata: dict[str, object], version: str) -> str:
     """Render the WinGet version manifest."""
     return "\n".join(
         (
+            schema_header(metadata, "version"),
+            "",
             f"PackageIdentifier: {yaml_string(str(metadata['packageIdentifier']))}",
             f"PackageVersion: {yaml_string(version)}",
             f"DefaultLocale: {yaml_string(str(metadata['packageLocale']))}",
@@ -222,7 +233,7 @@ def render_locale_manifest(metadata: dict[str, object], version: str) -> str:
         ("ShortDescription", "shortDescription"),
         ("Moniker", "moniker"),
     )
-    lines: list[str] = []
+    lines: list[str] = [schema_header(metadata, "defaultLocale"), ""]
     for yaml_key, metadata_key in fields:
         value = version if metadata_key is None else str(metadata[metadata_key])
         lines.append(f"{yaml_key}: {yaml_string(value)}")
@@ -251,6 +262,8 @@ def render_installer_manifest(
 ) -> str:
     """Render the two-architecture WinGet installer manifest."""
     lines = [
+        schema_header(metadata, "installer"),
+        "",
         f"PackageIdentifier: {yaml_string(str(metadata['packageIdentifier']))}",
         f"PackageVersion: {yaml_string(version)}",
         f"InstallerLocale: {yaml_string(str(metadata['installerLocale']))}",
