@@ -117,8 +117,26 @@ class PrepareWinGetReleaseManifestsTests(unittest.TestCase):
         self.assertIn(f'ReleaseDate: "{self.release_date}"', installer_manifest)
         self.assertIn(f'InstallerSha256: "{"A" * 64}"', installer_manifest)
         self.assertIn(
+            'ProductCode: "{11111111-1111-1111-1111-111111111111}"\n'
+            "Installers:",
+            installer_manifest,
+        )
+        self.assertIn(
             'ProductCode: "{22222222-2222-2222-2222-222222222222}"',
             installer_manifest,
+        )
+        self.assertEqual(2, installer_manifest.count("ProductCode:"))
+        self.assertLess(
+            installer_manifest.index(
+                'ProductCode: "{11111111-1111-1111-1111-111111111111}"'
+            ),
+            installer_manifest.index("Installers:"),
+        )
+        self.assertGreater(
+            installer_manifest.index(
+                'ProductCode: "{22222222-2222-2222-2222-222222222222}"'
+            ),
+            installer_manifest.index('Architecture: "arm64"'),
         )
 
         locale_manifest = (

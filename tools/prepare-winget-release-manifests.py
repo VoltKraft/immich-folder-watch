@@ -261,6 +261,11 @@ def render_installer_manifest(
     release_date: str,
 ) -> str:
     """Render the two-architecture WinGet installer manifest."""
+    default_product_code = next(
+        installer["productCode"]
+        for installer in installers
+        if installer["architecture"] == "x64"
+    )
     lines = [
         schema_header(metadata, "installer"),
         "",
@@ -269,6 +274,7 @@ def render_installer_manifest(
         f"InstallerLocale: {yaml_string(str(metadata['installerLocale']))}",
         f"InstallerType: {yaml_string(str(metadata['installerType']))}",
         f"ReleaseDate: {yaml_string(release_date)}",
+        f"ProductCode: {yaml_string(default_product_code)}",
         "Installers:",
     ]
     for installer in installers:
@@ -277,9 +283,12 @@ def render_installer_manifest(
                 f"  - Architecture: {yaml_string(installer['architecture'])}",
                 f"    InstallerUrl: {yaml_string(installer['url'])}",
                 f"    InstallerSha256: {yaml_string(installer['sha256'])}",
-                f"    ProductCode: {yaml_string(installer['productCode'])}",
             )
         )
+        if installer["productCode"] != default_product_code:
+            lines.append(
+                f"    ProductCode: {yaml_string(installer['productCode'])}"
+            )
     lines.extend(
         (
             'ManifestType: "installer"',
