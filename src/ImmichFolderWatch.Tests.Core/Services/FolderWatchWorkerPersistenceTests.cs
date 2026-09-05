@@ -2,6 +2,7 @@ using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.Tests.Core.Services;
@@ -25,12 +26,19 @@ public sealed class FolderWatchWorkerPersistenceTests
         var databasePath = Path.Combine(directory.Path, "sync-state.db");
         var client = new RecordingAssetClient();
         var config = CreateConfig(watchDirectory, syncMode, deleteAfterUpload: true);
-        using var worker = CreateWorker(config, databasePath, client);
+        var initialReconciliationLogger = syncMode == WatchSourceSyncModes.UploadNew
+            ? new InitialReconciliationLogger()
+            : null;
+        using var worker = CreateWorker(
+            config,
+            databasePath,
+            client,
+            workerLogger: initialReconciliationLogger);
         await worker.StartAsync(CancellationToken.None);
 
         if (syncMode == WatchSourceSyncModes.UploadNew)
         {
-            await Task.Delay(250);
+            await initialReconciliationLogger!.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
             await File.WriteAllTextAsync(filePath, "photo");
         }
 
@@ -274,7 +282,8 @@ public sealed class FolderWatchWorkerPersistenceTests
         AppConfig config,
         string databasePath,
         RecordingAssetClient client,
-        ILocalFileDeletionService? localFileDeletionService = null) =>
+        ILocalFileDeletionService? localFileDeletionService = null,
+        ILogger<FolderWatchWorker>? workerLogger = null) =>
         new(
             config,
             new AlwaysReadyChecker(),
@@ -283,7 +292,7 @@ public sealed class FolderWatchWorkerPersistenceTests
             client,
             new SqliteSyncStateStore(databasePath),
             new SyncStatusProvider(),
-            NullLogger<FolderWatchWorker>.Instance);
+            workerLogger ?? NullLogger<FolderWatchWorker>.Instance);
 
     private static AppConfig CreateConfig(
         string watchDirectory,
@@ -333,6 +342,40 @@ public sealed class FolderWatchWorkerPersistenceTests
         }
 
         Assert.True(condition(), "The expected condition was not reached before the timeout.");
+    }
+
+    private sealed class InitialReconciliationLogger : ILogger<FolderWatchWorker>
+    {
+        private const string ReconciliationMessagePrefix = "Persistent reconciliation for uploadNew";
+
+        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _reconciliationCount;
+
+        public Task WaitUntilReadyAsync(TimeSpan timeout) => _ready.Task.WaitAsync(timeout);
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel != LogLevel.Information
+                || !formatter(state, exception).StartsWith(ReconciliationMessagePrefix, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (Interlocked.Increment(ref _reconciliationCount) == 2)
+            {
+                _ready.TrySetResult();
+            }
+        }
     }
 
     private sealed class AlwaysReadyChecker : IFileReadinessChecker
