@@ -148,6 +148,11 @@ public sealed class MainWindowBindingTests
                     UriKind.Absolute),
             });
             var localizationService = new LocalizationService();
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("IFW_UI_PREVIEW_DIRECTORY")))
+            {
+                // Initialize before creating controls so localized option lists also use English.
+                localizationService.SetLanguage(LocalizationService.LanguageEnglish);
+            }
             application.Resources["Loc"] = new LocalizationProxy(localizationService);
 
             var syncStatusProvider = new SyncStatusProvider();
@@ -291,7 +296,14 @@ public sealed class MainWindowBindingTests
 
         Directory.CreateDirectory(outputDirectory);
         var viewModel = (MainWindowViewModel)window.DataContext;
+        viewModel.SelectedLanguage = viewModel.AvailableLanguages.Single(
+            language => language.Code == LocalizationService.LanguageEnglish);
+        Assert.Equal(LocalizationService.LanguageEnglish, viewModel.SelectedLanguage.Code);
         viewModel.ProductVersionText = "Preview · sample data";
+        viewModel.ImmichServerApiUrl = "https://immich.example.com/api";
+        viewModel.ImmichApiKey = string.Empty;
+        viewModel.LoggingTarget = LogTargets.File;
+        viewModel.LogDirectory = @"C:\Users\YOUR_USER\AppData\Local\Immich Folder Watch\logs";
         viewModel.SelectedSource!.Path = @"C:\Pictures\Screenshots";
         viewModel.SelectedSource.AlbumName = "Screenshots";
         viewModel.SelectedSource.IncludeSubdirectories = true;
@@ -302,7 +314,22 @@ public sealed class MainWindowBindingTests
             viewModel.SelectedSource.AlbumName = folder;
         }
         viewModel.SelectedSource = viewModel.Sources[0];
+        viewModel.SelectedSource.ExtensionsText = ".jpg\n.png\n.heic\n.mp4";
+        viewModel.SelectedSource.ExcludeDirectoriesText = "private";
+        viewModel.SelectedSource.ExcludeFileNamesText = "Thumbs.db";
         sourceTabs.SelectedIndex = 0;
+        var settingsTabs = Assert.IsType<TabControl>(window.FindName("SettingsTabs"));
+        var pages = new (string Name, int Section, int Tab)[]
+        {
+            ("overview", 0, 0),
+            ("folders", 1, 0),
+            ("filters", 1, 1),
+            ("advanced", 1, 2),
+            ("connection", 2, 0),
+            ("settings", 3, 0),
+            ("transfer", 3, 1),
+            ("logging", 3, 2),
+        };
         var content = (FrameworkElement)window.Content;
         foreach (var theme in new[] { "Light", "Dark" })
         {
@@ -310,19 +337,22 @@ public sealed class MainWindowBindingTests
             {
                 Source = new Uri($"pack://application:,,,/ImmichFolderWatch;component/Styles/Palette{theme}.xaml"),
             };
-            for (var section = 0; section < 4; section++)
+            foreach (var page in pages)
             {
-                viewModel.SelectedSectionIndex = section;
+                viewModel.SelectedSectionIndex = page.Section;
+                sourceTabs.SelectedIndex = page.Section == 1 ? page.Tab : 0;
+                settingsTabs.SelectedIndex = page.Section == 3 ? page.Tab : 0;
                 FlushBindings();
-                content.Measure(new Size(1080, 730));
-                content.Arrange(new Rect(0, 0, 1080, 730));
+                var height = page.Name is "filters" or "transfer" ? 900 : 730;
+                content.Measure(new Size(1080, height));
+                content.Arrange(new Rect(0, 0, 1080, height));
                 content.UpdateLayout();
                 Assert.False(window.IsLoaded);
-                var bitmap = new RenderTargetBitmap(1080, 730, 96, 96, PixelFormats.Pbgra32);
+                var bitmap = new RenderTargetBitmap(1080, height, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(content);
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                using var stream = File.Create(Path.Combine(outputDirectory, $"windows-{theme.ToLowerInvariant()}-{section}.png"));
+                using var stream = File.Create(Path.Combine(outputDirectory, $"windows-{theme.ToLowerInvariant()}-{page.Name}.png"));
                 encoder.Save(stream);
             }
         }

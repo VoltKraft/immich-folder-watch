@@ -4,13 +4,26 @@
 
 # Immich Folder Watch
 
-[![Platform Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11%2FServer-0078D6?logo=windows)](./docs/installation-windows.md)
-[![Platform Linux](https://img.shields.io/badge/Platform-Linux%20(Flatpak)-FCC624?logo=linux&logoColor=black)](./packaging/flatpak/README.md)
+[![Windows: x86-64 and ARM64](https://img.shields.io/badge/Windows-x86--64%20%7C%20ARM64-0078D6?logo=windows)](./docs/installation-windows.md)
+[![Linux Flatpak: x86-64 and ARM64](https://img.shields.io/badge/Linux%20(Flatpak)-x86--64%20%7C%20ARM64-FCC624?logo=linux&logoColor=black)](./packaging/flatpak/README.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
 `Immich Folder Watch` is a desktop app for **Windows and Linux** that watches local folders and uploads newly created media to Immich automatically.
 
 It runs as a per-user desktop app — no system service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a desktop before they land in Immich, this fills that gap without writing directly into Immich storage.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/ui-folders-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="./docs/images/ui-folders-light.png" />
+  <img src="./docs/images/ui-folders-light.png" alt="Immich Folder Watch on Windows: the English folder editor with sample folders and upload settings" width="1080" />
+</picture>
+
+*Windows interface with sample data. The preview follows your browser's color
+preference; [light](./docs/images/ui-folders-light.png) and
+[dark](./docs/images/ui-folders-dark.png) versions are also available directly.*
+
+See the [illustrated desktop guide](./docs/user-interface.md) to connect Immich,
+add folders, choose a sync mode, and adjust transfer and logging settings.
 
 ---
 
@@ -41,7 +54,7 @@ That gives you a clean, low-maintenance ingestion path:
 - Optional per-folder album placement in Immich
 - API-based uploads instead of storage hacks
 
-Each watched folder has its own **sync mode**: upload only new files that appear during runtime (the default, preserving prior behavior), upload everything the folder already contains, or keep the folder bidirectionally in sync with its Immich album (additive — local files missing in the album are uploaded and album assets missing locally are downloaded). Deletions are never mirrored — the app does not remove files locally or remotely, and it does not write directly into Immich's storage folders.
+Each watched folder has its own **sync mode**: upload only new files that appear during runtime (the default), upload everything the folder already contains, or synchronize uploads and downloads with Immich. Bidirectional sync also propagates local deletions and moves to Immich; upload-only modes can optionally delete confirmed local uploads. See the [sync modes and deletion behavior](./docs/user-interface.md#folders) before choosing a mode. All transfers and remote changes use the Immich API.
 
 ---
 
@@ -205,10 +218,12 @@ logging:
 
 ## Documentation
 
-The GUI keeps per-source watch options collapsed by default and only shows `Excluded Directories` when `Include subdirectories` is enabled.
+Select a folder under **Folders** to edit its **General**, **File filters**, and
+**Advanced** tabs. **Excluded Directories** is shown when **Include subdirectories** is enabled.
 
 Upload-only sources can optionally act as an inbox by permanently deleting local files after Immich confirms the upload and album assignment. The option is disabled by default and never applies to bidirectional `sync` sources.
 
+- [Illustrated desktop guide](./docs/user-interface.md)
 - [Configuration](./docs/configuration.md)
 - [Windows Installation](./docs/installation-windows.md)
 - [Linux Flatpak packaging](./packaging/flatpak/README.md)
