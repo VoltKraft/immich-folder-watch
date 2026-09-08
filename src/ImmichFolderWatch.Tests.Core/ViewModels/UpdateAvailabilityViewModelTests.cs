@@ -9,6 +9,7 @@ using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Tests.Core.ViewModels;
 
+[Collection("Localization")]
 public sealed class UpdateAvailabilityViewModelTests
 {
     [Fact]

@@ -23,7 +23,7 @@
   - HTTP client implementation for the Immich API
   - Retry and transient error handling
 - `ImmichFolderWatch.App`
-  - Avalonia desktop UI (MainWindow + ViewModel)
+  - Windows WPF desktop UI (MainWindow, with shared ViewModel)
   - Tray icon, tooltip, and context menu (Open, Restart, Quit)
   - `AppHost` — owns the internal `IHost` that runs the sync worker
   - `AutostartManager` — Startup-folder `.lnk` management via WScript.Shell COM
@@ -62,6 +62,8 @@
 - **Fast restart reconciliation.** The first run with an empty database performs a mode-appropriate bootstrap. Later runs enumerate inexpensive file metadata in the background and use size plus UTC modification time to avoid reprocessing unchanged content.
 - **Fail safe state handling.** A corrupt database is quarantined beside the original with a timestamp before a safe bootstrap. If the state cannot be opened or written, transfers stop instead of running without persistent tracking. A source scan that does not complete successfully cannot create deletion decisions.
 - **Soft server failures.** The server ping is an ongoing background monitor, not a fail-fast startup check — the desktop app stays alive while the Immich server is temporarily offline.
+- **Global transfer priority.** First upload attempts take priority over retries; the configured timestamp order applies within each group before selecting a batch. Each worker iteration processes at most one batch so new filesystem events and remote pulls remain responsive. Pending downloads are sorted per source/album. Source traversal and transfer readiness remain independent of priority; active transfers are never interrupted to reorder files.
+- **Persistent operation progress in the UI.** Sync status retains processed/total counts after an upload cycle or scan of all sync sources finishes, but hides them while inactive. Upload counts span successive batches while the ready queue remains nonempty and are kept separately from intervening downloads; retries after the queue drains start a new cycle. Active transfers and sync errors display the counts. Download totals grow as pending files are discovered per album; empty scans retain previous counts. Only completed attempts count as processed, including failures and skips. Server connectivity errors and sync errors have separate status fields so a successful ping does not hide a failed transfer. Pull errors survive subsequent albums in the same scan and clear after a later complete successful scan.
 - **API uploads only:** no direct writes to Immich storage.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.

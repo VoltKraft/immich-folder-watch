@@ -1,4 +1,5 @@
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Configuration;
 
 namespace ImmichFolderWatch.Core.Interfaces;
 
@@ -8,5 +9,10 @@ public interface IUploadBatchQueue
 
     bool TryEnqueue(UploadAssetRequest request);
 
-    IReadOnlyList<UploadAssetRequest> DequeueBatch(int maxBatchSize);
+    /// <summary>
+    /// Removes up to <paramref name="maxBatchSize"/> pending files in modification-time order.
+    /// First attempts precede retries, with the configured order applied within each group.
+    /// Files with unavailable timestamps follow dated files; equal timestamps retain enqueue order.
+    /// </summary>
+    IReadOnlyList<UploadAssetRequest> DequeueBatch(int maxBatchSize, string transferOrder = TransferOrders.NewestFirst);
 }

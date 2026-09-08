@@ -73,6 +73,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_FolderPath => Strings.UI_FolderPath;
     public string UI_ImmichAlbumName => Strings.UI_ImmichAlbumName;
     public string UI_AlbumNameWatermark => Strings.UI_AlbumNameWatermark;
+    public string UI_SyncMode => Strings.UI_SyncMode;
     public string UI_AdvancedWatchOptions => Strings.UI_AdvancedWatchOptions;
     public string UI_IncludeSubdirectories => Strings.UI_IncludeSubdirectories;
     public string UI_DeleteAfterUpload => Strings.UI_DeleteAfterUpload;
@@ -81,6 +82,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_ExcludedDirectories => Strings.UI_ExcludedDirectories;
     public string UI_ExcludedFileNames => Strings.UI_ExcludedFileNames;
     public string UI_WatchBehavior => Strings.UI_WatchBehavior;
+    public string UI_TransferOrder => Strings.ResourceManager.GetString(nameof(UI_TransferOrder), Strings.Culture) ?? nameof(UI_TransferOrder);
     public string UI_BatchIntervalSeconds => Strings.UI_BatchIntervalSeconds;
     public string UI_MaxBatchSize => Strings.UI_MaxBatchSize;
     public string UI_FileReadyTimeoutSeconds => Strings.UI_FileReadyTimeoutSeconds;
@@ -88,6 +90,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_LoggingAndRetry => Strings.UI_LoggingAndRetry;
     public string UI_RetryBaseDelayMs => Strings.UI_RetryBaseDelayMs;
     public string UI_LogLevel => Strings.UI_LogLevel;
+    public string UI_LogTarget => Strings.UI_LogTarget;
     public string UI_LogDirectory => Strings.UI_LogDirectory;
     public string UI_UseDefault => Strings.UI_UseDefault;
     public string UI_LogDirectoryHint => Strings.UI_LogDirectoryHint;

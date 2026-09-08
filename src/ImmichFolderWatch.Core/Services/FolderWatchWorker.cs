@@ -64,6 +64,8 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private volatile int _pullRequested;
 
+    private bool _continueUploadProgress;
+
     private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(PathComparer);
 
     private readonly ConcurrentDictionary<string, PendingUploadRetry> _pendingUploadRetries = new(PathComparer);
@@ -789,39 +791,59 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task PullFromImmichAsync(CancellationToken cancellationToken)
     {
-        foreach (var context in _sources)
+        _syncStatusProvider.ReportPullCycleStarted();
+        var completed = false;
+        try
         {
-            if (!context.IsSyncMode)
+            foreach (var context in _sources)
             {
-                continue;
-            }
-
-            var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
-            var pullSucceeded = false;
-            try
-            {
-                if (context.UseFlatAlbum)
+                if (!context.IsSyncMode)
                 {
-                    pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                    continue;
                 }
-                else if (context.UseSubdirsAsAlbums)
-                {
-                    pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
-            }
 
-            if (pullSucceeded && context.RemoteDeleteSafe)
-            {
-                await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
+                var pullSucceeded = false;
+                try
+                {
+                    if (context.UseFlatAlbum)
+                    {
+                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                    }
+                    else if (context.UseSubdirsAsAlbums)
+                    {
+                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _syncStatusProvider.ReportSyncFailed(ex.Message);
+                    _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
+                }
+
+                if (pullSucceeded && context.RemoteDeleteSafe)
+                {
+                    await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                }
             }
+            completed = true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _syncStatusProvider.ReportSyncFailed(ex.Message);
+            throw;
+        }
+        finally
+        {
+            _syncStatusProvider.ReportPullCycleCompleted(completed);
         }
     }
 
@@ -909,6 +931,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
         if (!result.IsSuccess)
         {
+            _syncStatusProvider.ReportSyncFailed(result.ErrorMessage ?? "Album sync pull failed.");
             _logger.LogWarning(
                 "Sync pull failed for album '{AlbumName}': {Error}",
                 context.Source.AlbumName,
@@ -949,6 +972,7 @@ public sealed class FolderWatchWorker : BackgroundService
         }
         else
         {
+            _syncStatusProvider.ReportSyncFailed(unassigned.ErrorMessage ?? "Listing unassigned assets failed.");
             _logger.LogWarning(
                 "Listing unassigned assets failed during sync pull: {Error}",
                 unassigned.ErrorMessage ?? "unknown");
@@ -958,6 +982,7 @@ public sealed class FolderWatchWorker : BackgroundService
         var albums = await _immichAssetClient.ListAlbumsAsync(cancellationToken);
         if (!albums.IsSuccess)
         {
+            _syncStatusProvider.ReportSyncFailed(albums.ErrorMessage ?? "Listing albums failed.");
             _logger.LogWarning("Listing albums failed during sync pull: {Error}", albums.ErrorMessage ?? "unknown");
             return false;
         }
@@ -994,6 +1019,7 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 if (!albumResult.AlbumMissing)
                 {
+                    _syncStatusProvider.ReportSyncFailed(albumResult.ErrorMessage ?? "Album sync pull failed.");
                     _logger.LogWarning(
                         "Sync pull failed for album '{AlbumName}': {Error}",
                         album.Name,
@@ -1124,7 +1150,11 @@ public sealed class FolderWatchWorker : BackgroundService
         try
         {
             var downloadedCount = 0;
-            foreach (var (asset, destinationPath) in pending)
+            var datedFirst = pending.OrderBy(item => !item.Asset.FileModifiedAt.HasValue);
+            var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
+                ? datedFirst.ThenBy(item => item.Asset.FileModifiedAt)
+                : datedFirst.ThenByDescending(item => item.Asset.FileModifiedAt);
+            foreach (var (asset, destinationPath) in ordered)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -1161,6 +1191,15 @@ public sealed class FolderWatchWorker : BackgroundService
                             asset.Id,
                             download.ErrorMessage ?? "download completed without a readable destination file");
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _syncStatusProvider.ReportDownloadFailed(destinationPath, ex.Message);
+                    _logger.LogWarning(ex, "Downloading asset {AssetId} failed.", asset.Id);
                 }
                 finally
                 {
@@ -1791,14 +1830,14 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task FlushUploadsAsync(CancellationToken cancellationToken)
     {
-        var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize);
+        var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize, _config.Watch.TransferOrder);
         if (batch.Count == 0)
         {
             return;
         }
 
         _logger.LogInformation("Uploading batch with {Count} file(s).", batch.Count);
-        _syncStatusProvider.ReportBatchStarted(batch.Count);
+        _syncStatusProvider.ReportBatchStarted(batch.Count + _uploadBatchQueue.Count, _continueUploadProgress);
         var requestIndex = 0;
 
         try
@@ -1930,8 +1969,14 @@ public sealed class FolderWatchWorker : BackgroundService
 
             throw;
         }
+        catch (Exception ex)
+        {
+            _syncStatusProvider.ReportSyncFailed(ex.Message);
+            throw;
+        }
         finally
         {
+            _continueUploadProgress = _uploadBatchQueue.Count > 0;
             _syncStatusProvider.ReportBatchCompleted();
         }
     }

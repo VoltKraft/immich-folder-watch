@@ -3,16 +3,19 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Documents;
+using System.Windows.Threading;
 using ImmichFolderWatch.App;
 using ImmichFolderWatch.App.Hosting;
 using ImmichFolderWatch.App.Services;
 using ImmichFolderWatch.App.Shared.Services;
 using ImmichFolderWatch.Core.Configuration;
+using ImmichFolderWatch.Core.Platform;
 using ImmichFolderWatch.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.Tests.Gui;
 
+[Collection(nameof(WpfApplicationCollection))]
 public sealed class MainWindowBindingTests
 {
     [Fact]
@@ -29,10 +32,14 @@ public sealed class MainWindowBindingTests
             {
                 failure = ex;
             }
-        });
+            finally
+            {
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+            }
+        }) { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        thread.Join();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "The WPF binding check timed out.");
 
         if (failure is not null)
         {
@@ -46,34 +53,41 @@ public sealed class MainWindowBindingTests
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown,
         };
-        application.Resources.MergedDictionaries.Add(new ResourceDictionary
-        {
-            Source = new Uri(
-                "pack://application:,,,/ImmichFolderWatch;component/Styles/PaletteDark.xaml",
-                UriKind.Absolute),
-        });
-        application.Resources.MergedDictionaries.Add(new ResourceDictionary
-        {
-            Source = new Uri(
-                "pack://application:,,,/ImmichFolderWatch;component/Styles/Styles.xaml",
-                UriKind.Absolute),
-        });
-        application.Resources["Loc"] = new LocalizationProxy();
-
-        var syncStatusProvider = new SyncStatusProvider();
-        var appHost = new AppHost(syncStatusProvider);
-        var window = new MainWindow(
-            appHost,
-            syncStatusProvider,
-            new AutostartManager(),
-            new AppConfigLoader(),
-            new ThemeWatcher(application),
-            LocalizationService.Instance,
-            NullLogger<MainWindow>.Instance,
-            "Version 2.8.1");
-
+        AppHost? appHost = null;
+        MainWindow? window = null;
         try
         {
+            application.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/ImmichFolderWatch;component/Styles/PaletteDark.xaml",
+                    UriKind.Absolute),
+            });
+            application.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/ImmichFolderWatch;component/Styles/Styles.xaml",
+                    UriKind.Absolute),
+            });
+            var localizationService = new LocalizationService();
+            application.Resources["Loc"] = new LocalizationProxy(localizationService);
+
+            var syncStatusProvider = new SyncStatusProvider();
+            appHost = new AppHost(syncStatusProvider);
+            window = new MainWindow(
+                appHost,
+                syncStatusProvider,
+                new TestAutostartManager(),
+                new AppConfigLoader(),
+                new ThemeWatcher(application),
+                localizationService,
+                NullLogger<MainWindow>.Instance,
+                "Test version");
+
+            // Keep the window unshown: its Loaded handler reads the user's
+            // configuration and starts access verification.
+            Assert.False(window.IsLoaded);
+            Assert.False(appHost.IsRunning);
             var run = Assert.IsType<Run>(window.FindName("UpdateAvailableTextRun"));
             var binding = BindingOperations.GetBinding(run, Run.TextProperty);
 
@@ -82,9 +96,42 @@ public sealed class MainWindowBindingTests
         }
         finally
         {
-            window.Close();
-            appHost.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            application.Shutdown();
+            try
+            {
+                window?.Close();
+            }
+            finally
+            {
+                try
+                {
+                    appHost?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+                finally
+                {
+                    application.Shutdown();
+                    // Shutdown queues its cleanup. Complete it before this STA
+                    // exits so later tests do not see its global Application.
+                    application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                    Assert.Null(Application.Current);
+                }
+            }
         }
     }
+
+    private sealed class TestAutostartManager : IAutoStartManager
+    {
+        public Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+        public Task EnableAsync(CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The binding check must not modify autostart.");
+
+        public Task DisableAsync(CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The binding check must not modify autostart.");
+    }
+}
+
+// WPF Application and its resources are process-global and owned by one STA.
+[CollectionDefinition(nameof(WpfApplicationCollection), DisableParallelization = true)]
+public sealed class WpfApplicationCollection
+{
 }

@@ -1,18 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Media;
-using Control = System.Windows.Controls.Control;
-using Size = System.Windows.Size;
-using Point = System.Windows.Point;
-using Brush = System.Windows.Media.Brush;
-using Brushes = System.Windows.Media.Brushes;
+using PasswordBox = System.Windows.Controls.PasswordBox;
 using TextBox = System.Windows.Controls.TextBox;
-using HorizontalAlignment = System.Windows.HorizontalAlignment;
-using VerticalAlignment = System.Windows.VerticalAlignment;
 
 namespace ImmichFolderWatch.App.Services;
 
+/// <summary>
+/// Supplies placeholder text and empty-input state to the text/password control templates.
+/// Placeholders belong inside the templates so ancestor visibility and scroll clipping apply.
+/// </summary>
 public static class WatermarkBehavior
 {
     public static readonly DependencyProperty WatermarkProperty = DependencyProperty.RegisterAttached(
@@ -21,151 +17,56 @@ public static class WatermarkBehavior
         typeof(WatermarkBehavior),
         new PropertyMetadata(string.Empty, OnWatermarkChanged));
 
-    public static string GetWatermark(DependencyObject obj)
-    {
-        return (string)obj.GetValue(WatermarkProperty);
-    }
+    private static readonly DependencyPropertyKey ShowWatermarkPropertyKey = DependencyProperty.RegisterAttachedReadOnly(
+        "ShowWatermark",
+        typeof(bool),
+        typeof(WatermarkBehavior),
+        new PropertyMetadata(false));
 
-    public static void SetWatermark(DependencyObject obj, string value)
-    {
-        obj.SetValue(WatermarkProperty, value);
-    }
+    public static readonly DependencyProperty ShowWatermarkProperty = ShowWatermarkPropertyKey.DependencyProperty;
 
-    private static void OnWatermarkChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    public static string GetWatermark(DependencyObject obj) => (string)obj.GetValue(WatermarkProperty);
+
+    public static void SetWatermark(DependencyObject obj, string value) => obj.SetValue(WatermarkProperty, value);
+
+    public static bool GetShowWatermark(DependencyObject obj) => (bool)obj.GetValue(ShowWatermarkProperty);
+
+    private static void OnWatermarkChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
     {
-        switch (d)
+        var hasWatermark = !string.IsNullOrEmpty(GetWatermark(sender));
+        switch (sender)
         {
             case TextBox textBox:
-                textBox.Loaded -= OnTextBoxLoaded;
-                textBox.GotFocus -= OnTextBoxFocusChanged;
-                textBox.LostFocus -= OnTextBoxFocusChanged;
-                textBox.TextChanged -= OnTextBoxTextChanged;
-                textBox.Loaded += OnTextBoxLoaded;
-                textBox.GotFocus += OnTextBoxFocusChanged;
-                textBox.LostFocus += OnTextBoxFocusChanged;
-                textBox.TextChanged += OnTextBoxTextChanged;
-                if (textBox.IsLoaded)
+                textBox.TextChanged -= OnTextChanged;
+                if (hasWatermark)
                 {
-                    UpdateAdornerFor(textBox);
+                    textBox.TextChanged += OnTextChanged;
                 }
+                UpdateShowWatermark(textBox);
                 break;
             case PasswordBox passwordBox:
-                passwordBox.Loaded -= OnPasswordBoxLoaded;
-                passwordBox.GotFocus -= OnPasswordBoxFocusChanged;
-                passwordBox.LostFocus -= OnPasswordBoxFocusChanged;
-                passwordBox.PasswordChanged -= OnPasswordBoxPasswordChanged;
-                passwordBox.Loaded += OnPasswordBoxLoaded;
-                passwordBox.GotFocus += OnPasswordBoxFocusChanged;
-                passwordBox.LostFocus += OnPasswordBoxFocusChanged;
-                passwordBox.PasswordChanged += OnPasswordBoxPasswordChanged;
-                if (passwordBox.IsLoaded)
+                passwordBox.PasswordChanged -= OnPasswordChanged;
+                if (hasWatermark)
                 {
-                    UpdateAdornerFor(passwordBox);
+                    passwordBox.PasswordChanged += OnPasswordChanged;
                 }
+                UpdateShowWatermark(passwordBox);
                 break;
         }
     }
 
-    private static void OnTextBoxLoaded(object sender, RoutedEventArgs e) => UpdateAdornerFor((Control)sender);
+    private static void OnTextChanged(object sender, TextChangedEventArgs e) => UpdateShowWatermark((TextBox)sender);
 
-    private static void OnTextBoxFocusChanged(object sender, RoutedEventArgs e) => UpdateAdornerFor((Control)sender);
+    private static void OnPasswordChanged(object sender, RoutedEventArgs e) => UpdateShowWatermark((PasswordBox)sender);
 
-    private static void OnTextBoxTextChanged(object sender, TextChangedEventArgs e) => UpdateAdornerFor((Control)sender);
+    private static void UpdateShowWatermark(TextBox textBox) =>
+        textBox.SetValue(ShowWatermarkPropertyKey,
+            !string.IsNullOrEmpty(GetWatermark(textBox)) && string.IsNullOrEmpty(textBox.Text));
 
-    private static void OnPasswordBoxLoaded(object sender, RoutedEventArgs e) => UpdateAdornerFor((Control)sender);
-
-    private static void OnPasswordBoxFocusChanged(object sender, RoutedEventArgs e) => UpdateAdornerFor((Control)sender);
-
-    private static void OnPasswordBoxPasswordChanged(object sender, RoutedEventArgs e) => UpdateAdornerFor((Control)sender);
-
-    private static void UpdateAdornerFor(Control control)
+    private static void UpdateShowWatermark(PasswordBox passwordBox)
     {
-        var layer = AdornerLayer.GetAdornerLayer(control);
-        if (layer is null)
-        {
-            return;
-        }
-
-        var existing = layer.GetAdorners(control);
-        if (existing is not null)
-        {
-            foreach (var adorner in existing)
-            {
-                if (adorner is WatermarkAdorner)
-                {
-                    layer.Remove(adorner);
-                }
-            }
-        }
-
-        if (ShouldShowWatermark(control))
-        {
-            var watermark = GetWatermark(control);
-            if (!string.IsNullOrEmpty(watermark))
-            {
-                layer.Add(new WatermarkAdorner(control, watermark));
-            }
-        }
-    }
-
-    private static bool ShouldShowWatermark(Control control)
-    {
-        return control switch
-        {
-            TextBox textBox => string.IsNullOrEmpty(textBox.Text),
-            PasswordBox passwordBox => string.IsNullOrEmpty(passwordBox.Password),
-            _ => false,
-        };
-    }
-
-    private sealed class WatermarkAdorner : Adorner
-    {
-        private readonly TextBlock _textBlock;
-
-        public WatermarkAdorner(UIElement adornedElement, string text)
-            : base(adornedElement)
-        {
-            IsHitTestVisible = false;
-            _textBlock = new TextBlock
-            {
-                Text = text,
-                Foreground = TryResolveBrush(adornedElement, "AppSecondaryText") ?? Brushes.Gray,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Padding = new Thickness(12, 0, 8, 0),
-                IsHitTestVisible = false,
-            };
-        }
-
-        protected override int VisualChildrenCount => 1;
-
-        protected override Visual GetVisualChild(int index) => _textBlock;
-
-        protected override Size MeasureOverride(Size constraint)
-        {
-            _textBlock.Measure(constraint);
-            return ((FrameworkElement)AdornedElement).RenderSize;
-        }
-
-        protected override Size ArrangeOverride(Size finalSize)
-        {
-            _textBlock.Arrange(new Rect(new Point(0, 0), finalSize));
-            return finalSize;
-        }
-
-        private static Brush? TryResolveBrush(DependencyObject context, string resourceKey)
-        {
-            if (context is FrameworkElement fe && fe.TryFindResource(resourceKey) is Brush feBrush)
-            {
-                return feBrush;
-            }
-
-            if (Application.Current?.TryFindResource(resourceKey) is Brush appBrush)
-            {
-                return appBrush;
-            }
-
-            return null;
-        }
+        using var password = passwordBox.SecurePassword;
+        passwordBox.SetValue(ShowWatermarkPropertyKey,
+            !string.IsNullOrEmpty(GetWatermark(passwordBox)) && password.Length == 0);
     }
 }

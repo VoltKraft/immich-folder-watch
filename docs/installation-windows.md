@@ -19,7 +19,7 @@ After install:
 
 1. Open the `Immich Folder Watch` desktop shortcut (or launch it from the Start menu).
 2. Enter your Immich URL and API key, then review the verification result.
-3. Select one or more folders. Expand **Advanced Watch Options** only if you want to adjust subdirectories, extensions, or exclude filters.
+3. Select one or more folders. Expand **Advanced options** to adjust subdirectories, local deletion after upload, extensions, or exclude filters. The global upload/download order defaults to newest files first and can be changed under **Watch behaviour**.
 4. Click **Save and Apply** — the app starts watching in-process and a tray icon appears in the notification area.
 
 ### Installed Layout

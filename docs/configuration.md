@@ -79,6 +79,7 @@ watch:
       excludeFileNames:
         - "Thumbs.db"
         - "*.tmp"
+  transferOrder: "newestFirst" # newestFirst (default) | oldestFirst
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30
@@ -107,6 +108,49 @@ localization:
 
 ## Notes
 
+### Transfer order and status
+
+The global **Transfer order** setting applies to every source and both transfer
+directions. `watch.transferOrder` accepts `newestFirst` (the default) or
+`oldestFirst`; empty or unrecognized values fall back to `newestFirst`.
+Uploads use the local UTC last-modified time sampled when queued and are ordered
+across ready queued files before selecting a batch. First attempts take priority
+over retries; the selected timestamp order applies within each group. Downloads are ordered within
+each source/album pull by the server's `fileModifiedAt`, falling back to
+`fileCreatedAt` and then `createdAt`. Files with no timestamp come last;
+equal timestamps retain queue/API order.
+This does not interrupt a running transfer or reorder the source/album traversal.
+Use **Save and Apply** to activate a changed order.
+
+Existing configurations without `transferOrder` automatically use `newestFirst`
+after upgrading to 2.9.0; no file or sync-state migration is required. Select
+`oldestFirst` to process older pending media first. Timestamp ordering replaces
+the previous queue arrival order.
+
+Each source's **Advanced options** contains both **Include subdirectories** and
+**Delete local files after upload** (available for upload modes only). Moving the
+controls does not change their saved values or deletion safeguards.
+
+The **Permissions** section starts collapsed. Its heading retains the aggregate
+check result and shows OK only when all listed permissions pass. Expand it to
+inspect individual results.
+
+**Sync status** shows **Inactive** without file counts, or the file being
+uploaded/downloaded or last sync error followed by `(processed of total)`. Processed files include
+successful, failed, and skipped attempts; an active file is not counted until its
+attempt finishes. Upload progress spans successive batches while the ready queue
+remains nonempty; retries becoming ready after the queue drains start a new cycle.
+Downloads between upload batches do not reset the saved upload counters. Download
+progress spans one scan of all sync sources, with the total growing as pending
+files are discovered in each album. Counts remain available after completion but
+are hidden while inactive. They reset when the next transfer operation starts;
+empty scans retain the counts.
+Errors remain visible after a failed operation, independently of server
+connectivity checks. A later successful scan clears a recovered pull error even
+when no downloads are needed. An empty scan does not clear an upload error.
+
+### File selection
+
 - File extensions are case-insensitive.
 - Each source has its own `extensions` include list.
 - Extensions without `.` are normalized automatically.
@@ -114,7 +158,7 @@ localization:
 - `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
 - `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
-- In the Windows GUI, new sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos) and keep the advanced watch options collapsed by default.
+- In the Windows GUI, new sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos) and keep **Advanced options** collapsed by default.
 - In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
 - `logging.target` controls where logs are written. Valid values:
   - `eventLog` (default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.

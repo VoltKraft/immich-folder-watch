@@ -24,6 +24,9 @@ public sealed class WatchSettings
 {
     public List<WatchSourceSettings> Sources { get; set; } = new();
 
+    /// <summary>The global timestamp order for pending uploads and downloads.</summary>
+    public string TransferOrder { get; set; } = TransferOrders.NewestFirst;
+
     // Legacy 1.4.x fallback input. New 1.5.0 configs store extensions per source.
     public List<string> Extensions { get; set; } = new();
 
@@ -32,6 +35,18 @@ public sealed class WatchSettings
     public int MaxBatchSize { get; set; } = 25;
 
     public int FileReadyTimeoutSeconds { get; set; } = 30;
+}
+
+public static class TransferOrders
+{
+    public const string NewestFirst = "newestFirst";
+
+    public const string OldestFirst = "oldestFirst";
+
+    public static string Normalize(string? value) =>
+        string.Equals(value?.Trim(), OldestFirst, StringComparison.OrdinalIgnoreCase)
+            ? OldestFirst
+            : NewestFirst;
 }
 
 public sealed class WatchSourceSettings

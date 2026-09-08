@@ -4,6 +4,7 @@ using ImmichFolderWatch.App.Shared.Services;
 
 namespace ImmichFolderWatch.Tests.Core.Localization;
 
+[Collection("Localization")]
 public sealed class LocalizationServiceTests
 {
     [Fact]

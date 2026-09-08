@@ -59,7 +59,9 @@
   <data name="Status_SyncRunning" xml:space="preserve"><value>Sync läuft</value></data>
   <data name="Status_Queue" xml:space="preserve"><value>Warteschlange</value></data>
   <data name="Status_NoSyncYet" xml:space="preserve"><value>Noch kein Sync durchgeführt.</value></data>
-  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Aktuell kein Upload.</value></data>
+  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Inaktiv</value></data>
+  <data name="Status_SyncErrorFormat" xml:space="preserve"><value>Sync-Fehler: {0}</value></data>
+  <data name="Status_FileProgressFormat" xml:space="preserve"><value>{0} ({1} von {2})</value></data>
   <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Zuletzt geprüft: {0}</value></data>
   <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
   <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
@@ -83,7 +85,7 @@
   <data name="UI_Status" xml:space="preserve"><value>Status</value></data>
   <data name="UI_ServerConnection" xml:space="preserve"><value>Server-Verbindung</value></data>
   <data name="UI_LastSync" xml:space="preserve"><value>Letzter Sync</value></data>
-  <data name="UI_CurrentSync" xml:space="preserve"><value>Aktueller Sync</value></data>
+  <data name="UI_CurrentSync" xml:space="preserve"><value>Sync Status</value></data>
   <data name="UI_PendingFiles" xml:space="preserve"><value>Wartende Dateien</value></data>
   <data name="UI_Autostart" xml:space="preserve"><value>Autostart</value></data>
   <data name="UI_StartOnLogin" xml:space="preserve"><value>Beim Anmelden starten</value></data>
@@ -101,7 +103,7 @@
   <data name="UI_FolderPath" xml:space="preserve"><value>Ordnerpfad</value></data>
   <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich-Albumname</value></data>
   <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leer lassen, um kein Album zu verwenden</value></data>
-  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Erweiterte Überwachungsoptionen</value></data>
+  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Erweiterte Optionen</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Unterordner einbeziehen</value></data>
   <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Lokale Dateien nach erfolgreichem Upload dauerhaft löschen</value></data>
   <data name="UI_DeleteAfterUploadDescription" xml:space="preserve"><value>Nachdem Immich den Upload und die Albumzuordnung bestätigt hat, wird die lokale Datei dauerhaft gelöscht. Dies bereinigt auch bereits verifizierte Uploads, deren Datei unverändert ist.</value></data>
@@ -109,6 +111,9 @@
   <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Ausgeschlossene Verzeichnisse</value></data>
   <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Ausgeschlossene Dateinamen</value></data>
   <data name="UI_WatchBehavior" xml:space="preserve"><value>Überwachungsverhalten</value></data>
+  <data name="UI_TransferOrder" xml:space="preserve"><value>Upload-/Download-Reihenfolge</value></data>
+  <data name="TransferOrder_NewestFirst" xml:space="preserve"><value>Neue Dateien zuerst</value></data>
+  <data name="TransferOrder_OldestFirst" xml:space="preserve"><value>Alte Dateien zuerst</value></data>
   <data name="UI_BatchIntervalSeconds" xml:space="preserve"><value>Batch-Intervall (Sekunden)</value></data>
   <data name="UI_MaxBatchSize" xml:space="preserve"><value>Maximale Batch-Größe</value></data>
   <data name="UI_FileReadyTimeoutSeconds" xml:space="preserve"><value>Datei-Bereit-Timeout (Sekunden)</value></data>

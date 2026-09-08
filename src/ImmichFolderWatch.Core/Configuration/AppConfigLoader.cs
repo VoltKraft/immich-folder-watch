@@ -70,6 +70,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
             },
             Watch = new WatchSettings
             {
+                TransferOrder = config.Watch.TransferOrder,
                 Sources = config.Watch.Sources
                     .Where(source => source is not null)
                     .Select(source => new WatchSourceSettings
@@ -126,6 +127,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
         config.Watch.Sources ??= new List<WatchSourceSettings>();
         config.Watch.Extensions ??= new List<string>();
         var legacyExtensions = NormalizeExtensions(config.Watch.Extensions);
+        config.Watch.TransferOrder = TransferOrders.Normalize(config.Watch.TransferOrder);
 
         config.Watch.Sources = config.Watch.Sources
             .Where(source => source is not null)

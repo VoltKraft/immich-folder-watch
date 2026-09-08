@@ -81,6 +81,7 @@ watch:
       excludeFileNames:
         - "Thumbs.db"
         - "*.tmp"
+  transferOrder: "newestFirst" # newestFirst (default) | oldestFirst
   batchIntervalSeconds: 5
   maxBatchSize: 25
   fileReadyTimeoutSeconds: 30

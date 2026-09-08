@@ -1099,7 +1099,10 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                     originalFileName = id;
                 }
 
-                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName)));
+                var timestamp = ExtractTimestamp(element, "fileModifiedAt")
+                    ?? ExtractTimestamp(element, "fileCreatedAt")
+                    ?? ExtractTimestamp(element, "createdAt");
+                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName), timestamp));
             }
 
             return true;
@@ -1110,6 +1113,15 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
             hasNextPage = false;
             return false;
         }
+    }
+
+    private static DateTimeOffset? ExtractTimestamp(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.String
+            && value.TryGetDateTimeOffset(out var timestamp)
+                ? timestamp
+                : null;
     }
 
     private static bool TryGetSearchItemsElement(JsonElement root, out JsonElement itemsElement, out bool hasNextPage)
