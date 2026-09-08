@@ -339,6 +339,15 @@ public sealed partial class MainWindow : Window
         ViewModel.AddSource();
     }
 
+    private void SourceList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // The advanced tab can disappear for another source's sync mode.
+        if (SourceTabs is not null)
+        {
+            SourceTabs.SelectedIndex = 0;
+        }
+    }
+
     private void RemoveSourceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: WatchSourceItem source })

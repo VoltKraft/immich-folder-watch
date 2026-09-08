@@ -269,6 +269,34 @@ public sealed partial class MainWindow : Window
         newItem.SetPortalPath(picked, hostPath ?? picked);
     }
 
+    private void ManageSourcesButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.SelectedSectionIndex = 1;
+        }
+    }
+
+    private void SourceEditor_DataContextChanged(object? sender, EventArgs e)
+    {
+        // A newly selected sync source may hide the previously selected Advanced tab.
+        if (sender is TabControl tabs)
+        {
+            tabs.SelectedIndex = 0;
+        }
+    }
+
+    private void AdvancedOptionsTab_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        // Mode changes can also hide Advanced without replacing the selected source.
+        if (e.Property == IsVisibleProperty
+            && sender is TabItem { IsVisible: false }
+            && this.FindControl<TabControl>("SourceEditorTabs") is { SelectedIndex: 2 } tabs)
+        {
+            tabs.SelectedIndex = 0;
+        }
+    }
+
     private void RemoveSourceButton_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is Button button

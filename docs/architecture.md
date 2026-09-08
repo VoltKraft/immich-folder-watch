@@ -56,6 +56,8 @@
 
 ## Design Decisions
 
+- **Shared draft, transient navigation.** Both desktop heads expose Overview, Folders, Connection, and Settings through the same `MainWindowViewModel` selection state. The folder editor binds to an existing `WatchSourceItem` in `Sources`, not a copy, so switching views cannot discard uncommitted edits. Collection changes reconcile the selection; loading an applied configuration restores it by path or index. Navigation state is not serialized. `DisplayName` is derived from `DisplayPath`, preserving Linux portal-path identity. Page-local scroll regions leave status and apply actions reachable. See [Desktop interface](user-interface.md) for the control map and upgrade behavior.
+
 - **Per-user, no service.** Multi-user machines get isolated configurations and logs with no privilege escalation at runtime.
 - **Single process.** GUI, sync worker, and tray where enabled share memory and push status directly; no RPC, no admin helper, no service control manager calls.
 - **One persistent state database per user.** Every watched source shares one `sync-state.db` beside the per-user configuration. Rows are separated by an account-context hash, normalized source path, and relative file path. The API key itself is never stored.

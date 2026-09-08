@@ -1,4 +1,5 @@
 using ImmichFolderWatch.App.Shared.ViewModels;
+using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.Core.Configuration;
 
 namespace ImmichFolderWatch.App.Shared.Models;
@@ -27,10 +28,8 @@ public sealed class WatchSourceItem : BindableBase
             if (SetProperty(ref _path, value))
             {
                 TrySuggestAlbumNameFromPath();
-                if (!string.IsNullOrEmpty(_displayPath))
-                {
-                    RaisePropertyChanged(nameof(DisplayPath));
-                }
+                RaisePropertyChanged(nameof(DisplayPath));
+                RaisePropertyChanged(nameof(DisplayName));
             }
         }
     }
@@ -56,11 +55,31 @@ public sealed class WatchSourceItem : BindableBase
         {
             if (SetProperty(ref _displayPath, value))
             {
+                RaisePropertyChanged(nameof(DisplayName));
                 if (!string.Equals(_path, value, StringComparison.Ordinal))
                 {
                     Path = value;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Compact, non-persisted folder label derived from the display path. Both path
+    /// separators are supported so portal host paths and Windows paths retain their names.
+    /// </summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DisplayPath))
+            {
+                return Strings.ResourceManager.GetString("UI_NewSource", Strings.Culture) ?? "New folder";
+            }
+
+            var path = DisplayPath.Trim().TrimEnd('\\', '/');
+            var separator = path.LastIndexOfAny(['\\', '/']);
+            return path.Length == 0 ? DisplayPath : path[(separator + 1)..];
         }
     }
 
@@ -79,6 +98,7 @@ public sealed class WatchSourceItem : BindableBase
         {
             _displayPath = resolved;
             RaisePropertyChanged(nameof(DisplayPath));
+            RaisePropertyChanged(nameof(DisplayName));
         }
     }
 
@@ -98,6 +118,7 @@ public sealed class WatchSourceItem : BindableBase
     {
         RaisePropertyChanged(nameof(SyncMode));
         RaisePropertyChanged(nameof(SelectedSyncModeOption));
+        RaisePropertyChanged(nameof(DisplayName));
     }
 
     public string AlbumName

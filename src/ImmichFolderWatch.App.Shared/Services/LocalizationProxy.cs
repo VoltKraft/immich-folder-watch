@@ -53,6 +53,19 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string Tray_Unavailable => Strings.Tray_Unavailable;
 
     public string UI_Status => Strings.UI_Status;
+    public string UI_Overview => GetNavigationText(nameof(UI_Overview));
+    public string UI_Folders => GetNavigationText(nameof(UI_Folders));
+    public string UI_Connection => GetNavigationText(nameof(UI_Connection));
+    public string UI_Settings => GetNavigationText(nameof(UI_Settings));
+    public string UI_General => GetNavigationText(nameof(UI_General));
+    public string UI_FileFilters => GetNavigationText(nameof(UI_FileFilters));
+    public string UI_Transfer => GetNavigationText(nameof(UI_Transfer));
+    public string UI_SelectSource => GetNavigationText(nameof(UI_SelectSource));
+    public string UI_NewSource => GetNavigationText(nameof(UI_NewSource));
+    public string UI_AdvancedOptions => GetNavigationText(nameof(UI_AdvancedOptions));
+    public string UI_Logging => GetNavigationText(nameof(UI_Logging));
+
+    private static string GetNavigationText(string key) => Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
     public string UI_ServerConnection => Strings.UI_ServerConnection;
     public string UI_LastSync => Strings.UI_LastSync;
     public string UI_CurrentSync => Strings.UI_CurrentSync;

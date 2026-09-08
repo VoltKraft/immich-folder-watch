@@ -73,8 +73,8 @@ Each watched folder has its own **sync mode**: upload only new files that appear
    `immich-folder-watch-<version>-win-arm64.msi` for Windows on Arm.
 2. Install it with administrative rights (per-machine binary install).
 3. Open the `Immich Folder Watch` desktop shortcut.
-4. Enter your Immich URL and API key and review the verification result.
-5. Select one or more folders and expand **Advanced options** to adjust subdirectories, local deletion after upload, extensions, or exclude filters. Choose the global upload/download order under **Watch behaviour**; new files are processed first by default.
+4. Open **Connection**, enter your Immich URL and API key, and review the verification result.
+5. Open **Folders** and add your sources. Select a folder to edit its **General**, **File filters**, or **Advanced** settings. Choose the global upload/download order under **Settings → Transfer**; new files are processed first by default. See the [desktop interface guide](docs/user-interface.md) for the full control map.
 6. **Save and Apply** — watching starts in-process.
 
 Each Windows user has their own configuration. The app autostarts at login by default.

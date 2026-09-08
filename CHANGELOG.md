@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-08
+
+### Added
+- Added sidebar navigation for Overview, Folders, Connection, and Settings on Windows and Linux, with a compact folder list and an editor for the selected source.
+
+### Changed
+- Grouped folder settings into General, File filters, and Advanced tabs, and application settings into General, Transfer, and Logging tabs.
+- Kept live status, save/apply actions, logs, and operation messages outside the scrolling page content. Existing configuration fields, sync behavior, Linux portal access, and platform actions remain available.
+- Retained source drafts while switching folders and pages, selected newly added sources, and restored the selected source after applying configuration where possible. No configuration or sync-state migration is required.
+
+### Documentation
+- Added a desktop-interface guide mapping every previous control to its new location, with upgrade guidance and feature-parity validation.
+
 ## [2.9.1] - 2026-09-08
 
 ### Fixed

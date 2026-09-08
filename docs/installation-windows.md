@@ -19,7 +19,7 @@ After install:
 
 1. Open the `Immich Folder Watch` desktop shortcut (or launch it from the Start menu).
 2. Enter your Immich URL and API key, then review the verification result.
-3. Select one or more folders. Expand **Advanced options** to adjust subdirectories, local deletion after upload, extensions, or exclude filters. The global upload/download order defaults to newest files first and can be changed under **Watch behaviour**.
+3. Open **Folders** and add one or more sources. Select a folder to edit **General**, **File filters**, or **Advanced** settings. The global upload/download order defaults to newest files first and can be changed under **Settings → Transfer**. See the [desktop interface guide](user-interface.md) for the complete control map.
 4. Click **Save and Apply** — the app starts watching in-process and a tray icon appears in the notification area.
 
 ### Installed Layout
@@ -34,7 +34,7 @@ After install:
 - Closing the main window hides it to the tray; the app keeps watching in the background.
 - The tray icon's tooltip shows last sync time, queue length, and server connection.
 - The tray context menu provides **Open GUI**, **Restart**, and **Quit**.
-- Disable autostart via the **Start at login** checkbox in the GUI.
+- Disable autostart via the **Start at login** checkbox under **Settings → General**.
 
 ### Uninstall
 

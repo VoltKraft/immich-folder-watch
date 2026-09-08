@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using ImmichFolderWatch.App.Shared.Models;
@@ -91,6 +92,8 @@ public sealed class MainWindowViewModel : BindableBase
     private readonly IPlatformLoggingCapabilities _loggingCapabilities;
     private bool _suppressAutostartWrite;
     private bool _suppressLanguageWrite;
+    private int _selectedSectionIndex;
+    private WatchSourceItem? _selectedSource;
 
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
@@ -159,7 +162,9 @@ public sealed class MainWindowViewModel : BindableBase
         RefreshLogTargetOptions();
         RefreshTransferOrderOptions();
 
+        Sources.CollectionChanged += Sources_CollectionChanged;
         AddSource();
+        SelectedSectionIndex = 0;
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
 
@@ -173,6 +178,68 @@ public sealed class MainWindowViewModel : BindableBase
     }
 
     public ObservableCollection<WatchSourceItem> Sources { get; } = new();
+
+    /// <summary>
+    /// Transient navigation state: overview (0), folders (1), connection (2), or settings (3).
+    /// Switching sections retains the complete configuration draft and does not apply it.
+    /// </summary>
+    public int SelectedSectionIndex
+    {
+        get => _selectedSectionIndex;
+        set
+        {
+            if (value is < 0 or > 3 || !SetProperty(ref _selectedSectionIndex, value))
+            {
+                return;
+            }
+
+            RaisePropertyChanged(nameof(IsOverviewSelected));
+            RaisePropertyChanged(nameof(IsFoldersSelected));
+            RaisePropertyChanged(nameof(IsConnectionSelected));
+            RaisePropertyChanged(nameof(IsSettingsSelected));
+        }
+    }
+
+    public bool IsOverviewSelected => SelectedSectionIndex == 0;
+    public bool IsFoldersSelected => SelectedSectionIndex == 1;
+    public bool IsConnectionSelected => SelectedSectionIndex == 2;
+    public bool IsSettingsSelected => SelectedSectionIndex == 3;
+
+    /// <summary>
+    /// The source edited by both desktop heads. References the original draft item,
+    /// so selection changes never copy or discard edits. Only members of Sources are accepted.
+    /// </summary>
+    public WatchSourceItem? SelectedSource
+    {
+        get => _selectedSource;
+        set
+        {
+            if (value is not null && !Sources.Contains(value))
+            {
+                return;
+            }
+
+            if (SetProperty(ref _selectedSource, value))
+            {
+                RaisePropertyChanged(nameof(HasSelectedSource));
+            }
+        }
+    }
+
+    public bool HasSelectedSource => SelectedSource is not null;
+
+    private void Sources_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (SelectedSource is not null && Sources.Contains(SelectedSource))
+        {
+            return;
+        }
+
+        // Prefer the next row at the removed item's index, then the previous row.
+        SelectedSource = Sources.Count == 0
+            ? null
+            : Sources[Math.Clamp(e.OldStartingIndex, 0, Sources.Count - 1)];
+    }
 
     public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
 
@@ -516,12 +583,19 @@ public sealed class MainWindowViewModel : BindableBase
 
     public void AddSource()
     {
-        Sources.Add(CreateDefaultSource());
+        var source = CreateDefaultSource();
+        Sources.Add(source);
+        SelectedSource = source;
+        SelectedSectionIndex = 1;
     }
 
     public void Load(AppConfig config, bool resetImmichCheckStatus = true)
     {
         ArgumentNullException.ThrowIfNull(config);
+
+        var selectedPath = SelectedSource?.Path;
+        var selectedIndex = SelectedSource is null ? 0 : Sources.IndexOf(SelectedSource);
+        var selectedSectionIndex = SelectedSectionIndex;
 
         ImmichServerApiUrl = config.Immich.ServerApiUrl;
         ImmichApiKey = config.Immich.ApiKey;
@@ -556,6 +630,10 @@ public sealed class MainWindowViewModel : BindableBase
         {
             AddSource();
         }
+
+        SelectedSource = Sources.FirstOrDefault(source => string.Equals(source.Path, selectedPath, StringComparison.Ordinal))
+            ?? Sources[Math.Clamp(selectedIndex, 0, Sources.Count - 1)];
+        SelectedSectionIndex = selectedSectionIndex;
 
         // Avalonia 11.3.x's ComboBox + SelectedValueBinding inside an
         // ItemsControl-DataTemplate doesn't reliably pick up the initial
