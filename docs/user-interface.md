@@ -1,5 +1,9 @@
 # Desktop interface
 
+Immich Folder Watch can upload new media, import existing files, or synchronize
+local folders and Immich albums in both directions. Choose a mode for each folder
+and use the interface to manage album mapping, filters, transfers, and logging.
+
 Use the sidebar to switch between **Overview**, **Folders**, **Connection**, and
 **Settings**. The status and action buttons remain in the footer on every page.
 The screenshots below show the Windows interface in English with sample data;
@@ -11,7 +15,8 @@ and settings, with the platform differences described below.
 1. In **Connection**, enter your Immich API URL and API key, then select
    **Verify Immich Access**.
 2. In **Folders**, select **Add Source**, choose the local source and its sync
-   mode, and review the optional album and file filters.
+   mode, and review the optional album and file filters. The default uploads
+   only new files; choose another mode to include existing files or downloads.
 3. In **Settings**, adjust application, transfer, or logging preferences if needed.
 4. Select **Save and Apply** to validate the complete configuration, save it,
    and start synchronization with those settings.
@@ -68,7 +73,7 @@ Set **Folder Path**, the optional **Immich Album Name**, and **Sync Mode**:
 | --- | --- |
 | **Upload new files only (default)** | Uploads files that appear while the app is running. Existing files are ignored. |
 | **Upload everything in the folder** | Includes existing files at startup and uploads new files added later. No downloads. |
-| **Sync folder with album (bidirectional)** | Uploads missing local media to Immich and downloads missing remote media. Local deletions move tracked assets to Immich trash; local moves and album/folder renames also affect synchronization. |
+| **Sync folder with album (bidirectional)** | Uploads missing local media to Immich and downloads missing remote media. Also propagates deletions, local moves, and album/folder renames as described below. |
 
 For upload modes, leave the album name empty to upload without album placement,
 or enter a name to use an album that the app creates if needed. Enable
@@ -77,8 +82,13 @@ or enter a name to use an album that the app creates if needed. Enable
 For bidirectional sync, an album name limits synchronization to that album and
 the source root; subfolders are ignored. With no album name, the root mirrors
 assets outside albums, and first-level subfolders mirror Immich albums. Recursion
-is automatic in this mode. Review the [sync and deletion rules](configuration.md#file-selection)
-before using it.
+is automatic in this mode.
+
+Local deletion moves tracked assets to Immich trash. Removing an asset from the
+remote source also permanently removes its tracked local file after a complete,
+successful pull. In a single-album source, removing an asset from that album is
+enough to trigger local removal. Review the [sync and deletion rules](configuration.md#file-selection)
+before using this mode.
 
 ### File filters
 

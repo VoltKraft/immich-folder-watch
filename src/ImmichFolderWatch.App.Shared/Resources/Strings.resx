@@ -94,7 +94,7 @@
   <data name="UI_ServerApiUrl" xml:space="preserve"><value>Server API URL</value></data>
   <data name="UI_ApiKey" xml:space="preserve"><value>API Key</value></data>
   <data name="UI_Permissions" xml:space="preserve"><value>Permissions</value></data>
-  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Checks the permissions needed for uploads and optional album placement.</value></data>
+  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Checks the permissions needed for the configured upload, album, and bidirectional sync operations.</value></data>
   <data name="UI_VerifyImmichAccess" xml:space="preserve"><value>Verify Immich Access</value></data>
   <data name="UI_WatchSources" xml:space="preserve"><value>Watch Sources</value></data>
   <data name="UI_AddSource" xml:space="preserve"><value>Add Source</value></data>
@@ -139,7 +139,7 @@
   <data name="SyncMode_UploadAll" xml:space="preserve"><value>Upload everything in the folder</value></data>
   <data name="SyncMode_UploadAll_Description" xml:space="preserve"><value>Uploads all files currently in the folder on start and keeps uploading new files added later. Files are never downloaded from Immich.</value></data>
   <data name="SyncMode_Sync" xml:space="preserve"><value>Sync folder with album (bidirectional)</value></data>
-  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Uploads local files that are missing in the album and downloads album assets that are missing locally. Deletions are not propagated.</value></data>
+  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Uploads and downloads media for the selected album, or maps subfolders to albums when no album is set. Local deletions move tracked Immich assets to trash; media removed from the synchronized remote scope is permanently deleted locally.</value></data>
 
   <data name="Permission_AssetUpload" xml:space="preserve"><value>Asset Upload</value></data>
   <data name="Permission_AlbumRead" xml:space="preserve"><value>Album Read</value></data>

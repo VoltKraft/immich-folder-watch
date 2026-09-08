@@ -1,5 +1,9 @@
 # Configuration
 
+Each source can upload new media, upload existing and new media, or synchronize
+with Immich in both directions. Album mapping, file filters, and optional local
+cleanup are configured per source; transfer order, retries, and logging are global.
+
 The app reads YAML configuration from a per-user location:
 
 - `%LOCALAPPDATA%\Immich Folder Watch\config.yaml` (Windows)
@@ -201,8 +205,14 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - `watch.sources[].syncMode` controls how the folder interacts with Immich. Valid values:
   - `uploadNew` (default): only upload files that appear in the folder while the app is running. Existing files are ignored. Matches the historical behavior of the app.
   - `uploadAll`: upload all files currently in the folder on start and keep uploading any new files added later. No files are ever downloaded from Immich.
-  - `sync`: keep the folder and Immich bidirectionally in sync. Downstream changes are picked up in realtime via the Immich Socket.IO channel (on asset upload/trash/delete/update/restore and album create/update/delete), with a 10-second polling fallback whenever the socket is disconnected. Local files missing on Immich are uploaded; Immich assets missing locally are downloaded. Deletions, moves, and subfolder changes are propagated from local to Immich:
+  - `sync`: keep the folder and Immich bidirectionally in sync. Downstream changes are picked up in realtime via the Immich Socket.IO channel (on asset upload/trash/delete/update/restore and album create/update/delete), with a 10-second polling fallback whenever the socket is disconnected. Local files missing on Immich are uploaded; Immich assets missing locally are downloaded. Synchronization also handles deletions, moves, and subfolder changes:
     - **Deleting a file locally** moves the corresponding Immich asset into the Immich trash.
+    - **Removing an asset from the remote source** removes its tracked local file
+      after a complete successful pull. For a single-album source, removing the
+      asset from that album is sufficient; for the all-albums source, this includes
+      trashing or deleting the asset in Immich. Local removal is permanent and does
+      not use the operating system's recycle bin or trash. Partial or failed pulls
+      do not trigger this cleanup.
     - **Moving a file** between the parent folder and a subfolder (or between two subfolders) updates the asset's album membership on Immich to match.
     - **Creating a first-level subfolder** creates the matching Immich album; **deleting a first-level subfolder** trashes any still-tracked assets under it and deletes the Immich album. (Applies to the subfolders-as-albums variant described below.)
     - **Renaming a first-level subfolder** renames the matching Immich album via `PATCH /albums/{id}`; **renaming an Immich album** renames the matching local first-level subfolder on the next pull. The worker tracks album ids so renames are detected even when the display name changes. Conflicts (a folder or album with the new name already exists) are logged and left untouched instead of being merged automatically.

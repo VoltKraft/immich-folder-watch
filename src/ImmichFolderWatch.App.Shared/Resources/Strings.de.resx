@@ -94,7 +94,7 @@
   <data name="UI_ServerApiUrl" xml:space="preserve"><value>Server-API-URL</value></data>
   <data name="UI_ApiKey" xml:space="preserve"><value>API-Schlüssel</value></data>
   <data name="UI_Permissions" xml:space="preserve"><value>Berechtigungen</value></data>
-  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Prüft die Berechtigungen, die für Uploads und die optionale Albenzuordnung benötigt werden.</value></data>
+  <data name="UI_PermissionsDescription" xml:space="preserve"><value>Prüft die Berechtigungen für die konfigurierten Uploads, Albenaktionen und die bidirektionale Synchronisation.</value></data>
   <data name="UI_VerifyImmichAccess" xml:space="preserve"><value>Immich-Zugang prüfen</value></data>
   <data name="UI_WatchSources" xml:space="preserve"><value>Überwachte Ordner</value></data>
   <data name="UI_AddSource" xml:space="preserve"><value>Ordner hinzufügen</value></data>
@@ -139,7 +139,7 @@
   <data name="SyncMode_UploadAll" xml:space="preserve"><value>Gesamten Ordnerinhalt hochladen</value></data>
   <data name="SyncMode_UploadAll_Description" xml:space="preserve"><value>Lädt beim Start alle im Ordner vorhandenen Dateien hoch und danach auch alle neu hinzukommenden. Dateien werden nicht aus Immich heruntergeladen.</value></data>
   <data name="SyncMode_Sync" xml:space="preserve"><value>Ordner mit Album synchronisieren (bidirektional)</value></data>
-  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Lädt lokale Dateien hoch, die im Album fehlen, und lädt Album-Assets herunter, die lokal fehlen. Löschungen werden nicht übernommen.</value></data>
+  <data name="SyncMode_Sync_Description" xml:space="preserve"><value>Lädt Medien für das gewählte Album hoch und herunter oder ordnet ohne Albumangabe Unterordner den Alben zu. Lokale Löschungen verschieben zugeordnete Immich-Assets in den Papierkorb; aus dem synchronisierten Immich-Bereich entfernte Medien werden lokal dauerhaft gelöscht.</value></data>
 
   <data name="Permission_AssetUpload" xml:space="preserve"><value>Asset-Upload</value></data>
   <data name="Permission_AlbumRead" xml:space="preserve"><value>Album lesen</value></data>

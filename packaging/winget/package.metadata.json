@@ -9,7 +9,7 @@
   "repository": "VoltKraft/immich-folder-watch",
   "license": "AGPL-3.0",
   "moniker": "immich-folder-watch",
-  "shortDescription": "A folder watcher and uploader for Immich that ingests new media files via the Immich HTTP API, built for automated, real-time media import on Windows and Linux.",
+  "shortDescription": "A desktop app for uploading media and synchronizing local folders with Immich, with per-folder modes, album mapping, file filters, and transfer controls on Windows and Linux.",
   "tags": [
     "immich",
     "immich-api"

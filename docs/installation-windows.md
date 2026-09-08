@@ -1,5 +1,8 @@
 # Installation on Windows
 
+Install the desktop app to upload media from local folders or synchronize folders
+and albums with Immich. Each folder has its own sync mode and file filters.
+
 ## Prerequisites
 
 - Windows 10/11 or Windows Server
@@ -18,9 +21,17 @@ x64-only and are not backfilled.
 After install:
 
 1. Open the `Immich Folder Watch` desktop shortcut (or launch it from the Start menu).
-2. Enter your Immich URL and API key, then review the verification result.
-3. Open **Folders** and add one or more sources. Select a folder to edit **General**, **File filters**, or **Advanced** settings. The global upload/download order defaults to newest files first and can be changed under **Settings → Transfer**. See the [desktop interface guide](user-interface.md) for the complete control map.
-4. Click **Save and Apply** — the app starts watching in-process and a tray icon appears in the notification area.
+2. Open **Connection**, enter your Immich API URL and key, and select **Verify Immich Access**.
+3. Open **Folders** and add one or more sources. Under **General**, choose whether
+   to upload only new files, upload existing and new files, or synchronize in both
+   directions. Review the album and **File filters**. Bidirectional sync also
+   propagates deletions; read the [desktop interface guide](user-interface.md#general)
+   before selecting it.
+4. Adjust global upload/download order, batching, and retries under
+   **Settings → Transfer**, or logging under **Settings → Logging**, if needed.
+5. Click **Save and Apply** to validate and save the configuration and start
+   synchronization in the selected modes. A tray icon remains available in the
+   notification area.
 
 ### Installed Layout
 
@@ -31,7 +42,7 @@ After install:
 
 ### Autostart and Tray Behavior
 
-- Closing the main window hides it to the tray; the app keeps watching in the background.
+- Closing the main window hides it to the tray; synchronization continues in the background.
 - The tray icon's tooltip shows last sync time, queue length, and server connection.
 - The tray context menu provides **Open GUI**, **Restart**, and **Quit**.
 - Disable autostart via the **Start at login** checkbox under **Settings → General**.

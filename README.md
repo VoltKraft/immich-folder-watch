@@ -8,14 +8,14 @@
 [![Linux Flatpak: x86-64 and ARM64](https://img.shields.io/badge/Linux%20(Flatpak)-x86--64%20%7C%20ARM64-FCC624?logo=linux&logoColor=black)](./packaging/flatpak/README.md)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](./LICENSE)
 
-`Immich Folder Watch` is a desktop app for **Windows and Linux** that watches local folders and uploads newly created media to Immich automatically.
+`Immich Folder Watch` connects local photo and video folders with Immich on **Windows and Linux**. Automatically upload new or existing media, or keep local folders and Immich albums synchronized with uploads and downloads. Choose the behavior separately for each folder.
 
-It runs as a per-user desktop app — no system service, no elevation on every change. If screenshots, camera imports, scanner output, or synced files land on a desktop before they land in Immich, this fills that gap without writing directly into Immich storage.
+Use it to keep an Immich album available locally, organize albums through local subfolders, import a photo collection, or send new camera imports and screenshots to Immich. It runs in the background as a per-user desktop app and communicates through the Immich API without writing directly into Immich storage.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/ui-folders-dark.png" />
   <source media="(prefers-color-scheme: light)" srcset="./docs/images/ui-folders-light.png" />
-  <img src="./docs/images/ui-folders-light.png" alt="Immich Folder Watch on Windows: the English folder editor with sample folders and upload settings" width="1080" />
+  <img src="./docs/images/ui-folders-light.png" alt="Immich Folder Watch on Windows: the English folder editor with sample folders, album placement, and sync mode selection" width="1080" />
 </picture>
 
 *Windows interface with sample data. The preview follows your browser's color
@@ -29,46 +29,53 @@ add folders, choose a sync mode, and adjust transfer and logging settings.
 
 ## Use Cases
 
-- Automatically upload screenshots into an Immich album
-- Watch a DSLR or SD-card import folder and send new photos to Immich
-- Ingest scanner output into a family archive
-- Pick up files dropped by another tool into a staging folder
-- Run a small always-on system that feeds Immich in the background
-- Separate sources by album, for example `Screenshots`, `Camera Imports`, or `Receipts`
-- Same configuration shape and feature set on Windows and Linux
+- Keep a local folder synchronized with an Immich album, including photos added to Immich from other devices
+- Access synchronized photos and videos locally with desktop tools, even while offline
+- Map first-level subfolders to Immich albums and keep their names and media placement in sync
+- Import an existing photo or video collection and continue uploading new additions
+- Automatically send new screenshots, camera imports, or scans to dedicated Immich albums
+- Use an upload inbox that optionally removes local files after a confirmed upload and album assignment
+- Combine workflows: synchronize a `Family` album while uploading new files from `Screenshots` or `Camera Imports`
 
 
 ---
 
-## Solution
+## How it works
 
-`immich-folder-watch` watches one or more folders, waits until files are fully written, and uploads them through the normal Immich HTTP API.
+Add one or more local folders and choose a **sync mode** for each:
 
-That gives you a clean, low-maintenance ingestion path:
+| Mode | Local folder → Immich | Immich → local folder |
+| --- | --- | --- |
+| **Upload new files only** (default) | Uploads new files that appear while the app is running; existing files are ignored. | No downloads. |
+| **Upload everything in the folder** | Includes existing media at startup and uploads new additions. | No downloads. |
+| **Sync folder with album (bidirectional)** | Uploads missing local media and propagates tracked local deletions and moves. | Downloads missing media and removes tracked local files when their media leaves the synchronized remote scope. |
 
-- Desktop GUI with background operation; the Windows build includes a tray icon,
-  while the Flatpak package shows an in-app banner until a Flatpak-safe tray
-  backend is available
-- Per-user operation — each user runs their own configuration
-- Autostart on login (toggleable in the GUI; uses the Background portal on Linux)
-- Optional per-folder album placement in Immich
-- API-based uploads instead of storage hacks
+In bidirectional mode, set an album name to synchronize one album with a flat
+local folder. Leave it empty to map first-level subfolders to Immich albums;
+the root folder then corresponds to media outside albums. Changes arrive through
+Immich's realtime connection, with polling as a fallback.
 
-Each watched folder has its own **sync mode**: upload only new files that appear during runtime (the default), upload everything the folder already contains, or synchronize uploads and downloads with Immich. Bidirectional sync also propagates local deletions and moves to Immich; upload-only modes can optionally delete confirmed local uploads. See the [sync modes and deletion behavior](./docs/user-interface.md#folders) before choosing a mode. All transfers and remote changes use the Immich API.
+Synchronization can change both sides: deleting a tracked local file moves its
+Immich asset to trash, and local folder changes can affect albums. Removing media
+from the synchronized remote scope can permanently delete its tracked local copy.
+Upload modes offer an optional inbox setting that permanently deletes confirmed local
+uploads. Review the [sync modes and deletion behavior](./docs/user-interface.md#folders)
+when choosing a workflow.
 
 ---
 
 ## Features
 
-- Watches one or more local folders for new media files
-- Waits until files are stable before upload
-- Uploads through the Immich API in configurable batches
-- Supports optional per-source `albumName`
-- Creates missing albums automatically when album placement is configured
-- Per-folder **sync mode**: `Upload new files only` (default), `Upload everything in the folder`, or `Sync folder with album (bidirectional)`
+- Per-folder upload or bidirectional sync, with multiple workflows running together
+- Local access to media downloaded from Immich, including additions from other devices
+- Optional album placement for uploads; single-album or subfolders-as-albums synchronization
+- Automatic album creation and synchronization of album/subfolder renames in bidirectional mode
+- Per-folder media extensions and exclusion filters
+- Configurable upload/download order, upload batches, and file readiness checks
 - Persistent sync state shared by all watched folders, so unchanged files do not generate uploads or downloads after a restart
 - Retries transient upload failures automatically
-- Runs as a per-user desktop app with live sync status
+- Live connection status, upload/download progress, last successful transfer, and sync errors
+- Background operation with a Windows tray icon; the Flatpak package provides an in-app background notice
 - Checks GitHub Releases on startup and links to the release page when an update is available
 - Autostarts on login by default; togglable in the GUI
 - Verifies Immich URL, API key, and required permissions from the GUI
@@ -87,8 +94,8 @@ Each watched folder has its own **sync mode**: upload only new files that appear
 2. Install it with administrative rights (per-machine binary install).
 3. Open the `Immich Folder Watch` desktop shortcut.
 4. Open **Connection**, enter your Immich URL and API key, and review the verification result.
-5. Open **Folders** and add your sources. Select a folder to edit its **General**, **File filters**, or **Advanced** settings. Choose the global upload/download order under **Settings → Transfer**; new files are processed first by default. See the [desktop interface guide](docs/user-interface.md) for the full control map.
-6. **Save and Apply** — watching starts in-process.
+5. Open **Folders**, add your sources, and choose each folder's upload or bidirectional sync mode under **General**. Review its album, file filters, and deletion behavior in the [desktop interface guide](docs/user-interface.md). Set the global upload/download order under **Settings → Transfer**; newest files are processed first by default.
+6. **Save and Apply** — transfers and folder monitoring start with the selected modes.
 
 Each Windows user has their own configuration. The app autostarts at login by default.
 `winget install VoltKraft.ImmichFolderWatch` selects the matching x64 or ARM64
@@ -162,7 +169,11 @@ Detailed guides:
 
 ## Example
 
-Example configuration:
+One configuration can combine different workflows. This example uploads new
+screenshots, imports an existing camera folder, and synchronizes a local folder
+with the `Family` album, including media added to that album from other devices.
+Deleting tracked local files or removing media from the `Family` album can also
+remove the corresponding copies on the other side.
 
 ```yaml
 immich:
@@ -173,55 +184,31 @@ watch:
   sources:
     - path: "C:\\Users\\YOUR_USER\\Pictures\\Screenshots"
       albumName: "Screenshots"
-      syncMode: "uploadNew" # uploadNew (default) | uploadAll | sync
-      deleteAfterUpload: false # upload modes only; permanently deletes verified local uploads
+      syncMode: "uploadNew"
+      deleteAfterUpload: false
       includeSubdirectories: true
-      extensions:
-        - ".avif"
-        - ".bmp"
-        - ".gif"
-        - ".heic"
-        - ".heif"
-        - ".jp2"
-        - ".jpe"
-        - ".jpeg"
-        - ".jpg"
-        - ".insp"
-        - ".jxl"
-        - ".png"
-        - ".psd"
-        - ".raw"
-        - ".rw2"
-        - ".svg"
-        - ".tif"
-        - ".tiff"
-        - ".webp"
-      excludeDirectories:
-        - "private"
-      excludeFileNames:
-        - "Thumbs.db"
+      extensions: [".png", ".jpg"]
+    - path: "C:\\Users\\YOUR_USER\\Pictures\\Camera Imports"
+      albumName: "Camera Imports"
+      syncMode: "uploadAll"
+      extensions: [".jpg", ".jpeg", ".heic", ".mp4"]
+    - path: "C:\\Users\\YOUR_USER\\Pictures\\Family"
+      albumName: "Family"
+      syncMode: "sync"
+      extensions: [".jpg", ".jpeg", ".heic", ".png", ".mp4"]
   transferOrder: "newestFirst" # newestFirst (default) | oldestFirst
-  batchIntervalSeconds: 5
-  maxBatchSize: 25
-  fileReadyTimeoutSeconds: 30
-
-retry:
-  maxAttempts: 5
-  baseDelayMilliseconds: 500
-
-logging:
-  level: "Information"
-  logDirectory: "C:\\Users\\YOUR_USER\\AppData\\Local\\Immich Folder Watch\\logs"
 ```
+
+See [Configuration](./docs/configuration.md) for all settings, defaults, and
+the additional API permissions required for bidirectional sync.
 
 ---
 
 ## Documentation
 
-Select a folder under **Folders** to edit its **General**, **File filters**, and
-**Advanced** tabs. **Excluded Directories** is shown when **Include subdirectories** is enabled.
-
-Upload-only sources can optionally act as an inbox by permanently deleting local files after Immich confirms the upload and album assignment. The option is disabled by default and never applies to bidirectional `sync` sources.
+Start with the illustrated guide to choose a workflow and configure folders.
+The configuration reference explains album mapping, file selection, transfer
+settings, and deletion behavior for each mode.
 
 - [Illustrated desktop guide](./docs/user-interface.md)
 - [Configuration](./docs/configuration.md)

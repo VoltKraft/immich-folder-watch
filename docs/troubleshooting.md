@@ -1,5 +1,9 @@
 # Troubleshooting
 
+Start with **Overview** for connection and synchronization status, then use
+**Open Logs** for details. The [desktop interface guide](user-interface.md)
+explains the controls for each folder's sync mode, filters, and global settings.
+
 ## App tray shows "Server offline"
 
 - Check `immich.serverApiUrl` ends with `/api`.
@@ -17,6 +21,21 @@
 
 - API key is missing or invalid.
 - Regenerate API key in Immich and update `config.yaml`.
+
+## Existing files or Immich assets are not synchronized
+
+- The default **Upload new files only** mode ignores existing local files. Select
+  **Upload everything in the folder** to include them at startup.
+- Upload modes never download. Select **Sync folder with album (bidirectional)**
+  to transfer in both directions, then use **Save and Apply**.
+- Check album mapping: a named album synchronizes only that album with the source
+  root. With no album name, first-level subfolders represent albums and the root
+  represents media outside albums.
+- Run **Connection → Verify Immich Access** after changing modes; bidirectional
+  sync requires additional API permissions. Verify local write permission and
+  available space when downloads fail.
+- Bidirectional sync propagates deletions too. Review the
+  [sync rules](configuration.md#file-selection) before enabling it.
 
 ## Upload returns HTTP 413
 
