@@ -5,6 +5,71 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 public sealed class SyncStatusProviderTests
 {
     [Fact]
+    public void BeginSyncSession_IgnoresLateHistoryFromPreviousWorker()
+    {
+        var status = new SyncStatusProvider();
+        var previous = DateTimeOffset.UtcNow.AddDays(-1);
+        var oldSession = status.BeginSyncSession();
+        status.RestoreLastSyncCompleted(previous, oldSession);
+        var currentSession = status.BeginSyncSession();
+        Assert.Null(status.LastSyncCompletedUtc);
+        status.RestoreLastSyncCompleted(previous, oldSession);
+        status.ReportUploadCompleted("old-upload.jpg", DateTimeOffset.UtcNow, oldSession);
+        status.ReportDownloadCompleted("old-download.jpg", DateTimeOffset.UtcNow, oldSession);
+        Assert.Null(status.LastSyncCompletedUtc);
+        status.RestoreLastSyncCompleted(previous.AddHours(-1), currentSession);
+        Assert.Equal(previous.AddHours(-1), status.LastSyncCompletedUtc);
+    }
+
+    [Fact]
+    public void RestoreLastSyncCompleted_ReplacesPriorAccountHistoryAndNotifiesObservers()
+    {
+        var status = new SyncStatusProvider();
+        var previous = new DateTimeOffset(2026, 9, 8, 12, 0, 0, TimeSpan.FromHours(2));
+        var notifications = new List<string?>();
+        status.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        status.RestoreLastSyncCompleted(previous);
+
+        Assert.Equal(previous.ToUniversalTime(), status.LastSyncCompletedUtc);
+        Assert.Equal(TimeSpan.Zero, status.LastSyncCompletedUtc!.Value.Offset);
+        Assert.Contains(nameof(SyncStatusProvider.LastSyncCompletedUtc), notifications);
+        status.RestoreLastSyncCompleted(null);
+        Assert.Null(status.LastSyncCompletedUtc);
+    }
+
+    [Fact]
+    public void SuccessfulTransfers_UsePersistedTimestampAndNeverRegressHistory()
+    {
+        var status = new SyncStatusProvider();
+        var previous = new DateTimeOffset(2026, 9, 8, 10, 0, 0, TimeSpan.Zero);
+        status.RestoreLastSyncCompleted(previous);
+        status.ReportUploadCompleted("photo.jpg", previous.AddMinutes(1));
+        Assert.Equal(previous.AddMinutes(1), status.LastSyncCompletedUtc);
+        status.ReportDownloadCompleted("download.jpg", previous.AddMinutes(2));
+        Assert.Equal(previous.AddMinutes(2), status.LastSyncCompletedUtc);
+        status.ReportUploadCompleted("delayed.jpg", previous.AddMinutes(-1));
+        Assert.Equal(previous.AddMinutes(2), status.LastSyncCompletedUtc);
+    }
+
+    [Fact]
+    public void FailedSkippedAndEmptyOperations_DoNotChangeRestoredHistory()
+    {
+        var status = new SyncStatusProvider();
+        var previous = DateTimeOffset.UtcNow.AddDays(-1);
+        status.RestoreLastSyncCompleted(previous);
+        status.ReportBatchStarted(2);
+        status.ReportUploadSkipped();
+        status.ReportUploadFailed("upload.jpg", "Upload denied");
+        status.ReportBatchCompleted();
+        status.ReportPullCycleStarted();
+        status.ReportPullCycleCompleted(completed: true);
+        status.ReportDownloadFailed("download.jpg", "Download denied");
+        status.ReportServerReachable(true);
+        Assert.Equal(previous, status.LastSyncCompletedUtc);
+    }
+
+    [Fact]
     public void UploadProgress_ResumesAcrossBatchesWithoutUsingInterveningPullCounters()
     {
         var provider = new SyncStatusProvider();

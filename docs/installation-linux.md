@@ -35,6 +35,11 @@ release explicitly announces that the listing is available.
 
 ## Sandbox behavior
 
+Use **Connection** for the Immich API URL and key, **Folders** for portal-granted
+sources and their selected-folder editor, and **Settings** for application,
+transfer and logging preferences. See the [desktop interface guide](user-interface.md)
+for all controls and the 2.10.0 upgrade notes.
+
 Folder selection uses the FreeDesktop FileChooser and Documents portals. The
 app can access only folders explicitly granted by the user; it does not receive
 host-wide or home-directory filesystem access.

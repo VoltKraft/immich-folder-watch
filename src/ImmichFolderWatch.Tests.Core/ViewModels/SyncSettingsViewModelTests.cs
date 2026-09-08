@@ -13,6 +13,22 @@ namespace ImmichFolderWatch.Tests.Core.ViewModels;
 public sealed class SyncSettingsViewModelTests
 {
     [Fact]
+    public void LastSync_FormatsRestoredDatabaseTimestampWithoutStartingATransfer()
+    {
+        var status = new SyncStatusProvider();
+        var vm = CreateViewModel(status);
+        var completedUtc = new DateTimeOffset(2026, 9, 7, 10, 30, 0, TimeSpan.Zero);
+        var session = status.BeginSyncSession();
+
+        status.RestoreLastSyncCompleted(completedUtc, session);
+
+        Assert.Equal(completedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"), vm.LastSyncText);
+        Assert.Equal("Inactive", vm.CurrentUploadText);
+        status.BeginSyncSession();
+        Assert.Equal(ImmichFolderWatch.App.Shared.Resources.Strings.Status_NoSyncYet, vm.LastSyncText);
+    }
+
+    [Fact]
     public void SyncStatus_ShowsInactiveAndCountsCompletedFilesAcrossBatches()
     {
         var status = new SyncStatusProvider();

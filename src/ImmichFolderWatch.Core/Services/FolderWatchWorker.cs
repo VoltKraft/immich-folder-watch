@@ -65,6 +65,7 @@ public sealed class FolderWatchWorker : BackgroundService
     private volatile int _pullRequested;
 
     private bool _continueUploadProgress;
+    private long _statusSession;
 
     private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(PathComparer);
 
@@ -142,9 +143,13 @@ public sealed class FolderWatchWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // A restarted host may reuse the status provider with a different Immich account.
+        _statusSession = _syncStatusProvider.BeginSyncSession();
         try
         {
             await _syncStateStore.InitializeAsync(stoppingToken);
+            var lastSuccessfulSync = await _syncStateStore.GetLastSuccessfulSyncAsync(_accountScope, stoppingToken);
+            _syncStatusProvider.RestoreLastSyncCompleted(lastSuccessfulSync, _statusSession);
             await _syncStateStore.DeleteExpiredTombstonesAsync(DateTimeOffset.UtcNow, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -1177,7 +1182,9 @@ public sealed class FolderWatchWorker : BackgroundService
                         _stateByPath[normalized] = entry;
                         _pathToAssetId[normalized] = asset.Id;
                         downloadedCount++;
-                        _syncStatusProvider.ReportDownloadCompleted(destinationPath);
+                        var completedUtc = DateTimeOffset.UtcNow;
+                        await _syncStateStore.RecordSuccessfulSyncAsync(_accountScope, completedUtc, cancellationToken);
+                        _syncStatusProvider.ReportDownloadCompleted(destinationPath, completedUtc, _statusSession);
                         _logger.LogInformation(
                             "Downloaded asset {AssetId} to {FilePath}.",
                             asset.Id,
@@ -1904,7 +1911,9 @@ public sealed class FolderWatchWorker : BackgroundService
                             cancellationToken);
                     }
 
-                    _syncStatusProvider.ReportUploadCompleted(request.FilePath);
+                    var completedUtc = DateTimeOffset.UtcNow;
+                    await _syncStateStore.RecordSuccessfulSyncAsync(_accountScope, completedUtc, cancellationToken);
+                    _syncStatusProvider.ReportUploadCompleted(request.FilePath, completedUtc, _statusSession);
                     _syncStatusProvider.ReportServerReachable(true);
                 }
                 else

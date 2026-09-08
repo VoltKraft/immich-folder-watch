@@ -89,6 +89,50 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
         }
     }
 
+    public async Task<DateTimeOffset?> GetLastSuccessfulSyncAsync(
+        string accountScope,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateAccountScope(accountScope);
+        await InitializeAsync(cancellationToken);
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT last_successful_sync_utc
+            FROM sync_account_status
+            WHERE account_scope = $account_scope;
+            """;
+        command.Parameters.AddWithValue("$account_scope", accountScope);
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is string timestamp ? FromDatabaseTimestamp(timestamp) : null;
+    }
+
+    public async Task RecordSuccessfulSyncAsync(
+        string accountScope,
+        DateTimeOffset completedUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateAccountScope(accountScope);
+        await InitializeAsync(cancellationToken);
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        // Fixed-width UTC roundtrip timestamps have chronological text ordering.
+        // A single upsert also prevents concurrent completions from moving time backwards.
+        command.CommandText = """
+            INSERT INTO sync_account_status (account_scope, last_successful_sync_utc)
+            VALUES ($account_scope, $completed_utc)
+            ON CONFLICT(account_scope) DO UPDATE SET
+                last_successful_sync_utc = MAX(
+                    sync_account_status.last_successful_sync_utc,
+                    excluded.last_successful_sync_utc);
+            """;
+        command.Parameters.AddWithValue("$account_scope", accountScope);
+        command.Parameters.AddWithValue("$completed_utc", ToDatabaseTimestamp(completedUtc));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<SyncStateEntry?> GetAsync(
         string accountScope,
         string sourcePath,
@@ -265,11 +309,6 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
                 throw new NotSupportedException(
                     $"The synchronization database schema version {version} is newer than the supported version {CurrentSchemaVersion}.");
             }
-
-            if (version == CurrentSchemaVersion)
-            {
-                return;
-            }
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -304,6 +343,39 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
             PRAGMA user_version = 1;
             """;
         await schemaCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        // This optional table leaves schema v1 readable by older binaries. Its creation
+        // and historical backfill are atomic, so later metadata updates never get replayed
+        // as transfer successes when the database is reopened.
+        await using var summaryExistsCommand = connection.CreateCommand();
+        summaryExistsCommand.Transaction = (SqliteTransaction)transaction;
+        summaryExistsCommand.CommandText = """
+            SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'table' AND name = 'sync_account_status';
+            """;
+        var summaryExists = Convert.ToInt64(
+            await summaryExistsCommand.ExecuteScalarAsync(cancellationToken),
+            CultureInfo.InvariantCulture) != 0;
+        if (!summaryExists)
+        {
+            await using var summaryCommand = connection.CreateCommand();
+            summaryCommand.Transaction = (SqliteTransaction)transaction;
+            summaryCommand.CommandText = """
+                CREATE TABLE sync_account_status (
+                    account_scope TEXT NOT NULL PRIMARY KEY,
+                    last_successful_sync_utc TEXT NOT NULL
+                );
+
+                INSERT INTO sync_account_status (account_scope, last_successful_sync_utc)
+                SELECT account_scope, MAX(last_synchronized_at_utc)
+                FROM sync_entries
+                WHERE status = $synchronized_status
+                GROUP BY account_scope;
+                """;
+            summaryCommand.Parameters.AddWithValue("$synchronized_status", (int)SyncEntryStatus.Synchronized);
+            await summaryCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
     }
 

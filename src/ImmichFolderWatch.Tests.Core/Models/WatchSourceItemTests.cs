@@ -5,6 +5,30 @@ namespace ImmichFolderWatch.Tests.Core.Models;
 
 public sealed class WatchSourceItemTests
 {
+    [Theory]
+    [InlineData("C:\\Pictures\\Camera\\", "Camera")]
+    [InlineData("/home/example/Pictures/Camera/", "Camera")]
+    [InlineData("/", "/")]
+    public void DisplayName_UsesFinalFolderComponent(string path, string expected)
+    {
+        var source = new WatchSourceItem { Path = path };
+        Assert.Equal(expected, source.DisplayName);
+    }
+
+    [Fact]
+    public void DisplayName_UsesPortalHostPathAndNotifiesOnPathChanges()
+    {
+        var source = new WatchSourceItem();
+        var changed = new List<string?>();
+        source.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        source.Path = "/photos/first";
+        Assert.Contains(nameof(WatchSourceItem.DisplayPath), changed);
+        Assert.Contains(nameof(WatchSourceItem.DisplayName), changed);
+        source.SetPortalPath("/run/user/1000/doc/example/opaque", "/home/example/Pictures/Camera");
+        Assert.Equal("Camera", source.DisplayName);
+        Assert.Equal("/run/user/1000/doc/example/opaque", source.Path);
+    }
+
     [Fact]
     public void DeleteAfterUpload_IsVisibleOnlyForUploadModes_AndPreservesValue()
     {

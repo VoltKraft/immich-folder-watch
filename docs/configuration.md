@@ -7,6 +7,9 @@ The app reads YAML configuration from a per-user location:
 
 Each Windows user has an independent config; the MSI does not create one automatically. The GUI writes this file on **Save and Apply**; on first launch without a config the GUI starts with empty fields.
 
+For the sidebar layout introduced in 2.10.0, see the [desktop interface guide](user-interface.md).
+The layout change requires no YAML or sync-state migration and preserves all existing settings.
+
 On upgrade from a pre-1.7 service-based install, the legacy `C:\ProgramData\Immich Folder Watch\config.yaml` is copied once into the installing user's `%LOCALAPPDATA%`.
 
 ## Persistent Sync State
@@ -34,6 +37,34 @@ and therefore requires a new bootstrap for that context.
 
 Do not edit or copy the database while the app is running. Include it with the
 configuration in per-user backups if retaining transfer history is important.
+
+### Last Sync across sessions
+
+Since 2.10.1, **Last Sync** is restored from `sync-state.db` before the worker
+contacts Immich. The database retains the latest successful upload/download time
+for each account context (API URL and API key), across all sources. It stores UTC;
+the desktop displays local time. Successful transfers update this value immediately,
+without waiting for application exit. Empty scans, failed or skipped transfers,
+server checks, and metadata-only reconciliation do not advance it.
+
+History is separate from individual file records, so removing a watched source,
+deleting a local file after upload, or expiring a tombstone does not erase it.
+Changing the API URL or key selects that context's history, or shows no previous
+sync if none exists. A late completion from an earlier worker cannot replace the
+new session's displayed timestamp.
+
+The auxiliary history table is created automatically without changing the existing
+schema-version-1 file records or YAML. On first creation only, the app seeds history
+from the newest available synchronized-record timestamp per account, excluding
+tombstones. This is a best-effort value for older installations: their records may
+reflect metadata reconciliation, and already-removed records cannot be reconstructed.
+From this update onward, only explicit successful transfers advance history.
+Older binaries can still open the database but do not maintain this history.
+
+History reads and writes use the existing state-database failure handling. A
+database-open/read failure prevents the worker from starting; a failed history
+write is not silently presented as a durable success. Back up the database along
+with the configuration; rebuilding a corrupt or removed database loses its history.
 
 ## Example
 
@@ -127,8 +158,8 @@ after upgrading to 2.9.0; no file or sync-state migration is required. Select
 `oldestFirst` to process older pending media first. Timestamp ordering replaces
 the previous queue arrival order.
 
-Each source's **Advanced options** contains both **Include subdirectories** and
-**Delete local files after upload** (available for upload modes only). Moving the
+Each source's **General** tab contains **Include subdirectories**, while its
+**Advanced** tab contains **Delete local files after upload** (available for upload modes only). Moving the
 controls does not change their saved values or deletion safeguards.
 
 The **Permissions** section starts collapsed. Its heading retains the aggregate
@@ -158,7 +189,7 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
 - `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
-- In the Windows GUI, new sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos) and keep **Advanced options** collapsed by default.
+- New sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos). Edit these under the selected folder's **File filters** tab.
 - In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
 - `logging.target` controls where logs are written. Valid values:
   - `eventLog` (default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
@@ -179,7 +210,7 @@ when no downloads are needed. An empty scan does not clear an upload error.
       - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored.
       - `albumName` **empty**: subfolders-as-albums sync. The root folder mirrors all Immich assets that are not in any album, and each first-level subfolder mirrors the Immich album with the same name. New subfolders become new albums (and new Immich albums become subfolders) in realtime. `includeSubdirectories` is forced on.
   - Missing, blank, or unknown values normalize to `uploadNew`. Pre-2.3 configs therefore load unchanged and keep the previous upload-only behavior.
-  - The mode is configurable per source in the Windows GUI (**Sync Mode** dropdown on each watched-folder card). The `Include subdirectories` checkbox is hidden when `sync` is selected, since the behavior is dictated by whether `albumName` is set.
+  - The mode is configurable per source under **Folders → General → Sync Mode**. The `Include subdirectories` checkbox is hidden when `sync` is selected, since the behavior is dictated by whether `albumName` is set.
   - When any source uses `syncMode: sync`, the GUI's **Verify Immich Access** check additionally requires the `asset.download`, `asset.read`, `asset.delete`, `albumAsset.delete`, `album.delete`, and `album.update` permissions on the API key (for pull, move, trash, remove-from-album, subfolder-delete → album-delete, and subfolder-rename → album-rename respectively). Upload-only configurations (`uploadNew` / `uploadAll`) do not need them.
 - `watch.sources[].deleteAfterUpload` is an opt-in inbox mode for upload-only sources:
   - The default is `false`. When `true` with `uploadNew` or `uploadAll`, a local file is permanently deleted only after Immich confirms the upload and any requested album assignment, the file's size and UTC modification time are still unchanged, and the successful upload state has been written to `sync-state.db`.
@@ -191,4 +222,4 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
 - Existing relative `logging.logDirectory` values still run after normalization, but the Windows GUI rewrites them to an absolute path on the next successful save.
-- `localization.language` selects the GUI language. `auto` picks German when the Windows UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through the **Appearance → Language** dropdown, which writes the selected value back to this field on the next save.
+- `localization.language` selects the GUI language. `auto` picks German when the Windows UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.

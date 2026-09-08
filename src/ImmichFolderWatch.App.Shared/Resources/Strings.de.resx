@@ -180,4 +180,15 @@
   <data name="Language_Auto" xml:space="preserve"><value>Automatisch (Systemeinstellung)</value></data>
   <data name="Language_English" xml:space="preserve"><value>Englisch</value></data>
   <data name="Language_German" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="UI_Overview" xml:space="preserve"><value>Übersicht</value></data>
+  <data name="UI_Folders" xml:space="preserve"><value>Ordner</value></data>
+  <data name="UI_Connection" xml:space="preserve"><value>Verbindung</value></data>
+  <data name="UI_Settings" xml:space="preserve"><value>Einstellungen</value></data>
+  <data name="UI_General" xml:space="preserve"><value>Allgemein</value></data>
+  <data name="UI_FileFilters" xml:space="preserve"><value>Dateifilter</value></data>
+  <data name="UI_Transfer" xml:space="preserve"><value>Übertragung</value></data>
+  <data name="UI_SelectSource" xml:space="preserve"><value>Wähle einen Ordner aus oder füge einen neuen hinzu, um seine Einstellungen zu bearbeiten.</value></data>
+  <data name="UI_NewSource" xml:space="preserve"><value>Neuer Ordner</value></data>
+  <data name="UI_AdvancedOptions" xml:space="preserve"><value>Erweitert</value></data>
+  <data name="UI_Logging" xml:space="preserve"><value>Protokollierung</value></data>
 </root>
