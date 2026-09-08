@@ -18,6 +18,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     private DateTimeOffset? _lastSyncCompletedUtc;
     private string? _currentlyUploadingFile;
     private int _uploadedInCurrentBatch;
+    private int _processedInCurrentBatch;
     private int _currentBatchSize;
     private string? _currentlyDownloadingFile;
     private int _downloadedInCurrentPull;
@@ -45,6 +46,12 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         get => _uploadedInCurrentBatch;
         private set => SetField(ref _uploadedInCurrentBatch, value);
+    }
+
+    public int ProcessedInCurrentBatch
+    {
+        get => _processedInCurrentBatch;
+        private set => SetField(ref _processedInCurrentBatch, value);
     }
 
     public int CurrentBatchSize
@@ -101,6 +108,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         {
             CurrentBatchSize = batchSize;
             UploadedInCurrentBatch = 0;
+            ProcessedInCurrentBatch = 0;
             LastErrorMessage = null;
         }
     }
@@ -115,6 +123,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             UploadedInCurrentBatch++;
+            ProcessedInCurrentBatch++;
             CurrentlyUploadingFile = null;
             LastSyncCompletedUtc = DateTimeOffset.UtcNow;
         }
@@ -124,8 +133,18 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         lock (_gate)
         {
+            ProcessedInCurrentBatch++;
             CurrentlyUploadingFile = null;
             LastErrorMessage = errorMessage;
+        }
+    }
+
+    public void ReportUploadSkipped()
+    {
+        lock (_gate)
+        {
+            ProcessedInCurrentBatch++;
+            CurrentlyUploadingFile = null;
         }
     }
 
@@ -135,6 +154,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         {
             CurrentBatchSize = 0;
             UploadedInCurrentBatch = 0;
+            ProcessedInCurrentBatch = 0;
             CurrentlyUploadingFile = null;
         }
     }

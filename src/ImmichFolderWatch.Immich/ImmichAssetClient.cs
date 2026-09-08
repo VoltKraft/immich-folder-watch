@@ -443,6 +443,31 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
     public async Task<UploadAssetResult> UploadAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken)
     {
+        for (var attempt = 1; attempt <= _retrySettings.MaxAttempts; attempt++)
+        {
+            var result = await UploadAssetAttemptAsync(request, cancellationToken);
+            if (result.IsSuccess || !result.CanRetry || attempt >= _retrySettings.MaxAttempts)
+            {
+                return result;
+            }
+
+            var delay = CalculateBackoff(attempt, _retrySettings.BaseDelayMilliseconds);
+            _logger.LogWarning(
+                "Upload attempt {Attempt}/{MaxAttempts} failed. Retrying in {DelayMs} ms for file {FilePath}.",
+                attempt,
+                _retrySettings.MaxAttempts,
+                delay.TotalMilliseconds,
+                request.FilePath);
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        return UploadAssetResult.Failure(null, "Upload failed after maximum retry attempts.");
+    }
+
+    public async Task<UploadAssetResult> UploadAssetAttemptAsync(
+        UploadAssetRequest request,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(request);
 
         if (!File.Exists(request.FilePath))
@@ -450,7 +475,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
             return UploadAssetResult.Failure(null, $"File does not exist: {request.FilePath}");
         }
 
-        var uploadResult = await UploadAssetFileAsync(request, cancellationToken);
+        var uploadResult = await UploadAssetFileAttemptAsync(request, cancellationToken);
         if (!uploadResult.IsSuccess)
         {
             return uploadResult;
@@ -466,101 +491,78 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         {
             return UploadAssetResult.Failure(
                 null,
-                $"Immich did not return an asset id, so the upload could not be placed into album '{albumName}'.");
+                $"Immich did not return an asset id, so the upload could not be placed into album '{albumName}'.",
+                canRetry: true);
         }
 
         var albumResolution = await ResolveOrCreateAlbumAsync(albumName, cancellationToken);
         if (!albumResolution.IsSuccess)
         {
-            return UploadAssetResult.Failure(albumResolution.StatusCode, albumResolution.ErrorMessage ?? "Album resolution failed.");
+            return UploadAssetResult.Failure(
+                albumResolution.StatusCode,
+                albumResolution.ErrorMessage ?? "Album resolution failed.",
+                IsRetryableFailureStatus(albumResolution.StatusCode));
         }
 
         var addResult = await AddAssetsToAlbumByIdAsync(albumResolution.AlbumId!, new[] { uploadResult.AssetId }, cancellationToken);
         if (!addResult.IsSuccess)
         {
-            return UploadAssetResult.Failure(addResult.StatusCode, addResult.ErrorMessage ?? "Adding the asset to the album failed.");
+            return UploadAssetResult.Failure(
+                addResult.StatusCode,
+                addResult.ErrorMessage ?? "Adding the asset to the album failed.",
+                IsRetryableFailureStatus(addResult.StatusCode));
         }
 
         return uploadResult;
     }
 
-    private async Task<UploadAssetResult> UploadAssetFileAsync(UploadAssetRequest request, CancellationToken cancellationToken)
+    private async Task<UploadAssetResult> UploadAssetFileAttemptAsync(
+        UploadAssetRequest request,
+        CancellationToken cancellationToken)
     {
-        for (var attempt = 1; attempt <= _retrySettings.MaxAttempts; attempt++)
+        try
         {
-            try
+            var uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: false, cancellationToken);
+            if (ShouldRetryUploadWithLegacyIdentifiers(uploadResponse.StatusCode, uploadResponse.Body))
             {
-                var uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: false, cancellationToken);
-                if (ShouldRetryUploadWithLegacyIdentifiers(uploadResponse.StatusCode, uploadResponse.Body))
-                {
-                    _logger.LogDebug(
-                        "Upload without legacy Immich device identifiers failed with HTTP {StatusCode}. Retrying with legacy identifiers for older Immich servers.",
-                        (int)uploadResponse.StatusCode);
+                _logger.LogDebug(
+                    "Upload without legacy Immich device identifiers failed with HTTP {StatusCode}. Retrying with legacy identifiers for older Immich servers.",
+                    (int)uploadResponse.StatusCode);
 
-                    uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: true, cancellationToken);
-                }
-
-                if (uploadResponse.IsSuccessStatusCode)
-                {
-                    var assetId = TryExtractId(uploadResponse.Body);
-                    return UploadAssetResult.Success(assetId);
-                }
-
-                LogKnownHttpErrors(uploadResponse.StatusCode, request.FilePath);
-
-                if (IsTransientStatusCode(uploadResponse.StatusCode) && attempt < _retrySettings.MaxAttempts)
-                {
-                    var delay = CalculateBackoff(attempt, _retrySettings.BaseDelayMilliseconds);
-                    _logger.LogWarning(
-                        "Upload attempt {Attempt}/{MaxAttempts} failed with HTTP {StatusCode}. Retrying in {DelayMs} ms for file {FilePath}.",
-                        attempt,
-                        _retrySettings.MaxAttempts,
-                        (int)uploadResponse.StatusCode,
-                        delay.TotalMilliseconds,
-                        request.FilePath);
-
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
-                }
-
-                return UploadAssetResult.Failure(
-                    uploadResponse.StatusCode,
-                    $"HTTP {(int)uploadResponse.StatusCode}: {TrimForLog(uploadResponse.Body)}");
+                uploadResponse = await SendUploadRequestAsync(request, includeLegacyIdentifiers: true, cancellationToken);
             }
-            catch (HttpRequestException ex) when (attempt < _retrySettings.MaxAttempts)
+
+            if (uploadResponse.IsSuccessStatusCode)
             {
-                var delay = CalculateBackoff(attempt, _retrySettings.BaseDelayMilliseconds);
-                _logger.LogWarning(
-                    ex,
-                    "Network error on attempt {Attempt}/{MaxAttempts}. Retrying in {DelayMs} ms for file {FilePath}.",
-                    attempt,
-                    _retrySettings.MaxAttempts,
-                    delay.TotalMilliseconds,
-                    request.FilePath);
+                var assetId = TryExtractId(uploadResponse.Body);
+                return UploadAssetResult.Success(assetId);
+            }
 
-                await Task.Delay(delay, cancellationToken);
-            }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested && attempt < _retrySettings.MaxAttempts)
-            {
-                var delay = CalculateBackoff(attempt, _retrySettings.BaseDelayMilliseconds);
-                _logger.LogWarning(
-                    ex,
-                    "Upload timeout on attempt {Attempt}/{MaxAttempts}. Retrying in {DelayMs} ms for file {FilePath}.",
-                    attempt,
-                    _retrySettings.MaxAttempts,
-                    delay.TotalMilliseconds,
-                    request.FilePath);
-
-                await Task.Delay(delay, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Upload failed for file {FilePath}.", request.FilePath);
-                return UploadAssetResult.Failure(null, ex.Message);
-            }
+            LogKnownHttpErrors(uploadResponse.StatusCode, request.FilePath);
+            return UploadAssetResult.Failure(
+                uploadResponse.StatusCode,
+                $"HTTP {(int)uploadResponse.StatusCode}: {TrimForLog(uploadResponse.Body)}",
+                IsTransientStatusCode(uploadResponse.StatusCode));
         }
-
-        return UploadAssetResult.Failure(null, "Upload failed after maximum retry attempts.");
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Network error while uploading file {FilePath}.", request.FilePath);
+            return UploadAssetResult.Failure(null, ex.Message, canRetry: true);
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Upload timed out for file {FilePath}.", request.FilePath);
+            return UploadAssetResult.Failure(null, ex.Message, canRetry: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Upload failed for file {FilePath}.", request.FilePath);
+            return UploadAssetResult.Failure(null, ex.Message);
+        }
     }
 
     private async Task<AssetSearchResult> SearchAssetsAsync(
@@ -956,6 +958,10 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             return ApiCallResult.FromResponse(response.StatusCode, body);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return ApiCallResult.FromException(ex.Message);
@@ -1235,6 +1241,9 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
             || statusCode == HttpStatusCode.ServiceUnavailable
             || statusCode == HttpStatusCode.GatewayTimeout;
     }
+
+    private static bool IsRetryableFailureStatus(HttpStatusCode? statusCode) =>
+        !statusCode.HasValue || IsTransientStatusCode(statusCode.Value);
 
     private static string TrimForLog(string value)
     {

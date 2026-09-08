@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-09-08
+
+### Fixed
+- Upload retries are now scheduled fairly so one failing file no longer exhausts every retry before other queued or newly detected files can upload.
+- Permanent upload rejections such as unsupported media formats are no longer queued indefinitely, and batch progress now advances after failed files.
+
+## [2.8.1] - 2026-09-08
+
+### Fixed
+- Fixed a Windows startup crash caused by the update notification text binding attempting to write to a read-only view-model property.
+
 ## [2.8.0] - 2026-09-04
 
 ### Added

@@ -8,6 +8,10 @@ public interface IImmichAssetClient
 
     Task<UploadAssetResult> UploadAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken);
 
+    Task<UploadAssetResult> UploadAssetAttemptAsync(
+        UploadAssetRequest request,
+        CancellationToken cancellationToken) => UploadAssetAsync(request, cancellationToken);
+
     Task<AlbumAssetsResult> GetAlbumAssetsAsync(string albumName, CancellationToken cancellationToken);
 
     Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken);

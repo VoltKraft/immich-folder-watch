@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Net;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Models;
@@ -9,6 +11,191 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class FolderWatchWorkerPersistenceTests
 {
+    [Fact]
+    public async Task TransientFailure_DoesNotBlockNewFileBehindRetryAttempts()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        var badFilePath = Path.Combine(watchDirectory, "bad.jpg");
+        var goodFilePath = Path.Combine(watchDirectory, "good.jpg");
+        var firstUploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new RecordingAssetClient
+        {
+            UploadHandler = async (request, count, cancellationToken) =>
+            {
+                if (count == 1)
+                {
+                    Assert.Equal(badFilePath, request.FilePath);
+                    firstUploadStarted.TrySetResult();
+                    await releaseFirstUpload.Task.WaitAsync(cancellationToken);
+                    return UploadAssetResult.Failure(null, "temporary network failure", canRetry: true);
+                }
+
+                return UploadAssetResult.Success($"asset-{count}");
+            },
+        };
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadNew);
+        var initialReconciliationLogger = new InitialReconciliationLogger();
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: initialReconciliationLogger);
+        await worker.StartAsync(CancellationToken.None);
+        await initialReconciliationLogger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+
+        await File.WriteAllTextAsync(badFilePath, "bad");
+        await firstUploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        await File.WriteAllTextAsync(goodFilePath, "good");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        releaseFirstUpload.TrySetResult();
+
+        await client.WaitForUploadCountAsync(3, TimeSpan.FromSeconds(8));
+
+        Assert.Collection(
+            client.UploadedPaths.Take(3),
+            path => Assert.Equal(badFilePath, path),
+            path => Assert.Equal(goodFilePath, path),
+            path => Assert.Equal(badFilePath, path));
+        await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task PermanentUploadFailure_IsNotQueuedAgain()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        var filePath = Path.Combine(watchDirectory, "unsupported.jpg");
+        await File.WriteAllTextAsync(filePath, "unsupported");
+
+        var client = new RecordingAssetClient
+        {
+            UploadHandler = (_, _, _) => Task.FromResult(
+                UploadAssetResult.Failure(HttpStatusCode.BadRequest, "unsupported format")),
+        };
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadAll);
+        using var worker = CreateWorker(config, databasePath, client);
+        await worker.StartAsync(CancellationToken.None);
+        await client.WaitForUploadCountAsync(1, TimeSpan.FromSeconds(8));
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(1, client.UploadCount);
+        await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task TransientUploadFailure_StopsAfterConfiguredAttempts()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        await File.WriteAllTextAsync(Path.Combine(watchDirectory, "unavailable.jpg"), "unavailable");
+
+        var client = new RecordingAssetClient
+        {
+            UploadHandler = (_, _, _) => Task.FromResult(
+                UploadAssetResult.Failure(HttpStatusCode.ServiceUnavailable, "try later", canRetry: true)),
+        };
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadAll);
+        config.Retry.MaxAttempts = 3;
+        config.Retry.BaseDelayMilliseconds = 1;
+        using var worker = CreateWorker(config, databasePath, client);
+        await worker.StartAsync(CancellationToken.None);
+        await client.WaitForUploadCountAsync(3, TimeSpan.FromSeconds(8));
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(3, client.UploadCount);
+        await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Shutdown_RequeuesCanceledBatchAndDrainsAllUploadNewFiles()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+
+        var cancellableUploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new RecordingAssetClient
+        {
+            UploadHandler = async (_, count, cancellationToken) =>
+            {
+                if (count == 1)
+                {
+                    cancellableUploadStarted.TrySetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+
+                return UploadAssetResult.Success($"asset-{count}");
+            },
+        };
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadNew);
+        var initialReconciliationLogger = new InitialReconciliationLogger();
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: initialReconciliationLogger);
+        await worker.StartAsync(CancellationToken.None);
+        await initialReconciliationLogger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+        await File.WriteAllTextAsync(Path.Combine(watchDirectory, "first.jpg"), "first");
+        await File.WriteAllTextAsync(Path.Combine(watchDirectory, "second.jpg"), "second");
+        await cancellableUploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(8));
+
+        await worker.StopAsync(CancellationToken.None);
+
+        var entries = await GetEntriesAsync(config, databasePath);
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(3, client.UploadCount);
+    }
+
+    [Fact]
+    public async Task Shutdown_PromotesFreshUploadNewDebounceEntry()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var client = new RecordingAssetClient();
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadNew);
+        var logger = new InitialReconciliationLogger();
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: logger);
+        await worker.StartAsync(CancellationToken.None);
+        await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+
+        await File.WriteAllTextAsync(Path.Combine(watchDirectory, "fresh.jpg"), "fresh");
+        await logger.WaitForFileEventAsync(TimeSpan.FromSeconds(8));
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal(1, client.UploadCount);
+        Assert.Single(await GetEntriesAsync(config, databasePath));
+    }
+
+    [Fact]
+    public async Task Shutdown_DoesNotLoopWhenFreshFileNeverBecomesReady()
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Path.Combine(directory.Path, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var client = new RecordingAssetClient();
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadNew);
+        var logger = new InitialReconciliationLogger();
+        using var worker = CreateWorker(
+            config,
+            databasePath,
+            client,
+            workerLogger: logger,
+            fileReadinessChecker: new NeverReadyChecker());
+        await worker.StartAsync(CancellationToken.None);
+        await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+        await File.WriteAllTextAsync(Path.Combine(watchDirectory, "locked.jpg"), "locked");
+        await logger.WaitForFileEventAsync(TimeSpan.FromSeconds(8));
+
+        await worker.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(3));
+
+        Assert.Equal(0, client.UploadCount);
+    }
+
     [Theory]
     [InlineData(WatchSourceSyncModes.UploadNew)]
     [InlineData(WatchSourceSyncModes.UploadAll)]
@@ -133,7 +320,7 @@ public sealed class FolderWatchWorkerPersistenceTests
         var releaseUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new RecordingAssetClient
         {
-            UploadHandler = async (count, cancellationToken) =>
+            UploadHandler = async (_, count, cancellationToken) =>
             {
                 if (count == 1)
                 {
@@ -283,10 +470,11 @@ public sealed class FolderWatchWorkerPersistenceTests
         string databasePath,
         RecordingAssetClient client,
         ILocalFileDeletionService? localFileDeletionService = null,
-        ILogger<FolderWatchWorker>? workerLogger = null) =>
+        ILogger<FolderWatchWorker>? workerLogger = null,
+        IFileReadinessChecker? fileReadinessChecker = null) =>
         new(
             config,
-            new AlwaysReadyChecker(),
+            fileReadinessChecker ?? new AlwaysReadyChecker(),
             localFileDeletionService ?? new LocalFileDeletionService(),
             new UploadBatchQueue(),
             client,
@@ -349,9 +537,12 @@ public sealed class FolderWatchWorkerPersistenceTests
         private const string ReconciliationMessagePrefix = "Persistent reconciliation for uploadNew";
 
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _fileEvent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _reconciliationCount;
 
         public Task WaitUntilReadyAsync(TimeSpan timeout) => _ready.Task.WaitAsync(timeout);
+
+        public Task WaitForFileEventAsync(TimeSpan timeout) => _fileEvent.Task.WaitAsync(timeout);
 
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
@@ -365,8 +556,15 @@ public sealed class FolderWatchWorkerPersistenceTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
+            var message = formatter(state, exception);
+            if (logLevel == LogLevel.Debug
+                && message.StartsWith("File event captured", StringComparison.Ordinal))
+            {
+                _fileEvent.TrySetResult();
+            }
+
             if (logLevel != LogLevel.Information
-                || !formatter(state, exception).StartsWith(ReconciliationMessagePrefix, StringComparison.Ordinal))
+                || !message.StartsWith(ReconciliationMessagePrefix, StringComparison.Ordinal))
             {
                 return;
             }
@@ -386,15 +584,27 @@ public sealed class FolderWatchWorkerPersistenceTests
             CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
+    private sealed class NeverReadyChecker : IFileReadinessChecker
+    {
+        public Task<bool> WaitUntilReadyAsync(
+            string filePath,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+    }
+
     private sealed class RecordingAssetClient : IImmichAssetClient
     {
         private int _uploadCount;
 
+        private readonly ConcurrentQueue<string> _uploadedPaths = new();
+
         public int UploadCount => Volatile.Read(ref _uploadCount);
+
+        public IReadOnlyList<string> UploadedPaths => _uploadedPaths.ToArray();
 
         public bool FailUploads { get; init; }
 
-        public Func<int, CancellationToken, Task<UploadAssetResult>>? UploadHandler { get; init; }
+        public Func<UploadAssetRequest, int, CancellationToken, Task<UploadAssetResult>>? UploadHandler { get; init; }
 
         public Task PingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -403,9 +613,10 @@ public sealed class FolderWatchWorkerPersistenceTests
             CancellationToken cancellationToken)
         {
             var count = Interlocked.Increment(ref _uploadCount);
+            _uploadedPaths.Enqueue(request.FilePath);
             if (UploadHandler is not null)
             {
-                return await UploadHandler(count, cancellationToken);
+                return await UploadHandler(request, count, cancellationToken);
             }
 
             return FailUploads

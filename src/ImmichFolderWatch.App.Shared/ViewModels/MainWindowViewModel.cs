@@ -918,7 +918,7 @@ public sealed class MainWindowViewModel : BindableBase
             var prefixed = string.Format(_localizationService.CurrentCulture, Strings.Status_UploadingPrefix, fileName);
             if (_syncStatusProvider.CurrentBatchSize > 0)
             {
-                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.UploadedInCurrentBatch + 1}/{_syncStatusProvider.CurrentBatchSize})";
+                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.ProcessedInCurrentBatch + 1}/{_syncStatusProvider.CurrentBatchSize})";
             }
             else
             {
@@ -940,7 +940,7 @@ public sealed class MainWindowViewModel : BindableBase
         }
         else if (_syncStatusProvider.CurrentBatchSize > 0)
         {
-            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_BatchProgressFormat, _syncStatusProvider.UploadedInCurrentBatch, _syncStatusProvider.CurrentBatchSize);
+            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_BatchProgressFormat, _syncStatusProvider.ProcessedInCurrentBatch, _syncStatusProvider.CurrentBatchSize);
         }
         else if (_syncStatusProvider.CurrentPullSize > 0)
         {

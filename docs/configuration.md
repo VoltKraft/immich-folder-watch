@@ -110,6 +110,7 @@ localization:
 - File extensions are case-insensitive.
 - Each source has its own `extensions` include list.
 - Extensions without `.` are normalized automatically.
+- `retry.maxAttempts` applies only to transient upload failures such as network errors, timeouts, rate limiting, and temporary server errors. Retries are delayed and placed behind newly detected files; permanent HTTP errors are not retried unless the file changes. `uploadAll` and `sync` sources can also retry during a later startup reconciliation.
 - `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
 - `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.
