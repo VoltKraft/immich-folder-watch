@@ -129,8 +129,9 @@ Avalonia's build telemetry task, whose per-user log path is restricted in the
 validation environment; it does not change application behavior. Offline WPF
 screenshots were inspected in both themes. No new dependencies were added.
 
-Native Linux desktop/portal interaction, MSI/Flatpak packaging, and live Immich
-integration were not run as part of this UI change. The independent binding
+Native Linux desktop/portal interaction, Flatpak packaging, and live Immich
+integration were not run as part of this UI change. Windows MSI packaging was
+subsequently verified as described below. The independent binding
 review found no removed configuration, validation, status or action bindings.
 
 ### 2.10.1 persistence validation
@@ -148,3 +149,21 @@ dotnet test ImmichFolderWatch.sln -c Debug --artifacts-path artifacts/last-sync-
 The initial run against existing outputs was aborted by a Windows in-page error
 in the test host; the complete rerun above used fresh build outputs and passed.
 No live Immich server or native Linux portal was used.
+
+### Windows installer validation
+
+Self-contained Windows x64 installers were built for both 2.10.0 and 2.10.1:
+
+```powershell
+.\packaging\windows\build-msi.ps1 -Runtime win-x64
+```
+
+Both builds succeeded. The MSI Property and Summary Information tables were
+opened read-only to verify the product version and `x64;1033` package template.
+The published application includes the .NET runtime, and the 2.10.1 payload's
+product version identifies commit `8bb5a5d`. Each installer is approximately
+52.9 MiB and is generated under `artifacts/windows/msi/`; binaries are not committed.
+
+WiX reports WIX1101 for the existing SQLite native DLL's default language metadata;
+there were no installer build errors. Installation/upgrade on a live system and
+ARM64 MSI packaging were not exercised for this change.
