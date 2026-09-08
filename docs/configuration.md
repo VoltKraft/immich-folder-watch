@@ -38,6 +38,34 @@ and therefore requires a new bootstrap for that context.
 Do not edit or copy the database while the app is running. Include it with the
 configuration in per-user backups if retaining transfer history is important.
 
+### Last Sync across sessions
+
+Since 2.10.1, **Last Sync** is restored from `sync-state.db` before the worker
+contacts Immich. The database retains the latest successful upload/download time
+for each account context (API URL and API key), across all sources. It stores UTC;
+the desktop displays local time. Successful transfers update this value immediately,
+without waiting for application exit. Empty scans, failed or skipped transfers,
+server checks, and metadata-only reconciliation do not advance it.
+
+History is separate from individual file records, so removing a watched source,
+deleting a local file after upload, or expiring a tombstone does not erase it.
+Changing the API URL or key selects that context's history, or shows no previous
+sync if none exists. A late completion from an earlier worker cannot replace the
+new session's displayed timestamp.
+
+The auxiliary history table is created automatically without changing the existing
+schema-version-1 file records or YAML. On first creation only, the app seeds history
+from the newest available synchronized-record timestamp per account, excluding
+tombstones. This is a best-effort value for older installations: their records may
+reflect metadata reconciliation, and already-removed records cannot be reconstructed.
+From this update onward, only explicit successful transfers advance history.
+Older binaries can still open the database but do not maintain this history.
+
+History reads and writes use the existing state-database failure handling. A
+database-open/read failure prevents the worker from starting; a failed history
+write is not silently presented as a durable success. Back up the database along
+with the configuration; rebuilding a corrupt or removed database loses its history.
+
 ## Example
 
 See [packaging/windows/config.windows.example.yaml](../packaging/windows/config.windows.example.yaml) for a standalone reference file.

@@ -37,6 +37,11 @@ the real WPF controls, with synthetic values and no server connection.
 | Open Logs; Save and Apply; operation and validation messages | Fixed footer |
 | Linux background/tray notice and explicit Quit | Notice above the pages and **Quit** in the footer |
 
+**Last Sync** includes successful transfers from previous sessions starting in
+2.10.1. It is restored from the account's history in `sync-state.db`, even while
+the server is offline. See [Last Sync across sessions](configuration.md#last-sync-across-sessions)
+for persistence, upgrade behavior, and the limitations of pre-update history.
+
 ## Set up or edit folders
 
 1. Open **Connection**, enter the server API URL and key, and verify access.
@@ -127,3 +132,19 @@ screenshots were inspected in both themes. No new dependencies were added.
 Native Linux desktop/portal interaction, MSI/Flatpak packaging, and live Immich
 integration were not run as part of this UI change. The independent binding
 review found no removed configuration, validation, status or action bindings.
+
+### 2.10.1 persistence validation
+
+The solution build passed with no warnings or errors. The full suite passed
+281 portable and 36 Windows tests, including previous-session upload/download
+restoration, account changes, delete-after-upload, migration, and stale worker
+completion. Commands:
+
+```powershell
+dotnet build ImmichFolderWatch.sln -c Debug -p:UsedAvaloniaProducts=
+dotnet test ImmichFolderWatch.sln -c Debug --artifacts-path artifacts/last-sync-validation -p:UsedAvaloniaProducts= --verbosity minimal
+```
+
+The initial run against existing outputs was aborted by a Windows in-page error
+in the test host; the complete rerun above used fresh build outputs and passed.
+No live Immich server or native Linux portal was used.

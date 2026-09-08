@@ -14,6 +14,7 @@ public enum ServerConnectionState
 public sealed class SyncStatusProvider : INotifyPropertyChanged
 {
     private readonly object _gate = new();
+    private long _syncSession;
 
     private DateTimeOffset? _lastSyncCompletedUtc;
     private string? _currentlyUploadingFile;
@@ -44,6 +45,38 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         get => _lastSyncCompletedUtc;
         private set => SetField(ref _lastSyncCompletedUtc, value);
+    }
+
+    /// <summary>
+    /// Clears the previous account's history and returns a token for this worker session.
+    /// Late completions from a stopped worker cannot replace the new session's history.
+    /// </summary>
+    public long BeginSyncSession()
+    {
+        lock (_gate)
+        {
+            _syncSession++;
+            LastSyncCompletedUtc = null;
+            return _syncSession;
+        }
+    }
+
+    /// <summary>
+    /// Replaces the displayed history with the current account's durable timestamp.
+    /// The worker calls this before starting transfers, including null when no history
+    /// exists or when resetting a previous account during a host restart.
+    /// </summary>
+    /// <param name="completedUtc">Persisted time, normalized to UTC, or null to clear history.</param>
+    /// <param name="syncSession">Token from BeginSyncSession; stale tokens are ignored. Null bypasses session checking.</param>
+    public void RestoreLastSyncCompleted(DateTimeOffset? completedUtc, long? syncSession = null)
+    {
+        lock (_gate)
+        {
+            if (syncSession is null || syncSession == _syncSession)
+            {
+                LastSyncCompletedUtc = completedUtc?.ToUniversalTime();
+            }
+        }
     }
 
     public string? CurrentlyUploadingFile
@@ -166,7 +199,11 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         CurrentlyUploadingFile = filePath;
     }
 
-    public void ReportUploadCompleted(string filePath)
+    /// <summary>Reports success using the durable completion timestamp when supplied by the worker.</summary>
+    /// <param name="filePath">Completed upload path, retained for the reporting API contract.</param>
+    /// <param name="completedUtc">Persisted completion time, or current UTC time when omitted.</param>
+    /// <param name="syncSession">Optional worker token; only the history timestamp is fenced against stale sessions.</param>
+    public void ReportUploadCompleted(string filePath, DateTimeOffset? completedUtc = null, long? syncSession = null)
     {
         lock (_gate)
         {
@@ -174,7 +211,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
             ProcessedInCurrentBatch++;
             ProcessedFileCount = ++_processedInUploadCycle;
             CurrentlyUploadingFile = null;
-            LastSyncCompletedUtc = DateTimeOffset.UtcNow;
+            AdvanceLastSyncCompleted(completedUtc ?? DateTimeOffset.UtcNow, syncSession);
         }
     }
 
@@ -291,14 +328,18 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         CurrentlyDownloadingFile = filePath;
     }
 
-    public void ReportDownloadCompleted(string filePath)
+    /// <summary>Reports success using the durable completion timestamp when supplied by the worker.</summary>
+    /// <param name="filePath">Completed download path, retained for the reporting API contract.</param>
+    /// <param name="completedUtc">Persisted completion time, or current UTC time when omitted.</param>
+    /// <param name="syncSession">Optional worker token; only the history timestamp is fenced against stale sessions.</param>
+    public void ReportDownloadCompleted(string filePath, DateTimeOffset? completedUtc = null, long? syncSession = null)
     {
         lock (_gate)
         {
             DownloadedInCurrentPull++;
             ProcessedFileCount++;
             CurrentlyDownloadingFile = null;
-            LastSyncCompletedUtc = DateTimeOffset.UtcNow;
+            AdvanceLastSyncCompleted(completedUtc ?? DateTimeOffset.UtcNow, syncSession);
         }
     }
 
@@ -359,6 +400,20 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         field = value;
         OnPropertyChanged(propertyName);
         return true;
+    }
+
+    private void AdvanceLastSyncCompleted(DateTimeOffset completedUtc, long? syncSession)
+    {
+        if (syncSession is not null && syncSession != _syncSession)
+        {
+            return;
+        }
+
+        var normalized = completedUtc.ToUniversalTime();
+        if (LastSyncCompletedUtc is null || normalized > LastSyncCompletedUtc.Value)
+        {
+            LastSyncCompletedUtc = normalized;
+        }
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

@@ -60,6 +60,167 @@ public sealed class SqliteSyncStateStoreTests
     }
 
     [Fact]
+    public async Task RecordSuccessfulSyncAsync_PersistsAcrossStoreInstancesAndSeparatesAccounts()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        Assert.Null(await store.GetLastSuccessfulSyncAsync("scope-a"));
+
+        await store.RecordSuccessfulSyncAsync("scope-a", SyncTimestamp);
+        await store.RecordSuccessfulSyncAsync("scope-b", SyncTimestamp.AddHours(1));
+        SqliteConnection.ClearAllPools();
+
+        var reopened = CreateStore(directory);
+        Assert.Equal(SyncTimestamp, await reopened.GetLastSuccessfulSyncAsync("scope-a"));
+        Assert.Equal(SyncTimestamp.AddHours(1), await reopened.GetLastSuccessfulSyncAsync("scope-b"));
+        Assert.Null(await reopened.GetLastSuccessfulSyncAsync("unknown"));
+    }
+
+    [Fact]
+    public async Task RecordSuccessfulSyncAsync_NormalizesOffsetsAndNeverMovesBackwards()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var latest = SyncTimestamp.AddTicks(1);
+
+        await store.RecordSuccessfulSyncAsync("scope", SyncTimestamp.ToOffset(TimeSpan.FromHours(12)));
+        await store.RecordSuccessfulSyncAsync("scope", latest.ToOffset(TimeSpan.FromHours(-10)));
+        await store.RecordSuccessfulSyncAsync("scope", SyncTimestamp.ToOffset(TimeSpan.FromHours(14)));
+
+        var actual = await CreateStore(directory).GetLastSuccessfulSyncAsync("scope");
+        Assert.Equal(latest, actual);
+        Assert.Equal(TimeSpan.Zero, actual!.Value.Offset);
+    }
+
+    [Fact]
+    public async Task RecordSuccessfulSyncAsync_ConcurrentStoresKeepLatestCompletion()
+    {
+        using var directory = new TemporaryDirectory();
+        var first = CreateStore(directory);
+        var second = CreateStore(directory);
+        await first.InitializeAsync();
+        await second.InitializeAsync();
+
+        await Task.WhenAll(
+            Task.Run(() => first.RecordSuccessfulSyncAsync("scope", SyncTimestamp.AddSeconds(2))),
+            Task.Run(() => second.RecordSuccessfulSyncAsync("scope", SyncTimestamp)),
+            Task.Run(() => first.RecordSuccessfulSyncAsync("scope", SyncTimestamp.AddSeconds(1))));
+
+        Assert.Equal(SyncTimestamp.AddSeconds(2), await second.GetLastSuccessfulSyncAsync("scope"));
+    }
+
+    [Fact]
+    public async Task LastSuccessfulSync_SurvivesEntryDeletionAndTombstoneExpiry()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var source = Path.Combine(directory.Path, "photos");
+        await store.UpsertAsync(CreateEntry("scope", source, "photo.jpg", "asset-1"));
+        await store.RecordSuccessfulSyncAsync("scope", SyncTimestamp);
+        await store.UpsertAsync(CreateEntry("scope", source, "deleted.jpg", "asset-2") with
+        {
+            Status = SyncEntryStatus.Tombstone,
+            LastSynchronizedAtUtc = SyncTimestamp.AddDays(1),
+            TombstoneExpiresAtUtc = SyncTimestamp.AddDays(2),
+        });
+
+        Assert.True(await store.DeleteAsync("scope", source, "photo.jpg"));
+        Assert.Equal(1, await store.DeleteExpiredTombstonesAsync(SyncTimestamp.AddDays(3)));
+
+        var reopened = CreateStore(directory);
+        Assert.Empty(await reopened.GetSourceEntriesAsync("scope", source));
+        Assert.Equal(SyncTimestamp, await reopened.GetLastSuccessfulSyncAsync("scope"));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_MetadataUpdatesDoNotRecordOrAdvanceSuccessfulSync()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var entry = CreateEntry("scope", Path.Combine(directory.Path, "photos"), "photo.jpg", "asset");
+        await store.UpsertAsync(entry);
+        Assert.Null(await CreateStore(directory).GetLastSuccessfulSyncAsync("scope"));
+
+        await store.RecordSuccessfulSyncAsync("scope", SyncTimestamp);
+        await store.UpsertAsync(entry with
+        {
+            AlbumName = "Renamed album",
+            LastSynchronizedAtUtc = SyncTimestamp.AddDays(1),
+        });
+
+        Assert.Equal(SyncTimestamp, await CreateStore(directory).GetLastSuccessfulSyncAsync("scope"));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BackfillsVersionOneHistoryOnceWithoutTombstones()
+    {
+        using var directory = new TemporaryDirectory();
+        var legacy = CreateStore(directory);
+        var source = Path.Combine(directory.Path, "photos");
+        var newestEntry = CreateEntry("scope-a", source, "new.jpg", "asset-new") with
+        {
+            LastSynchronizedAtUtc = SyncTimestamp.AddHours(1),
+        };
+        await legacy.UpsertAsync(CreateEntry("scope-a", source, "old.jpg", "asset-old"));
+        await legacy.UpsertAsync(newestEntry);
+        await legacy.UpsertAsync(CreateEntry("scope-b", source, "other.jpg", "asset-other"));
+        foreach (var account in new[] { "scope-a", "tombstones-only" })
+        {
+            await legacy.UpsertAsync(CreateEntry(account, source, "deleted.jpg", "asset-deleted") with
+            {
+                Status = SyncEntryStatus.Tombstone,
+                LastSynchronizedAtUtc = SyncTimestamp.AddDays(1),
+                TombstoneExpiresAtUtc = SyncTimestamp.AddDays(2),
+            });
+        }
+
+        // Reproduce the pre-extension v1 database: the base table and its rows are unchanged.
+        await using (var connection = new SqliteConnection($"Data Source={legacy.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE sync_account_status; PRAGMA user_version;";
+            Assert.Equal(1L, await command.ExecuteScalarAsync());
+        }
+
+        var upgraded = CreateStore(directory);
+        Assert.Equal(newestEntry.LastSynchronizedAtUtc, await upgraded.GetLastSuccessfulSyncAsync("scope-a"));
+        Assert.Equal(SyncTimestamp, await upgraded.GetLastSuccessfulSyncAsync("scope-b"));
+        Assert.Null(await upgraded.GetLastSuccessfulSyncAsync("tombstones-only"));
+        Assert.Equal(3, (await upgraded.GetSourceEntriesAsync("scope-a", source)).Count);
+
+        await upgraded.UpsertAsync(newestEntry with { LastSynchronizedAtUtc = SyncTimestamp.AddDays(3) });
+        await upgraded.UpsertAsync(CreateEntry("new-account", source, "metadata.jpg", "asset-metadata"));
+        var reopened = CreateStore(directory);
+        Assert.Equal(newestEntry.LastSynchronizedAtUtc, await reopened.GetLastSuccessfulSyncAsync("scope-a"));
+        Assert.Null(await reopened.GetLastSuccessfulSyncAsync("new-account"));
+        await using var migrated = new SqliteConnection($"Data Source={legacy.DatabasePath}");
+        await migrated.OpenAsync();
+        await using var versionCommand = migrated.CreateCommand();
+        versionCommand.CommandText = "PRAGMA user_version;";
+        Assert.Equal(1L, await versionCommand.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_RefusesNewerVersionWithoutCreatingSummary()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        await using var connection = new SqliteConnection($"Data Source={store.DatabasePath}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version = 2;";
+        await command.ExecuteNonQueryAsync();
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => store.InitializeAsync());
+
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE name = 'sync_account_status';";
+        Assert.Equal(0L, await command.ExecuteScalarAsync());
+        command.CommandText = "PRAGMA user_version;";
+        Assert.Equal(2L, await command.ExecuteScalarAsync());
+    }
+
+    [Fact]
     public async Task UpsertAsync_RoundTripsAndUpdatesEntry()
     {
         using var directory = new TemporaryDirectory();

@@ -56,6 +56,8 @@
 
 ## Design Decisions
 
+- **Durable last-transfer history.** The state store keeps an account-scoped high-water timestamp independently of file entries. The worker reads it before registration/reconciliation and explicitly writes after a successful upload/download, before reporting completion to the UI. Generic entry upserts never update it. An additive auxiliary table preserves schema-version-1 compatibility and is seeded once from available synchronized records for old installations; this backfill is approximate because historic entries did not distinguish transfer and reconciliation timestamps. Status restoration and completion use a worker-session token so a late completion during a timed-out shutdown cannot overwrite a newly selected account's history. Timestamp updates are monotonic in both SQLite and the UI.
+
 - **Shared draft, transient navigation.** Both desktop heads expose Overview, Folders, Connection, and Settings through the same `MainWindowViewModel` selection state. The folder editor binds to an existing `WatchSourceItem` in `Sources`, not a copy, so switching views cannot discard uncommitted edits. Collection changes reconcile the selection; loading an applied configuration restores it by path or index. Navigation state is not serialized. `DisplayName` is derived from `DisplayPath`, preserving Linux portal-path identity. Page-local scroll regions leave status and apply actions reachable. See [Desktop interface](user-interface.md) for the control map and upgrade behavior.
 
 - **Per-user, no service.** Multi-user machines get isolated configurations and logs with no privilege escalation at runtime.

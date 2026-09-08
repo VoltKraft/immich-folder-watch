@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-09-08
+
+### Fixed
+- Restored Last Sync from the per-user synchronization database when starting a new session, before contacting Immich. Successful uploads and downloads persist the same timestamp shown in the UI.
+- Kept transfer history after local deletion and state cleanup, isolated it by Immich account context, and prevented late completions from a previous worker from replacing the current account's displayed history.
+- Initialized existing installations' history once from available synchronized records. Empty scans, failures, skips, and later metadata-only changes do not advance Last Sync.
+
 ## [2.10.0] - 2026-09-08
 
 ### Added
