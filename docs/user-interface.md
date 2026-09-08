@@ -1,116 +1,223 @@
 # Desktop interface
 
-Version 2.10.0 replaces the single scrolling configuration form with four sidebar
-pages on Windows and Linux. The header, navigation, status and action footer stay
-in place; only the selected page or folder list needs scrolling. The folder list
-shows a short folder name and its full display path, so equally named folders can
-still be distinguished. Long paths are abbreviated in the row and available in full
-on hover.
+Immich Folder Watch can upload new media, import existing files, or synchronize
+local folders and Immich albums in both directions. Choose a mode for each folder
+and use the interface to manage album mapping, filters, transfers, and logging.
 
-![Windows folder editor in the light theme, using sample data](images/ui-folders-light.png)
+Use the sidebar to switch between **Overview**, **Folders**, **Connection**, and
+**Settings**. The status and action buttons remain in the footer on every page.
+The screenshots below show the Windows interface in English with sample data;
+they follow your browser's light or dark preference. Linux has the same pages
+and settings, with the platform differences described below.
 
-The same layout follows the system theme:
+## First setup
 
-![Windows folder editor in the dark theme, using sample data](images/ui-folders-dark.png)
+1. In **Connection**, enter your Immich API URL and API key, then select
+   **Verify Immich Access**.
+2. In **Folders**, select **Add Source**, choose the local source and its sync
+   mode, and review the optional album and file filters. The default uploads
+   only new files; choose another mode to include existing files or downloads.
+3. In **Settings**, adjust application, transfer, or logging preferences if needed.
+4. Select **Save and Apply** to validate the complete configuration, save it,
+   and start synchronization with those settings.
 
-Additional previews: [General settings](images/ui-settings-light.png) and
-[Immich connection](images/ui-connection-dark.png). These are offline renders of
-the real WPF controls, with synthetic values and no server connection.
+## Overview
 
-## Find an existing control
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-overview-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-overview-light.png">
+  <img src="images/ui-overview-light.png" alt="English Overview page showing server connection, last sync, and sync status.">
+</picture>
 
-| Previous location or task | New location |
+**Server Connection** shows connectivity. **Last Sync** shows the latest
+successful upload or download, including previous sessions; an empty scan does
+not advance it. See [Last Sync across sessions](configuration.md#last-sync-across-sessions)
+for storage and upgrade details. **Sync Status** shows the current transfer,
+progress, or most recent sync error. The header contains the application version
+and an update link when one is available.
+
+## Connection
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-connection-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-connection-light.png">
+  <img src="images/ui-connection-light.png" alt="English Connection page with a sample API URL, API key field, and permission checks.">
+</picture>
+
+Enter the **Server API URL**, including `/api`, for example
+`https://immich.example.com/api`, and an **API Key** created in Immich. The eye
+button reveals or hides the key. **Verify Immich Access** checks the URL, key,
+and permissions without saving the draft. Expand **Permissions** to inspect
+individual results. Bidirectional sync requires additional permissions, so run
+the check again after changing sync modes.
+
+## Folders
+
+Select **Add Source**, then select a folder in the list to edit it. On Windows,
+enter its path; on Linux, use the desktop folder picker to grant access.
+**Remove** removes the selected source from the draft configuration; it does not
+delete local files or Immich assets. Hover over an abbreviated path to read it
+in full.
+
+### General
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-folders-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-folders-light.png">
+  <img src="images/ui-folders-light.png" alt="English Folders page with the General tab, local folder path, album name, and sync mode.">
+</picture>
+
+Set **Folder Path**, the optional **Immich Album Name**, and **Sync Mode**:
+
+| Sync mode | What it does |
 | --- | --- |
-| Server connection, last sync, current transfer and sync errors | **Overview**; the live status also remains in the footer |
-| Version and available update link | Header |
-| Immich API URL, API key, reveal/hide key, validation results | **Connection** |
-| Verify access; aggregate and individual permission results | **Connection**, with expandable **Permissions** |
-| Add or remove a watched source | **Folders** |
-| Folder path, album, sync mode and its explanation | Select a folder, then **General** |
-| Include subdirectories | Folder **General**, for upload modes |
-| Included extensions, excluded directories and file names | Folder **File filters** |
-| Delete local files after confirmed upload | Folder **Advanced**, for upload modes |
-| Autostart and language | **Settings → General** |
-| Transfer order, batch interval, batch size, file readiness timeout | **Settings → Transfer** |
-| Retry attempt limit and base delay | **Settings → Transfer** |
-| Log level, target, file directory and default-directory action | **Settings → Logging** |
-| Open Logs; Save and Apply; operation and validation messages | Fixed footer |
-| Linux background/tray notice and explicit Quit | Notice above the pages and **Quit** in the footer |
+| **Upload new files only (default)** | Uploads files that appear while the app is running. Existing files are ignored. |
+| **Upload everything in the folder** | Includes existing files at startup and uploads new files added later. No downloads. |
+| **Sync folder with album (bidirectional)** | Uploads missing local media to Immich and downloads missing remote media. Also propagates deletions, local moves, and album/folder renames as described below. |
 
-**Last Sync** includes successful transfers from previous sessions starting in
-2.10.1. It is restored from the account's history in `sync-state.db`, even while
-the server is offline. See [Last Sync across sessions](configuration.md#last-sync-across-sessions)
-for persistence, upgrade behavior, and the limitations of pre-update history.
+For upload modes, leave the album name empty to upload without album placement,
+or enter a name to use an album that the app creates if needed. Enable
+**Include subdirectories** to upload from nested folders.
 
-## Set up or edit folders
+For bidirectional sync, an album name limits synchronization to that album and
+the source root; subfolders are ignored. With no album name, the root mirrors
+assets outside albums, and first-level subfolders mirror Immich albums. Recursion
+is automatic in this mode.
 
-1. Open **Connection**, enter the server API URL and key, and verify access.
-   Expand **Permissions** to inspect individual results.
-2. Open **Folders** and add a folder. Linux continues to use the desktop folder
-   portal to grant access. Windows retains the editable folder-path field.
-3. Select a folder in the list. Set its path, optional album, sync mode and
-   recursive upload option under **General**. Use **File filters** for extension
-   and exclusion lists. **Advanced** contains deletion after confirmed upload.
-4. Open **Settings** to change global transfer, retry, logging or application
-   preferences.
-5. Select **Save and Apply** in the footer to persist the entire draft and
-   restart synchronization with it. Validation and save failures appear in the
-   footer even when the affected setting is on another page.
+Local deletion moves tracked assets to Immich trash. Removing an asset from the
+remote source also permanently removes its tracked local file after a complete,
+successful pull. In a single-album source, removing an asset from that album is
+enough to trigger local removal. Review the [sync and deletion rules](configuration.md#file-selection)
+before using this mode.
 
-Changing a sidebar page, detail tab or selected folder keeps the edits already
-made. Saving includes every source, not only the selected one. Adding selects
-the new folder; removing the selected folder selects the next available entry,
-or the preceding one at the end of the list. An empty list shows an instruction
-to add a folder. Removing a source from the configuration does not delete its
-local files or Immich assets.
+### File filters
 
-Autostart retains its existing immediate operating-system effect. Language
-changes update the interface immediately; the language preference is included
-when saving the configuration. Navigation itself neither saves settings nor
-starts or pauses synchronization. Closing/hiding and tray behavior are unchanged.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-filters-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-filters-light.png">
+  <img src="images/ui-filters-light.png" alt="English File filters tab with included extensions, excluded directories, and excluded file names.">
+</picture>
 
-## Compatibility and upgrade
+Use one entry per line. **Extensions** selects media types, such as `.jpg` or
+`.mp4`; new folders start with the supported media extensions. **Excluded
+Directories** matches paths relative to the source, such as `private` or
+`**/cache`. **Excluded File Names** matches names, such as `Thumbs.db` or `*.tmp`.
+Matching is case-insensitive. Directory exclusions are shown for upload modes
+when **Include subdirectories** is enabled. Hidden values remain saved.
 
-No YAML or sync-state migration is required for 2.10.0. Existing configuration
-keys, defaults, sync modes, filtering and deletion safeguards are unchanged.
-The selected page, folder and display name are transient UI state, not new
-configuration fields. After applying a configuration, the editor retains the
-selected source where possible.
+### Advanced
 
-For bidirectional sync, recursion and deletion controls keep their existing
-mode-dependent visibility and semantics. Hidden filter and deletion values are
-retained. A portal-granted Linux folder displays its host path while retaining
-the granted portal path for persistence and transfers; selecting a different
-folder does not replace this grant.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-advanced-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-advanced-light.png">
+  <img src="images/ui-advanced-light.png" alt="English Advanced tab showing the optional permanent deletion setting for uploaded local files.">
+</picture>
 
-Both heads keep English/German live localization and the current platform theme.
-Long lists and settings pages scroll independently at smaller window sizes;
-keyboard navigation and page tabs remain available. See
-[Configuration](configuration.md) for field semantics and
-[Architecture](architecture.md) for the shared draft and navigation model.
+Upload modes offer **Permanently delete local files after successful upload**.
+This is off by default. Deletion happens after Immich confirms the upload and
+requested album placement, the successful state is saved, and the local file is
+still unchanged. Enabling it also removes unchanged, previously verified
+uploads. **Deletion bypasses the recycle bin or trash** and leaves the Immich
+asset intact. This option is unavailable for bidirectional sync.
 
-## Regression checks and screenshots
+## Settings
 
-Portable `NavigationViewModelTests` cover retained source/global configuration,
-add/remove/load selection, localization and portal-path identity. Windows
-`MainWindowBindingTests` also exercise real WPF bindings, conditional controls,
-and layout with 40 sources at the minimum window size. The window remains
-unshown and its runtime host stays stopped, avoiding real configuration and HTTP
-access.
+### General
 
-To regenerate offline WPF previews from the repository root on Windows:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-settings-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-settings-light.png">
+  <img src="images/ui-settings-light.png" alt="English General settings with Start on login and the Language selector.">
+</picture>
+
+**Start on login** changes operating-system autostart immediately. **Language**
+switches immediately between English, German, or the system default; select
+**Save and Apply** to keep the preference. The app follows the system's light
+or dark theme.
+
+### Transfer
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-transfer-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-transfer-light.png">
+  <img src="images/ui-transfer-light.png" alt="English Transfer settings with ordering, batch, readiness, and retry controls.">
+</picture>
+
+- **Upload and Download Order** processes newer or older pending files first.
+- **Batch Interval Seconds** and **Max Batch Size** control upload batching.
+- **File Ready Timeout Seconds** limits how long the app waits for a file to
+  become ready for upload.
+- **Retry Max Attempts** and **Retry Base Delay (ms)** control retries for
+  transient upload failures, such as timeouts or temporary server errors.
+
+These settings apply across folders. Enter positive whole numbers and select
+**Save and Apply** to activate changes. See [Configuration](configuration.md#transfer-order-and-status)
+for ordering details and defaults.
+
+### Logging
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ui-logging-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/ui-logging-light.png">
+  <img src="images/ui-logging-light.png" alt="English Logging settings with log level, File target, log directory, and Use Default.">
+</picture>
+
+**Log Level** controls detail. **Log Target** selects Windows Event Log or files
+on Windows, and Journald or files on Linux. For **File**, set an absolute
+**Log Directory**, or select **Use Default** to restore the standard location.
+**Open Logs** in the footer opens Event Viewer for the Windows Event Log target,
+or the file directory for file logging. On Linux it opens the file directory;
+use the system journal tools to inspect Journald output.
+
+## Save, troubleshoot, and close
+
+Switching pages, tabs, or folders preserves your draft. **Save and Apply** checks
+and saves every folder and global setting, then restarts synchronization.
+Navigation alone does not save or pause synchronization.
+
+If saving fails, read the footer message, correct the indicated field, and retry.
+For connection problems, check **Connection → Permissions**; for transfer errors,
+check **Overview** and **Open Logs**. If Windows reports an unregistered Event Log
+source, logging falls back to files; reinstall through the MSI to register it.
+For detailed settings and paths, see [Configuration](configuration.md).
+
+Closing the window keeps synchronization running in the background. Windows
+provides a tray menu. On Linux, use the launcher to reopen the window and the
+footer's **Quit** button to stop the app; tray availability depends on the desktop
+and packaging. Linux may request permission to run in the background.
+
+## Compatibility
+
+The sidebar layout introduced in 2.10.0 requires no configuration or sync-state
+migration. Selecting pages or folders does not add saved configuration fields.
+Existing filter and deletion values are retained when their controls are hidden.
+Linux shows the host folder path while preserving the portal grant used for file
+access. See [Architecture](architecture.md) for the shared interface model.
+
+## Reproduce the screenshots
+
+The screenshots are offline renders of actual WPF controls, with English sample
+data and no server connection. On Windows, run this from the repository root
+using the SDK selected by `global.json`:
 
 ```powershell
 $env:IFW_UI_PREVIEW_DIRECTORY = Join-Path (Get-Location) 'artifacts/ui-preview'
-dotnet test src/ImmichFolderWatch.Tests/ImmichFolderWatch.Tests.csproj -c Debug --filter FullyQualifiedName~MainWindowBindingTests
-Remove-Item Env:IFW_UI_PREVIEW_DIRECTORY
+try {
+    dotnet test src/ImmichFolderWatch.Tests/ImmichFolderWatch.Tests.csproj -c Debug --filter FullyQualifiedName~MainWindowBindingTests
+} finally {
+    Remove-Item Env:IFW_UI_PREVIEW_DIRECTORY
+}
 ```
 
-Review the generated images before replacing documentation screenshots. A native
-Linux desktop smoke check should additionally exercise two portal-granted
-folders: edit the first, switch to the second and back, remove the selected
-source, and verify that the persisted paths still reference the granted folders.
-Windows rendering and portable tests do not exercise native Linux portal dialogs.
+The generator creates `windows-{theme}-{page}.png`, where `theme` is `light` or
+`dark` and `page` is `overview`, `folders`, `connection`, `settings`, `filters`,
+`advanced`, `transfer`, or `logging`. Review every image before copying it to
+`docs/images/ui-{page}-{theme}.png`. Keep screenshots in English and use only
+synthetic paths, URLs, and credentials. These previews do not verify native Linux
+portal dialogs or a live Immich connection.
+
+<details>
+<summary>Historical implementation validation</summary>
 
 ### 2.10.0 validation
 
@@ -167,3 +274,5 @@ product version identifies commit `8bb5a5d`. Each installer is approximately
 WiX reports WIX1101 for the existing SQLite native DLL's default language metadata;
 there were no installer build errors. Installation/upgrade on a live system and
 ARM64 MSI packaging were not exercised for this change.
+
+</details>

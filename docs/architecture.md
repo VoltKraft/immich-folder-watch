@@ -2,9 +2,10 @@
 
 ## Goals
 
-- Watch local folders for new media files.
-- Upload files through the Immich HTTP API.
-- Keep upload and HTTP behavior isolated from watcher orchestration.
+- Support per-folder upload modes and bidirectional synchronization with Immich.
+- Transfer media, manage album membership, and propagate supported deletion and
+  rename operations through the Immich API.
+- Keep HTTP and realtime API integration isolated from synchronization orchestration.
 - Run as a per-user desktop app (GUI + sync worker in a single process; tray
   support is available on Windows and disabled in the Flatpak package).
 
@@ -20,7 +21,8 @@
   - File-based log provider
   - `InstallationPaths` (per-user `%LOCALAPPDATA%` locations + legacy ProgramData lookup)
 - `ImmichFolderWatch.Immich`
-  - HTTP client implementation for the Immich API
+  - HTTP client for media uploads/downloads, albums, and asset trash operations
+  - Socket.IO notifications that trigger reconciliation of remote changes
   - Retry and transient error handling
 - `ImmichFolderWatch.App`
   - Windows WPF desktop UI (MainWindow, with shared ViewModel)
@@ -68,7 +70,8 @@
 - **Soft server failures.** The server ping is an ongoing background monitor, not a fail-fast startup check — the desktop app stays alive while the Immich server is temporarily offline.
 - **Global transfer priority.** First upload attempts take priority over retries; the configured timestamp order applies within each group before selecting a batch. Each worker iteration processes at most one batch so new filesystem events and remote pulls remain responsive. Pending downloads are sorted per source/album. Source traversal and transfer readiness remain independent of priority; active transfers are never interrupted to reorder files.
 - **Persistent operation progress in the UI.** Sync status retains processed/total counts after an upload cycle or scan of all sync sources finishes, but hides them while inactive. Upload counts span successive batches while the ready queue remains nonempty and are kept separately from intervening downloads; retries after the queue drains start a new cycle. Active transfers and sync errors display the counts. Download totals grow as pending files are discovered per album; empty scans retain previous counts. Only completed attempts count as processed, including failures and skips. Server connectivity errors and sync errors have separate status fields so a successful ping does not hide a failed transfer. Pull errors survive subsequent albums in the same scan and clear after a later complete successful scan.
-- **API uploads only:** no direct writes to Immich storage.
+- **API-only Immich integration:** uploads, downloads, album changes, and asset
+  trash operations use the Immich API; no direct access to Immich storage.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.
 

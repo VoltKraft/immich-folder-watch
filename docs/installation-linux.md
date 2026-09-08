@@ -1,5 +1,8 @@
 # Installation on Linux
 
+The desktop app uploads media from local folders or synchronizes folders and
+albums with Immich, with a separate sync mode and file filters for each source.
+
 The supported Linux packages are the `x86_64` and `aarch64` Flatpak bundles
 attached to future GitHub Releases created by the current workflow. Releases
 through `v2.7.0` are not backfilled. The package runs per user and does not
@@ -33,19 +36,27 @@ The Flathub publication is currently postponed. Do not use
 `flatpak install flathub io.github.voltkraft.immich-folder-watch` unless a future
 release explicitly announces that the listing is available.
 
-## Sandbox behavior
+## First setup
 
-Use **Connection** for the Immich API URL and key, **Folders** for portal-granted
-sources and their selected-folder editor, and **Settings** for application,
-transfer and logging preferences. See the [desktop interface guide](user-interface.md)
-for all controls and the 2.10.0 upgrade notes.
+1. In **Connection**, enter the Immich API URL and key, then select
+   **Verify Immich Access**.
+2. In **Folders**, select **Add Source** and grant access to a local folder.
+   Under **General**, choose an upload mode or bidirectional sync, and review
+   album placement and **File filters**. Bidirectional sync also propagates
+   deletions; read the [desktop interface guide](user-interface.md#general)
+   before selecting it.
+3. Use **Settings** for application, transfer, and logging preferences.
+4. Select **Save and Apply** to validate and save the configuration and start
+   synchronization in the selected modes.
+
+## Sandbox behavior
 
 Folder selection uses the FreeDesktop FileChooser and Documents portals. The
 app can access only folders explicitly granted by the user; it does not receive
 host-wide or home-directory filesystem access.
 
 The package currently uses X11/XWayland and runs without a system tray icon.
-Closing the window hides it while the watcher continues running. Reopen it from
+Closing the window hides it while synchronization continues. Reopen it from
 the app launcher or the desktop's Background Apps view, and use the in-app Quit
 button to stop it completely.
 

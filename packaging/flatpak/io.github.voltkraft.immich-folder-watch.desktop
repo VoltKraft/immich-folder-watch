@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Immich Folder Watch
-GenericName=Folder Watcher
-Comment=Watch folders and upload new media to your Immich server
+GenericName=Media Synchronization
+Comment=Upload media and synchronize local folders with Immich
 Exec=immich-folder-watch %U
 Icon=io.github.voltkraft.immich-folder-watch
 Categories=Graphics;Photography;
