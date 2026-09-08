@@ -9,6 +9,22 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class ImmichAssetClientTests
 {
+    [Theory]
+    [InlineData("\"fileModifiedAt\":\"2026-01-02T03:04:05Z\",\"fileCreatedAt\":\"2025-01-01T00:00:00Z\"")]
+    [InlineData("\"fileModifiedAt\":\"invalid\",\"fileCreatedAt\":\"2026-01-02T03:04:05Z\"")]
+    [InlineData("\"createdAt\":\"2026-01-02T03:04:05Z\"")]
+    public async Task GetAlbumAssetsAsync_ParsesTimestampWithCreationFallback(string timestampJson)
+    {
+        var (client, _) = CreateClient(
+            _ => CreateJsonResponse(HttpStatusCode.OK, "[{\"id\":\"album-1\",\"albumName\":\"Screenshots\"}]"),
+            _ => CreateJsonResponse(HttpStatusCode.OK, "{\"assets\":{\"items\":[{\"id\":\"asset-1\",\"originalFileName\":\"photo.jpg\"," + timestampJson + "}],\"nextPage\":null}}"));
+
+        var result = await client.GetAlbumAssetsAsync("Screenshots", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero), Assert.Single(result.Assets).FileModifiedAt);
+    }
+
     [Fact]
     public async Task UploadAssetAsync_AddsAssetToExistingAlbum()
     {

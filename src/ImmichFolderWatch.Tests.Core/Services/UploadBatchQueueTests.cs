@@ -1,10 +1,41 @@
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class UploadBatchQueueTests
 {
+    [Theory]
+    [InlineData(TransferOrders.NewestFirst, "new.jpg", "old.jpg")]
+    [InlineData(TransferOrders.OldestFirst, "old.jpg", "new.jpg")]
+    public void DequeueBatch_OrdersEntireQueueBeforeApplyingBatchSize(string order, string first, string second)
+    {
+        var directory = Directory.CreateTempSubdirectory("ifw-order-");
+        try
+        {
+            var oldPath = Path.Combine(directory.FullName, "old.jpg");
+            var newPath = Path.Combine(directory.FullName, "new.jpg");
+            File.WriteAllText(oldPath, "old");
+            File.WriteAllText(newPath, "new");
+            File.SetLastWriteTimeUtc(oldPath, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            File.SetLastWriteTimeUtc(newPath, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var queue = new UploadBatchQueue();
+            queue.TryEnqueue(new UploadAssetRequest(Path.Combine(directory.FullName, "missing.jpg"), "Unknown"));
+            queue.TryEnqueue(new UploadAssetRequest(oldPath, "Album A"));
+            queue.TryEnqueue(new UploadAssetRequest(newPath, "Album B"));
+
+            Assert.Equal(first, Path.GetFileName(Assert.Single(queue.DequeueBatch(1, order)).FilePath));
+            Assert.Equal(second, Path.GetFileName(Assert.Single(queue.DequeueBatch(1, order)).FilePath));
+            Assert.Equal("missing.jpg", Path.GetFileName(Assert.Single(queue.DequeueBatch(1, order)).FilePath));
+            Assert.Equal(0, queue.Count);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void TryEnqueue_DeduplicatesByPathWhileQueued()
     {

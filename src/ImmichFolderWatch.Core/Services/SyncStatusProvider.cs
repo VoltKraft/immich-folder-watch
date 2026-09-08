@@ -25,6 +25,14 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     private int _pendingCount;
     private ServerConnectionState _serverConnection = ServerConnectionState.Unknown;
     private string? _lastErrorMessage;
+    private string? _lastServerErrorMessage;
+    private string? _lastSyncErrorMessage;
+    private int _processedFileCount;
+    private int _totalFileCount;
+    private bool _pullCycleInProgress;
+    private bool _pullCycleHasFailure;
+    private bool _pullCycleHasTransfers;
+    private bool _lastSyncErrorWasPull;
     private DateTimeOffset? _lastServerCheckUtc;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -95,13 +103,47 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         private set => SetField(ref _lastServerCheckUtc, value);
     }
 
-    public void ReportBatchStarted(int batchSize)
+    /// <summary>Files attempted (including failures and skips) in the current or most recent transfer operation.</summary>
+    public int ProcessedFileCount
+    {
+        get => _processedFileCount;
+        private set => SetField(ref _processedFileCount, value);
+    }
+
+    /// <summary>Known files in the current or most recent operation; grows as a pull discovers more albums.</summary>
+    public int TotalFileCount
+    {
+        get => _totalFileCount;
+        private set => SetField(ref _totalFileCount, value);
+    }
+
+    public string? LastSyncErrorMessage
+    {
+        get => _lastSyncErrorMessage;
+        private set => SetField(ref _lastSyncErrorMessage, value);
+    }
+
+    public string? LastServerErrorMessage
+    {
+        get => _lastServerErrorMessage;
+        private set => SetField(ref _lastServerErrorMessage, value);
+    }
+
+    /// <summary>Starts an upload batch. Continue progress only for subsequent batches in the same queue flush.</summary>
+    public void ReportBatchStarted(int batchSize, bool continueProgress = false)
     {
         lock (_gate)
         {
             CurrentBatchSize = batchSize;
             UploadedInCurrentBatch = 0;
-            LastErrorMessage = null;
+            if (!continueProgress)
+            {
+                ProcessedFileCount = 0;
+                LastSyncErrorMessage = null;
+                LastErrorMessage = null;
+                _lastSyncErrorWasPull = false;
+            }
+            TotalFileCount = ProcessedFileCount + batchSize;
         }
     }
 
@@ -115,6 +157,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             UploadedInCurrentBatch++;
+            ProcessedFileCount++;
             CurrentlyUploadingFile = null;
             LastSyncCompletedUtc = DateTimeOffset.UtcNow;
         }
@@ -125,7 +168,32 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             CurrentlyUploadingFile = null;
+            ProcessedFileCount++;
+            LastSyncErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? Path.GetFileName(filePath) : errorMessage;
+            LastErrorMessage = LastSyncErrorMessage;
+            _lastSyncErrorWasPull = false;
+        }
+    }
+
+    public void ReportUploadSkipped()
+    {
+        lock (_gate)
+        {
+            ProcessedFileCount++;
+        }
+    }
+
+    /// <summary>Reports an operation-level failure without counting an additional file attempt.</summary>
+    public void ReportSyncFailed(string errorMessage)
+    {
+        lock (_gate)
+        {
+            CurrentlyUploadingFile = null;
+            CurrentlyDownloadingFile = null;
+            LastSyncErrorMessage = errorMessage;
             LastErrorMessage = errorMessage;
+            _lastSyncErrorWasPull = _pullCycleInProgress;
+            _pullCycleHasFailure |= _pullCycleInProgress;
         }
     }
 
@@ -139,13 +207,58 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Begins a scan of all sync sources. Empty scans preserve the most recent file counters.</summary>
+    public void ReportPullCycleStarted()
+    {
+        lock (_gate)
+        {
+            _pullCycleInProgress = true;
+            _pullCycleHasFailure = false;
+            _pullCycleHasTransfers = false;
+        }
+    }
+
+    /// <summary>
+    /// Ends the scan and clears an earlier pull error only after a complete successful scan.
+    /// An empty scan does not clear an upload error or reset file counters.
+    /// </summary>
+    public void ReportPullCycleCompleted(bool completed)
+    {
+        lock (_gate)
+        {
+            if (completed && !_pullCycleHasFailure && _lastSyncErrorWasPull)
+            {
+                LastSyncErrorMessage = null;
+                LastErrorMessage = null;
+                _lastSyncErrorWasPull = false;
+            }
+            _pullCycleInProgress = false;
+        }
+    }
+
+    /// <summary>
+    /// Starts one album's downloads, accumulating progress and retaining errors inside an active pull cycle.
+    /// Without an enclosing cycle, starts a standalone transfer operation.
+    /// </summary>
     public void ReportPullStarted(int pullSize)
     {
         lock (_gate)
         {
             CurrentPullSize = pullSize;
             DownloadedInCurrentPull = 0;
-            LastErrorMessage = null;
+            if (!_pullCycleInProgress || !_pullCycleHasTransfers)
+            {
+                if (!_pullCycleInProgress || !_pullCycleHasFailure)
+                {
+                    LastErrorMessage = null;
+                    LastSyncErrorMessage = null;
+                    _lastSyncErrorWasPull = false;
+                }
+                ProcessedFileCount = 0;
+                TotalFileCount = 0;
+            }
+            TotalFileCount += pullSize;
+            _pullCycleHasTransfers = true;
         }
     }
 
@@ -159,6 +272,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             DownloadedInCurrentPull++;
+            ProcessedFileCount++;
             CurrentlyDownloadingFile = null;
             LastSyncCompletedUtc = DateTimeOffset.UtcNow;
         }
@@ -169,7 +283,11 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             CurrentlyDownloadingFile = null;
-            LastErrorMessage = errorMessage;
+            ProcessedFileCount++;
+            LastSyncErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? Path.GetFileName(filePath) : errorMessage;
+            LastErrorMessage = LastSyncErrorMessage;
+            _lastSyncErrorWasPull = true;
+            _pullCycleHasFailure = true;
         }
     }
 
@@ -194,6 +312,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         {
             ServerConnection = reachable ? ServerConnectionState.Ok : ServerConnectionState.Error;
             LastServerCheckUtc = DateTimeOffset.UtcNow;
+            LastServerErrorMessage = reachable ? null : errorMessage;
             if (!reachable)
             {
                 LastErrorMessage = errorMessage;

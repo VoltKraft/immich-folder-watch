@@ -53,6 +53,15 @@
 - Check write/delete permissions on the watched folder. A deletion failure keeps the verified state and is retried during five-second polling sweeps and after restart without another upload.
 - Local deletion is permanent; the file is not moved to the desktop recycle bin or trash. The corresponding Immich asset is not deleted.
 
+## Placeholder text remains visible after collapsing options (Windows)
+
+Versions before 2.9.1 can leave example text such as `private`, `**/cache`, or
+`Thumbs.db` floating over unrelated settings after collapsing Advanced options
+or scrolling. These are input placeholders, not misplaced configuration values.
+Install 2.9.1 or later. Placeholders are now rendered inside their input controls
+and follow the same visibility and scroll clipping. No configuration changes are
+required.
+
 ## Logs
 
 - Console logs include timestamps and structured fields.

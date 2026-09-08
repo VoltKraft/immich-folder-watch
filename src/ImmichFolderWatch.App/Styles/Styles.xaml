@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:services="clr-namespace:ImmichFolderWatch.App.Services">
 
   <sys:Double x:Key="AppFontSize">14</sys:Double>
 
@@ -169,11 +170,23 @@
                   CornerRadius="8"
                   Padding="{TemplateBinding Padding}"
                   SnapsToDevicePixels="True">
-            <ScrollViewer x:Name="PART_ContentHost"
-                          VerticalAlignment="Center"
-                          Focusable="False" />
+            <Grid ClipToBounds="True">
+              <ScrollViewer x:Name="PART_ContentHost"
+                            VerticalAlignment="Center"
+                            Focusable="False" />
+              <TextBlock x:Name="Watermark"
+                         Text="{TemplateBinding services:WatermarkBehavior.Watermark}"
+                         Foreground="{DynamicResource AppSecondaryText}"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Left"
+                         IsHitTestVisible="False"
+                         Visibility="Collapsed" />
+            </Grid>
           </Border>
           <ControlTemplate.Triggers>
+            <Trigger Property="services:WatermarkBehavior.ShowWatermark" Value="True">
+              <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
+            </Trigger>
             <Trigger Property="IsFocused" Value="True">
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AppTextBoxBorderFocused}" />
             </Trigger>
@@ -205,11 +218,23 @@
                   CornerRadius="8"
                   Padding="{TemplateBinding Padding}"
                   SnapsToDevicePixels="True">
-            <ScrollViewer x:Name="PART_ContentHost"
-                          VerticalAlignment="Center"
-                          Focusable="False" />
+            <Grid ClipToBounds="True">
+              <ScrollViewer x:Name="PART_ContentHost"
+                            VerticalAlignment="Center"
+                            Focusable="False" />
+              <TextBlock x:Name="Watermark"
+                         Text="{TemplateBinding services:WatermarkBehavior.Watermark}"
+                         Foreground="{DynamicResource AppSecondaryText}"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Left"
+                         IsHitTestVisible="False"
+                         Visibility="Collapsed" />
+            </Grid>
           </Border>
           <ControlTemplate.Triggers>
+            <Trigger Property="services:WatermarkBehavior.ShowWatermark" Value="True">
+              <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
+            </Trigger>
             <Trigger Property="IsFocused" Value="True">
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AppTextBoxBorderFocused}" />
             </Trigger>

@@ -59,7 +59,9 @@
   <data name="Status_SyncRunning" xml:space="preserve"><value>Sync running</value></data>
   <data name="Status_Queue" xml:space="preserve"><value>Queue</value></data>
   <data name="Status_NoSyncYet" xml:space="preserve"><value>No sync performed yet.</value></data>
-  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Currently no upload.</value></data>
+  <data name="Status_NoCurrentUpload" xml:space="preserve"><value>Inactive</value></data>
+  <data name="Status_SyncErrorFormat" xml:space="preserve"><value>Sync error: {0}</value></data>
+  <data name="Status_FileProgressFormat" xml:space="preserve"><value>{0} ({1} of {2})</value></data>
   <data name="Status_LastCheckedFormat" xml:space="preserve"><value>Last checked: {0}</value></data>
   <data name="Status_BatchProgressFormat" xml:space="preserve"><value>Batch: {0}/{1}</value></data>
   <data name="Status_UploadingPrefix" xml:space="preserve"><value>Upload: {0}</value></data>
@@ -83,7 +85,7 @@
   <data name="UI_Status" xml:space="preserve"><value>Status</value></data>
   <data name="UI_ServerConnection" xml:space="preserve"><value>Server Connection</value></data>
   <data name="UI_LastSync" xml:space="preserve"><value>Last Sync</value></data>
-  <data name="UI_CurrentSync" xml:space="preserve"><value>Current Sync</value></data>
+  <data name="UI_CurrentSync" xml:space="preserve"><value>Sync Status</value></data>
   <data name="UI_PendingFiles" xml:space="preserve"><value>Pending Files</value></data>
   <data name="UI_Autostart" xml:space="preserve"><value>Autostart</value></data>
   <data name="UI_StartOnLogin" xml:space="preserve"><value>Start on login</value></data>
@@ -101,7 +103,7 @@
   <data name="UI_FolderPath" xml:space="preserve"><value>Folder Path</value></data>
   <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich Album Name</value></data>
   <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leave empty for no album</value></data>
-  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Advanced Watch Options</value></data>
+  <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Advanced Options</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Include subdirectories</value></data>
   <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Permanently delete local files after successful upload</value></data>
   <data name="UI_DeleteAfterUploadDescription" xml:space="preserve"><value>After Immich confirms the upload and album assignment, the local file is permanently deleted. This also removes previously verified uploads whose file has not changed.</value></data>
@@ -109,6 +111,9 @@
   <data name="UI_ExcludedDirectories" xml:space="preserve"><value>Excluded Directories</value></data>
   <data name="UI_ExcludedFileNames" xml:space="preserve"><value>Excluded File Names</value></data>
   <data name="UI_WatchBehavior" xml:space="preserve"><value>Watch Behavior</value></data>
+  <data name="UI_TransferOrder" xml:space="preserve"><value>Upload and Download Order</value></data>
+  <data name="TransferOrder_NewestFirst" xml:space="preserve"><value>Newest files first</value></data>
+  <data name="TransferOrder_OldestFirst" xml:space="preserve"><value>Oldest files first</value></data>
   <data name="UI_BatchIntervalSeconds" xml:space="preserve"><value>Batch Interval Seconds</value></data>
   <data name="UI_MaxBatchSize" xml:space="preserve"><value>Max Batch Size</value></data>
   <data name="UI_FileReadyTimeoutSeconds" xml:space="preserve"><value>File Ready Timeout Seconds</value></data>

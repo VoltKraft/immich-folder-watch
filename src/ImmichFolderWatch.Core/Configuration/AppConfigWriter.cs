@@ -27,6 +27,7 @@ public sealed class AppConfigWriter
             },
             Watch = new WritableWatchSettings
             {
+                TransferOrder = TransferOrders.Normalize(config.Watch.TransferOrder),
                 Sources = (config.Watch.Sources ?? new List<WatchSourceSettings>())
                     .Select(source => new WritableWatchSourceSettings
                     {
@@ -87,6 +88,8 @@ public sealed class AppConfigWriter
     private sealed class WritableWatchSettings
     {
         public List<WritableWatchSourceSettings> Sources { get; set; } = new();
+
+        public string TransferOrder { get; set; } = TransferOrders.NewestFirst;
 
         public int BatchIntervalSeconds { get; set; } = 5;
 

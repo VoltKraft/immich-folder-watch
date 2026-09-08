@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Models;
 
@@ -10,11 +10,22 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
         ? StringComparer.OrdinalIgnoreCase
         : StringComparer.Ordinal;
 
-    private readonly ConcurrentQueue<UploadAssetRequest> _queue = new();
+    private readonly object _gate = new();
 
-    private readonly ConcurrentDictionary<string, byte> _queuedPaths = new(PathComparer);
+    private readonly Dictionary<string, QueuedUpload> _queuedPaths = new(PathComparer);
 
-    public int Count => _queuedPaths.Count;
+    private long _nextSequence;
+
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _queuedPaths.Count;
+            }
+        }
+    }
 
     public bool TryEnqueue(UploadAssetRequest request)
     {
@@ -30,32 +41,54 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
             SourcePath = normalizedSourcePath,
         };
 
-        if (!_queuedPaths.TryAdd(normalizedPath, 0))
+        var timestamp = GetLastWriteTimeUtc(normalizedPath);
+        lock (_gate)
         {
-            return false;
+            return _queuedPaths.TryAdd(normalizedPath, new QueuedUpload(normalizedRequest, timestamp, _nextSequence++));
         }
-
-        _queue.Enqueue(normalizedRequest);
-        return true;
     }
 
-    public IReadOnlyList<UploadAssetRequest> DequeueBatch(int maxBatchSize)
+    public IReadOnlyList<UploadAssetRequest> DequeueBatch(int maxBatchSize, string transferOrder = TransferOrders.NewestFirst)
     {
         if (maxBatchSize <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maxBatchSize), "Batch size must be greater than zero.");
         }
 
-        var batch = new List<UploadAssetRequest>(maxBatchSize);
-
-        while (batch.Count < maxBatchSize && _queue.TryDequeue(out var item))
+        lock (_gate)
         {
-            _queuedPaths.TryRemove(item.FilePath, out _);
-            batch.Add(item);
-        }
+            var datedFirst = _queuedPaths.Values.OrderBy(item => !item.LastWriteTimeUtc.HasValue);
+            var ordered = TransferOrders.Normalize(transferOrder) == TransferOrders.OldestFirst
+                ? datedFirst.ThenBy(item => item.LastWriteTimeUtc)
+                : datedFirst.ThenByDescending(item => item.LastWriteTimeUtc);
+            var batch = ordered.ThenBy(item => item.Sequence)
+                .Take(maxBatchSize)
+                .Select(item => item.Request)
+                .ToList();
+            foreach (var item in batch)
+            {
+                _queuedPaths.Remove(item.FilePath);
+            }
 
-        return batch;
+            return batch;
+        }
     }
+
+    private static DateTime? GetLastWriteTimeUtc(string path)
+    {
+        try
+        {
+            var file = new FileInfo(path);
+            return file.Exists ? file.LastWriteTimeUtc : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            // A disappearing or inaccessible file must not prevent other files from being queued.
+            return null;
+        }
+    }
+
+    private sealed record QueuedUpload(UploadAssetRequest Request, DateTime? LastWriteTimeUtc, long Sequence);
 
     private static string NormalizePath(string path)
     {

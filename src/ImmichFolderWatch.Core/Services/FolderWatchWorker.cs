@@ -775,39 +775,59 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task PullFromImmichAsync(CancellationToken cancellationToken)
     {
-        foreach (var context in _sources)
+        _syncStatusProvider.ReportPullCycleStarted();
+        var completed = false;
+        try
         {
-            if (!context.IsSyncMode)
+            foreach (var context in _sources)
             {
-                continue;
-            }
-
-            var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
-            var pullSucceeded = false;
-            try
-            {
-                if (context.UseFlatAlbum)
+                if (!context.IsSyncMode)
                 {
-                    pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                    continue;
                 }
-                else if (context.UseSubdirsAsAlbums)
-                {
-                    pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
-            }
 
-            if (pullSucceeded && context.RemoteDeleteSafe)
-            {
-                await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                var remoteAssetIds = new HashSet<string>(StringComparer.Ordinal);
+                var pullSucceeded = false;
+                try
+                {
+                    if (context.UseFlatAlbum)
+                    {
+                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                    }
+                    else if (context.UseSubdirsAsAlbums)
+                    {
+                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _syncStatusProvider.ReportSyncFailed(ex.Message);
+                    _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
+                }
+
+                if (pullSucceeded && context.RemoteDeleteSafe)
+                {
+                    await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                }
             }
+            completed = true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _syncStatusProvider.ReportSyncFailed(ex.Message);
+            throw;
+        }
+        finally
+        {
+            _syncStatusProvider.ReportPullCycleCompleted(completed);
         }
     }
 
@@ -895,6 +915,7 @@ public sealed class FolderWatchWorker : BackgroundService
 
         if (!result.IsSuccess)
         {
+            _syncStatusProvider.ReportSyncFailed(result.ErrorMessage ?? "Album sync pull failed.");
             _logger.LogWarning(
                 "Sync pull failed for album '{AlbumName}': {Error}",
                 context.Source.AlbumName,
@@ -935,6 +956,7 @@ public sealed class FolderWatchWorker : BackgroundService
         }
         else
         {
+            _syncStatusProvider.ReportSyncFailed(unassigned.ErrorMessage ?? "Listing unassigned assets failed.");
             _logger.LogWarning(
                 "Listing unassigned assets failed during sync pull: {Error}",
                 unassigned.ErrorMessage ?? "unknown");
@@ -944,6 +966,7 @@ public sealed class FolderWatchWorker : BackgroundService
         var albums = await _immichAssetClient.ListAlbumsAsync(cancellationToken);
         if (!albums.IsSuccess)
         {
+            _syncStatusProvider.ReportSyncFailed(albums.ErrorMessage ?? "Listing albums failed.");
             _logger.LogWarning("Listing albums failed during sync pull: {Error}", albums.ErrorMessage ?? "unknown");
             return false;
         }
@@ -980,6 +1003,7 @@ public sealed class FolderWatchWorker : BackgroundService
             {
                 if (!albumResult.AlbumMissing)
                 {
+                    _syncStatusProvider.ReportSyncFailed(albumResult.ErrorMessage ?? "Album sync pull failed.");
                     _logger.LogWarning(
                         "Sync pull failed for album '{AlbumName}': {Error}",
                         album.Name,
@@ -1110,7 +1134,11 @@ public sealed class FolderWatchWorker : BackgroundService
         try
         {
             var downloadedCount = 0;
-            foreach (var (asset, destinationPath) in pending)
+            var datedFirst = pending.OrderBy(item => !item.Asset.FileModifiedAt.HasValue);
+            var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
+                ? datedFirst.ThenBy(item => item.Asset.FileModifiedAt)
+                : datedFirst.ThenByDescending(item => item.Asset.FileModifiedAt);
+            foreach (var (asset, destinationPath) in ordered)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -1147,6 +1175,15 @@ public sealed class FolderWatchWorker : BackgroundService
                             asset.Id,
                             download.ErrorMessage ?? "download completed without a readable destination file");
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _syncStatusProvider.ReportDownloadFailed(destinationPath, ex.Message);
+                    _logger.LogWarning(ex, "Downloading asset {AssetId} failed.", asset.Id);
                 }
                 finally
                 {
@@ -1756,95 +1793,113 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task FlushUploadsAsync(CancellationToken cancellationToken)
     {
+        var continueProgress = false;
         while (true)
         {
-            var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize);
+            var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize, _config.Watch.TransferOrder);
             if (batch.Count == 0)
             {
                 return;
             }
 
             _logger.LogInformation("Uploading batch with {Count} file(s).", batch.Count);
-            _syncStatusProvider.ReportBatchStarted(batch.Count);
+            _syncStatusProvider.ReportBatchStarted(batch.Count + _uploadBatchQueue.Count, continueProgress);
+            continueProgress = true;
 
-            foreach (var request in batch)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!File.Exists(request.FilePath))
+                foreach (var request in batch)
                 {
-                    _logger.LogWarning("Skipping upload because file no longer exists: {FilePath}", request.FilePath);
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                var context = FindSourceContext(request.SourcePath, request.FilePath);
-                if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
-                {
-                    _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
-                    continue;
-                }
+                    if (!File.Exists(request.FilePath))
+                    {
+                        _logger.LogWarning("Skipping upload because file no longer exists: {FilePath}", request.FilePath);
+                        _syncStatusProvider.ReportUploadSkipped();
+                        continue;
+                    }
 
-                _syncStatusProvider.ReportUploadStarted(request.FilePath);
-                var result = await _immichAssetClient.UploadAssetAsync(request, cancellationToken);
-                if (result.IsSuccess)
-                {
-                    _logger.LogInformation(
-                        "Upload succeeded for {FilePath} (Album: {AlbumName}, AssetId: {AssetId}).",
-                        request.FilePath,
-                        request.AlbumName,
-                        result.AssetId ?? "n/a");
+                    var context = FindSourceContext(request.SourcePath, request.FilePath);
+                    if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
+                    {
+                        _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
+                        _syncStatusProvider.ReportUploadSkipped();
+                        continue;
+                    }
 
-                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
-                        || currentFingerprint != uploadedFingerprint)
+                    _syncStatusProvider.ReportUploadStarted(request.FilePath);
+                    var result = await _immichAssetClient.UploadAssetAsync(request, cancellationToken);
+                    if (result.IsSuccess)
                     {
                         _logger.LogInformation(
-                            "File changed while it was being uploaded and will be queued again: {FilePath}",
-                            request.FilePath);
-                        OnFileEvent(context, request.FilePath);
+                            "Upload succeeded for {FilePath} (Album: {AlbumName}, AssetId: {AssetId}).",
+                            request.FilePath,
+                            request.AlbumName,
+                            result.AssetId ?? "n/a");
+
+                        if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
+                            || currentFingerprint != uploadedFingerprint)
+                        {
+                            _logger.LogInformation(
+                                "File changed while it was being uploaded and will be queued again: {FilePath}",
+                                request.FilePath);
+                            OnFileEvent(context, request.FilePath);
+                        }
+                        else
+                        {
+                            var normalizedPath = NormalizePath(request.FilePath);
+                            var entry = CreateSynchronizedEntry(
+                                context,
+                                normalizedPath,
+                                result.AssetId,
+                                request.AlbumName,
+                                currentFingerprint,
+                                SyncTransferDirection.Upload);
+                            await _syncStateStore.UpsertAsync(entry, cancellationToken);
+                            _stateByPath[normalizedPath] = entry;
+                            if (!string.IsNullOrWhiteSpace(result.AssetId))
+                            {
+                                _pathToAssetId[normalizedPath] = result.AssetId!;
+                            }
+
+                            await TryDeleteVerifiedLocalFileAsync(
+                                context,
+                                normalizedPath,
+                                entry,
+                                cancellationToken);
+                        }
+
+                        _syncStatusProvider.ReportUploadCompleted(request.FilePath);
+                        _syncStatusProvider.ReportServerReachable(true);
                     }
                     else
                     {
-                        var normalizedPath = NormalizePath(request.FilePath);
-                        var entry = CreateSynchronizedEntry(
-                            context,
-                            normalizedPath,
-                            result.AssetId,
+                        _logger.LogError(
+                            "Upload failed for {FilePath} (Album: {AlbumName}). StatusCode={StatusCode}; Error={Error}",
+                            request.FilePath,
                             request.AlbumName,
-                            currentFingerprint,
-                            SyncTransferDirection.Upload);
-                        await _syncStateStore.UpsertAsync(entry, cancellationToken);
-                        _stateByPath[normalizedPath] = entry;
-                        if (!string.IsNullOrWhiteSpace(result.AssetId))
-                        {
-                            _pathToAssetId[normalizedPath] = result.AssetId!;
-                        }
-
-                        await TryDeleteVerifiedLocalFileAsync(
-                            context,
-                            normalizedPath,
-                            entry,
-                            cancellationToken);
+                            result.StatusCode.HasValue
+                                ? ((int)result.StatusCode.Value).ToString(CultureInfo.InvariantCulture)
+                                : "n/a",
+                            result.ErrorMessage ?? "unknown error");
+                        _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
+                        OnFileEvent(context, request.FilePath);
                     }
-
-                    _syncStatusProvider.ReportUploadCompleted(request.FilePath);
-                    _syncStatusProvider.ReportServerReachable(true);
-                }
-                else
-                {
-                    _logger.LogError(
-                        "Upload failed for {FilePath} (Album: {AlbumName}). StatusCode={StatusCode}; Error={Error}",
-                        request.FilePath,
-                        request.AlbumName,
-                        result.StatusCode.HasValue
-                            ? ((int)result.StatusCode.Value).ToString(CultureInfo.InvariantCulture)
-                            : "n/a",
-                        result.ErrorMessage ?? "unknown error");
-                    _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
-                    OnFileEvent(context, request.FilePath);
                 }
             }
-
-            _syncStatusProvider.ReportBatchCompleted();
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _syncStatusProvider.ReportSyncFailed(ex.Message);
+                throw;
+            }
+            finally
+            {
+                _syncStatusProvider.ReportBatchCompleted();
+            }
         }
     }
 

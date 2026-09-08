@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-09-08
+
+### Fixed
+- Kept input placeholders inside their controls so collapsing Advanced options, hiding fields, or scrolling cannot leave floating placeholder text over other settings. (Windows)
+
+## [2.9.0] - 2026-09-08
+
+### Added
+- Added a global transfer-order setting for uploads and downloads, with newest files first by default and an oldest-first alternative.
+
+### Changed
+- Moved local deletion after upload into each source's renamed Advanced options section on Windows and Linux.
+- Collapsed permission details by default while retaining the overall result in the expander heading. The heading shows OK only when every listed permission passes.
+- Replaced Current sync and the separate pending-file count with Sync status. Inactivity is shown without file counts; active files and sync errors show processed and total file counts. Progress continues across upload batches in the same queue flush.
+
+### Fixed
+- Kept transfer errors separate from server connectivity details so a successful server check cannot hide a sync failure.
+- Retained download errors across albums in the same scan and cleared recovered pull errors after a successful later scan, including scans with no pending downloads.
+- Restored missing sync-mode and log-target labels and corrected the read-only Windows update-notice binding discovered during UI validation.
+
 ## [2.8.0] - 2026-09-04
 
 ### Added

@@ -112,7 +112,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _serverConnectionDetail = string.Empty;
     private string _lastSyncText = string.Empty;
     private string _currentUploadText = string.Empty;
-    private string _pendingCountText = "0";
+    private string _selectedTransferOrder = TransferOrders.NewestFirst;
     private bool _autostartEnabled;
     private string _productVersionText = string.Empty;
     private bool _isUpdateAvailable;
@@ -157,6 +157,7 @@ public sealed class MainWindowViewModel : BindableBase
 
         RefreshSyncModeOptions();
         RefreshLogTargetOptions();
+        RefreshTransferOrderOptions();
 
         AddSource();
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
@@ -384,10 +385,18 @@ public sealed class MainWindowViewModel : BindableBase
         set => SetProperty(ref _currentUploadText, value);
     }
 
-    public string PendingCountText
+    public ObservableCollection<TransferOrderOption> AvailableTransferOrders { get; } = new();
+
+    public string SelectedTransferOrder
     {
-        get => _pendingCountText;
-        set => SetProperty(ref _pendingCountText, value);
+        get => _selectedTransferOrder;
+        set
+        {
+            if (value is not null)
+            {
+                SetProperty(ref _selectedTransferOrder, TransferOrders.Normalize(value));
+            }
+        }
     }
 
     public bool AutostartEnabled
@@ -516,6 +525,7 @@ public sealed class MainWindowViewModel : BindableBase
 
         ImmichServerApiUrl = config.Immich.ServerApiUrl;
         ImmichApiKey = config.Immich.ApiKey;
+        SelectedTransferOrder = config.Watch.TransferOrder;
         BatchIntervalSeconds = config.Watch.BatchIntervalSeconds.ToString();
         MaxBatchSize = config.Watch.MaxBatchSize.ToString();
         FileReadyTimeoutSeconds = config.Watch.FileReadyTimeoutSeconds.ToString();
@@ -616,6 +626,7 @@ public sealed class MainWindowViewModel : BindableBase
             },
             Watch = new WatchSettings
             {
+                TransferOrder = SelectedTransferOrder,
                 Sources = Sources.Select(source => new WatchSourceSettings
                 {
                     Path = source.Path.Trim(),
@@ -716,7 +727,13 @@ public sealed class MainWindowViewModel : BindableBase
 
         SetImmichUrlStatus(result.UrlState);
         SetImmichApiKeyStatus(result.ApiKeyState);
-        SetImmichPermissionsStatus(result.PermissionsState);
+        var permissionState = result.PermissionsState;
+        if (permissionState == CheckState.Passed
+            && (result.PermissionResults.Count == 0 || result.PermissionResults.Any(item => item.State != CheckState.Passed)))
+        {
+            permissionState = result.PermissionResults.Count == 0 ? CheckState.NotChecked : CheckState.Warning;
+        }
+        SetImmichPermissionsStatus(permissionState);
 
         RefreshPermissionStatuses(CreatePermissionItems(result.PermissionResults));
     }
@@ -809,6 +826,7 @@ public sealed class MainWindowViewModel : BindableBase
 
         RefreshSyncModeOptions();
         RefreshLogTargetOptions();
+        RefreshTransferOrderOptions();
 
         _suppressLanguageWrite = true;
         try
@@ -893,9 +911,9 @@ public sealed class MainWindowViewModel : BindableBase
         ServerConnectionTone = StatusToneMapper.FromServerConnection(_syncStatusProvider.ServerConnection);
 
         if (_syncStatusProvider.ServerConnection == ServerConnectionState.Error
-            && !string.IsNullOrWhiteSpace(_syncStatusProvider.LastErrorMessage))
+            && !string.IsNullOrWhiteSpace(_syncStatusProvider.LastServerErrorMessage))
         {
-            ServerConnectionDetail = _syncStatusProvider.LastErrorMessage!;
+            ServerConnectionDetail = _syncStatusProvider.LastServerErrorMessage!;
         }
         else if (_syncStatusProvider.LastServerCheckUtc.HasValue)
         {
@@ -912,46 +930,33 @@ public sealed class MainWindowViewModel : BindableBase
                 .ToString("dd.MM.yyyy HH:mm:ss", _localizationService.CurrentCulture)
             : Strings.Status_NoSyncYet;
 
+        string activity;
+        var showProgress = true;
         if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyUploadingFile))
         {
             var fileName = Path.GetFileName(_syncStatusProvider.CurrentlyUploadingFile);
-            var prefixed = string.Format(_localizationService.CurrentCulture, Strings.Status_UploadingPrefix, fileName);
-            if (_syncStatusProvider.CurrentBatchSize > 0)
-            {
-                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.UploadedInCurrentBatch + 1}/{_syncStatusProvider.CurrentBatchSize})";
-            }
-            else
-            {
-                CurrentUploadText = prefixed;
-            }
+            activity = string.Format(_localizationService.CurrentCulture, Strings.Status_UploadingPrefix, fileName);
         }
         else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.CurrentlyDownloadingFile))
         {
             var fileName = Path.GetFileName(_syncStatusProvider.CurrentlyDownloadingFile);
-            var prefixed = string.Format(_localizationService.CurrentCulture, Strings.Status_DownloadingPrefix, fileName);
-            if (_syncStatusProvider.CurrentPullSize > 0)
-            {
-                CurrentUploadText = $"{prefixed} ({_syncStatusProvider.DownloadedInCurrentPull + 1}/{_syncStatusProvider.CurrentPullSize})";
-            }
-            else
-            {
-                CurrentUploadText = prefixed;
-            }
+            activity = string.Format(_localizationService.CurrentCulture, Strings.Status_DownloadingPrefix, fileName);
         }
-        else if (_syncStatusProvider.CurrentBatchSize > 0)
+        else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.LastSyncErrorMessage))
         {
-            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_BatchProgressFormat, _syncStatusProvider.UploadedInCurrentBatch, _syncStatusProvider.CurrentBatchSize);
-        }
-        else if (_syncStatusProvider.CurrentPullSize > 0)
-        {
-            CurrentUploadText = string.Format(_localizationService.CurrentCulture, Strings.Status_PullProgressFormat, _syncStatusProvider.DownloadedInCurrentPull, _syncStatusProvider.CurrentPullSize);
+            activity = string.Format(_localizationService.CurrentCulture, Localized("Status_SyncErrorFormat"),
+                _syncStatusProvider.LastSyncErrorMessage);
         }
         else
         {
-            CurrentUploadText = Strings.Status_NoCurrentUpload;
+            activity = Strings.Status_NoCurrentUpload;
+            showProgress = false;
         }
 
-        PendingCountText = _syncStatusProvider.PendingCount.ToString(_localizationService.CurrentCulture);
+        CurrentUploadText = showProgress
+            ? string.Format(_localizationService.CurrentCulture, Localized("Status_FileProgressFormat"),
+                activity, _syncStatusProvider.ProcessedFileCount, _syncStatusProvider.TotalFileCount)
+            : activity;
 
         if (_syncStatusProvider.ServerConnection == ServerConnectionState.Error)
         {
@@ -965,6 +970,11 @@ public sealed class MainWindowViewModel : BindableBase
         {
             SyncStatusBadgeText = Strings.Status_SyncRunning;
             SyncStatusBadgeTone = StatusTone.Info;
+        }
+        else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.LastSyncErrorMessage))
+        {
+            SyncStatusBadgeText = Strings.Server_Error;
+            SyncStatusBadgeTone = StatusTone.Error;
         }
         else if (_syncStatusProvider.PendingCount > 0)
         {
@@ -1154,6 +1164,18 @@ public sealed class MainWindowViewModel : BindableBase
         {
             source.RaiseSyncModeChangedForBindingRefresh();
         }
+    }
+
+    private static string Localized(string key) => Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
+
+    private void RefreshTransferOrderOptions()
+    {
+        var selected = SelectedTransferOrder;
+        AvailableTransferOrders.Clear();
+        AvailableTransferOrders.Add(new TransferOrderOption(TransferOrders.NewestFirst, Localized("TransferOrder_NewestFirst")));
+        AvailableTransferOrders.Add(new TransferOrderOption(TransferOrders.OldestFirst, Localized("TransferOrder_OldestFirst")));
+        SelectedTransferOrder = selected;
+        RaisePropertyChanged(nameof(SelectedTransferOrder));
     }
 
     private void RefreshLogTargetOptions()

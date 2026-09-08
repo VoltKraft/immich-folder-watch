@@ -83,16 +83,9 @@
   </branding>
 
   <releases>
-    <release version="2.8.0" date="2026-09-04">
+    <release version="2.9.1" date="2026-09-08">
       <description>
-        <p>Added:</p>
-        <ul>
-          <li>Added a best-effort startup update check that links to a newer stable GitHub release from the version display without interrupting application startup when the check fails.</li>
-        </ul>
-        <p>Changed:</p>
-        <ul>
-          <li>GitHub releases now publish x64 and ARM64 Windows MSIs and Linux Flatpak bundles atomically from the same commit, and WinGet submissions include both Windows architectures. Linux distribution uses the GitHub sideload bundles while Flathub publication remains postponed.</li>
-        </ul>
+        <p>Fixed:</p>
       </description>
     </release>
   </releases>
