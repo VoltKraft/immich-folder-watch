@@ -57,7 +57,9 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
 
         lock (_gate)
         {
-            var datedFirst = _queuedPaths.Values.OrderBy(item => !item.LastWriteTimeUtc.HasValue);
+            var datedFirst = _queuedPaths.Values
+                .OrderBy(item => item.Request.Attempt > 1)
+                .ThenBy(item => !item.LastWriteTimeUtc.HasValue);
             var ordered = TransferOrders.Normalize(transferOrder) == TransferOrders.OldestFirst
                 ? datedFirst.ThenBy(item => item.LastWriteTimeUtc)
                 : datedFirst.ThenByDescending(item => item.LastWriteTimeUtc);

@@ -114,7 +114,8 @@ The global **Transfer order** setting applies to every source and both transfer
 directions. `watch.transferOrder` accepts `newestFirst` (the default) or
 `oldestFirst`; empty or unrecognized values fall back to `newestFirst`.
 Uploads use the local UTC last-modified time sampled when queued and are ordered
-across ready queued files before selecting a batch. Downloads are ordered within
+across ready queued files before selecting a batch. First attempts take priority
+over retries; the selected timestamp order applies within each group. Downloads are ordered within
 each source/album pull by the server's `fileModifiedAt`, falling back to
 `fileCreatedAt` and then `createdAt`. Files with no timestamp come last;
 equal timestamps retain queue/API order.
@@ -137,7 +138,9 @@ inspect individual results.
 **Sync status** shows **Inactive** without file counts, or the file being
 uploaded/downloaded or last sync error followed by `(processed of total)`. Processed files include
 successful, failed, and skipped attempts; an active file is not counted until its
-attempt finishes. Upload progress spans the batches of one queue flush; download
+attempt finishes. Upload progress spans successive batches while the ready queue
+remains nonempty; retries becoming ready after the queue drains start a new cycle.
+Downloads between upload batches do not reset the saved upload counters. Download
 progress spans one scan of all sync sources, with the total growing as pending
 files are discovered in each album. Counts remain available after completion but
 are hidden while inactive. They reset when the next transfer operation starts;
@@ -151,6 +154,7 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - File extensions are case-insensitive.
 - Each source has its own `extensions` include list.
 - Extensions without `.` are normalized automatically.
+- `retry.maxAttempts` applies only to transient upload failures such as network errors, timeouts, rate limiting, and temporary server errors. Retries are delayed and placed behind newly detected files; permanent HTTP errors are not retried unless the file changes. `uploadAll` and `sync` sources can also retry during a later startup reconciliation.
 - `watch.sources[].excludeDirectories` and `watch.sources[].excludeFileNames` use case-insensitive glob patterns.
 - `excludeDirectories` are matched against the directory path relative to the source root. Use patterns like `private` or `**/cache`.
 - `excludeFileNames` are matched against the file name only. Use patterns like `Thumbs.db` or `*.tmp`.

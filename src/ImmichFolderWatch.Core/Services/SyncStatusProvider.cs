@@ -18,6 +18,9 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     private DateTimeOffset? _lastSyncCompletedUtc;
     private string? _currentlyUploadingFile;
     private int _uploadedInCurrentBatch;
+    private int _processedInCurrentBatch;
+    private int _processedInUploadCycle;
+    private string? _uploadCycleError;
     private int _currentBatchSize;
     private string? _currentlyDownloadingFile;
     private int _downloadedInCurrentPull;
@@ -53,6 +56,12 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         get => _uploadedInCurrentBatch;
         private set => SetField(ref _uploadedInCurrentBatch, value);
+    }
+
+    public int ProcessedInCurrentBatch
+    {
+        get => _processedInCurrentBatch;
+        private set => SetField(ref _processedInCurrentBatch, value);
     }
 
     public int CurrentBatchSize
@@ -129,20 +138,25 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         private set => SetField(ref _lastServerErrorMessage, value);
     }
 
-    /// <summary>Starts an upload batch. Continue progress only for subsequent batches in the same queue flush.</summary>
+    /// <summary>Starts an upload batch. Continue progress while the ready upload queue remains nonempty, including across loop iterations.</summary>
     public void ReportBatchStarted(int batchSize, bool continueProgress = false)
     {
         lock (_gate)
         {
             CurrentBatchSize = batchSize;
             UploadedInCurrentBatch = 0;
+            ProcessedInCurrentBatch = 0;
             if (!continueProgress)
             {
-                ProcessedFileCount = 0;
-                LastSyncErrorMessage = null;
-                LastErrorMessage = null;
-                _lastSyncErrorWasPull = false;
+                _processedInUploadCycle = 0;
+                _uploadCycleError = null;
             }
+            // A pull can run between upload batches. Restore this upload operation's
+            // counters and error instead of continuing from the intervening pull.
+            ProcessedFileCount = _processedInUploadCycle;
+            LastSyncErrorMessage = _uploadCycleError;
+            LastErrorMessage = _uploadCycleError;
+            _lastSyncErrorWasPull = false;
             TotalFileCount = ProcessedFileCount + batchSize;
         }
     }
@@ -157,7 +171,8 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             UploadedInCurrentBatch++;
-            ProcessedFileCount++;
+            ProcessedInCurrentBatch++;
+            ProcessedFileCount = ++_processedInUploadCycle;
             CurrentlyUploadingFile = null;
             LastSyncCompletedUtc = DateTimeOffset.UtcNow;
         }
@@ -168,10 +183,12 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         lock (_gate)
         {
             CurrentlyUploadingFile = null;
-            ProcessedFileCount++;
+            ProcessedInCurrentBatch++;
+            ProcessedFileCount = ++_processedInUploadCycle;
             LastSyncErrorMessage = string.IsNullOrWhiteSpace(errorMessage) ? Path.GetFileName(filePath) : errorMessage;
             LastErrorMessage = LastSyncErrorMessage;
             _lastSyncErrorWasPull = false;
+            _uploadCycleError = LastSyncErrorMessage;
         }
     }
 
@@ -179,7 +196,9 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     {
         lock (_gate)
         {
-            ProcessedFileCount++;
+            ProcessedInCurrentBatch++;
+            ProcessedFileCount = ++_processedInUploadCycle;
+            CurrentlyUploadingFile = null;
         }
     }
 
@@ -194,6 +213,10 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
             LastErrorMessage = errorMessage;
             _lastSyncErrorWasPull = _pullCycleInProgress;
             _pullCycleHasFailure |= _pullCycleInProgress;
+            if (!_pullCycleInProgress)
+            {
+                _uploadCycleError = errorMessage;
+            }
         }
     }
 
@@ -203,6 +226,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
         {
             CurrentBatchSize = 0;
             UploadedInCurrentBatch = 0;
+            ProcessedInCurrentBatch = 0;
             CurrentlyUploadingFile = null;
         }
     }

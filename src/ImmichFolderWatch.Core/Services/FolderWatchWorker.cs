@@ -20,6 +20,8 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(750);
 
+    private static readonly TimeSpan MaxUploadRetryDelay = TimeSpan.FromSeconds(30);
+
     private static readonly TimeSpan AlbumPullInterval = TimeSpan.FromSeconds(10);
 
     // Periodic polling sweep alongside FileSystemWatcher. FSW is reliable
@@ -62,7 +64,11 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private volatile int _pullRequested;
 
+    private bool _continueUploadProgress;
+
     private readonly ConcurrentDictionary<string, PendingFile> _debouncedFiles = new(PathComparer);
+
+    private readonly ConcurrentDictionary<string, PendingUploadRetry> _pendingUploadRetries = new(PathComparer);
 
     private readonly ConcurrentDictionary<string, string> _pathToAssetId = new(PathComparer);
 
@@ -184,14 +190,18 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
 
                 await PromoteDebouncedFilesAsync(stoppingToken);
-                _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+                PromoteUploadRetries(includeNotYetEligible: false);
+                _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
 
                 var batchDue = DateTimeOffset.UtcNow - lastFlush >= _batchInterval;
                 if (_uploadBatchQueue.Count >= _config.Watch.MaxBatchSize || batchDue)
                 {
                     await FlushUploadsAsync(stoppingToken);
-                    lastFlush = DateTimeOffset.UtcNow;
-                    _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+                    if (_uploadBatchQueue.Count == 0)
+                    {
+                        lastFlush = DateTimeOffset.UtcNow;
+                    }
+                    _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
                 }
 
                 var pullRequested = Interlocked.Exchange(ref _pullRequested, 0) == 1;
@@ -232,11 +242,17 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
             }
 
-            _logger.LogInformation("Flushing pending uploads before shutdown.");
-            await PromoteDebouncedFilesAsync(CancellationToken.None);
-            await FlushUploadsAsync(CancellationToken.None);
-            _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
             DisposeWatchers();
+            _logger.LogInformation("Flushing pending uploads before shutdown.");
+            await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
+            PromoteUploadRetries(includeNotYetEligible: true);
+            while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+            {
+                await FlushUploadsAsync(CancellationToken.None);
+                await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
+                PromoteUploadRetries(includeNotYetEligible: true);
+            }
+            _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
         }
     }
 
@@ -649,7 +665,7 @@ public sealed class FolderWatchWorker : BackgroundService
                 context.Source.Path);
         }
 
-        _syncStatusProvider.ReportPendingCount(_uploadBatchQueue.Count);
+        _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
     }
 
     private async Task<bool> ReconcileAlbumAsync(
@@ -1246,6 +1262,8 @@ public sealed class FolderWatchWorker : BackgroundService
         var albumName = GetEffectiveAlbum(context, normalizedPath);
         var timestamp = DateTimeOffset.UtcNow;
 
+        _pendingUploadRetries.TryRemove(normalizedPath, out _);
+
         _debouncedFiles.AddOrUpdate(
             normalizedPath,
             _ => new PendingFile(albumName, context.NormalizedRoot, timestamp),
@@ -1734,21 +1752,33 @@ public sealed class FolderWatchWorker : BackgroundService
         return true;
     }
 
-    private async Task PromoteDebouncedFilesAsync(CancellationToken cancellationToken)
+    private async Task PromoteDebouncedFilesAsync(
+        CancellationToken cancellationToken,
+        bool includeNotYetMatured = false)
     {
         var now = DateTimeOffset.UtcNow;
-        var maturedPaths = _debouncedFiles
-            .Where(pair => now - pair.Value.LastEventUtc >= DebounceDelay)
-            .Select(pair => pair.Key)
+        var maturedFiles = _debouncedFiles
+            .Where(pair => includeNotYetMatured || now - pair.Value.LastEventUtc >= DebounceDelay)
+            .OrderBy(pair => pair.Value.LastEventUtc)
             .ToList();
 
-        foreach (var path in maturedPaths)
+        foreach (var matured in maturedFiles)
         {
-            if (!_debouncedFiles.TryRemove(path, out var pendingFile))
+            if (!_debouncedFiles.TryRemove(matured.Key, out var pendingFile))
             {
                 continue;
             }
 
+            if (pendingFile != matured.Value)
+            {
+                _debouncedFiles.AddOrUpdate(
+                    matured.Key,
+                    pendingFile,
+                    (_, current) => current.LastEventUtc >= pendingFile.LastEventUtc ? current : pendingFile);
+                continue;
+            }
+
+            var path = matured.Key;
             if (!File.Exists(path))
             {
                 _logger.LogDebug("Skipping missing file {FilePath}.", path);
@@ -1763,9 +1793,15 @@ public sealed class FolderWatchWorker : BackgroundService
                     _config.Watch.FileReadyTimeoutSeconds,
                     path);
                 var context = FindSourceContext(pendingFile.SourcePath, path);
-                if (context is not null)
+                if (context is not null && !includeNotYetMatured)
                 {
                     OnFileEvent(context, path);
+                }
+                else if (includeNotYetMatured)
+                {
+                    _logger.LogWarning(
+                        "Leaving unready file on disk because it could not be flushed during shutdown: {FilePath}",
+                        path);
                 }
                 continue;
             }
@@ -1778,6 +1814,7 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
+            _pendingUploadRetries.TryRemove(path, out _);
             var queued = _uploadBatchQueue.TryEnqueue(
                 new UploadAssetRequest(path, pendingFile.AlbumName, pendingFile.SourcePath));
             if (queued)
@@ -1793,114 +1830,203 @@ public sealed class FolderWatchWorker : BackgroundService
 
     private async Task FlushUploadsAsync(CancellationToken cancellationToken)
     {
-        var continueProgress = false;
-        while (true)
+        var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize, _config.Watch.TransferOrder);
+        if (batch.Count == 0)
         {
-            var batch = _uploadBatchQueue.DequeueBatch(_config.Watch.MaxBatchSize, _config.Watch.TransferOrder);
-            if (batch.Count == 0)
-            {
-                return;
-            }
+            return;
+        }
 
-            _logger.LogInformation("Uploading batch with {Count} file(s).", batch.Count);
-            _syncStatusProvider.ReportBatchStarted(batch.Count + _uploadBatchQueue.Count, continueProgress);
-            continueProgress = true;
+        _logger.LogInformation("Uploading batch with {Count} file(s).", batch.Count);
+        _syncStatusProvider.ReportBatchStarted(batch.Count + _uploadBatchQueue.Count, _continueUploadProgress);
+        var requestIndex = 0;
 
-            try
+        try
+        {
+            for (; requestIndex < batch.Count; requestIndex++)
             {
-                foreach (var request in batch)
+                var request = batch[requestIndex];
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!File.Exists(request.FilePath))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    _logger.LogWarning("Skipping upload because file no longer exists: {FilePath}", request.FilePath);
+                    _syncStatusProvider.ReportUploadSkipped();
+                    continue;
+                }
 
-                    if (!File.Exists(request.FilePath))
-                    {
-                        _logger.LogWarning("Skipping upload because file no longer exists: {FilePath}", request.FilePath);
-                        _syncStatusProvider.ReportUploadSkipped();
-                        continue;
-                    }
+                var context = FindSourceContext(request.SourcePath, request.FilePath);
+                if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
+                {
+                    _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
+                    _syncStatusProvider.ReportUploadSkipped();
+                    continue;
+                }
 
-                    var context = FindSourceContext(request.SourcePath, request.FilePath);
-                    if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
-                    {
-                        _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
-                        _syncStatusProvider.ReportUploadSkipped();
-                        continue;
-                    }
+                _syncStatusProvider.ReportUploadStarted(request.FilePath);
+                var result = await _immichAssetClient.UploadAssetAttemptAsync(request, cancellationToken);
+                if (result.IsSuccess)
+                {
+                    _logger.LogInformation(
+                        "Upload succeeded for {FilePath} (Album: {AlbumName}, AssetId: {AssetId}).",
+                        request.FilePath,
+                        request.AlbumName,
+                        result.AssetId ?? "n/a");
 
-                    _syncStatusProvider.ReportUploadStarted(request.FilePath);
-                    var result = await _immichAssetClient.UploadAssetAsync(request, cancellationToken);
-                    if (result.IsSuccess)
+                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
+                        || currentFingerprint != uploadedFingerprint)
                     {
                         _logger.LogInformation(
-                            "Upload succeeded for {FilePath} (Album: {AlbumName}, AssetId: {AssetId}).",
-                            request.FilePath,
-                            request.AlbumName,
-                            result.AssetId ?? "n/a");
-
-                        if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
-                            || currentFingerprint != uploadedFingerprint)
-                        {
-                            _logger.LogInformation(
-                                "File changed while it was being uploaded and will be queued again: {FilePath}",
-                                request.FilePath);
-                            OnFileEvent(context, request.FilePath);
-                        }
-                        else
-                        {
-                            var normalizedPath = NormalizePath(request.FilePath);
-                            var entry = CreateSynchronizedEntry(
-                                context,
-                                normalizedPath,
-                                result.AssetId,
-                                request.AlbumName,
-                                currentFingerprint,
-                                SyncTransferDirection.Upload);
-                            await _syncStateStore.UpsertAsync(entry, cancellationToken);
-                            _stateByPath[normalizedPath] = entry;
-                            if (!string.IsNullOrWhiteSpace(result.AssetId))
-                            {
-                                _pathToAssetId[normalizedPath] = result.AssetId!;
-                            }
-
-                            await TryDeleteVerifiedLocalFileAsync(
-                                context,
-                                normalizedPath,
-                                entry,
-                                cancellationToken);
-                        }
-
-                        _syncStatusProvider.ReportUploadCompleted(request.FilePath);
-                        _syncStatusProvider.ReportServerReachable(true);
+                            "File changed while it was being uploaded and will be queued again: {FilePath}",
+                            request.FilePath);
+                        OnFileEvent(context, request.FilePath);
                     }
                     else
                     {
-                        _logger.LogError(
-                            "Upload failed for {FilePath} (Album: {AlbumName}). StatusCode={StatusCode}; Error={Error}",
-                            request.FilePath,
+                        var normalizedPath = NormalizePath(request.FilePath);
+                        var entry = CreateSynchronizedEntry(
+                            context,
+                            normalizedPath,
+                            result.AssetId,
                             request.AlbumName,
+                            currentFingerprint,
+                            SyncTransferDirection.Upload);
+                        await _syncStateStore.UpsertAsync(entry, cancellationToken);
+                        _stateByPath[normalizedPath] = entry;
+                        if (!string.IsNullOrWhiteSpace(result.AssetId))
+                        {
+                            _pathToAssetId[normalizedPath] = result.AssetId!;
+                        }
+
+                        await TryDeleteVerifiedLocalFileAsync(
+                            context,
+                            normalizedPath,
+                            entry,
+                            cancellationToken);
+                    }
+
+                    _syncStatusProvider.ReportUploadCompleted(request.FilePath);
+                    _syncStatusProvider.ReportServerReachable(true);
+                }
+                else
+                {
+                    _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
+
+                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
+                        || currentFingerprint != uploadedFingerprint)
+                    {
+                        _logger.LogInformation(
+                            "File changed while its upload failed and will be queued as a new upload: {FilePath}",
+                            request.FilePath);
+                        OnFileEvent(context, request.FilePath);
+                        continue;
+                    }
+
+                    if (result.CanRetry && request.Attempt < _config.Retry.MaxAttempts)
+                    {
+                        var delay = CalculateUploadRetryDelay(request.Attempt);
+                        var nextAttempt = request.Attempt + 1;
+                        var normalizedPath = NormalizePath(request.FilePath);
+                        if (!_debouncedFiles.ContainsKey(normalizedPath))
+                        {
+                            _pendingUploadRetries[normalizedPath] = new PendingUploadRetry(
+                                request,
+                                nextAttempt,
+                                DateTimeOffset.UtcNow + delay);
+                        }
+                        _logger.LogWarning(
+                            "Upload attempt {Attempt}/{MaxAttempts} failed for {FilePath}. Scheduled attempt {NextAttempt} in {DelayMs} ms. StatusCode={StatusCode}; Error={Error}",
+                            request.Attempt,
+                            _config.Retry.MaxAttempts,
+                            request.FilePath,
+                            nextAttempt,
+                            delay.TotalMilliseconds,
                             result.StatusCode.HasValue
                                 ? ((int)result.StatusCode.Value).ToString(CultureInfo.InvariantCulture)
                                 : "n/a",
                             result.ErrorMessage ?? "unknown error");
-                        _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
-                        OnFileEvent(context, request.FilePath);
+                        continue;
                     }
+
+                    _logger.LogError(
+                        "Upload failed permanently after attempt {Attempt}/{MaxAttempts} for {FilePath} (Album: {AlbumName}). StatusCode={StatusCode}; Error={Error}",
+                        request.Attempt,
+                        _config.Retry.MaxAttempts,
+                        request.FilePath,
+                        request.AlbumName,
+                        result.StatusCode.HasValue
+                            ? ((int)result.StatusCode.Value).ToString(CultureInfo.InvariantCulture)
+                            : "n/a",
+                        result.ErrorMessage ?? "unknown error");
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            for (; requestIndex < batch.Count; requestIndex++)
             {
-                throw;
+                _uploadBatchQueue.TryEnqueue(batch[requestIndex]);
             }
-            catch (Exception ex)
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _syncStatusProvider.ReportSyncFailed(ex.Message);
+            throw;
+        }
+        finally
+        {
+            _continueUploadProgress = _uploadBatchQueue.Count > 0;
+            _syncStatusProvider.ReportBatchCompleted();
+        }
+    }
+
+    private void PromoteUploadRetries(bool includeNotYetEligible)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var eligibleRetries = _pendingUploadRetries
+            .Where(pair => includeNotYetEligible || pair.Value.EligibleAtUtc <= now)
+            .OrderBy(pair => pair.Value.EligibleAtUtc)
+            .ToList();
+
+        foreach (var retry in eligibleRetries)
+        {
+            if (!_pendingUploadRetries.TryRemove(retry.Key, out var pendingRetry))
             {
-                _syncStatusProvider.ReportSyncFailed(ex.Message);
-                throw;
+                continue;
             }
-            finally
+
+            if (pendingRetry != retry.Value)
             {
-                _syncStatusProvider.ReportBatchCompleted();
+                _pendingUploadRetries.AddOrUpdate(
+                    retry.Key,
+                    pendingRetry,
+                    (_, current) => current.Attempt <= pendingRetry.Attempt ? current : pendingRetry);
+                continue;
+            }
+
+            if (_debouncedFiles.ContainsKey(retry.Key))
+            {
+                continue;
+            }
+
+            if (!_uploadBatchQueue.TryEnqueue(pendingRetry.Request with { Attempt = pendingRetry.Attempt }))
+            {
+                _logger.LogDebug("Duplicate retry queue entry ignored for file {FilePath}.", retry.Key);
             }
         }
+    }
+
+    private int GetPendingUploadCount() =>
+        _uploadBatchQueue.Count + _debouncedFiles.Count + _pendingUploadRetries.Count;
+
+    private TimeSpan CalculateUploadRetryDelay(int attempt)
+    {
+        var factor = Math.Pow(2, attempt - 1);
+        var delayMilliseconds = Math.Min(
+            factor * _config.Retry.BaseDelayMilliseconds,
+            MaxUploadRetryDelay.TotalMilliseconds);
+        return TimeSpan.FromMilliseconds(delayMilliseconds);
     }
 
     private static string NormalizePath(string path)
@@ -2242,6 +2368,11 @@ public sealed class FolderWatchWorker : BackgroundService
     }
 
     private sealed record PendingFile(string AlbumName, string SourcePath, DateTimeOffset LastEventUtc);
+
+    private sealed record PendingUploadRetry(
+        UploadAssetRequest Request,
+        int Attempt,
+        DateTimeOffset EligibleAtUtc);
 
     private readonly record struct FileFingerprint(long FileSize, long LastWriteTimeUtcTicks)
     {

@@ -296,6 +296,85 @@ public sealed class ImmichAssetClientTests
         }
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, false)]
+    [InlineData(HttpStatusCode.RequestTimeout, true)]
+    [InlineData(HttpStatusCode.TooManyRequests, true)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
+    public async Task UploadAssetAttemptAsync_ClassifiesWhetherFailureCanBeRetried(
+        HttpStatusCode statusCode,
+        bool expectedCanRetry)
+    {
+        var filePath = CreateTempFile();
+        try
+        {
+            var (client, handler) = CreateClient(
+                _ => CreateJsonResponse(statusCode, "{\"message\":\"upload failed\"}"));
+
+            var result = await client.UploadAssetAttemptAsync(
+                new UploadAssetRequest(filePath, string.Empty),
+                CancellationToken.None);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(expectedCanRetry, result.CanRetry);
+            Assert.Single(handler.Requests);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAssetAttemptAsync_ClassifiesTemporaryAlbumFailureAsRetryable()
+    {
+        var filePath = CreateTempFile();
+        try
+        {
+            var (client, handler) = CreateClient(
+                _ => CreateJsonResponse(HttpStatusCode.Created, "{\"id\":\"asset-1\"}"),
+                _ => CreateJsonResponse(HttpStatusCode.ServiceUnavailable, "{\"message\":\"try later\"}"));
+
+            var result = await client.UploadAssetAttemptAsync(
+                new UploadAssetRequest(filePath, "Screenshots"),
+                CancellationToken.None);
+
+            Assert.False(result.IsSuccess);
+            Assert.True(result.CanRetry);
+            Assert.Equal(2, handler.Requests.Count);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAssetAttemptAsync_PropagatesCancellationDuringAlbumRequest()
+    {
+        var filePath = CreateTempFile();
+        try
+        {
+            var handler = new AlbumCancellationHttpMessageHandler();
+            using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://immich.example.com/api/") };
+            var client = new ImmichAssetClient(
+                httpClient,
+                new RetrySettings { MaxAttempts = 1, BaseDelayMilliseconds = 1 },
+                NullLogger<ImmichAssetClient>.Instance);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.UploadAssetAttemptAsync(
+                new UploadAssetRequest(filePath, "Screenshots"),
+                cancellation.Token));
+
+            Assert.Equal(2, handler.RequestCount);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
     private static (ImmichAssetClient Client, RecordingHttpMessageHandler Handler) CreateClient(params Func<HttpRequestMessage, HttpResponseMessage>[] responders)
     {
         var handler = new RecordingHttpMessageHandler(responders);
@@ -357,6 +436,27 @@ public sealed class ImmichAssetClientTests
 
             Requests.Add(new RecordedRequest(request.Method, request.RequestUri?.PathAndQuery ?? string.Empty, body));
             return _responders.Dequeue()(request);
+        }
+    }
+
+    private sealed class AlbumCancellationHttpMessageHandler : HttpMessageHandler
+    {
+        private int _requestCount;
+
+        public int RequestCount => Volatile.Read(ref _requestCount);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var requestCount = Interlocked.Increment(ref _requestCount);
+            if (requestCount == 1)
+            {
+                return CreateJsonResponse(HttpStatusCode.Created, "{\"id\":\"asset-1\"}");
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The cancellation-aware delay should not complete normally.");
         }
     }
 

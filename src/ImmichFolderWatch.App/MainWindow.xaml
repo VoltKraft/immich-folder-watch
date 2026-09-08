@@ -91,7 +91,8 @@
                        Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVis}}">
               <Hyperlink NavigateUri="{Binding UpdateDownloadUri}"
                          RequestNavigate="UpdateHyperlink_RequestNavigate">
-                <Run Text="{Binding UpdateAvailableText, Mode=OneWay}" />
+                <Run x:Name="UpdateAvailableTextRun"
+                     Text="{Binding UpdateAvailableText, Mode=OneWay}" />
               </Hyperlink>
             </TextBlock>
           </StackPanel>

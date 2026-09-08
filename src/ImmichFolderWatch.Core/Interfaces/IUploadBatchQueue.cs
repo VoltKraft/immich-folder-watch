@@ -11,6 +11,7 @@ public interface IUploadBatchQueue
 
     /// <summary>
     /// Removes up to <paramref name="maxBatchSize"/> pending files in modification-time order.
+    /// First attempts precede retries, with the configured order applied within each group.
     /// Files with unavailable timestamps follow dated files; equal timestamps retain enqueue order.
     /// </summary>
     IReadOnlyList<UploadAssetRequest> DequeueBatch(int maxBatchSize, string transferOrder = TransferOrders.NewestFirst);
