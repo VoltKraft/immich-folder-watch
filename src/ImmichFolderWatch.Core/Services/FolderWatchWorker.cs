@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.Core.Services;
 
-public sealed class FolderWatchWorker : BackgroundService
+public sealed partial class FolderWatchWorker : BackgroundService
 {
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase
@@ -169,23 +169,26 @@ public sealed class FolderWatchWorker : BackgroundService
 
         _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
 
-        if (_immichRealtimeClient is not null)
-        {
-            _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
-            _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
-        }
-
-        await LoadPersistedStateAsync(stoppingToken);
-        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: true);
-        await PullFromImmichAsync(stoppingToken);
-        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: false);
-
-        using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        var lastFlush = DateTimeOffset.UtcNow;
-        var lastAlbumPull = DateTimeOffset.UtcNow;
-
+        var timestampRepairFailed = false;
+        var timestampRecoveryCompleted = false;
         try
         {
+            await LoadPersistedStateAsync(stoppingToken);
+            await RecoverTimestampRepairsAsync(stoppingToken);
+            timestampRecoveryCompleted = true;
+            if (_immichRealtimeClient is not null)
+            {
+                _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
+                _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
+            }
+
+            await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: true);
+            await PullFromImmichAsync(stoppingToken);
+            await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: false);
+
+            using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            var lastFlush = DateTimeOffset.UtcNow;
+            var lastAlbumPull = DateTimeOffset.UtcNow;
             while (await loopTimer.WaitForNextTickAsync(stoppingToken))
             {
                 if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
@@ -232,8 +235,15 @@ public sealed class FolderWatchWorker : BackgroundService
         {
             _logger.LogInformation("Folder watch worker received shutdown signal.");
         }
+        catch (TimestampRepairException ex)
+        {
+            timestampRepairFailed = true;
+            _syncStatusProvider.ReportSyncFailed("Timestamp correction could not be completed. Restart synchronization to recover safely.");
+            _logger.LogError(ex, "Synchronization paused to preserve a pending timestamp correction.");
+        }
         finally
         {
+            DisposeWatchers();
             if (_immichRealtimeClient is not null)
             {
                 _immichRealtimeClient.RemoteChangeDetected -= OnRemoteChangeDetected;
@@ -247,17 +257,19 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
             }
 
-            DisposeWatchers();
-            _logger.LogInformation("Flushing pending uploads before shutdown.");
-            await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
-            PromoteUploadRetries(includeNotYetEligible: true);
-            while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+            if (timestampRecoveryCompleted && !timestampRepairFailed)
             {
-                await FlushUploadsAsync(CancellationToken.None);
+                _logger.LogInformation("Flushing pending uploads before shutdown.");
                 await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
                 PromoteUploadRetries(includeNotYetEligible: true);
+                while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+                {
+                    await FlushUploadsAsync(CancellationToken.None);
+                    await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
+                    PromoteUploadRetries(includeNotYetEligible: true);
+                }
+                _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
             }
-            _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
         }
     }
 
@@ -824,6 +836,10 @@ public sealed class FolderWatchWorker : BackgroundService
                 {
                     throw;
                 }
+                catch (TimestampRepairException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _syncStatusProvider.ReportSyncFailed(ex.Message);
@@ -1125,6 +1141,8 @@ public sealed class FolderWatchWorker : BackgroundService
                             continue;
                         }
 
+                        currentState = await CorrectDownloadedTimestampsAsync(context, normalized, asset, currentState, cancellationToken);
+                        if (!TryGetFingerprint(normalized, out existingFingerprint) || !existingFingerprint.Matches(currentState)) continue;
                         _pathToAssetId[normalized] = asset.Id;
                         if (string.Equals(currentState.AlbumName, effectiveAlbum, StringComparison.Ordinal))
                         {
@@ -1173,6 +1191,16 @@ public sealed class FolderWatchWorker : BackgroundService
                 try
                 {
                     var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
+                    string? timestampError = null;
+                    if (download.IsSuccess && DownloadedFileTimestamps.GetDesired(asset) is { } desired)
+                    {
+                        try { DownloadedFileTimestamps.Apply(normalized, desired); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                        {
+                            timestampError = "The original file was downloaded, but its timestamps could not be restored.";
+                            _logger.LogWarning(ex, "Could not restore timestamps for downloaded asset {AssetId}; a later pull will retry.", asset.Id);
+                        }
+                    }
                     if (download.IsSuccess && TryGetFingerprint(normalized, out var fingerprint))
                     {
                         var entry = CreateSynchronizedEntry(
@@ -1189,6 +1217,7 @@ public sealed class FolderWatchWorker : BackgroundService
                         var completedUtc = DateTimeOffset.UtcNow;
                         await _syncStateStore.RecordSuccessfulSyncAsync(_accountScope, completedUtc, cancellationToken);
                         _syncStatusProvider.ReportDownloadCompleted(destinationPath, completedUtc, _statusSession);
+                        if (timestampError is not null) _syncStatusProvider.ReportSyncFailed(timestampError);
                         _logger.LogInformation(
                             "Downloaded asset {AssetId} to {FilePath}.",
                             asset.Id,

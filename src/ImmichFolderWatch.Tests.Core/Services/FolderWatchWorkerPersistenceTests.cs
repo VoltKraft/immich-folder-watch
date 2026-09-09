@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.Tests.Core.Services;
 
-public sealed class FolderWatchWorkerPersistenceTests
+public sealed partial class FolderWatchWorkerPersistenceTests
 {
     [Theory]
     [InlineData(false)]
@@ -794,14 +794,15 @@ public sealed class FolderWatchWorkerPersistenceTests
         ILogger<FolderWatchWorker>? workerLogger = null,
         IFileReadinessChecker? fileReadinessChecker = null,
         SyncStatusProvider? syncStatusProvider = null,
-        IImmichRealtimeClient? realtimeClient = null) =>
+        IImmichRealtimeClient? realtimeClient = null,
+        ISyncStateStore? stateStore = null) =>
         new(
             config,
             fileReadinessChecker ?? new AlwaysReadyChecker(),
             localFileDeletionService ?? new LocalFileDeletionService(),
             new UploadBatchQueue(),
             client,
-            new SqliteSyncStateStore(databasePath),
+            stateStore ?? new SqliteSyncStateStore(databasePath),
             syncStatusProvider ?? new SyncStatusProvider(),
             workerLogger ?? NullLogger<FolderWatchWorker>.Instance,
             realtimeClient);

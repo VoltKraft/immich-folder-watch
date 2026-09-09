@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Platform;
@@ -199,12 +200,18 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
     {
         ArgumentNullException.ThrowIfNull(entry);
         ValidateEntry(entry);
-        var normalizedSourcePath = NormalizeSourcePath(entry.SourcePath);
-        var normalizedRelativePath = NormalizeRelativePath(entry.RelativePath);
         await InitializeAsync(cancellationToken);
-
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await UpsertCoreAsync(connection, (SqliteTransaction)transaction, entry, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task UpsertCoreAsync(SqliteConnection connection, SqliteTransaction transaction,
+        SyncStateEntry entry, CancellationToken cancellationToken)
+    {
+        var normalizedSourcePath = NormalizeSourcePath(entry.SourcePath);
+        var normalizedRelativePath = NormalizeRelativePath(entry.RelativePath);
         await using var command = connection.CreateCommand();
         command.Transaction = (SqliteTransaction)transaction;
         command.CommandText = """
@@ -247,8 +254,158 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
                 : DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task SaveTimestampRepairAsync(SyncTimestampRepair repair, CancellationToken cancellationToken = default)
+    {
+        repair = NormalizeRepair(repair);
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = CreateRepairCommand(connection, transaction, repair.OriginalEntry);
+        command.CommandText = """
+            INSERT INTO sync_timestamp_repairs (account_scope, source_key, relative_path_key, repair_json)
+            VALUES ($account_scope, $source_key, $relative_path_key, $repair_json)
+            ON CONFLICT(account_scope, source_key, relative_path_key) DO NOTHING;
+            """;
+        command.Parameters.AddWithValue("$repair_json", JsonSerializer.Serialize(repair));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        var pending = await ReadRepairAsync(connection, transaction, repair.OriginalEntry, cancellationToken);
+        if (pending is null || !RepairsEqual(pending, repair))
+            throw new InvalidOperationException("A different timestamp repair is already pending for this file.");
         await transaction.CommitAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SyncTimestampRepair>> GetTimestampRepairsAsync(
+        string accountScope, string sourcePath, CancellationToken cancellationToken = default)
+    {
+        ValidateAccountScope(accountScope);
+        var sourceKey = GetPathKey(NormalizeSourcePath(sourcePath));
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT repair_json FROM sync_timestamp_repairs
+            WHERE account_scope = $account_scope AND source_key = $source_key
+            ORDER BY relative_path_key;
+            """;
+        command.Parameters.AddWithValue("$account_scope", accountScope);
+        command.Parameters.AddWithValue("$source_key", sourceKey);
+        var repairs = new List<SyncTimestampRepair>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) repairs.Add(DeserializeRepair(reader.GetString(0)));
+        return repairs;
+    }
+
+    public async Task CompleteTimestampRepairAsync(SyncTimestampRepair repair, SyncStateEntry? updatedEntry,
+        CancellationToken cancellationToken = default)
+    {
+        repair = NormalizeRepair(repair);
+        if (updatedEntry is not null)
+        {
+            ValidateEntry(updatedEntry);
+            if (!EntriesHaveSameIdentity(repair.OriginalEntry, updatedEntry))
+                throw new ArgumentException("The updated mapping must identify the repair's original file.", nameof(updatedEntry));
+        }
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        var pending = await ReadRepairAsync(connection, transaction, repair.OriginalEntry, cancellationToken);
+        if (pending is null) return;
+        if (!RepairsEqual(pending, repair))
+            throw new InvalidOperationException("The pending timestamp repair has changed.");
+        if (updatedEntry is not null)
+        {
+            await using var currentCommand = CreateRepairCommand(connection, transaction, repair.OriginalEntry);
+            currentCommand.CommandText = """
+                SELECT account_scope, source_path, relative_path, asset_id, album_name,
+                       file_size, last_write_time_utc, direction, status,
+                       last_synchronized_at_utc, tombstone_expires_at_utc
+                FROM sync_entries
+                WHERE account_scope = $account_scope AND source_key = $source_key
+                  AND relative_path_key = $relative_path_key;
+                """;
+            SyncStateEntry? current;
+            await using (var reader = await currentCommand.ExecuteReaderAsync(cancellationToken))
+                current = await reader.ReadAsync(cancellationToken) ? ReadEntry(reader) : null;
+            if (current is null || NormalizeEntryForComparison(current) != NormalizeEntryForComparison(repair.OriginalEntry))
+                throw new InvalidOperationException("The synchronization mapping changed while timestamp repair was pending.");
+            await UpsertCoreAsync(connection, transaction, updatedEntry, cancellationToken);
+        }
+        await using var delete = CreateRepairCommand(connection, transaction, repair.OriginalEntry);
+        delete.CommandText = """
+            DELETE FROM sync_timestamp_repairs
+            WHERE account_scope = $account_scope AND source_key = $source_key
+              AND relative_path_key = $relative_path_key;
+            """;
+        await delete.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private SqliteCommand CreateRepairCommand(SqliteConnection connection, SqliteTransaction transaction, SyncStateEntry entry)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.Parameters.AddWithValue("$account_scope", entry.AccountScope);
+        command.Parameters.AddWithValue("$source_key", GetPathKey(NormalizeSourcePath(entry.SourcePath)));
+        command.Parameters.AddWithValue("$relative_path_key", GetPathKey(NormalizeRelativePath(entry.RelativePath)));
+        return command;
+    }
+
+    private async Task<SyncTimestampRepair?> ReadRepairAsync(SqliteConnection connection, SqliteTransaction transaction,
+        SyncStateEntry entry, CancellationToken cancellationToken)
+    {
+        await using var command = CreateRepairCommand(connection, transaction, entry);
+        command.CommandText = """
+            SELECT repair_json FROM sync_timestamp_repairs
+            WHERE account_scope = $account_scope AND source_key = $source_key
+              AND relative_path_key = $relative_path_key;
+            """;
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is string json ? DeserializeRepair(json) : null;
+    }
+
+    private SyncTimestampRepair DeserializeRepair(string json) => NormalizeRepair(
+        JsonSerializer.Deserialize<SyncTimestampRepair>(json)
+        ?? throw new InvalidDataException("The timestamp repair journal contains an empty record."));
+
+    private SyncTimestampRepair NormalizeRepair(SyncTimestampRepair repair)
+    {
+        ArgumentNullException.ThrowIfNull(repair);
+        ArgumentNullException.ThrowIfNull(repair.OriginalEntry);
+        ValidateEntry(repair.OriginalEntry);
+        if (repair.ContentSha256 is not { Length: 64 } || !repair.ContentSha256.All(Uri.IsHexDigit))
+            throw new ArgumentException("The content fingerprint must be a 64-character hexadecimal SHA-256.", nameof(repair));
+        return repair with
+        {
+            OriginalEntry = repair.OriginalEntry with
+            {
+                SourcePath = NormalizeSourcePath(repair.OriginalEntry.SourcePath),
+                RelativePath = NormalizeRelativePath(repair.OriginalEntry.RelativePath),
+                LastWriteTimeUtc = repair.OriginalEntry.LastWriteTimeUtc.ToUniversalTime(),
+                LastSynchronizedAtUtc = repair.OriginalEntry.LastSynchronizedAtUtc.ToUniversalTime(),
+                TombstoneExpiresAtUtc = repair.OriginalEntry.TombstoneExpiresAtUtc?.ToUniversalTime(),
+            },
+            CreationTimeUtc = repair.CreationTimeUtc.ToUniversalTime(),
+            LastWriteTimeUtc = repair.LastWriteTimeUtc.ToUniversalTime(),
+            ContentSha256 = repair.ContentSha256.ToUpperInvariant(),
+        };
+    }
+
+    private SyncStateEntry NormalizeEntryForComparison(SyncStateEntry entry) => entry with
+    {
+        SourcePath = GetPathKey(NormalizeSourcePath(entry.SourcePath)),
+        RelativePath = GetPathKey(NormalizeRelativePath(entry.RelativePath)),
+    };
+
+    private bool EntriesHaveSameIdentity(SyncStateEntry first, SyncStateEntry second) =>
+        first.AccountScope == second.AccountScope
+        && GetPathKey(NormalizeSourcePath(first.SourcePath)) == GetPathKey(NormalizeSourcePath(second.SourcePath))
+        && GetPathKey(NormalizeRelativePath(first.RelativePath)) == GetPathKey(NormalizeRelativePath(second.RelativePath));
+
+    private bool RepairsEqual(SyncTimestampRepair first, SyncTimestampRepair second) =>
+        first with { OriginalEntry = NormalizeEntryForComparison(first.OriginalEntry) }
+        == second with { OriginalEntry = NormalizeEntryForComparison(second.OriginalEntry) };
 
     public async Task<bool> DeleteAsync(
         string accountScope,
@@ -339,6 +496,14 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
             CREATE INDEX IF NOT EXISTS ix_sync_entries_asset_id
                 ON sync_entries (account_scope, asset_id)
                 WHERE asset_id IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS sync_timestamp_repairs (
+                account_scope TEXT NOT NULL,
+                source_key TEXT NOT NULL,
+                relative_path_key TEXT NOT NULL,
+                repair_json TEXT NOT NULL,
+                PRIMARY KEY (account_scope, source_key, relative_path_key)
+            );
 
             PRAGMA user_version = 1;
             """;

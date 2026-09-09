@@ -39,6 +39,27 @@ public interface ISyncStateStore
 
     Task UpsertAsync(SyncStateEntry entry, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Persists repair intent before modifying the file. Repeating the same repair is
+    /// idempotent; a different pending repair for the same file throws InvalidOperationException.
+    /// </summary>
+    Task SaveTimestampRepairAsync(SyncTimestampRepair repair, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns pending repairs for one account and normalized source path.</summary>
+    Task<IReadOnlyList<SyncTimestampRepair>> GetTimestampRepairsAsync(
+        string accountScope, string sourcePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically updates the mapping and deletes matching repair intent. A non-null entry
+    /// must have the same identity (otherwise ArgumentException), and the stored mapping
+    /// must still equal OriginalEntry. Changed mappings or intent throw InvalidOperationException
+    /// and leave both records unchanged. Null only deletes matching intent. Missing intent is
+    /// an idempotent no-op. This never records a transfer success.
+    /// </summary>
+    Task CompleteTimestampRepairAsync(
+        SyncTimestampRepair repair, SyncStateEntry? updatedEntry, CancellationToken cancellationToken = default);
+
+
     Task<bool> DeleteAsync(
         string accountScope,
         string sourcePath,

@@ -241,3 +241,35 @@ automatic album suggestion is cleared. Explicitly entered and saved album names
 are preserved. Leave `albumName` empty to synchronize unassigned media at the
 root and all albums in subfolders. For an existing source that should cover the
 whole library, clear its album field and save/apply; no YAML format changes.
+
+
+### Downloaded file dates
+
+For bidirectional sync, the original Immich `fileCreatedAt` timestamp is retained
+separately from the server's upload date (`createdAt`). Missing or invalid original
+creation dates leave local timestamps unchanged; an upload date is never substituted.
+
+- Linux: the file's modification date (`mtime`, shown as **Modified**) is set to
+  original creation time. Linux/Btrfs does not provide a normal API for replacing
+  the filesystem birth time shown as **Created**, which remains the local download
+  date. File content and embedded EXIF/video metadata remain unchanged.
+- Windows: the filesystem **Created** date is set to original creation time, and
+  **Modified** retains Immich's file modification date (or creation date if missing).
+  Timestamp precision and support depend on the target filesystem.
+
+After upgrading, sync pulls also correct persisted download mappings whose asset
+ID, file size and modification date still match. Uploaded, untracked and locally
+modified files are not rewritten by this correction. Existing unknown files first
+adopted by filename receive a persisted download mapping; they become eligible on
+later pulls while unchanged. File contents are hashed during correction/recovery
+to detect concurrent changes, without transferring the file again.
+
+A durable SQLite journal records each correction before changing timestamps. An
+interrupted correction is recovered before startup reconciliation can queue any
+uploads. Completed corrections update the stored fingerprint without advancing
+last-sync or transfer counters. Journal/storage failures pause synchronization;
+restart after resolving the underlying error. If contents changed without a
+distinguishable size/date change, recovery pauses for review instead of accepting
+the modified file as synchronized. Do not delete pending journal entries manually.
+No YAML migration is required. The journal table is additive; finish recovery
+before downgrading to an older version that does not understand this journal.

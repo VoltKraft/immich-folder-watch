@@ -89,3 +89,21 @@ packages require the corresponding [desktop smoke tests](linux-smoke.md).
 - These checks establish portal access and tray protocol operation, not visual
   tray rendering or login/logout behavior on every supported desktop. Live
   library transfers remain a separate installation smoke check.
+
+## Download timestamp follow-up
+
+- Separate original creation dates are parsed for both album and unassigned asset
+  search responses. Missing/invalid dates are not replaced by upload dates.
+- Real-file tests cover timestamp application and unchanged bytes. Worker tests
+  cover new downloads/restart, existing mappings, local edits, interrupted
+  corrections, database commit failures and cancellation before startup recovery.
+- SQLite tests cover atomic repair completion, rollback, persistence and account/
+  source isolation. The full portable suite passed 366 tests; the subsequent
+  startup-cancellation guard passed the 16 targeted timestamp/storage cases,
+  including one additional regression (367 distinct portable tests passed).
+- Linux uses modification time for original creation dates; the actual birth time
+  remains filesystem-controlled. Windows creation-time support is covered by
+  platform-conditional tests, which require Windows to execute that assertion.
+- The Linux desktop build and all 37 Linux tests passed. The Windows WPF host
+  cross-compiled successfully on Linux; native Windows execution remains unverified.
+  NuGet vulnerability lookup emitted `NU1900`; compilation had no errors.

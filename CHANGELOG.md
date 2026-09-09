@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Restored original creation dates for downloads: Linux uses the modification date; Windows sets the creation date and preserves the remote modification date. Existing unchanged download mappings are corrected with durable recovery that prevents timestamp-only reuploads.
 - Enabled Flatpak tray integration through the app's own D-Bus namespace, with menu actions and recovery when the desktop tray host returns.
 - Resolved original folder display paths using sandbox-accessible document metadata and opaque portal IDs while retaining granted access paths for synchronization.
 - Removed untouched automatic album suggestions when selecting bidirectional sync and reported missing named albums as actionable sync errors with automatic recovery.

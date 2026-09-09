@@ -377,6 +377,117 @@ public sealed class SqliteSyncStateStoreTests
         Assert.Equal(withoutSlash, withSlash);
     }
 
+    [Fact]
+    public async Task TimestampRepairs_PersistAcrossReopenAndRespectAccountSourceAndPathCase()
+    {
+        using var directory = new TemporaryDirectory();
+        var source = Path.Combine(directory.Path, "Photos");
+        var store = CreateStore(directory, pathsCaseSensitive: false);
+        var entry = CreateEntry("scope-a", source + Path.DirectorySeparatorChar, "Photo.jpg", "asset");
+        var repair = new SyncTimestampRepair(entry, FileTimestamp.AddDays(-1), FileTimestamp, new string('a', 64));
+        await store.SaveTimestampRepairAsync(repair);
+        await store.SaveTimestampRepairAsync(repair with { OriginalEntry = entry with { SourcePath = source.ToUpperInvariant(), RelativePath = "PHOTO.JPG" } });
+        await store.SaveTimestampRepairAsync(repair with { OriginalEntry = entry with { AccountScope = "scope-b" } });
+        await store.SaveTimestampRepairAsync(repair with { OriginalEntry = entry with { SourcePath = source + "Other" } });
+        SqliteConnection.ClearAllPools();
+        var reopened = CreateStore(directory, pathsCaseSensitive: false);
+        var actual = Assert.Single(await reopened.GetTimestampRepairsAsync("scope-a", source.ToLowerInvariant()));
+        Assert.Equal(Path.TrimEndingDirectorySeparator(source), actual.OriginalEntry.SourcePath);
+        Assert.Equal(repair.CreationTimeUtc, actual.CreationTimeUtc);
+        Assert.Equal(new string('A', 64), actual.ContentSha256);
+        Assert.Single(await reopened.GetTimestampRepairsAsync("scope-b", source));
+        Assert.Empty(await reopened.GetTimestampRepairsAsync("unknown", source));
+        Assert.Empty(await reopened.GetTimestampRepairsAsync("scope-a", source + "missing"));
+        Assert.Empty(await CreateStore(directory, pathsCaseSensitive: true).GetTimestampRepairsAsync("scope-a", source.ToLowerInvariant()));
+    }
+
+    [Fact]
+    public async Task CompleteTimestampRepairAsync_UpdatesMappingAndRemovesJournalWithoutRecordingSuccess()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var entry = CreateEntry("scope", Path.Combine(directory.Path, "photos"), "photo.jpg", "asset");
+        var repair = CreateRepair(entry);
+        await store.UpsertAsync(entry);
+        await store.RecordSuccessfulSyncAsync("scope", SyncTimestamp);
+        await store.SaveTimestampRepairAsync(repair);
+        var updated = entry with { LastWriteTimeUtc = repair.LastWriteTimeUtc };
+        await store.CompleteTimestampRepairAsync(repair, updated);
+        Assert.Equal(updated, await store.GetAsync("scope", entry.SourcePath, entry.RelativePath));
+        Assert.Empty(await store.GetTimestampRepairsAsync("scope", entry.SourcePath));
+        Assert.Equal(SyncTimestamp, await store.GetLastSuccessfulSyncAsync("scope"));
+        await store.UpsertAsync(updated with { AssetId = "newer" });
+        await store.CompleteTimestampRepairAsync(repair, updated);
+        Assert.Equal("newer", (await store.GetAsync("scope", entry.SourcePath, entry.RelativePath))!.AssetId);
+    }
+
+    [Fact]
+    public async Task CompleteTimestampRepairAsync_RejectsChangedMappingAndNullOnlyDiscardsIntent()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var entry = CreateEntry("scope", Path.Combine(directory.Path, "photos"), "photo.jpg", "asset");
+        var repair = CreateRepair(entry);
+        await store.UpsertAsync(entry);
+        await store.SaveTimestampRepairAsync(repair);
+        var changed = entry with { AssetId = "different-asset" };
+        await store.UpsertAsync(changed);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CompleteTimestampRepairAsync(repair, entry with { LastWriteTimeUtc = repair.LastWriteTimeUtc }));
+        Assert.Single(await store.GetTimestampRepairsAsync("scope", entry.SourcePath));
+        Assert.Equal(changed, await store.GetAsync("scope", entry.SourcePath, entry.RelativePath));
+        await store.CompleteTimestampRepairAsync(repair, null);
+        Assert.Empty(await store.GetTimestampRepairsAsync("scope", entry.SourcePath));
+        Assert.Equal(changed, await store.GetAsync("scope", entry.SourcePath, entry.RelativePath));
+    }
+
+    [Fact]
+    public async Task CompleteTimestampRepairAsync_RollsBackMappingWhenJournalDeleteFails()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var entry = CreateEntry("scope", Path.Combine(directory.Path, "photos"), "photo.jpg", "asset");
+        var repair = CreateRepair(entry);
+        await store.UpsertAsync(entry);
+        await store.SaveTimestampRepairAsync(repair);
+        await using (var connection = new SqliteConnection($"Data Source={store.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TRIGGER reject_repair_delete BEFORE DELETE ON sync_timestamp_repairs BEGIN SELECT RAISE(ABORT, 'test journal failure'); END;";
+            await command.ExecuteNonQueryAsync();
+        }
+        await Assert.ThrowsAsync<SqliteException>(() => store.CompleteTimestampRepairAsync(repair, entry with { LastWriteTimeUtc = repair.LastWriteTimeUtc }));
+        Assert.Equal(entry, await store.GetAsync("scope", entry.SourcePath, entry.RelativePath));
+        Assert.Single(await store.GetTimestampRepairsAsync("scope", entry.SourcePath));
+    }
+
+    [Fact]
+    public async Task TimestampRepairs_RejectConflictingIntentAndMismatchedCompletionIdentity()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var entry = CreateEntry("scope", Path.Combine(directory.Path, "photos"), "photo.jpg", "asset");
+        var repair = CreateRepair(entry);
+        await store.SaveTimestampRepairAsync(repair);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveTimestampRepairAsync(repair with { LastWriteTimeUtc = FileTimestamp.AddHours(2) }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CompleteTimestampRepairAsync(repair with { LastWriteTimeUtc = FileTimestamp.AddHours(2) }, null));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.CompleteTimestampRepairAsync(repair, entry with { AccountScope = "other" }));
+        Assert.Equal(repair, Assert.Single(await store.GetTimestampRepairsAsync("scope", entry.SourcePath)));
+    }
+
+    [Fact]
+    public async Task SaveTimestampRepairAsync_RejectsInvalidContentFingerprint()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = CreateStore(directory);
+        var repair = CreateRepair(CreateEntry("scope", directory.Path, "photo.jpg", "asset"));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.SaveTimestampRepairAsync(repair with { ContentSha256 = "not-a-hash" }));
+        Assert.Empty(await store.GetTimestampRepairsAsync("scope", directory.Path));
+    }
+
+    private static SyncTimestampRepair CreateRepair(SyncStateEntry entry) =>
+        new(entry, FileTimestamp.AddDays(-1), FileTimestamp.AddHours(-1), new string('A', 64));
+
     private static SqliteSyncStateStore CreateStore(
         TemporaryDirectory directory,
         bool? pathsCaseSensitive = null) =>
