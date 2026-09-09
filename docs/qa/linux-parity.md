@@ -125,8 +125,14 @@ packages require the corresponding [desktop smoke tests](linux-smoke.md).
   line endings. NuGet vulnerability lookup remained unavailable (`NU1900`).
 - The preceding fd9a315 development Flatpak was built, test-imported and installed;
   installed assemblies matched the build. The version-only release preparation
-  does not constitute native Windows/MSI or ARM64 Flatpak validation. Those remain
-  required in their native CI/release jobs before publishing artifacts.
+  does not constitute MSI or ARM64 Flatpak validation. Those remain required in
+  their native release jobs before publishing artifacts.
+- Native Windows CI passed 36 Windows-specific tests, 366 portable tests (eight
+  native Linux cases skipped), and 28 Linux-head tests (nine native protocol cases
+  skipped). The upload-order regression waits for completed transfer persistence
+  before stopping the worker so shutdown retry behavior cannot race its assertions.
+  Five repeated Release runs of both ordering directions and all five targeted
+  ordering/shutdown-requeue cases passed after this correction.
 - The screenshots below come from the headless fixture with synthetic data and
   illustrate the Linux folder editor and logging settings; they do not establish
   native tray rendering, portal consent or login/logout behavior.

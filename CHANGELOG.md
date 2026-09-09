@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Skipped native Linux D-Bus tests explicitly on other operating systems so the Windows solution test job remains compatible.
+- Stabilized upload-order regression checks by waiting for completed transfers before shutdown, preserving coverage of deliberate cancellation retries.
 - Applied download order globally across sync sources, albums and unassigned assets, using original creation time first so newer photos in later albums no longer wait behind older unassigned files.
 - Restored original creation dates for downloads: Linux uses the modification date; Windows sets the creation date and preserves the remote modification date. Existing unchanged download mappings are corrected with durable recovery that prevents timestamp-only reuploads.
 - Enabled Flatpak tray integration through the app's own D-Bus namespace, with menu actions and recovery when the desktop tray host returns.

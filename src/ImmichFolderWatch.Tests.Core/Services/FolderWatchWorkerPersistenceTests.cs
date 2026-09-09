@@ -130,7 +130,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         using var worker = CreateWorker(config, Path.Combine(directory.Path, "sync-state.db"), client,
             syncStatusProvider: status);
         await worker.StartAsync(CancellationToken.None);
-        await client.WaitForUploadCountAsync(2, TimeSpan.FromSeconds(8));
+        // The fake records request entry before the worker persists success. Stopping
+        // there cancels persistence and deliberately requeues that attempt on shutdown.
+        await WaitUntilAsync(() => status.ProcessedFileCount == 2 && status.CurrentBatchSize == 0,
+            TimeSpan.FromSeconds(8));
         await worker.StopAsync(CancellationToken.None);
 
         Assert.Equal(new[] { first, second }, client.UploadedPaths.Select(Path.GetFileName).ToArray());
