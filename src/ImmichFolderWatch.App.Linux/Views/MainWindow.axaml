@@ -350,6 +350,9 @@
                                 PlaceholderText="{Binding UI_AlbumNameWatermark, Source={StaticResource Loc}}"
                                 AutomationProperties.Name="{Binding UI_ImmichAlbumName, Source={StaticResource Loc}}"/>
                           </Grid>
+                          <TextBlock IsVisible="{Binding !ShowIncludeSubdirectories}"
+                              Text="{Binding UI_SyncAlbumHint, Source={StaticResource Loc}}"
+                              TextWrapping="Wrap" Opacity="0.75" />
                           <StackPanel Spacing="6">
                             <TextBlock Text="{Binding UI_SyncMode, Source={StaticResource Loc}}" />
                             <ComboBox

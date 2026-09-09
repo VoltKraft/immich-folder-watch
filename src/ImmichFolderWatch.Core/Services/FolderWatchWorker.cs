@@ -930,6 +930,10 @@ public sealed class FolderWatchWorker : BackgroundService
             // deleted by the user". Skip delete propagation either way
             // — a fresh upload re-creates the album, and the next pull
             // sees the new state.
+            _syncStatusProvider.ReportSyncFailed(
+                $"The configured Immich album '{context.Source.AlbumName}' does not exist. "
+                + "Choose an existing album to download its files, or clear the album name to synchronize all albums and unassigned assets. "
+                + "Uploading a local file will create the configured album.");
             _logger.LogDebug("Sync pull skipped; album '{AlbumName}' does not exist yet.", context.Source.AlbumName);
             return false;
         }

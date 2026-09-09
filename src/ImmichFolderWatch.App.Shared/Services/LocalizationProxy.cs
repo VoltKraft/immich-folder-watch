@@ -91,6 +91,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_Remove => Strings.UI_Remove;
     public string UI_FolderPath => Strings.UI_FolderPath;
     public string UI_ImmichAlbumName => Strings.UI_ImmichAlbumName;
+    public string UI_SyncAlbumHint => Strings.ResourceManager.GetString("UI_SyncAlbumHint", Strings.Culture) ?? string.Empty;
     public string UI_AlbumNameWatermark => Strings.UI_AlbumNameWatermark;
     public string UI_SyncMode => Strings.UI_SyncMode;
     public string UI_AdvancedWatchOptions => Strings.UI_AdvancedWatchOptions;

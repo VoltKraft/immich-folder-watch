@@ -11,6 +11,61 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed class FolderWatchWorkerPersistenceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Sync_ReportsMissingAlbumAndPreservesLocalFilesUntilSelectedAlbumRecovers(bool previouslyDownloaded)
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "watch")).FullName;
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.Sync);
+        var remoteAssets = new[] { new AlbumAssetSummary("remote", "photo.jpg") };
+        if (previouslyDownloaded)
+        {
+            var seedClient = new RecordingAssetClient { RemoteAssets = remoteAssets };
+            var seedLogger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync);
+            using var seedWorker = CreateWorker(config, databasePath, seedClient, workerLogger: seedLogger);
+            await seedWorker.StartAsync(CancellationToken.None);
+            await seedLogger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+            Assert.Single(seedClient.DownloadedAssets);
+            await seedWorker.StopAsync(CancellationToken.None);
+        }
+
+        var albumMissing = 1;
+        var client = new RecordingAssetClient
+        {
+            AlbumAssetsHandler = _ => Volatile.Read(ref albumMissing) == 1
+                ? AlbumAssetsResult.Missing()
+                : AlbumAssetsResult.Success(remoteAssets),
+        };
+        var status = new SyncStatusProvider();
+        var realtime = new TriggeredRealtimeClient();
+        var logger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync);
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: logger,
+            syncStatusProvider: status, realtimeClient: realtime);
+        await worker.StartAsync(CancellationToken.None);
+        await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+
+        Assert.Contains("configured Immich album 'Camera' does not exist", status.LastSyncErrorMessage);
+        Assert.Contains("clear the album name", status.LastSyncErrorMessage);
+        Assert.Empty(client.DownloadedAssets);
+        Assert.Equal(0, client.UploadCount);
+        Assert.Equal(previouslyDownloaded, File.Exists(Path.Combine(watchDirectory, "photo.jpg")));
+
+        Interlocked.Exchange(ref albumMissing, 0);
+        realtime.RequestPull();
+        await WaitUntilAsync(
+            () => status.LastSyncErrorMessage is null && status.CurrentPullSize == 0
+                && (previouslyDownloaded || client.DownloadedAssets.Count == 1),
+            TimeSpan.FromSeconds(8));
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal("remote", await File.ReadAllTextAsync(Path.Combine(watchDirectory, "photo.jpg")));
+        Assert.Equal(previouslyDownloaded ? 0 : 1, client.DownloadedAssets.Count);
+        Assert.Equal(0, client.UploadCount);
+    }
+
     [Fact]
     public async Task Sync_RetainsSourceListingFailureUntilSuccessfulEmptyRecoveryPull()
     {

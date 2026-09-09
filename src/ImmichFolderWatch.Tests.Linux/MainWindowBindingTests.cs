@@ -113,6 +113,26 @@ public sealed class MainWindowBindingTests
     }
 
     [AvaloniaFact]
+    public void NewSourceSyncMode_ClearsUntouchedAlbumSuggestionInTheActualEditor()
+    {
+        WithWindow((window, vm) =>
+        {
+            vm.AddSource();
+            var source = vm.SelectedSource!;
+            source.SetPortalPath("/run/user/1000/doc/opaque-ID_123/Photos", "/home/example/Photos");
+            Flush(window);
+            Assert.Equal("Photos", source.AlbumName);
+            var modes = FindEditor<ComboBox>(window, Strings.UI_SyncMode);
+            modes.SelectedItem = vm.AvailableSyncModes.Single(mode => mode.Code == WatchSourceSyncModes.Sync);
+            Flush(window);
+            Assert.Empty(source.AlbumName);
+            Assert.Empty(FindEditor<TextBox>(window, Strings.UI_ImmichAlbumName).Text!);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text =>
+                text.IsVisible && text.Text == Strings.ResourceManager.GetString("UI_SyncAlbumHint", Strings.Culture));
+        });
+    }
+
+    [AvaloniaFact]
     public void ApiKey_IsMaskedAndRevealButtonUpdatesActualInput()
     {
         WithWindow((window, vm) =>

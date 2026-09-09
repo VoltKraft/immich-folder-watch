@@ -102,7 +102,7 @@
   <data name="UI_Remove" xml:space="preserve"><value>Entfernen</value></data>
   <data name="UI_FolderPath" xml:space="preserve"><value>Ordnerpfad</value></data>
   <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich-Albumname</value></data>
-  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leer lassen, um kein Album zu verwenden</value></data>
+  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Optionaler Albumname</value></data>
   <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Erweiterte Optionen</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Unterordner einbeziehen</value></data>
   <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Lokale Dateien nach erfolgreichem Upload dauerhaft löschen</value></data>
@@ -196,4 +196,5 @@
   <data name="UI_LinuxAutostartDescription" xml:space="preserve"><value>Nach Zustimmung des Desktops bei der Anmeldung starten. Das Flatpak-Paket öffnet das Fenster, da sein Tray-Symbol deaktiviert ist.</value></data>
   <data name="UI_ChooseFolder" xml:space="preserve"><value>Ordner auswählen…</value></data>
   <data name="Op_SyncStartFailedFormat" xml:space="preserve"><value>Synchronisation konnte nicht gestartet werden: {0}</value></data>
+  <data name="UI_SyncAlbumHint" xml:space="preserve"><value>Leer lassen, um alle Alben in Unterordner zu synchronisieren. Mit dem Namen eines vorhandenen Albums wird nur dieses Album synchronisiert.</value></data>
 </root>

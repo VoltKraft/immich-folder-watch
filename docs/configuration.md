@@ -219,7 +219,7 @@ when no downloads are needed. An empty scan does not clear an upload error.
     - **Creating a first-level subfolder** creates the matching Immich album; **deleting a first-level subfolder** trashes any still-tracked assets under it and deletes the Immich album. (Applies to the subfolders-as-albums variant described below.)
     - **Renaming a first-level subfolder** renames the matching Immich album via `PATCH /albums/{id}`; **renaming an Immich album** renames the matching local first-level subfolder on the next pull. The worker tracks album ids so renames are detected even when the display name changes. Conflicts (a folder or album with the new name already exists) are logged and left untouched instead of being merged automatically.
     - Two shapes are supported depending on `albumName`:
-      - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored.
+      - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored. If the named album does not exist, the sync status explains that no files can be downloaded from it yet. Select an existing album or clear `albumName` to mirror all albums and unassigned assets; uploading a local file creates the named album. A missing album never deletes previously synchronized local files.
       - `albumName` **empty**: subfolders-as-albums sync. The root folder mirrors all Immich assets that are not in any album, and each first-level subfolder mirrors the Immich album with the same name. New subfolders become new albums (and new Immich albums become subfolders) in realtime. `includeSubdirectories` is forced on.
   - Missing, blank, or unknown values normalize to `uploadNew`. Pre-2.3 configs therefore load unchanged and keep the previous upload-only behavior.
   - The mode is configurable per source under **Folders → General → Sync Mode**. The `Include subdirectories` checkbox is hidden when `sync` is selected, since the behavior is dictated by whether `albumName` is set.
@@ -235,3 +235,9 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
 - Existing relative `logging.logDirectory` values still run after normalization; both GUIs rewrite them to an absolute path on the next successful save.
 - `localization.language` selects the GUI language. `auto` picks German when the operating system UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.
+
+When switching a newly added source to bidirectional `sync`, an untouched
+automatic album suggestion is cleared. Explicitly entered and saved album names
+are preserved. Leave `albumName` empty to synchronize unassigned media at the
+root and all albums in subfolders. For an existing source that should cover the
+whole library, clear its album field and save/apply; no YAML format changes.
