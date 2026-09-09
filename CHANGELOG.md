@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced the app logo with an open golden folder and a compact five-color flower inspired by Immich. The transparent SVG has no white outlines or outer padding, allowing generated icons to use the full available width.
+
 ## [2.10.1] - 2026-09-08
 
 ### Fixed

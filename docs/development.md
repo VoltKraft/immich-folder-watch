@@ -10,6 +10,21 @@ dotnet build ImmichFolderWatch.sln -c Debug
 The app build generates branding assets automatically from `assets/branding/logo.svg`
 into `artifacts/branding/`.
 
+### Branding
+
+The logo source is the open golden folder with a compact five-color flower. The
+petals are individually rotated 6 degrees clockwise and moved toward the center;
+their spacing exposes the folder color without white outlines. Its transparent
+`1024 x 820` viewBox fits the artwork without an outer border or additional padding.
+Keep this tight crop when editing the source: the generator preserves the aspect
+ratio and centers it in square PNG and ICO frames, using their full width. The
+remaining space above and below is transparent and preserves the folder's proportions.
+Edit the SVG rather than generated assets. To regenerate only the branding assets:
+
+```bash
+dotnet build tools/BrandAssetGen/BrandAssetGen.csproj -c Debug
+```
+
 ## Test
 
 ```bash
