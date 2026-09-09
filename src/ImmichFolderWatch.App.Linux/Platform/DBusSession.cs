@@ -21,6 +21,9 @@ public sealed class DBusSession : IAsyncDisposable
         _address = address;
     }
 
+    /// <summary>Returns the shared session connection, connecting on first use.</summary>
+    /// <exception cref="OperationCanceledException">The caller cancels or session disposal cancels a pending wait.</exception>
+    /// <exception cref="ObjectDisposedException">The session is disposed, including when a queued caller acquires the gate during disposal.</exception>
     public async Task<DBusConnection> GetAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

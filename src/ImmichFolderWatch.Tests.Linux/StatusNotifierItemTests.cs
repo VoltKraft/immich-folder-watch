@@ -111,10 +111,30 @@ public sealed class StatusNotifierItemTests
     public async Task DisposingWithdrawsBusNameAndStopsExporting()
     {
         await using var bus = await TestBus.StartAsync();
-        var item = new StatusNotifierItem(bus.Address, 1, 1, [255, 0, 0, 0]);
+        using var item = new StatusNotifierItem(bus.Address, 1, 1, [255, 0, 0, 0]);
         await item.StartAsync(TestContext.Current.CancellationToken);
+        var nameReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var ownershipWatch = await bus.Connection.AddMatchAsync(new MatchRule
+        {
+            Type = MessageType.Signal, Sender = "org.freedesktop.DBus",
+            Interface = "org.freedesktop.DBus", Member = "NameOwnerChanged", Arg0 = StatusNotifierItem.BusName,
+        }, static (message, _) =>
+        {
+            var reader = message.GetBodyReader();
+            _ = reader.ReadString();
+            _ = reader.ReadString();
+            return reader.ReadString();
+        }, (matchError, owner, _, _) =>
+        {
+            if (matchError is not null) nameReleased.TrySetException(matchError);
+            else if (string.IsNullOrEmpty(owner)) nameReleased.TrySetResult();
+        }, flags: ObserverFlags.None, emitOnCapturedContext: false);
+
         item.Dispose();
         Assert.False(item.IsRegistered);
+        // Local disposal precedes the daemon's removal of its well-known name.
+        // Wait for that acknowledgement before asserting a subsequent lookup fails.
+        await nameReleased.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var error = await Assert.ThrowsAnyAsync<DBusErrorReplyException>(() => bus.GetPropertiesAsync("/StatusNotifierItem", StatusNotifierItem.ItemInterface));
         Assert.Contains("org.freedesktop.DBus.Error.ServiceUnknown", error.Message);
     }

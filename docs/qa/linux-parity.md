@@ -133,6 +133,10 @@ packages require the corresponding [desktop smoke tests](linux-smoke.md).
   before stopping the worker so shutdown retry behavior cannot race its assertions.
   Five repeated Release runs of both ordering directions and all five targeted
   ordering/shutdown-requeue cases passed after this correction.
+- Session-disposal coverage accepts cancellation or disposal for a queued caller:
+  semaphore acquisition can win the cancellation race. It still requires the
+  stalled connection to cancel, the queued call to terminate promptly and calls
+  started after disposal to throw `ObjectDisposedException`.
 - The screenshots below come from the headless fixture with synthetic data and
   illustrate the Linux folder editor and logging settings; they do not establish
   native tray rendering, portal consent or login/logout behavior.

@@ -20,7 +20,7 @@ public sealed class DBusBackgroundPortalRequestTests
     }
 
     [LinuxDBusFact]
-    public async Task Session_DisposeCancelsStalledConnectionAndQueuedCalls()
+    public async Task Session_DisposeTerminatesStalledConnectionAndQueuedCalls()
     {
         var socketPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ifw-dbus-" + Guid.NewGuid().ToString("N"));
         using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -34,7 +34,11 @@ public sealed class DBusBackgroundPortalRequestTests
             var queued = session.GetAsync();
             await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => connecting);
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued);
+            // A waiter may acquire the released gate before semaphore cancellation
+            // wins. It then observes disposal rather than cancellation; both terminate it.
+            var queuedError = await Record.ExceptionAsync(() => queued.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.True(queuedError is OperationCanceledException or ObjectDisposedException,
+                $"Expected cancellation or disposal, received {queuedError?.GetType().Name ?? "no exception"}.");
             await Assert.ThrowsAsync<ObjectDisposedException>(() => session.GetAsync());
         }
         finally
