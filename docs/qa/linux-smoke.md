@@ -105,13 +105,14 @@ devices=dri;
 
 [Session Bus Policy]
 org.freedesktop.Notifications=talk
+org.kde.StatusNotifierWatcher=talk
 ```
 
 (The order of bus-policy lines is not deterministic.)
 
 Forbidden lines (must NOT appear): `host` in `filesystems=`,
 `session-bus` in `sockets=`, `org.freedesktop.systemd1=talk`,
-any `org.kde.*` StatusNotifierItem policy, anything `=own`, `wayland` in
+broad `org.kde.*` own-name policies, anything `=own`, `wayland` in
 `sockets=`, `xdg-pictures`, `xdg-videos`, `home`, or any other static
 filesystem grant beyond Flatpak's implicit app-private XDG dirs.
 
@@ -162,7 +163,8 @@ Steps:
 
 Expected: the picker is the GTK/KDE *portal* picker (not Avalonia's
 fallback ad-hoc one). After confirmation, the folder appears in the
-Watch list with a path like `/run/user/1000/doc/<id>/sourceA`.
+Watch list with its original host path. The saved configuration retains the
+granted `/run/user/1000/doc/<opaque-id>/sourceA` access path; host paths are display-only.
 
 Notes: if the picker hangs, check the log for
 `org.freedesktop.portal.Documents` errors — see
@@ -319,28 +321,22 @@ ShowAsync yet. Hooking it up to FlushUploadsAsync's else-branch
 ("Upload failed for {FilePath}") plus a dedup window (one toast
 per asset+error class per minute) is a small follow-up commit.
 
-#### SMK-17 — Flatpak tray-disabled banner  `H`
+#### SMK-17 — Flatpak tray and menu  `H`
 
-Setup: any supported Flatpak desktop session.
+Setup: KDE Plasma or GNOME with an enabled AppIndicator extension.
 
 Steps:
-1. Launch app.
-2. Confirm the main window shows a banner explaining that tray
-   integration is disabled in the current Flatpak package.
-3. Close the window via the X button; the process remains running.
-4. Launch the app again from the desktop launcher or terminal.
-5. Confirm the existing instance shows and activates the same window.
-6. Use the footer `Quit` button; `pgrep -f immich-folder-watch` returns
-   nothing.
+1. Launch the app and confirm its tray icon appears without a fallback banner.
+2. Close the main window, then use the tray's **Open** action to reopen it.
+3. Check the localized tooltip and **Open**, **Restart**, **Quit** menu labels.
+4. Use **Restart** and confirm synchronization reloads the saved configuration.
+5. Use **Quit** and confirm the app and tray item disappear.
+6. Relaunch, temporarily disable/re-enable the tray host, and confirm the window
+   remains reachable and the tray registers again when the host returns.
 
-Expected: no tray icon is registered and there is no
-`StatusNotifierWatcher`/`org.kde.*` D-Bus policy in the installed Flatpak
-metadata. The banner keeps the close-to-background behavior discoverable
-until a Flatpak-safe tray backend is available.
-
-Notes: Flathub no longer accepts the broad KDE D-Bus own-name grant required
-by Avalonia's current SNI backend for new apps, so the shared Flatpak package
-ships without tray support.
+Expected: the item owns `io.github.voltkraft.immich-folder-watch.Tray`; installed
+metadata contains only the narrow `org.kde.StatusNotifierWatcher=talk` grant.
+There is no broad KDE own-name grant or unfiltered session-bus access.
 
 #### SMK-18 — Background mode on bare GNOME (no AppIndicator)  `H`
 

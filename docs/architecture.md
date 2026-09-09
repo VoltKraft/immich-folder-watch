@@ -44,7 +44,7 @@ tracked in [Linux feature parity](qa/linux-parity.md).
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
-2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed on a build with tray support, the main window stays hidden and only the tray icon is shown; the Flatpak package shows the window because its current tray backend is disabled.
+2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. The tray registers with the desktop watcher; if registration fails or the watcher disappears, the application shows the window so it remains reachable. Flatpak uses the same behavior.
 3. `AppHost` constructs an `IHost` that wires:
    - `AppConfig` (loaded from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`)
    - the shared sync-state store (`sync-state.db` beside `config.yaml`)
@@ -58,6 +58,13 @@ tracked in [Linux feature parity](qa/linux-parity.md).
 7. Status changes are pushed into `SyncStatusProvider`; the ViewModel and, where enabled, the tray tooltip subscribe and re-render on the UI thread.
 8. On **Save and Apply**, both windows call the shared `ConfigApplyService`. It normalizes and validates the draft, checks required Immich permissions, and writes YAML through `AppConfigWriter` only after validation succeeds. It then awaits `AppHost.RestartAsync(newConfig)`. The replacement host reuses the same per-user database. Local validation and failed access checks do not write or restart; a restart failure is reported after saving.
 9. On startup, `LocalizationService.SetLanguage(config.Localization.Language)` resolves `auto`/`en`/`de` to a `CultureInfo` and applies it before the window is built. Runtime language changes raise `LanguageChanged`; `LocalizationProxy` rebroadcasts it as `PropertyChanged(string.Empty)` so every XAML binding (`{Binding X, Source={StaticResource Loc}}`) refreshes. The tray tooltip, where enabled, and permission list subscribe to the same event.
+
+The Linux tray exports StatusNotifierItem and DBusMenu through a dedicated D-Bus
+connection under `io.github.voltkraft.immich-folder-watch.Tray`. This namespace is
+already owned by the Flatpak app; only watcher communication needs an explicit
+`org.kde.StatusNotifierWatcher` talk rule. Availability follows acknowledged
+registration, watcher changes trigger re-registration, and disposing the
+connection withdraws the item and menu together.
 
 ## Design Decisions
 

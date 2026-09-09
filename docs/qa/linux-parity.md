@@ -15,16 +15,18 @@ acceptance.
 | Autostart | Linux requests approval once on fresh setup. The shared view model stays responsive and serializes changes. Tests cover approval, denial, timeout, cancellation, existing installations, and initialization/toggle races. |
 | Background operation and shutdown | Closing hides the window; explicit Quit closes it after stopping synchronization. Headless tests exercise hide/reopen and explicit close. Portal tests verify hiding preserves confirmed autostart. Host lifecycle tests verify pending start/restart, cancellation and disposal without UI dispatch, including partial-start cleanup and retry. Connection disposal cancels pending and queued bus connections. |
 | Tray where supported | Linux provides localized Open, Restart and Quit. The tooltip tracks connectivity, last sync and queue size. Portable tests verify text updates and language changes; native tray rendering is a desktop smoke check. |
-| Folder editing | Linux uses Choose Folder to replace/renew a portal grant while keeping source settings. Headless tests verify the displayed host path remains read-only and separate from the saved access path, including selection after removal/re-add. |
+| Folder editing | Linux uses Choose Folder to replace/renew a portal grant while keeping source settings. Headless tests verify the displayed host path remains read-only and separate from the saved access path, including selection after removal/re-add. Display lookup uses the host-path xattr or sandbox-accessible `Documents.GetHostPaths`, accepts opaque document IDs and preserves nested paths. |
 | Status, API key and navigation | Real Avalonia controls are tested for masking/reveal, semantic status tones, live theme changes, draft retention, source modes and tab visibility. |
 | Logs | File logging opens its directory. Journald opens a Flatpak-safe viewer of the latest 500 session entries; persistent history remains in the journal. Tests verify bounded retention, long-entry truncation, worker-provider replacement and the read-only window. XDG defaults are covered by view-model tests; legacy relative log directories are resolved against the configuration directory. |
 | Version and update hints | Both hosts use the existing shared GitHub checker, version provider and update view-model state. Existing update tests remain part of the portable suite. |
 
 ## Intentional platform differences
 
-- Flatpak retains its restricted permissions, portal folder access, X11/XWayland
-  runtime and disabled tray. Autostart opens its window; the launcher reopens a
-  hidden window. No broad filesystem or D-Bus permission was added.
+- Flatpak retains its restricted permissions, portal folder access and X11/XWayland
+  runtime. The tray owns only `io.github.voltkraft.immich-folder-watch.Tray` in the
+  implicit app namespace and talks to `org.kde.StatusNotifierWatcher`. Autostart
+  hides only while a tray entry point is available. GNOME needs an AppIndicator
+  extension; the launcher can always reopen the window.
 - Autostart requires portal approval. The local flag records the last confirmed
   response; the portal offers no query for changes made outside the application.
   `autostart-initialized` records that first-run setup was offered, while the
@@ -68,3 +70,22 @@ packages require the corresponding [desktop smoke tests](linux-smoke.md).
   Windows test execution and MSI creation were not performed on this Linux host.
 - Native desktop consent, tray rendering, login/logout, Flatpak package building
   and live Immich were not exercised in this validation run.
+
+## Flatpak follow-up validation on 2026-09-09
+
+- The portable suite passed 339/339 tests. Missing-album regression tests also
+  passed after removing a startup race from their seeded-download setup.
+- The Linux suite passed 37/37 tests, including 12 document-path cases and six
+  tray protocol cases. The actual folder editor verifies that switching a new
+  source to sync clears an untouched upload album suggestion.
+- Tray protocol coverage includes registration, localized menu actions, watcher
+  replacement, delayed obsolete replies and the application's restricted `xdg-dbus-proxy` policy.
+- A native probe using the production document and tray implementations resolved
+  the existing portal grant inside Flatpak, created/renamed/removed its own
+  temporary file, and received the desktop watcher's registration acknowledgement.
+- The Windows WPF Debug host cross-compiled successfully. NuGet vulnerability
+  lookup remained unavailable (`NU1900`); Windows execution and MSI validation
+  still require Windows.
+- These checks establish portal access and tray protocol operation, not visual
+  tray rendering or login/logout behavior on every supported desktop. Live
+  library transfers remain a separate installation smoke check.

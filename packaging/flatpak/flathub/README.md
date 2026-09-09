@@ -26,9 +26,9 @@ Key properties:
 - [x] `desktop-file-validate ../io.github.voltkraft.immich-folder-watch.desktop` — no warnings.
 - [x] `flatpak-builder --show-manifest io.github.voltkraft.immich-folder-watch.yml` parses cleanly when a sibling `nuget-sources.json` is present.
 - [x] Manifest `finish-args` reviewed against Flathub's "Permissions" guidance.
-- [x] StatusNotifierItem tray disabled for the Flathub build; the current
-  Avalonia tray backend requires a broad KDE D-Bus own-name grant that Flathub
-  no longer accepts for new apps.
+- [x] StatusNotifierItem uses the app-ID namespace and a narrow watcher
+  talk-name permission. A filtered D-Bus integration test verifies registration,
+  exported menu and actions without broad KDE ownership.
 - [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
 - [ ] Release tag pushed; `tag:` and `commit:` in the submission manifest match
   the version and SHA reported by `git rev-parse v<version>`.

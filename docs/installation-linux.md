@@ -40,7 +40,8 @@ release explicitly announces that the listing is available.
 
 On a fresh setup, the app requests permission to start at login once. Accept
 to enable it, or decline and enable it later in **Settings → Start on login**.
-The Flatpak autostart opens the window because the package has no tray icon.
+Autostart runs hidden when the desktop supports a tray icon; otherwise the
+window opens so the application remains reachable.
 
 1. In **Connection**, enter the Immich API URL and key, then select
    **Verify Immich Access**.
@@ -61,7 +62,8 @@ host-wide or home-directory filesystem access. Use **Choose Folder** in the
 source editor to change a folder or renew its grant while keeping the other
 source settings.
 
-The package currently uses X11/XWayland and runs without a system tray icon.
+The package uses X11/XWayland and supports a tray icon through StatusNotifierItem.
+KDE Plasma provides a tray host; GNOME requires an AppIndicator extension.
 Closing the window hides it while synchronization continues. Reopen it from
 the app launcher or the desktop's Background Apps view, and use the in-app Quit
 button to stop it completely.

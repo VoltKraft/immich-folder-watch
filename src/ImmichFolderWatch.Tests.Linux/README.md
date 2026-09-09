@@ -41,3 +41,8 @@ xUnit v3 is [Apache-2.0](https://github.com/xunit/xunit/blob/v3-3.2.2/LICENSE),
 and the xUnit Visual Studio runner 3.1.5 declares Apache-2.0 in its published
 NuGet metadata. Both licenses are compatible with this repository's AGPL-3.0-only
 license. These dependencies are used only by the test project.
+
+Linux protocol tests require `dbus-daemon` and `xdg-dbus-proxy`. They run on
+isolated buses and include the same app-ID namespace ownership and watcher
+talk rule used by Flatpak. Document-path tests cover opaque IDs, nested paths,
+xattr lookup, denied/older portals, timeout and cancellation.

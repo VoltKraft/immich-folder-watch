@@ -136,10 +136,10 @@ The planned Flathub publication is currently postponed. See
 [`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
 
 The Flatpak package runs through X11/XWayland because the current Avalonia
-Linux backend initializes X11. The Flatpak package disables Avalonia's
-StatusNotifierItem tray backend because it requires a broad KDE D-Bus own-name
-permission that Flathub no longer grants to new apps; the app shows a window
-banner and can be reopened from the launcher or Background Apps.
+Linux backend initializes X11. Its tray uses the application's own D-Bus
+namespace and supports KDE Plasma and GNOME with an AppIndicator extension.
+When no tray host is available, the app shows a banner and remains reachable
+through the launcher or Background Apps.
 
 Sandbox layout:
 

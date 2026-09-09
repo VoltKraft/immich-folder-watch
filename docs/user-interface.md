@@ -201,11 +201,12 @@ For detailed settings and paths, see [Configuration](configuration.md).
 Closing the window keeps synchronization running in the background. Windows
 provides a tray menu. On Linux, use the launcher to reopen the window and the
 footer's **Quit** button to stop the app; tray availability depends on the desktop
-and packaging. Linux may request permission to run in the background. Outside
-Flatpak, a supported tray provides **Open**, **Restart**, and **Quit**, with a
+and packaging. Linux may request permission to run in the background. A supported
+tray, including in Flatpak, provides **Open**, **Restart**, and **Quit**, with a
 localized tooltip showing server connectivity, last synchronization, and queue
 size. **Restart** reloads the saved configuration. Explicit quit waits for
-synchronization to stop. Flatpak retains its visible autostart and tray notice.
+synchronization to stop. Autostart runs hidden when a tray host is available;
+without one, or when it disappears, the window opens and shows a tray notice.
 
 ## Compatibility
 

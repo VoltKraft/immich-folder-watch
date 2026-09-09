@@ -42,7 +42,7 @@ dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.cspr
 The GUI tests use actual Avalonia controls in an isolated headless application.
 See [the test fixture guide](../src/ImmichFolderWatch.Tests.Linux/README.md) for
 synthetic screenshots, test-only dependency licenses, and coverage boundaries.
-Portal protocol tests use an isolated `dbus-daemon` on Linux. Desktop-specific
+Portal protocol tests use an isolated `dbus-daemon` and `xdg-dbus-proxy` on Linux. Desktop-specific
 acceptance remains in [Linux smoke tests](qa/linux-smoke.md).
 
 ## Run

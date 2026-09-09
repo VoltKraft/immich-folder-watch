@@ -63,7 +63,6 @@ public sealed partial class App : Application
             var startHidden = (desktop.Args ?? Array.Empty<string>()).Any(a =>
                 string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase));
-            var isFlatpak = File.Exists("/.flatpak-info");
 
             // Observe unexpected background failures and retain their diagnostic
             // details even when a third-party asynchronous operation is abandoned.
@@ -182,46 +181,31 @@ public sealed partial class App : Application
             var theme = provider.GetRequiredService<IThemeProvider>();
             theme.Initialize();
 
-            var trayDisabledForFlatpak = isFlatpak;
-            if (trayDisabledForFlatpak)
+            _trayHost = provider.GetRequiredService<AvaloniaTrayHost>();
+            _trayHost.OpenRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                viewModel.TrayStatusMessage =
-                    ImmichFolderWatch.App.Shared.Resources.Strings.Tray_FlatpakUnsupported;
-            }
-            else
+                _mainWindow?.Show();
+                _mainWindow?.Activate();
+            });
+            _trayHost.RestartRequested += (_, _) => _ = RestartSyncAsync();
+            _trayHost.QuitRequested += (_, _) => _ = ShutdownAsync();
+            _trayHost.TrayAvailable += (_, _) => viewModel.TrayStatusMessage = string.Empty;
+            _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                _trayHost = provider.GetRequiredService<AvaloniaTrayHost>();
-                _trayHost.OpenRequested += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+                // A missing or disappearing tray must never strand an autostarted
+                // process without a visible way to reach the configuration window.
+                if (_mainWindow is { IsVisible: false })
                 {
-                    _mainWindow?.Show();
-                    _mainWindow?.Activate();
-                });
-                _trayHost.RestartRequested += (_, _) => _ = RestartSyncAsync();
-                _trayHost.QuitRequested += (_, _) => _ = ShutdownAsync();
-                _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
-                    // If we started hidden (autostart) but the tray fails,
-                    // surface the GUI so the user can see the app is alive
-                    // — otherwise it'd be running invisibly with no entry
-                    // point until they relaunched the .desktop file.
-                    if (startHidden && _mainWindow is { IsVisible: false })
-                    {
-                        _mainWindow.Show();
-                        _mainWindow.Activate();
-                    }
-                });
-                _ = _trayHost.StartAsync(this);
-            }
+                    _mainWindow.Show();
+                    _mainWindow.Activate();
+                }
+            });
+            _ = _trayHost.StartAsync(this, _shutdown.Token);
 
-            // ClassicDesktopStyleApplicationLifetime.Start() auto-Show()s
-            // whatever is assigned to MainWindow once we return from
-            // OnFrameworkInitializationCompleted. To honour --background
-            // we leave it unassigned only when a tray entry point can
-            // bring it back. The Flatpak package currently disables the
-            // tray, so autostart launches visibly instead of stranding
-            // the process without a GUI entry point.
-            var shouldStartHidden = startHidden && !trayDisabledForFlatpak;
+            // Start() automatically shows desktop.MainWindow. A background launch
+            // bootstraps directly; failed tray registration shows the window above.
+            var shouldStartHidden = startHidden;
             if (!shouldStartHidden)
             {
                 desktop.MainWindow = _mainWindow;
@@ -237,11 +221,9 @@ public sealed partial class App : Application
             }
             void RefreshTrayMessage(object? sender, EventArgs args)
             {
-                viewModel.TrayStatusMessage = trayDisabledForFlatpak
-                    ? ImmichFolderWatch.App.Shared.Resources.Strings.Tray_FlatpakUnsupported
-                    : _trayHost is { IsTrayIconRegistered: true }
-                        ? string.Empty
-                        : ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+                viewModel.TrayStatusMessage = _trayHost is { IsTrayIconRegistered: true }
+                    ? string.Empty
+                    : ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
             }
             LocalizationService.Instance.LanguageChanged += RefreshTrayMessage;
             desktop.ShutdownRequested += (_, _) =>
