@@ -531,8 +531,10 @@ public sealed class FolderWatchWorkerPersistenceTests
         await worker.StopAsync(CancellationToken.None);
     }
 
-    [Fact]
-    public async Task RestartSkipsUnchangedFile_ThenUploadsSingleModification()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(200)]
+    public async Task RestartSkipsUnchangedFile_ThenUploadsSingleModification(int uploadDelayMilliseconds)
     {
         using var directory = new TemporaryDirectory();
         var watchDirectory = Path.Combine(directory.Path, "watch");
@@ -541,7 +543,14 @@ public sealed class FolderWatchWorkerPersistenceTests
         await File.WriteAllTextAsync(filePath, "first version");
 
         var databasePath = Path.Combine(directory.Path, "sync-state.db");
-        var client = new RecordingAssetClient();
+        var client = new RecordingAssetClient
+        {
+            UploadHandler = async (_, count, cancellationToken) =>
+            {
+                await Task.Delay(uploadDelayMilliseconds, cancellationToken);
+                return UploadAssetResult.Success($"asset-{count}");
+            },
+        };
         var config = CreateConfig(watchDirectory, WatchSourceSyncModes.UploadAll);
 
         var firstSuccess = await RunUntilUploadCountAsync(config, databasePath, client, expectedCount: 1);
@@ -553,6 +562,7 @@ public sealed class FolderWatchWorkerPersistenceTests
         await Task.Delay(TimeSpan.FromMilliseconds(1500));
         Assert.Equal(1, client.UploadCount);
         await secondWorker.StopAsync(CancellationToken.None);
+        Assert.Equal(1, client.UploadCount);
         Assert.Equal(firstSuccess, secondStatus.LastSyncCompletedUtc);
         Assert.Equal(firstSuccess, await GetLastSuccessfulSyncAsync(syncConfig, databasePath));
 
@@ -561,8 +571,14 @@ public sealed class FolderWatchWorkerPersistenceTests
         using var thirdWorker = CreateWorker(syncConfig, databasePath, client, syncStatusProvider: thirdStatus);
         await thirdWorker.StartAsync(CancellationToken.None);
         await client.WaitForUploadCountAsync(2, TimeSpan.FromSeconds(8));
+        // The client counts attempts before the worker persists success. Stopping
+        // earlier can cancel that work and replay the upload during shutdown.
+        await WaitUntilAsync(
+            () => thirdStatus.LastSyncCompletedUtc > firstSuccess,
+            TimeSpan.FromSeconds(8));
         Assert.Equal(2, client.UploadCount);
         await thirdWorker.StopAsync(CancellationToken.None);
+        Assert.Equal(2, client.UploadCount);
         var secondSuccess = Assert.IsType<DateTimeOffset>(thirdStatus.LastSyncCompletedUtc);
         Assert.True(secondSuccess > firstSuccess);
         Assert.Equal(secondSuccess, await GetLastSuccessfulSyncAsync(syncConfig, databasePath));
@@ -573,6 +589,7 @@ public sealed class FolderWatchWorkerPersistenceTests
         await Task.Delay(TimeSpan.FromMilliseconds(1500));
         Assert.Equal(2, client.UploadCount);
         await fourthWorker.StopAsync(CancellationToken.None);
+        Assert.Equal(2, client.UploadCount);
         Assert.Equal(secondSuccess, fourthStatus.LastSyncCompletedUtc);
 
         var store = new SqliteSyncStateStore(databasePath);
@@ -700,7 +717,9 @@ public sealed class FolderWatchWorkerPersistenceTests
         }
 
         Assert.NotEmpty(await store.GetSourceEntriesAsync(scope, sourcePath));
+        await WaitUntilAsync(() => status.LastSyncCompletedUtc.HasValue, TimeSpan.FromSeconds(8));
         await worker.StopAsync(CancellationToken.None);
+        Assert.Equal(expectedCount, client.UploadCount);
         var lastSuccess = Assert.IsType<DateTimeOffset>(status.LastSyncCompletedUtc);
         Assert.Equal(lastSuccess, await store.GetLastSuccessfulSyncAsync(scope));
         return lastSuccess;
