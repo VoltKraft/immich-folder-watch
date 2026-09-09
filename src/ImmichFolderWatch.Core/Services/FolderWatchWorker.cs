@@ -810,6 +810,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
     {
         _syncStatusProvider.ReportPullCycleStarted();
         var completed = false;
+        var pending = new List<PendingDownload>();
+        var deletionChecks = new List<(WatchSourceContext Context, HashSet<string> RemoteAssetIds)>();
         try
         {
             foreach (var context in _sources)
@@ -825,11 +827,11 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 {
                     if (context.UseFlatAlbum)
                     {
-                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, pending, cancellationToken);
                     }
                     else if (context.UseSubdirsAsAlbums)
                     {
-                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
+                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, pending, cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
@@ -846,11 +848,15 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
                 }
 
-                if (pullSucceeded && context.RemoteDeleteSafe)
+                if (pullSucceeded && context.RemoteDeleteSafe
+                    && _sources.Count(source => source.IsSyncMode && PathComparer.Equals(source.NormalizedRoot, context.NormalizedRoot)) == 1)
                 {
-                    await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                    deletionChecks.Add((context, remoteAssetIds));
                 }
             }
+            await DownloadAssetsAsync(pending, cancellationToken);
+            foreach (var (context, remoteAssetIds) in deletionChecks)
+                await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
             completed = true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -887,6 +893,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
         var stale = _stateByPath
             .Where(entry =>
                 IsPathWithinSource(context, entry.Key)
+                && PathComparer.Equals(NormalizeDirectory(entry.Value.SourcePath), context.NormalizedRoot)
                 && entry.Value.Status == SyncEntryStatus.Synchronized
                 && !string.IsNullOrWhiteSpace(entry.Value.AssetId)
                 && !remoteAssetIds.Contains(entry.Value.AssetId))
@@ -937,6 +944,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
     private async Task<bool> PullFlatAlbumAsync(
         WatchSourceContext context,
         HashSet<string> remoteAssetIds,
+        List<PendingDownload> pending,
         CancellationToken cancellationToken)
     {
         var result = await _immichAssetClient.GetAlbumAssetsAsync(context.Source.AlbumName, cancellationToken);
@@ -972,13 +980,14 @@ public sealed partial class FolderWatchWorker : BackgroundService
             }
         }
 
-        await DownloadAssetsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken);
+        pending.AddRange(await PrepareDownloadsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken));
         return true;
     }
 
     private async Task<bool> PullSubdirsAsAlbumsAsync(
         WatchSourceContext context,
         HashSet<string> remoteAssetIds,
+        List<PendingDownload> pending,
         CancellationToken cancellationToken)
     {
         var allOk = true;
@@ -993,7 +1002,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     remoteAssetIds.Add(asset.Id);
                 }
             }
-            await DownloadAssetsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken);
+            pending.AddRange(await PrepareDownloadsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken));
         }
         else
         {
@@ -1063,19 +1072,24 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 }
             }
 
-            await DownloadAssetsAsync(context, albumDir, albumResult.Assets, cancellationToken);
+            pending.AddRange(await PrepareDownloadsAsync(context, albumDir, albumResult.Assets, cancellationToken));
         }
 
         return allOk;
     }
 
-    private async Task DownloadAssetsAsync(
+    private sealed record PendingDownload(WatchSourceContext Context, AlbumAssetSummary Asset, string DestinationPath)
+    {
+        public DateTimeOffset? SortTimestamp => Asset.FileCreatedAt ?? Asset.FileModifiedAt;
+    }
+
+    private async Task<IReadOnlyList<PendingDownload>> PrepareDownloadsAsync(
         WatchSourceContext context,
         string targetDirectory,
         IReadOnlyList<AlbumAssetSummary> assets,
         CancellationToken cancellationToken)
     {
-        var pending = new List<(AlbumAssetSummary Asset, string DestinationPath)>();
+        var pending = new List<PendingDownload>();
 
         foreach (var asset in assets)
         {
@@ -1165,28 +1179,40 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 continue;
             }
 
-            pending.Add((asset, destinationPath));
+            pending.Add(new PendingDownload(context, asset, destinationPath));
         }
 
-        if (pending.Count == 0)
-        {
-            return;
-        }
+        return pending;
+    }
+
+    private async Task DownloadAssetsAsync(IReadOnlyList<PendingDownload> candidates, CancellationToken cancellationToken)
+    {
+        // Gather every source/album before transferring: an older unassigned
+        // file must not run ahead of today's photo in a later album.
+        var datedFirst = candidates.OrderBy(item => !item.SortTimestamp.HasValue);
+        var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
+            ? datedFirst.ThenBy(item => item.SortTimestamp)
+            : datedFirst.ThenByDescending(item => item.SortTimestamp);
+        var pending = ordered.DistinctBy(item => NormalizePath(item.DestinationPath), PathComparer).ToList();
+        if (pending.Count == 0) return;
 
         _syncStatusProvider.ReportPullStarted(pending.Count);
         try
         {
             var downloadedCount = 0;
-            var datedFirst = pending.OrderBy(item => !item.Asset.FileModifiedAt.HasValue);
-            var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
-                ? datedFirst.ThenBy(item => item.Asset.FileModifiedAt)
-                : datedFirst.ThenByDescending(item => item.Asset.FileModifiedAt);
-            foreach (var (asset, destinationPath) in ordered)
+            foreach (var (context, asset, destinationPath) in pending)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _syncStatusProvider.ReportDownloadStarted(destinationPath);
                 var normalized = NormalizePath(destinationPath);
+                // Collection can take time. Recheck local edits and deletions
+                // immediately before download rather than overwriting a new file.
+                if (File.Exists(destinationPath) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
+                {
+                    _syncStatusProvider.ReportDownloadSkipped();
+                    continue;
+                }
+                _syncStatusProvider.ReportDownloadStarted(destinationPath);
                 _downloadsInProgress[normalized] = 0;
                 try
                 {
@@ -1250,9 +1276,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
             if (downloadedCount > 0)
             {
                 _logger.LogInformation(
-                    "Sync pull downloaded {Count} new file(s) into {Directory}.",
-                    downloadedCount,
-                    targetDirectory);
+                    "Sync pull downloaded {Count} new file(s) across configured sources.",
+                    downloadedCount);
             }
         }
         finally

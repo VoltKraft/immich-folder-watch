@@ -864,10 +864,12 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _fileEvent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _reconciliationCount;
+        private readonly int _expectedReconciliations;
 
-        public InitialReconciliationLogger(string syncMode = WatchSourceSyncModes.UploadNew)
+        public InitialReconciliationLogger(string syncMode = WatchSourceSyncModes.UploadNew, int sourceCount = 1)
         {
             _reconciliationMessagePrefix = $"Persistent reconciliation for {syncMode}";
+            _expectedReconciliations = 2 * sourceCount;
         }
 
         public Task WaitUntilReadyAsync(TimeSpan timeout) => _ready.Task.WaitAsync(timeout);
@@ -899,7 +901,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
                 return;
             }
 
-            if (Interlocked.Increment(ref _reconciliationCount) == 2)
+            if (Interlocked.Increment(ref _reconciliationCount) == _expectedReconciliations)
             {
                 _ready.TrySetResult();
             }
@@ -929,6 +931,8 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         public ConcurrentQueue<string> DownloadedAssets { get; } = new();
 
         public IReadOnlyList<AlbumAssetSummary>? RemoteAssets { get; init; }
+        public IReadOnlyList<AlbumInfo> RemoteAlbums { get; init; } = [];
+        public IReadOnlyList<AlbumAssetSummary> UnassignedAssets { get; init; } = [];
 
         public Func<string, AlbumAssetsResult>? AlbumAssetsHandler { get; init; }
 
@@ -981,16 +985,17 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
         public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken)
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             await File.WriteAllTextAsync(destinationPath, assetId, cancellationToken);
             DownloadedAssets.Enqueue(assetId);
             return DownloadAssetResult.Success();
         }
 
         public Task<AlbumListResult> ListAlbumsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(AlbumListResult.Success([]));
+            Task.FromResult(AlbumListResult.Success(RemoteAlbums));
 
         public Task<UnassignedAssetsResult> GetUnassignedAssetsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(UnassignedAssetsResult.Success([]));
+            Task.FromResult(UnassignedAssetsResult.Success(UnassignedAssets));
 
         public Task<AlbumMembershipUpdateResult> AddAssetsToAlbumAsync(string albumName, IReadOnlyList<string> assetIds, CancellationToken cancellationToken) =>
             Task.FromResult(AlbumMembershipUpdateResult.Success());

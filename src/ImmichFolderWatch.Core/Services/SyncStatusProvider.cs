@@ -298,7 +298,7 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Starts one album's downloads, accumulating progress and retaining errors inside an active pull cycle.
+    /// Starts a group of downloads, accumulating progress and retaining errors inside an active pull cycle.
     /// Without an enclosing cycle, starts a standalone transfer operation.
     /// </summary>
     public void ReportPullStarted(int pullSize)
@@ -340,6 +340,16 @@ public sealed class SyncStatusProvider : INotifyPropertyChanged
             ProcessedFileCount++;
             CurrentlyDownloadingFile = null;
             AdvanceLastSyncCompleted(completedUtc ?? DateTimeOffset.UtcNow, syncSession);
+        }
+    }
+
+    /// <summary>Counts a no-longer-needed candidate without recording a transfer or changing last-sync history.</summary>
+    public void ReportDownloadSkipped()
+    {
+        lock (_gate)
+        {
+            ProcessedFileCount++;
+            CurrentlyDownloadingFile = null;
         }
     }
 

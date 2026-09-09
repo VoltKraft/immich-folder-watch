@@ -150,11 +150,18 @@ directions. `watch.transferOrder` accepts `newestFirst` (the default) or
 `oldestFirst`; empty or unrecognized values fall back to `newestFirst`.
 Uploads use the local UTC last-modified time sampled when queued and are ordered
 across ready queued files before selecting a batch. First attempts take priority
-over retries; the selected timestamp order applies within each group. Downloads are ordered within
-each source/album pull by the server's `fileModifiedAt`, falling back to
-`fileCreatedAt` and then `createdAt`. Files with no timestamp come last;
-equal timestamps retain queue/API order.
-This does not interrupt a running transfer or reorder the source/album traversal.
+over retries; the selected timestamp order applies within each group. Downloads are collected
+across all configured sync sources, albums and unassigned files before transfer.
+The shared download queue uses original `fileCreatedAt`, falling back to the
+existing modification/upload timestamp when original creation is unavailable.
+Files with no timestamp come last; equal timestamps retain source/API order.
+Metadata collection can take time before the first download. A running transfer
+is not interrupted; newly discovered assets join the next pull cycle. Local
+files created or deleted during collection are checked again before transfer.
+An album-listing failure still prevents remote-delete propagation for that source.
+Remote-delete propagation only removes mappings owned by that source. If multiple
+sync sources share exactly the same local root, automatic remote-to-local deletion
+is disabled because ownership cannot be distinguished; use separate folders.
 Use **Save and Apply** to activate a changed order.
 
 Existing configurations without `transferOrder` automatically use `newestFirst`
