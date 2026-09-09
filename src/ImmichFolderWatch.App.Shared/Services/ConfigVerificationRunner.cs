@@ -56,6 +56,28 @@ public sealed class ConfigVerificationRunner
             : VerificationResult.Passed();
     }
 
+    /// <summary>
+    /// Clears in-progress badges after an unexpected access-check failure while retaining which
+    /// permissions are required by the current draft. The URL failure blocks configuration apply.
+    /// </summary>
+    public static ImmichAccessCheckResult CreateUnexpectedFailureResult(Exception exception, AppConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(config);
+
+        const string message = "Not checked because the Immich access check failed unexpectedly.";
+        return new ImmichAccessCheckResult
+        {
+            UrlState = CheckState.Failed,
+            UrlMessage = $"Immich access check failed unexpectedly: {exception.Message}",
+            ApiKeyState = CheckState.NotChecked,
+            ApiKeyMessage = message,
+            PermissionsState = CheckState.NotChecked,
+            PermissionsMessage = message,
+            PermissionResults = CreateNotCheckedPermissionResults(message, RequiresAlbumPermissions(config), RequiresSyncPermissions(config)),
+        };
+    }
+
     private static HttpClient CreateHttpClient(AppConfig normalizedConfig)
     {
         var httpClient = new HttpClient
@@ -98,73 +120,95 @@ public sealed class ConfigVerificationRunner
             ApiKeyMessage = string.IsNullOrWhiteSpace(apiKeyError) ? "Not checked yet." : apiKeyError,
             PermissionsState = CheckState.NotChecked,
             PermissionsMessage = Message,
-            PermissionResults =
-            [
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Asset Upload",
-                    PermissionName = "asset.upload",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = true,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Album Read",
-                    PermissionName = "album.read",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireAlbumPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Album Create",
-                    PermissionName = "album.create",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireAlbumPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Add Asset To Album",
-                    PermissionName = "albumAsset.create",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireAlbumPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Asset Download",
-                    PermissionName = "asset.download",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireSyncPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Asset Read",
-                    PermissionName = "asset.read",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireSyncPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Asset Delete",
-                    PermissionName = "asset.delete",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireSyncPermissions,
-                },
-                new ImmichPermissionCheckResult
-                {
-                    DisplayName = "Remove Asset From Album",
-                    PermissionName = "albumAsset.delete",
-                    State = CheckState.NotChecked,
-                    Message = Message,
-                    BlocksConfigVerification = requireSyncPermissions,
-                },
-            ],
+            PermissionResults = CreateNotCheckedPermissionResults(Message, requireAlbumPermissions, requireSyncPermissions),
         };
+    }
+
+    private static IReadOnlyList<ImmichPermissionCheckResult> CreateNotCheckedPermissionResults(
+        string message, bool requireAlbumPermissions, bool requireSyncPermissions)
+    {
+        return
+        [
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Asset Upload",
+                PermissionName = "asset.upload",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = true,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Album Read",
+                PermissionName = "album.read",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireAlbumPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Album Create",
+                PermissionName = "album.create",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireAlbumPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Add Asset To Album",
+                PermissionName = "albumAsset.create",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireAlbumPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Asset Download",
+                PermissionName = "asset.download",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Asset Read",
+                PermissionName = "asset.read",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Asset Delete",
+                PermissionName = "asset.delete",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Remove Asset From Album",
+                PermissionName = "albumAsset.delete",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Album Delete",
+                PermissionName = "album.delete",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+            new ImmichPermissionCheckResult
+            {
+                DisplayName = "Album Update",
+                PermissionName = "album.update",
+                State = CheckState.NotChecked,
+                Message = message,
+                BlocksConfigVerification = requireSyncPermissions,
+            },
+        ];
     }
 }

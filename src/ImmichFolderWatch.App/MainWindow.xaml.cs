@@ -434,38 +434,16 @@ public sealed partial class MainWindow : Window
         {
             var configPath = InstallationPaths.GetConfigPath();
 
-            ViewModel.SetImmichCheckInProgress();
             ViewModel.OperationMessage = Strings.Op_CheckingConfig;
-
-            var accessResult = await _verificationRunner.CheckImmichAccessAsync(
-                draftConfig,
-                configPath,
-                CancellationToken.None);
-            ViewModel.ApplyImmichCheckResult(accessResult);
-
-            var verificationResult = _verificationRunner.BuildVerificationResult(
-                draftConfig,
-                configPath,
-                accessResult);
-
+            var verificationResult = await new ConfigApplyService().ApplyAsync(
+                draftConfig, configPath, _appHost.RestartAsync,
+                accessChecked: ViewModel.ApplyImmichCheckResult,
+                saving: () => ViewModel.OperationMessage = Strings.Op_SavingRestarting);
             if (!verificationResult.Success)
             {
                 ViewModel.OperationMessage = string.Join(Environment.NewLine, verificationResult.Errors);
                 return;
             }
-
-            ViewModel.OperationMessage = Strings.Op_SavingRestarting;
-
-            var configDirectory = Path.GetDirectoryName(configPath);
-            if (!string.IsNullOrWhiteSpace(configDirectory))
-            {
-                Directory.CreateDirectory(configDirectory);
-            }
-
-            var yaml = new AppConfigWriter().Serialize(draftConfig);
-            await File.WriteAllTextAsync(configPath, yaml);
-
-            await _appHost.RestartAsync(draftConfig);
 
             LoadConfigFromDisk(configPath, resetImmichCheckStatus: false);
             ViewModel.OperationMessage = string.IsNullOrEmpty(_appHost.LastLoggingWarning)
