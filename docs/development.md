@@ -31,6 +31,20 @@ dotnet build tools/BrandAssetGen/BrandAssetGen.csproj -c Debug
 dotnet test ImmichFolderWatch.sln -c Debug
 ```
 
+On Linux, build the Avalonia host and run both portable and Linux GUI tests:
+
+```bash
+dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj -c Debug
+dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj -c Debug
+dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj -c Debug
+```
+
+The GUI tests use actual Avalonia controls in an isolated headless application.
+See [the test fixture guide](../src/ImmichFolderWatch.Tests.Linux/README.md) for
+synthetic screenshots, test-only dependency licenses, and coverage boundaries.
+Portal protocol tests use an isolated `dbus-daemon` on Linux. Desktop-specific
+acceptance remains in [Linux smoke tests](qa/linux-smoke.md).
+
 ## Run
 
 ```bash

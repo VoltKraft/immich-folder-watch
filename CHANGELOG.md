@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Brought Linux configuration apply and initial access checks in line with Windows, including local validation, required Immich permissions, shared YAML writing, and explicit failure states.
+- Applied configured startup language on Linux and preserved language preferences when saving on both platforms.
+- Waited for desktop portal approval before confirming Linux autostart, requested it once on fresh setup, and preserved the choice when hiding the window. Permission dialogs no longer block the UI.
+- Restored Linux tray restart, live localized status tooltips, semantic status colors, and graceful explicit shutdown while retaining Flatpak-specific tray and startup behavior.
+
+### Added
+- Added a portal folder replacement action that preserves source settings and a Flatpak-safe session log viewer for Journald logging.
+- Added Linux headless GUI regressions, isolated portal protocol tests, and configuration-apply/autostart/language coverage.
+
 ### Changed
 - Replaced the app logo with an open golden folder and a compact five-color flower inspired by Immich. The transparent SVG has no white outlines or outer padding, allowing generated icons to use the full available width.
 

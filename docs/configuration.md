@@ -196,9 +196,11 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - New sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos). Edit these under the selected folder's **File filters** tab.
 - In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
 - `logging.target` controls where logs are written. Valid values:
-  - `eventLog` (default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
-  - `file`: writes to a daily-rotated text file under `logging.logDirectory`. The GUI's **Open Logs** button opens the directory in Explorer.
-  - Missing, blank, or unknown values normalize to `eventLog`. Pre-2.3 configs therefore load unchanged but switch to Event Log on next save.
+  - `eventLog` (Windows default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
+  - `file`: writes to a daily-rotated text file under `logging.logDirectory`. The GUI's **Open Logs** button opens the directory in the platform file manager.
+  - `journald` (Linux default): writes systemd-formatted output to the system journal. **Open Logs** shows recent session entries without granting Flatpak access to host logs.
+  - Missing, blank, or unknown values normalize to `eventLog`; the Linux host coerces unsupported targets to `journald`.
+  - Fresh Linux UI settings use the platform XDG state directory for file logs. Existing absolute directories are retained; legacy relative directories are resolved against the configuration directory before editing.
   - If the Event Log source is not registered (e.g. xcopy or developer install), the app falls back to file logging and surfaces a warning in the UI.
 - `watch.sources[].albumName` is optional. Leave it empty to upload files without assigning them to an Immich album.
 - If `watch.sources[].albumName` is set, uploads are added to that album and the daemon creates the album automatically if it does not exist yet.
@@ -231,5 +233,5 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - In the Windows GUI, a newly added source suggests the folder name as the album name once; if you clear the field afterwards, it stays empty.
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
-- Existing relative `logging.logDirectory` values still run after normalization, but the Windows GUI rewrites them to an absolute path on the next successful save.
-- `localization.language` selects the GUI language. `auto` picks German when the Windows UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.
+- Existing relative `logging.logDirectory` values still run after normalization; both GUIs rewrite them to an absolute path on the next successful save.
+- `localization.language` selects the GUI language. `auto` picks German when the operating system UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.

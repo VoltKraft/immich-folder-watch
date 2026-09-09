@@ -38,6 +38,9 @@
   - Unit tests for config parsing, readiness checks, batching/dedup
   - Unit tests for config verification, file filtering, installation paths, ViewModel state
 
+The Linux-specific acceptance matrix and intentional platform differences are
+tracked in [Linux feature parity](qa/linux-parity.md).
+
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
@@ -53,7 +56,7 @@
 5. The worker reconciles local metadata in the background. The source path and relative file path identify a file within an account context; size and UTC modification time form the fast fingerprint. Matching files are skipped without hashing, API calls, uploads, or downloads. New or changed files continue through readiness checks, deduplication, and transfer batching.
 6. A successful upload is committed only after the transfer, any requested album placement, and a final check that the local file did not change during transfer. A download is committed only after its temporary file has been atomically renamed into place. Tombstones preserve completed deletion and move decisions across restarts.
 7. Status changes are pushed into `SyncStatusProvider`; the ViewModel and, where enabled, the tray tooltip subscribe and re-render on the UI thread.
-8. On **Save and Apply**, the ViewModel writes the new YAML and `AppHost.RestartAsync(newConfig)` tears down and rebuilds the internal host. The replacement host reuses the same per-user database.
+8. On **Save and Apply**, both windows call the shared `ConfigApplyService`. It normalizes and validates the draft, checks required Immich permissions, and writes YAML through `AppConfigWriter` only after validation succeeds. It then awaits `AppHost.RestartAsync(newConfig)`. The replacement host reuses the same per-user database. Local validation and failed access checks do not write or restart; a restart failure is reported after saving.
 9. On startup, `LocalizationService.SetLanguage(config.Localization.Language)` resolves `auto`/`en`/`de` to a `CultureInfo` and applies it before the window is built. Runtime language changes raise `LanguageChanged`; `LocalizationProxy` rebroadcasts it as `PropertyChanged(string.Empty)` so every XAML binding (`{Binding X, Source={StaticResource Loc}}`) refreshes. The tray tooltip, where enabled, and permission list subscribe to the same event.
 
 ## Design Decisions
