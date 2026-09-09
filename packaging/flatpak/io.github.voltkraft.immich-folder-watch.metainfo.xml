@@ -88,13 +88,30 @@
   </branding>
 
   <releases>
-    <release version="2.10.1" date="2026-09-08">
+    <release version="2.11.0" date="2026-09-09">
       <description>
         <p>Fixed:</p>
         <ul>
-          <li>Restored Last Sync from the per-user synchronization database when starting a new session, before contacting Immich. Successful uploads and downloads persist the same timestamp shown in the UI.</li>
-          <li>Kept transfer history after local deletion and state cleanup, isolated it by Immich account context, and prevented late completions from a previous worker from replacing the current account's displayed history.</li>
-          <li>Initialized existing installations' history once from available synchronized records. Empty scans, failures, skips, and later metadata-only changes do not advance Last Sync.</li>
+          <li>Skipped native Linux D-Bus tests explicitly on other operating systems so the Windows solution test job remains compatible.</li>
+          <li>Applied download order globally across sync sources, albums and unassigned assets, using original creation time first so newer photos in later albums no longer wait behind older unassigned files.</li>
+          <li>Restored original creation dates for downloads: Linux uses the modification date; Windows sets the creation date and preserves the remote modification date. Existing unchanged download mappings are corrected with durable recovery that prevents timestamp-only reuploads.</li>
+          <li>Enabled Flatpak tray integration through the app's own D-Bus namespace, with menu actions and recovery when the desktop tray host returns.</li>
+          <li>Resolved original folder display paths using sandbox-accessible document metadata and opaque portal IDs while retaining granted access paths for synchronization.</li>
+          <li>Removed untouched automatic album suggestions when selecting bidirectional sync and reported missing named albums as actionable sync errors with automatic recovery.</li>
+          <li>Packaged the current generated square PNG icon instead of stale or non-square launcher assets.</li>
+          <li>Brought Linux configuration apply and initial access checks in line with Windows, including local validation, required Immich permissions, shared YAML writing, and explicit failure states.</li>
+          <li>Applied configured startup language on Linux and preserved language preferences when saving on both platforms.</li>
+          <li>Waited for desktop portal approval before confirming Linux autostart, requested it once on fresh setup, and preserved the choice when hiding the window. Permission dialogs no longer block the UI.</li>
+          <li>Restored Linux tray restart, live localized status tooltips, semantic status colors, and graceful explicit shutdown while retaining Flatpak-specific tray and startup behavior.</li>
+        </ul>
+        <p>Added:</p>
+        <ul>
+          <li>Added a portal folder replacement action that preserves source settings and a Flatpak-safe session log viewer for Journald logging.</li>
+          <li>Added Linux headless GUI regressions, isolated portal protocol tests, and configuration-apply/autostart/language coverage.</li>
+        </ul>
+        <p>Changed:</p>
+        <ul>
+          <li>Replaced the app logo with an open golden folder and a compact five-color flower inspired by Immich. The transparent SVG has no white outlines or outer padding, allowing generated icons to use the full available width.</li>
         </ul>
       </description>
     </release>

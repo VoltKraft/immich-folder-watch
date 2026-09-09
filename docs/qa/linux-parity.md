@@ -107,3 +107,30 @@ packages require the corresponding [desktop smoke tests](linux-smoke.md).
 - The Linux desktop build and all 37 Linux tests passed. The Windows WPF host
   cross-compiled successfully on Linux; native Windows execution remains unverified.
   NuGet vulnerability lookup emitted `NU1900`; compilation had no errors.
+
+## 2.11.0 integration validation
+
+- The release branch contains the fetched `origin/main` baseline without divergent
+  upstream commits. Version 2.11.0 includes the backward-compatible Linux desktop
+  additions and synchronization fixes documented in the changelog.
+- Download-order regression tests cover both directions across sources, albums
+  and unassigned assets, original creation dates, unknown dates, concurrent local
+  files, failed listings and overlapping source roots. Skips complete progress
+  without advancing transfer history.
+- Native Linux D-Bus tests use explicit platform skips on Windows. Portable and
+  headless UI cases remain available to the full Windows solution test job.
+- Release validation: 374 portable tests, 37 Linux tests and 15 release-tooling
+  tests passed. Linux and Windows WPF Release hosts compiled successfully on Linux.
+  AppStream, desktop entry and Flatpak manifest validation passed against committed
+  line endings. NuGet vulnerability lookup remained unavailable (`NU1900`).
+- The preceding fd9a315 development Flatpak was built, test-imported and installed;
+  installed assemblies matched the build. The version-only release preparation
+  does not constitute native Windows/MSI or ARM64 Flatpak validation. Those remain
+  required in their native CI/release jobs before publishing artifacts.
+- The screenshots below come from the headless fixture with synthetic data and
+  illustrate the Linux folder editor and logging settings; they do not establish
+  native tray rendering, portal consent or login/logout behavior.
+
+![Linux folder editor, light theme](images/linux-folders-2.11.0.png)
+
+![Linux logging settings, dark theme](images/linux-logging-2.11.0.png)
