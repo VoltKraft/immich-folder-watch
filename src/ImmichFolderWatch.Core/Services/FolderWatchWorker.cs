@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.Core.Services;
 
-public sealed class FolderWatchWorker : BackgroundService
+public sealed partial class FolderWatchWorker : BackgroundService
 {
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase
@@ -169,23 +169,26 @@ public sealed class FolderWatchWorker : BackgroundService
 
         _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
 
-        if (_immichRealtimeClient is not null)
-        {
-            _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
-            _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
-        }
-
-        await LoadPersistedStateAsync(stoppingToken);
-        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: true);
-        await PullFromImmichAsync(stoppingToken);
-        await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: false);
-
-        using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        var lastFlush = DateTimeOffset.UtcNow;
-        var lastAlbumPull = DateTimeOffset.UtcNow;
-
+        var timestampRepairFailed = false;
+        var timestampRecoveryCompleted = false;
         try
         {
+            await LoadPersistedStateAsync(stoppingToken);
+            await RecoverTimestampRepairsAsync(stoppingToken);
+            timestampRecoveryCompleted = true;
+            if (_immichRealtimeClient is not null)
+            {
+                _immichRealtimeClient.RemoteChangeDetected += OnRemoteChangeDetected;
+                _ = Task.Run(() => _immichRealtimeClient.StartAsync(stoppingToken), stoppingToken);
+            }
+
+            await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: true);
+            await PullFromImmichAsync(stoppingToken);
+            await ReconcileExistingFilesAsync(stoppingToken, deferUnknownSyncFiles: false);
+
+            using var loopTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            var lastFlush = DateTimeOffset.UtcNow;
+            var lastAlbumPull = DateTimeOffset.UtcNow;
             while (await loopTimer.WaitForNextTickAsync(stoppingToken))
             {
                 if (DateTimeOffset.UtcNow - _lastPollingSweep >= PollingSweepInterval)
@@ -232,8 +235,15 @@ public sealed class FolderWatchWorker : BackgroundService
         {
             _logger.LogInformation("Folder watch worker received shutdown signal.");
         }
+        catch (TimestampRepairException ex)
+        {
+            timestampRepairFailed = true;
+            _syncStatusProvider.ReportSyncFailed("Timestamp correction could not be completed. Restart synchronization to recover safely.");
+            _logger.LogError(ex, "Synchronization paused to preserve a pending timestamp correction.");
+        }
         finally
         {
+            DisposeWatchers();
             if (_immichRealtimeClient is not null)
             {
                 _immichRealtimeClient.RemoteChangeDetected -= OnRemoteChangeDetected;
@@ -247,17 +257,19 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
             }
 
-            DisposeWatchers();
-            _logger.LogInformation("Flushing pending uploads before shutdown.");
-            await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
-            PromoteUploadRetries(includeNotYetEligible: true);
-            while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+            if (timestampRecoveryCompleted && !timestampRepairFailed)
             {
-                await FlushUploadsAsync(CancellationToken.None);
+                _logger.LogInformation("Flushing pending uploads before shutdown.");
                 await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
                 PromoteUploadRetries(includeNotYetEligible: true);
+                while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+                {
+                    await FlushUploadsAsync(CancellationToken.None);
+                    await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
+                    PromoteUploadRetries(includeNotYetEligible: true);
+                }
+                _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
             }
-            _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
         }
     }
 
@@ -798,6 +810,8 @@ public sealed class FolderWatchWorker : BackgroundService
     {
         _syncStatusProvider.ReportPullCycleStarted();
         var completed = false;
+        var pending = new List<PendingDownload>();
+        var deletionChecks = new List<(WatchSourceContext Context, HashSet<string> RemoteAssetIds)>();
         try
         {
             foreach (var context in _sources)
@@ -813,14 +827,18 @@ public sealed class FolderWatchWorker : BackgroundService
                 {
                     if (context.UseFlatAlbum)
                     {
-                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, cancellationToken);
+                        pullSucceeded = await PullFlatAlbumAsync(context, remoteAssetIds, pending, cancellationToken);
                     }
                     else if (context.UseSubdirsAsAlbums)
                     {
-                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, cancellationToken);
+                        pullSucceeded = await PullSubdirsAsAlbumsAsync(context, remoteAssetIds, pending, cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (TimestampRepairException)
                 {
                     throw;
                 }
@@ -830,11 +848,15 @@ public sealed class FolderWatchWorker : BackgroundService
                     _logger.LogWarning(ex, "Sync pull failed for source {Path}.", context.Source.Path);
                 }
 
-                if (pullSucceeded && context.RemoteDeleteSafe)
+                if (pullSucceeded && context.RemoteDeleteSafe
+                    && _sources.Count(source => source.IsSyncMode && PathComparer.Equals(source.NormalizedRoot, context.NormalizedRoot)) == 1)
                 {
-                    await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
+                    deletionChecks.Add((context, remoteAssetIds));
                 }
             }
+            await DownloadAssetsAsync(pending, cancellationToken);
+            foreach (var (context, remoteAssetIds) in deletionChecks)
+                await PropagateRemoteDeletesAsync(context, remoteAssetIds, cancellationToken);
             completed = true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -871,6 +893,7 @@ public sealed class FolderWatchWorker : BackgroundService
         var stale = _stateByPath
             .Where(entry =>
                 IsPathWithinSource(context, entry.Key)
+                && PathComparer.Equals(NormalizeDirectory(entry.Value.SourcePath), context.NormalizedRoot)
                 && entry.Value.Status == SyncEntryStatus.Synchronized
                 && !string.IsNullOrWhiteSpace(entry.Value.AssetId)
                 && !remoteAssetIds.Contains(entry.Value.AssetId))
@@ -921,6 +944,7 @@ public sealed class FolderWatchWorker : BackgroundService
     private async Task<bool> PullFlatAlbumAsync(
         WatchSourceContext context,
         HashSet<string> remoteAssetIds,
+        List<PendingDownload> pending,
         CancellationToken cancellationToken)
     {
         var result = await _immichAssetClient.GetAlbumAssetsAsync(context.Source.AlbumName, cancellationToken);
@@ -930,6 +954,10 @@ public sealed class FolderWatchWorker : BackgroundService
             // deleted by the user". Skip delete propagation either way
             // — a fresh upload re-creates the album, and the next pull
             // sees the new state.
+            _syncStatusProvider.ReportSyncFailed(
+                $"The configured Immich album '{context.Source.AlbumName}' does not exist. "
+                + "Choose an existing album to download its files, or clear the album name to synchronize all albums and unassigned assets. "
+                + "Uploading a local file will create the configured album.");
             _logger.LogDebug("Sync pull skipped; album '{AlbumName}' does not exist yet.", context.Source.AlbumName);
             return false;
         }
@@ -952,13 +980,14 @@ public sealed class FolderWatchWorker : BackgroundService
             }
         }
 
-        await DownloadAssetsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken);
+        pending.AddRange(await PrepareDownloadsAsync(context, context.NormalizedRoot, result.Assets, cancellationToken));
         return true;
     }
 
     private async Task<bool> PullSubdirsAsAlbumsAsync(
         WatchSourceContext context,
         HashSet<string> remoteAssetIds,
+        List<PendingDownload> pending,
         CancellationToken cancellationToken)
     {
         var allOk = true;
@@ -973,7 +1002,7 @@ public sealed class FolderWatchWorker : BackgroundService
                     remoteAssetIds.Add(asset.Id);
                 }
             }
-            await DownloadAssetsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken);
+            pending.AddRange(await PrepareDownloadsAsync(context, context.NormalizedRoot, unassigned.Assets, cancellationToken));
         }
         else
         {
@@ -1043,19 +1072,24 @@ public sealed class FolderWatchWorker : BackgroundService
                 }
             }
 
-            await DownloadAssetsAsync(context, albumDir, albumResult.Assets, cancellationToken);
+            pending.AddRange(await PrepareDownloadsAsync(context, albumDir, albumResult.Assets, cancellationToken));
         }
 
         return allOk;
     }
 
-    private async Task DownloadAssetsAsync(
+    private sealed record PendingDownload(WatchSourceContext Context, AlbumAssetSummary Asset, string DestinationPath)
+    {
+        public DateTimeOffset? SortTimestamp => Asset.FileCreatedAt ?? Asset.FileModifiedAt;
+    }
+
+    private async Task<IReadOnlyList<PendingDownload>> PrepareDownloadsAsync(
         WatchSourceContext context,
         string targetDirectory,
         IReadOnlyList<AlbumAssetSummary> assets,
         CancellationToken cancellationToken)
     {
-        var pending = new List<(AlbumAssetSummary Asset, string DestinationPath)>();
+        var pending = new List<PendingDownload>();
 
         foreach (var asset in assets)
         {
@@ -1121,6 +1155,8 @@ public sealed class FolderWatchWorker : BackgroundService
                             continue;
                         }
 
+                        currentState = await CorrectDownloadedTimestampsAsync(context, normalized, asset, currentState, cancellationToken);
+                        if (!TryGetFingerprint(normalized, out existingFingerprint) || !existingFingerprint.Matches(currentState)) continue;
                         _pathToAssetId[normalized] = asset.Id;
                         if (string.Equals(currentState.AlbumName, effectiveAlbum, StringComparison.Ordinal))
                         {
@@ -1143,32 +1179,54 @@ public sealed class FolderWatchWorker : BackgroundService
                 continue;
             }
 
-            pending.Add((asset, destinationPath));
+            pending.Add(new PendingDownload(context, asset, destinationPath));
         }
 
-        if (pending.Count == 0)
-        {
-            return;
-        }
+        return pending;
+    }
+
+    private async Task DownloadAssetsAsync(IReadOnlyList<PendingDownload> candidates, CancellationToken cancellationToken)
+    {
+        // Gather every source/album before transferring: an older unassigned
+        // file must not run ahead of today's photo in a later album.
+        var datedFirst = candidates.OrderBy(item => !item.SortTimestamp.HasValue);
+        var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
+            ? datedFirst.ThenBy(item => item.SortTimestamp)
+            : datedFirst.ThenByDescending(item => item.SortTimestamp);
+        var pending = ordered.DistinctBy(item => NormalizePath(item.DestinationPath), PathComparer).ToList();
+        if (pending.Count == 0) return;
 
         _syncStatusProvider.ReportPullStarted(pending.Count);
         try
         {
             var downloadedCount = 0;
-            var datedFirst = pending.OrderBy(item => !item.Asset.FileModifiedAt.HasValue);
-            var ordered = _config.Watch.TransferOrder == TransferOrders.OldestFirst
-                ? datedFirst.ThenBy(item => item.Asset.FileModifiedAt)
-                : datedFirst.ThenByDescending(item => item.Asset.FileModifiedAt);
-            foreach (var (asset, destinationPath) in ordered)
+            foreach (var (context, asset, destinationPath) in pending)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _syncStatusProvider.ReportDownloadStarted(destinationPath);
                 var normalized = NormalizePath(destinationPath);
+                // Collection can take time. Recheck local edits and deletions
+                // immediately before download rather than overwriting a new file.
+                if (File.Exists(destinationPath) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
+                {
+                    _syncStatusProvider.ReportDownloadSkipped();
+                    continue;
+                }
+                _syncStatusProvider.ReportDownloadStarted(destinationPath);
                 _downloadsInProgress[normalized] = 0;
                 try
                 {
                     var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
+                    string? timestampError = null;
+                    if (download.IsSuccess && DownloadedFileTimestamps.GetDesired(asset) is { } desired)
+                    {
+                        try { DownloadedFileTimestamps.Apply(normalized, desired); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                        {
+                            timestampError = "The original file was downloaded, but its timestamps could not be restored.";
+                            _logger.LogWarning(ex, "Could not restore timestamps for downloaded asset {AssetId}; a later pull will retry.", asset.Id);
+                        }
+                    }
                     if (download.IsSuccess && TryGetFingerprint(normalized, out var fingerprint))
                     {
                         var entry = CreateSynchronizedEntry(
@@ -1185,6 +1243,7 @@ public sealed class FolderWatchWorker : BackgroundService
                         var completedUtc = DateTimeOffset.UtcNow;
                         await _syncStateStore.RecordSuccessfulSyncAsync(_accountScope, completedUtc, cancellationToken);
                         _syncStatusProvider.ReportDownloadCompleted(destinationPath, completedUtc, _statusSession);
+                        if (timestampError is not null) _syncStatusProvider.ReportSyncFailed(timestampError);
                         _logger.LogInformation(
                             "Downloaded asset {AssetId} to {FilePath}.",
                             asset.Id,
@@ -1217,9 +1276,8 @@ public sealed class FolderWatchWorker : BackgroundService
             if (downloadedCount > 0)
             {
                 _logger.LogInformation(
-                    "Sync pull downloaded {Count} new file(s) into {Directory}.",
-                    downloadedCount,
-                    targetDirectory);
+                    "Sync pull downloaded {Count} new file(s) across configured sources.",
+                    downloadedCount);
             }
         }
         finally

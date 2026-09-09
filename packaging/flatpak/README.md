@@ -133,16 +133,17 @@ The manifest declares only the portals the app actually needs:
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
 | `--talk-name=org.freedesktop.Notifications` | Toasts |
+| `--talk-name=org.kde.StatusNotifierWatcher` | Register the tray item with the desktop |
 
 Notably **not** granted: `--filesystem=host`, `flatpak-spawn --host`,
 `--filesystem=home`, `--filesystem=xdg-pictures`,
 `--filesystem=xdg-videos`, `--talk-name=org.freedesktop.systemd1`, raw
-`--socket=session-bus`, `--socket=wayland`, or StatusNotifierItem permissions.
-Folder access is intentionally portal-based in the Flatpak package. The
-current Avalonia tray backend needs a broad KDE D-Bus own-name grant that
-Flathub no longer accepts for new apps, so the Flatpak package starts in
-window-only mode and shows an in-app banner until a Flatpak-safe tray backend
-is available.
+`--socket=session-bus`, `--socket=wayland`, or broad KDE own-name permissions.
+Folder access remains portal-based. The tray exports StatusNotifierItem and
+DBusMenu on `io.github.voltkraft.immich-folder-watch.Tray`, which Flatpak already
+allows in the application's own namespace. KDE Plasma and GNOME with an
+AppIndicator extension provide the watcher. Without one, the app displays a
+notice and remains reachable through its window and launcher.
 
 Verify at runtime with:
 
@@ -153,24 +154,12 @@ flatpak info -M io.github.voltkraft.immich-folder-watch
 
 ## Branding assets
 
-`packaging/flatpak/icons/` holds the committed icons that get installed
-into `/app/share/icons/hicolor/`:
-
-- `scalable/apps/io.github.voltkraft.immich-folder-watch.svg` — copy of `assets/branding/logo.svg`
-- `512x512/apps/io.github.voltkraft.immich-folder-watch.png` — 512px raster fallback
-
-Both are produced by `tools/BrandAssetGen` from `assets/branding/logo.svg`;
-the artefacts under `artifacts/branding/flatpak/` are intermediate. Regenerate
-after a logo change:
-
-```bash
-~/.dotnet/dotnet run --project tools/BrandAssetGen --configuration Release -- \
-    --project-root "$(pwd)"
-cp assets/branding/logo.svg \
-   packaging/flatpak/icons/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
-cp artifacts/branding/flatpak/io.github.voltkraft.immich-folder-watch.png \
-   packaging/flatpak/icons/512x512/apps/io.github.voltkraft.immich-folder-watch.png
-```
+The application build generates the launcher icon from `assets/branding/logo.svg`
+through `tools/BrandAssetGen`. The manifest installs the current square 512×512
+PNG from `artifacts/branding/flatpak/`; the legacy copies under
+`packaging/flatpak/icons/` are not used by the build. The source logo may use a
+tightly cropped, rectangular canvas, so its SVG is not exported as a Flatpak
+launcher icon: Flatpak requires square icon dimensions.
 
 ## Release-time AppStream block
 

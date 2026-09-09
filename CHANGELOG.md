@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-09
+
+### Fixed
+- Skipped native Linux D-Bus tests explicitly on other operating systems so the Windows solution test job remains compatible.
+- Stabilized upload-order regression checks by waiting for completed transfers before shutdown, preserving coverage of deliberate cancellation retries.
+- Made D-Bus disposal checks deterministic by accepting documented queued-call shutdown outcomes and waiting for confirmed tray-name withdrawal.
+- Applied download order globally across sync sources, albums and unassigned assets, using original creation time first so newer photos in later albums no longer wait behind older unassigned files.
+- Restored original creation dates for downloads: Linux uses the modification date; Windows sets the creation date and preserves the remote modification date. Existing unchanged download mappings are corrected with durable recovery that prevents timestamp-only reuploads.
+- Enabled Flatpak tray integration through the app's own D-Bus namespace, with menu actions and recovery when the desktop tray host returns.
+- Resolved original folder display paths using sandbox-accessible document metadata and opaque portal IDs while retaining granted access paths for synchronization.
+- Removed untouched automatic album suggestions when selecting bidirectional sync and reported missing named albums as actionable sync errors with automatic recovery.
+- Packaged the current generated square PNG icon instead of stale or non-square launcher assets.
+- Brought Linux configuration apply and initial access checks in line with Windows, including local validation, required Immich permissions, shared YAML writing, and explicit failure states.
+- Applied configured startup language on Linux and preserved language preferences when saving on both platforms.
+- Waited for desktop portal approval before confirming Linux autostart, requested it once on fresh setup, and preserved the choice when hiding the window. Permission dialogs no longer block the UI.
+- Restored Linux tray restart, live localized status tooltips, semantic status colors, and graceful explicit shutdown while retaining Flatpak-specific tray and startup behavior.
+
+### Added
+- Added a portal folder replacement action that preserves source settings and a Flatpak-safe session log viewer for Journald logging.
+- Added Linux headless GUI regressions, isolated portal protocol tests, and configuration-apply/autostart/language coverage.
+
 ### Changed
 - Replaced the app logo with an open golden folder and a compact five-color flower inspired by Immich. The transparent SVG has no white outlines or outer padding, allowing generated icons to use the full available width.
 

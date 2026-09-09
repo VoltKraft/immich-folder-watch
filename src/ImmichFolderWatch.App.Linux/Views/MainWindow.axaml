@@ -1,6 +1,7 @@
 <Window
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ImmichFolderWatch.App.Linux.Controls"
     x:Class="ImmichFolderWatch.App.Linux.Views.MainWindow"
     x:CompileBindings="False"
     Title="Immich Folder Watch"
@@ -58,13 +59,13 @@
         IsVisible="{Binding TrayStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
       <TextBlock Text="{Binding TrayStatusMessage}" TextWrapping="Wrap" />
     </Border>
-    <Grid Grid.Row="2" ColumnDefinitions="172,*">
+    <Grid x:Name="MainContent" Grid.Row="2" ColumnDefinitions="172,*">
       <Border
           Padding="10,16"
           Background="{DynamicResource SystemRegionBrush}"
           BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
           BorderThickness="0,0,1,0">
-        <ListBox Classes="navigation" Background="Transparent" SelectedIndex="{Binding SelectedSectionIndex, Mode=TwoWay}">
+        <ListBox x:Name="NavigationList" Classes="navigation" Background="Transparent" SelectedIndex="{Binding SelectedSectionIndex, Mode=TwoWay}">
           <ListBoxItem
               Content="{Binding UI_Overview, Source={StaticResource Loc}}"
               AutomationProperties.Name="{Binding UI_Overview, Source={StaticResource Loc}}"/>
@@ -95,16 +96,11 @@
                 <StackPanel Spacing="10">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding UI_Status, Source={StaticResource Loc}}" />
-                    <Border
+                    <controls:StatusPill
                         Margin="12,0,0,0"
-                        Padding="8,2"
-                        CornerRadius="10"
                         VerticalAlignment="Center"
-                        Background="{DynamicResource SystemAccentColorBrush}"
                         IsVisible="{Binding SyncStatusBadgeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                        Grid.Column="1">
-                      <TextBlock Text="{Binding SyncStatusBadgeText}" Foreground="White" FontSize="12" />
-                    </Border>
+                        Grid.Column="1" Text="{Binding SyncStatusBadgeText}" Tone="{Binding SyncStatusBadgeTone}" />
                   </Grid>
                   <TextBlock Text="{Binding StatusHeadline}" TextWrapping="Wrap" Opacity="0.8" />
                   <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto,Auto">
@@ -122,16 +118,11 @@
                         VerticalAlignment="Center"
                         Text="{Binding ServerConnectionDetail}"
                         TextWrapping="Wrap"/>
-                    <Border
+                    <controls:StatusPill
                         Grid.Row="0"
                         Grid.Column="2"
                         Margin="0,0,0,8"
-                        Padding="8,2"
-                        CornerRadius="10"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource SystemBaseLowColor}">
-                      <TextBlock Text="{Binding ServerConnectionText}" />
-                    </Border>
+                        VerticalAlignment="Center" Text="{Binding ServerConnectionText}" Tone="{Binding ServerConnectionTone}" />
                     <TextBlock
                         Grid.Row="1"
                         Grid.Column="0"
@@ -191,16 +182,11 @@
                       Text="{Binding ImmichServerApiUrl}"
                       PlaceholderText="https://immich.example.com/api"
                       AutomationProperties.Name="{Binding UI_ServerApiUrl, Source={StaticResource Loc}}"/>
-                  <Border
+                  <controls:StatusPill
                       Grid.Row="0"
                       Grid.Column="2"
                       Margin="0,0,0,8"
-                      Padding="8,2"
-                      CornerRadius="10"
-                      VerticalAlignment="Center"
-                      Background="{DynamicResource SystemBaseLowColor}">
-                    <TextBlock Text="{Binding ImmichUrlStatusText}" />
-                  </Border>
+                      VerticalAlignment="Center" Text="{Binding ImmichUrlStatusText}" Tone="{Binding ImmichUrlStatusTone}" />
                   <TextBlock
                       Grid.Row="1"
                       Grid.Column="0"
@@ -208,7 +194,7 @@
                       VerticalAlignment="Center"
                       Text="{Binding UI_ApiKey, Source={StaticResource Loc}}"/>
                   <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,12,8" ColumnDefinitions="*,Auto">
-                    <TextBox
+                    <TextBox x:Name="ApiKeyInput"
                         Grid.Column="0"
                         Text="{Binding ImmichApiKey}"
                         PasswordChar="•"
@@ -225,23 +211,16 @@
                       <TextBlock Text="👁" />
                     </Button>
                   </Grid>
-                  <Border
+                  <controls:StatusPill
                       Grid.Row="1"
                       Grid.Column="2"
                       Margin="0,0,0,8"
-                      Padding="8,2"
-                      CornerRadius="10"
-                      VerticalAlignment="Center"
-                      Background="{DynamicResource SystemBaseLowColor}">
-                    <TextBlock Text="{Binding ImmichApiKeyStatusText}" />
-                  </Border>
+                      VerticalAlignment="Center" Text="{Binding ImmichApiKeyStatusText}" Tone="{Binding ImmichApiKeyStatusTone}" />
                   <Expander Grid.Row="2" Grid.ColumnSpan="3" Margin="0,0,0,8" IsExpanded="False" HorizontalAlignment="Stretch">
                     <Expander.Header>
                       <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock VerticalAlignment="Center" Text="{Binding UI_Permissions, Source={StaticResource Loc}}" />
-                        <Border Padding="8,2" CornerRadius="10" VerticalAlignment="Center" Background="{DynamicResource SystemBaseLowColor}">
-                          <TextBlock Text="{Binding ImmichPermissionsStatusText}" />
-                        </Border>
+                        <controls:StatusPill VerticalAlignment="Center" Text="{Binding ImmichPermissionsStatusText}" Tone="{Binding ImmichPermissionsStatusTone}" />
                       </StackPanel>
                     </Expander.Header>
                     <StackPanel Margin="0,12,0,0" Spacing="10">
@@ -260,16 +239,11 @@
                                   <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                   <TextBlock Margin="0,2,0,0" Opacity="0.75" Text="{Binding PermissionName}" />
                                 </StackPanel>
-                                <Border
+                                <controls:StatusPill
                                     Grid.Row="0"
                                     Grid.Column="1"
                                     Margin="12,0,0,0"
-                                    Padding="8,2"
-                                    CornerRadius="10"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource SystemBaseLowColor}">
-                                  <TextBlock Text="{Binding StatusText}" />
-                                </Border>
+                                    VerticalAlignment="Center" Text="{Binding StatusText}" Tone="{Binding StatusTone}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="0"
@@ -305,7 +279,7 @@
             <Button Grid.Column="1" Click="AddSourceButton_Click" Content="{Binding UI_AddSource, Source={StaticResource Loc}}" />
           </Grid>
           <Grid Grid.Row="1" ColumnDefinitions="230,*">
-            <ListBox
+            <ListBox x:Name="SourcesList" SelectionMode="AlwaysSelected"
                 Margin="0,0,18,0"
                 ItemsSource="{Binding Sources}"
                 SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
@@ -359,13 +333,15 @@
                                 Grid.Column="0"
                                 Margin="0,0,0,8"
                                 Text="{Binding UI_ImmichAlbumName, Source={StaticResource Loc}}"/>
-                            <TextBox
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Margin="0,0,0,8"
-                                Text="{Binding DisplayPath}"
-                                PlaceholderText="/home/user/Pictures/Screenshots"
-                                AutomationProperties.Name="{Binding UI_FolderPath, Source={StaticResource Loc}}"/>
+                            <Grid Grid.Row="1" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
+                              <TextBox x:Name="SourcePathInput"
+                                  Text="{Binding DisplayPath, Mode=OneWay}"
+                                  IsReadOnly="True"
+                                  AutomationProperties.Name="{Binding UI_FolderPath, Source={StaticResource Loc}}"/>
+                              <Button Grid.Column="1" Margin="8,0,0,0"
+                                  Click="ChangeSourceFolderButton_Click"
+                                  Content="{Binding UI_ChooseFolder, Source={StaticResource Loc}}"/>
+                            </Grid>
                             <TextBox
                                 Grid.Row="3"
                                 Grid.Column="0"
@@ -374,6 +350,9 @@
                                 PlaceholderText="{Binding UI_AlbumNameWatermark, Source={StaticResource Loc}}"
                                 AutomationProperties.Name="{Binding UI_ImmichAlbumName, Source={StaticResource Loc}}"/>
                           </Grid>
+                          <TextBlock IsVisible="{Binding !ShowIncludeSubdirectories}"
+                              Text="{Binding UI_SyncAlbumHint, Source={StaticResource Loc}}"
+                              TextWrapping="Wrap" Opacity="0.75" />
                           <StackPanel Spacing="6">
                             <TextBlock Text="{Binding UI_SyncMode, Source={StaticResource Loc}}" />
                             <ComboBox
@@ -464,8 +443,8 @@
                   <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="8" Padding="18">
                     <StackPanel Spacing="10">
                       <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding UI_Autostart, Source={StaticResource Loc}}" />
-                      <CheckBox IsChecked="{Binding AutostartEnabled}" Content="{Binding UI_StartOnLogin, Source={StaticResource Loc}}" />
-                      <TextBlock Opacity="0.75" TextWrapping="Wrap" Text="{Binding UI_AutostartDescription, Source={StaticResource Loc}}" />
+                      <CheckBox IsEnabled="{Binding !IsAutostartChangeInProgress}" IsChecked="{Binding AutostartEnabled}" Content="{Binding UI_StartOnLogin, Source={StaticResource Loc}}" />
+                      <TextBlock Opacity="0.75" TextWrapping="Wrap" Text="{Binding UI_LinuxAutostartDescription, Source={StaticResource Loc}}" />
                     </StackPanel>
                   </Border>
                   <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="8" Padding="18">

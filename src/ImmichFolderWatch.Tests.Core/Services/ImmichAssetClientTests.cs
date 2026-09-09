@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using ImmichFolderWatch.Core.Configuration;
@@ -23,6 +24,44 @@ public sealed class ImmichAssetClientTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero), Assert.Single(result.Assets).FileModifiedAt);
+    }
+
+    [Theory]
+    [InlineData("\"fileCreatedAt\":\"2020-02-03T14:15:16+02:00\",\"fileModifiedAt\":\"2024-01-01T00:00:00Z\"", "2020-02-03T12:15:16Z")]
+    [InlineData("\"fileCreatedAt\":\"2020-02-03T12:15:16Z\",\"fileModifiedAt\":\"invalid\"", "2020-02-03T12:15:16Z")]
+    [InlineData("\"fileCreatedAt\":\"invalid\",\"fileModifiedAt\":\"2024-01-01T00:00:00Z\"", null)]
+    [InlineData("\"fileCreatedAt\":null,\"createdAt\":\"2024-01-01T00:00:00Z\"", null)]
+    [InlineData("\"fileCreatedAt\":\"invalid\",\"createdAt\":\"2024-01-01T00:00:00Z\"", null)]
+    [InlineData("\"createdAt\":\"2024-01-01T00:00:00Z\"", null)]
+    public async Task GetAlbumAssetsAsync_ParsesOriginalCreationIndependentlyFromModificationAndUploadTime(
+        string timestampJson, string? expectedCreation)
+    {
+        var (client, _) = CreateClient(
+            _ => CreateJsonResponse(HttpStatusCode.OK, "[{\"id\":\"album-1\",\"albumName\":\"Screenshots\"}]"),
+            _ => CreateJsonResponse(HttpStatusCode.OK, "{\"assets\":{\"items\":[{\"id\":\"asset-1\",\"originalFileName\":\"photo.jpg\"," + timestampJson + "}],\"nextPage\":null}}"));
+
+        var result = await client.GetAlbumAssetsAsync("Screenshots", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var asset = Assert.Single(result.Assets);
+        Assert.Equal(expectedCreation is null ? (DateTimeOffset?)null
+            : DateTimeOffset.Parse(expectedCreation, CultureInfo.InvariantCulture), asset.FileCreatedAt);
+    }
+
+    [Fact]
+    public async Task GetUnassignedAssetsAsync_PreservesBothOriginalFileTimestamps()
+    {
+        var (client, _) = CreateClient(_ => CreateJsonResponse(HttpStatusCode.OK,
+            "{\"assets\":{\"items\":[{\"id\":\"asset-1\",\"originalFileName\":\"photo.jpg\","
+            + "\"fileCreatedAt\":\"2020-01-01T00:00:00Z\",\"fileModifiedAt\":\"2021-01-01T00:00:00Z\","
+            + "\"createdAt\":\"2026-01-01T00:00:00Z\"}],\"nextPage\":null}}"));
+
+        var result = await client.GetUnassignedAssetsAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var asset = Assert.Single(result.Assets);
+        Assert.Equal(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero), asset.FileCreatedAt);
+        Assert.Equal(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero), asset.FileModifiedAt);
     }
 
     [Fact]

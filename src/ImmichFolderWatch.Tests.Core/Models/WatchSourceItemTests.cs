@@ -55,6 +55,48 @@ public sealed class WatchSourceItemTests
     }
 
     [Fact]
+    public void SyncMode_ClearsUntouchedUploadAlbumSuggestion()
+    {
+        var item = new WatchSourceItem { Path = "/photos/Camera" };
+        Assert.Equal("Camera", item.AlbumName);
+        var changed = new List<string?>();
+        item.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        item.SyncMode = WatchSourceSyncModes.Sync;
+
+        Assert.Empty(item.AlbumName);
+        Assert.Contains(nameof(WatchSourceItem.AlbumName), changed);
+        item.Path = "/photos/Other";
+        Assert.Empty(item.AlbumName);
+    }
+
+    [Fact]
+    public void Path_DoesNotSuggestAlbumWhenSyncIsAlreadySelected()
+    {
+        var item = new WatchSourceItem { SyncMode = WatchSourceSyncModes.Sync };
+
+        item.Path = "/photos/Camera";
+
+        Assert.Empty(item.AlbumName);
+    }
+
+    [Theory]
+    [InlineData("Camera")]
+    [InlineData("Selected album")]
+    [InlineData("")]
+    public void SyncMode_PreservesExplicitOrLoadedAlbumEvenWhenItMatchesSuggestion(string album)
+    {
+        // Match MainWindowViewModel.Load's order, including a saved name equal to
+        // the folder suggestion and an explicitly empty all-library selection.
+        var item = new WatchSourceItem { Path = "/photos/Camera", AlbumName = album };
+
+        item.SyncMode = WatchSourceSyncModes.Sync;
+        item.Path = "/photos/Other";
+
+        Assert.Equal(album, item.AlbumName);
+    }
+
+    [Fact]
     public void Path_PrefillsAlbumNameOnce_FromFolderName()
     {
         var item = new WatchSourceItem();

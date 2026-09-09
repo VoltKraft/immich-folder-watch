@@ -27,6 +27,12 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public string UI_SessionLogs => Strings.ResourceManager.GetString("UI_SessionLogs", Strings.Culture) ?? "UI_SessionLogs";
+    public string UI_SessionLogsDescription => Strings.ResourceManager.GetString("UI_SessionLogsDescription", Strings.Culture) ?? "UI_SessionLogsDescription";
+    public string UI_LinuxAutostartDescription => Strings.ResourceManager.GetString("UI_LinuxAutostartDescription", Strings.Culture) ?? "UI_LinuxAutostartDescription";
+    public string UI_ChooseFolder => Strings.ResourceManager.GetString("UI_ChooseFolder", Strings.Culture) ?? "UI_ChooseFolder";
+    public string Op_SyncStartFailedFormat => Strings.ResourceManager.GetString("Op_SyncStartFailedFormat", Strings.Culture) ?? "Op_SyncStartFailedFormat";
+
     public string App_StatusHeadline_Running => Strings.App_StatusHeadline_Running;
     public string App_SaveAndApply => Strings.App_SaveAndApply;
 
@@ -85,6 +91,7 @@ public sealed class LocalizationProxy : INotifyPropertyChanged
     public string UI_Remove => Strings.UI_Remove;
     public string UI_FolderPath => Strings.UI_FolderPath;
     public string UI_ImmichAlbumName => Strings.UI_ImmichAlbumName;
+    public string UI_SyncAlbumHint => Strings.ResourceManager.GetString("UI_SyncAlbumHint", Strings.Culture) ?? string.Empty;
     public string UI_AlbumNameWatermark => Strings.UI_AlbumNameWatermark;
     public string UI_SyncMode => Strings.UI_SyncMode;
     public string UI_AdvancedWatchOptions => Strings.UI_AdvancedWatchOptions;

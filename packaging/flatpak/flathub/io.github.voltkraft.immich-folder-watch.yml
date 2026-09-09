@@ -19,6 +19,7 @@ finish-args:
   - --share=network
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
 
 modules:
   - name: immich-folder-watch
@@ -59,7 +60,5 @@ modules:
           ${FLATPAK_DEST}/share/applications/io.github.voltkraft.immich-folder-watch.desktop
       - install -Dm644 packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
           ${FLATPAK_DEST}/share/metainfo/io.github.voltkraft.immich-folder-watch.metainfo.xml
-      - install -Dm644 packaging/flatpak/icons/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
-          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.voltkraft.immich-folder-watch.svg
-      - install -Dm644 packaging/flatpak/icons/512x512/apps/io.github.voltkraft.immich-folder-watch.png
+      - install -Dm644 artifacts/branding/flatpak/io.github.voltkraft.immich-folder-watch.png
           ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.voltkraft.immich-folder-watch.png

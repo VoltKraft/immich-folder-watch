@@ -38,10 +38,13 @@
   - Unit tests for config parsing, readiness checks, batching/dedup
   - Unit tests for config verification, file filtering, installation paths, ViewModel state
 
+The Linux-specific acceptance matrix and intentional platform differences are
+tracked in [Linux feature parity](qa/linux-parity.md).
+
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
-2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed on a build with tray support, the main window stays hidden and only the tray icon is shown; the Flatpak package shows the window because its current tray backend is disabled.
+2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. The tray registers with the desktop watcher; if registration fails or the watcher disappears, the application shows the window so it remains reachable. Flatpak uses the same behavior.
 3. `AppHost` constructs an `IHost` that wires:
    - `AppConfig` (loaded from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`)
    - the shared sync-state store (`sync-state.db` beside `config.yaml`)
@@ -53,10 +56,27 @@
 5. The worker reconciles local metadata in the background. The source path and relative file path identify a file within an account context; size and UTC modification time form the fast fingerprint. Matching files are skipped without hashing, API calls, uploads, or downloads. New or changed files continue through readiness checks, deduplication, and transfer batching.
 6. A successful upload is committed only after the transfer, any requested album placement, and a final check that the local file did not change during transfer. A download is committed only after its temporary file has been atomically renamed into place. Tombstones preserve completed deletion and move decisions across restarts.
 7. Status changes are pushed into `SyncStatusProvider`; the ViewModel and, where enabled, the tray tooltip subscribe and re-render on the UI thread.
-8. On **Save and Apply**, the ViewModel writes the new YAML and `AppHost.RestartAsync(newConfig)` tears down and rebuilds the internal host. The replacement host reuses the same per-user database.
+8. On **Save and Apply**, both windows call the shared `ConfigApplyService`. It normalizes and validates the draft, checks required Immich permissions, and writes YAML through `AppConfigWriter` only after validation succeeds. It then awaits `AppHost.RestartAsync(newConfig)`. The replacement host reuses the same per-user database. Local validation and failed access checks do not write or restart; a restart failure is reported after saving.
 9. On startup, `LocalizationService.SetLanguage(config.Localization.Language)` resolves `auto`/`en`/`de` to a `CultureInfo` and applies it before the window is built. Runtime language changes raise `LanguageChanged`; `LocalizationProxy` rebroadcasts it as `PropertyChanged(string.Empty)` so every XAML binding (`{Binding X, Source={StaticResource Loc}}`) refreshes. The tray tooltip, where enabled, and permission list subscribe to the same event.
 
+The Linux tray exports StatusNotifierItem and DBusMenu through a dedicated D-Bus
+connection under `io.github.voltkraft.immich-folder-watch.Tray`. This namespace is
+already owned by the Flatpak app; only watcher communication needs an explicit
+`org.kde.StatusNotifierWatcher` talk rule. Availability follows acknowledged
+registration, watcher changes trigger re-registration, and disposing the
+connection withdraws the item and menu together.
+
 ## Design Decisions
+
+- **Recoverable download timestamps.** Original creation time is independent of
+  transfer ordering and server upload time. New downloads apply platform-specific
+  timestamps before storing their filesystem fingerprint. Existing download
+  mappings use an additive `sync_timestamp_repairs` SQLite journal containing the
+  old mapping, desired UTC timestamps and content SHA-256. Completion atomically
+  updates the mapping and removes the journal; startup recovery precedes upload
+  reconciliation. Metadata-only corrections never advance transfer history.
+  Readback accounts for filesystem precision. An ambiguous edit or journal failure
+  pauses the worker without flushing uploads. See [downloaded file dates](configuration.md#downloaded-file-dates).
 
 - **Durable last-transfer history.** The state store keeps an account-scoped high-water timestamp independently of file entries. The worker reads it before registration/reconciliation and explicitly writes after a successful upload/download, before reporting completion to the UI. Generic entry upserts never update it. An additive auxiliary table preserves schema-version-1 compatibility and is seeded once from available synchronized records for old installations; this backfill is approximate because historic entries did not distinguish transfer and reconciliation timestamps. Status restoration and completion use a worker-session token so a late completion during a timed-out shutdown cannot overwrite a newly selected account's history. Timestamp updates are monotonic in both SQLite and the UI.
 

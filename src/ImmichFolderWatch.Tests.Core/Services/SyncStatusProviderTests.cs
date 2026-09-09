@@ -5,6 +5,20 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 public sealed class SyncStatusProviderTests
 {
     [Fact]
+    public void ReportDownloadSkipped_CompletesProgressWithoutAdvancingTransferHistory()
+    {
+        var status = new SyncStatusProvider();
+        var previous = DateTimeOffset.UtcNow.AddDays(-1);
+        status.ReportDownloadCompleted("previous.jpg", previous);
+        status.ReportPullCycleStarted();
+        status.ReportPullStarted(1);
+        status.ReportDownloadSkipped();
+        Assert.Equal(status.TotalFileCount, status.ProcessedFileCount);
+        Assert.Equal(0, status.DownloadedInCurrentPull);
+        Assert.Equal(previous, status.LastSyncCompletedUtc);
+    }
+
+    [Fact]
     public void BeginSyncSession_IgnoresLateHistoryFromPreviousWorker()
     {
         var status = new SyncStatusProvider();

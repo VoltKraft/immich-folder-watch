@@ -54,18 +54,25 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Install portal protocol test tools
+        run: sudo apt-get update && sudo apt-get install -y dbus-daemon xdg-dbus-proxy
+
       - name: Restore Linux-portable projects
         run: |
           dotnet restore src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj
           dotnet restore src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj
+          dotnet restore src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj
 
       - name: Build
         run: |
           dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj --configuration Release --no-restore
           dotnet build src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-restore
+          dotnet build src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-build
+        run: |
+          dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-build
+          dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj --configuration Release --no-build
 
   lint-flatpak:
     name: Lint Flatpak packaging

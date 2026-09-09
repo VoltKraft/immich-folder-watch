@@ -9,8 +9,63 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.Tests.Core.Services;
 
-public sealed class FolderWatchWorkerPersistenceTests
+public sealed partial class FolderWatchWorkerPersistenceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Sync_ReportsMissingAlbumAndPreservesLocalFilesUntilSelectedAlbumRecovers(bool previouslyDownloaded)
+    {
+        using var directory = new TemporaryDirectory();
+        var watchDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "watch")).FullName;
+        var databasePath = Path.Combine(directory.Path, "sync-state.db");
+        var config = CreateConfig(watchDirectory, WatchSourceSyncModes.Sync);
+        var remoteAssets = new[] { new AlbumAssetSummary("remote", "photo.jpg") };
+        if (previouslyDownloaded)
+        {
+            var seedClient = new RecordingAssetClient { RemoteAssets = remoteAssets };
+            var seedLogger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync);
+            using var seedWorker = CreateWorker(config, databasePath, seedClient, workerLogger: seedLogger);
+            await seedWorker.StartAsync(CancellationToken.None);
+            await seedLogger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+            Assert.Single(seedClient.DownloadedAssets);
+            await seedWorker.StopAsync(CancellationToken.None);
+        }
+
+        var albumMissing = 1;
+        var client = new RecordingAssetClient
+        {
+            AlbumAssetsHandler = _ => Volatile.Read(ref albumMissing) == 1
+                ? AlbumAssetsResult.Missing()
+                : AlbumAssetsResult.Success(remoteAssets),
+        };
+        var status = new SyncStatusProvider();
+        var realtime = new TriggeredRealtimeClient();
+        var logger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync);
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: logger,
+            syncStatusProvider: status, realtimeClient: realtime);
+        await worker.StartAsync(CancellationToken.None);
+        await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+
+        Assert.Contains("configured Immich album 'Camera' does not exist", status.LastSyncErrorMessage);
+        Assert.Contains("clear the album name", status.LastSyncErrorMessage);
+        Assert.Empty(client.DownloadedAssets);
+        Assert.Equal(0, client.UploadCount);
+        Assert.Equal(previouslyDownloaded, File.Exists(Path.Combine(watchDirectory, "photo.jpg")));
+
+        Interlocked.Exchange(ref albumMissing, 0);
+        realtime.RequestPull();
+        await WaitUntilAsync(
+            () => status.LastSyncErrorMessage is null && status.CurrentPullSize == 0
+                && (previouslyDownloaded || client.DownloadedAssets.Count == 1),
+            TimeSpan.FromSeconds(8));
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal("remote", await File.ReadAllTextAsync(Path.Combine(watchDirectory, "photo.jpg")));
+        Assert.Equal(previouslyDownloaded ? 0 : 1, client.DownloadedAssets.Count);
+        Assert.Equal(0, client.UploadCount);
+    }
+
     [Fact]
     public async Task Sync_RetainsSourceListingFailureUntilSuccessfulEmptyRecoveryPull()
     {
@@ -75,7 +130,10 @@ public sealed class FolderWatchWorkerPersistenceTests
         using var worker = CreateWorker(config, Path.Combine(directory.Path, "sync-state.db"), client,
             syncStatusProvider: status);
         await worker.StartAsync(CancellationToken.None);
-        await client.WaitForUploadCountAsync(2, TimeSpan.FromSeconds(8));
+        // The fake records request entry before the worker persists success. Stopping
+        // there cancels persistence and deliberately requeues that attempt on shutdown.
+        await WaitUntilAsync(() => status.ProcessedFileCount == 2 && status.CurrentBatchSize == 0,
+            TimeSpan.FromSeconds(8));
         await worker.StopAsync(CancellationToken.None);
 
         Assert.Equal(new[] { first, second }, client.UploadedPaths.Select(Path.GetFileName).ToArray());
@@ -739,14 +797,15 @@ public sealed class FolderWatchWorkerPersistenceTests
         ILogger<FolderWatchWorker>? workerLogger = null,
         IFileReadinessChecker? fileReadinessChecker = null,
         SyncStatusProvider? syncStatusProvider = null,
-        IImmichRealtimeClient? realtimeClient = null) =>
+        IImmichRealtimeClient? realtimeClient = null,
+        ISyncStateStore? stateStore = null) =>
         new(
             config,
             fileReadinessChecker ?? new AlwaysReadyChecker(),
             localFileDeletionService ?? new LocalFileDeletionService(),
             new UploadBatchQueue(),
             client,
-            new SqliteSyncStateStore(databasePath),
+            stateStore ?? new SqliteSyncStateStore(databasePath),
             syncStatusProvider ?? new SyncStatusProvider(),
             workerLogger ?? NullLogger<FolderWatchWorker>.Instance,
             realtimeClient);
@@ -808,10 +867,12 @@ public sealed class FolderWatchWorkerPersistenceTests
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _fileEvent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _reconciliationCount;
+        private readonly int _expectedReconciliations;
 
-        public InitialReconciliationLogger(string syncMode = WatchSourceSyncModes.UploadNew)
+        public InitialReconciliationLogger(string syncMode = WatchSourceSyncModes.UploadNew, int sourceCount = 1)
         {
             _reconciliationMessagePrefix = $"Persistent reconciliation for {syncMode}";
+            _expectedReconciliations = 2 * sourceCount;
         }
 
         public Task WaitUntilReadyAsync(TimeSpan timeout) => _ready.Task.WaitAsync(timeout);
@@ -843,7 +904,7 @@ public sealed class FolderWatchWorkerPersistenceTests
                 return;
             }
 
-            if (Interlocked.Increment(ref _reconciliationCount) == 2)
+            if (Interlocked.Increment(ref _reconciliationCount) == _expectedReconciliations)
             {
                 _ready.TrySetResult();
             }
@@ -873,6 +934,8 @@ public sealed class FolderWatchWorkerPersistenceTests
         public ConcurrentQueue<string> DownloadedAssets { get; } = new();
 
         public IReadOnlyList<AlbumAssetSummary>? RemoteAssets { get; init; }
+        public IReadOnlyList<AlbumInfo> RemoteAlbums { get; init; } = [];
+        public IReadOnlyList<AlbumAssetSummary> UnassignedAssets { get; init; } = [];
 
         public Func<string, AlbumAssetsResult>? AlbumAssetsHandler { get; init; }
 
@@ -925,16 +988,17 @@ public sealed class FolderWatchWorkerPersistenceTests
 
         public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken)
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             await File.WriteAllTextAsync(destinationPath, assetId, cancellationToken);
             DownloadedAssets.Enqueue(assetId);
             return DownloadAssetResult.Success();
         }
 
         public Task<AlbumListResult> ListAlbumsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(AlbumListResult.Success([]));
+            Task.FromResult(AlbumListResult.Success(RemoteAlbums));
 
         public Task<UnassignedAssetsResult> GetUnassignedAssetsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(UnassignedAssetsResult.Success([]));
+            Task.FromResult(UnassignedAssetsResult.Success(UnassignedAssets));
 
         public Task<AlbumMembershipUpdateResult> AddAssetsToAlbumAsync(string albumName, IReadOnlyList<string> assetIds, CancellationToken cancellationToken) =>
             Task.FromResult(AlbumMembershipUpdateResult.Success());

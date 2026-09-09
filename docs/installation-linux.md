@@ -38,6 +38,11 @@ release explicitly announces that the listing is available.
 
 ## First setup
 
+On a fresh setup, the app requests permission to start at login once. Accept
+to enable it, or decline and enable it later in **Settings → Start on login**.
+Autostart runs hidden when the desktop supports a tray icon; otherwise the
+window opens so the application remains reachable.
+
 1. In **Connection**, enter the Immich API URL and key, then select
    **Verify Immich Access**.
 2. In **Folders**, select **Add Source** and grant access to a local folder.
@@ -53,9 +58,12 @@ release explicitly announces that the listing is available.
 
 Folder selection uses the FreeDesktop FileChooser and Documents portals. The
 app can access only folders explicitly granted by the user; it does not receive
-host-wide or home-directory filesystem access.
+host-wide or home-directory filesystem access. Use **Choose Folder** in the
+source editor to change a folder or renew its grant while keeping the other
+source settings.
 
-The package currently uses X11/XWayland and runs without a system tray icon.
+The package uses X11/XWayland and supports a tray icon through StatusNotifierItem.
+KDE Plasma provides a tray host; GNOME requires an AppIndicator extension.
 Closing the window hides it while synchronization continues. Reopen it from
 the app launcher or the desktop's Background Apps view, and use the in-app Quit
 button to stop it completely.
@@ -64,7 +72,7 @@ Per-user data is stored under:
 
 - Config: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/config.yaml`
 - Sync state: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db`
-- File logs: `~/.var/app/io.github.voltkraft.immich-folder-watch/data/Immich Folder Watch/logs/`
+- File logs: the directory shown under **Settings → Logging**. For fresh settings, this is `immich-folder-watch/logs` below the sandbox's `XDG_STATE_HOME`, falling back to `$HOME/.local/state`. Existing configured directories are retained.
 
 The default journald output can be inspected with:
 

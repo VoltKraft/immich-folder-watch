@@ -55,6 +55,9 @@ the check again after changing sync modes.
 
 Select **Add Source**, then select a folder in the list to edit it. On Windows,
 enter its path; on Linux, use the desktop folder picker to grant access.
+Use **Choose Folder** to replace a Linux source path or renew a stale grant
+without losing that source's album, mode, or filters. The displayed host path
+is read-only; the saved portal path remains the access identity.
 **Remove** removes the selected source from the draft configuration; it does not
 delete local files or Immich assets. Hover over an abbreviated path to read it
 in full.
@@ -130,7 +133,12 @@ asset intact. This option is unavailable for bidirectional sync.
   <img src="images/ui-settings-light.png" alt="English General settings with Start on login and the Language selector.">
 </picture>
 
-**Start on login** changes operating-system autostart immediately. **Language**
+**Start on login** changes operating-system autostart immediately. On a fresh
+Linux setup, the app requests desktop approval once. The toggle waits for the
+portal response without blocking the UI; denial leaves it disabled, and you can
+retry using the toggle. Existing installations retain their autostart choice.
+Closing the window preserves that choice when requesting background permission.
+**Language**
 switches immediately between English, German, or the system default; select
 **Save and Apply** to keep the preference. The app follows the system's light
 or dark theme.
@@ -166,13 +174,22 @@ for ordering details and defaults.
 on Windows, and Journald or files on Linux. For **File**, set an absolute
 **Log Directory**, or select **Use Default** to restore the standard location.
 **Open Logs** in the footer opens Event Viewer for the Windows Event Log target,
-or the file directory for file logging. On Linux it opens the file directory;
-use the system journal tools to inspect Journald output.
+or the file directory for file logging. For Linux Journald logging it opens a
+read-only live viewer of the latest 500 entries from this app session, including
+startup and synchronization restarts. Entries longer than 8,192 characters are
+truncated in the viewer. This requires no host journal access in Flatpak. Use
+system journal tools for persistent history and complete entries; Journald
+remains the configured output.
 
 ## Save, troubleshoot, and close
 
 Switching pages, tabs, or folders preserves your draft. **Save and Apply** checks
 and saves every folder and global setting, then restarts synchronization.
+Both platforms validate local settings and Immich access before writing or
+restarting. Validation and permission failures leave the applied configuration
+untouched. A failure while restarting is reported after saving, so the saved
+configuration can be corrected and retried. Application startup also checks
+Immich access automatically; unexpected check failures clear the checking state.
 Navigation alone does not save or pause synchronization.
 
 If saving fails, read the footer message, correct the indicated field, and retry.
@@ -184,7 +201,12 @@ For detailed settings and paths, see [Configuration](configuration.md).
 Closing the window keeps synchronization running in the background. Windows
 provides a tray menu. On Linux, use the launcher to reopen the window and the
 footer's **Quit** button to stop the app; tray availability depends on the desktop
-and packaging. Linux may request permission to run in the background.
+and packaging. Linux may request permission to run in the background. A supported
+tray, including in Flatpak, provides **Open**, **Restart**, and **Quit**, with a
+localized tooltip showing server connectivity, last synchronization, and queue
+size. **Restart** reloads the saved configuration. Explicit quit waits for
+synchronization to stop. Autostart runs hidden when a tray host is available;
+without one, or when it disappears, the window opens and shows a tray notice.
 
 ## Compatibility
 

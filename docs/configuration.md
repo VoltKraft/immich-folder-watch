@@ -150,11 +150,18 @@ directions. `watch.transferOrder` accepts `newestFirst` (the default) or
 `oldestFirst`; empty or unrecognized values fall back to `newestFirst`.
 Uploads use the local UTC last-modified time sampled when queued and are ordered
 across ready queued files before selecting a batch. First attempts take priority
-over retries; the selected timestamp order applies within each group. Downloads are ordered within
-each source/album pull by the server's `fileModifiedAt`, falling back to
-`fileCreatedAt` and then `createdAt`. Files with no timestamp come last;
-equal timestamps retain queue/API order.
-This does not interrupt a running transfer or reorder the source/album traversal.
+over retries; the selected timestamp order applies within each group. Downloads are collected
+across all configured sync sources, albums and unassigned files before transfer.
+The shared download queue uses original `fileCreatedAt`, falling back to the
+existing modification/upload timestamp when original creation is unavailable.
+Files with no timestamp come last; equal timestamps retain source/API order.
+Metadata collection can take time before the first download. A running transfer
+is not interrupted; newly discovered assets join the next pull cycle. Local
+files created or deleted during collection are checked again before transfer.
+An album-listing failure still prevents remote-delete propagation for that source.
+Remote-delete propagation only removes mappings owned by that source. If multiple
+sync sources share exactly the same local root, automatic remote-to-local deletion
+is disabled because ownership cannot be distinguished; use separate folders.
 Use **Save and Apply** to activate a changed order.
 
 Existing configurations without `transferOrder` automatically use `newestFirst`
@@ -196,9 +203,11 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - New sources prefill the full set of Immich-supported media extensions (images, RAW formats, and videos). Edit these under the selected folder's **File filters** tab.
 - In the Windows GUI, `Excluded Directories` is shown only when `Include subdirectories` is enabled, but existing values are preserved when the field is hidden again.
 - `logging.target` controls where logs are written. Valid values:
-  - `eventLog` (default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
-  - `file`: writes to a daily-rotated text file under `logging.logDirectory`. The GUI's **Open Logs** button opens the directory in Explorer.
-  - Missing, blank, or unknown values normalize to `eventLog`. Pre-2.3 configs therefore load unchanged but switch to Event Log on next save.
+  - `eventLog` (Windows default): writes to a dedicated **Windows Event Log** named "Immich Folder Watch". The MSI installer registers the log and source at install time. The GUI's **Open Logs** button opens Event Viewer directly to the dedicated log.
+  - `file`: writes to a daily-rotated text file under `logging.logDirectory`. The GUI's **Open Logs** button opens the directory in the platform file manager.
+  - `journald` (Linux default): writes systemd-formatted output to the system journal. **Open Logs** shows recent session entries without granting Flatpak access to host logs.
+  - Missing, blank, or unknown values normalize to `eventLog`; the Linux host coerces unsupported targets to `journald`.
+  - Fresh Linux UI settings use the platform XDG state directory for file logs. Existing absolute directories are retained; legacy relative directories are resolved against the configuration directory before editing.
   - If the Event Log source is not registered (e.g. xcopy or developer install), the app falls back to file logging and surfaces a warning in the UI.
 - `watch.sources[].albumName` is optional. Leave it empty to upload files without assigning them to an Immich album.
 - If `watch.sources[].albumName` is set, uploads are added to that album and the daemon creates the album automatically if it does not exist yet.
@@ -217,7 +226,7 @@ when no downloads are needed. An empty scan does not clear an upload error.
     - **Creating a first-level subfolder** creates the matching Immich album; **deleting a first-level subfolder** trashes any still-tracked assets under it and deletes the Immich album. (Applies to the subfolders-as-albums variant described below.)
     - **Renaming a first-level subfolder** renames the matching Immich album via `PATCH /albums/{id}`; **renaming an Immich album** renames the matching local first-level subfolder on the next pull. The worker tracks album ids so renames are detected even when the display name changes. Conflicts (a folder or album with the new name already exists) are logged and left untouched instead of being merged automatically.
     - Two shapes are supported depending on `albumName`:
-      - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored.
+      - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored. If the named album does not exist, the sync status explains that no files can be downloaded from it yet. Select an existing album or clear `albumName` to mirror all albums and unassigned assets; uploading a local file creates the named album. A missing album never deletes previously synchronized local files.
       - `albumName` **empty**: subfolders-as-albums sync. The root folder mirrors all Immich assets that are not in any album, and each first-level subfolder mirrors the Immich album with the same name. New subfolders become new albums (and new Immich albums become subfolders) in realtime. `includeSubdirectories` is forced on.
   - Missing, blank, or unknown values normalize to `uploadNew`. Pre-2.3 configs therefore load unchanged and keep the previous upload-only behavior.
   - The mode is configurable per source under **Folders → General → Sync Mode**. The `Include subdirectories` checkbox is hidden when `sync` is selected, since the behavior is dictated by whether `albumName` is set.
@@ -231,5 +240,43 @@ when no downloads are needed. An empty scan does not clear an upload error.
 - In the Windows GUI, a newly added source suggests the folder name as the album name once; if you clear the field afterwards, it stays empty.
 - Relative watch-source paths are resolved against the directory that contains `config.yaml` at runtime.
 - Existing `1.4.x` configs that still use top-level `watch.extensions` are migrated to per-source extensions when loaded and rewritten in the new format on the next save.
-- Existing relative `logging.logDirectory` values still run after normalization, but the Windows GUI rewrites them to an absolute path on the next successful save.
-- `localization.language` selects the GUI language. `auto` picks German when the Windows UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.
+- Existing relative `logging.logDirectory` values still run after normalization; both GUIs rewrite them to an absolute path on the next successful save.
+- `localization.language` selects the GUI language. `auto` picks German when the operating system UI culture is German and English otherwise. `en` and `de` pin the language. Missing, blank, or unknown values normalize to `auto`. The language can also be changed at runtime through **Settings → General → Language**, which writes the selected value back to this field on the next save.
+
+When switching a newly added source to bidirectional `sync`, an untouched
+automatic album suggestion is cleared. Explicitly entered and saved album names
+are preserved. Leave `albumName` empty to synchronize unassigned media at the
+root and all albums in subfolders. For an existing source that should cover the
+whole library, clear its album field and save/apply; no YAML format changes.
+
+
+### Downloaded file dates
+
+For bidirectional sync, the original Immich `fileCreatedAt` timestamp is retained
+separately from the server's upload date (`createdAt`). Missing or invalid original
+creation dates leave local timestamps unchanged; an upload date is never substituted.
+
+- Linux: the file's modification date (`mtime`, shown as **Modified**) is set to
+  original creation time. Linux/Btrfs does not provide a normal API for replacing
+  the filesystem birth time shown as **Created**, which remains the local download
+  date. File content and embedded EXIF/video metadata remain unchanged.
+- Windows: the filesystem **Created** date is set to original creation time, and
+  **Modified** retains Immich's file modification date (or creation date if missing).
+  Timestamp precision and support depend on the target filesystem.
+
+After upgrading, sync pulls also correct persisted download mappings whose asset
+ID, file size and modification date still match. Uploaded, untracked and locally
+modified files are not rewritten by this correction. Existing unknown files first
+adopted by filename receive a persisted download mapping; they become eligible on
+later pulls while unchanged. File contents are hashed during correction/recovery
+to detect concurrent changes, without transferring the file again.
+
+A durable SQLite journal records each correction before changing timestamps. An
+interrupted correction is recovered before startup reconciliation can queue any
+uploads. Completed corrections update the stored fingerprint without advancing
+last-sync or transfer counters. Journal/storage failures pause synchronization;
+restart after resolving the underlying error. If contents changed without a
+distinguishable size/date change, recovery pauses for review instead of accepting
+the modified file as synchronized. Do not delete pending journal entries manually.
+No YAML migration is required. The journal table is additive; finish recovery
+before downgrading to an older version that does not understand this journal.

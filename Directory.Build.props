@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup>
-    <Version>2.10.1</Version>
-    <AssemblyVersion>2.10.1.0</AssemblyVersion>
-    <FileVersion>2.10.1.0</FileVersion>
+    <Version>2.11.0</Version>
+    <AssemblyVersion>2.11.0.0</AssemblyVersion>
+    <FileVersion>2.11.0.0</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -14,7 +14,7 @@
       App.csproj without erroring NETSDK1100. The actual `dotnet build`
       of the WPF App still requires Windows-resident WPF runtime
       bits at runtime; ci.yaml's build-linux job intentionally builds
-      only App.Linux + Tests.Core, never App.csproj or the WPF Tests.
+      only App.Linux + Tests.Core + Tests.Linux, never App.csproj or the WPF Tests.
     -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>

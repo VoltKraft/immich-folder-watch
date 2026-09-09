@@ -126,7 +126,8 @@ public sealed class WatchSourceItem : BindableBase
         get => _albumName;
         set
         {
-            if (SetProperty(ref _albumName, value) && !_isApplyingAlbumSuggestion)
+            SetProperty(ref _albumName, value);
+            if (!_isApplyingAlbumSuggestion)
             {
                 _albumNameTouchedByUser = true;
             }
@@ -176,6 +177,13 @@ public sealed class WatchSourceItem : BindableBase
         {
             if (SetProperty(ref _syncMode, WatchSourceSyncModes.Normalize(value)))
             {
+                if (_syncMode == WatchSourceSyncModes.Sync && _hasAutoFilledAlbumName && !_albumNameTouchedByUser)
+                {
+                    // An upload suggestion must not silently limit a new sync source
+                    // to an album that may not exist. Explicit and loaded names remain selected.
+                    SetProperty(ref _albumName, string.Empty, nameof(AlbumName));
+                }
+
                 RaisePropertyChanged(nameof(ShowIncludeSubdirectories));
                 RaisePropertyChanged(nameof(ShowExcludeDirectories));
                 RaisePropertyChanged(nameof(ShowDeleteAfterUpload));
@@ -225,7 +233,7 @@ public sealed class WatchSourceItem : BindableBase
 
     private void TrySuggestAlbumNameFromPath()
     {
-        if (_hasAutoFilledAlbumName || _albumNameTouchedByUser || !string.IsNullOrWhiteSpace(_albumName))
+        if (_syncMode == WatchSourceSyncModes.Sync || _hasAutoFilledAlbumName || _albumNameTouchedByUser || !string.IsNullOrWhiteSpace(_albumName))
         {
             return;
         }

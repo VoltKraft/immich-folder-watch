@@ -1099,10 +1099,11 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                     originalFileName = id;
                 }
 
+                var fileCreatedAt = ExtractTimestamp(element, "fileCreatedAt");
                 var timestamp = ExtractTimestamp(element, "fileModifiedAt")
-                    ?? ExtractTimestamp(element, "fileCreatedAt")
+                    ?? fileCreatedAt
                     ?? ExtractTimestamp(element, "createdAt");
-                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName), timestamp));
+                assets.Add(new AlbumAssetSummary(id, Path.GetFileName(originalFileName), timestamp, fileCreatedAt));
             }
 
             return true;

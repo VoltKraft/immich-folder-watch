@@ -90,7 +90,11 @@ public sealed class MainWindowViewModel : BindableBase
     private readonly LocalizationService _localizationService;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IPlatformLoggingCapabilities _loggingCapabilities;
-    private bool _suppressAutostartWrite;
+    private readonly IPlatformPaths? _platformPaths;
+    private readonly SemaphoreSlim _autostartGate = new(1, 1);
+    private int _pendingAutostartChanges;
+    private bool _isAutostartChangeInProgress;
+    private bool _lastKnownAutostartEnabled;
     private bool _suppressLanguageWrite;
     private int _selectedSectionIndex;
     private WatchSourceItem? _selectedSource;
@@ -104,7 +108,7 @@ public sealed class MainWindowViewModel : BindableBase
     private string _retryBaseDelayMilliseconds = "500";
     private string _loggingLevel = "Information";
     private string _loggingTarget = LogTargets.EventLog;
-    private string _logDirectory = GetDefaultLogDirectory();
+    private string _logDirectory;
     private string _statusHeadline = string.Empty;
     private string _statusDetails = string.Empty;
     private string _trayStatusMessage = string.Empty;
@@ -143,7 +147,8 @@ public sealed class MainWindowViewModel : BindableBase
         IAutoStartManager autostartManager,
         LocalizationService localizationService,
         IUiDispatcher uiDispatcher,
-        IPlatformLoggingCapabilities loggingCapabilities)
+        IPlatformLoggingCapabilities loggingCapabilities,
+        IPlatformPaths? platformPaths = null)
     {
         _syncStatusProvider = syncStatusProvider ?? throw new ArgumentNullException(nameof(syncStatusProvider));
         _autostartManager = autostartManager ?? throw new ArgumentNullException(nameof(autostartManager));
@@ -151,6 +156,8 @@ public sealed class MainWindowViewModel : BindableBase
         _uiDispatcher = uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher));
         _loggingCapabilities = loggingCapabilities ?? throw new ArgumentNullException(nameof(loggingCapabilities));
         _loggingTarget = _loggingCapabilities.DefaultTarget;
+        _platformPaths = platformPaths;
+        _logDirectory = GetDefaultLogDirectory();
 
         AvailableLanguages = BuildLanguageOptions();
         _selectedLanguage = FindLanguageOption(_localizationService.CurrentLanguage);
@@ -168,9 +175,7 @@ public sealed class MainWindowViewModel : BindableBase
         RefreshImmichApiKeyPresentation(resetVisibleState: true);
         ResetImmichCheckStatus();
 
-        _suppressAutostartWrite = true;
-        AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
-        _suppressAutostartWrite = false;
+        _ = RefreshAutostartFromDiskAsync();
 
         RefreshSyncStatusFromProvider();
         _syncStatusProvider.PropertyChanged += SyncStatusProvider_PropertyChanged;
@@ -471,18 +476,17 @@ public sealed class MainWindowViewModel : BindableBase
         get => _autostartEnabled;
         set
         {
-            if (!SetProperty(ref _autostartEnabled, value))
+            if (SetProperty(ref _autostartEnabled, value))
             {
-                return;
+                _ = SetAutostartAsync(value);
             }
-
-            if (_suppressAutostartWrite)
-            {
-                return;
-            }
-
-            ApplyAutostartChange(value);
         }
+    }
+
+    public bool IsAutostartChangeInProgress
+    {
+        get => _isAutostartChangeInProgress;
+        private set => SetProperty(ref _isAutostartChangeInProgress, value);
     }
 
     public string OperationMessage
@@ -593,6 +597,7 @@ public sealed class MainWindowViewModel : BindableBase
     {
         ArgumentNullException.ThrowIfNull(config);
 
+        _localizationService.SetLanguage(config.Localization?.Language);
         var selectedPath = SelectedSource?.Path;
         var selectedIndex = SelectedSource is null ? 0 : Sources.IndexOf(SelectedSource);
         var selectedSectionIndex = SelectedSectionIndex;
@@ -731,6 +736,10 @@ public sealed class MainWindowViewModel : BindableBase
                 Target = loggingTarget,
                 LogDirectory = string.IsNullOrWhiteSpace(logDirectory) ? GetDefaultLogDirectory() : logDirectory,
             },
+            Localization = new LocalizationSettings
+            {
+                Language = LocalizationService.NormalizeCode(SelectedLanguage.Code),
+            },
         };
 
         errors = errorList;
@@ -818,15 +827,110 @@ public sealed class MainWindowViewModel : BindableBase
 
     public void RefreshAutostartFromDisk()
     {
-        _suppressAutostartWrite = true;
+        _ = RefreshAutostartFromDiskAsync();
+    }
+
+    /// <summary>
+    /// Refreshes the platform autostart flag without blocking the UI. Call on the UI thread.
+    /// Failures are reported through <see cref="OperationMessage"/>.
+    /// </summary>
+    public async Task RefreshAutostartFromDiskAsync()
+    {
+        await _autostartGate.WaitAsync();
         try
         {
-            AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
+            await ReadAutostartStateAsync();
+        }
+        catch (Exception ex)
+        {
+            OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_AutostartFailedFormat, ex.Message);
         }
         finally
         {
-            _suppressAutostartWrite = false;
+            _autostartGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Runs platform-specific first-run setup while disabling the autostart toggle. Call on the UI
+    /// thread. Later changes wait for setup to finish. Cancellation and setup failures propagate to
+    /// the startup caller after releasing the gate and restoring the busy indicator.
+    /// </summary>
+    public async Task InitializeAutostartAsync(
+        Func<CancellationToken, Task> initializeAsync, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(initializeAsync);
+        _pendingAutostartChanges++;
+        IsAutostartChangeInProgress = true;
+        var acquired = false;
+        try
+        {
+            await _autostartGate.WaitAsync(cancellationToken);
+            acquired = true;
+            await initializeAsync(cancellationToken);
+            await ReadAutostartStateAsync();
+        }
+        finally
+        {
+            if (acquired)
+            {
+                _autostartGate.Release();
+            }
+            _pendingAutostartChanges--;
+            IsAutostartChangeInProgress = _pendingAutostartChanges > 0;
+        }
+    }
+
+    /// <summary>
+    /// Applies an autostart change, awaiting any platform permission dialog. Call on the UI thread.
+    /// Concurrent requests run in order. Failures restore the last known platform state, set
+    /// <see cref="OperationMessage"/>, and return false instead of escaping a binding setter.
+    /// </summary>
+    public async Task<bool> SetAutostartAsync(bool enabled)
+    {
+        SetProperty(ref _autostartEnabled, enabled, nameof(AutostartEnabled));
+        _pendingAutostartChanges++;
+        IsAutostartChangeInProgress = true;
+        await _autostartGate.WaitAsync();
+        try
+        {
+            if (enabled)
+            {
+                await _autostartManager.EnableAsync();
+            }
+            else
+            {
+                await _autostartManager.DisableAsync();
+            }
+
+            await ReadAutostartStateAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_AutostartFailedFormat, ex.Message);
+            try
+            {
+                await ReadAutostartStateAsync();
+            }
+            catch
+            {
+                SetProperty(ref _autostartEnabled, _lastKnownAutostartEnabled, nameof(AutostartEnabled));
+            }
+            return false;
+        }
+        finally
+        {
+            _autostartGate.Release();
+            _pendingAutostartChanges--;
+            IsAutostartChangeInProgress = _pendingAutostartChanges > 0;
+        }
+    }
+
+    private async Task ReadAutostartStateAsync()
+    {
+        _lastKnownAutostartEnabled = await _autostartManager.IsEnabledAsync();
+        SetProperty(ref _autostartEnabled, _lastKnownAutostartEnabled, nameof(AutostartEnabled));
     }
 
     /// <summary>
@@ -841,34 +945,6 @@ public sealed class MainWindowViewModel : BindableBase
         else
         {
             _uiDispatcher.Post(() => ApplyUpdateInfoOnUiThread(updateInfo));
-        }
-    }
-
-    private void ApplyAutostartChange(bool enabled)
-    {
-        try
-        {
-            if (enabled)
-            {
-                _autostartManager.EnableAsync().GetAwaiter().GetResult();
-            }
-            else
-            {
-                _autostartManager.DisableAsync().GetAwaiter().GetResult();
-            }
-        }
-        catch (Exception ex)
-        {
-            OperationMessage = string.Format(_localizationService.CurrentCulture, Strings.Op_AutostartFailedFormat, ex.Message);
-            _suppressAutostartWrite = true;
-            try
-            {
-                AutostartEnabled = _autostartManager.IsEnabledAsync().GetAwaiter().GetResult();
-            }
-            finally
-            {
-                _suppressAutostartWrite = false;
-            }
         }
     }
 
@@ -1103,7 +1179,11 @@ public sealed class MainWindowViewModel : BindableBase
         };
     }
 
-    private void ResetImmichCheckStatus()
+    /// <summary>
+    /// Clears access-check badges and permission rows when the configuration draft changes.
+    /// Call on the UI thread; stale asynchronous results must not be applied afterward.
+    /// </summary>
+    public void ResetImmichCheckStatus()
     {
         SetImmichUrlStatus(CheckState.NotChecked);
         SetImmichApiKeyStatus(CheckState.NotChecked);
@@ -1273,9 +1353,9 @@ public sealed class MainWindowViewModel : BindableBase
         _ => target,
     };
 
-    private static string GetDefaultLogDirectory()
+    private string GetDefaultLogDirectory()
     {
-        return Path.GetFullPath(InstallationPaths.GetLogDirectory());
+        return Path.GetFullPath(_platformPaths?.GetLogDirectory() ?? InstallationPaths.GetLogDirectory());
     }
 
     private void RefreshImmichApiKeyPresentation(bool resetVisibleState)

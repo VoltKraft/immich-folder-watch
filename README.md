@@ -136,18 +136,18 @@ The planned Flathub publication is currently postponed. See
 [`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
 
 The Flatpak package runs through X11/XWayland because the current Avalonia
-Linux backend initializes X11. The Flatpak package disables Avalonia's
-StatusNotifierItem tray backend because it requires a broad KDE D-Bus own-name
-permission that Flathub no longer grants to new apps; the app shows a window
-banner and can be reopened from the launcher or Background Apps.
+Linux backend initializes X11. Its tray uses the application's own D-Bus
+namespace and supports KDE Plasma and GNOME with an AppIndicator extension.
+When no tray host is available, the app shows a banner and remains reachable
+through the launcher or Background Apps.
 
 Sandbox layout:
 
 - App ID: `io.github.voltkraft.immich-folder-watch`
 - Config: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/config.yaml`
 - Sync state: `~/.var/app/io.github.voltkraft.immich-folder-watch/config/immich-folder-watch/sync-state.db`
-- Logs: journald (default — `journalctl --user -t io.github.voltkraft.immich-folder-watch.desktop`) or `~/.var/app/io.github.voltkraft.immich-folder-watch/data/Immich Folder Watch/logs/` when File logging is selected
-- Autostart: managed via the desktop's Background portal — toggle inside the GUI
+- Logs: journald (default — `journalctl --user -t io.github.voltkraft.immich-folder-watch.desktop`) or the directory shown under **Settings → Logging** when File logging is selected
+- Autostart: requests desktop approval once during first setup; managed via the Background portal and the GUI toggle
 
 Folder picking goes through the FreeDesktop FileChooser portal so the app only sees the folders you explicitly grant. The watcher resolves the doc-portal handles back to host paths via `org.freedesktop.portal.Documents`, and inotify-blind FUSE mounts are covered by a 5-second polling sweep.
 

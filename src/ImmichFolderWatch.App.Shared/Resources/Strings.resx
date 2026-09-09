@@ -102,7 +102,7 @@
   <data name="UI_Remove" xml:space="preserve"><value>Remove</value></data>
   <data name="UI_FolderPath" xml:space="preserve"><value>Folder Path</value></data>
   <data name="UI_ImmichAlbumName" xml:space="preserve"><value>Immich Album Name</value></data>
-  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Leave empty for no album</value></data>
+  <data name="UI_AlbumNameWatermark" xml:space="preserve"><value>Optional album name</value></data>
   <data name="UI_AdvancedWatchOptions" xml:space="preserve"><value>Advanced Options</value></data>
   <data name="UI_IncludeSubdirectories" xml:space="preserve"><value>Include subdirectories</value></data>
   <data name="UI_DeleteAfterUpload" xml:space="preserve"><value>Permanently delete local files after successful upload</value></data>
@@ -191,4 +191,10 @@
   <data name="UI_NewSource" xml:space="preserve"><value>New folder</value></data>
   <data name="UI_AdvancedOptions" xml:space="preserve"><value>Advanced</value></data>
   <data name="UI_Logging" xml:space="preserve"><value>Logging</value></data>
+  <data name="UI_SessionLogs" xml:space="preserve"><value>Session Logs</value></data>
+  <data name="UI_SessionLogsDescription" xml:space="preserve"><value>Latest 500 entries from this session. Select text to copy it. Persistent history is available in the system journal.</value></data>
+  <data name="UI_LinuxAutostartDescription" xml:space="preserve"><value>Start at login after approval by your desktop. The Flatpak package opens the window because its system tray is disabled.</value></data>
+  <data name="UI_ChooseFolder" xml:space="preserve"><value>Choose Folder…</value></data>
+  <data name="Op_SyncStartFailedFormat" xml:space="preserve"><value>Synchronization could not be started: {0}</value></data>
+  <data name="UI_SyncAlbumHint" xml:space="preserve"><value>Leave empty to synchronize all albums into subfolders. Enter an existing album name to synchronize only that album.</value></data>
 </root>
