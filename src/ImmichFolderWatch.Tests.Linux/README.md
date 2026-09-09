@@ -46,3 +46,9 @@ Linux protocol tests require `dbus-daemon` and `xdg-dbus-proxy`. They run on
 isolated buses and include the same app-ID namespace ownership and watcher
 talk rule used by Flatpak. Document-path tests cover opaque IDs, nested paths,
 xattr lookup, denied/older portals, timeout and cancellation.
+
+When running the full solution on Windows, the six native tray protocol tests
+and three document-portal protocol tests are reported as skipped by `LinuxFact`.
+Platform-neutral document-path, lifecycle, session, access-check and headless GUI
+checks remain enabled. On Linux, missing protocol tools fail the corresponding
+tests rather than silently reducing coverage; the Linux CI job installs them.

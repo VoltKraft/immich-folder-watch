@@ -42,10 +42,9 @@ public sealed class DocumentPortalClientTests
             "/run/user/1000/doc/abcd/Photos", cancelled.Token));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ResolveHostPathAsync_UsesSandboxAccessibleGetHostPathsAndParsesByteStringDictionary()
     {
-        if (!OperatingSystem.IsLinux()) return;
         await using var portal = await TestDocumentsPortal.StartAsync();
         await using var session = new DBusSession(portal.Address);
         var client = new DocumentPortalClient(session, NullLogger<DocumentPortalClient>.Instance, _ => null);
@@ -55,10 +54,9 @@ public sealed class DocumentPortalClientTests
         Assert.Equal(new[] { "abcd" }, portal.RequestedIds);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ResolveHostPathAsync_OlderOrDeniedPortalKeepsAccessPathFallback()
     {
-        if (!OperatingSystem.IsLinux()) return;
         await using var portal = await TestDocumentsPortal.StartAsync();
         portal.DenyRequest = true;
         await using var session = new DBusSession(portal.Address);
@@ -66,10 +64,9 @@ public sealed class DocumentPortalClientTests
         Assert.Null(await client.ResolveHostPathAsync("/run/user/1000/doc/abcd/Photos", TestContext.Current.CancellationToken));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ResolveHostPathAsync_StalledPortalReturnsWithoutBlockingShutdown()
     {
-        if (!OperatingSystem.IsLinux()) return;
         await using var portal = await TestDocumentsPortal.StartAsync();
         portal.IgnoreRequest = true;
         await using var session = new DBusSession(portal.Address);

@@ -7,7 +7,7 @@ namespace ImmichFolderWatch.Tests.Linux;
 
 public sealed class StatusNotifierItemTests
 {
-    [Fact]
+    [LinuxFact]
     public async Task RegistersUnderApplicationNamespaceAndExportsIconAndMenu()
     {
         await using var bus = await TestBus.StartAsync();
@@ -26,7 +26,7 @@ public sealed class StatusNotifierItemTests
         Assert.Equal(new[] { "Open", "Restart", "Quit" }, layout);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task MenuEventsDispatchActionsAndLanguageChangesUpdateLayout()
     {
         await using var bus = await TestBus.StartAsync();
@@ -42,7 +42,7 @@ public sealed class StatusNotifierItemTests
         Assert.Equal(new[] { "Öffnen", "Neustart", "Beenden" }, await bus.GetLayoutAsync());
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task MissingWatcherKeepsUnregisteredAndWatcherRecoveryRegistersAgain()
     {
         await using var bus = await TestBus.StartAsync(ownWatcher: false);
@@ -56,7 +56,7 @@ public sealed class StatusNotifierItemTests
         Assert.True(item.IsRegistered);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task FlatpakStyleBusFilterAllowsRegistrationAndMenuWithoutKdeOwnership()
     {
         await using var bus = await TestBus.StartAsync();
@@ -90,7 +90,7 @@ public sealed class StatusNotifierItemTests
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task DelayedRegistrationReplyCannotRestoreAvailabilityAfterWatcherDisappears()
     {
         await using var bus = await TestBus.StartAsync();
@@ -107,7 +107,7 @@ public sealed class StatusNotifierItemTests
         Assert.False(item.IsRegistered);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task DisposingWithdrawsBusNameAndStopsExporting()
     {
         await using var bus = await TestBus.StartAsync();
