@@ -5,41 +5,79 @@ namespace ImmichFolderWatch.App.Linux.Platform;
 public sealed class DBusSession : IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly CancellationTokenSource _disposeCancellation = new();
+    private readonly string? _address;
     private DBusConnection? _connection;
+    private int _disposed;
+
+    public DBusSession()
+    {
+    }
+
+    /// <summary>Connects to an explicit bus address, useful for an isolated integration-test bus.</summary>
+    public DBusSession(string address)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(address);
+        _address = address;
+    }
 
     public async Task<DBusConnection> GetAsync(CancellationToken cancellationToken = default)
     {
-        if (_connection is not null)
-        {
-            return _connection;
-        }
-
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCancellation.Token);
+        await _gate.WaitAsync(linked.Token).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             if (_connection is null)
             {
-                var address = DBusAddress.Session
+                var address = _address ?? DBusAddress.Session
                     ?? throw new InvalidOperationException(
                         "No D-Bus session bus address. Set DBUS_SESSION_BUS_ADDRESS or run inside a desktop session.");
                 var connection = new DBusConnection(address);
-                await connection.ConnectAsync().ConfigureAwait(false);
-                _connection = connection;
+                try
+                {
+                    await connection.ConnectAsync().AsTask().WaitAsync(linked.Token).ConfigureAwait(false);
+                    linked.Token.ThrowIfCancellationRequested();
+                    ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+                    _connection = connection;
+                }
+                catch
+                {
+                    connection.Dispose();
+                    throw;
+                }
             }
+
+            return _connection;
         }
         finally
         {
             _gate.Release();
         }
-
-        return _connection;
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        _connection?.Dispose();
-        _connection = null;
-        _gate.Dispose();
-        return ValueTask.CompletedTask;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _disposeCancellation.Cancel();
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _connection?.Dispose();
+            _connection = null;
+            _disposeCancellation.Dispose();
+        }
+        finally
+        {
+            // Already queued GetAsync callers must be able to acquire and release
+            // the gate before observing disposal. No wait handle is allocated here.
+            _gate.Release();
+        }
     }
 }

@@ -191,4 +191,9 @@
   <data name="UI_NewSource" xml:space="preserve"><value>Neuer Ordner</value></data>
   <data name="UI_AdvancedOptions" xml:space="preserve"><value>Erweitert</value></data>
   <data name="UI_Logging" xml:space="preserve"><value>Protokollierung</value></data>
+  <data name="UI_SessionLogs" xml:space="preserve"><value>Sitzungsprotokoll</value></data>
+  <data name="UI_SessionLogsDescription" xml:space="preserve"><value>Die letzten 500 Einträge dieser Sitzung. Text zum Kopieren markieren. Dauerhafte Protokolle sind im Systemjournal verfügbar.</value></data>
+  <data name="UI_LinuxAutostartDescription" xml:space="preserve"><value>Nach Zustimmung des Desktops bei der Anmeldung starten. Das Flatpak-Paket öffnet das Fenster, da sein Tray-Symbol deaktiviert ist.</value></data>
+  <data name="UI_ChooseFolder" xml:space="preserve"><value>Ordner auswählen…</value></data>
+  <data name="Op_SyncStartFailedFormat" xml:space="preserve"><value>Synchronisation konnte nicht gestartet werden: {0}</value></data>
 </root>

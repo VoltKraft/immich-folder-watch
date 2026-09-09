@@ -1,98 +1,132 @@
 using ImmichFolderWatch.Core.Platform;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Tmds.DBus.Protocol;
 
 namespace ImmichFolderWatch.App.Linux.Platform;
 
-public sealed class PortalAutostartManager : IAutoStartManager
+/// <summary>Persists only portal-confirmed autostart state and serializes background permission changes.</summary>
+public sealed class PortalAutostartManager(IBackgroundPortalRequest portal, IPlatformPaths paths,
+    ILogger<PortalAutostartManager>? logger = null) : IAutoStartManager
 {
-    private const string PortalService = "org.freedesktop.portal.Desktop";
-    private const string PortalPath = "/org/freedesktop/portal/desktop";
-    private const string BackgroundIface = "org.freedesktop.portal.Background";
     private const string AutostartFlagFileName = "autostart-requested";
+    private const string InitializedFlagFileName = "autostart-initialized";
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
-    private readonly DBusSession _session;
-    private readonly IPlatformPaths _paths;
-    private readonly ILogger<PortalAutostartManager> _logger;
-
-    public PortalAutostartManager(DBusSession session, IPlatformPaths paths)
-        : this(session, paths, NullLogger<PortalAutostartManager>.Instance)
+    /// <summary>
+    /// Offers autostart once for a new installation. Existing configurations and
+    /// remembered choices are preserved; a denied request can be retried in settings.
+    /// </summary>
+    public async Task InitializeAsync(bool configurationExists, CancellationToken cancellationToken = default)
     {
-    }
-
-    public PortalAutostartManager(DBusSession session, IPlatformPaths paths, ILogger<PortalAutostartManager> logger)
-    {
-        _session = session;
-        _paths = paths;
-        _logger = logger;
-    }
-
-    public Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(File.Exists(GetFlagPath()));
-
-    public async Task EnableAsync(CancellationToken cancellationToken = default)
-    {
-        await CallRequestBackgroundAsync(autostart: true, cancellationToken).ConfigureAwait(false);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            Directory.CreateDirectory(_paths.GetUserDataRoot());
-            await File.WriteAllTextAsync(GetFlagPath(), DateTime.UtcNow.ToString("O"), cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to persist autostart flag");
-        }
-    }
-
-    public async Task DisableAsync(CancellationToken cancellationToken = default)
-    {
-        await CallRequestBackgroundAsync(autostart: false, cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var path = GetFlagPath();
-            if (File.Exists(path))
+            var initializedPath = Path.Combine(paths.GetUserDataRoot(), InitializedFlagFileName);
+            if (configurationExists || File.Exists(initializedPath) || File.Exists(GetFlagPath()))
             {
-                File.Delete(path);
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to clear autostart flag");
-        }
-    }
 
-    private string GetFlagPath() => Path.Combine(_paths.GetUserDataRoot(), AutostartFlagFileName);
-
-    private async Task CallRequestBackgroundAsync(bool autostart, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var connection = await _session.GetAsync(cancellationToken).ConfigureAwait(false);
-            var writer = connection.GetMessageWriter();
-            writer.WriteMethodCallHeader(
-                destination: PortalService,
-                path: PortalPath,
-                @interface: BackgroundIface,
-                member: "RequestBackground",
-                signature: "sa{sv}",
-                flags: MessageFlags.None);
-            writer.WriteString(string.Empty);
-            var options = new Dictionary<string, VariantValue>
-            {
-                ["autostart"] = VariantValue.Bool(autostart),
-                ["background"] = VariantValue.Bool(true),
-                ["commandline"] = VariantValue.Array(new[] { "immich-folder-watch", "--background" }),
-                ["reason"] = VariantValue.String("Watch folders and upload media to Immich"),
-            };
-            writer.WriteDictionary(options);
-            var message = writer.CreateMessage();
-            await connection.CallMethodAsync(message).ConfigureAwait(false);
+            Directory.CreateDirectory(paths.GetUserDataRoot());
+            File.WriteAllText(initializedPath, DateTime.UtcNow.ToString("O"));
+            await SetEnabledCoreAsync(true, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "RequestBackground(autostart={Autostart}) failed", autostart);
             throw;
         }
+        catch (Exception ex)
+        {
+            (logger ?? NullLogger<PortalAutostartManager>.Instance).LogWarning(ex,
+                "Initial autostart request failed; autostart can be changed in settings.");
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
+
+    /// <summary>Returns the last confirmed state; the portal does not provide a query for external changes.</summary>
+    public Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(File.Exists(GetFlagPath()));
+    }
+
+    public Task EnableAsync(CancellationToken cancellationToken = default)
+        => SetEnabledAsync(true, cancellationToken);
+
+    public Task DisableAsync(CancellationToken cancellationToken = default)
+        => SetEnabledAsync(false, cancellationToken);
+
+    /// <summary>Requests background permission without changing the last confirmed autostart choice.</summary>
+    public async Task<bool> RequestBackgroundPermissionAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var autostart = await IsEnabledAsync(cancellationToken).ConfigureAwait(false);
+            var result = await portal.RequestAsync(autostart, cancellationToken).ConfigureAwait(false);
+            EnsureCompleted(result);
+            PersistState(result.Autostart);
+            return result.Background;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task SetEnabledAsync(bool enabled, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SetEnabledCoreAsync(enabled, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task SetEnabledCoreAsync(bool enabled, CancellationToken cancellationToken)
+    {
+        var result = await portal.RequestAsync(enabled, cancellationToken).ConfigureAwait(false);
+        EnsureCompleted(result);
+        // Even a successful interaction can decline autostart. Persist the actual
+        // result first so a later close-to-background request cannot re-enable it.
+        PersistState(result.Autostart);
+        if (result.Autostart != enabled)
+        {
+            throw new InvalidOperationException("The Background portal did not grant the requested autostart setting.");
+        }
+    }
+
+    private static void EnsureCompleted(BackgroundPortalResponse result)
+    {
+        if (result.ResponseCode == 1)
+        {
+            throw new OperationCanceledException("The Background portal request was cancelled by the user.");
+        }
+        if (result.ResponseCode != 0)
+        {
+            throw new InvalidOperationException("The Background portal request was denied or failed.");
+        }
+    }
+
+    private void PersistState(bool enabled)
+    {
+        if (enabled)
+        {
+            Directory.CreateDirectory(paths.GetUserDataRoot());
+            File.WriteAllText(GetFlagPath(), DateTime.UtcNow.ToString("O"));
+        }
+        else if (File.Exists(GetFlagPath()))
+        {
+            File.Delete(GetFlagPath());
+        }
+    }
+
+    private string GetFlagPath() => Path.Combine(paths.GetUserDataRoot(), AutostartFlagFileName);
 }

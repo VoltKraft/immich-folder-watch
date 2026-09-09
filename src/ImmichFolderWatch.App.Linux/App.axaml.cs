@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ImmichFolderWatch.App.Linux.Hosting;
+using ImmichFolderWatch.App.Linux.Logging;
 using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Linux.ViewModels;
 using ImmichFolderWatch.App.Linux.Views;
@@ -24,6 +25,11 @@ public sealed partial class App : Application
     private MainWindow? _mainWindow;
     private AvaloniaTrayHost? _trayHost;
     private Task? _updateCheckTask;
+    private Task? _shutdownTask;
+    private Task? _disposeTask;
+    private ServiceProvider? _provider;
+
+    public static CancellationToken ShutdownToken => (Current as App)?._shutdown.Token ?? CancellationToken.None;
 
     /// <summary>
     /// Service-locator handle for code-behind click handlers in
@@ -59,9 +65,8 @@ public sealed partial class App : Application
                 string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase));
             var isFlatpak = File.Exists("/.flatpak-info");
 
-            // Avalonia 11.3.x lets unobserved task exceptions reach the
-            // dispatcher and kill the process; route them to the logger
-            // instead so background D-Bus failures don't take the GUI down.
+            // Observe unexpected background failures and retain their diagnostic
+            // details even when a third-party asynchronous operation is abandoned.
             TaskScheduler.UnobservedTaskException += static (sender, args) =>
             {
                 Console.Error.WriteLine($"[unobserved-task] {args.Exception}");
@@ -69,9 +74,12 @@ public sealed partial class App : Application
             };
 
             var services = new ServiceCollection();
+            var sessionLogs = new SessionLogBuffer();
+            services.AddSingleton(sessionLogs);
             services.AddLogging(builder =>
             {
                 builder.SetMinimumLevel(LogLevel.Information);
+                builder.AddProvider(new SessionLoggerProvider(sessionLogs));
                 if (JournaldLoggingExtensions.IsJournaldDetected())
                 {
                     // systemd / journald style for autostart + Flatpak launches
@@ -95,7 +103,9 @@ public sealed partial class App : Application
             });
             services.AddSingleton<DBusSession>();
             services.AddSingleton<IPlatformPaths, XdgPlatformPaths>();
-            services.AddSingleton<IAutoStartManager, PortalAutostartManager>();
+            services.AddSingleton<IBackgroundPortalRequest, DBusBackgroundPortalRequest>();
+            services.AddSingleton<PortalAutostartManager>();
+            services.AddSingleton<IAutoStartManager>(sp => sp.GetRequiredService<PortalAutostartManager>());
             services.AddSingleton<IThemeProvider, PortalThemeProvider>();
             services.AddSingleton<INotifier, DBusNotifier>();
             services.AddSingleton<ISingleInstanceCoordinator, UnixSingleInstanceCoordinator>();
@@ -118,6 +128,7 @@ public sealed partial class App : Application
             services.AddSingleton<AppConfigLoader>();
             services.AddSingleton<AppHost>();
             services.AddSingleton<ConfigVerificationRunner>();
+            services.AddSingleton(_ => new ConfigApplyService());
             services.AddSingleton(_ => new HttpClient(new HttpClientHandler
             {
                 AllowAutoRedirect = false,
@@ -130,6 +141,7 @@ public sealed partial class App : Application
             services.AddSingleton<ShellViewModel>();
             var provider = services.BuildServiceProvider();
             Services = provider;
+            _provider = provider;
 
             var single = provider.GetRequiredService<ISingleInstanceCoordinator>();
             if (!single.IsPrimaryInstance)
@@ -141,7 +153,7 @@ public sealed partial class App : Application
                 // Dispatcher shut down" in the second instance. Queuing it via
                 // UIThread.Post lets the main loop spin up first and then
                 // process the shutdown gracefully.
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => desktop.Shutdown(0));
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = ShutdownAsync());
                 return;
             }
 
@@ -151,6 +163,7 @@ public sealed partial class App : Application
             // LocalizationService.LanguageChanged so the {StaticResource Loc}
             // bindings refresh when the language switches.
             _ = provider.GetRequiredService<LocalizationProxy>();
+            ApplyStartupLanguage(provider);
             var viewModel = provider.GetRequiredService<MainWindowViewModel>();
             var productVersion = ProductVersionProvider.GetProductVersion(typeof(App).Assembly);
             viewModel.ProductVersionText = $"Version {productVersion?.ToString(3) ?? "unknown"}";
@@ -183,7 +196,8 @@ public sealed partial class App : Application
                     _mainWindow?.Show();
                     _mainWindow?.Activate();
                 });
-                _trayHost.QuitRequested += (_, _) => desktop.Shutdown(0);
+                _trayHost.RestartRequested += (_, _) => _ = RestartSyncAsync();
+                _trayHost.QuitRequested += (_, _) => _ = ShutdownAsync();
                 _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
@@ -221,35 +235,125 @@ public sealed partial class App : Application
                 // background watcher actually runs without a visible UI.
                 _ = _mainWindow.EnsureBootstrappedAsync();
             }
-            desktop.Exit += async (_, _) =>
+            void RefreshTrayMessage(object? sender, EventArgs args)
             {
+                viewModel.TrayStatusMessage = trayDisabledForFlatpak
+                    ? ImmichFolderWatch.App.Shared.Resources.Strings.Tray_FlatpakUnsupported
+                    : _trayHost is { IsTrayIconRegistered: true }
+                        ? string.Empty
+                        : ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
+            }
+            LocalizationService.Instance.LanguageChanged += RefreshTrayMessage;
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                // The desktop callback is synchronous. Do not veto logout; stop
+                // services off the UI thread before allowing windows to close.
                 _shutdown.Cancel();
-                if (_updateCheckTask is not null)
-                {
-                    try
-                    {
-                        await _updateCheckTask;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                }
-
+                if (_mainWindow is not null) _mainWindow.IsExiting = true;
+                DisposeServicesAsync().GetAwaiter().GetResult();
+            };
+            desktop.Exit += (_, _) =>
+            {
+                LocalizationService.Instance.LanguageChanged -= RefreshTrayMessage;
+                _shutdown.Cancel();
                 _trayHost?.Dispose();
-                if (provider is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync();
-                }
-                else if (provider is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-
-                _shutdown.Dispose();
             };
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Stops synchronization before ending the desktop lifetime. Repeated quit requests share one task.</summary>
+    public Task ShutdownAsync() => _shutdownTask ??= ShutdownCoreAsync();
+
+    private async Task ShutdownCoreAsync()
+    {
+        _shutdown.Cancel();
+        if (_mainWindow is not null)
+        {
+            _mainWindow.IsExiting = true;
+        }
+        try
+        {
+            await Task.WhenAll(_mainWindow?.WaitForBootstrapAsync() ?? Task.CompletedTask,
+                _updateCheckTask ?? Task.CompletedTask);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _provider?.GetRequiredService<ILogger<App>>().LogWarning(ex, "A startup task failed during shutdown.");
+        }
+
+        await DisposeServicesAsync();
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown(0);
+        }
+    }
+
+    private Task DisposeServicesAsync()
+    {
+        if (_disposeTask is not null) return _disposeTask;
+        _trayHost?.Dispose();
+        var provider = _provider;
+        _provider = null;
+        Services = null;
+        return _disposeTask = Task.Run(async () =>
+        {
+            try
+            {
+                if (provider is not null) await provider.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Shutdown cleanup failed: {ex}");
+            }
+        });
+    }
+
+    private async Task RestartSyncAsync()
+    {
+        if (_provider is null || _shutdown.IsCancellationRequested)
+        {
+            return;
+        }
+        try
+        {
+            var paths = _provider.GetRequiredService<IPlatformPaths>();
+            var config = _provider.GetRequiredService<AppConfigLoader>().Load(paths.GetConfigPath());
+            await _provider.GetRequiredService<AppHost>().RestartAsync(config, _shutdown.Token);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _provider?.GetRequiredService<ILogger<App>>().LogWarning(ex, "Could not restart synchronization.");
+            if (_mainWindow?.DataContext is MainWindowViewModel vm)
+            {
+                vm.OperationMessage = ex.Message;
+            }
+        }
+    }
+
+    private static void ApplyStartupLanguage(IServiceProvider services)
+    {
+        var language = LocalizationService.LanguageAuto;
+        try
+        {
+            var path = services.GetRequiredService<IPlatformPaths>().GetConfigPath();
+            if (File.Exists(path))
+            {
+                language = services.GetRequiredService<AppConfigLoader>().LoadForEditing(path).Localization.Language;
+            }
+        }
+        catch (Exception ex)
+        {
+            services.GetRequiredService<ILogger<App>>().LogWarning(ex, "Could not read the startup language.");
+        }
+        LocalizationService.Instance.SetLanguage(language);
     }
 
     private static async Task CheckForUpdatesAsync(

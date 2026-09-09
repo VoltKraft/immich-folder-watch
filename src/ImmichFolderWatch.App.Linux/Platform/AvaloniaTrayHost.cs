@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using ImmichFolderWatch.App.Shared.Resources;
+using ImmichFolderWatch.App.Shared.Services;
+using ImmichFolderWatch.Core.Services;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Tmds.DBus.Protocol;
 using AvaloniaApplication = Avalonia.Application;
 
@@ -19,32 +21,38 @@ public sealed class AvaloniaTrayHost : IDisposable
 
     private readonly DBusSession _session;
     private readonly ILogger<AvaloniaTrayHost> _logger;
+    private readonly SyncStatusProvider _syncStatusProvider;
+    private readonly LocalizationService _localizationService;
+    private NativeMenuItem? _openItem;
+    private NativeMenuItem? _restartItem;
+    private NativeMenuItem? _quitItem;
     private TrayIcon? _trayIcon;
     private DispatcherUnhandledExceptionEventHandler? _dispatcherFilter;
     private bool _disposed;
 
-    public AvaloniaTrayHost(DBusSession session)
-        : this(session, NullLogger<AvaloniaTrayHost>.Instance)
-    {
-    }
-
-    public AvaloniaTrayHost(DBusSession session, ILogger<AvaloniaTrayHost> logger)
+    public AvaloniaTrayHost(DBusSession session, SyncStatusProvider syncStatusProvider,
+        LocalizationService localizationService, ILogger<AvaloniaTrayHost> logger)
     {
         _session = session;
         _logger = logger;
+        _syncStatusProvider = syncStatusProvider;
+        _localizationService = localizationService;
+        _syncStatusProvider.PropertyChanged += OnSyncStatusChanged;
+        _localizationService.LanguageChanged += OnLanguageChanged;
     }
 
     public bool IsTrayAvailable { get; private set; }
 
     /// <summary>
     /// True only after a TrayIcon has actually been registered and is
-    /// expected to be visible to the user. The MainWindow predicates
-    /// "close = hide" on this so the user is never stranded with a
-    /// hidden window and no tray icon to bring it back.
+    /// expected to be visible to the user. Startup uses this to keep
+    /// the window visible when no tray can provide an entry point.
     /// </summary>
     public bool IsTrayIconRegistered { get; private set; }
 
     public event EventHandler? OpenRequested;
+
+    public event EventHandler? RestartRequested;
 
     public event EventHandler? QuitRequested;
 
@@ -95,20 +103,24 @@ public sealed class AvaloniaTrayHost : IDisposable
 
         var menu = new NativeMenu();
 
-        var openItem = new NativeMenuItem(Strings.Tray_Open);
-        openItem.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
-        menu.Items.Add(openItem);
+        _openItem = new NativeMenuItem(Strings.Tray_Open);
+        _openItem.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(_openItem);
+
+        _restartItem = new NativeMenuItem(Strings.Tray_Restart);
+        _restartItem.Click += (_, _) => RestartRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(_restartItem);
 
         menu.Items.Add(new NativeMenuItemSeparator());
 
-        var quitItem = new NativeMenuItem(Strings.Tray_Quit);
-        quitItem.Click += (_, _) => QuitRequested?.Invoke(this, EventArgs.Empty);
-        menu.Items.Add(quitItem);
+        _quitItem = new NativeMenuItem(Strings.Tray_Quit);
+        _quitItem.Click += (_, _) => QuitRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(_quitItem);
 
         var trayIcon = new TrayIcon
         {
             Icon = icon,
-            ToolTipText = "Immich Folder Watch",
+            ToolTipText = TrayStatusText.Compose(_syncStatusProvider, _localizationService),
             Menu = menu,
             IsVisible = true,
         };
@@ -131,6 +143,33 @@ public sealed class AvaloniaTrayHost : IDisposable
 
         _trayIcon = trayIcon;
         IsTrayIconRegistered = true;
+    }
+
+    private void OnSyncStatusChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SyncStatusProvider.ServerConnection)
+            or nameof(SyncStatusProvider.LastSyncCompletedUtc) or nameof(SyncStatusProvider.PendingCount))
+        {
+            RefreshTrayText();
+        }
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => RefreshTrayText();
+
+    private void RefreshTrayText()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed || _trayIcon is null)
+            {
+                return;
+            }
+
+            _trayIcon.ToolTipText = TrayStatusText.Compose(_syncStatusProvider, _localizationService);
+            if (_openItem is not null) _openItem.Header = Strings.Tray_Open;
+            if (_restartItem is not null) _restartItem.Header = Strings.Tray_Restart;
+            if (_quitItem is not null) _quitItem.Header = Strings.Tray_Quit;
+        });
     }
 
     private void InstallDispatcherFilter()
@@ -239,6 +278,8 @@ public sealed class AvaloniaTrayHost : IDisposable
         }
 
         _disposed = true;
+        _syncStatusProvider.PropertyChanged -= OnSyncStatusChanged;
+        _localizationService.LanguageChanged -= OnLanguageChanged;
         UninstallDispatcherFilter();
 
         if (_trayIcon is null)

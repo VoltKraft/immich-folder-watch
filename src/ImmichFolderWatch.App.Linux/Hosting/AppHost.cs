@@ -1,5 +1,6 @@
 using System.Net;
 using ImmichFolderWatch.App.Shared.Services;
+using ImmichFolderWatch.App.Linux.Logging;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Logging;
@@ -25,6 +26,8 @@ public sealed class AppHost : IAsyncDisposable
     private readonly SyncStatusProvider _syncStatusProvider;
     private readonly IPlatformPaths _platformPaths;
     private readonly IPlatformLoggingCapabilities _loggingCapabilities;
+    private readonly SessionLogBuffer _sessionLogs;
+    private readonly Func<AppConfig, IHost> _hostFactory;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private IHost? _host;
     private AppConfig? _currentConfig;
@@ -32,7 +35,19 @@ public sealed class AppHost : IAsyncDisposable
     public AppHost(
         SyncStatusProvider syncStatusProvider,
         IPlatformPaths platformPaths,
-        IPlatformLoggingCapabilities loggingCapabilities)
+        IPlatformLoggingCapabilities loggingCapabilities,
+        SessionLogBuffer sessionLogs)
+        : this(syncStatusProvider, platformPaths, loggingCapabilities, sessionLogs, null)
+    {
+    }
+
+    // Allows lifecycle tests to control asynchronous start/stop without real workers or Immich.
+    internal AppHost(
+        SyncStatusProvider syncStatusProvider,
+        IPlatformPaths platformPaths,
+        IPlatformLoggingCapabilities loggingCapabilities,
+        SessionLogBuffer sessionLogs,
+        Func<AppConfig, IHost>? hostFactory)
     {
         ArgumentNullException.ThrowIfNull(syncStatusProvider);
         ArgumentNullException.ThrowIfNull(platformPaths);
@@ -40,9 +55,13 @@ public sealed class AppHost : IAsyncDisposable
         _syncStatusProvider = syncStatusProvider;
         _platformPaths = platformPaths;
         _loggingCapabilities = loggingCapabilities;
+        _sessionLogs = sessionLogs;
+        _hostFactory = hostFactory ?? BuildHost;
     }
 
     public AppConfig? CurrentConfig => _currentConfig;
+
+    public string? LastLoggingWarning { get; private set; }
 
     public bool IsRunning => _host is not null;
 
@@ -50,7 +69,7 @@ public sealed class AppHost : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        await _lifecycleGate.WaitAsync(cancellationToken);
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (_host is not null)
@@ -58,9 +77,7 @@ public sealed class AppHost : IAsyncDisposable
                 return;
             }
 
-            _host = BuildHost(config);
-            _currentConfig = config;
-            await _host.StartAsync(cancellationToken);
+            await StartInternalAsync(config, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -70,10 +87,10 @@ public sealed class AppHost : IAsyncDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        await _lifecycleGate.WaitAsync(cancellationToken);
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await StopInternalAsync(cancellationToken);
+            await StopInternalAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -85,17 +102,40 @@ public sealed class AppHost : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(newConfig);
 
-        await _lifecycleGate.WaitAsync(cancellationToken);
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await StopInternalAsync(cancellationToken);
-            _host = BuildHost(newConfig);
-            _currentConfig = newConfig;
-            await _host.StartAsync(cancellationToken);
+            await StopInternalAsync(cancellationToken).ConfigureAwait(false);
+            await StartInternalAsync(newConfig, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StartInternalAsync(AppConfig config, CancellationToken cancellationToken)
+    {
+        var errors = AppConfigValidator.Validate(config);
+        if (errors.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        }
+        var host = _hostFactory(config);
+        try
+        {
+            await host.StartAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            host.Dispose();
+            throw;
+        }
+        _host = host;
+        _currentConfig = config;
+        if (LastLoggingWarning is not null)
+        {
+            host.Services.GetRequiredService<ILogger<AppHost>>().LogWarning("{Warning}", LastLoggingWarning);
         }
     }
 
@@ -108,7 +148,7 @@ public sealed class AppHost : IAsyncDisposable
 
         try
         {
-            await _host.StopAsync(cancellationToken);
+            await _host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -131,6 +171,8 @@ public sealed class AppHost : IAsyncDisposable
 
         builder.Logging.ClearProviders();
         builder.Logging.SetMinimumLevel(logLevel);
+        builder.Logging.AddProvider(new SessionLoggerProvider(_sessionLogs));
+        LastLoggingWarning = null;
 
         var effectiveTarget = _loggingCapabilities.CoerceToSupported(config.Logging.Target);
         if (LogTargets.IsJournald(effectiveTarget))
@@ -161,21 +203,15 @@ public sealed class AppHost : IAsyncDisposable
                 Directory.CreateDirectory(logDirectory);
                 builder.Logging.AddProvider(new FileLoggerProvider(logDirectory, logLevel));
             }
-            catch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Read-only fs / missing parent — degrade to console-only
-                // logging. Rare under XDG_STATE_HOME inside the Flatpak sandbox.
+                LastLoggingWarning = $"File logging is unavailable: {ex.Message}";
             }
         }
 
-        // Default BackgroundServiceExceptionBehavior is StopHost, which
-        // tears down the whole IHost (and the Avalonia GUI alongside it
-        // via the App.axaml.cs Exit hook) the moment FolderWatchWorker
-        // throws — e.g. when every configured watch source is a stale
-        // doc-portal mount the user can no longer reach. Switch to
-        // Ignore so the worker just stops, the user sees the warning
-        // log + can fix the source via Save & Apply, and the GUI stays
-        // up to receive that fix.
+        // Keep other hosted services available after a worker failure, such as
+        // an inaccessible document-portal mount. The user can inspect the log,
+        // renew the folder grant and restart the worker through Save & Apply.
         builder.Services.Configure<HostOptions>(options =>
         {
             options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
@@ -222,10 +258,10 @@ public sealed class AppHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _lifecycleGate.WaitAsync();
+        await _lifecycleGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await StopInternalAsync(CancellationToken.None);
+            await StopInternalAsync(CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {

@@ -191,4 +191,9 @@
   <data name="UI_NewSource" xml:space="preserve"><value>New folder</value></data>
   <data name="UI_AdvancedOptions" xml:space="preserve"><value>Advanced</value></data>
   <data name="UI_Logging" xml:space="preserve"><value>Logging</value></data>
+  <data name="UI_SessionLogs" xml:space="preserve"><value>Session Logs</value></data>
+  <data name="UI_SessionLogsDescription" xml:space="preserve"><value>Latest 500 entries from this session. Select text to copy it. Persistent history is available in the system journal.</value></data>
+  <data name="UI_LinuxAutostartDescription" xml:space="preserve"><value>Start at login after approval by your desktop. The Flatpak package opens the window because its system tray is disabled.</value></data>
+  <data name="UI_ChooseFolder" xml:space="preserve"><value>Choose Folder…</value></data>
+  <data name="Op_SyncStartFailedFormat" xml:space="preserve"><value>Synchronization could not be started: {0}</value></data>
 </root>

@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using ImmichFolderWatch.App.Linux.Hosting;
+using ImmichFolderWatch.App.Linux.Logging;
+using ImmichFolderWatch.App.Linux.Services;
 using ImmichFolderWatch.App.Linux.Platform;
 using ImmichFolderWatch.App.Shared.Services;
+using ImmichFolderWatch.App.Shared.Resources;
+using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.ViewModels;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
@@ -18,8 +20,11 @@ namespace ImmichFolderWatch.App.Linux.Views;
 
 public sealed partial class MainWindow : Window
 {
-    private bool _initialLoadDone;
-    private bool _isVerifyInProgress;
+    private Task? _bootstrapTask;
+    private Task? _backgroundRequestTask;
+    private LogsWindow? _logsWindow;
+    internal bool IsExiting { get; set; }
+    private readonly ImmichAccessCheckSession _accessChecks = new();
     private bool _isSaveInProgress;
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
@@ -28,12 +33,13 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Opened += OnOpened;
+        Closed += (_, _) => _accessChecks.Dispose();
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
-        if (e.Cancel)
+        if (e.Cancel || IsExiting)
         {
             return;
         }
@@ -60,15 +66,15 @@ public sealed partial class MainWindow : Window
         var bgClient = App.Services?.GetService<BackgroundPortalClient>();
         if (bgClient is not null)
         {
-            _ = bgClient.RequestBackgroundAsync();
+            _backgroundRequestTask ??= bgClient.RequestBackgroundAsync(App.ShutdownToken);
         }
     }
 
-    private void QuitButton_Click(object? sender, RoutedEventArgs e)
+    private async void QuitButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (Application.Current is App app)
         {
-            desktop.Shutdown(0);
+            await app.ShutdownAsync();
         }
     }
 
@@ -116,7 +122,8 @@ public sealed partial class MainWindow : Window
         var snapshot = ViewModel.Sources.ToList();
         foreach (var source in snapshot)
         {
-            var hostPath = await docClient.ResolveHostPathAsync(source.Path);
+            App.ShutdownToken.ThrowIfCancellationRequested();
+            var hostPath = await docClient.ResolveHostPathAsync(source.Path, App.ShutdownToken);
             if (!string.IsNullOrEmpty(hostPath))
             {
                 source.SetPortalPath(source.Path, hostPath);
@@ -137,16 +144,15 @@ public sealed partial class MainWindow : Window
     /// launches with --background (autostart): in that path the window
     /// stays hidden, so the Opened event never fires and the
     /// FolderWatchWorker would otherwise never start. Guarded by
-    /// <see cref="_initialLoadDone"/> to keep both call sites idempotent.
+    /// <see cref="_bootstrapTask"/> to keep both call sites idempotent.
     /// </summary>
-    internal async Task EnsureBootstrappedAsync()
-    {
-        if (_initialLoadDone)
-        {
-            return;
-        }
-        _initialLoadDone = true;
+    internal Task EnsureBootstrappedAsync() => _bootstrapTask ??= BootstrapAsync();
 
+    internal Task WaitForBootstrapAsync() => Task.WhenAll(
+        _bootstrapTask ?? Task.CompletedTask, _backgroundRequestTask ?? Task.CompletedTask);
+
+    private async Task BootstrapAsync()
+    {
         var services = App.Services;
         if (services is null || ViewModel is null)
         {
@@ -163,8 +169,14 @@ public sealed partial class MainWindow : Window
             try
             {
                 loadedConfig = loader.LoadForEditing(configPath);
+                loadedConfig.Logging.LogDirectory = AppConfigLoader.NormalizeForRuntime(
+                    loadedConfig, Path.GetDirectoryName(configPath) ?? AppContext.BaseDirectory).Logging.LogDirectory;
                 ViewModel.Load(loadedConfig);
                 await ResolveSourceDisplayPathsAsync(services);
+            }
+            catch (OperationCanceledException) when (App.ShutdownToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {
@@ -192,13 +204,41 @@ public sealed partial class MainWindow : Window
                     loadedConfig,
                     Path.GetDirectoryName(configPath) ?? AppContext.BaseDirectory);
                 var host = services.GetRequiredService<AppHost>();
-                await host.StartAsync(runtimeConfig);
+                await host.StartAsync(runtimeConfig, App.ShutdownToken);
             }
-            catch
+            catch (OperationCanceledException) when (App.ShutdownToken.IsCancellationRequested)
             {
-                // Hosted-services start failure is non-fatal at this stage —
-                // the user can fix the config + Save & Apply to retry.
+                return;
             }
+            catch (Exception ex)
+            {
+                ViewModel.OperationMessage = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    Localized("Op_SyncStartFailedFormat"), ex.Message);
+                services.GetRequiredService<ILogger<MainWindow>>().LogWarning(ex, "Could not start synchronization.");
+            }
+        }
+
+        await Task.WhenAll(
+            InitializeAutostartAsync(configPath),
+            RunImmichAccessCheckAsync(updateOperationMessage: false));
+    }
+
+    private async Task InitializeAutostartAsync(string configPath)
+    {
+        if (App.Services is null || ViewModel is null)
+        {
+            return;
+        }
+
+        var manager = App.Services.GetRequiredService<PortalAutostartManager>();
+        try
+        {
+            await ViewModel.InitializeAutostartAsync(
+                ct => manager.InitializeAsync(File.Exists(configPath), ct), App.ShutdownToken);
+        }
+        catch (OperationCanceledException) when (App.ShutdownToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -209,37 +249,81 @@ public sealed partial class MainWindow : Window
 
     private async void VerifyImmichButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_isVerifyInProgress || ViewModel is null || App.Services is null)
-        {
-            return;
-        }
-        _isVerifyInProgress = true;
+        await RunImmichAccessCheckAsync(updateOperationMessage: true);
+    }
 
-        try
+    private Task RunImmichAccessCheckAsync(bool updateOperationMessage)
+    {
+        if (_isSaveInProgress || ViewModel is null || App.Services is null)
         {
-            ViewModel.SetImmichCheckInProgress();
-
-            var paths = App.Services.GetRequiredService<IPlatformPaths>();
-            var runner = App.Services.GetRequiredService<ConfigVerificationRunner>();
-            var checkConfig = ViewModel.CreateImmichCheckConfig();
-
-            var result = await runner.CheckImmichAccessAsync(
-                checkConfig,
-                paths.GetConfigPath(),
-                CancellationToken.None);
-
-            ViewModel.ApplyImmichCheckResult(result);
+            return Task.CompletedTask;
         }
-        catch (Exception ex)
+        var checkConfig = ViewModel.CreateImmichCheckConfig();
+        ViewModel.SetImmichCheckInProgress();
+        if (updateOperationMessage)
         {
-            ViewModel.OperationMessage =
-                string.Format(System.Globalization.CultureInfo.CurrentCulture,
-                    Strings_Op_ImmichCheckFailedFormat, ex.Message);
+            ViewModel.OperationMessage = Strings.Op_CheckingImmich;
         }
-        finally
+        var paths = App.Services.GetRequiredService<IPlatformPaths>();
+        var runner = App.Services.GetRequiredService<ConfigVerificationRunner>();
+        return _accessChecks.RunAsync(checkConfig,
+            (config, token) => runner.CheckImmichAccessAsync(config, paths.GetConfigPath(), token),
+            result =>
+            {
+                if (!CheckStillMatchesDraft(checkConfig)) return;
+                ViewModel.ApplyImmichCheckResult(result);
+                if (updateOperationMessage)
+                {
+                    ViewModel.OperationMessage = BuildImmichCheckSummary(result);
+                }
+            },
+            exception =>
+            {
+                if (!CheckStillMatchesDraft(checkConfig)) return;
+                ViewModel.ApplyImmichCheckResult(ConfigVerificationRunner.CreateUnexpectedFailureResult(exception, checkConfig));
+                ViewModel.OperationMessage = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    Strings.Op_ImmichCheckFailedFormat, exception.Message);
+            },
+            App.ShutdownToken);
+    }
+
+    private bool CheckStillMatchesDraft(AppConfig checkedConfig)
+    {
+        if (ViewModel is null) return false;
+        var current = ViewModel.CreateImmichCheckConfig();
+        static (bool Albums, bool Sync) RequiredPermissions(AppConfig config) => (
+            config.Watch.Sources.Any(source => !string.IsNullOrWhiteSpace(source.AlbumName)),
+            config.Watch.Sources.Any(source => WatchSourceSyncModes.Normalize(source.SyncMode) == WatchSourceSyncModes.Sync));
+        if (checkedConfig.Immich.ServerApiUrl == current.Immich.ServerApiUrl
+            && checkedConfig.Immich.ApiKey == current.Immich.ApiKey
+            && RequiredPermissions(checkedConfig) == RequiredPermissions(current))
         {
-            _isVerifyInProgress = false;
+            return true;
         }
+        ViewModel.ResetImmichCheckStatus();
+        if (ViewModel.OperationMessage == Strings.Op_CheckingImmich)
+        {
+            ViewModel.OperationMessage = string.Empty;
+        }
+        return false;
+    }
+
+    private static string BuildImmichCheckSummary(ImmichAccessCheckResult result)
+    {
+        if (result.UrlState == CheckState.Failed)
+        {
+            return result.UrlMessage;
+        }
+        if (result.ApiKeyState == CheckState.Failed)
+        {
+            return result.ApiKeyMessage;
+        }
+        return result.PermissionsState switch
+        {
+            CheckState.Passed => Strings.Op_ImmichCheckOk,
+            CheckState.Warning or CheckState.Failed => result.PermissionsMessage,
+            _ => Strings.Op_ImmichCheckDone,
+        };
     }
 
     private async void AddSourceButton_Click(object? sender, RoutedEventArgs e)
@@ -250,7 +334,7 @@ public sealed partial class MainWindow : Window
         }
 
         var picker = App.Services.GetRequiredService<PortalFolderPicker>();
-        var picked = await picker.PickFolderAsync("Pick a folder to watch");
+        var picked = await picker.PickFolderAsync(Localized("UI_ChooseFolder"));
         if (string.IsNullOrWhiteSpace(picked))
         {
             // User dismissed the picker — do not append an empty source.
@@ -267,6 +351,23 @@ public sealed partial class MainWindow : Window
         var docClient = App.Services.GetRequiredService<DocumentPortalClient>();
         var hostPath = await docClient.ResolveHostPathAsync(picked);
         newItem.SetPortalPath(picked, hostPath ?? picked);
+    }
+
+    private async void ChangeSourceFolderButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: WatchSourceItem source } || App.Services is null)
+        {
+            return;
+        }
+        var picker = App.Services.GetRequiredService<PortalFolderPicker>();
+        var picked = await picker.PickFolderAsync(Localized("UI_ChooseFolder"));
+        if (string.IsNullOrWhiteSpace(picked))
+        {
+            return;
+        }
+        var docClient = App.Services.GetRequiredService<DocumentPortalClient>();
+        var hostPath = await docClient.ResolveHostPathAsync(picked);
+        source.SetPortalPath(picked, hostPath ?? picked);
     }
 
     private void ManageSourcesButton_Click(object? sender, RoutedEventArgs e)
@@ -315,6 +416,7 @@ public sealed partial class MainWindow : Window
         }
         var paths = App.Services.GetRequiredService<IPlatformPaths>();
         ViewModel.LogDirectory = paths.GetLogDirectory();
+        ViewModel.OperationMessage = Strings.Op_LogDirReset;
     }
 
     private void OpenLogsButton_Click(object? sender, RoutedEventArgs e)
@@ -324,17 +426,39 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (LogTargets.IsJournald(ViewModel.LoggingTarget) && App.Services is not null)
+        {
+            if (_logsWindow is null)
+            {
+                _logsWindow = new LogsWindow(App.Services.GetRequiredService<SessionLogBuffer>());
+                _logsWindow.Closed += (_, _) => _logsWindow = null;
+                _logsWindow.Show(this);
+            }
+            _logsWindow.Activate();
+            return;
+        }
+
         var dir = ViewModel.GetEffectiveLogDirectory();
         if (string.IsNullOrWhiteSpace(dir))
         {
             ViewModel.OperationMessage =
-                "Log directory is empty (logging target may be set to a non-file target).";
+                Strings.Op_NoLogDir;
             return;
         }
 
         try
         {
-            Directory.CreateDirectory(dir);
+            if (!Path.IsPathFullyQualified(dir) && App.Services is not null)
+            {
+                var configPath = App.Services.GetRequiredService<IPlatformPaths>().GetConfigPath();
+                dir = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(configPath)!, dir));
+            }
+            if (!Directory.Exists(dir))
+            {
+                ViewModel.OperationMessage = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    Strings.Op_LogDirMissingFormat, dir);
+                return;
+            }
             var proc = Process.Start(new ProcessStartInfo("xdg-open", dir)
             {
                 UseShellExecute = false,
@@ -356,69 +480,54 @@ public sealed partial class MainWindow : Window
         {
             return;
         }
+        if (!ViewModel.TryCreateConfig(out var draftConfig, out var errors))
+        {
+            ViewModel.OperationMessage = string.Join(Environment.NewLine, errors);
+            return;
+        }
+        _accessChecks.Cancel();
+        ViewModel.ResetImmichCheckStatus();
         _isSaveInProgress = true;
-
+        var mainContent = this.FindControl<Control>("MainContent");
+        if (mainContent is not null) mainContent.IsEnabled = false;
         try
         {
-            if (!ViewModel.TryCreateConfig(out var newConfig, out var errors))
+            ViewModel.OperationMessage = Strings.Op_CheckingConfig;
+            var paths = App.Services.GetRequiredService<IPlatformPaths>();
+            var host = App.Services.GetRequiredService<AppHost>();
+            var result = await App.Services.GetRequiredService<ConfigApplyService>().ApplyAsync(
+                draftConfig, paths.GetConfigPath(), host.RestartAsync,
+                accessChecked: ViewModel.ApplyImmichCheckResult,
+                saving: () => ViewModel.OperationMessage = Strings.Op_SavingRestarting,
+                cancellationToken: App.ShutdownToken);
+            if (!result.Success)
             {
-                ViewModel.OperationMessage = string.Join(Environment.NewLine, errors);
+                ViewModel.OperationMessage = string.Join(Environment.NewLine, result.Errors);
                 return;
             }
-
-            var paths = App.Services.GetRequiredService<IPlatformPaths>();
             var loader = App.Services.GetRequiredService<AppConfigLoader>();
-            var configPath = paths.GetConfigPath();
-
-            var configDir = Path.GetDirectoryName(configPath);
-            if (!string.IsNullOrWhiteSpace(configDir))
-            {
-                Directory.CreateDirectory(configDir);
-            }
-
-            // The loader saves verbatim; runtime normalisation is applied
-            // separately when handing the config to AppHost.
-            await SaveYamlAsync(loader, newConfig, configPath);
-
-            var runtimeConfig = AppConfigLoader.NormalizeForRuntime(
-                newConfig,
-                Path.GetDirectoryName(configPath) ?? AppContext.BaseDirectory);
-
-            var host = App.Services.GetRequiredService<AppHost>();
-            await host.RestartAsync(runtimeConfig);
-
-            ViewModel.OperationMessage = Strings_Op_SavedApplied;
+            ViewModel.Load(loader.LoadForEditing(paths.GetConfigPath()), resetImmichCheckStatus: false);
+            await ResolveSourceDisplayPathsAsync(App.Services);
+            ViewModel.OperationMessage = string.IsNullOrWhiteSpace(host.LastLoggingWarning)
+                ? Strings.Op_SavedApplied
+                : $"{Strings.Op_SavedApplied} — {host.LastLoggingWarning}";
+        }
+        catch (OperationCanceledException) when (App.ShutdownToken.IsCancellationRequested)
+        {
         }
         catch (Exception ex)
         {
-            ViewModel.OperationMessage =
-                string.Format(System.Globalization.CultureInfo.CurrentCulture,
-                    Strings_Op_SaveFailedFormat, ex.Message);
+            ViewModel.OperationMessage = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                Strings.Op_SaveFailedFormat, ex.Message);
         }
         finally
         {
             _isSaveInProgress = false;
+            if (mainContent is not null) mainContent.IsEnabled = true;
         }
     }
 
-    private static Task SaveYamlAsync(AppConfigLoader loader, AppConfig config, string path)
-    {
-        return Task.Run(() =>
-        {
-            var serializer = new YamlDotNet.Serialization.SerializerBuilder()
-                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance)
-                .Build();
-            var yaml = serializer.Serialize(config);
-            File.WriteAllText(path, yaml);
-        });
-    }
+    private static string Localized(string key) => Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
 
-    private static string Strings_Op_ConfigLoadFailedFormat
-        => ImmichFolderWatch.App.Shared.Resources.Strings.Op_ConfigLoadFailedFormat;
-    private static string Strings_Op_ImmichCheckFailedFormat
-        => ImmichFolderWatch.App.Shared.Resources.Strings.Op_ImmichCheckFailedFormat;
-    private static string Strings_Op_SavedApplied
-        => ImmichFolderWatch.App.Shared.Resources.Strings.Op_SavedApplied;
-    private static string Strings_Op_SaveFailedFormat
-        => ImmichFolderWatch.App.Shared.Resources.Strings.Op_SaveFailedFormat;
+    private static string Strings_Op_ConfigLoadFailedFormat => Strings.Op_ConfigLoadFailedFormat;
 }

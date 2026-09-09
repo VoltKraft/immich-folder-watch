@@ -46,6 +46,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ImmichFolderWatch.Tests.Linux" />
     <AvaloniaResource Include="$(BrandHeaderLogo)" Link="Assets/header-logo.png" />
   </ItemGroup>
 </Project>
