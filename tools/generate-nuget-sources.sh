@@ -7,18 +7,22 @@
 # it as a sibling source list next to the manifest. This script regenerates
 # that file from the live solution. It is gitignored upstream, copied beside
 # the temporary GitHub release manifest in CI, and would be committed only in
-# a future per-app Flathub repository.
+# the per-app Flathub repository.
 #
 # Run from a Linux dev machine with .NET 10 SDK + python3 + git on PATH.
 # Use --runtime linux-x64 or --runtime linux-arm64 to select the target
 # architecture. The default remains linux-x64 for local compatibility.
+# Use --source-root to target another checkout and --output to keep each
+# architecture's generated sources outside that checkout.
 
 set -euo pipefail
 
 RUNTIME="linux-x64"
+OUTPUT=""
+SOURCE_ROOT=""
 
 usage() {
-  echo "Usage: $0 [--runtime linux-x64|linux-arm64]" >&2
+  echo "Usage: $0 [--runtime linux-x64|linux-arm64] [--source-root DIR] [--output FILE]" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -34,6 +38,32 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runtime=*)
       RUNTIME="${1#*=}"
+      shift
+      ;;
+    --output|--source-root)
+      if [[ $# -lt 2 || -z "$2" || "$2" == --* ]]; then
+        echo "ERROR: $1 requires a value." >&2
+        usage
+        exit 1
+      fi
+      if [[ "$1" == --output ]]; then
+        OUTPUT="$2"
+      else
+        SOURCE_ROOT="$2"
+      fi
+      shift 2
+      ;;
+    --output=*|--source-root=*)
+      if [[ -z "${1#*=}" ]]; then
+        echo "ERROR: ${1%%=*} requires a value." >&2
+        usage
+        exit 1
+      fi
+      if [[ "$1" == --output=* ]]; then
+        OUTPUT="${1#*=}"
+      else
+        SOURCE_ROOT="${1#*=}"
+      fi
       shift
       ;;
     -h|--help)
@@ -57,8 +87,14 @@ case "${RUNTIME}" in
 esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT="${REPO_ROOT}/packaging/flatpak/flathub/nuget-sources.json"
-PROJECT="${REPO_ROOT}/src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj"
+SOURCE_ROOT="${SOURCE_ROOT:-${REPO_ROOT}}"
+OUTPUT="${OUTPUT:-${SOURCE_ROOT}/packaging/flatpak/flathub/nuget-sources.json}"
+PROJECT="${SOURCE_ROOT}/src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj"
+
+if [[ ! -f "${PROJECT}" ]]; then
+  echo "ERROR: Linux project not found at ${PROJECT}." >&2
+  exit 1
+fi
 
 CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/immich-folder-watch"
 TOOLS_DIR="${CACHE_DIR}/flatpak-builder-tools"

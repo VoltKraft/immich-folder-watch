@@ -10,6 +10,8 @@
 
 `Immich Folder Watch` connects local photo and video folders with Immich on **Windows and Linux**. Automatically upload new or existing media, or keep local folders and Immich albums synchronized with uploads and downloads. Choose the behavior separately for each folder.
 
+This is a community desktop client maintained separately from the Immich project.
+
 Use it to keep an Immich album available locally, organize albums through local subfolders, import a photo collection, or send new camera imports and screenshots to Immich. It runs in the background as a per-user desktop app and communicates through the Immich API without writing directly into Immich storage.
 
 <picture>
@@ -132,7 +134,8 @@ GitHub's single-file bundle records Flathub as the source for its Freedesktop
 runtime dependency, but it does not configure an application repository.
 Download each new application version manually and install it with
 `flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak`.
-The planned Flathub publication is currently postponed. See
+Flathub release automation is prepared; initial acceptance is still pending. See
+[`the Flathub preparation guide`](./packaging/flatpak/flathub/README.md) for status and
 [`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
 
 The Flatpak package runs through X11/XWayland because the current Avalonia

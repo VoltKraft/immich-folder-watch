@@ -1,0 +1,192 @@
+name: Flathub
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published stable release to prepare, for example v2.11.0
+        required: true
+        type: string
+      submit:
+        description: Submit an update to the accepted Flathub app (requires enabled automation)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Serialize updates across releases; submission also rejects a superseded tag.
+concurrency:
+  group: flathub
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare complete Flathub sources
+    if: >-
+      github.repository == 'VoltKraft/immich-folder-watch' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (!github.event.release.draft && !github.event.release.prerelease))
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      # Tooling comes from main so manual preparation can target older releases.
+      # Application sources and packaging always come from the selected tag.
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: automation
+          persist-credentials: false
+
+      - name: Read published release
+        id: release
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) {
+              throw new Error('A stable vMAJOR.MINOR.PATCH release tag is required.');
+            }
+            const {data: release} = await github.rest.repos.getReleaseByTag({...context.repo, tag});
+            if (release.draft || release.prerelease || !release.published_at || release.tag_name !== tag) {
+              throw new Error('The selected release must be published and stable.');
+            }
+            require('node:fs').writeFileSync('release.json', JSON.stringify(release));
+            core.setOutput('tag', tag);
+
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+
+      - name: Resolve immutable release commit
+        id: commit
+        working-directory: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install .NET Flatpak SDK extension
+        run: |
+          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
+
+      - name: Generate both offline NuGet feeds
+        run: |
+          automation/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-x64 --output "$PWD/nuget-x64.json"
+          automation/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-arm64 --output "$PWD/nuget-arm64.json"
+
+      - name: Prepare and validate release files
+        env:
+          RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
+        run: |
+          python3 automation/tools/prepare-flathub-release.py \
+            --source-root source --release-json release.json --commit "$RELEASE_COMMIT" \
+            --nuget-x64 nuget-x64.json --nuget-arm64 nuget-arm64.json --output-dir flathub-release
+          flatpak-builder --show-manifest flathub-release/io.github.voltkraft.immich-folder-watch.yml > /dev/null
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: flathub-${{ steps.release.outputs.tag }}
+          path: flathub-release/
+          if-no-files-found: error
+
+  validate:
+    name: Validate offline Flathub build (${{ matrix.arch }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: flathub-${{ needs.prepare.outputs.tag }}
+          path: flathub-release
+
+      - name: Install .NET Flatpak SDK extension
+        run: |
+          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
+
+      - name: Build from the combined offline feed
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flathub-release/io.github.voltkraft.immich-folder-watch.yml
+          bundle: flathub-${{ needs.prepare.outputs.tag }}-${{ matrix.arch }}.flatpak
+          artifact-name: flathub-test-${{ needs.prepare.outputs.tag }}-${{ matrix.arch }}
+          arch: ${{ matrix.arch }}
+          branch: stable
+          repo-dir: repo
+          mirror-screenshots-url: https://dl.flathub.org/media
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Validate Flathub repository
+        run: flatpak-builder-lint repo repo
+
+  submit:
+    name: Update accepted Flathub app
+    needs: [prepare, validate]
+    if: >-
+      vars.FLATHUB_AUTOMATION_ENABLED == 'true' &&
+      (github.event_name == 'release' || inputs.submit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: flathub-${{ needs.prepare.outputs.tag }}
+          path: artifacts/flathub-release
+
+      - name: Verify updater credentials
+        env:
+          FLATHUB_TOKEN: ${{ secrets.FLATHUB_TOKEN }}
+        run: |
+          if [ -z "$FLATHUB_TOKEN" ]; then
+            echo "FLATHUB_TOKEN is required when Flathub automation is enabled." >&2
+            exit 1
+          fi
+
+      - name: Create or reuse release update pull request
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          # Enable only after Flathub has granted GitHub automerge for the app.
+          AUTO_MERGE: ${{ vars.FLATHUB_AUTOMERGE_ENABLED == 'true' }}
+        with:
+          github-token: ${{ secrets.FLATHUB_TOKEN }}
+          script: |
+            await require('./tools/update-flathub-pr.cjs')({
+              github, context, core,
+              directory: 'artifacts/flathub-release',
+              tag: process.env.RELEASE_TAG,
+              autoMerge: process.env.AUTO_MERGE === 'true',
+            });

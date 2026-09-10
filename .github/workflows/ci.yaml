@@ -19,6 +19,12 @@ permissions:
   contents: read
 
 jobs:
+  validate-flatpak:
+    name: Validate native Flatpak packages
+    uses: ./.github/workflows/flatpak-validation.yaml
+    with:
+      source_ref: ${{ github.sha }}
+
   build-windows:
     name: Build and Test (windows-latest)
     runs-on: windows-latest
@@ -120,3 +126,10 @@ jobs:
 
       - name: Test release tooling
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py' -v
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test Flathub update automation
+        run: node --test tools/tests/test_update_flathub_pr.cjs

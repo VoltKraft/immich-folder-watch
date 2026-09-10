@@ -1,0 +1,317 @@
+{
+  "avalonia": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.buildservices": {
+    "11.3.2": [
+      "Avalonia.BuildServices-LICENSE.txt"
+    ]
+  },
+  "avalonia.desktop": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.fonts.inter": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md",
+      "Inter-OFL.txt"
+    ]
+  },
+  "avalonia.freedesktop": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.freedesktop.atspi": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.harfbuzz": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.native": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.remote.protocol": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.skia": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.themes.fluent": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.win32": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "avalonia.x11": {
+    "12.0.3": [
+      "Avalonia-LICENSE.md",
+      "Avalonia-NOTICE.md"
+    ]
+  },
+  "excss": {
+    "4.3.1": [
+      "ExCSS-LICENSE.txt"
+    ]
+  },
+  "microcom.runtime": {
+    "0.11.4": [
+      "MicroCom-LICENSE.txt"
+    ]
+  },
+  "microsoft.data.sqlite": {
+    "10.0.10": [
+      "Dotnet.Sqlite-LICENSE.txt"
+    ]
+  },
+  "microsoft.data.sqlite.core": {
+    "10.0.10": [
+      "Dotnet.Sqlite-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.binder": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.commandline": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.environmentvariables": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.fileextensions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.json": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.configuration.usersecrets": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.dependencyinjection": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.dependencyinjection.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.diagnostics": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.diagnostics.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.fileproviders.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.fileproviders.physical": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.filesystemglobbing": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.hosting": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.hosting.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.abstractions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.configuration": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.console": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.debug": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.eventlog": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.logging.eventsource": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.options": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.options.configurationextensions": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "microsoft.extensions.primitives": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "shimskiasharp": {
+    "3.6.0": [
+      "Svg.Skia-LICENSE.txt"
+    ]
+  },
+  "socketio.core": {
+    "3.1.2": [
+      "SocketIO-LICENSE.txt"
+    ]
+  },
+  "socketio.serializer.core": {
+    "3.1.2": [
+      "SocketIO-LICENSE.txt"
+    ]
+  },
+  "socketio.serializer.systemtextjson": {
+    "3.1.2": [
+      "SocketIO-LICENSE.txt"
+    ]
+  },
+  "socketioclient": {
+    "3.1.2": [
+      "SocketIO-LICENSE.txt"
+    ]
+  },
+  "sqlitepclraw.bundle_e_sqlite3": {
+    "2.1.11": [
+      "SQLitePCLRaw-2.1.11-LICENSE.txt",
+      "SQLitePCLRaw-2.1.11-NOTICE.txt"
+    ],
+    "3.0.5": [
+      "SQLitePCLRaw-3.0.5-LICENSE.txt",
+      "SQLitePCLRaw-3.0.5-NOTICE.txt"
+    ]
+  },
+  "sqlitepclraw.config.e_sqlite3": {
+    "3.0.5": [
+      "SQLitePCLRaw-3.0.5-LICENSE.txt",
+      "SQLitePCLRaw-3.0.5-NOTICE.txt"
+    ]
+  },
+  "sqlitepclraw.core": {
+    "2.1.11": [
+      "SQLitePCLRaw-2.1.11-LICENSE.txt",
+      "SQLitePCLRaw-2.1.11-NOTICE.txt"
+    ],
+    "3.0.5": [
+      "SQLitePCLRaw-3.0.5-LICENSE.txt",
+      "SQLitePCLRaw-3.0.5-NOTICE.txt"
+    ]
+  },
+  "sqlitepclraw.provider.e_sqlite3": {
+    "3.0.5": [
+      "SQLitePCLRaw-3.0.5-LICENSE.txt",
+      "SQLitePCLRaw-3.0.5-NOTICE.txt"
+    ]
+  },
+  "svg.custom": {
+    "3.6.0": [
+      "Svg.Custom-LICENSE.txt"
+    ]
+  },
+  "svg.model": {
+    "3.6.0": [
+      "Svg.Skia-LICENSE.txt"
+    ]
+  },
+  "svg.skia": {
+    "3.6.0": [
+      "Svg.Skia-LICENSE.txt"
+    ]
+  },
+  "system.diagnostics.eventlog": {
+    "10.0.0": [
+      "Dotnet-LICENSE.txt"
+    ]
+  },
+  "tmds.dbus.protocol": {
+    "0.92.0": [
+      "Tmds.DBus-LICENSE.txt"
+    ]
+  }
+}

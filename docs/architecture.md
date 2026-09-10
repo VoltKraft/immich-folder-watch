@@ -66,6 +66,12 @@ already owned by the Flatpak app; only watcher communication needs an explicit
 registration, watcher changes trigger re-registration, and disposing the
 connection withdraws the item and menu together.
 
+Linux notifications use the version-1 Notification portal contract over the
+shared session connection. Each event gets a unique ID, so later events do not
+replace earlier ones. Submission waits at most three seconds; failures are
+logged, caller cancellation propagates, and desktop presentation is not
+observable through this API. No direct notification-daemon permission is needed.
+
 ## Design Decisions
 
 - **Recoverable download timestamps.** Original creation time is independent of
@@ -94,6 +100,19 @@ connection withdraws the item and menu together.
   trash operations use the Immich API; no direct access to Immich storage.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.
+
+## Release distribution
+
+GitHub publication remains atomic across both Windows MSIs and both Linux
+Flatpaks from one commit. WinGet and Flathub updates run independently after that
+publication. Flathub receives a source manifest and one combined offline NuGet
+feed, checked by native build jobs for both x86_64 and aarch64, because updating
+the Git tag alone would leave its dependency inputs stale. The accepted Flathub
+repository builds and publishes its own package through an update PR; upstream
+never uploads a GitHub Flatpak bundle to Flathub. Submission and automerge are
+separately enabled after external approval. See
+[Flathub preparation](../packaging/flatpak/flathub/README.md) for requirements,
+activation and failure handling.
 
 ## Immich API Assumptions
 

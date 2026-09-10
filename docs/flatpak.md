@@ -11,7 +11,7 @@ All Flatpak packaging lives under `packaging/flatpak/`:
   building the Flatpak locally, the sandbox permission set, and branding
   assets.
 - [`packaging/flatpak/flathub/README.md`](../packaging/flatpak/flathub/README.md)
-  — the postponed Flathub submission and continuous-publishing plan.
+  — Flathub submission requirements and release-update activation.
 
 The app builds against the freedesktop runtime 25.08 + the .NET 10 SDK
 extension, runs entirely per-user (no daemon, no root), and accesses
@@ -19,4 +19,6 @@ watch folders through the FileChooser / Documents portals. The release
 workflow builds both bundles from the manifest under
 `packaging/flatpak/flathub/`, temporarily pinning its Git source to the same
 commit used for both Windows MSIs. GitHub bundles must be reinstalled manually
-for each application update. Publication through Flathub is currently postponed.
+for each application update. Flathub automation is prepared, but initial
+acceptance and activation remain pending; use the linked submission guide for
+current prerequisites.

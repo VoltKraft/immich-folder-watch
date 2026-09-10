@@ -20,6 +20,12 @@
       desktop app with X11 and XWayland support, talking to Immich over
       its public HTTP API rather than touching the server's storage directly.
     </p>
+    <p>
+      An existing Immich server and an API key are required. Configure the
+      connection after installation, then choose folders and grant access
+      through the desktop folder picker. The linked help page explains setup.
+    </p>
+    <p>Immich Folder Watch is a community desktop client maintained separately from the Immich project.</p>
     <p>Use cases:</p>
     <ul>
       <li>Automatically upload screenshots into a dedicated Immich album.</li>
@@ -57,6 +63,7 @@
 
   <url type="homepage">https://github.com/VoltKraft/immich-folder-watch</url>
   <url type="bugtracker">https://github.com/VoltKraft/immich-folder-watch/issues</url>
+  <url type="help">https://github.com/VoltKraft/immich-folder-watch/blob/main/docs/installation-linux.md</url>
   <url type="vcs-browser">https://github.com/VoltKraft/immich-folder-watch</url>
 
   <screenshots>

@@ -15,7 +15,8 @@ through `v2.7.0` remain MSI-only.
 There is one shared Flatpak manifest:
 
 - `flathub/io.github.voltkraft.immich-folder-watch.yml` — the packaging source
-  of truth. It remains tag + commit pinned for a future Flathub submission.
+  of truth. Its example pin references a published release; preparation
+  generates a matching tag + commit pin for each selected release.
   During a GitHub release, `tools/prepare-flatpak-release-manifest.py` copies it
   to an ignored build directory, removes the not-yet-created tag, and pins the
   Git source to the exact commit used by the Windows MSI.
@@ -23,9 +24,10 @@ There is one shared Flatpak manifest:
 The release workflow builds architecture-specific Windows and Linux packages in
 parallel, then publishes none unless all four builds succeed. The Flatpak names
 are `immich-folder-watch-<version>-linux-x64.flatpak` and
-`immich-folder-watch-<version>-linux-arm64.flatpak`. The separate Flathub
-submission is currently postponed; see
-[`flathub/README.md`](flathub/README.md) for the retained plan.
+`immich-folder-watch-<version>-linux-arm64.flatpak`. Flathub preparation runs after
+publication and generates a complete feed for both architectures. Initial
+acceptance and update activation are still pending;
+see [`flathub/README.md`](flathub/README.md) for requirements and setup.
 
 ## Install a published bundle
 
@@ -125,21 +127,22 @@ The committed source manifest must remain `type: git`.
 
 ## Sandbox permissions
 
-The manifest declares only the portals the app actually needs:
+The manifest grants the following static permissions:
 
 | `finish-args` | What it enables |
 |---|---|
 | `--share=ipc` + `--socket=x11` | X11/XWayland display access. Avalonia's current Linux backend initializes X11. |
 | `--share=network` | Talk to the Immich server (HTTP + Socket.IO) |
 | `--device=dri` | GPU compositor for Avalonia |
-| `--talk-name=org.freedesktop.Notifications` | Toasts |
 | `--talk-name=org.kde.StatusNotifierWatcher` | Register the tray item with the desktop |
 
 Notably **not** granted: `--filesystem=host`, `flatpak-spawn --host`,
 `--filesystem=home`, `--filesystem=xdg-pictures`,
 `--filesystem=xdg-videos`, `--talk-name=org.freedesktop.systemd1`, raw
 `--socket=session-bus`, `--socket=wayland`, or broad KDE own-name permissions.
-Folder access remains portal-based. The tray exports StatusNotifierItem and
+Folder access and notifications use portals. Notifications call
+`org.freedesktop.portal.Notification.AddNotification` through Flatpak's implicit
+portal access; no direct notification-daemon permission is granted. The tray exports StatusNotifierItem and
 DBusMenu on `io.github.voltkraft.immich-folder-watch.Tray`, which Flatpak already
 allows in the application's own namespace. KDE Plasma and GNOME with an
 AppIndicator extension provide the watcher. Without one, the app displays a
@@ -161,6 +164,17 @@ PNG from `artifacts/branding/flatpak/`; the legacy copies under
 tightly cropped, rectangular canvas, so its SVG is not exported as a Flatpak
 launcher icon: Flatpak requires square icon dimensions.
 
+## License notices
+
+Flatpak Builder copies the application license. The build also installs
+`THIRD_PARTY_NOTICES.md` and runs `tools/install-flatpak-license-notices.py` to
+collect package-supplied licenses and notices from the offline NuGet archives.
+Versioned supplemental texts under `licenses/` cover packages that omit them.
+Their source provenance is recorded beside the files. The installed inventory
+describes the complete build feed, including build-only and other-platform
+inputs; it is not a list of runtime-shipped assemblies. Unknown package versions
+that require supplements must be reviewed before a dependency update can build.
+
 ## Release-time AppStream block
 
 `tools/update-appstream.py <version>` reads the matching `## [<version>]`
@@ -175,10 +189,10 @@ python3 tools/update-appstream.py 2.8.0 \
     --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
 ```
 
-## Deferred Flathub submission
+## Flathub submission and updates
 
 The Flathub manifest under `flathub/` already uses `type: git` with a
 pinned tag/commit and a sibling `nuget-sources.json`.
 [`flathub/README.md`](flathub/README.md) covers the pre-submission
-checklist and future continuous-publishing flow. The submission is currently
-postponed; GitHub Releases is the active Linux distribution channel.
+requirements, current blockers and activation of release-triggered updates.
+GitHub Releases remains available while initial Flathub acceptance is pending.

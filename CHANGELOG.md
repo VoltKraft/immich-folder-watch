@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Prepared release-triggered Flathub updates with immutable source validation, a combined offline NuGet feed for x86_64 and aarch64, native architecture build checks, and opt-in update pull requests and approved automerge.
+- Added native x86_64 and aarch64 Flatpak candidate builds and repository lint to CI before release publication.
+
+### Fixed
+- Routed Linux notifications through the desktop Notification portal and removed direct notification-daemon access from the Flatpak sandbox.
+- Clarified the Immich server/API-key setup requirements and community-client identity in the Linux app metadata.
+- Included NuGet license texts, native/.NET third-party notices, and source-backed supplemental attribution in Flatpak packages.
+
+### Documentation
+- Replaced the deferred Flathub plan with current submission requirements, activation instructions, validation boundaries, and GitHub-bundle migration guidance.
+
 ## [2.11.0] - 2026-09-09
 
 ### Fixed

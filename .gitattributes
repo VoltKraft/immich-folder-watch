@@ -1,0 +1,10 @@
+# Preserve authoritative notice bytes used by the checksum catalog.
+packaging/flatpak/licenses/*-LICENSE* -text
+packaging/flatpak/licenses/*-NOTICE* -text
+packaging/flatpak/licenses/*-OFL* -text
+
+# Retain whitespace in these original upstream notices.
+packaging/flatpak/licenses/Avalonia-NOTICE.md whitespace=-blank-at-eol
+packaging/flatpak/licenses/SQLitePCLRaw-2.1.11-NOTICE.txt whitespace=-blank-at-eol,-blank-at-eof
+packaging/flatpak/licenses/SQLitePCLRaw-3.0.5-NOTICE.txt whitespace=-blank-at-eol,-blank-at-eof
+packaging/flatpak/licenses/Svg.Custom-LICENSE.txt whitespace=-blank-at-eol

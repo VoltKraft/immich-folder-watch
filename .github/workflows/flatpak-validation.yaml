@@ -1,0 +1,102 @@
+name: Native Flatpak validation
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Full public Git commit SHA to validate without creating a release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare commit-pinned Flatpak candidate
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install .NET Flatpak SDK extension
+        run: |
+          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
+
+      - name: Generate both offline NuGet feeds
+        run: |
+          source/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-x64 --output "$PWD/source/artifacts/flatpak-validation/nuget-x64.json"
+          source/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-arm64 --output "$PWD/source/artifacts/flatpak-validation/nuget-arm64.json"
+
+      - name: Prepare and validate candidate packaging
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_ref }}
+        run: |
+          python3 source/tools/prepare-flatpak-validation.py \
+            --source-root source --commit "$SOURCE_COMMIT" \
+            --nuget-x64 source/artifacts/flatpak-validation/nuget-x64.json \
+            --nuget-arm64 source/artifacts/flatpak-validation/nuget-arm64.json \
+            --output-dir flatpak-validation
+          flatpak-builder --show-manifest flatpak-validation/io.github.voltkraft.immich-folder-watch.yml > /dev/null
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: flatpak-candidate-${{ inputs.source_ref }}
+          path: flatpak-validation/
+          if-no-files-found: error
+
+  validate:
+    name: Build and lint Flatpak (${{ matrix.arch }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: flatpak-candidate-${{ inputs.source_ref }}
+          path: flatpak-validation
+
+      - name: Install .NET Flatpak SDK extension
+        run: |
+          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
+
+      - name: Build immutable candidate from the combined offline feed
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak-validation/io.github.voltkraft.immich-folder-watch.yml
+          bundle: flatpak-candidate-${{ inputs.source_ref }}-${{ matrix.arch }}.flatpak
+          artifact-name: flatpak-validation-${{ inputs.source_ref }}-${{ matrix.arch }}
+          arch: ${{ matrix.arch }}
+          branch: test
+          repo-dir: repo
+          mirror-screenshots-url: https://dl.flathub.org/media
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Validate Flathub repository
+        run: flatpak-builder-lint repo repo

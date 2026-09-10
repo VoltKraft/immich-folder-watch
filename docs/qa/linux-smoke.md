@@ -104,7 +104,6 @@ sockets=x11;
 devices=dri;
 
 [Session Bus Policy]
-org.freedesktop.Notifications=talk
 org.kde.StatusNotifierWatcher=talk
 ```
 
@@ -308,14 +307,14 @@ Steps:
 
 Expected:
 - Step 1: silent. Status row + log show the upload, but the
-  notification daemon doesn't get a Notify call for the success
-  path. Verified by `dbus-monitor --session "interface='org.freedesktop.Notifications'"`
+  app doesn't send an AddNotification call for the success
+  path. Verified by `dbus-monitor --session "interface='org.freedesktop.portal.Notification'"`
   (no traffic during step 1).
 - Step 3: failure-toast surfaces (NOT IMPLEMENTED YET — tracked as
   a follow-up; for now mark as `[NOTE: failure-toast deferred]`).
 
-Notes: INotifier / DBusNotifier infrastructure is wired and the
-Flatpak manifest grants `--talk-name=org.freedesktop.Notifications`,
+Notes: INotifier / DBusNotifier infrastructure is wired through the Notification
+portal, without direct notification-daemon permission,
 but the FolderWatchWorker's upload-failure path doesn't call
 ShowAsync yet. Hooking it up to FlushUploadsAsync's else-branch
 ("Upload failed for {FilePath}") plus a dedup window (one toast

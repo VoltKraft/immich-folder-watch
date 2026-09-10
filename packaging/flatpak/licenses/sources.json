@@ -1,0 +1,66 @@
+{
+  "Avalonia-LICENSE.md": {
+    "url": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/21e816874efa142bf9903b51fd323d1f35e56ab3/licence.md",
+    "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+  },
+  "Avalonia-NOTICE.md": {
+    "url": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/21e816874efa142bf9903b51fd323d1f35e56ab3/NOTICE.md",
+    "sha256": "dd6f80852d16320c865a2e403ffd1a8b07a0e34c5b37122c0bc2343639ff68e6"
+  },
+  "Avalonia.BuildServices-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia.BuildServices/777f975b0a0cecf0311273711d56697212c558c0/LICENSE",
+    "sha256": "94162c40c663bd96ec1b870e6aba6ef0a43f44c9eb500807e7965e7078f6dc47"
+  },
+  "ExCSS-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/TylerBrinks/ExCSS/c97e84d6126bb2e42658cf5af627d52e697c8779/license.txt",
+    "sha256": "fe201d8ad7c9f2122b4813fe0811075b63fbac9f4fb0c9075f49f38718a728ad"
+  },
+  "MicroCom-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/kekekeks/MicroCom/28850f85fb586488828ab7267ed4a87e8c970b51/LICENSE",
+    "sha256": "6ee769c9ac4dac9abb16b98b1341e9528ff9f4ab685481410d3376d14148f3a9"
+  },
+  "Dotnet-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
+    "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  "Dotnet.Sqlite-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/dotnet/dotnet/f7d90799ce4ef09a0bb257852a57248d2a8fb8dd/LICENSE.TXT",
+    "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  "SocketIO-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/doghappy/socket.io-client-csharp/dc5e7d9d6c26d04d924351c8e242b6e8a8807f7a/LICENSE",
+    "sha256": "e97ff25fc8529385c2a1a12a3a780f07322c32d95f2b00b5a277e7855a900fb8"
+  },
+  "SQLitePCLRaw-3.0.5-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "SQLitePCLRaw-3.0.5-NOTICE.txt": {
+    "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT",
+    "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9"
+  },
+  "SQLitePCLRaw-2.1.11-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/fe99a5c9ea3bdb07c431b3945eed5c3e4f548e1a/LICENSE.TXT",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "SQLitePCLRaw-2.1.11-NOTICE.txt": {
+    "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/fe99a5c9ea3bdb07c431b3945eed5c3e4f548e1a/NOTICE.TXT",
+    "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b"
+  },
+  "Svg.Skia-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/wieslawsoltes/Svg.Skia/705b3df1a092713af31896243f67ad0cb65184bd/LICENSE.TXT",
+    "sha256": "31fdac60ff94d9cab3afef9794905df38c47e82b6879819c025d703d3aebd953"
+  },
+  "Svg.Custom-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/wieslawsoltes/Svg.Skia/705b3df1a092713af31896243f67ad0cb65184bd/src/Svg.Custom/LICENSE.TXT",
+    "sha256": "d0ab1d6a97c328acf658b57141b6f2863d7eaf0066e42a9fd0792df0c4fd2521"
+  },
+  "Tmds.DBus-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/tmds/Tmds.DBus/282acebca8d4e4e3ba211646ac650911ee94edfd/COPYING",
+    "sha256": "aca3b49277abcc7886ccb2f115603a9f5b15fc3f96019a10c00f2974098b210c"
+  },
+  "Inter-OFL.txt": {
+    "url": "https://raw.githubusercontent.com/rsms/inter/0a5106e0bde18df09374066bf3a7998e3546307d/LICENSE.txt",
+    "sha256": "4d7d9c95e7d7f2f0ebf76d5e0b344826b74e903a34028ee18ab54bb639e45906"
+  }
+}

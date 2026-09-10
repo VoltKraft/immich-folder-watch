@@ -300,6 +300,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  trigger-winget:
+    name: Trigger WinGet update
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-latest
+    steps:
       - name: Trigger WinGet workflow
         uses: actions/github-script@v8
         env:
@@ -314,5 +319,30 @@ jobs:
               ref: "main",
               inputs: {
                 release_tag: process.env.RELEASE_TAG,
+              },
+            });
+
+  trigger-flathub:
+    name: Trigger Flathub preparation and update
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-latest
+    steps:
+      # Releases created with GITHUB_TOKEN do not trigger release workflows.
+      # Dispatch explicitly, independently of the WinGet update result.
+      - name: Trigger Flathub workflow
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'flathub.yaml',
+              ref: 'main',
+              inputs: {
+                release_tag: process.env.RELEASE_TAG,
+                submit: 'true',
               },
             });
