@@ -13,8 +13,8 @@ All Flatpak packaging lives under `packaging/flatpak/`:
 - [`packaging/flatpak/flathub/README.md`](../packaging/flatpak/flathub/README.md)
   — Flathub submission requirements and release-update activation.
 
-The app builds against the freedesktop runtime 25.08 + the .NET 10 SDK
-extension, runs entirely per-user (no daemon, no root), and accesses
+The app builds against the freedesktop runtime 26.08 with a pinned Microsoft
+.NET 10 SDK used only during compilation. It runs entirely per-user (no daemon, no root), and accesses
 watch folders through the FileChooser / Documents portals. The release
 workflow builds both bundles from the manifest under
 `packaging/flatpak/flathub/`, temporarily pinning its Git source to the same

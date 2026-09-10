@@ -110,10 +110,22 @@ jobs:
         # The same manifest feeds future Flathub submission and the
         # commit-pinned GitHub release bundle.
         run: |
-          printf '[]\n' > packaging/flatpak/flathub/nuget-sources.json
+          # An empty source list is silently discarded by some Builder versions.
+          # This parse-only inline source exercises sibling-list resolution.
+          printf '[{"type":"inline","contents":"parse-only","dest-filename":".ci-parse-only"}]\n' > packaging/flatpak/flathub/nuget-sources.json
           flatpak-builder --show-manifest \
             packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml \
-            > /dev/null
+            > /tmp/flatpak-manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('/tmp/flatpak-manifest.json').read_text())
+          sources = manifest['modules'][0]['sources']
+          assert [source['type'] for source in sources] == ['git', 'archive', 'archive', 'inline']
+          PY
+
+      - name: Validate shared SDK pins
+        run: python3 tools/read-flatpak-sdk.py --manifest packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml --format json
 
       - name: Check Flatpak NuGet generator arguments
         run: |

@@ -114,6 +114,13 @@ separately enabled after external approval. See
 [Flathub preparation](../packaging/flatpak/flathub/README.md) for requirements,
 activation and failure handling.
 
+The Flatpak build uses current Freedesktop 26.08 and exact architecture-specific
+Microsoft .NET SDK archive sources. The SDK stays inside the module build tree;
+only the self-contained application is exported. NuGet preparation must use
+the same SDK version as offline publication. This removes the dependency on a
+matching .NET Flatpak SDK extension while making SDK security updates an
+explicit packaging maintenance responsibility.
+
 ## Immich API Assumptions
 
 The Immich API can evolve. The following assumptions are centralized in

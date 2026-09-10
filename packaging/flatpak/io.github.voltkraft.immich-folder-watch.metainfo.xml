@@ -110,6 +110,7 @@
         <ul>
           <li>Routed Linux notifications through the desktop Notification portal and removed direct notification-daemon access from the Flatpak sandbox.</li>
           <li>Clarified the Immich server/API-key setup requirements and community-client identity in the Linux app metadata.</li>
+          <li>Updated Flatpak to Freedesktop 26.08 with a pinned, build-only Microsoft .NET SDK for both architectures.</li>
           <li>Included NuGet license texts, native/.NET third-party notices, and source-backed supplemental attribution in Flatpak packages.</li>
         </ul>
         <p>Documentation:</p>

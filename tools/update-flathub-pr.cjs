@@ -21,22 +21,41 @@ function compareVersions(left, right) {
 }
 
 function manifestIdentity(text, upstream) {
-    // The checked-in template deliberately has one Git source. Fail closed if
-    // its structure changes instead of trying to implement a YAML parser here.
-    function field(name) {
-        const matches = [...text.matchAll(new RegExp(`^\\s*${name}:\\s*(\\S+)\\s*$`, 'gm'))];
-        if (matches.length !== 1) throw new Error(`Manifest must have exactly one ${name} field.`);
-        return matches[0][1];
+    // Parse only the template's top-level app ID and direct fields of its single
+    // Git source. SDK archives have their own URLs and must not supply app identity.
+    // Unsupported YAML layouts fail closed rather than being partially interpreted.
+    const lines = text.split(/\r?\n/);
+    function field(name, sourceLines, indent) {
+        const pattern = new RegExp(`^${indent}${name}:[ \\t]*(.*)$`);
+        const matches = sourceLines.map(line => pattern.exec(line)).filter(Boolean);
+        if (matches.length !== 1 || !/^\S+$/.test(matches[0][1].trim())) {
+            throw new Error(`Manifest must have exactly one ${name} field with a plain scalar value.`);
+        }
+        return matches[0][1].trim();
     }
-    if (field('app-id') !== APP_ID || [...text.matchAll(/^\s*- type: git\s*$/gm)].length !== 1) {
+    const gitSources = lines.flatMap((line, index) => {
+        const match = /^([ \t]*)-[ \t]+type:[ \t]*git[ \t]*(?:#.*)?$/.exec(line);
+        return match ? [{ index, indent: match[1] }] : [];
+    });
+    if (field('app-id', lines, '') !== APP_ID || gitSources.length !== 1) {
         throw new Error('Manifest must describe the expected app and exactly one Git source.');
     }
+    const source = gitSources[0];
+    let end = source.index + 1;
+    while (end < lines.length) {
+        const line = lines[end];
+        if (line.trim() && !line.trimStart().startsWith('#') &&
+            /^[ \t]*/.exec(line)[0].length <= source.indent.length) break;
+        end++;
+    }
+    const gitLines = lines.slice(source.index + 1, end);
+    const gitField = name => field(name, gitLines, source.indent + '  ');
     const expectedUrl = `https://github.com/${upstream.owner}/${upstream.repo}.git`;
-    if (field('url').toLowerCase() !== expectedUrl.toLowerCase()) {
+    if (gitField('url').toLowerCase() !== expectedUrl.toLowerCase()) {
         throw new Error('Manifest Git source does not match the upstream repository.');
     }
-    const tag = field('tag');
-    const commit = field('commit');
+    const tag = gitField('tag');
+    const commit = gitField('commit');
     if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('Manifest commit must be a full lowercase Git SHA.');
     return { tag, commit, version: version(tag) };
 }

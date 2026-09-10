@@ -19,6 +19,18 @@ function manifest(tag = 'v1.1.0', commit = NEW_COMMIT) {
     return `app-id: ${APP_ID}\nmodules:\n  - name: immich-folder-watch\n    sources:\n      - type: git\n        url: https://github.com/VoltKraft/immich-folder-watch.git\n        tag: ${tag}\n        commit: ${commit}\n      - nuget-sources.json\n`;
 }
 
+function sdkArchive(arch, runtime) {
+    return `      - type: archive\n        dest: dotnet-sdk\n        only-arches: [${arch}]\n` +
+        `        url: https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-${runtime}.tar.gz\n` +
+        `        sha512: ${'d'.repeat(128)}\n`;
+}
+
+function manifestWithSdkArchives(tag = 'v1.1.0', commit = NEW_COMMIT) {
+    return manifest(tag, commit)
+        .replace('      - type: git\n', sdkArchive('x86_64', 'linux-x64') + '      - type: git\n')
+        .replace('      - nuget-sources.json\n', sdkArchive('aarch64', 'linux-arm64') + '      - nuget-sources.json\n');
+}
+
 function apiError(status) {
     return Object.assign(new Error(`HTTP ${status}`), { status });
 }
@@ -176,6 +188,68 @@ test('requires a nonempty generated offline feed', async t => {
     await fs.writeFile(path.join(directory, 'nuget-sources.json'), '[]');
     await assert.rejects(run(), /nonempty JSON array/);
     assert.equal(mutations().length, 0);
+});
+
+test('updates app identity independently of both architecture-specific SDK archive sources', async t => {
+    const { run, state, directory } = await fixture(t);
+    const content = manifestWithSdkArchives();
+    await fs.writeFile(path.join(directory, MANIFEST), content);
+    state.commits[MASTER][MANIFEST] = manifestWithSdkArchives('v1.0.0', OLD_COMMIT);
+
+    assert.equal((await run()).status, 'pull-request-ready');
+
+    assert.equal(state.commits[state.refs[BRANCH]][MANIFEST], content);
+    assert.equal(state.pulls.length, 1);
+});
+
+test('ignores archive and nested checker identity fields outside the direct Git source properties', async t => {
+    const { run, state, directory } = await fixture(t);
+    const content = manifestWithSdkArchives()
+        .replace('        dest: dotnet-sdk\n', `        dest: dotnet-sdk\n        tag: v9.0.0\n        commit: ${OLD_COMMIT}\n`)
+        .replace(`        commit: ${NEW_COMMIT}\n`, `        commit: ${NEW_COMMIT}\n` +
+            '        x-checker-data:\n          type: json\n          url: https://example.invalid/releases\n' +
+            `          tag: v8.0.0\n          commit: ${OLD_COMMIT}\n`);
+    await fs.writeFile(path.join(directory, MANIFEST), content);
+
+    assert.equal((await run()).status, 'pull-request-ready');
+    assert.equal(state.commits[state.refs[BRANCH]][MANIFEST], content);
+});
+
+test('cannot borrow missing Git identity from adjacent archives or nested metadata', async t => {
+    const values = { url: 'https://github.com/VoltKraft/immich-folder-watch.git', tag: 'v1.1.0', commit: NEW_COMMIT };
+    for (const [field, value] of Object.entries(values)) {
+        for (const location of ['archive', 'nested', 'following-section']) {
+            const { run, directory, mutations } = await fixture(t);
+            let content = manifestWithSdkArchives().replace(`        ${field}: ${value}\n`, '');
+            if (location === 'archive') {
+                content = content.replace('        dest: dotnet-sdk\n', `        dest: dotnet-sdk\n        ${field}: ${value}\n`);
+            } else if (location === 'nested') {
+                content = content.replace('      - type: git\n', `      - type: git\n        metadata:\n          ${field}: ${value}\n`);
+            } else {
+                content += `    build-commands:\n      - metadata:\n        ${field}: ${value}\n`;
+            }
+            await fs.writeFile(path.join(directory, MANIFEST), content);
+            await assert.rejects(run(), new RegExp(`exactly one ${field} field`));
+            assert.equal(mutations().length, 0);
+        }
+    }
+});
+
+test('rejects duplicate Git sources and duplicate direct identity fields with SDK archives present', async t => {
+    const variants = [
+        manifestWithSdkArchives().replace('      - nuget-sources.json\n',
+            '      - type: git # Another app source\n        url: https://example.invalid/other.git\n'),
+        manifestWithSdkArchives().replace(`        tag: v1.1.0\n`, '        tag: v1.1.0\n        tag: v1.1.0\n'),
+        manifestWithSdkArchives().replace(`        commit: ${NEW_COMMIT}\n`, `        commit: ${NEW_COMMIT}\n        commit:\n`),
+        manifestWithSdkArchives().replace('        url: https://github.com/VoltKraft/immich-folder-watch.git\n',
+            '        url: https://example.invalid/other.git\n'),
+    ];
+    for (const content of variants) {
+        const { run, directory, mutations } = await fixture(t);
+        await fs.writeFile(path.join(directory, MANIFEST), content);
+        await assert.rejects(run(), /exactly one Git source|exactly one tag field|exactly one commit field|does not match the upstream repository/);
+        assert.equal(mutations().length, 0);
+    }
 });
 
 test('refuses a downgrade and a reused version with a different commit', async t => {

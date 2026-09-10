@@ -1,14 +1,13 @@
 app-id: io.github.voltkraft.immich-folder-watch
 runtime: org.freedesktop.Platform
-runtime-version: "25.08"
+runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.dotnet10
 command: immich-folder-watch
 
 build-options:
-  append-path: /usr/lib/sdk/dotnet10/bin
+  append-path: /run/build/immich-folder-watch/dotnet-sdk
   env:
+    DOTNET_ROOT: /run/build/immich-folder-watch/dotnet-sdk
     DOTNET_CLI_TELEMETRY_OPTOUT: "1"
     DOTNET_NOLOGO: "1"
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
@@ -28,6 +27,21 @@ modules:
         url: https://github.com/VoltKraft/immich-folder-watch.git
         tag: v2.11.0
         commit: ddfbf46f66731302f243909f148d982e88154a52
+      # The build-only SDK stays outside /app. These pins are also read by
+      # tools/read-flatpak-sdk.py for the host restore and CI setup steps.
+      # Source: https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json
+      - type: archive
+        dest: dotnet-sdk
+        strip-components: 0
+        only-arches: [x86_64]
+        url: https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-linux-x64.tar.gz
+        sha512: 51c8b999af9e8dd9998c9edc5944e19a90788862068acd38694e098889054ce8c23d4f0c5cccfa16bf187d044562359e5ee69a9f8ad0bbe913ba90311fbce25b
+      - type: archive
+        dest: dotnet-sdk
+        strip-components: 0
+        only-arches: [aarch64]
+        url: https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-linux-arm64.tar.gz
+        sha512: 58ace73ced6b4360754689a686bdfb8a317f4da6cb8bb416dbc7d0ba9f47e43e3c09f5eb1f1a1cfaacbd10df9558da4882bf2a5e195d6ab56a02c1f9f76102ed
       # The release updater pins the source and regenerates the complete
       # offline feed together; a tag-only checker would leave stale packages.
       - nuget-sources.json

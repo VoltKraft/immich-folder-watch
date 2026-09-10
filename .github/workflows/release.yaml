@@ -157,7 +157,7 @@ jobs:
             dotnet_runtime: linux-arm64
             asset_arch: linux-arm64
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
       options: --privileged
 
     steps:
@@ -167,17 +167,16 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
-      - name: Setup .NET
+      - name: Read pinned Flatpak SDK
+        id: flatpak_sdk
+        run: |
+          sdk_version=$(python3 tools/read-flatpak-sdk.py --manifest packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml --format version)
+          echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pinned .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
-
-      - name: Install .NET Flatpak SDK extension
-        run: |
-          flatpak remote-add --system --if-not-exists \
-            flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --system --noninteractive -y flathub \
-            org.freedesktop.Sdk.Extension.dotnet10//25.08
+          dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
       - name: Generate offline NuGet sources
         run: tools/generate-nuget-sources.sh --runtime ${{ matrix.dotnet_runtime }}

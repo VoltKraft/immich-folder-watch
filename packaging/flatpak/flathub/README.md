@@ -11,7 +11,9 @@ external prerequisites below. No existing release is changed or backfilled.
 GitHub Release, then dispatches WinGet and Flathub independently. The explicit
 dispatch is necessary because releases created with `GITHUB_TOKEN` do not start
 other `release` workflows. `flathub.yaml` also handles human-published releases
-and supports manual preparation of an existing stable release.
+and supports manual preparation of a compatible stable release. The pinned-SDK
+path requires a release containing this packaging (starting with prepared
+version `2.11.1`); older releases are not retrofitted.
 
 The Flathub workflow:
 
@@ -47,13 +49,13 @@ Checked on 2026-09-10 against the official
 [maintenance guide](https://docs.flathub.org/docs/for-app-authors/maintenance).
 These policies can change; recheck them before submitting.
 See [validation evidence](../../../docs/qa/flathub-preparation.md) for executed
-checks and the native ARM64/remote publication boundaries.
+checks and the remaining desktop/publication boundaries.
 
 | Area | Repository status and remaining action |
 | --- | --- |
 | Application identity | The reverse-domain ID maps to the GitHub project. Desktop entry, metadata and icon use the same ID. Verify GitHub ownership in Flathub's developer portal after acceptance. |
 | License and sources | AGPL-3.0-only application, CC0 metadata, immutable Git source and hashed NuGet downloads. The build includes package license/notice texts and versioned upstream supplements. Submit packaging files only. The maintainer must confirm rights to the current name/logo before submission. |
-| Runtime | **Open prerequisite:** 26.08 Platform/SDK is available for both architectures, while the .NET 10 SDK extension is currently available only through 25.08. New submissions require the latest runtime. Obtain a reviewer exception for supported 25.08 or wait for a compatible 26.08 extension and update/test all packaging tooling together. |
+| Runtime | Uses the current Freedesktop 26.08 Platform/SDK for both architectures. A pinned official Microsoft .NET 10 SDK is downloaded as a build-only source; it does not require the unavailable 26.08 .NET extension. Native builds and repository lint must pass before submission. |
 | Offline builds | The generator covers both architectures; native CI builds verify the combined feed. Flathub will also run its own build and repository linter. |
 | Sandbox | No broad filesystem, session/system bus or host-spawn access. Folder selection and autostart use portals. X11/IPC matches the current Avalonia backend; do not replace it with Wayland permissions without testing backend support. |
 | Notifications | `DBusNotifier` uses the Notification portal with no direct notification-daemon permission. Isolated bus tests verify the portal contract; desktop presentation still needs a smoke test. |
@@ -62,11 +64,13 @@ checks and the native ARM64/remote publication boundaries.
 | Automation | Custom update PRs are supported. Disable the global external-data checker to avoid tag-only updates with stale NuGet sources. Automerge requires Flathub approval. |
 | Human submission | A maintainer must perform the initial submission and review interactions and disclose AI-generated material as required below. |
 
-The manifest linter reports that 26.08 is available. Its warning is not approval
-for a new submission on 25.08. A 25.08 SDK extension must not simply be combined
-with a 26.08 base; see [extension compatibility](https://docs.flatpak.org/en/latest/extension.html#finding-base-runtime-version).
-The official [.NET 10 extension](https://github.com/flathub/org.freedesktop.Sdk.Extension.dotnet10)
-documents the self-contained build and offline NuGet approach used here.
+The .NET SDK is unpacked only in the module's build directory. The exported app
+contains the self-contained runtime and application, with license notices; it
+must not include the SDK. This approach has an accepted
+[Flathub packaging precedent](https://github.com/flathub/com.revolutionarygamesstudio.ThriveLauncher/blob/11b254ca2a7673cd4cdee4857933743e38f349e8/com.revolutionarygamesstudio.ThriveLauncher.yaml).
+It avoids combining an extension with an incompatible runtime branch. The
+maintainer must update the SDK pins and regenerate/test both NuGet feeds for
+.NET security updates. See [SDK maintenance](../README.md) for the shared inputs.
 
 ## Prepare the packaging files
 
@@ -87,10 +91,12 @@ reviewable artifact without creating a PR. The artifact contains only:
 - `flathub.json`
 
 For local preparation, start in the upstream repository with the SDK and Flatpak
-prerequisites from [the packaging guide](../README.md). Use a new output directory:
+prerequisites from [the packaging guide](../README.md). Wait until `v2.11.1` has
+actually been published; before then use the candidate CI artifacts. Use a new
+output directory:
 
 ```bash
-release_tag=v2.11.0
+release_tag=v2.11.1
 validation_dir="$PWD/artifacts/flathub-preparation"
 mkdir -p "$validation_dir"
 git clone --branch "$release_tag" https://github.com/VoltKraft/immich-folder-watch.git "$validation_dir/source"

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Routed Linux notifications through the desktop Notification portal and removed direct notification-daemon access from the Flatpak sandbox.
 - Clarified the Immich server/API-key setup requirements and community-client identity in the Linux app metadata.
+- Updated Flatpak to Freedesktop 26.08 with a pinned, build-only Microsoft .NET SDK for both architectures.
 - Included NuGet license texts, native/.NET third-party notices, and source-backed supplemental attribution in Flatpak packages.
 
 ### Documentation

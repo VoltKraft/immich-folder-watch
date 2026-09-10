@@ -16,7 +16,7 @@ jobs:
     name: Prepare commit-pinned Flatpak candidate
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
       options: --privileged
     steps:
       - uses: actions/checkout@v6
@@ -26,14 +26,16 @@ jobs:
           path: source
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Install .NET Flatpak SDK extension
+      - name: Read pinned candidate SDK
+        id: flatpak_sdk
         run: |
-          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
+          sdk_version=$(python3 source/tools/read-flatpak-sdk.py --manifest source/packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml --format version)
+          echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pinned .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
       - name: Generate both offline NuGet feeds
         run: |
@@ -72,18 +74,13 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: aarch64
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
       options: --privileged
     steps:
       - uses: actions/download-artifact@v7
         with:
           name: flatpak-candidate-${{ inputs.source_ref }}
           path: flatpak-validation
-
-      - name: Install .NET Flatpak SDK extension
-        run: |
-          flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --system --noninteractive -y flathub org.freedesktop.Sdk.Extension.dotnet10//25.08
 
       - name: Build immutable candidate from the combined offline feed
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6

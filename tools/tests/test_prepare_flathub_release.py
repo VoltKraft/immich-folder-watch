@@ -309,19 +309,19 @@ class GeneratorArgumentTests(unittest.TestCase):
         (self.repo / self.project_suffix).touch()
         self.mock_bin = self.root / "bin"
         self.mock_bin.mkdir()
-        for command in ("git", "flatpak", "dotnet"):
+        for command in ("dotnet",):
             path = self.mock_bin / command
             path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             path.chmod(0o755)
-        cache = self.root / "cache"
-        generator = cache / "immich-folder-watch/flatpak-builder-tools/dotnet/flatpak-dotnet-generator.py"
-        generator.parent.mkdir(parents=True)
+        generator = self.repo / "tools/generate-flatpak-nuget-sources.py"
         generator.write_text(
             "import json, sys\nfrom pathlib import Path\n"
-            "Path(sys.argv[-2]).write_text(json.dumps([{'arguments': sys.argv[1:]}]))\n",
+            "args = dict(zip(sys.argv[1::2], sys.argv[2::2]))\n"
+            "output = Path(args['--output'])\noutput.parent.mkdir(parents=True, exist_ok=True)\n"
+            "output.write_text(json.dumps([{'arguments': args}]))\n",
             encoding="utf-8",
         )
-        self.environment = {**os.environ, "XDG_CACHE_HOME": str(cache), "PATH": str(self.mock_bin) + os.pathsep + os.environ["PATH"]}
+        self.environment = {**os.environ, "PATH": str(self.mock_bin) + os.pathsep + os.environ["PATH"]}
 
     def run_generator(self, *arguments: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(["bash", str(self.script), *arguments], capture_output=True, text=True, env=self.environment)
@@ -331,8 +331,8 @@ class GeneratorArgumentTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         output = self.repo / "packaging/flatpak/flathub/nuget-sources.json"
         arguments = json.loads(output.read_text())[0]["arguments"]
-        self.assertIn("--runtime=linux-x64", arguments)
-        self.assertEqual(str(self.repo / self.project_suffix), arguments[-1])
+        self.assertEqual("linux-x64", arguments["--runtime"])
+        self.assertEqual(str(self.repo), arguments["--source-root"])
 
     def test_explicit_source_root_output_and_runtime_in_both_option_forms(self) -> None:
         source = self.root / "release checkout"
@@ -346,8 +346,8 @@ class GeneratorArgumentTests(unittest.TestCase):
                 result = self.run_generator(*args)
                 self.assertEqual(0, result.returncode, result.stderr)
                 arguments = json.loads(output.read_text())[0]["arguments"]
-                self.assertIn("--runtime=linux-arm64", arguments)
-                self.assertEqual(str(source / self.project_suffix), arguments[-1])
+                self.assertEqual("linux-arm64", arguments["--runtime"])
+                self.assertEqual(str(source), arguments["--source-root"])
         self.assertFalse((source / "packaging").exists())
 
     def test_rejects_missing_output_source_root_and_unsupported_runtime(self) -> None:
