@@ -8,46 +8,45 @@ for current requirements and external prerequisites.
 
 ## Executed checks
 
+The final [complete CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/34489668378)
+passed for commit `ca8cbc78b5dd17f0d8973d1c57e5d9399859dee0`, prepared version
+`2.11.1`. Subsequent validation-report edits do not change these package inputs.
+
 | Check | Result |
 | --- | --- |
-| `python3 -m unittest discover -s tools/tests -p 'test_*.py'` | 83 passed, including release/candidate preparation, SDK pins, isolated NuGet generation and license-notice regressions. |
-| `node tools/tests/test_update_flathub_pr.cjs` | 22 passed with mocked GitHub APIs; no live PR created. |
-| Actionlint on CI, Release, Flathub and native validation workflows | Passed. |
-| Bash syntax, YAML/JSON parsing, AppStream, desktop entry, `git diff --check` | Passed. |
-| `.NET` Linux app build, Debug | Passed with zero warnings/errors. |
-| `.NET` Core tests, Debug | 374 passed. |
-| `.NET` Linux tests, Debug | 44 passed, including 7 Notification portal regressions. |
-| Offline license/notice installation | All 83 archives accepted; 67 archive-provided files verified byte-for-byte plus 16 immutable upstream supplements. |
-| Real published `v2.11.0` metadata and tag | Verified four nonempty release assets and commit `ddfbf46f66731302f243909f148d982e88154a52`. |
-| NuGet generation from an isolated clean release checkout | 80 x64 entries and 81 ARM64 entries; deterministic merged feed contains 83 entries. |
-| Official Builder 1.4.9, x86_64 offline build | Passed from the generated three-file package using the combined feed. |
-| Stable export with screenshot mirroring and full compose URL policy | Passed, including the `screenshots/x86_64` OSTree ref. |
-| Flathub repository lint on that export | No errors; warning that Freedesktop 26.08 is available. |
+| Python tooling | 83 passed: release/candidate preparation, SDK pins, isolated NuGet generation and license notices. |
+| JavaScript updater | 22 passed with mocked GitHub APIs; no live PR created. |
+| Actionlint, Bash syntax, manifest resolution, AppStream, desktop entry, diff checks | Passed. The dry parse verifies one Git source, both SDK archives and the sibling feed. |
+| Ubuntu Release build/tests | 374 Core and 44 Linux tests passed, including 7 Notification portal regressions. |
+| Windows Release solution build/tests | 36 Windows, 366 Core (8 platform skips), and 29 Linux tests (15 native Linux skips) passed. This does not produce an MSI. |
+| Exact .NET SDK 10.0.401 restores | 80 x64 and 83 ARM64 packages from fresh caches; merged feed has 83 archives, including both 10.0.12 runtime packs. |
+| Native x86_64 Flatpak | Built and passed Flathub repository lint on Freedesktop 26.08. |
+| Native aarch64 Flatpak | Built and passed Flathub repository lint on Freedesktop 26.08. |
+| Downloaded bundle inspection | Both ELF architectures and 26.08 runtime refs verified; self-contained .NET 10.0.12, no build SDK, notices for 83 archives and the application AGPL license present. No broad filesystem or direct notification-daemon grant. |
+| Release preparation baseline | Published v2.11.0 had exactly four nonempty assets and its tag matched commit `ddfbf46f66731302f243909f148d982e88154a52`. The new SDK path requires a new release containing the current packaging. |
 
-The export was built with `--default-branch=stable`,
-`--mirror-screenshots-url=https://dl.flathub.org/media`, and
-`--compose-url-policy=full`. An initial run without mirroring failed the
-screenshot checks; the final workflow and documented command include these
-options. The app was not installed over the user's existing installation.
+Both native exports mirror screenshots and pass repository lint without
+diagnostics. The published 25.08 Builder container installs the actual 26.08
+runtime/SDK through `--install-deps-from=flathub`; it does not select the app's ABI.
+The initial missing 26.08 container-tag issue has been corrected in the workflow.
 
-Generated files and logs remain ignored under `artifacts/flathub-validation/`.
-The test used the released revision's original metadata; subsequent upstream
-screenshot fixes require a new release to appear in a prepared package.
+The delete-after-upload regression now waits for successful completion before
+stopping the worker. This avoids cancelling its final persistence write from
+inside the test; production code and the deletion/durable-state assertions are
+unchanged. Both theory cases passed five consecutive focused .NET 10.0.401
+Release runs (10/10), followed by the complete green CI run above.
 
-The first full upstream [CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/34484622019)
-validated commit `08f2c1a1963f60e5a779aded0be6b141b3fa0359` on the previous
-25.08 runtime: both native Flatpak builds and repository lint passed. Windows
-passed 36 Windows tests, 366 Core tests (8 platform skips) and 29 Linux tests
-(15 native Linux skips). Ubuntu passed all 374 Core and 44 Linux tests. Both
-Flatpak builds installed notices for 83 NuGet archives and recorded the root
-application license. The runtime-update warning motivated the subsequent
-26.08/pinned-SDK migration; use the final candidate run for desktop acceptance.
+The final downloaded artifacts and `package-inspection.json` are ignored under
+`artifacts/flathub-candidate/`. Bundles were imported only into an isolated
+inspection repository; no installed app or user configuration was changed.
 
-The pinned .NET SDK 10.0.401 restored 80 x64 and 83 ARM64 packages from fresh
-caches; the validated merged feed contains 83 archives, including both 10.0.12
-self-contained runtime packs. Archive bytes were checked against NuGet's archive
-SHA-512 records. Signed-package content hashes are intentionally not used as
-whole-archive checksums. The source checkout remained unchanged by restore.
+| Bundle | SHA-256 |
+| --- | --- |
+| x86_64 | `95edbfc455aa4098596da73fac9c22569de1a2b81019d312da277907af40305c` |
+| aarch64 | `212065cec3400bf90a8bc51ae85f9e36acc1d7e810dcb145c99bbabab2ef28dc` |
+
+At verification time, `FLATHUB_TOKEN`, `FLATHUB_AUTOMATION_ENABLED` and
+`FLATHUB_AUTOMERGE_ENABLED` were absent. No `v2.11.1` tag or release was created.
 
 ## Candidate desktop acceptance
 
