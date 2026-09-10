@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-09-10
+
 ### Added
 - Prepared release-triggered Flathub updates with immutable source validation, a combined offline NuGet feed for x86_64 and aarch64, native architecture build checks, and opt-in update pull requests and approved automerge.
 - Added native x86_64 and aarch64 Flatpak candidate builds and repository lint to CI before release publication.
