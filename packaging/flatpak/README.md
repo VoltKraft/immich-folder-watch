@@ -192,8 +192,12 @@ from [Microsoft's release metadata](https://builds.dotnet.microsoft.com/dotnet/r
 verify their bytes, update both manifest entries together, install that exact
 host SDK, and regenerate both feeds. Run native CI for both architectures and
 review any new package versions against the notice catalog below. Runtime upgrades
-also require updating the Flatpak CI container images and testing the exported
-packages. Do not combine mismatched SDK-extension and runtime branches.
+also require testing the exported packages. CI currently runs Builder in the
+published `freedesktop-25.08` tooling image, because the `freedesktop-26.08` image
+tag is not yet available. Builder's `--install-deps-from=flathub` installs the
+manifest's actual 26.08 runtime and SDK; the outer container does not select the
+application ABI. Switch the tooling image once its 26.08 tag is published. Do not
+combine mismatched SDK-extension and runtime branches.
 
 ## License notices
 

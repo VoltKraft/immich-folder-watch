@@ -157,7 +157,9 @@ jobs:
             dotnet_runtime: linux-arm64
             asset_arch: linux-arm64
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
+      # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
 
     steps:
