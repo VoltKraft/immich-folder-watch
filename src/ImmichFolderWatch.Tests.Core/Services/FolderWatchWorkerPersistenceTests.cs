@@ -409,6 +409,8 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         Assert.Equal(1, client.UploadCount);
         Assert.False(File.Exists(filePath));
         Assert.Empty(await GetEntriesAsync(config, databasePath));
+        // File cleanup precedes the final success write; stopping early can cancel that write.
+        await WaitUntilAsync(() => status.LastSyncCompletedUtc.HasValue, TimeSpan.FromSeconds(3));
         await worker.StopAsync(CancellationToken.None);
 
         var lastSuccess = Assert.IsType<DateTimeOffset>(status.LastSyncCompletedUtc);
