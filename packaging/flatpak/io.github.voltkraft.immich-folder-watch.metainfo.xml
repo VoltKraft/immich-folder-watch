@@ -61,8 +61,12 @@
 
   <screenshots>
     <screenshot type="default">
-      <caption>Settings: Immich server, watch sources, per-folder sync mode, and autostart</caption>
-      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/v2.5.0/packaging/flatpak/screenshots/GUI.png</image>
+      <caption>Watch folders, album placement, and synchronization mode</caption>
+      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/1d81dc6d73c4a98a2eab6b52125815214c4ece9f/docs/qa/images/linux-folders-2.11.0.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Logging settings in the dark theme</caption>
+      <image>https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/1d81dc6d73c4a98a2eab6b52125815214c4ece9f/docs/qa/images/linux-logging-2.11.0.png</image>
     </screenshot>
   </screenshots>
 

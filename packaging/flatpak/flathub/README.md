@@ -29,7 +29,7 @@ Key properties:
 - [x] StatusNotifierItem uses the app-ID namespace and a narrow watcher
   talk-name permission. A filtered D-Bus integration test verifies registration,
   exported menu and actions without broad KDE ownership.
-- [ ] Three screenshots in `../screenshots/` (see README there). User-action: capture from the live app on Fedora + GNOME.
+- [ ] Review the current Linux screenshot selection (see `../screenshots/README.md`) before submission; add native desktop captures if needed.
 - [ ] Release tag pushed; `tag:` and `commit:` in the submission manifest match
   the version and SHA reported by `git rev-parse v<version>`.
 - [ ] Fresh architecture-complete `nuget-sources.json` generated against that
