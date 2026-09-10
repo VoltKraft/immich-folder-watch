@@ -47,7 +47,8 @@ application updates. Download each new version manually and install it with
 
 ## Local build
 
-Prerequisites on the dev machine (Fedora shown; Debian/Ubuntu in parens):
+Prerequisites: Python 3.11 or newer, the exact .NET SDK described below, and
+Flatpak tools (Fedora shown; Debian/Ubuntu in parens):
 
 ```bash
 sudo dnf install flatpak flatpak-builder    # apt install flatpak flatpak-builder
@@ -184,7 +185,9 @@ launcher icon: Flatpak requires square icon dimensions.
 The two architecture-filtered SDK archive entries in the shared manifest are
 the single source of truth for the version, official download URLs and SHA-512
 pins. `tools/read-flatpak-sdk.py` validates those entries; feed generation and
-Actions setup read the same version. The archives unpack under the module's
+Actions setup read the same version. Keep the documented SDK source field layout;
+structural changes require updating the parser and its tests. The archives unpack
+under the module's
 `dotnet-sdk` build directory and are not installed under `/app`.
 
 For a .NET SDK/security update, obtain both Linux architecture archives and hashes
