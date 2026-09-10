@@ -619,8 +619,8 @@ list, not the blocker list.
 1. Bump `Directory.Build.props` via
    `tools/release/bump-version.sh <version>`.
 2. Fill in CHANGELOG.md release notes under the new heading.
-3. `python3 tools/update-appstream.py <version>` to refresh the
-   metainfo `<release>` block.
+3. `python3 tools/update-appstream.py <version> --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml`
+   to refresh the metainfo `<release>` block.
 4. `git commit -m "release: v<version>"` on `main`.
 5. Push — `release.yaml` builds x64 and ARM64 Windows MSIs and Linux Flatpaks
    from the same commit. It creates `v<version>` and the GitHub Release only

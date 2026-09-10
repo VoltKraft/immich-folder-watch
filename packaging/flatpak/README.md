@@ -2,7 +2,8 @@
 
 `immich-folder-watch` ships to Linux desktops as `x86_64` and `aarch64` Flatpak
 bundles on **GitHub Releases**. The app builds against the freedesktop runtime
-25.08 + the .NET 10 SDK extension and installs the Avalonia head as a
+26.08 and uses a pinned Microsoft .NET 10 SDK only while building the Avalonia
+head as a
 self-contained `linux-x64` or `linux-arm64` publish.
 
 App ID: `io.github.voltkraft.immich-folder-watch`
@@ -52,22 +53,34 @@ Prerequisites on the dev machine (Fedora shown; Debian/Ubuntu in parens):
 sudo dnf install flatpak flatpak-builder    # apt install flatpak flatpak-builder
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub \
-  org.freedesktop.Platform//25.08 \
-  org.freedesktop.Sdk//25.08 \
-  org.freedesktop.Sdk.Extension.dotnet10//25.08
+  org.freedesktop.Platform//26.08 \
+  org.freedesktop.Sdk//26.08
 ```
+
+Install the exact host .NET SDK reported by this command and put its `dotnet`
+executable on `PATH` before generating the feed:
+
+```bash
+python3 tools/read-flatpak-sdk.py \
+  --manifest packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml \
+  --format version
+```
+
+The generator selects that exact SDK with roll-forward disabled. It restores
+against nuget.org in fresh temporary package/HTTP caches and verifies archive
+bytes against NuGet's checksum records. It does not need a Flatpak SDK extension,
+reuse the user's NuGet cache, or replace an existing feed when restore fails.
 
 Then, from the repo root:
 
 ```bash
 # 1) Pre-generate the offline NuGet feed. The Flatpak build sandbox has
 #    no network access, so flatpak-builder hands dotnet a frozen package
-#    list instead of running `dotnet restore`. Re-run this whenever the
+#    list for its offline restore. Re-run this whenever the
 #    NuGet dependency graph changes — most often an Avalonia or .NET
 #    package version bump in src/ImmichFolderWatch.App.Linux/*.csproj.
-#    A stale feed silently re-installs the OLD packages; when in doubt,
-#    regenerate. The script reads the csproj graph from your working
-#    tree, so make sure it matches the tag the manifest is pinned to.
+#    Missing packages fail the offline restore; regenerate the complete feed.
+#    The script reads the working tree, which must match the source commit.
 ./tools/generate-nuget-sources.sh --runtime linux-x64
 #    -> writes packaging/flatpak/flathub/nuget-sources.json
 
@@ -99,12 +112,14 @@ maps the Flatpak architecture to the corresponding .NET runtime automatically.
 ### Iterating on local (un-pushed) changes
 
 To build uncommitted or unpushed changes, change the Git source block only in
-the generated manifest under `artifacts/flatpak-local/` to a local-dir source:
+the generated manifest under `artifacts/flatpak-local/` to a local-dir source,
+keeping the SDK archive entries and NuGet source list intact:
 
 ```yaml
     sources:
       - type: dir
         path: ../..
+      # Keep the existing architecture-specific SDK archive sources here.
       - nuget-sources.json
 ```
 
@@ -164,6 +179,22 @@ PNG from `artifacts/branding/flatpak/`; the legacy copies under
 tightly cropped, rectangular canvas, so its SVG is not exported as a Flatpak
 launcher icon: Flatpak requires square icon dimensions.
 
+## SDK maintenance
+
+The two architecture-filtered SDK archive entries in the shared manifest are
+the single source of truth for the version, official download URLs and SHA-512
+pins. `tools/read-flatpak-sdk.py` validates those entries; feed generation and
+Actions setup read the same version. The archives unpack under the module's
+`dotnet-sdk` build directory and are not installed under `/app`.
+
+For a .NET SDK/security update, obtain both Linux architecture archives and hashes
+from [Microsoft's release metadata](https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json),
+verify their bytes, update both manifest entries together, install that exact
+host SDK, and regenerate both feeds. Run native CI for both architectures and
+review any new package versions against the notice catalog below. Runtime upgrades
+also require updating the Flatpak CI container images and testing the exported
+packages. Do not combine mismatched SDK-extension and runtime branches.
+
 ## License notices
 
 Flatpak Builder copies the application license. The build also installs
@@ -178,7 +209,7 @@ that require supplements must be reviewed before a dependency update can build.
 ## Release-time AppStream block
 
 `tools/update-appstream.py <version>` reads the matching `## [<version>]`
-section from `CHANGELOG.md` and emits an AppStream `<release>` block into
+section from `CHANGELOG.md` and prints an AppStream `<release>` block. Add `--metainfo` to write it into
 `io.github.voltkraft.immich-folder-watch.metainfo.xml`, filtering out items
 tagged `(Windows)` so the Linux-facing metadata only documents what Linux
 users will see on GitHub Releases and, in the future, Flathub. Run it before

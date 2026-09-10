@@ -12,7 +12,7 @@
 #
 # This script does NOT touch packaging/flatpak/*.metainfo.xml. After
 # filling in the CHANGELOG notes, run
-#   python3 tools/update-appstream.py <new-version>
+#   python3 tools/update-appstream.py <new-version> --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml
 # to refresh the AppStream <release> block so the tagged release carries
 # accurate Linux "What's New" metadata.
 
@@ -84,7 +84,7 @@ echo "Inserted '## [${NEW}] - ${TODAY}' below '## [Unreleased]' in CHANGELOG.md.
 echo
 echo "Next steps:"
 echo "  1. Fill in release notes under the new CHANGELOG heading."
-echo "  2. python3 tools/update-appstream.py ${NEW}   # refresh metainfo <release> block"
+echo "  2. python3 tools/update-appstream.py ${NEW} --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml"
 echo "  3. git diff Directory.Build.props CHANGELOG.md packaging/flatpak/*.metainfo.xml"
 echo "  4. git commit -m \"release: v${NEW}\""
 echo "  5. git push origin main                       # triggers release.yaml (MSI + Flatpak)"
