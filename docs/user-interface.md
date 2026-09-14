@@ -205,8 +205,10 @@ and packaging. Linux may request permission to run in the background. A supporte
 tray, including in Flatpak, provides **Open**, **Restart**, and **Quit**, with a
 localized tooltip showing server connectivity, last synchronization, and queue
 size. **Restart** reloads the saved configuration. Explicit quit waits for
-synchronization to stop. Autostart runs hidden when a tray host is available;
-without one, or when it disappears, the window opens and shows a tray notice.
+synchronization to stop. If the initial tray registration fails during background
+startup, the window opens once with a tray notice. Later tray outages or recovery
+do not reopen or activate the window. After closing it, use the launcher or the
+tray's **Open** action to return to the app.
 
 ## Compatibility
 

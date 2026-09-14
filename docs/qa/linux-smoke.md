@@ -330,8 +330,13 @@ Steps:
 3. Check the localized tooltip and **Open**, **Restart**, **Quit** menu labels.
 4. Use **Restart** and confirm synchronization reloads the saved configuration.
 5. Use **Quit** and confirm the app and tray item disappear.
-6. Relaunch, temporarily disable/re-enable the tray host, and confirm the window
-   remains reachable and the tray registers again when the host returns.
+6. Relaunch, close the window with the title-bar close button, and temporarily
+   disable/re-enable the tray host several times. Confirm the window stays hidden
+   and focus remains in the current application while the tray registers again.
+7. Reopen through the launcher while the tray host is disabled and confirm the
+   tray notice is visible. Close again; restoring the tray must not reopen it.
+8. Start with `--background` without a tray host. Confirm the window opens once;
+   after closing it, tray changes must leave it hidden.
 
 Expected: the item owns `io.github.voltkraft.immich-folder-watch.Tray`; installed
 metadata contains only the narrow `org.kde.StatusNotifierWatcher=talk` grant.

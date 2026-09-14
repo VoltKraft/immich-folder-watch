@@ -189,18 +189,9 @@ public sealed partial class App : Application
             });
             _trayHost.RestartRequested += (_, _) => _ = RestartSyncAsync();
             _trayHost.QuitRequested += (_, _) => _ = ShutdownAsync();
-            _trayHost.TrayAvailable += (_, _) => viewModel.TrayStatusMessage = string.Empty;
-            _trayHost.TrayUnavailable += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                viewModel.TrayStatusMessage = ImmichFolderWatch.App.Shared.Resources.Strings.Tray_Unavailable;
-                // A missing or disappearing tray must never strand an autostarted
-                // process without a visible way to reach the configuration window.
-                if (_mainWindow is { IsVisible: false })
-                {
-                    _mainWindow.Show();
-                    _mainWindow.Activate();
-                }
-            });
+            // AvaloniaTrayHost delivers availability events on the UI thread.
+            _trayHost.TrayAvailable += (_, _) => _mainWindow.UpdateTrayAvailability(true);
+            _trayHost.TrayUnavailable += (_, _) => _mainWindow.UpdateTrayAvailability(false);
             _ = _trayHost.StartAsync(this, _shutdown.Token);
 
             // Start() automatically shows desktop.MainWindow. A background launch

@@ -25,7 +25,8 @@ acceptance.
 - Flatpak retains its restricted permissions, portal folder access and X11/XWayland
   runtime. The tray owns only `io.github.voltkraft.immich-folder-watch.Tray` in the
   implicit app namespace and talks to `org.kde.StatusNotifierWatcher`. Autostart
-  hides only while a tray entry point is available. GNOME needs an AppIndicator
+  stays hidden if initial tray registration succeeds; later tray outages preserve
+  window visibility. GNOME needs an AppIndicator
   extension; the launcher can always reopen the window.
 - Autostart requires portal approval. The local flag records the last confirmed
   response; the portal offers no query for changes made outside the application.

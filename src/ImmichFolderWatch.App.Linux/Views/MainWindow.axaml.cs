@@ -26,6 +26,8 @@ public sealed partial class MainWindow : Window
     internal bool IsExiting { get; set; }
     private readonly ImmichAccessCheckSession _accessChecks = new();
     private bool _isSaveInProgress;
+    private bool _hasBeenOpened;
+    private bool _hasReceivedTrayAvailability;
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
 
@@ -34,6 +36,26 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         Opened += OnOpened;
         Closed += (_, _) => _accessChecks.Dispose();
+    }
+
+    /// <summary>
+    /// Updates the tray notice on the UI thread. Only the first availability
+    /// report may reveal a never-opened window when startup has no tray.
+    /// Later watcher changes must preserve the user's window visibility.
+    /// </summary>
+    internal void UpdateTrayAvailability(bool available)
+    {
+        if (ViewModel is { } viewModel)
+        {
+            viewModel.TrayStatusMessage = available ? string.Empty : Strings.Tray_Unavailable;
+        }
+
+        var showStartupFallback = !_hasReceivedTrayAvailability && !_hasBeenOpened && !available;
+        _hasReceivedTrayAvailability = true;
+        if (showStartupFallback && !IsExiting)
+        {
+            Show();
+        }
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
@@ -133,6 +155,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnOpened(object? sender, EventArgs e)
     {
+        _hasBeenOpened = true;
         await EnsureBootstrappedAsync();
     }
 

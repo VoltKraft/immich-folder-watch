@@ -44,7 +44,7 @@ tracked in [Linux feature parity](qa/linux-parity.md).
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
-2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. The tray registers with the desktop watcher; if registration fails or the watcher disappears, the application shows the window so it remains reachable. Flatpak uses the same behavior.
+2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. On Linux, a failed initial tray registration shows a never-opened window once. Subsequent watcher changes only update the tray notice, preserving window visibility and focus. Closing the window before registration completes also suppresses the startup fallback. Flatpak uses the same behavior; the launcher can reopen the window even without a tray.
 3. `AppHost` constructs an `IHost` that wires:
    - `AppConfig` (loaded from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`)
    - the shared sync-state store (`sync-state.db` beside `config.yaml`)

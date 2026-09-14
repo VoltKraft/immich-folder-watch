@@ -9,7 +9,8 @@ dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.cspr
 The fixture supplies synthetic configuration and never starts the production
 application, Immich connections, folder workers, portals, or autostart services.
 Tests exercise actual controls and bindings, source draft retention, sync-mode
-tab visibility, API-key masking, status colors, close/reopen behavior, session
+tab visibility, API-key masking, status colors, close/reopen behavior, startup-only
+tray fallback and hidden-window preservation across tray outages/recovery, session
 logging, and layout at the supported minimum window size. These checks do not
 replace desktop acceptance tests for Flatpak portals, tray integration, or logout.
 
