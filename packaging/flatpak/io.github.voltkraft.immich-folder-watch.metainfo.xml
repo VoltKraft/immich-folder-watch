@@ -99,23 +99,11 @@
   </branding>
 
   <releases>
-    <release version="2.11.1" date="2026-09-10">
+    <release version="2.11.2" date="2026-09-14">
       <description>
-        <p>Added:</p>
-        <ul>
-          <li>Prepared release-triggered Flathub updates with immutable source validation, a combined offline NuGet feed for x86_64 and aarch64, native architecture build checks, and opt-in update pull requests and approved automerge.</li>
-          <li>Added native x86_64 and aarch64 Flatpak candidate builds and repository lint to CI before release publication.</li>
-        </ul>
         <p>Fixed:</p>
         <ul>
-          <li>Routed Linux notifications through the desktop Notification portal and removed direct notification-daemon access from the Flatpak sandbox.</li>
-          <li>Clarified the Immich server/API-key setup requirements and community-client identity in the Linux app metadata.</li>
-          <li>Updated Flatpak to Freedesktop 26.08 with a pinned, build-only Microsoft .NET SDK for both architectures.</li>
-          <li>Included NuGet license texts, native/.NET third-party notices, and source-backed supplemental attribution in Flatpak packages.</li>
-        </ul>
-        <p>Documentation:</p>
-        <ul>
-          <li>Replaced the deferred Flathub plan with current submission requirements, activation instructions, validation boundaries, and GitHub-bundle migration guidance.</li>
+          <li>Kept the Linux window hidden after closing it when the desktop tray host disappears or reconnects. Missing-tray window fallback now applies only to the initial background startup.</li>
         </ul>
       </description>
     </release>

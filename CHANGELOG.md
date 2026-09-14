@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.2] - 2026-09-14
+
 ### Fixed
 - Kept the Linux window hidden after closing it when the desktop tray host disappears or reconnects. Missing-tray window fallback now applies only to the initial background startup.
 
