@@ -157,6 +157,8 @@ jobs:
             dotnet_runtime: linux-arm64
             asset_arch: linux-arm64
     container:
+      # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
+      # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
 
@@ -167,17 +169,16 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
-      - name: Setup .NET
+      - name: Read pinned Flatpak SDK
+        id: flatpak_sdk
+        run: |
+          sdk_version=$(python3 tools/read-flatpak-sdk.py --manifest packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml --format version)
+          echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pinned .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
-
-      - name: Install .NET Flatpak SDK extension
-        run: |
-          flatpak remote-add --system --if-not-exists \
-            flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --system --noninteractive -y flathub \
-            org.freedesktop.Sdk.Extension.dotnet10//25.08
+          dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
       - name: Generate offline NuGet sources
         run: tools/generate-nuget-sources.sh --runtime ${{ matrix.dotnet_runtime }}
@@ -300,6 +301,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  trigger-winget:
+    name: Trigger WinGet update
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-latest
+    steps:
       - name: Trigger WinGet workflow
         uses: actions/github-script@v8
         env:
@@ -314,5 +320,30 @@ jobs:
               ref: "main",
               inputs: {
                 release_tag: process.env.RELEASE_TAG,
+              },
+            });
+
+  trigger-flathub:
+    name: Trigger Flathub preparation and update
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-latest
+    steps:
+      # Releases created with GITHUB_TOKEN do not trigger release workflows.
+      # Dispatch explicitly, independently of the WinGet update result.
+      - name: Trigger Flathub workflow
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'flathub.yaml',
+              ref: 'main',
+              inputs: {
+                release_tag: process.env.RELEASE_TAG,
+                submit: 'true',
               },
             });

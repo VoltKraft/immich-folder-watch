@@ -231,6 +231,84 @@ public sealed class MainWindowBindingTests
     }
 
     [AvaloniaFact]
+    public void TrayAvailabilityChanges_KeepClosedWindowHiddenAndUpdateNotice()
+    {
+        WithWindow((window, vm) =>
+        {
+            window.UpdateTrayAvailability(true);
+            window.Close();
+            foreach (var available in new[] { false, false, true, false, true })
+            {
+                window.UpdateTrayAvailability(available);
+                Flush(window);
+                Assert.False(window.IsVisible);
+                Assert.Equal(available ? string.Empty : Strings.Tray_Unavailable, vm.TrayStatusMessage);
+            }
+
+            window.Show();
+            Flush(window);
+            Assert.True(window.IsVisible);
+        });
+    }
+
+    [AvaloniaFact]
+    public void TrayUnavailable_AfterClosingBeforeInitialRegistration_KeepsWindowHidden()
+    {
+        WithWindow((window, vm) =>
+        {
+            window.Close();
+            window.UpdateTrayAvailability(false);
+            Flush(window);
+            Assert.False(window.IsVisible);
+            Assert.Equal(Strings.Tray_Unavailable, vm.TrayStatusMessage);
+        });
+    }
+
+    [AvaloniaFact]
+    public void TrayUnavailable_OnBackgroundStartup_ShowsFallbackOnlyOnce()
+    {
+        WithWindow((window, vm) =>
+        {
+            Assert.False(window.IsVisible);
+            window.UpdateTrayAvailability(false);
+            Flush(window);
+            Assert.True(window.IsVisible);
+            Assert.Equal(Strings.Tray_Unavailable, vm.TrayStatusMessage);
+
+            window.Close();
+            window.UpdateTrayAvailability(false);
+            window.UpdateTrayAvailability(true);
+            window.UpdateTrayAvailability(false);
+            Flush(window);
+            Assert.False(window.IsVisible);
+        }, showWindow: false);
+    }
+
+    [AvaloniaFact]
+    public void TrayUnavailable_AfterSuccessfulBackgroundStartup_KeepsWindowHidden()
+    {
+        WithWindow((window, _) =>
+        {
+            window.UpdateTrayAvailability(true);
+            window.UpdateTrayAvailability(false);
+            Flush(window);
+            Assert.False(window.IsVisible);
+        }, showWindow: false);
+    }
+
+    [AvaloniaFact]
+    public void TrayUnavailable_DuringShutdown_DoesNotShowStartupFallback()
+    {
+        WithWindow((window, _) =>
+        {
+            window.IsExiting = true;
+            window.UpdateTrayAvailability(false);
+            Flush(window);
+            Assert.False(window.IsVisible);
+        }, showWindow: false);
+    }
+
+    [AvaloniaFact]
     public void ExplicitShutdown_ClosesWindowInsteadOfCancelingExit()
     {
         WithWindow((window, _) =>
@@ -305,7 +383,7 @@ public sealed class MainWindowBindingTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private static void WithWindow(Action<MainWindow, MainWindowViewModel> verify)
+    private static void WithWindow(Action<MainWindow, MainWindowViewModel> verify, bool showWindow = true)
     {
         // Never initialize the production App: its services start network, portal,
         // startup and filesystem integrations. The real view runs with synthetic data.
@@ -326,7 +404,7 @@ public sealed class MainWindowBindingTests
         var window = new MainWindow { DataContext = vm };
         try
         {
-            window.Show();
+            if (showWindow) window.Show();
             Flush(window);
             verify(window, vm);
         }

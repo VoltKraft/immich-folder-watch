@@ -44,7 +44,7 @@ tracked in [Linux feature parity](qa/linux-parity.md).
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
-2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. The tray registers with the desktop watcher; if registration fails or the watcher disappears, the application shows the window so it remains reachable. Flatpak uses the same behavior.
+2. The app builds the desktop `App` and starts with classic-desktop lifetime. When `--autostart` is passed, the main window starts hidden. On Linux, a failed initial tray registration shows a never-opened window once. Subsequent watcher changes only update the tray notice, preserving window visibility and focus. Closing the window before registration completes also suppresses the startup fallback. Flatpak uses the same behavior; the launcher can reopen the window even without a tray.
 3. `AppHost` constructs an `IHost` that wires:
    - `AppConfig` (loaded from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`)
    - the shared sync-state store (`sync-state.db` beside `config.yaml`)
@@ -65,6 +65,12 @@ already owned by the Flatpak app; only watcher communication needs an explicit
 `org.kde.StatusNotifierWatcher` talk rule. Availability follows acknowledged
 registration, watcher changes trigger re-registration, and disposing the
 connection withdraws the item and menu together.
+
+Linux notifications use the version-1 Notification portal contract over the
+shared session connection. Each event gets a unique ID, so later events do not
+replace earlier ones. Submission waits at most three seconds; failures are
+logged, caller cancellation propagates, and desktop presentation is not
+observable through this API. No direct notification-daemon permission is needed.
 
 ## Design Decisions
 
@@ -94,6 +100,26 @@ connection withdraws the item and menu together.
   trash operations use the Immich API; no direct access to Immich storage.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.
+
+## Release distribution
+
+GitHub publication remains atomic across both Windows MSIs and both Linux
+Flatpaks from one commit. WinGet and Flathub updates run independently after that
+publication. Flathub receives a source manifest and one combined offline NuGet
+feed, checked by native build jobs for both x86_64 and aarch64, because updating
+the Git tag alone would leave its dependency inputs stale. The accepted Flathub
+repository builds and publishes its own package through an update PR; upstream
+never uploads a GitHub Flatpak bundle to Flathub. Submission and automerge are
+separately enabled after external approval. See
+[Flathub preparation](../packaging/flatpak/flathub/README.md) for requirements,
+activation and failure handling.
+
+The Flatpak build uses current Freedesktop 26.08 and exact architecture-specific
+Microsoft .NET SDK archive sources. The SDK stays inside the module build tree;
+only the self-contained application is exported. NuGet preparation must use
+the same SDK version as offline publication. This removes the dependency on a
+matching .NET Flatpak SDK extension while making SDK security updates an
+explicit packaging maintenance responsibility.
 
 ## Immich API Assumptions
 

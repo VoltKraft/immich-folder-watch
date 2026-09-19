@@ -9,7 +9,8 @@ dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.cspr
 The fixture supplies synthetic configuration and never starts the production
 application, Immich connections, folder workers, portals, or autostart services.
 Tests exercise actual controls and bindings, source draft retention, sync-mode
-tab visibility, API-key masking, status colors, close/reopen behavior, session
+tab visibility, API-key masking, status colors, close/reopen behavior, startup-only
+tray fallback and hidden-window preservation across tray outages/recovery, session
 logging, and layout at the supported minimum window size. These checks do not
 replace desktop acceptance tests for Flatpak portals, tray integration, or logout.
 
@@ -46,9 +47,13 @@ Linux protocol tests require `dbus-daemon` and `xdg-dbus-proxy`. They run on
 isolated buses and include the same app-ID namespace ownership and watcher
 talk rule used by Flatpak. Document-path tests cover opaque IDs, nested paths,
 xattr lookup, denied/older portals, timeout and cancellation.
+Notification tests use a synthetic portal on a bus without service activation,
+verifying version-1 payloads, independent IDs, priorities, failures, timeout and
+cancellation. A filtered proxy proves delivery needs portal access only, without
+permission to call the notification daemon directly.
 
-When running the full solution on Windows, the six native tray protocol tests
-and three document-portal protocol tests are reported as skipped by `LinuxFact`.
+When running the full solution on Windows, native tray, document and notification
+protocol tests are reported as skipped by `LinuxFact`.
 Platform-neutral document-path, lifecycle, session, access-check and headless GUI
 checks remain enabled. On Linux, missing protocol tools fail the corresponding
 tests rather than silently reducing coverage; the Linux CI job installs them.

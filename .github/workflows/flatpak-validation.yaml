@@ -1,0 +1,98 @@
+name: Native Flatpak validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare commit-pinned Flatpak candidate
+    runs-on: ubuntu-24.04
+    container:
+      # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
+      # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          path: source
+          persist-credentials: false
+
+      - name: Read pinned candidate SDK
+        id: flatpak_sdk
+        run: |
+          sdk_version=$(python3 source/tools/read-flatpak-sdk.py --manifest source/packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml --format version)
+          echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pinned .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
+
+      - name: Generate both offline NuGet feeds
+        run: |
+          source/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-x64 --output "$PWD/source/artifacts/flatpak-validation/nuget-x64.json"
+          source/tools/generate-nuget-sources.sh --source-root "$PWD/source" \
+            --runtime linux-arm64 --output "$PWD/source/artifacts/flatpak-validation/nuget-arm64.json"
+
+      - name: Prepare and validate candidate packaging
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          python3 source/tools/prepare-flatpak-validation.py \
+            --source-root source --commit "$SOURCE_COMMIT" \
+            --nuget-x64 source/artifacts/flatpak-validation/nuget-x64.json \
+            --nuget-arm64 source/artifacts/flatpak-validation/nuget-arm64.json \
+            --output-dir flatpak-validation
+          flatpak-builder --show-manifest flatpak-validation/io.github.voltkraft.immich-folder-watch.yml > /dev/null
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: flatpak-candidate-${{ github.sha }}
+          path: flatpak-validation/
+          if-no-files-found: error
+
+  validate:
+    name: Build and lint Flatpak (${{ matrix.arch }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    container:
+      # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
+      # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: flatpak-candidate-${{ github.sha }}
+          path: flatpak-validation
+
+      - name: Build immutable candidate from the combined offline feed
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak-validation/io.github.voltkraft.immich-folder-watch.yml
+          bundle: flatpak-candidate-${{ github.sha }}-${{ matrix.arch }}.flatpak
+          artifact-name: flatpak-validation-${{ github.sha }}-${{ matrix.arch }}
+          arch: ${{ matrix.arch }}
+          branch: test
+          repo-dir: repo
+          mirror-screenshots-url: https://dl.flathub.org/media
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Validate Flathub repository
+        run: flatpak-builder-lint repo repo

@@ -32,9 +32,27 @@ new application version manually and install it with:
 flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak
 ```
 
-The Flathub publication is currently postponed. Do not use
-`flatpak install flathub io.github.voltkraft.immich-folder-watch` unless a future
-release explicitly announces that the listing is available.
+## Flathub (pending initial acceptance)
+
+Release-update automation is prepared, but the app is not advertised as available
+on Flathub yet. See the [submission status](../packaging/flatpak/flathub/README.md).
+Use the following commands only after a release announces the published listing:
+
+```bash
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub io.github.voltkraft.immich-folder-watch
+flatpak update --user io.github.voltkraft.immich-folder-watch
+```
+
+For migration from a per-user GitHub bundle, close the app and back up
+`~/.var/app/io.github.voltkraft.immich-folder-watch/` first. Remove the old bundle
+with `flatpak uninstall --user io.github.voltkraft.immich-folder-watch`, without
+`--delete-data`, then install from Flathub using the command above. This keeps
+the same app ID and its configuration/sync database. Confirm the installation's
+origin and branch with `flatpak list --app --columns=application,origin,branch`
+and check folder access and synchronization before resuming unattended use.
+Subsequent versions arrive through Flatpak or the desktop software center's
+update mechanism.
 
 ## First setup
 

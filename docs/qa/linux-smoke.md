@@ -104,7 +104,6 @@ sockets=x11;
 devices=dri;
 
 [Session Bus Policy]
-org.freedesktop.Notifications=talk
 org.kde.StatusNotifierWatcher=talk
 ```
 
@@ -308,14 +307,14 @@ Steps:
 
 Expected:
 - Step 1: silent. Status row + log show the upload, but the
-  notification daemon doesn't get a Notify call for the success
-  path. Verified by `dbus-monitor --session "interface='org.freedesktop.Notifications'"`
+  app doesn't send an AddNotification call for the success
+  path. Verified by `dbus-monitor --session "interface='org.freedesktop.portal.Notification'"`
   (no traffic during step 1).
 - Step 3: failure-toast surfaces (NOT IMPLEMENTED YET — tracked as
   a follow-up; for now mark as `[NOTE: failure-toast deferred]`).
 
-Notes: INotifier / DBusNotifier infrastructure is wired and the
-Flatpak manifest grants `--talk-name=org.freedesktop.Notifications`,
+Notes: INotifier / DBusNotifier infrastructure is wired through the Notification
+portal, without direct notification-daemon permission,
 but the FolderWatchWorker's upload-failure path doesn't call
 ShowAsync yet. Hooking it up to FlushUploadsAsync's else-branch
 ("Upload failed for {FilePath}") plus a dedup window (one toast
@@ -331,8 +330,13 @@ Steps:
 3. Check the localized tooltip and **Open**, **Restart**, **Quit** menu labels.
 4. Use **Restart** and confirm synchronization reloads the saved configuration.
 5. Use **Quit** and confirm the app and tray item disappear.
-6. Relaunch, temporarily disable/re-enable the tray host, and confirm the window
-   remains reachable and the tray registers again when the host returns.
+6. Relaunch, close the window with the title-bar close button, and temporarily
+   disable/re-enable the tray host several times. Confirm the window stays hidden
+   and focus remains in the current application while the tray registers again.
+7. Reopen through the launcher while the tray host is disabled and confirm the
+   tray notice is visible. Close again; restoring the tray must not reopen it.
+8. Start with `--background` without a tray host. Confirm the window opens once;
+   after closing it, tray changes must leave it hidden.
 
 Expected: the item owns `io.github.voltkraft.immich-folder-watch.Tray`; installed
 metadata contains only the narrow `org.kde.StatusNotifierWatcher=talk` grant.
@@ -620,8 +624,8 @@ list, not the blocker list.
 1. Bump `Directory.Build.props` via
    `tools/release/bump-version.sh <version>`.
 2. Fill in CHANGELOG.md release notes under the new heading.
-3. `python3 tools/update-appstream.py <version>` to refresh the
-   metainfo `<release>` block.
+3. `python3 tools/update-appstream.py <version> --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml`
+   to refresh the metainfo `<release>` block.
 4. `git commit -m "release: v<version>"` on `main`.
 5. Push — `release.yaml` builds x64 and ARM64 Windows MSIs and Linux Flatpaks
    from the same commit. It creates `v<version>` and the GitHub Release only

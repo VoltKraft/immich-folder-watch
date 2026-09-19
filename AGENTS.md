@@ -80,7 +80,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/lang/de/) using stable `MA
 
 Never reuse or alter a released version. `Directory.Build.props` is the source of truth for `<Version>`; corresponding assembly and file versions use `MAJOR.MINOR.PATCH.0`. Release tags use `vMAJOR.MINOR.PATCH`, where `v` is only a tag prefix. This repository's current release workflow publishes stable versions; introduce prerelease identifiers or build metadata only after adapting and validating all release and packaging automation.
 
-Prepare a version with `tools/release/bump-version.sh MAJOR.MINOR.PATCH`, complete the generated `CHANGELOG.md` section, then run `python3 tools/update-appstream.py MAJOR.MINOR.PATCH`. Review every changed version reference and follow the platform-specific release instructions before committing with `release: vMAJOR.MINOR.PATCH`.
+Prepare a version with `tools/release/bump-version.sh MAJOR.MINOR.PATCH`, complete the generated `CHANGELOG.md` section, then run `python3 tools/update-appstream.py MAJOR.MINOR.PATCH --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml`. Review every changed version reference and follow the platform-specific release instructions before committing with `release: vMAJOR.MINOR.PATCH`.
 
 ## Commits and Pull Requests
 

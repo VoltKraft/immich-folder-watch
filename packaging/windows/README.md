@@ -26,6 +26,13 @@ Build either package from Windows with:
 The resulting names are `immich-folder-watch-<version>-win-x64.msi` and
 `immich-folder-watch-<version>-win-arm64.msi`.
 
+The WiX project disables hard links when copying build outputs, including
+`.wixpdb` files, from `obj` to the package output directory. This keeps the
+outputs compatible with cloud sync providers such as Nextcloud on Windows.
+The setting applies both to `build-msi.ps1` and direct builds of the WiX project.
+Existing hard-linked outputs must be replaced with independent copies once;
+an incremental build may otherwise keep them because their contents are unchanged.
+
 ## Default Layout
 
 - `%ProgramFiles%\Immich Folder Watch\bin\`: app binaries and runtime files
