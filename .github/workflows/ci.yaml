@@ -22,8 +22,6 @@ jobs:
   validate-flatpak:
     name: Validate native Flatpak packages
     uses: ./.github/workflows/flatpak-validation.yaml
-    with:
-      source_ref: ${{ github.sha }}
 
   build-windows:
     name: Build and Test (windows-latest)

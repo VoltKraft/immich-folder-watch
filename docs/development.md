@@ -57,7 +57,10 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 
 - `ci.yaml`: cross-platform build + test coverage for the codebase, plus native
   x86_64/aarch64 candidate builds through `flatpak-validation.yaml`. Candidate
-  packages use the `test` Flatpak branch and do not create a release.
+  packages use the `test` Flatpak branch and do not create a release. The reusable
+  workflow takes its source commit directly from the caller's `github.sha`
+  event context; it does not accept a separate source-ref input. Checkout,
+  manifest preparation and artifact names all use that same commit.
 - `release.yaml`: build x64 and ARM64 Windows MSIs and Linux Flatpaks from the
   same immutable commit, then publish all four only after successful CI on
   `main` and only when the version tag does not already exist

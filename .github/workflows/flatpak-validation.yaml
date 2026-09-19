@@ -2,11 +2,6 @@ name: Native Flatpak validation
 
 on:
   workflow_call:
-    inputs:
-      source_ref:
-        description: Full public Git commit SHA to validate without creating a release
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -23,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           path: source
           persist-credentials: false
@@ -48,7 +43,7 @@ jobs:
 
       - name: Prepare and validate candidate packaging
         env:
-          SOURCE_COMMIT: ${{ inputs.source_ref }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: |
           python3 source/tools/prepare-flatpak-validation.py \
             --source-root source --commit "$SOURCE_COMMIT" \
@@ -59,7 +54,7 @@ jobs:
 
       - uses: actions/upload-artifact@v6
         with:
-          name: flatpak-candidate-${{ inputs.source_ref }}
+          name: flatpak-candidate-${{ github.sha }}
           path: flatpak-validation/
           if-no-files-found: error
 
@@ -83,15 +78,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: flatpak-candidate-${{ inputs.source_ref }}
+          name: flatpak-candidate-${{ github.sha }}
           path: flatpak-validation
 
       - name: Build immutable candidate from the combined offline feed
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           manifest-path: flatpak-validation/io.github.voltkraft.immich-folder-watch.yml
-          bundle: flatpak-candidate-${{ inputs.source_ref }}-${{ matrix.arch }}.flatpak
-          artifact-name: flatpak-validation-${{ inputs.source_ref }}-${{ matrix.arch }}
+          bundle: flatpak-candidate-${{ github.sha }}-${{ matrix.arch }}.flatpak
+          artifact-name: flatpak-validation-${{ github.sha }}-${{ matrix.arch }}
           arch: ${{ matrix.arch }}
           branch: test
           repo-dir: repo
