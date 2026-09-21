@@ -35,15 +35,23 @@ public sealed partial class FolderWatchWorkerPersistenceTests
                 });
             },
         };
-        using var worker = CreateWorker(config, Path.Combine(directory.Path, "state.db"), client);
+        var databasePath = Path.Combine(directory.Path, "state.db");
+        var logger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync, sourceCount: 2);
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: logger);
         await worker.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => client.DownloadedAssets.Count == 5, TimeSpan.FromSeconds(8));
+        await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
         await worker.StopAsync(CancellationToken.None);
         Assert.False(prematureDownload);
         var dated = new[] { "old-album", "unassigned", "other-source", "today" };
         Assert.Equal((order == TransferOrders.NewestFirst ? dated.Reverse() : dated).Append("unknown"), client.DownloadedAssets.ToArray());
         Assert.Equal("today", await File.ReadAllTextAsync(Path.Combine(root, "Latest", "today.jpg")));
         Assert.Equal(0, client.UploadCount);
+        var store = new SqliteSyncStateStore(databasePath);
+        var scope = SyncAccountScope.Create(config.Immich.ServerApiUrl, config.Immich.ApiKey);
+        var entries = (await store.GetSourceEntriesAsync(scope, root))
+            .Concat(await store.GetSourceEntriesAsync(scope, other)).ToArray();
+        Assert.Equal(5, entries.Length);
+        Assert.All(entries, entry => Assert.Equal(SyncEntryStatus.Synchronized, entry.Status));
     }
 
     [Theory]

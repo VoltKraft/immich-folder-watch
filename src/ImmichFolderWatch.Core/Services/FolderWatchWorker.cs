@@ -1450,6 +1450,13 @@ public sealed partial class FolderWatchWorker : BackgroundService
     {
         try
         {
+            // Native watchers also report temporary and excluded files. Match the
+            // polling sweep's filter before creating tombstones or opening SQLite.
+            if (!context.Filter.IsMatch(oldFullPath))
+            {
+                return;
+            }
+
             var normalized = NormalizePath(oldFullPath);
             _debouncedFiles.TryRemove(normalized, out _);
 

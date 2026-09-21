@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Check destination directory write access before downloading originals, so an unwritable sync folder reports one source error instead of retrying every pending asset. Retry the check on the next pull and keep independent sources active.
 - Show resolved host folder paths in overview sync errors while retaining Linux portal access paths for file operations and diagnostic logs.
+- Ignore native deletion events for temporary and excluded files before accessing sync state, and wait for durable completion in download-order tests to prevent Windows database cleanup races.
 
 ## [2.11.2] - 2026-09-14
 

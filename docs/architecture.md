@@ -105,6 +105,11 @@ observable through this API. No direct notification-daemon permission is needed.
   source from remote-deletion propagation. The next pull retries the check;
   independent sources remain active. This detects directory/portal write denial,
   not disk capacity or permissions on an existing temporary download file.
+- **Filtered deletion events.** Native watcher deletions use the same source file
+  filter as polling before persisting tombstones or calling Immich. Write probes,
+  temporary downloads, and excluded files cannot start background database work
+  when removed. Matching media still receive protective tombstones even when an
+  Immich asset ID has not yet been mapped.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.
 

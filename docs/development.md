@@ -45,6 +45,14 @@ synthetic screenshots, test-only dependency licenses, and coverage boundaries.
 Portal protocol tests use an isolated `dbus-daemon` and `xdg-dbus-proxy` on Linux. Desktop-specific
 acceptance remains in [Linux smoke tests](qa/linux-smoke.md).
 
+Worker integration tests must wait for durable completion before stopping the
+worker or removing its temporary database. A fake client's transfer counter can
+advance before timestamps and sync state have been persisted. For initial sync,
+use `InitialReconciliationLogger` with the configured source count to wait for
+both reconciliation passes, then stop the worker and inspect the persisted state.
+Windows rejects deleting an open SQLite database; Linux unlink behavior can hide
+background operations that a test has not waited for.
+
 ## Run
 
 ```bash

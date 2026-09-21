@@ -6,6 +6,44 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 
 public sealed partial class FolderWatchWorkerPersistenceTests
 {
+    [Theory]
+    [InlineData("ifw-write-check-0123456789abcdef0123456789abcdef")]
+    [InlineData("photo.jpg.downloading")]
+    [InlineData("ignored.jpg")]
+    public async Task Sync_IgnoresExcludedFileDeletionsButPropagatesMediaDeletion(string ignoredName)
+    {
+        using var directory = new TemporaryDirectory();
+        var root = Directory.CreateDirectory(Path.Combine(directory.Path, "watch")).FullName;
+        var databasePath = Path.Combine(directory.Path, "state.db");
+        var config = CreateConfig(root, WatchSourceSyncModes.Sync);
+        config.Watch.Sources[0].ExcludeFileNames = ["ignored.jpg"];
+        var client = new RecordingAssetClient { RemoteAssets = [new("remote", "photo.jpg")] };
+        var logger = new InitialReconciliationLogger(WatchSourceSyncModes.Sync);
+        using var worker = CreateWorker(config, databasePath, client, workerLogger: logger);
+        try
+        {
+            await worker.StartAsync(CancellationToken.None);
+            await logger.WaitUntilReadyAsync(TimeSpan.FromSeconds(8));
+            var ignoredPath = Path.Combine(root, ignoredName);
+            await File.WriteAllTextAsync(ignoredPath, "temporary or excluded content");
+            File.Delete(ignoredPath);
+            File.Delete(Path.Combine(root, "photo.jpg"));
+            // A real media deletion follows the ignored event on the same watcher
+            // and confirms that the deletion pipeline has processed the event stream.
+            await WaitUntilAsync(() => client.TrashedAssets.Contains("remote"), TimeSpan.FromSeconds(8));
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        var entry = Assert.Single(await GetEntriesAsync(config, databasePath));
+        Assert.Equal("photo.jpg", entry.RelativePath);
+        Assert.Equal(SyncEntryStatus.Tombstone, entry.Status);
+        Assert.Equal(new[] { "remote" }, client.TrashedAssets.ToArray());
+        Assert.Equal(0, client.UploadCount);
+    }
+
     [UnixFilePermissionsFact]
     public async Task Sync_WriteDeniedDirectorySkipsDownloadsAndRecoversWithoutRestart()
     {

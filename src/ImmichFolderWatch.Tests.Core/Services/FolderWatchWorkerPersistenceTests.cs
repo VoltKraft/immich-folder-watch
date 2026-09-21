@@ -942,6 +942,8 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
         public ConcurrentQueue<string> DownloadedAssets { get; } = new();
 
+        public ConcurrentQueue<string> TrashedAssets { get; } = new();
+
         public IReadOnlyList<AlbumAssetSummary>? RemoteAssets { get; init; }
         public IReadOnlyList<AlbumInfo> RemoteAlbums { get; init; } = [];
         public IReadOnlyList<AlbumAssetSummary> UnassignedAssets { get; init; } = [];
@@ -1015,8 +1017,11 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         public Task<AlbumMembershipUpdateResult> RemoveAssetsFromAlbumAsync(string albumName, IReadOnlyList<string> assetIds, CancellationToken cancellationToken) =>
             Task.FromResult(AlbumMembershipUpdateResult.Success());
 
-        public Task<TrashAssetsResult> TrashAssetsAsync(IReadOnlyList<string> assetIds, CancellationToken cancellationToken) =>
-            Task.FromResult(TrashAssetsResult.Success());
+        public Task<TrashAssetsResult> TrashAssetsAsync(IReadOnlyList<string> assetIds, CancellationToken cancellationToken)
+        {
+            foreach (var assetId in assetIds) TrashedAssets.Enqueue(assetId);
+            return Task.FromResult(TrashAssetsResult.Success());
+        }
 
         public Task<EnsureAlbumResult> EnsureAlbumAsync(string albumName, CancellationToken cancellationToken) =>
             Task.FromResult(EnsureAlbumResult.Success("album"));

@@ -105,6 +105,7 @@
         <ul>
           <li>Check destination directory write access before downloading originals, so an unwritable sync folder reports one source error instead of retrying every pending asset. Retry the check on the next pull and keep independent sources active.</li>
           <li>Show resolved host folder paths in overview sync errors while retaining Linux portal access paths for file operations and diagnostic logs.</li>
+          <li>Ignore native deletion events for temporary and excluded files before accessing sync state, and wait for durable completion in download-order tests to prevent Windows database cleanup races.</li>
         </ul>
       </description>
     </release>
