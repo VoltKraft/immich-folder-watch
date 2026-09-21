@@ -99,11 +99,12 @@
   </branding>
 
   <releases>
-    <release version="2.11.2" date="2026-09-14">
+    <release version="2.11.3" date="2026-09-21">
       <description>
         <p>Fixed:</p>
         <ul>
-          <li>Kept the Linux window hidden after closing it when the desktop tray host disappears or reconnects. Missing-tray window fallback now applies only to the initial background startup.</li>
+          <li>Check destination directory write access before downloading originals, so an unwritable sync folder reports one source error instead of retrying every pending asset. Retry the check on the next pull and keep independent sources active.</li>
+          <li>Show resolved host folder paths in overview sync errors while retaining Linux portal access paths for file operations and diagnostic logs.</li>
         </ul>
       </description>
     </release>
