@@ -37,6 +37,36 @@ explains the controls for each folder's sync mode, filters, and global settings.
 - Bidirectional sync propagates deletions too. Review the
   [sync rules](configuration.md#file-selection) before enabling it.
 
+## Downloads repeatedly fail with "Access to the path ... .downloading is denied"
+
+This is a local write failure when creating the temporary download file. It is
+separate from an Immich connection or API-key error. Failed downloads remain
+pending, which is why the same files can appear again in subsequent sync cycles.
+
+- Confirm that the signed-in desktop user can create and remove a file in the
+  actual destination folder, including the affected album subfolder. Check its
+  ownership, permissions, ACLs, and whether the filesystem is mounted read-only.
+- With Flatpak, open **Folders**, select the affected folder again with **Choose Folder…**,
+  and use **Save and Apply** to renew the portal selection. Host filesystem
+  permissions and the portal's write grant must both allow access; selecting a
+  folder again cannot repair host permissions.
+- If only one filename fails, inspect any existing `<filename>.downloading` file
+  and its permissions. Stop the app before moving aside a leftover temporary
+  file. Keep the original media and `sync-state.db` intact.
+- A `/run/user/<uid>/doc/<id>/...` path is the normal Documents portal access path.
+  Do not manually replace it in the configuration with the host path: that path
+  may be inaccessible inside the sandbox. Overview errors show the host path
+  when the portal can resolve it; diagnostic logs retain the actual access path.
+
+Before requesting originals, the worker creates and removes a unique,
+extensionless probe file in each directory with pending downloads. If that fails,
+the affected source scan stops with a folder error; it does not attempt every
+download or propagate remote deletions for that incomplete source scan. Other
+sources continue. The next pull retries the check, allowing automatic recovery
+after permissions are corrected. File-specific failures and permission changes
+after the check can still produce individual download errors. The probe does
+not certify free disk space or permissions on existing temporary files.
+
 ## Upload returns HTTP 413
 
 - File exceeds server/proxy body size limits.

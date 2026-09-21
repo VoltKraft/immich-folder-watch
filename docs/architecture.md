@@ -98,6 +98,13 @@ observable through this API. No direct notification-daemon permission is needed.
 - **Persistent operation progress in the UI.** Sync status retains processed/total counts after an upload cycle or scan of all sync sources finishes, but hides them while inactive. Upload counts span successive batches while the ready queue remains nonempty and are kept separately from intervening downloads; retries after the queue drains start a new cycle. Active transfers and sync errors display the counts. Download totals grow as pending files are discovered per album; empty scans retain previous counts. Only completed attempts count as processed, including failures and skips. Server connectivity errors and sync errors have separate status fields so a successful ping does not hide a failed transfer. Pull errors survive subsequent albums in the same scan and clear after a later complete successful scan.
 - **API-only Immich integration:** uploads, downloads, album changes, and asset
   trash operations use the Immich API; no direct access to Immich storage.
+- **Download directory access.** Before queuing missing originals from a target
+  directory, the worker creates an extensionless, uniquely named file with
+  delete-on-close semantics to verify local write access. Failure aborts that
+  source scan before requesting that directory's originals and excludes the incomplete
+  source from remote-deletion propagation. The next pull retries the check;
+  independent sources remain active. This detects directory/portal write denial,
+  not disk capacity or permissions on an existing temporary download file.
 - **Path identity follows the platform:** Windows path keys are case-insensitive; Linux path keys preserve case. Identical relative paths in different watched sources remain independent.
 - **Single instance per user:** mutex name includes the user SID so different Windows users can run concurrent instances.
 

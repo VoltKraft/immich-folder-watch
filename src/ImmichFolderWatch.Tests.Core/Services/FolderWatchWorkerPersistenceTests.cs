@@ -869,7 +869,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _fileEvent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _reconciliationCount;
+        private int _syncPullFailureCount;
         private readonly int _expectedReconciliations;
+
+        public int SyncPullFailureCount => Volatile.Read(ref _syncPullFailureCount);
 
         public InitialReconciliationLogger(string syncMode = WatchSourceSyncModes.UploadNew, int sourceCount = 1)
         {
@@ -894,6 +897,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests
             Func<TState, Exception?, string> formatter)
         {
             var message = formatter(state, exception);
+            if (logLevel == LogLevel.Warning && message.StartsWith("Sync pull failed for source", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref _syncPullFailureCount);
+            }
             if (logLevel == LogLevel.Debug
                 && message.StartsWith("File event captured", StringComparison.Ordinal))
             {

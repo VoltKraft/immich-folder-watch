@@ -1182,7 +1182,33 @@ public sealed partial class FolderWatchWorker : BackgroundService
             pending.Add(new PendingDownload(context, asset, destinationPath));
         }
 
+        if (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureDownloadDirectoryWritable(targetDirectory);
+        }
+
         return pending;
+    }
+
+    private static void EnsureDownloadDirectoryWritable(string targetDirectory)
+    {
+        try
+        {
+            Directory.CreateDirectory(targetDirectory);
+            // Probe once per directory before requesting any originals. A readable
+            // portal grant can still deny writes; retrying every asset cannot fix it.
+            // The unique, extensionless file cannot match a configured media extension.
+            using var probe = new FileStream(
+                Path.Combine(targetDirectory, $"ifw-write-check-{Guid.NewGuid():N}"),
+                FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            throw new UnauthorizedAccessException(
+                $"Cannot write downloads to folder '{targetDirectory}'. Check folder write permissions. "
+                + "For Flatpak, select the folder again and use Save and Apply to renew its access grant.", ex);
+        }
     }
 
     private async Task DownloadAssetsAsync(IReadOnlyList<PendingDownload> candidates, CancellationToken cancellationToken)
