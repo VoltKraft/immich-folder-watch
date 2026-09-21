@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using ImmichFolderWatch.App.Shared.Models;
 using ImmichFolderWatch.App.Shared.Resources;
 using ImmichFolderWatch.App.Shared.Services;
@@ -92,6 +93,7 @@ public sealed class MainWindowViewModel : BindableBase
     private readonly IPlatformLoggingCapabilities _loggingCapabilities;
     private readonly IPlatformPaths? _platformPaths;
     private readonly SemaphoreSlim _autostartGate = new(1, 1);
+    private readonly HashSet<WatchSourceItem> _observedSources = new();
     private int _pendingAutostartChanges;
     private bool _isAutostartChangeInProgress;
     private bool _lastKnownAutostartEnabled;
@@ -235,6 +237,22 @@ public sealed class MainWindowViewModel : BindableBase
 
     private void Sources_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        foreach (var source in _observedSources.Where(source => !Sources.Contains(source)).ToArray())
+        {
+            source.PropertyChanged -= Source_PropertyChanged;
+            _observedSources.Remove(source);
+        }
+
+        foreach (var source in Sources)
+        {
+            if (_observedSources.Add(source))
+            {
+                source.PropertyChanged += Source_PropertyChanged;
+            }
+        }
+
+        RefreshSyncStatusFromProvider();
+
         if (SelectedSource is not null && Sources.Contains(SelectedSource))
         {
             return;
@@ -244,6 +262,15 @@ public sealed class MainWindowViewModel : BindableBase
         SelectedSource = Sources.Count == 0
             ? null
             : Sources[Math.Clamp(e.OldStartingIndex, 0, Sources.Count - 1)];
+    }
+
+    private void Source_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName)
+            || e.PropertyName is nameof(WatchSourceItem.Path) or nameof(WatchSourceItem.DisplayPath))
+        {
+            SyncStatusProvider_PropertyChanged(sender, e);
+        }
     }
 
     public ObservableCollection<ImmichPermissionStatusItem> ImmichPermissionStatuses { get; } = new();
@@ -1099,7 +1126,7 @@ public sealed class MainWindowViewModel : BindableBase
         else if (!string.IsNullOrWhiteSpace(_syncStatusProvider.LastSyncErrorMessage))
         {
             activity = string.Format(_localizationService.CurrentCulture, Localized("Status_SyncErrorFormat"),
-                _syncStatusProvider.LastSyncErrorMessage);
+                FormatSyncErrorForDisplay(_syncStatusProvider.LastSyncErrorMessage));
         }
         else
         {
@@ -1145,6 +1172,32 @@ public sealed class MainWindowViewModel : BindableBase
             SyncStatusBadgeText = Strings.Status_Ready;
             SyncStatusBadgeTone = StatusTone.Neutral;
         }
+    }
+
+    private string FormatSyncErrorForDisplay(string message)
+    {
+        var paths = Sources
+            .Where(source => !string.IsNullOrWhiteSpace(source.Path)
+                && !string.Equals(source.Path, source.DisplayPath, StringComparison.Ordinal))
+            .Select(source => (Access: source.Path.TrimEnd('/', '\\'), Display: source.DisplayPath.TrimEnd('/', '\\')))
+            .Where(path => path.Access.Length > 0)
+            .GroupBy(path => path.Access, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Display, StringComparer.Ordinal);
+        if (paths.Count == 0)
+        {
+            return message;
+        }
+
+        // Replace only complete access roots. A single pass preserves nested grants
+        // and avoids rewriting a host path that resembles another portal access path.
+        var roots = string.Join("|", paths.Keys.OrderByDescending(path => path.Length).Select(Regex.Escape));
+        var pattern = "(?<![^\\s'\"(=:\\[])(?:" + roots + ")(?=[/\\\\'\"]|$)";
+        return Regex.Replace(message, pattern, match =>
+        {
+            var display = paths[match.Value];
+            return display.Length == 0 && (match.Index + match.Length == message.Length
+                || message[match.Index + match.Length] is not ('/' or '\\')) ? "/" : display;
+        }, RegexOptions.CultureInvariant);
     }
 
     private void RefreshPermissionStatusTexts()

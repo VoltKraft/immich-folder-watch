@@ -33,7 +33,9 @@ and settings, with the platform differences described below.
 successful upload or download, including previous sessions; an empty scan does
 not advance it. See [Last Sync across sessions](configuration.md#last-sync-across-sessions)
 for storage and upgrade details. **Sync Status** shows the current transfer,
-progress, or most recent sync error. The header contains the application version
+progress, or most recent sync error. On Linux, sync errors display the original
+host path for known folder grants once that path has been resolved. Session logs
+retain the portal access path for diagnostics. The header contains the application version
 and an update link when one is available.
 
 ## Connection

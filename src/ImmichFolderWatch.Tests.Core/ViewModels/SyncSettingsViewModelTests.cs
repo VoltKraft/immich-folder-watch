@@ -88,6 +88,75 @@ public sealed class SyncSettingsViewModelTests
         Assert.Equal("Sync error: other.jpg (2 of 2)", vm.CurrentUploadText);
     }
 
+    [Theory]
+    [InlineData("Access to '/run/user/1000/doc/grant/Pictures/photo.jpg.downloading' is denied.",
+        "Access to '/home/example/Pictures/photo.jpg.downloading' is denied.")]
+    [InlineData("Access to '/run/user/1000/doc/grant/Pictures' is denied.",
+        "Access to '/home/example/Pictures' is denied.")]
+    [InlineData("/run/user/1000/doc/grant/Pictures/photo.jpg",
+        "/home/example/Pictures/photo.jpg")]
+    [InlineData("Access to '/run/user/1000/doc/grant/PicturesBackup/photo.jpg' is denied.",
+        "Access to '/run/user/1000/doc/grant/PicturesBackup/photo.jpg' is denied.")]
+    [InlineData("Access to '/other/run/user/1000/doc/grant/Pictures/photo.jpg' is denied.",
+        "Access to '/other/run/user/1000/doc/grant/Pictures/photo.jpg' is denied.")]
+    public void SyncStatus_UsesHostPathOnlyForKnownAccessRoots(string error, string displayedError)
+    {
+        var status = new SyncStatusProvider();
+        var vm = CreateViewModel(status);
+        var source = vm.Sources[0];
+        source.SetPortalPath("/run/user/1000/doc/grant/Pictures", "/home/example/Pictures");
+
+        status.ReportPullStarted(1);
+        status.ReportDownloadFailed("photo.jpg", error);
+        status.ReportPullCompleted();
+
+        Assert.Equal($"Sync error: {displayedError} (1 of 1)", vm.CurrentUploadText);
+        Assert.Equal(error, status.LastSyncErrorMessage);
+        Assert.Equal("/run/user/1000/doc/grant/Pictures", source.Path);
+    }
+
+    [Fact]
+    public void SyncStatus_RefreshesExistingErrorWhenHostPathResolvesAndSourcesChange()
+    {
+        const string accessPath = "/run/user/1000/doc/grant/Pictures";
+        var status = new SyncStatusProvider();
+        var vm = CreateViewModel(status);
+        var source = vm.Sources[0];
+        source.Path = accessPath;
+        status.ReportDownloadFailed("photo.jpg", $"Access to '{accessPath}/photo.jpg' is denied.");
+        Assert.Contains(accessPath, vm.CurrentUploadText);
+
+        source.SetPortalPath(accessPath, "/home/example/Pictures");
+        Assert.Contains("/home/example/Pictures/photo.jpg", vm.CurrentUploadText);
+        Assert.DoesNotContain(accessPath, vm.CurrentUploadText);
+
+        vm.Sources.Clear();
+        Assert.Contains(accessPath, vm.CurrentUploadText);
+        source.SetPortalPath(accessPath, "/home/example/Other");
+        Assert.Contains(accessPath, vm.CurrentUploadText);
+
+        vm.Sources.Add(source);
+        Assert.Contains("/home/example/Other/photo.jpg", vm.CurrentUploadText);
+    }
+
+    [Fact]
+    public void SyncStatus_PrefersLongestRootAndDoesNotRewriteReplacementText()
+    {
+        const string accessPath = "/run/user/1000/doc/grant/Pictures";
+        var status = new SyncStatusProvider();
+        var vm = CreateViewModel(status);
+        vm.Sources[0].SetPortalPath(accessPath, "/home/example/Pictures");
+        var nested = new WatchSourceItem();
+        nested.SetPortalPath(accessPath + "/Nested", accessPath + "/Host");
+        vm.Sources.Add(nested);
+
+        status.ReportDownloadFailed("photo.jpg",
+            $"Access to '{accessPath}/Nested/photo.jpg' and '{accessPath}/NestedBackup/photo.jpg' is denied.");
+
+        Assert.Contains($"'{accessPath}/Host/photo.jpg'", vm.CurrentUploadText);
+        Assert.Contains("'/home/example/Pictures/NestedBackup/photo.jpg'", vm.CurrentUploadText);
+    }
+
     [Fact]
     public void ServerFailure_DoesNotReplaceSyncErrorOrMarkInactiveSyncAsFailed()
     {
