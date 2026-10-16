@@ -1,2 +1,4 @@
 [agents]
 enabled = true
+# Leave concurrency at the Codex default.
+# Intentionally omit model and reasoning defaults to preserve client inheritance.

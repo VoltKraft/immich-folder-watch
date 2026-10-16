@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles; application behavior and release versions are unchanged.
+
 ## [2.11.3] - 2026-09-21
 
 ### Fixed

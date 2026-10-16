@@ -220,6 +220,13 @@ settings, and deletion behavior for each mode.
 - [Architecture](./docs/architecture.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Development](./docs/development.md)
+- [Project brief and selected scope](./docs/project.md)
+- [Project status and next action](./docs/status.md)
+
+For Codex-assisted work, start at [AGENTS.md](./AGENTS.md). Discuss an idea or
+request a concrete change; Codex maintains the plan and status. Once a milestone
+is selected, a short prompt such as "Continue the project" resumes its next
+authorized step. Goal mode requires an explicit request and a defined milestone.
 
 ---
 

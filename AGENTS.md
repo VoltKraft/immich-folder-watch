@@ -1,97 +1,196 @@
-# Repository Guidelines
+# Repository Guidance
 
-## Project Context and Structure
+## Project entry
 
-Immich Folder Watch is a .NET 10 desktop application for Windows and Linux. It watches local folders and transfers new media through the Immich HTTP API; it must never write directly to Immich storage.
+Immich Folder Watch is an established .NET 10 desktop application for Windows
+(WPF) and Linux (Avalonia). It watches and synchronizes local media through the
+Immich API; it must never write directly to Immich storage. See
+[README.md](README.md) for product usage and [the project brief](docs/project.md)
+for the existing architecture, canonical specifications, and selected scope.
+The project is initialized. Preserve its implementation, data, and history;
+do not restart template onboarding or infer a new product plan from maintenance.
 
-Production code lives under `src/`:
+Before substantive project work:
 
-- `ImmichFolderWatch.Core`: configuration, watching, synchronization, logging, and platform abstractions. Keep it independent of UI and runtime hosts.
-- `ImmichFolderWatch.Immich`: Immich HTTP and realtime API integration. Isolate API-version changes here.
-- `ImmichFolderWatch.App.Shared`: shared view models, models, services, and localized resources.
-- `ImmichFolderWatch.App`: Windows WPF entry point and platform services.
-- `ImmichFolderWatch.App.Linux`: Linux Avalonia entry point and portal integrations.
-- `ImmichFolderWatch.Tests.Core`: portable xUnit tests; `ImmichFolderWatch.Tests`: Windows-specific tests.
+1. Read [the project brief](docs/project.md) for scope, active milestone,
+   requirements, acceptance criteria, and project-specific boundaries.
+2. Read [the status](docs/status.md) for progress, evidence, blockers, and the
+   next action. Verify relevant live state before relying on recorded progress.
+3. Read the shared [documentation](docs/guidelines/documentation.md) and
+   [collaboration](docs/guidelines/collaboration.md) rules.
+4. Read every domain guide applicable to the task, including mixed work:
+   [software](docs/guidelines/software.md), [CAD](docs/guidelines/cad.md), and
+   [3D printing](docs/guidelines/3d-printing.md). CAD automation scripts also
+   require the software guide. Read applicable nested repository instructions.
 
-Documentation belongs in `docs/`, packaging definitions in `packaging/`, branding sources in `assets/`, and maintenance utilities in `tools/`. Do not commit or manually edit generated output in `artifacts/`, `bin/`, or `obj/`.
+These are required reads, not optional links. Load detailed referenced evidence
+when needed; do not reread unrelated archives on every continuation.
+Use [document ownership and precedence](docs/guidelines/documentation.md#document-ownership-and-precedence)
+to reconcile project decisions, defaults, and recorded state.
 
-## Working Agreements
+## From brainstorming to implementation
 
-- Derive behavior, tooling, and supported commands from checked-in code, manifests, and documentation; do not assume absent tools or frameworks.
-- Follow established patterns, keep changes focused, and preserve unrelated user changes.
-- Update tests and documentation in the same change when behavior, public interfaces, configuration, dependencies, or operations change.
-- Avoid manual changes to generated, vendored, or lock files unless explicitly required. Modify the generator or source asset instead.
-- Keep comments, logs, documentation, examples, changelog entries, TODOs, and commit messages in English regardless of the conversation language.
+- For new project work, the user discusses an idea. Codex owns
+  filling and maintaining the project brief, status, and project README; never
+  require the user to fill out the templates or supply formal acceptance criteria.
+- During brainstorming, explore options and ask only questions that materially
+  affect the plan. Derive draft requirements, milestones, acceptance checks, and
+  applicable domain rules from the discussion and available evidence. Keep
+  alternatives and assumptions distinct from the user's chosen direction.
+- Persist meaningful planning results in the existing documents when the active
+  mode permits edits. If Plan mode or read-only restrictions prohibit writing,
+  retain a self-contained proposed plan in the chat and disclose that it is not
+  saved to the repository. Once edits are allowed, persist it before implementation.
+- A request to implement or work on a concrete, selected plan is sufficient
+  direction to record that plan and begin; do not require a separate form-filling
+  or approval round.
+  Carry forward existing decisions, select the first actionable milestone, and
+  initialize status yourself. Ask only about unresolved essentials for dependent
+  work, and do not implement merely because an idea was mentioned.
+- Fill only what is relevant now. Mark irrelevant fields as not applicable and
+  keep nonblocking unknowns explicit. Inspect tools and commands as needed; do
+  not fabricate values to make the documents look complete.
+- When beginning implementation of a concrete project, automatically perform the
+  [one-time template cleanup](docs/guidelines/documentation.md#one-time-template-cleanup)
+  and record completion in the status document. Skip it during brainstorming,
+  template maintenance, or when already completed; respect writing restrictions.
 
-## Build, Run, and Test Commands
+## Working agreements
 
-Use the SDK selected by `global.json` (currently .NET 10):
+- Automatically select and use suitable agents when their contribution improves
+  the task under the [collaboration rules](docs/guidelines/collaboration.md#automatic-agent-selection).
+  No special prompt or manual agent selection is required. Keep simple tasks
+  local, retain the default model for uncertain assignments, and coordinate
+  exclusive access to shared applications.
+- Follow established conventions, keep changes focused, and preserve unrelated
+  user changes. Do not manually edit generated, vendored, or lock files unless
+  required by the task; prefer modifying their source or generating tool.
+- Derive tools, structure, and commands from checked-in files and verified
+  environment state. Do not invent a stack, installed application, or capability.
+- Keep requirements in the project brief and progress in the status document.
+  Link to authoritative detailed specifications rather than duplicating them.
+- Keep AGENTS.md current automatically throughout the project, without a separate
+  user prompt. When project context, structure, tooling, responsibilities, or
+  referenced workflows change, update its concise description and relevant links
+  in the same change. This ongoing maintenance continues after template cleanup.
+  Preserve all general working rules and required reading obligations; do not
+  remove or weaken them while adapting project-specific guidance. Keep detailed
+  requirements in the project brief and progress in the status document, and
+  verify updated descriptions and links against the actual project state.
+- Distinguish assumptions, user reports, prepared work, executed changes, and
+  verified results. Record unknowns and their impact; continue independent work
+  when missing information does not prevent it.
+- Existing authorization remains valid. A short prompt grants no additional
+  permission for external publication, unrelated resources, or machine operation.
+- Before adding or updating dependencies, verify their licenses from
+  authoritative sources against the repository license and intended distribution.
+  Do not add incompatible or unverifiable dependencies. If needed for the task,
+  explain the dependency, license concern, and compatible alternatives first.
+- Write repository documentation, comments, docstrings, API documentation, TODOs,
+  explanatory example text, logs, changelogs, and commit messages in English.
 
-```bash
-dotnet restore ImmichFolderWatch.sln
-dotnet build ImmichFolderWatch.sln -c Debug
-dotnet test ImmichFolderWatch.sln -c Debug
-dotnet run --project src/ImmichFolderWatch.App
-dotnet run --project src/ImmichFolderWatch.App.Linux
-```
+## Short prompts and goals
 
-The full solution, including WPF tests, requires Windows. On Linux, use:
+- Interpret "work on the project", "continue the project", and equivalent
+  requests in the user's language as continuing the active milestone in the
+  project brief. Choose the next useful, authorized action from verified state.
+- Resolve missing context under the onboarding workflow above. A saved brainstorm
+  is not a selected implementation plan. If the selected plan is ready but no
+  milestone is active, select its first ready milestone and record the selection.
+  Ready means its outcome, acceptance evidence, boundaries, and prerequisites are
+  clear enough for the next action; resolve only missing essentials first.
+  A concrete scoped task, such as template maintenance, proceeds within its own
+  scope without initializing an unrelated project.
+- After a milestone is completed, end that assignment with evidence and a next
+  step. On a subsequent user continuation request, select the next ready milestone
+  within the selected plan and recorded implementation scope, using its order and
+  dependencies. If no clear next milestone exists, help resolve that choice;
+  if the plan is finished, report
+  completion instead of inventing work. Never use this rule to retarget an
+  unfinished goal or bypass a prerequisite.
+- Start Goal mode only when the user explicitly requests a goal. For a new goal,
+  resolve the active milestone to its stable ID, concrete outcome, acceptance
+  criteria, evidence requirements, and boundaries. Record this run's reference
+  in the status document. Do not silently follow a changed active-milestone
+  pointer or weaken criteria to finish. Surface material scope changes.
+- A project document does not activate a goal or transfer an active goal to a
+  new chat. Follow the available goal controls and their lifecycle rules; verify
+  the actual goal state before continuing an existing run. If those controls are
+  unavailable, disclose that and do not claim Goal mode is active.
+- At completion, report evidence against the selected milestone. Do not
+  automatically expand the assignment to later milestones. If blocked, record
+  the missing prerequisite and the concrete next action needed to resume;
+  continue independent work within scope when possible.
 
-```bash
-dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj -c Debug
-dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj -c Debug
-```
+## Validation and handoff
 
-Building an app generates branding from `assets/branding/logo.svg`. There is no separate repository lint or formatting command; the current .NET analyzers run during builds. Consult `packaging/flatpak/README.md` and `packaging/windows/README.md` for packaging workflows rather than duplicating them here.
+- Automatically save work in the applications being used and create local Git
+  commits at meaningful checkpoints under the
+  [saving and commit rules](docs/guidelines/collaboration.md#saving-and-commit-checkpoints).
+  This is standing authorization within the task scope; do not ask again for
+  routine saves or local commits. Respect active mode and permission restrictions.
+- Run the smallest relevant validation first; broaden checks when justified.
+  Review the final diff and artifact set for unintended changes.
+- Update relevant checks and documentation with behavior, interface,
+  configuration, dependency, command, or operational changes. Follow the shared
+  [documentation and release rules](docs/guidelines/documentation.md).
+- Update the status after meaningful progress and before handoff: evidence,
+  revision, checks and their results, unresolved questions, and next action.
+  The uninitialized reusable template keeps brief/status uninitialized and
+  CHANGELOG.md as an empty project scaffold, recording template-only work in Git.
+  This repository is already initialized: later template-workflow updates must
+  preserve its populated records and product history, and update its actual status.
+- Completion requires the requested deliverables, relevant passing checks, and
+  updated documentation. Disclose checks that failed or could not run. Digital
+  validation alone does not establish physical fit, strength, or safe operation.
 
-## Coding and API Documentation
+## Project-specific engineering rules
 
-Use four-space indentation and existing C# conventions: file-scoped namespaces, PascalCase types and public members, camelCase locals and parameters, and `Async` suffixes for asynchronous methods. Nullable reference types, implicit usings, and current .NET analyzers are enabled. Keep watcher orchestration out of HTTP implementations and runtime-host concerns out of Core.
+- Preserve the per-user security model, portal-based Linux folder access, .NET 10,
+  and Windows/Linux compatibility unless the selected task explicitly changes it.
+  Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version
+  changes in `ImmichFolderWatch.Immich`, separate from watcher orchestration.
+- Follow [development commands and test prerequisites](docs/development.md).
+  Use the SDK selected by [global.json](global.json). The full solution/test
+  workflow requires Windows; Linux uses the Avalonia host, portable Core tests,
+  and Linux GUI/protocol tests. A documented command is not evidence of execution.
+  Builds generate branding from `assets/branding/logo.svg`; .NET analyzers run
+  during builds. No separate repository formatter or lint command is established.
+- Use four-space C# indentation, file-scoped namespaces, PascalCase types/public
+  members, camelCase locals/parameters, and `Async` suffixes. Preserve enabled
+  nullable reference types, implicit usings, and analyzers in Directory.Build.props.
+- Tests use xUnit and Coverlet. Match platform scope, mirror production namespaces,
+  name classes `*Tests`, and use descriptive case names. Add regression coverage
+  for behavior changes. Await durable worker persistence before stopping workers
+  or removing test databases, as described in the development guide. Avoid live
+  Immich dependencies unless an integration check is explicitly scoped and authorized.
+- Do not commit or manually edit generated `artifacts/`, `bin/`, or `obj/` output.
+  Never commit API keys, private URLs, credentials, or sanitized-looking real secrets.
+  Follow [SECURITY.md](SECURITY.md) for private vulnerability reporting. Verify
+  dependencies against the repository's **AGPL-3.0-only** license and intended
+  distribution; retain the existing attribution and license evidence.
+- Prefer focused Conventional Commit subjects. PRs explain intent/user impact,
+  linked issues, validation, and documentation/migration effects. Include screenshots
+  for visible WPF/Avalonia changes. Keep independent changes separately reviewable.
 
-Prefer clear names and simple structure over comments that narrate code. Comments should explain non-obvious reasons, invariants, edge cases, units, concurrency, security boundaries, performance tradeoffs, or external constraints. Describe workarounds with their cause and removal condition. Document public or complex APIs where contracts are not evident, including parameters, results, errors, side effects, nullability, thread safety, and lifecycle when relevant. Keep documentation beside the behavior and update both together.
+## Project release procedure
 
-Do not leave commented-out code or vague TODOs. A TODO must identify the missing work, why it remains, and a tracking reference when available. Simplify overly complex code instead of compensating with large comments.
+[Directory.Build.props](Directory.Build.props) owns `<Version>` and corresponding
+`MAJOR.MINOR.PATCH.0` assembly/file versions. Releases use stable
+`MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH` tags. Never reuse or alter a released
+version. The compatibility contract covers user-visible behavior, configuration,
+CLI options, persistent formats, and supported integrations. Increment MAJOR for
+incompatible changes, MINOR for compatible features/capabilities, and PATCH for
+compatible bug, security, documentation, packaging, or maintenance fixes.
 
-## Testing and Validation
-
-Tests use xUnit and Coverlet. Put tests in the project matching their platform scope, mirror production namespaces, name classes `*Tests`, and use descriptive method names such as `WaitUntilReadyAsync_ReturnsFalse_WhenTimeoutExpires`. Add regression coverage for behavior changes. Avoid live-Immich dependencies unless the test is explicitly documented as an integration check.
-
-Run the smallest relevant test first, then broader checks justified by the change. Before completion, review the final diff for unintended edits and run the applicable build and test commands. Report exactly what ran and disclose skipped or unavailable checks. Work is complete only when the requested behavior, relevant validation, and required documentation are all addressed.
-
-## Security, Compatibility, and Dependencies
-
-Preserve the per-user security model, portal-based Linux folder access, and API-only Immich boundary. Never commit API keys, private URLs, credentials, or sanitized-looking real secrets. Follow `SECURITY.md` for private vulnerability reporting.
-
-Before adding or updating a dependency, verify its license from an authoritative source against this repository's `AGPL-3.0-only` license and intended distribution. Do not add dependencies with incompatible or unverifiable licenses. If a requested dependency presents such a concern, stop and tell the user the package, license, conflict, and compatible alternatives. Preserve .NET 10 and supported Windows/Linux compatibility unless the task explicitly changes it.
-
-## Documentation Standards
-
-Treat documentation as implementation. Document public interfaces, configuration, environment variables, inputs, outputs, side effects, failure modes, and compatibility requirements when they change. Provide migration guidance for breaking changes, renamed settings, changed defaults, or persistent-format changes.
-
-Keep examples minimal, realistic, secure, and executable, and verify commands against the repository. Maintain one source of truth: keep `README.md` focused on orientation and common workflows, then link to detailed documents instead of copying them. Record significant architectural decisions and tradeoffs in `docs/architecture.md` or an ADR if that practice is introduced. Correct obsolete or contradictory text rather than preserving it.
-
-## Versioning and Releases
-
-Follow [Semantic Versioning 2.0.0](https://semver.org/lang/de/) using stable `MAJOR.MINOR.PATCH` versions:
-
-- Increment `MAJOR` for incompatible changes to user-visible behavior, configuration, command-line options, persistent formats, or supported integration contracts.
-- Increment `MINOR` for backward-compatible features or meaningful capability additions.
-- Increment `PATCH` for backward-compatible bug, security, documentation, packaging, or maintenance fixes that do not add a public capability.
-
-Never reuse or alter a released version. `Directory.Build.props` is the source of truth for `<Version>`; corresponding assembly and file versions use `MAJOR.MINOR.PATCH.0`. Release tags use `vMAJOR.MINOR.PATCH`, where `v` is only a tag prefix. This repository's current release workflow publishes stable versions; introduce prerelease identifiers or build metadata only after adapting and validating all release and packaging automation.
-
-Prepare a version with `tools/release/bump-version.sh MAJOR.MINOR.PATCH`, complete the generated `CHANGELOG.md` section, then run `python3 tools/update-appstream.py MAJOR.MINOR.PATCH --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml`. Review every changed version reference and follow the platform-specific release instructions before committing with `release: vMAJOR.MINOR.PATCH`.
-
-## Commits and Pull Requests
-
-Prefer focused Conventional Commit-style subjects, for example `fix(immich): retry transient uploads` or `docs(config): clarify API URL`. Short imperative maintenance subjects also occur in history; whichever form is used, keep it specific and concise.
-
-Pull requests should explain intent and user impact, link relevant issues, include appropriate tests, and identify documentation or migration effects. Add screenshots for visible WPF or Avalonia changes. Keep independent changes separately reviewable.
-
-## Subagent Strategy
-
-For each task, decide whether delegation would materially improve correctness, coverage, independent verification, or delivery time. Inspect currently available agents rather than assuming a fixed roster. Delegate only coherent, independently verifiable workstreams where the benefit exceeds coordination overhead, context loss, and edit-conflict risk.
-
-Choose specialists by scope; use coordination or planning agents for multi-stage work when available, or create a purpose-built agent with a bounded objective if no role fits. Each assignment must state its scope, relevant context, constraints, expected result, and validation criteria. Select model capability and reasoning effort according to complexity, ambiguity, risk, and required confidence, and escalate if the work proves harder than expected.
-
-Parallelize independent investigations, reviews, tests, or isolated edits; sequence dependent or overlapping work. Wait for required results, reconcile disagreements, and perform a cross-cutting final review. The primary agent remains responsible for the complete request, architecture and integration decisions, verification, conflict resolution, and final response. Treat subagent findings as evidence and independently verify important or high-risk claims.
+Routine local checkpoints stay under `Unreleased` and do not bump product versions.
+For an explicitly selected release, follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+and the platform-specific [Windows](packaging/windows/README.md) and
+[Flatpak](packaging/flatpak/README.md) instructions. From the repository root, run
+`tools/release/bump-version.sh MAJOR.MINOR.PATCH`, complete its generated changelog
+section, then run
+`python3 tools/update-appstream.py MAJOR.MINOR.PATCH --metainfo packaging/flatpak/io.github.voltkraft.immich-folder-watch.metainfo.xml`.
+Review all version references before a release commit with subject
+`release: vMAJOR.MINOR.PATCH`. Reserve this subject for actual release preparation.
+Prerelease identifiers or build metadata require adapting and validating all
+release/packaging automation first. Local commits do not authorize publication.
