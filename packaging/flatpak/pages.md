@@ -1,8 +1,7 @@
 # GitHub Pages Flatpak repository
 
-The prepared repository URL is <https://voltkraft.github.io/immich-folder-watch/>.
-Activation is pending explicit approval for uploading the signing key; see
-[project status](../../docs/status.md).
+The repository is available at <https://voltkraft.github.io/immich-folder-watch/>.
+See [project status](../../docs/status.md) for deployment and verification evidence.
 It supplements GitHub Release bundles and is independent of Flathub acceptance.
 See [Linux installation](../../docs/installation-linux.md) for user commands.
 

@@ -1,8 +1,7 @@
 # Flatpak Packaging
 
 `immich-folder-watch` ships to Linux desktops as `x86_64` and `aarch64` Flatpak
-bundles on **GitHub Releases**. A signed **GitHub Pages repository** is prepared;
-initial activation is pending (see [status](../../docs/status.md)).
+bundles on **GitHub Releases** and through a signed **GitHub Pages repository**.
 The app builds against the freedesktop runtime
 26.08 and uses a pinned Microsoft .NET 10 SDK only while building the Avalonia
 head as a

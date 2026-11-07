@@ -10,8 +10,8 @@
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
 - Brief revision: `IFW-BRIEF-20261107-01`.
-- Plan maturity: Existing implementation; GitHub Pages Flatpak distribution selected.
-- Active milestone: `M-FLATPAK-PAGES-20261107`.
+- Plan maturity: Existing implementation; GitHub Pages Flatpak distribution complete.
+- Active milestone: None; `M-FLATPAK-PAGES-20261107` is complete.
 - Implementation request / scope: The user's 2026-11-07 request to distribute
   Flatpaks through a GitHub Pages repository in addition to GitHub Releases,
   including `.flatpakref` installation. Implement tooling, automation, signed
@@ -30,9 +30,10 @@
   checkpoint commits are covered by the user's migration and checkpoint instructions.
 - External actions: The current distribution request covers configuring and
   publishing the requested GitHub Pages Flatpak repository and workflows using
-  existing published bundles. The automatic approval reviewer requires explicit
-  user consent before uploading the private signing key to the repository secret;
-  that external setup remains pending (see status). No new product release, tag
+  existing published bundles. On 2026-11-07 the user explicitly approved storing
+  the private signing key as an Actions secret in `VoltKraft/immich-folder-watch`,
+  pushing the changes, activating Pages, and verifying the live distribution.
+  No new product release, tag
   replacement, Immich access, live synchronization or personal app installation
   is included. The older migration itself authorized no external publication.
 - Keep `.git` configuration/history, nested checkouts under `worktrees/`, ignored

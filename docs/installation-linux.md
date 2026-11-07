@@ -10,10 +10,6 @@ need root privileges at runtime.
 
 ## Install from the Flatpak repository
 
-Initial activation is pending; these commands become usable after the first
-Pages deployment. Until then, use [GitHub Release bundles](#install-from-github-releases).
-See [project status](status.md) for activation evidence.
-
 Install Flatpak through your distribution's package manager, then open the
 [`.flatpakref` installer](https://voltkraft.github.io/immich-folder-watch/io.github.voltkraft.immich-folder-watch.flatpakref)
 in your software center or run:

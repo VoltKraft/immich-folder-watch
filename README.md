@@ -116,9 +116,6 @@ Upgrading from an older service-based install: the legacy service is stopped and
 
 ### Linux (Flatpak)
 
-Repository publication is prepared; initial activation is pending. Until then,
-use the release bundles described in [Linux installation](docs/installation-linux.md#install-from-github-releases).
-
 Install from the signed [Flatpak repository](https://voltkraft.github.io/immich-folder-watch/) on
 GitHub Pages. The `.flatpakref` selects `x86_64` or `aarch64` automatically:
 
