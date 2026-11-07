@@ -116,27 +116,26 @@ Upgrading from an older service-based install: the legacy service is stopped and
 
 ### Linux (Flatpak)
 
-1. Download the matching bundle from
-   [GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases):
-   `immich-folder-watch-<version>-linux-x64.flatpak` on `x86_64` or
-   `immich-folder-watch-<version>-linux-arm64.flatpak` on `aarch64`.
-2. Install and launch it for the current user:
+Repository publication is prepared; initial activation is pending. Until then,
+use the release bundles described in [Linux installation](docs/installation-linux.md#install-from-github-releases).
+
+Install from the signed [Flatpak repository](https://voltkraft.github.io/immich-folder-watch/) on
+GitHub Pages. The `.flatpakref` selects `x86_64` or `aarch64` automatically:
 
 ```bash
-flatpak install --user ./immich-folder-watch-<version>-linux-<architecture>.flatpak
+flatpak install --user https://voltkraft.github.io/immich-folder-watch/io.github.voltkraft.immich-folder-watch.flatpakref
 flatpak run io.github.voltkraft.immich-folder-watch
 ```
 
-Flatpak assets are published by the current release workflow; `v2.7.0` and
-earlier releases are not backfilled.
-
-GitHub's single-file bundle records Flathub as the source for its Freedesktop
-runtime dependency, but it does not configure an application repository.
-Download each new application version manually and install it with
-`flatpak install --user --or-update ./immich-folder-watch-<version>-linux-<architecture>.flatpak`.
-Flathub release automation is prepared; initial acceptance is still pending. See
-[`the Flathub preparation guide`](./packaging/flatpak/flathub/README.md) for status and
-[`packaging/flatpak/README.md`](./packaging/flatpak/README.md) for local builds.
+Updates arrive through your desktop software center or
+`flatpak update --user io.github.voltkraft.immich-folder-watch`.
+[GitHub Releases](https://github.com/VoltKraft/immich-folder-watch/releases)
+continue to provide standalone `.flatpak` bundles for manual installation.
+See [Linux installation](docs/installation-linux.md) for repository setup,
+bundle installation and migration without deleting application data, and
+[Flatpak packaging](packaging/flatpak/README.md) for local builds.
+Flathub initial acceptance remains pending; see the
+[Flathub preparation guide](packaging/flatpak/flathub/README.md).
 
 The Flatpak package runs through X11/XWayland because the current Avalonia
 Linux backend initializes X11. Its tray uses the application's own D-Bus

@@ -92,7 +92,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             appstream \
             desktop-file-utils \
-            flatpak-builder
+            flatpak-builder \
+            ostree \
+            gnupg
 
       - name: Validate AppStream metainfo
         # `--no-net` keeps the lint passing on PR/dev pushes where the

@@ -194,3 +194,8 @@ Review all version references before a release commit with subject
 `release: vMAJOR.MINOR.PATCH`. Reserve this subject for actual release preparation.
 Prerelease identifiers or build metadata require adapting and validating all
 release/packaging automation first. Local commits do not authorize publication.
+
+GitHub Pages Flatpak distribution uses the existing published bundles; see the
+[repository deployment guide](packaging/flatpak/pages.md). Keep its persistent
+GPG identity, both architectures, signature verification and existing release
+assets intact. Candidate builds must not be published to the stable repository.

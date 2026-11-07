@@ -72,6 +72,10 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 - `release.yaml`: build x64 and ARM64 Windows MSIs and Linux Flatpaks from the
   same immutable commit, then publish all four only after successful CI on
   `main` and only when the version tag does not already exist
+- `flatpak-pages.yaml`: import the latest published Linux bundles into a signed
+  GitHub Pages repository, with `.flatpakref` installation and Flatpak updates;
+  explicitly dispatched after release publication (also supports manual recovery).
+  See the [repository deployment guide](../packaging/flatpak/pages.md).
 - `winget.yaml`: generate and submit the two-architecture WinGet manifest after
   the GitHub Release has been published
 - `flathub.yaml`: prepare and build both architectures after publication, then

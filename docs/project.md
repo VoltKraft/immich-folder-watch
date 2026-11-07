@@ -9,29 +9,32 @@
 - Product baseline: The checked-in version is `2.11.3` in
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
-- Brief revision: `IFW-BRIEF-20261016-01`.
-- Plan maturity: Existing implementation with established documentation. The
-  workflow migration below is selected; no subsequent product milestone is selected.
-- Active milestone: None; the migration milestone is complete (see status).
-  No subsequent product milestone is selected.
-- Implementation request / scope: The user's 2026-10-16 request to migrate the
-  current template workflow into this established project without breaking it.
-  This covers contributor documentation and agent configuration only.
-- Requirement source: The current request, the pre-migration AGENTS.md, and the
-  existing product documents linked below. Existing implementation is context,
-  not proof that every runtime or desktop acceptance check has passed.
+- Brief revision: `IFW-BRIEF-20261107-01`.
+- Plan maturity: Existing implementation; GitHub Pages Flatpak distribution selected.
+- Active milestone: `M-FLATPAK-PAGES-20261107`.
+- Implementation request / scope: The user's 2026-11-07 request to distribute
+  Flatpaks through a GitHub Pages repository in addition to GitHub Releases,
+  including `.flatpakref` installation. Implement tooling, automation, signed
+  metadata, installation/setup documentation and the repository configuration.
+- Requirement source: The current request and existing packaging/release contracts.
+  The completed contributor-workflow migration remains recorded below.
 
 ## Scope and boundaries
 
-- Preserve application sources, user configuration/data, API behavior, dependencies,
-  license/attribution, build/packaging/release automation, versions, and release history.
+- Preserve application sources, user configuration/data, API behavior, application
+  dependencies, license/attribution, versions and release history. Extend only
+  packaging/distribution automation for the selected milestone.
 - Maintain API-only Immich integration; never write directly to Immich storage.
   Preserve per-user security and Linux portal folder access.
 - Authorized location: This repository. Local recovery copies and scoped local
   checkpoint commits are covered by the user's migration and checkpoint instructions.
-- External actions: No Immich request, live synchronization, upload, download,
-  deletion, installation, publication, push, or release is authorized by this migration.
-  Reading existing documentation does not grant those permissions.
+- External actions: The current distribution request covers configuring and
+  publishing the requested GitHub Pages Flatpak repository and workflows using
+  existing published bundles. The automatic approval reviewer requires explicit
+  user consent before uploading the private signing key to the repository secret;
+  that external setup remains pending (see status). No new product release, tag
+  replacement, Immich access, live synchronization or personal app installation
+  is included. The older migration itself authorized no external publication.
 - Keep `.git` configuration/history, nested checkouts under `worktrees/`, ignored
   build caches, and unrelated user changes intact. Do not launch the app against
   personal media to validate documentation.
@@ -45,7 +48,8 @@
 ## Requirements
 
 Detailed product contracts remain in their existing authoritative documents.
-The following requirements define only this migration and ongoing workflow.
+The following historical requirements define the completed migration and ongoing
+workflow. The current distribution requirements are in its milestone below.
 
 | ID | Requirement | Source | Verification |
 | --- | --- | --- | --- |
@@ -78,10 +82,28 @@ The following requirements define only this migration and ongoing workflow.
 | TM-AC03 | The resulting 34 roles/config parse; default inheritance, the two bounded helper overrides, and absence of a project concurrency cap match the selected template. | TOML/static comparison; no claim of live client reload |
 | TM-AC04 | Original replaced/retired files are recoverable; status distinguishes actual checks from historical QA and defines a truthful next action. | Recovery manifest, final review, local checkpoint or disclosed save limitation |
 
-No later product milestone is selected. On a subsequent continuation request,
-use any concrete task supplied by the user; otherwise help select the next change
-from current evidence. Do not treat a QA checklist or an old deployment plan as
-blanket authorization to implement, publish, or run live synchronization.
+### M-FLATPAK-PAGES-20261107 - Add an updateable Flatpak repository
+
+- Outcome: A signed, multiarchitecture OSTree repository on GitHub Pages, with
+  `.flatpakrepo` and `.flatpakref` entry points, while retaining release bundles.
+- Distribution branch: Preserve the published bundles' `master` Flatpak branch;
+  only published stable SemVer releases may feed it (not CI candidate builds).
+- Automation: Import both architecture bundles from the latest published release;
+  serialize deployments and refuse stale/manual older-release publication.
+  Explicitly dispatch after releases created by `GITHUB_TOKEN`.
+- Trust: Use a persistent repository-specific GPG key, sign commits and summary,
+  and embed its public key in both installation descriptors. Never commit private keys.
+- Storage: Rebuild the current snapshot from published bundles; no historical
+  repository or generated binary Git branch. Enforce the Pages 1 GB site limit.
+- Acceptance: `FP-AC01` real signed two-architecture import and descriptor validation;
+  `FP-AC02` isolated client signature verification and update discovery;
+  `FP-AC03` automated tests and workflow review, preserving existing release assets;
+  `FP-AC04` deployment and live descriptor/repository checks, or explicitly recorded
+  external blocker; `FP-AC05` setup, migration, recovery and installation docs.
+- Completion boundary: No app behavior or product-version change; no Flathub
+  submission changes, native UI test, or connection to Immich is required.
+
+No subsequent milestone is selected after this distribution work.
 
 ## Structure and tools
 

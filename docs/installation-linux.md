@@ -3,10 +3,56 @@
 The desktop app uploads media from local folders or synchronizes folders and
 albums with Immich, with a separate sync mode and file filters for each source.
 
-The supported Linux packages are the `x86_64` and `aarch64` Flatpak bundles
-attached to future GitHub Releases created by the current workflow. Releases
-through `v2.7.0` are not backfilled. The package runs per user and does not
-install a system service or need root privileges at runtime.
+The supported Linux packages are `x86_64` and `aarch64` Flatpaks, available
+through the signed GitHub Pages repository and as standalone GitHub Release
+bundles. The package runs per user and does not install a system service or
+need root privileges at runtime.
+
+## Install from the Flatpak repository
+
+Initial activation is pending; these commands become usable after the first
+Pages deployment. Until then, use [GitHub Release bundles](#install-from-github-releases).
+See [project status](status.md) for activation evidence.
+
+Install Flatpak through your distribution's package manager, then open the
+[`.flatpakref` installer](https://voltkraft.github.io/immich-folder-watch/io.github.voltkraft.immich-folder-watch.flatpakref)
+in your software center or run:
+
+```bash
+flatpak install --user https://voltkraft.github.io/immich-folder-watch/io.github.voltkraft.immich-folder-watch.flatpakref
+flatpak run io.github.voltkraft.immich-folder-watch
+```
+
+The installer selects the native architecture and adds the application's signed
+update source. It uses Flathub for the Freedesktop runtime dependency.
+Alternatively, add the repository explicitly and install the app:
+
+```bash
+flatpak remote-add --user --if-not-exists immich-folder-watch https://voltkraft.github.io/immich-folder-watch/immich-folder-watch.flatpakrepo
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user immich-folder-watch io.github.voltkraft.immich-folder-watch
+```
+
+Subsequent versions arrive through your desktop software center or:
+
+```bash
+flatpak update --user io.github.voltkraft.immich-folder-watch
+```
+
+The application ref retains the existing `master` Flatpak branch; it carries
+published stable releases, not development builds. Both installation files
+embed the repository's public signing key. Do not disable signature verification.
+
+### Migrate an existing bundle installation
+
+Close the app and back up `~/.var/app/io.github.voltkraft.immich-folder-watch/`.
+Check the current origin with
+`flatpak list --app --columns=application,origin,branch`.
+If installed from a standalone bundle, uninstall it with
+`flatpak uninstall --user io.github.voltkraft.immich-folder-watch` **without
+`--delete-data`**, then install the `.flatpakref` above. The same app ID preserves
+configuration and the sync database. Verify the new origin, folder permissions,
+and synchronization before resuming unattended use.
 
 ## Install from GitHub Releases
 

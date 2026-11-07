@@ -1,7 +1,9 @@
 # Flatpak Packaging
 
 `immich-folder-watch` ships to Linux desktops as `x86_64` and `aarch64` Flatpak
-bundles on **GitHub Releases**. The app builds against the freedesktop runtime
+bundles on **GitHub Releases**. A signed **GitHub Pages repository** is prepared;
+initial activation is pending (see [status](../../docs/status.md)).
+The app builds against the freedesktop runtime
 26.08 and uses a pinned Microsoft .NET 10 SDK only while building the Avalonia
 head as a
 self-contained `linux-x64` or `linux-arm64` publish.
@@ -29,6 +31,15 @@ are `immich-folder-watch-<version>-linux-x64.flatpak` and
 publication and generates a complete feed for both architectures. Initial
 acceptance and update activation are still pending;
 see [`flathub/README.md`](flathub/README.md) for requirements and setup.
+
+## GitHub Pages repository
+
+The [repository deployment guide](pages.md) covers the signing key, Actions
+configuration, publication/recovery and local validation. The workflow imports
+the already-published x86_64 and aarch64 bundles and serves an OSTree repository,
+`.flatpakrepo`, and architecture-independent `.flatpakref`. Releases remain the
+archive for downloadable bundles. See [Linux installation](../../docs/installation-linux.md)
+for installation, updates and migration from an existing bundle.
 
 ## Install a published bundle
 

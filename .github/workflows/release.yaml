@@ -301,6 +301,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  trigger-flatpak-pages:
+    name: Update Flatpak repository
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-latest
+    steps:
+      # GITHUB_TOKEN release events do not start other workflows.
+      - name: Trigger Flatpak repository deployment
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'flatpak-pages.yaml',
+              ref: 'main',
+              inputs: { release_tag: process.env.RELEASE_TAG },
+            });
+
   trigger-winget:
     name: Trigger WinGet update
     needs: [prepare-release, publish-release]

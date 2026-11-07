@@ -1,0 +1,133 @@
+name: Flatpak repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published release tag (empty selects latest; older releases are refused)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize the complete selection/build/deploy sequence. Never cancel a deployment.
+concurrency:
+  group: flatpak-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.event_name == 'release' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      release_tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Select latest published stable release
+        id: release
+        uses: actions/github-script@v8
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getLatestRelease(context.repo);
+            const requested = process.env.REQUESTED_TAG;
+            if (release.draft || release.prerelease || !/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(release.tag_name)) {
+              throw new Error('The latest release must be a published stable vMAJOR.MINOR.PATCH release.');
+            }
+            if (requested && requested !== release.tag_name) {
+              throw new Error(`Refusing stale release ${requested}; latest is ${release.tag_name}.`);
+            }
+            const version = release.tag_name.slice(1);
+            for (const arch of ['x64', 'arm64']) {
+              const name = `immich-folder-watch-${version}-linux-${arch}.flatpak`;
+              if (release.assets.filter(asset => asset.name === name && asset.state === 'uploaded').length !== 1) {
+                throw new Error(`Expected exactly one uploaded asset ${name}.`);
+              }
+            }
+            core.setOutput('tag', release.tag_name);
+            core.setOutput('version', version);
+
+      - name: Read GitHub Pages URL
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak ostree gnupg
+
+      - name: Download both release bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "immich-folder-watch-${VERSION}-linux-x64.flatpak" \
+            --pattern "immich-folder-watch-${VERSION}-linux-arm64.flatpak" \
+            --dir artifacts/flatpak-pages-input
+
+      - name: Import signing key and build repository
+        env:
+          FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+          FLATPAK_GPG_KEY_ID: ${{ vars.FLATPAK_GPG_KEY_ID }}
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -euo pipefail
+          test -n "$FLATPAK_GPG_PRIVATE_KEY" || { echo 'Missing FLATPAK_GPG_PRIVATE_KEY secret.' >&2; exit 1; }
+          test -n "$FLATPAK_GPG_KEY_ID" || { echo 'Missing FLATPAK_GPG_KEY_ID variable.' >&2; exit 1; }
+          export GNUPGHOME
+          GNUPGHOME=$(mktemp -d)
+          chmod 700 "$GNUPGHOME"
+          trap 'gpgconf --kill gpg-agent; rm -rf "$GNUPGHOME"' EXIT
+          printf '%s' "$FLATPAK_GPG_PRIVATE_KEY" | gpg --batch --quiet --import
+          unset FLATPAK_GPG_PRIVATE_KEY
+          python3 tools/build-flatpak-repo.py \
+            --bundles-dir artifacts/flatpak-pages-input \
+            --output-dir artifacts/flatpak-pages \
+            --base-url "$PAGES_URL" \
+            --gpg-key-id "$FLATPAK_GPG_KEY_ID"
+
+      - name: Upload Pages snapshot
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: artifacts/flatpak-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Refuse a release superseded while building
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getLatestRelease(context.repo);
+            if (release.tag_name !== process.env.RELEASE_TAG) {
+              throw new Error('A newer release was published; run the workflow again for the latest release.');
+            }
+
+      - name: Deploy signed Flatpak repository
+        id: deployment
+        uses: actions/deploy-pages@v4
