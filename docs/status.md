@@ -2,7 +2,7 @@
 
 ## Active security remediation (2026-11-09)
 
-- Milestone: `M-SECURITY-REMEDIATION-20261109`; in progress.
+- Milestone: `M-SECURITY-REMEDIATION-20261109`; draft PR delivered, CI follow-up in progress.
 - Goal run: active in chat `01a1c1ee-b279-76d2-8529-eaf116140007`, created
   2026-11-09; criteria SEC-AC01 through SEC-AC05 fixed in the selected brief.
 - Baseline: refreshed `origin/main`, `26a0de519ee4f7eae2e556b8da7726539d578594`;
@@ -15,7 +15,10 @@
 - Workstreams: CI/publication credentials, API/transfer bounds, local config/runtime
   security and HTTPS policy, watch-root and remote-album authorization.
 - User approved HTTPS-by-default with explicit HTTP exception and `xhigh` rescan.
-- Checkpoint: `a303e95` contains reviewed CI hardening and the remediation plan.
+- Checkpoints: `a303e95` contains reviewed CI hardening; `6e1a781` contains
+  application remediation. Both are pushed to the single
+  [draft PR #26](https://github.com/VoltKraft/immich-folder-watch/pull/26), targeting `main`.
+  No merge or release was performed.
 - Current disposition: 13 findings addressed in code; one partially addressed
   (`csf_77f3e84ec9b70e5aff765235`, concurrent watch-directory replacement).
   Full mapping, compatibility changes and residual risks are in
@@ -25,7 +28,7 @@
   redirect/buffering in SocketIO and stale authority after failed/offline/rapid
   folder renames. No remaining actionable issue in those reviewed fixes; the
   acknowledged handle-bound filesystem gap remains open.
-- Next action: commit application changes, push the branch and create one draft PR. Inspect Windows/native CI after creation.
+- Next action: validate the Windows test-cleanup correction in the same PR; retain the draft for the documented residual race and unavailable exact-commit rescan.
 
 ### Security validation (2026-11-09)
 
@@ -38,7 +41,8 @@
 | Workflow validation | actionlint 1.7.12 passed; YAML parsed; independent CI review passed | No release/WinGet/Flathub dispatch executed |
 | Filesystem/album security | Linked entries, ownership scope/restart, exact-ID and stale-ID handling covered | Path checks are not race-proof; Windows reparse/runtime acceptance outstanding |
 | Rescan | Not executed: exposed Cloud connector has no documented PR branch/commit selector; no UI available and PR security-review feature disabled | Unchanged-main scan would not validate this branch; arrange exact-commit scan when supported |
-| Windows/ARM64 runtime | Pending CI / physical platform availability | Linux execution and native ABI source inspection do not establish native runtime behavior |
+| GitHub CI `42693673854` at `6e1a781` | Linux build/tests and packaging lint passed. Windows build passed with 0 warnings/errors; test job exposed pooled SQLite handles in the new ownership test cleanup | Added the repository-standard pool clearing after awaited operations; rerun pending. Windows-specific 36 tests passed; native Flatpak candidates still running |
+| Windows/ARM64 runtime | Windows CI rerun pending; actual ARM64/UNC runtime still unavailable | Native ABI source inspection and package compilation do not establish native runtime behavior |
 | Worker follow-up | 54 passed, 1 existing test raced SQLite persistence; moved its database assertion after durable completion and worker stop; final combined rerun passed | No product behavior was changed to satisfy the timing assertion |
 | Initial sandbox attempts | VSTest socket and GPG-agent startup were denied; approved isolated reruns passed | Environment failures were not counted as passing tests |
 | Repository diff | `git diff --check` passed; 79 local documentation paths checked with no missing targets; final staged artifact review passed | Only task-owned sources/docs/tests are staged |

@@ -30,7 +30,13 @@ public sealed class AlbumOwnershipSecurityTests
             await Assert.ThrowsAnyAsync<Exception>(() => store.SaveOwnedAlbumAsync("account", dir.FullName, "Renamed", "replacement", default));
             await Assert.ThrowsAsync<ArgumentException>(() => store.GetOwnedAlbumAsync("account", dir.FullName, "../escape", default));
         }
-        finally { dir.Delete(true); }
+        finally
+        {
+            // Disposed store connections remain pooled; Windows keeps their files
+            // locked until the pool is cleared, as in the other database fixtures.
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            dir.Delete(true);
+        }
     }
 
     [Fact]
