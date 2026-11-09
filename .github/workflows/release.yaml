@@ -13,8 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  actions: write
-  contents: write
+  contents: read
 
 jobs:
   prepare-release:
@@ -41,8 +40,9 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/main' }}
 
@@ -105,13 +105,14 @@ jobs:
           - win-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.x
 
@@ -133,7 +134,7 @@ jobs:
             -Destination (Join-Path $assetRoot "immich-folder-watch-${{ needs.prepare-release.outputs.version }}-${{ matrix.runtime }}.msi")
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: immich-folder-watch-windows-${{ matrix.runtime }}
           path: artifacts/release
@@ -159,13 +160,14 @@ jobs:
     container:
       # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
       # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:c91a88269eee8fcdd73ecf43064232fbebe27411f926f63f38bdf70c51f2ceae
       options: --privileged
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
@@ -176,7 +178,7 @@ jobs:
           echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
 
       - name: Setup pinned .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
@@ -196,7 +198,7 @@ jobs:
             artifacts/flatpak-release/nuget-sources.json
 
       - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           manifest-path: artifacts/flatpak-release/io.github.voltkraft.immich-folder-watch.yml
           bundle: immich-folder-watch-${{ needs.prepare-release.outputs.version }}-${{ matrix.asset_arch }}.flatpak
@@ -206,6 +208,8 @@ jobs:
           repository-url: https://flathub.org/repo/flathub.flatpakrepo
 
   publish-release:
+    permissions:
+      contents: write
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs:
@@ -221,20 +225,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: immich-folder-watch-windows-*
           path: artifacts/release
           merge-multiple: true
 
       - name: Download Flatpak artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: immich-folder-watch-flatpak-*
           path: artifacts/release
@@ -279,17 +284,20 @@ jobs:
           fi
 
       - name: Create immutable release tag
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           TAG_NAME: ${{ needs.prepare-release.outputs.tag }}
           TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG_NAME" "$TARGET_SHA"
-          git push origin "refs/tags/$TAG_NAME"
+        with:
+          script: |
+            await github.rest.git.createRef({
+              ...context.repo,
+              ref: `refs/tags/${process.env.TAG_NAME}`,
+              sha: process.env.TARGET_SHA,
+            });
 
       - name: Publish release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag }}
           name: ${{ needs.prepare-release.outputs.tag }}
@@ -302,13 +310,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   trigger-flatpak-pages:
+    permissions:
+      actions: write
     name: Update Flatpak repository
     needs: [prepare-release, publish-release]
     runs-on: ubuntu-latest
     steps:
       # GITHUB_TOKEN release events do not start other workflows.
       - name: Trigger Flatpak repository deployment
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
         with:
@@ -322,12 +332,14 @@ jobs:
             });
 
   trigger-winget:
+    permissions:
+      actions: write
     name: Trigger WinGet update
     needs: [prepare-release, publish-release]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger WinGet workflow
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
         with:
@@ -344,6 +356,8 @@ jobs:
             });
 
   trigger-flathub:
+    permissions:
+      actions: write
     name: Trigger Flathub preparation and update
     needs: [prepare-release, publish-release]
     runs-on: ubuntu-latest
@@ -351,7 +365,7 @@ jobs:
       # Releases created with GITHUB_TOKEN do not trigger release workflows.
       # Dispatch explicitly, independently of the WinGet update result.
       - name: Trigger Flathub workflow
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
         with:

@@ -9,15 +9,45 @@
 - Product baseline: The checked-in version is `2.11.3` in
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
-- Brief revision: `IFW-BRIEF-20261107-01`.
-- Plan maturity: Existing implementation; GitHub Pages Flatpak distribution complete.
-- Active milestone: None; `M-FLATPAK-PAGES-20261107` is complete.
+- Brief revision: `IFW-BRIEF-20261109-01`.
+- Plan maturity: Selected security remediation plan; established application.
+- Active milestone: `M-SECURITY-REMEDIATION-20261109`.
 - Implementation request / scope: The user's 2026-11-07 request to distribute
   Flatpaks through a GitHub Pages repository in addition to GitHub Releases,
   including `.flatpakref` installation. Implement tooling, automation, signed
   metadata, installation/setup documentation and the repository configuration.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## Selected security remediation (2026-11-09)
+
+The attached user request selects all open Codex Security Cloud findings for the
+current repository, `VoltKraft/immich-folder-watch`, on the latest `main` baseline.
+It authorizes one branch `security/remediate-all-findings`, scoped commits, a push,
+and exactly one consolidated PR titled `security: remediate Codex Security Cloud findings`.
+Use a draft if validation is incomplete or significant risks remain. Do not merge,
+release, alter published assets, or contact a live Immich installation.
+
+### M-SECURITY-REMEDIATION-20261109
+
+- SEC-AC01: Retrieve every available open finding and full evidence across severities;
+  inspect existing patches, deduplicate root causes, and record individual dispositions.
+- SEC-AC02: Address actionable root causes with focused changes and regression tests;
+  document unsafe-to-fix cases and residual risks without marking them fixed.
+- SEC-AC03: Run relevant Linux portable/UI tests, builds/analyzers and workflow checks;
+  independently review the combined diff. Windows-only checks require CI evidence.
+- SEC-AC04: Rescan the updated commit/branch if the available service supports it;
+  record target revision and any inability to scan the PR branch.
+- SEC-AC05: Deliver one PR with all finding IDs/severities/dispositions, dependency,
+  validation and rescan results, limitations and reviewer actions.
+- Compatibility exception explicitly approved on 2026-11-09: require HTTPS by
+  default; existing HTTP installations must explicitly opt into insecure transport.
+  Preserve the option and provide migration guidance. No version/release bump here.
+- Scan choice approved: the service's offered model with `xhigh` reasoning, as in
+  the original scan. This is not a model choice for local subagents.
+
+The historical distribution-only scope below describes the completed milestone;
+security remediation additionally authorizes the application and CI changes above.
 
 ## Scope and boundaries
 

@@ -1,6 +1,24 @@
 # Project Status
 
-## Current handoff
+## Active security remediation (2026-11-09)
+
+- Milestone: `M-SECURITY-REMEDIATION-20261109`; in progress.
+- Goal run: active in chat `01a1c1ee-b279-76d2-8529-eaf116140007`, created
+  2026-11-09; criteria SEC-AC01 through SEC-AC05 fixed in the selected brief.
+- Baseline: refreshed `origin/main`, `26a0de519ee4f7eae2e556b8da7726539d578594`;
+  initially clean. Working branch: `security/remediate-all-findings`.
+- Discovery: 14 new findings (11 medium, 3 low) from completed repository scan
+  `wfr_1cb38532afa4dc13e4acdc43f5953f4ebd3b4308486bbadb640050a3194de7fb`,
+  target `3d41ef56b524b7acfa11559859fc0c7dab0daa73`, completed 2026-10-03.
+  Direct repository-filtered finding lists returned zero; querying the exact scan
+  returned all 14 with no further cursor. Full details contain no proposed patches.
+- Workstreams: CI/publication credentials, API/transfer bounds, local config/runtime
+  security and HTTPS policy, watch-root and remote-album authorization.
+- User approved HTTPS-by-default with explicit HTTP exception and `xhigh` rescan.
+- Next action: implement and validate root-cause fixes, record every disposition,
+  independently review, and publish the consolidated PR. No finding marked fixed.
+
+## Previous completed distribution handoff
 
 - Template cleanup: Completed 2026-10-16. Initialized workflow records for the
   established project; preserved its README, implementation, product documents,
@@ -22,7 +40,7 @@
   select any subsequent product milestone separately.
 - Required input: None.
 
-## Goal run reference
+## Historical distribution Goal reference
 
 - Goal requested for this assignment: No. No Goal was started.
 - Actual Goal state in another chat: Not inspected; this document neither activates
