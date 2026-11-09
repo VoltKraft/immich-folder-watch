@@ -1,5 +1,6 @@
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Platform;
 
 namespace ImmichFolderWatch.App.Shared.Services;
 
@@ -77,8 +78,16 @@ public sealed class ConfigApplyService
         cancellationToken.ThrowIfCancellationRequested();
         saving?.Invoke();
         var yaml = new AppConfigWriter().Serialize(normalizedConfig);
-        Directory.CreateDirectory(configDirectory);
-        await File.WriteAllTextAsync(fullPath, yaml, cancellationToken);
+        if (OperatingSystem.IsLinux())
+        {
+            using var directory = LinuxPrivateDirectory.Open(configDirectory);
+            await directory.WriteTextAtomicallyAsync(Path.GetFileName(fullPath), yaml, cancellationToken);
+        }
+        else
+        {
+            Directory.CreateDirectory(configDirectory);
+            await File.WriteAllTextAsync(fullPath, yaml, cancellationToken);
+        }
         await restartAsync(normalizedConfig, cancellationToken);
         return VerificationResult.Passed();
     }

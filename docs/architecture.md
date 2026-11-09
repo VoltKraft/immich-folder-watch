@@ -41,6 +41,20 @@
 The Linux-specific acceptance matrix and intentional platform differences are
 tracked in [Linux feature parity](qa/linux-parity.md).
 
+## Security boundaries
+
+Immich connections require HTTPS unless the configuration explicitly enables
+insecure HTTP; credentialed HTTP and realtime transports do not follow redirects.
+API inventories and transfer streams have finite resource limits. An incomplete
+remote inventory cannot authorize local cleanup. Linux secret configuration uses
+owner-validated private directories and descriptor-relative atomic writes.
+Folder-driven album mutations require recorded creation provenance and an exact
+album ID; worker startup revokes old pathname authority. Linked watch entries are
+rejected, with concurrent directory-swap races still an explicit limitation.
+See [configuration](configuration.md) and the
+[security remediation record](security-remediation-20261109.md) for contracts,
+migration details and remaining work.
+
 ## Runtime Flow
 
 1. `Program.Main` acquires a single-instance mutex scoped to the current user SID. If already held, it signals the running instance via a named pipe and exits.
@@ -54,7 +68,7 @@ tracked in [Linux feature parity](qa/linux-parity.md).
    - `SyncStatusProvider` (singleton)
 4. The worker opens the shared, versioned SQLite database, loads the state for the configured Immich account and sources, then starts one `FileSystemWatcher` per source.
 5. The worker reconciles local metadata in the background. The source path and relative file path identify a file within an account context; size and UTC modification time form the fast fingerprint. Matching files are skipped without hashing, API calls, uploads, or downloads. New or changed files continue through readiness checks, deduplication, and transfer batching.
-6. A successful upload is committed only after the transfer, any requested album placement, and a final check that the local file did not change during transfer. A download is committed only after its temporary file has been atomically renamed into place. Tombstones preserve completed deletion and move decisions across restarts.
+6. A successful upload is committed only after the transfer, any requested album placement, and a final check that the local file did not change during transfer. A download is committed only after its exclusive temporary file has been atomically moved into place without overwriting a destination that appeared during transfer. Tombstones preserve completed deletion and move decisions across restarts.
 7. Status changes are pushed into `SyncStatusProvider`; the ViewModel and, where enabled, the tray tooltip subscribe and re-render on the UI thread.
 8. On **Save and Apply**, both windows call the shared `ConfigApplyService`. It normalizes and validates the draft, checks required Immich permissions, and writes YAML through `AppConfigWriter` only after validation succeeds. It then awaits `AppHost.RestartAsync(newConfig)`. The replacement host reuses the same per-user database. Local validation and failed access checks do not write or restart; a restart failure is reported after saving.
 9. On startup, `LocalizationService.SetLanguage(config.Localization.Language)` resolves `auto`/`en`/`de` to a `CultureInfo` and applies it before the window is built. Runtime language changes raise `LanguageChanged`; `LocalizationProxy` rebroadcasts it as `PropertyChanged(string.Empty)` so every XAML binding (`{Binding X, Source={StaticResource Loc}}`) refreshes. The tray tooltip, where enabled, and permission list subscribe to the same event.

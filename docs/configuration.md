@@ -16,6 +16,45 @@ The layout change requires no YAML or sync-state migration and preserves all exi
 
 On upgrade from a pre-1.7 service-based install, the legacy `C:\ProgramData\Immich Folder Watch\config.yaml` is copied once into the installing user's `%LOCALAPPDATA%`.
 
+### Transport security and HTTP migration
+
+HTTPS is required by default for configuration checks, uploads/downloads, and
+realtime connections. Existing HTTP configurations must be migrated to a valid
+HTTPS endpoint before synchronization can resume. An installation that deliberately
+accepts sending its API key and media without encryption can instead stop the app,
+edit its YAML, and set `immich.allowInsecureHttp: true`. This is an explicit
+security exception, including for loopback addresses; it is not automatically
+enabled for existing configurations. The GUI retains this YAML setting when saving.
+To revoke the exception, set it to `false` or remove the setting and restart.
+
+Only HTTP and HTTPS URLs without embedded credentials, query parameters, or
+fragments are accepted. Configure the final API URL ending in `/api`; credentialed
+HTTP requests do not follow redirects. Use a server certificate trusted by the
+operating system; certificate verification is not bypassed.
+Realtime polling and WebSocket upgrades also reject redirects and cross-origin
+requests; polling responses and complete WebSocket messages are limited to 4 MiB.
+Oversized realtime messages fail the connection while periodic synchronization
+remains available.
+
+### Local configuration protection
+
+Linux **Save and Apply** validates ownership and rejects linked config paths,
+creates/restricts the application config directory to mode `0700`, and atomically
+replaces the configuration with a flushed mode-`0600` file. Existing broad file
+permissions are corrected by replacement; foreign-owned files and directories are
+rejected. Directory ancestors must be root/current-user-owned and must not be
+writable by other users, except for sticky directories such as `/tmp`. Symlinked
+ancestors are rejected. Move a linked or shared configuration to a private real
+directory before saving. Filesystems that cannot report Linux ownership/modes
+fail closed. Windows continues to use inherited per-user ACLs.
+
+These protections apply when saving, not retroactively to existing copies or
+backups. If a prior configuration was readable by another user, rotate the Immich
+API key and protect or remove exposed copies. When `XDG_RUNTIME_DIR` is absent,
+Linux instance coordination uses a protected `runtime` directory beneath the
+per-user config root instead of a predictable directory in shared `/tmp`.
+Invalid runtime paths are reported as startup errors, not as an existing instance.
+
 ## Persistent Sync State
 
 The app automatically creates one `sync-state.db` beside `config.yaml`. This is
@@ -80,6 +119,7 @@ See [packaging/windows/config.windows.example.yaml](../packaging/windows/config.
 immich:
   serverApiUrl: "https://immich.example.com/api"
   apiKey: "IMMICH_API_KEY"
+  allowInsecureHttp: false # explicitly accepting cleartext credentials/media is required for HTTP
 
 watch:
   sources:
@@ -193,6 +233,13 @@ when no downloads are needed. An empty scan does not clear an upload error.
 
 ### File selection
 
+Linked files and reparse-point directories beneath watch roots are rejected;
+recursive polling does not traverse them. Pathname checks are repeated at transfer
+and cleanup boundaries, but do not provide atomic protection against a concurrent
+attacker swapping directory entries. Use sources writable only by trusted users;
+complete handle-bound authorization remains an open security remediation.
+
+
 - File extensions are case-insensitive.
 - Each source has its own `extensions` include list.
 - Extensions without `.` are normalized automatically.
@@ -223,8 +270,23 @@ when no downloads are needed. An empty scan does not clear an upload error.
       not use the operating system's recycle bin or trash. Partial or failed pulls
       do not trigger this cleanup.
     - **Moving a file** between the parent folder and a subfolder (or between two subfolders) updates the asset's album membership on Immich to match.
-    - **Creating a first-level subfolder** creates the matching Immich album; **deleting a first-level subfolder** trashes any still-tracked assets under it and deletes the Immich album. (Applies to the subfolders-as-albums variant described below.)
-    - **Renaming a first-level subfolder** renames the matching Immich album via `PATCH /albums/{id}`; **renaming an Immich album** renames the matching local first-level subfolder on the next pull. The worker tracks album ids so renames are detected even when the display name changes. Conflicts (a folder or album with the new name already exists) are logged and left untouched instead of being merged automatically.
+    - **Creating a first-level subfolder** may create a new Immich album. The exact ID
+      returned by that creation is recorded with the account and source in `sync-state.db`.
+      An existing same-name album is never adopted for destructive folder operations.
+    - **Deleting or renaming a first-level subfolder** can delete or rename only its
+      recorded, newly created album ID. Directory deletion does not bulk-trash assets
+      by folder name; ordinary mapped file deletion events retain the policy above.
+      Unowned/legacy/imported folders preserve their remote albums and log a refusal.
+      Renames revoke the old path's authority before contacting Immich, including when
+      the remote rename fails. Recover a failed rename manually in Immich.
+    - Album mutation authority is conservatively revoked whenever the worker starts
+      (including Save and Apply), because offline folder replacement cannot be proven
+      from pathname mappings. Existing remote albums must then be renamed/deleted in
+      Immich; uploads and downloads remain available. There is no automatic adoption
+      or manual ownership-editing procedure. This deliberately protects pre-existing
+      albums at the cost of folder-driven album rename/delete after restart.
+    - **Renaming an Immich album** still renames the matching local first-level folder
+      on the next pull. Conflicting target names are logged and not merged.
     - Two shapes are supported depending on `albumName`:
       - `albumName` **set**: flat single-album sync. All files in the source root are kept in sync with that one album. `includeSubdirectories` is forced off — subfolders are ignored. If the named album does not exist, the sync status explains that no files can be downloaded from it yet. Select an existing album or clear `albumName` to mirror all albums and unassigned assets; uploading a local file creates the named album. A missing album never deletes previously synchronized local files.
       - `albumName` **empty**: subfolders-as-albums sync. The root folder mirrors all Immich assets that are not in any album, and each first-level subfolder mirrors the Immich album with the same name. New subfolders become new albums (and new Immich albums become subfolders) in realtime. `includeSubdirectories` is forced on.

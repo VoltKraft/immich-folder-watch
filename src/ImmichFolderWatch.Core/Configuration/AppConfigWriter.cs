@@ -24,6 +24,7 @@ public sealed class AppConfigWriter
             {
                 ServerApiUrl = config.Immich.ServerApiUrl,
                 ApiKey = config.Immich.ApiKey,
+                AllowInsecureHttp = config.Immich.AllowInsecureHttp,
             },
             Watch = new WritableWatchSettings
             {

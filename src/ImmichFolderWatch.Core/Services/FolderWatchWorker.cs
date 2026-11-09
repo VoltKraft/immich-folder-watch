@@ -148,6 +148,12 @@ public sealed partial class FolderWatchWorker : BackgroundService
         try
         {
             await _syncStateStore.InitializeAsync(stoppingToken);
+            if (_syncStateStore is IAlbumOwnershipStore ownership)
+            {
+                // Name-only filesystem identity cannot prove continuity while this
+                // host was stopped. Fail closed rather than adopt a recreated path.
+                await ownership.RevokeAlbumOwnershipAsync(_accountScope, stoppingToken);
+            }
             var lastSuccessfulSync = await _syncStateStore.GetLastSuccessfulSyncAsync(_accountScope, stoppingToken);
             _syncStatusProvider.RestoreLastSyncCompleted(lastSuccessfulSync, _statusSession);
             await _syncStateStore.DeleteExpiredTombstonesAsync(DateTimeOffset.UtcNow, stoppingToken);
@@ -584,7 +590,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     ? SearchOption.AllDirectories
                     : SearchOption.TopDirectoryOnly;
 
-                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*",
+                    WatchPathSafety.EnumerationOptions(context.EffectiveIncludeSubdirectories)))
                 {
                     var normalized = NormalizePath(filePath);
                     seen.Add(normalized);
@@ -747,7 +754,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
             try
             {
                 current = new Dictionary<string, FileFingerprint>(PathComparer);
-                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*", searchOption))
+                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*",
+                    WatchPathSafety.EnumerationOptions(context.EffectiveIncludeSubdirectories)))
                 {
                     var normalized = NormalizePath(filePath);
                     if (!TryGetFingerprint(normalized, out var fingerprint))
@@ -910,6 +918,11 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     TombstoneExpiresAtUtc = DateTimeOffset.UtcNow + TombstoneTtl,
                 };
                 await _syncStateStore.UpsertAsync(tombstone, cancellationToken);
+
+                if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, entry.Key, allowMissingLeaf: true))
+                {
+                    continue;
+                }
 
                 if (File.Exists(entry.Key))
                 {
@@ -1112,6 +1125,10 @@ public sealed partial class FolderWatchWorker : BackgroundService
             }
 
             var destinationPath = Path.Combine(targetDirectory, asset.OriginalFileName);
+            if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, destinationPath, allowMissingLeaf: true))
+            {
+                throw new IOException("Download destination contains a link or escapes its watch source.");
+            }
             var normalized = NormalizePath(destinationPath);
 
             // Path-level tombstone catches the rare case where the
@@ -1233,7 +1250,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 var normalized = NormalizePath(destinationPath);
                 // Collection can take time. Recheck local edits and deletions
                 // immediately before download rather than overwriting a new file.
-                if (File.Exists(destinationPath) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
+                if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, destinationPath, allowMissingLeaf: true)
+                    || File.Exists(destinationPath) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
                 {
                     _syncStatusProvider.ReportDownloadSkipped();
                     continue;
@@ -1512,201 +1530,157 @@ public sealed partial class FolderWatchWorker : BackgroundService
         }
     }
 
+    private readonly SemaphoreSlim _albumMutationLock = new(1, 1);
+
     private async Task HandleSubdirCreatedAsync(string fullPath)
     {
+        await _albumMutationLock.WaitAsync();
         try
         {
-            var dirName = Path.GetFileName(NormalizeDirectory(fullPath));
-            if (string.IsNullOrWhiteSpace(dirName))
+            var context = FindSourceContext(string.Empty, fullPath);
+            if (context is null || !context.UseSubdirsAsAlbums
+                || !WatchPathSafety.IsSafePath(context.NormalizedRoot, fullPath)
+                || _syncStateStore is not IAlbumOwnershipStore ownership)
             {
                 return;
             }
 
-            var result = await _immichAssetClient.EnsureAlbumAsync(dirName, CancellationToken.None);
-            if (result.IsSuccess)
+            var name = Path.GetFileName(NormalizeDirectory(fullPath));
+            if (await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, CancellationToken.None) is not null)
             {
-                if (!string.IsNullOrWhiteSpace(result.AlbumId))
-                {
-                    _albumIdToDirName[result.AlbumId!] = dirName;
-                }
+                return;
+            }
 
-                _logger.LogInformation("Ensured album '{AlbumName}' after subfolder creation.", dirName);
+            var result = await _immichAssetClient.CreateOwnedAlbumAsync(name, CancellationToken.None);
+            if (result.IsSuccess && !string.IsNullOrWhiteSpace(result.AlbumId))
+            {
+                await ownership.SaveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, result.AlbumId, CancellationToken.None);
+                _albumIdToDirName[result.AlbumId] = name;
             }
             else
             {
-                _logger.LogWarning(
-                    "Failed to ensure album '{AlbumName}' for new subfolder: {Error}",
-                    dirName,
-                    result.ErrorMessage ?? "unknown");
+                _logger.LogInformation("Subfolder {Path} has no newly created owned album; existing albums remain unowned: {Error}", fullPath, result.ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to handle subfolder creation {Path}.", fullPath);
+            _logger.LogError(ex, "Failed to bind a newly created album to {Path}.", fullPath);
+        }
+        finally
+        {
+            _albumMutationLock.Release();
         }
     }
 
     private async Task HandleSubdirDeletedAsync(string fullPath)
     {
+        await _albumMutationLock.WaitAsync();
         try
         {
             var normalizedDir = NormalizeDirectory(fullPath);
-            var dirName = Path.GetFileName(normalizedDir);
-            if (string.IsNullOrWhiteSpace(dirName))
+            var context = FindSourceContext(string.Empty, normalizedDir);
+            if (context is null || !context.UseSubdirsAsAlbums
+                || _syncStateStore is not IAlbumOwnershipStore ownership)
             {
                 return;
             }
 
-            var sourceContext = FindSourceContext(string.Empty, normalizedDir);
-            if (sourceContext is not null)
+            var name = Path.GetFileName(normalizedDir);
+            var albumId = await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, CancellationToken.None);
+            if (albumId is null)
             {
-                await TombstonePersistedStatePrefixAsync(sourceContext, normalizedDir, CancellationToken.None);
+                _logger.LogWarning("Remote album deletion refused for unowned subfolder {Path}.", fullPath);
+                return;
             }
 
-            var prefix = normalizedDir + Path.DirectorySeparatorChar;
-            var toTrash = new List<string>();
-            foreach (var entry in _pathToAssetId.ToArray())
+            // Never trash all assets based on a directory name. Individual file
+            // deletion events retain the existing mapped-asset synchronization policy.
+            var result = await _immichAssetClient.DeleteAlbumByIdAsync(albumId, CancellationToken.None);
+            if (result.IsSuccess || result.AlbumMissing)
             {
-                if (!entry.Key.StartsWith(prefix, PathComparison))
-                {
-                    continue;
-                }
-
-                if (_pathToAssetId.TryRemove(entry.Key, out var assetId))
-                {
-                    _debouncedFiles.TryRemove(entry.Key, out _);
-                    toTrash.Add(assetId);
-                }
-            }
-
-            if (toTrash.Count > 0)
-            {
-                var trashResult = await _immichAssetClient.TrashAssetsAsync(toTrash, CancellationToken.None);
-                if (trashResult.IsSuccess)
-                {
-                    _logger.LogInformation(
-                        "Trashed {Count} asset(s) from deleted subfolder '{DirName}'.",
-                        toTrash.Count,
-                        dirName);
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "Failed to trash {Count} asset(s) from subfolder '{DirName}': {Error}",
-                        toTrash.Count,
-                        dirName,
-                        trashResult.ErrorMessage ?? "unknown");
-                }
-            }
-
-            var deleteResult = await _immichAssetClient.DeleteAlbumAsync(dirName, CancellationToken.None);
-            if (deleteResult.IsSuccess)
-            {
-                _logger.LogInformation("Deleted album '{AlbumName}' after subfolder removal.", dirName);
+                await ownership.RemoveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, albumId, CancellationToken.None);
+                _albumIdToDirName.TryRemove(albumId, out _);
             }
             else
             {
-                _logger.LogWarning(
-                    "Failed to delete album '{AlbumName}' after subfolder removal: {Error}",
-                    dirName,
-                    deleteResult.ErrorMessage ?? "unknown");
-            }
-
-            foreach (var entry in _albumIdToDirName.ToArray())
-            {
-                if (string.Equals(entry.Value, dirName, StringComparison.Ordinal))
-                {
-                    _albumIdToDirName.TryRemove(entry.Key, out _);
-                }
+                _logger.LogWarning("Owned album deletion failed for {Path}: {Error}", fullPath, result.ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle subfolder deletion {Path}.", fullPath);
         }
+        finally
+        {
+            _albumMutationLock.Release();
+        }
     }
 
     private async Task HandleSubdirRenamedAsync(string oldFullPath, string newFullPath)
     {
+        await _albumMutationLock.WaitAsync();
         try
         {
-            var oldNormalizedDir = NormalizeDirectory(oldFullPath);
-            var newNormalizedDir = NormalizeDirectory(newFullPath);
-            var oldDirName = Path.GetFileName(oldNormalizedDir);
-            var newDirName = Path.GetFileName(newNormalizedDir);
-
-            if (string.IsNullOrWhiteSpace(newDirName))
+            var oldDir = NormalizeDirectory(oldFullPath);
+            var newDir = NormalizeDirectory(newFullPath);
+            var context = FindSourceContext(string.Empty, oldDir);
+            if (context is null || !context.UseSubdirsAsAlbums
+                || _syncStateStore is not IAlbumOwnershipStore ownership)
             {
                 return;
             }
 
-            RekeyPathMapPrefix(oldNormalizedDir, newNormalizedDir);
-            var sourceContext = FindSourceContext(string.Empty, newNormalizedDir);
-            if (sourceContext is not null)
+            var oldName = Path.GetFileName(oldDir);
+            var newName = Path.GetFileName(newDir);
+            var albumId = await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, oldName, CancellationToken.None);
+            if (albumId is not null)
             {
-                await RekeyPersistedStatePrefixAsync(
-                    sourceContext,
-                    oldNormalizedDir,
-                    newNormalizedDir,
-                    CancellationToken.None);
+                // Revoke first, even when a second rename has already removed the
+                // destination or later state/network operations fail.
+                await ownership.RemoveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, oldName, albumId, CancellationToken.None);
             }
 
-            if (string.IsNullOrWhiteSpace(oldDirName)
-                || string.Equals(oldDirName, newDirName, StringComparison.Ordinal))
+            if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, newDir))
             {
                 return;
             }
 
-            var rename = await _immichAssetClient.RenameAlbumAsync(oldDirName, newDirName, CancellationToken.None);
-            if (rename.IsSuccess && !rename.AlbumMissing)
+            RekeyPathMapPrefix(oldDir, newDir);
+            await RekeyPersistedStatePrefixAsync(context, oldDir, newDir, CancellationToken.None);
+            if (albumId is null)
             {
-                if (!string.IsNullOrWhiteSpace(rename.AlbumId))
-                {
-                    _albumIdToDirName[rename.AlbumId!] = newDirName;
-                }
-
-                _logger.LogInformation(
-                    "Renamed Immich album '{OldName}' to '{NewName}' after subfolder rename.",
-                    oldDirName,
-                    newDirName);
+                _logger.LogWarning("Remote album rename refused for unowned subfolder {Path}.", oldFullPath);
                 return;
             }
 
-            if (rename.AlbumMissing)
+            if (await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, newName, CancellationToken.None) is not null)
             {
-                var ensure = await _immichAssetClient.EnsureAlbumAsync(newDirName, CancellationToken.None);
-                if (ensure.IsSuccess)
-                {
-                    if (!string.IsNullOrWhiteSpace(ensure.AlbumId))
-                    {
-                        _albumIdToDirName[ensure.AlbumId!] = newDirName;
-                    }
-
-                    _logger.LogInformation(
-                        "Subfolder renamed '{OldName}' -> '{NewName}'; target album ensured (no source album existed).",
-                        oldDirName,
-                        newDirName);
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "Failed to ensure album '{AlbumName}' after subfolder rename: {Error}",
-                        newDirName,
-                        ensure.ErrorMessage ?? "unknown");
-                }
-
+                _logger.LogWarning("Remote album rename refused because destination {Path} is already bound.", newFullPath);
                 return;
             }
 
-            _logger.LogWarning(
-                "Failed to rename Immich album '{OldName}' -> '{NewName}': {Error}",
-                oldDirName,
-                newDirName,
-                rename.ErrorMessage ?? "unknown");
+            var result = await _immichAssetClient.RenameAlbumByIdAsync(albumId, newName, CancellationToken.None);
+            if (result.IsSuccess && !result.AlbumMissing)
+            {
+                await ownership.SaveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, newName, albumId, CancellationToken.None);
+                _albumIdToDirName[albumId] = newName;
+            }
+            else if (result.AlbumMissing)
+            {
+                await ownership.RemoveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, oldName, albumId, CancellationToken.None);
+            }
+            else
+            {
+                _logger.LogWarning("Owned album rename failed for {Path}: {Error}", oldFullPath, result.ErrorMessage);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle subfolder rename {Old} -> {New}.", oldFullPath, newFullPath);
+        }
+        finally
+        {
+            _albumMutationLock.Release();
         }
     }
 
@@ -1953,7 +1927,9 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 }
 
                 var context = FindSourceContext(request.SourcePath, request.FilePath);
-                if (context is null || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
+                if (context is null
+                    || !WatchPathSafety.IsSafePath(context.NormalizedRoot, request.FilePath)
+                    || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
                 {
                     _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
                     _syncStatusProvider.ReportUploadSkipped();
@@ -2263,6 +2239,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
         CancellationToken cancellationToken)
     {
         if (!context.DeleteAfterUpload
+            || !WatchPathSafety.IsSafePath(context.NormalizedRoot, fullPath)
             || entry.Direction != SyncTransferDirection.Upload
             || entry.Status != SyncEntryStatus.Synchronized
             || !TryGetFingerprint(fullPath, out var fingerprint)

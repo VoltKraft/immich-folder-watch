@@ -71,7 +71,7 @@ when choosing a workflow.
 - Per-folder upload or bidirectional sync, with multiple workflows running together
 - Local access to media downloaded from Immich, including additions from other devices
 - Optional album placement for uploads; single-album or subfolders-as-albums synchronization
-- Automatic album creation and synchronization of album/subfolder renames in bidirectional mode
+- Automatic album creation and guarded album/subfolder renames in bidirectional mode (see [ownership and restart limits](docs/configuration.md#file-selection))
 - Per-folder media extensions and exclusion filters
 - Configurable upload/download order, upload batches, and file readiness checks
 - Persistent sync state shared by all watched folders, so unchanged files do not generate uploads or downloads after a restart
@@ -95,9 +95,12 @@ when choosing a workflow.
    `immich-folder-watch-<version>-win-arm64.msi` for Windows on Arm.
 2. Install it with administrative rights (per-machine binary install).
 3. Open the `Immich Folder Watch` desktop shortcut.
-4. Open **Connection**, enter your Immich URL and API key, and review the verification result.
+4. Open **Connection**, enter your HTTPS Immich URL and API key, and review the verification result.
 5. Open **Folders**, add your sources, and choose each folder's upload or bidirectional sync mode under **General**. Review its album, file filters, and deletion behavior in the [desktop interface guide](docs/user-interface.md). Set the global upload/download order under **Settings → Transfer**; newest files are processed first by default.
 6. **Save and Apply** — transfers and folder monitoring start with the selected modes.
+
+HTTPS is required by default. Existing HTTP installations need the explicit
+[insecure-transport migration option](docs/configuration.md#transport-security-and-http-migration).
 
 Each Windows user has their own configuration. The app autostarts at login by default.
 `winget install VoltKraft.ImmichFolderWatch` selects the matching x64 or ARM64

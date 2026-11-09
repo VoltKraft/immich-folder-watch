@@ -32,7 +32,7 @@ public static class AppConfigValidator
         return value.EndsWith('/') ? value : $"{value}/";
     }
 
-    public static string? ValidateServerApiUrl(string value)
+    public static string? ValidateServerApiUrl(string value, bool allowInsecureHttp = false)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -42,6 +42,21 @@ public static class AppConfigValidator
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
         {
             return "immich.serverApiUrl must be a valid absolute URL.";
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
+        {
+            return "immich.serverApiUrl must use HTTPS (or explicitly permitted HTTP).";
+        }
+
+        if (uri.Scheme == Uri.UriSchemeHttp && !allowInsecureHttp)
+        {
+            return "immich.serverApiUrl must use HTTPS. To explicitly accept unencrypted API keys and media, set immich.allowInsecureHttp: true in config.yaml.";
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            return "immich.serverApiUrl must not contain user credentials, a query, or a fragment.";
         }
 
         var normalizedPath = uri.AbsolutePath.TrimEnd('/');
@@ -64,7 +79,7 @@ public static class AppConfigValidator
 
     private static void ValidateImmich(AppConfig config, List<string> errors)
     {
-        var apiUrlError = ValidateServerApiUrl(config.Immich.ServerApiUrl);
+        var apiUrlError = ValidateServerApiUrl(config.Immich.ServerApiUrl, config.Immich.AllowInsecureHttp);
         if (!string.IsNullOrWhiteSpace(apiUrlError))
         {
             errors.Add(apiUrlError);

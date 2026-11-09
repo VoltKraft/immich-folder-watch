@@ -15,6 +15,9 @@ public sealed class AppConfig
 
 public sealed class ImmichSettings
 {
+    /// <summary>Explicitly permits sending credentials and media over unencrypted HTTP.</summary>
+    public bool AllowInsecureHttp { get; set; }
+
     public string ServerApiUrl { get; set; } = string.Empty;
 
     public string ApiKey { get; set; } = string.Empty;

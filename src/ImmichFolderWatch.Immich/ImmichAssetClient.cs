@@ -7,11 +7,12 @@ using System.Text.Json;
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace ImmichFolderWatch.Immich;
 
-public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityVerifier
+public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityVerifier
 {
     private const int MaxBackoffMilliseconds = 30_000;
 
@@ -25,13 +26,27 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
     private readonly RetrySettings _retrySettings;
 
+    private readonly ImmichTransferLimits _limits;
+
     private readonly ILogger<ImmichAssetClient> _logger;
 
     public ImmichAssetClient(
         HttpClient httpClient,
         RetrySettings retrySettings,
         ILogger<ImmichAssetClient> logger)
+        : this(httpClient, retrySettings, logger, new ImmichTransferLimits())
     {
+    }
+
+    public ImmichAssetClient(
+        HttpClient httpClient,
+        RetrySettings retrySettings,
+        ILogger<ImmichAssetClient> logger,
+        ImmichTransferLimits limits)
+    {
+        ArgumentNullException.ThrowIfNull(limits);
+        limits.Validate();
+        _limits = limits;
         _httpClient = httpClient;
         _retrySettings = retrySettings;
         _logger = logger;
@@ -100,56 +115,117 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        var directory = Path.GetDirectoryName(destinationPath);
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var tempPath = destinationPath + ".downloading";
+        string? tempPath = null;
         try
         {
+            destinationPath = Path.GetFullPath(destinationPath);
+            var directory = Path.GetDirectoryName(destinationPath)!;
+            Directory.CreateDirectory(directory);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(_limits.DownloadTimeout);
             using var request = new HttpRequestMessage(HttpMethod.Get, ImmichApiRoutes.AssetOriginalFile(assetId));
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                var body = await ReadResponseAsync(response, deadline.Token);
                 return DownloadAssetResult.Failure(
                     response.StatusCode,
                     $"HTTP {(int)response.StatusCode}: {TrimForLog(body)}");
             }
 
-            await using (var inputStream = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var outputStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            if (response.Content.Headers.ContentLength > _limits.MaxDownloadBytes)
             {
-                await inputStream.CopyToAsync(outputStream, cancellationToken);
+                return DownloadAssetResult.Failure(null, "Asset exceeds the download size limit.");
             }
 
-            if (File.Exists(destinationPath))
+            var readFreeSpace = DownloadStorage.CreateFreeSpaceReader(directory);
+            EnsureFreeSpace(readFreeSpace, 0);
+            // CreateNew rejects every existing entry, including symbolic links. Never reuse a predictable partial file.
+            var candidatePath = Path.Combine(directory, $".{Guid.NewGuid():N}.downloading");
+            var options = new FileStreamOptions
             {
-                File.Delete(destinationPath);
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
             }
 
-            File.Move(tempPath, destinationPath);
+            await using (var output = new FileStream(candidatePath, options))
+            {
+                // Cleanup is permitted only after this invocation successfully creates the entry.
+                tempPath = candidatePath;
+                using var inactivity = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+                inactivity.CancelAfter(_limits.BodyInactivityTimeout);
+                await using var input = await response.Content.ReadAsStreamAsync(inactivity.Token);
+                var buffer = new byte[81920];
+                long transferred = 0;
+                while (true)
+                {
+                    inactivity.CancelAfter(_limits.BodyInactivityTimeout);
+                    var count = await input.ReadAsync(buffer, inactivity.Token);
+                    if (count == 0) break;
+                    if (count > _limits.MaxDownloadBytes - transferred)
+                    {
+                        throw new IOException("Asset exceeds the download size limit.");
+                    }
+
+                    EnsureFreeSpace(readFreeSpace, count);
+                    await output.WriteAsync(buffer.AsMemory(0, count), inactivity.Token);
+                    transferred += count;
+                }
+
+                if (response.Content.Headers.ContentLength is { } expected && transferred != expected)
+                {
+                    throw new IOException("Asset download ended before its declared length was received.");
+                }
+            }
+
+            // No overwrite: a local producer wins any race to create the destination.
+            File.Move(tempPath, destinationPath, overwrite: false);
+            tempPath = null;
             return DownloadAssetResult.Success();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            if (File.Exists(tempPath))
+            _logger.LogError(ex, "Asset download failed for {AssetId}.", assetId);
+            return DownloadAssetResult.Failure(null, ex.Message);
+        }
+        finally
+        {
+            if (tempPath is not null)
             {
                 try
                 {
                     File.Delete(tempPath);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Could not remove an incomplete download.");
                 }
             }
-
-            _logger.LogError(ex, "Asset download failed for {AssetId}.", assetId);
-            return DownloadAssetResult.Failure(null, ex.Message);
         }
     }
+
+    private void EnsureFreeSpace(Func<long> readFreeSpace, int bytesToWrite)
+    {
+        if (readFreeSpace() - bytesToWrite < _limits.MinimumFreeSpaceBytes)
+        {
+            throw new IOException("The download would exhaust the configured free-space reserve.");
+        }
+    }
+
+    private Task<string> ReadResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
+        BoundedResponseReader.ReadAsync(response.Content,
+            response.IsSuccessStatusCode ? _limits.MaxMetadataBytes : _limits.MaxDiagnosticBytes,
+            truncate: !response.IsSuccessStatusCode, _limits.BodyInactivityTimeout, cancellationToken);
 
     public async Task<AlbumListResult> ListAlbumsAsync(CancellationToken cancellationToken)
     {
@@ -572,6 +648,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
     {
         var collected = new List<AlbumAssetSummary>();
         var page = 1;
+        long collectedBytes = 0;
 
         while (true)
         {
@@ -595,23 +672,29 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                     $"HTTP {(int)result.StatusCode!.Value}: {TrimForLog(result.Body)}");
             }
 
-            if (!TryParseSearchAssets(result.Body, out var pageAssets, out var hasNextPage))
+            if (!TryParseSearchAssets(result.Body, page, out var pageAssets, out var hasNextPage))
             {
                 return AssetSearchResult.Failure(result.StatusCode, parseErrorMessage);
             }
 
-            collected.AddRange(pageAssets);
+            collectedBytes += Encoding.UTF8.GetByteCount(result.Body);
+            if (collectedBytes > _limits.MaxSearchBytes || pageAssets.Count > _limits.MaxSearchAssets - collected.Count)
+            {
+                return AssetSearchResult.Failure(null, "Asset search exceeds its aggregate resource limit; the snapshot is incomplete.");
+            }
 
-            if (!hasNextPage || pageAssets.Count == 0)
+            collected.AddRange(pageAssets);
+            if (!hasNextPage)
             {
                 break;
+            }
+
+            if (pageAssets.Count == 0 || page >= _limits.MaxSearchPages)
+            {
+                return AssetSearchResult.Failure(null, "Asset search pagination is incomplete; remote deletions cannot be inferred.");
             }
 
             page++;
-            if (page > 500)
-            {
-                break;
-            }
         }
 
         return AssetSearchResult.Success(collected);
@@ -843,7 +926,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
     {
         try
         {
-            using var response = await _httpClient.GetAsync(route, cancellationToken);
+            using var response = await _httpClient.GetAsync(route, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation("Immich connectivity verified using endpoint {Route}.", route);
@@ -856,7 +939,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 return false;
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await ReadResponseAsync(response, cancellationToken);
             throw new HttpRequestException(
                 $"Ping endpoint '{route}' failed with HTTP {(int)response.StatusCode}: {TrimForLog(body)}");
         }
@@ -871,14 +954,14 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
     {
         try
         {
-            using var response = await _httpClient.GetAsync(ImmichApiRoutes.ServerInfo, cancellationToken);
+            using var response = await _httpClient.GetAsync(ImmichApiRoutes.ServerInfo, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation("Immich connectivity verified using fallback endpoint {Route}.", ImmichApiRoutes.ServerInfo);
                 return true;
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await ReadResponseAsync(response, cancellationToken);
             _logger.LogError(
                 "Immich fallback connectivity check failed with HTTP {StatusCode}. Response: {Response}",
                 (int)response.StatusCode,
@@ -899,8 +982,9 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         CancellationToken cancellationToken)
     {
         using var content = CreateUploadContent(request, includeLegacyIdentifiers);
-        using var response = await _httpClient.PostAsync(ImmichApiRoutes.AssetUpload, content, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, ImmichApiRoutes.AssetUpload) { Content = content };
+        using var response = await _httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var responseBody = await ReadResponseAsync(response, cancellationToken);
         return new UploadHttpResult(response.StatusCode, responseBody);
     }
 
@@ -913,6 +997,12 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
 
     private static MultipartFormDataContent CreateUploadContent(UploadAssetRequest request, bool includeLegacyIdentifiers)
     {
+        if (!string.IsNullOrWhiteSpace(request.SourcePath)
+            && !WatchPathSafety.IsSafePath(request.SourcePath, request.FilePath))
+        {
+            throw new IOException("Upload path is outside its source or contains a symbolic link or reparse point.");
+        }
+
         var fileInfo = new FileInfo(request.FilePath);
         var multipart = new MultipartFormDataContent();
 
@@ -954,8 +1044,8 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 Content = content,
             };
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var body = await ReadResponseAsync(response, cancellationToken);
             return ApiCallResult.FromResponse(response.StatusCode, body);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1052,14 +1142,14 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
         return false;
     }
 
-    private static bool TryParseSearchAssets(string responseBody, out List<AlbumAssetSummary> assets, out bool hasNextPage)
+    private bool TryParseSearchAssets(string responseBody, int currentPage, out List<AlbumAssetSummary> assets, out bool hasNextPage)
     {
         assets = new List<AlbumAssetSummary>();
         hasNextPage = false;
 
         if (string.IsNullOrWhiteSpace(responseBody))
         {
-            return true;
+            return false;
         }
 
         try
@@ -1072,7 +1162,7 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 itemsElement = document.RootElement;
             }
             else if (document.RootElement.ValueKind == JsonValueKind.Object
-                && TryGetSearchItemsElement(document.RootElement, out itemsElement, out hasNextPage))
+                && TryGetSearchItemsElement(document.RootElement, currentPage, out itemsElement, out hasNextPage))
             {
                 // itemsElement is now set
             }
@@ -1081,16 +1171,16 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 return false;
             }
 
+            if (itemsElement.GetArrayLength() > _limits.MaxSearchAssets)
+            {
+                return false;
+            }
+
             foreach (var element in itemsElement.EnumerateArray())
             {
-                if (element.ValueKind != JsonValueKind.Object)
+                if (element.ValueKind != JsonValueKind.Object || !TryExtractString(element, "id", out var id))
                 {
-                    continue;
-                }
-
-                if (!TryExtractString(element, "id", out var id))
-                {
-                    continue;
+                    return false;
                 }
 
                 if (!TryExtractString(element, "originalFileName", out var originalFileName)
@@ -1125,43 +1215,47 @@ public sealed class ImmichAssetClient : IImmichAssetClient, IImmichConnectivityV
                 : null;
     }
 
-    private static bool TryGetSearchItemsElement(JsonElement root, out JsonElement itemsElement, out bool hasNextPage)
+    private static bool TryGetSearchItemsElement(JsonElement root, int currentPage, out JsonElement itemsElement, out bool hasNextPage)
     {
         itemsElement = default;
         hasNextPage = false;
-
+        var container = root;
         if (root.TryGetProperty("assets", out var assetsElement))
         {
             if (assetsElement.ValueKind == JsonValueKind.Array)
             {
                 itemsElement = assetsElement;
-                return true;
             }
-
-            if (assetsElement.ValueKind == JsonValueKind.Object
-                && assetsElement.TryGetProperty("items", out var items)
-                && items.ValueKind == JsonValueKind.Array)
+            else if (assetsElement.ValueKind == JsonValueKind.Object)
             {
-                itemsElement = items;
-
-                if (assetsElement.TryGetProperty("nextPage", out var nextPage))
-                {
-                    hasNextPage = nextPage.ValueKind switch
-                    {
-                        JsonValueKind.Number => true,
-                        JsonValueKind.String => !string.IsNullOrWhiteSpace(nextPage.GetString()),
-                        _ => false,
-                    };
-                }
-
-                return true;
+                container = assetsElement;
+            }
+            else
+            {
+                return false;
             }
         }
 
-        if (root.TryGetProperty("items", out var topItems) && topItems.ValueKind == JsonValueKind.Array)
+        if (itemsElement.ValueKind != JsonValueKind.Array)
         {
-            itemsElement = topItems;
+            if (!container.TryGetProperty("items", out itemsElement) || itemsElement.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+        }
+
+        if (!container.TryGetProperty("nextPage", out var nextPage) || nextPage.ValueKind == JsonValueKind.Null)
+        {
             return true;
+        }
+
+        // Do not infer a complete snapshot from malformed, repeated, or skipped continuation metadata.
+        int next;
+        if (nextPage.ValueKind == JsonValueKind.Number && nextPage.TryGetInt32(out next)
+            || nextPage.ValueKind == JsonValueKind.String && int.TryParse(nextPage.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out next))
+        {
+            hasNextPage = next == currentPage + 1;
+            return hasNextPage;
         }
 
         return false;

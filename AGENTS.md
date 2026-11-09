@@ -159,6 +159,9 @@ to reconcile project decisions, defaults, and recorded state.
 - Use four-space C# indentation, file-scoped namespaces, PascalCase types/public
   members, camelCase locals/parameters, and `Async` suffixes. Preserve enabled
   nullable reference types, implicit usings, and analyzers in Directory.Build.props.
+- Security regression coverage and known residual risks are tracked in
+  [the security remediation record](docs/security-remediation-20261109.md). Preserve
+  HTTPS opt-in policy, bounded transfers, and exact-ID album authorization when changing sync behavior.
 - Tests use xUnit and Coverlet. Match platform scope, mirror production namespaces,
   name classes `*Tests`, and use descriptive case names. Add regression coverage
   for behavior changes. Await durable worker persistence before stopping workers

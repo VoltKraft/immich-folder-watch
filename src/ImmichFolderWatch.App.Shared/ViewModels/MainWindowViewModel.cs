@@ -103,6 +103,7 @@ public sealed class MainWindowViewModel : BindableBase
 
     private string _immichServerApiUrl = string.Empty;
     private string _immichApiKey = string.Empty;
+    private bool _allowInsecureHttp;
     private string _batchIntervalSeconds = "5";
     private string _maxBatchSize = "25";
     private string _fileReadyTimeoutSeconds = "30";
@@ -631,6 +632,7 @@ public sealed class MainWindowViewModel : BindableBase
 
         ImmichServerApiUrl = config.Immich.ServerApiUrl;
         ImmichApiKey = config.Immich.ApiKey;
+        _allowInsecureHttp = config.Immich.AllowInsecureHttp;
         SelectedTransferOrder = config.Watch.TransferOrder;
         BatchIntervalSeconds = config.Watch.BatchIntervalSeconds.ToString();
         MaxBatchSize = config.Watch.MaxBatchSize.ToString();
@@ -733,6 +735,7 @@ public sealed class MainWindowViewModel : BindableBase
             {
                 ServerApiUrl = ImmichServerApiUrl.Trim(),
                 ApiKey = ImmichApiKey.Trim(),
+                AllowInsecureHttp = _allowInsecureHttp,
             },
             Watch = new WatchSettings
             {
@@ -786,6 +789,7 @@ public sealed class MainWindowViewModel : BindableBase
             {
                 ServerApiUrl = ImmichServerApiUrl.Trim(),
                 ApiKey = ImmichApiKey.Trim(),
+                AllowInsecureHttp = _allowInsecureHttp,
             },
             Watch = new WatchSettings
             {

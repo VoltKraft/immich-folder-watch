@@ -408,10 +408,11 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
         Assert.Equal(1, client.UploadCount);
         Assert.False(File.Exists(filePath));
-        Assert.Empty(await GetEntriesAsync(config, databasePath));
-        // File cleanup precedes the final success write; stopping early can cancel that write.
+        // File cleanup precedes state deletion and the final success write.
+        // Wait for durable completion before inspecting the database or stopping.
         await WaitUntilAsync(() => status.LastSyncCompletedUtc.HasValue, TimeSpan.FromSeconds(3));
         await worker.StopAsync(CancellationToken.None);
+        Assert.Empty(await GetEntriesAsync(config, databasePath));
 
         var lastSuccess = Assert.IsType<DateTimeOffset>(status.LastSyncCompletedUtc);
         Assert.Equal(lastSuccess, await GetLastSuccessfulSyncAsync(config, databasePath));
@@ -939,6 +940,22 @@ public sealed partial class FolderWatchWorkerPersistenceTests
     private sealed class RecordingAssetClient : IImmichAssetClient
     {
         private int _uploadCount;
+
+        public ConcurrentQueue<string> MutatedAlbums { get; } = new();
+        public bool FailAlbumRename { get; init; }
+
+        public Task<DeleteAlbumResult> DeleteAlbumByIdAsync(string albumId, CancellationToken cancellationToken)
+        {
+            MutatedAlbums.Enqueue("delete:" + albumId);
+            return Task.FromResult(DeleteAlbumResult.Success());
+        }
+
+        public Task<RenameAlbumResult> RenameAlbumByIdAsync(string albumId, string newName, CancellationToken cancellationToken)
+        {
+            MutatedAlbums.Enqueue("rename:" + albumId);
+            return Task.FromResult(FailAlbumRename
+                ? RenameAlbumResult.Failure(null, "test failure") : RenameAlbumResult.Success(albumId));
+        }
 
         public ConcurrentQueue<string> DownloadedAssets { get; } = new();
 

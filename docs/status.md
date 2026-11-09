@@ -15,8 +15,33 @@
 - Workstreams: CI/publication credentials, API/transfer bounds, local config/runtime
   security and HTTPS policy, watch-root and remote-album authorization.
 - User approved HTTPS-by-default with explicit HTTP exception and `xhigh` rescan.
-- Next action: implement and validate root-cause fixes, record every disposition,
-  independently review, and publish the consolidated PR. No finding marked fixed.
+- Checkpoint: `a303e95` contains reviewed CI hardening and the remediation plan.
+- Current disposition: 13 findings addressed in code; one partially addressed
+  (`csf_77f3e84ec9b70e5aff765235`, concurrent watch-directory replacement).
+  Full mapping, compatibility changes and residual risks are in
+  [the remediation record](security-remediation-20261109.md).
+- Independent reviewers checked CI trust, native Linux storage, REST/download
+  bounds, realtime adapters and album authority. Review-driven corrections cover
+  redirect/buffering in SocketIO and stale authority after failed/offline/rapid
+  folder renames. No remaining actionable issue in those reviewed fixes; the
+  acknowledged handle-bound filesystem gap remains open.
+- Next action: commit application changes, push the branch and create one draft PR. Inspect Windows/native CI after creation.
+
+### Security validation (2026-11-09)
+
+| Check | Result | Limits |
+| --- | --- | --- |
+| Portable Core tests | 448 passed on final combined rerun; 0 failed/skipped | .NET 10.0.203 selected by `global.json`; Linux x86_64 |
+| Linux GUI/protocol tests | 53 passed | Isolated headless UI, local sockets and D-Bus; no live Immich |
+| Linux app build/analyzers | Passed, 0 warnings/errors | Debug build; generated branding not committed |
+| Tooling/packaging | 97 Python tests passed, including real PowerShell security scripts and isolated signed Flatpak repository tests | Synthetic keys/artifacts only; no publication |
+| Workflow validation | actionlint 1.7.12 passed; YAML parsed; independent CI review passed | No release/WinGet/Flathub dispatch executed |
+| Filesystem/album security | Linked entries, ownership scope/restart, exact-ID and stale-ID handling covered | Path checks are not race-proof; Windows reparse/runtime acceptance outstanding |
+| Rescan | Not executed: exposed Cloud connector has no documented PR branch/commit selector; no UI available and PR security-review feature disabled | Unchanged-main scan would not validate this branch; arrange exact-commit scan when supported |
+| Windows/ARM64 runtime | Pending CI / physical platform availability | Linux execution and native ABI source inspection do not establish native runtime behavior |
+| Worker follow-up | 54 passed, 1 existing test raced SQLite persistence; moved its database assertion after durable completion and worker stop; final combined rerun passed | No product behavior was changed to satisfy the timing assertion |
+| Initial sandbox attempts | VSTest socket and GPG-agent startup were denied; approved isolated reruns passed | Environment failures were not counted as passing tests |
+| Repository diff | `git diff --check` passed; 79 local documentation paths checked with no missing targets; final staged artifact review passed | Only task-owned sources/docs/tests are staged |
 
 ## Previous completed distribution handoff
 

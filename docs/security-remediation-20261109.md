@@ -21,24 +21,26 @@ The two download-file findings share one implementation but retain distinct IDs.
 ## Finding dispositions
 
 These are code-review dispositions, not a claim that Security Cloud has closed
-or rescanned them. Final combined validation remains in progress.
+or rescanned them. Combined Linux validation passed; the final worker follow-up and remote CI
+status are recorded in [status](status.md). Thirteen findings are fixed in code,
+one is partially fixed, none is classified as false positive, and none was skipped.
 
 | Finding ID | Severity | Component | Remediation | Disposition |
 | --- | --- | --- | --- | --- |
-| `csf_204d80f4dba65ad2200a0f52` | Medium | Download staging | Unpredictable same-directory staging with exclusive creation; cleanup only the created staging path. | Implemented; targeted tests pass |
-| `csf_e072282d3540054e0caa735a` | Medium | Publication actions | Full verified commit SHAs; multiarchitecture build-image digest. | Implemented; workflow tests/review pass |
+| `csf_204d80f4dba65ad2200a0f52` | Medium | Download staging | Unpredictable same-directory staging with exclusive creation; cleanup only the created staging path. | Fixed; targeted tests pass |
+| `csf_e072282d3540054e0caa735a` | Medium | Publication actions | Full verified commit SHAs; multiarchitecture build-image digest. | Fixed; workflow tests/review pass |
 | `csf_77f3e84ec9b70e5aff765235` | Medium | Watch-root filesystem access | Reject linked entries/components and skip recursive reparse points; recheck upload/download/delete boundaries. | **Partially fixed; concurrent directory replacement remains open** |
-| `csf_c793af7c8b73e70cd9cef253` | Medium | Linux secret configuration | Owner-validated private directories, descriptor-relative exclusive 0600 temporary write and atomic replacement. | Implemented; targeted tests pass |
-| `csf_3d1deaf494d68bcd8705352c` | Medium | Remote album mutation | Record creation-returned IDs scoped to account/source; refuse pre-existing adoption; mutate by ID; revoke old-path/restart authority. | Implemented; targeted tests pass |
-| `csf_740910544257761f129c14fc` | Medium | Download finalization | Atomic no-overwrite move; preserve destinations that appear during transfer. | Implemented; targeted tests pass |
-| `csf_22bdb9836b247cce7ea03578` | Medium | WinGet dispatcher | Pass tag as environment data; validate stable version syntax before output/checkout. | Implemented; executable PowerShell tests pass |
-| `csf_88aa96fa9a7f83ae24cfc275` | Medium | Remote inventory | Reject pagination/aggregate limits, malformed entries and contradictory continuation instead of reporting a complete inventory. | Implemented; targeted tests pass |
-| `csf_ab63fa83a1bc6518321098e3` | Medium | HTTP/realtime transport | HTTPS by default with user-approved explicit insecure HTTP exception; reject redirects. | Implemented; realtime adapter validation pending |
-| `csf_7872ec7777b99b8829e90b22` | Medium | WinGet executable | Pin v1.12.13.0 and verify independently checked upstream SHA-256 before token-bearing execution. | Implemented; executable PowerShell tests pass |
-| `csf_84f52d35e0746ff5aca7f195` | Medium | Release credentials | Read-only build jobs, no persisted checkout credentials, isolated publication/dispatch write permissions. | Implemented; workflow tests/review pass |
-| `csf_9d99342d709dbfe0f2367899` | Low | API response buffering | Headers-only requests and bounded decompressed metadata/error reads; cumulative search limits. Realtime transport also bounded. | Implemented; realtime adapter validation pending |
-| `csf_0c8e7f62652e1f88aecb3ab2` | Low | Linux single instance | Verified private per-user fallback instead of predictable shared `/tmp`; primary-only socket cleanup. | Implemented; targeted tests pass |
-| `csf_3c832cee2a5242ec46db86c9` | Low | Download resources | Per-asset byte ceiling, free-space reserve, inactivity/overall deadlines and failure cleanup. | Implemented; targeted tests pass |
+| `csf_c793af7c8b73e70cd9cef253` | Medium | Linux secret configuration | Owner-validated private directories, descriptor-relative exclusive 0600 temporary write and atomic replacement. | Fixed; targeted tests pass |
+| `csf_3d1deaf494d68bcd8705352c` | Medium | Remote album mutation | Record creation-returned IDs scoped to account/source; refuse pre-existing adoption; mutate by ID; revoke old-path/restart authority. | Fixed; targeted tests pass |
+| `csf_740910544257761f129c14fc` | Medium | Download finalization | Atomic no-overwrite move; preserve destinations that appear during transfer. | Fixed; targeted tests pass |
+| `csf_22bdb9836b247cce7ea03578` | Medium | WinGet dispatcher | Pass tag as environment data; validate stable version syntax before output/checkout. | Fixed; executable PowerShell tests pass |
+| `csf_88aa96fa9a7f83ae24cfc275` | Medium | Remote inventory | Reject pagination/aggregate limits, malformed entries and contradictory continuation instead of reporting a complete inventory. | Fixed; targeted tests pass |
+| `csf_ab63fa83a1bc6518321098e3` | Medium | HTTP/realtime transport | HTTPS by default with user-approved explicit insecure HTTP exception; reject redirects. | Fixed; targeted tests and independent review pass |
+| `csf_7872ec7777b99b8829e90b22` | Medium | WinGet executable | Pin v1.12.13.0 and verify independently checked upstream SHA-256 before token-bearing execution. | Fixed; executable PowerShell tests pass |
+| `csf_84f52d35e0746ff5aca7f195` | Medium | Release credentials | Read-only build jobs, no persisted checkout credentials, isolated publication/dispatch write permissions. | Fixed; workflow tests/review pass |
+| `csf_9d99342d709dbfe0f2367899` | Low | API response buffering | Headers-only requests and bounded decompressed metadata/error reads; cumulative search limits. Realtime transport also bounded. | Fixed; targeted tests and independent review pass |
+| `csf_0c8e7f62652e1f88aecb3ab2` | Low | Linux single instance | Verified private per-user fallback instead of predictable shared `/tmp`; primary-only socket cleanup. | Fixed; targeted tests pass |
+| `csf_3c832cee2a5242ec46db86c9` | Low | Download resources | Per-asset byte ceiling, free-space reserve, inactivity/overall deadlines and failure cleanup. | Fixed; targeted tests pass |
 
 ## Compatibility and limits
 
@@ -89,8 +91,14 @@ changes remain Unreleased (Keep a Changelog 1.1.0 / Semantic Versioning 2.0.0).
 Targeted regression tests and independent reviews have run during implementation;
 [status](status.md) records final combined checks and revision. Independent review
 found stale folder authority and the default SocketIO redirect/buffering gap;
-these were addressed before handoff. Realtime adapter review is still pending.
+these were addressed before handoff. Realtime adapter follow-up review found no further actionable issue.
 
-The rescan API exposes repository/environment and model/reasoning selection but
-no documented branch/commit selector. Branch-scan capability is being checked;
-no scan of unchanged `main` will be claimed as validation of the PR.
+The exposed rescan API provides repository/environment and model/reasoning
+selection but no documented branch/commit selector or declared ref variable.
+The environment points to this repository whose default branch is `main`; no UI
+was available to select a different branch. PR security review is disabled in the
+current service feature configuration. Therefore no new Cloud scan was executed:
+a scan of unchanged `main` would not validate this PR. This is a connector/access
+limitation, not a claim about all Security Cloud capabilities. A reviewer must
+arrange a scan of the exact PR commit when supported, without merging merely to
+obtain scan coverage. The user selected `xhigh` reasoning for that rescan.

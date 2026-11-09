@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Require HTTPS for Immich by default, with an explicit documented `allowInsecureHttp` migration option for trusted legacy HTTP installations.
+- Write Linux configuration containing API keys atomically with owner-only permissions; use a verified private directory for single-instance state.
+- Bound API response sizes and download resources, reject incomplete remote inventories before cleanup, and finalize downloads without replacing local files.
+- Refuse linked watch entries and scope folder-driven album mutations to newly created, explicitly recorded IDs; revoke folder authority after worker restarts and failed renames.
+- Pin CI actions, the Flatpak build image and WinGet submission binary; restrict release job tokens and validate dispatcher tags outside executable source.
+
 ### Added
 - Signed GitHub Pages Flatpak repository for x86_64 and aarch64, with `.flatpakrepo`/`.flatpakref` installation, normal Flatpak updates, and release-triggered deployment alongside existing GitHub Release bundles.
 
