@@ -2,9 +2,13 @@
 
 ## Active security remediation (2026-11-09)
 
-- Milestone: `M-SECURITY-REMEDIATION-20261109`; draft PR delivered, CI follow-up in progress.
-- Goal run: active in chat `01a1c1ee-b279-76d2-8529-eaf116140007`, created
-  2026-11-09; criteria SEC-AC01 through SEC-AC05 fixed in the selected brief.
+- Milestone: `M-SECURITY-REMEDIATION-20261109`; remediation pass delivered in draft PR #26, with one explicitly open residual finding.
+- Goal run: requested and executed in chat `01a1c1ee-b279-76d2-8529-eaf116140007`, created
+  2026-11-09; criteria SEC-AC01 through SEC-AC05 fixed in the selected brief. The user later
+  explicitly reaffirmed subagent use; focused implementation and independent reviews
+  were used. Completion permits explicitly documented unresolved findings. The remediation
+  assignment is delivered; the filesystem finding remains explicitly open and
+  the PR is not ready to merge.
 - Baseline: refreshed `origin/main`, `26a0de519ee4f7eae2e556b8da7726539d578594`;
   initially clean. Working branch: `security/remediate-all-findings`.
 - Discovery: 14 new findings (11 medium, 3 low) from completed repository scan
@@ -16,7 +20,7 @@
   security and HTTPS policy, watch-root and remote-album authorization.
 - User approved HTTPS-by-default with explicit HTTP exception and `xhigh` rescan.
 - Checkpoints: `a303e95` contains reviewed CI hardening; `6e1a781` contains
-  application remediation. Both are pushed to the single
+  application remediation; `cf290b6` corrects the Windows SQLite fixture cleanup. All are pushed to the single
   [draft PR #26](https://github.com/VoltKraft/immich-folder-watch/pull/26), targeting `main`.
   No merge or release was performed.
 - Current disposition: 13 findings addressed in code; one partially addressed
@@ -28,7 +32,9 @@
   redirect/buffering in SocketIO and stale authority after failed/offline/rapid
   folder renames. No remaining actionable issue in those reviewed fixes; the
   acknowledged handle-bound filesystem gap remains open.
-- Next action: validate the Windows test-cleanup correction in the same PR; retain the draft for the documented residual race and unavailable exact-commit rescan.
+- Next action: review the single PR; retain draft status until the open filesystem
+  race is resolved and exact-commit security validation can be arranged. All six CI jobs passed on `cf290b6`; this final handoff updates documentation only.
+  No additional milestone was selected.
 
 ### Security validation (2026-11-09)
 
@@ -41,8 +47,10 @@
 | Workflow validation | actionlint 1.7.12 passed; YAML parsed; independent CI review passed | No release/WinGet/Flathub dispatch executed |
 | Filesystem/album security | Linked entries, ownership scope/restart, exact-ID and stale-ID handling covered | Path checks are not race-proof; Windows reparse/runtime acceptance outstanding |
 | Rescan | Not executed: exposed Cloud connector has no documented PR branch/commit selector; no UI available and PR security-review feature disabled | Unchanged-main scan would not validate this branch; arrange exact-commit scan when supported |
-| GitHub CI `42693673854` at `6e1a781` | Linux build/tests and packaging lint passed. Windows build passed with 0 warnings/errors; test job exposed pooled SQLite handles in the new ownership test cleanup | Added the repository-standard pool clearing after awaited operations; rerun pending. Windows-specific 36 tests passed; native Flatpak candidates still running |
-| Windows/ARM64 runtime | Windows CI rerun pending; actual ARM64/UNC runtime still unavailable | Native ABI source inspection and package compilation do not establish native runtime behavior |
+| GitHub CI `42693673854` at `6e1a781` | Linux build/tests and packaging lint passed. Windows build passed with 0 warnings/errors; test job exposed pooled SQLite handles in the new ownership test cleanup | Added the repository-standard pool clearing after awaited operations; rerun passed in `42694315680`; Windows-specific 36 tests also passed |
+| [GitHub CI `42694315680`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42694315680) at `cf290b6` | All six jobs passed: Windows/Linux application checks, packaging lint, candidate preparation, and native x86_64/aarch64 packages. Windows: Core 439 passed / 9 platform skips; Windows-specific 36 passed; Linux-project tests 34 passed / 19 platform skips; full solution build 0 warnings/errors; 7 PowerShell security tests passed | Both native x86_64 and aarch64 candidate builds/validation and artifact uploads passed; actual ARM64/UNC app runtime not exercised |
+| Superseded native run | Earlier x86_64 candidate could not fetch its replaced synthetic PR merge commit after a new push | No source/compiler failure; current run is authoritative |
+| Native runtime limits | Actual ARM64/UNC runtime remains unavailable | Native ABI source inspection and package compilation do not establish runtime behavior |
 | Worker follow-up | 54 passed, 1 existing test raced SQLite persistence; moved its database assertion after durable completion and worker stop; final combined rerun passed | No product behavior was changed to satisfy the timing assertion |
 | Initial sandbox attempts | VSTest socket and GPG-agent startup were denied; approved isolated reruns passed | Environment failures were not counted as passing tests |
 | Repository diff | `git diff --check` passed; 79 local documentation paths checked with no missing targets; final staged artifact review passed | Only task-owned sources/docs/tests are staged |

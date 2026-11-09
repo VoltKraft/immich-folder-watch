@@ -4,7 +4,7 @@
 
 Baseline: `26a0de519ee4f7eae2e556b8da7726539d578594` (`origin/main`, fetched
 2026-11-09). One branch: `security/remediate-all-findings`; one consolidated PR
-will target `main`. No merge, product release, live Immich access or scanner
+targets `main` in [draft PR #26](https://github.com/VoltKraft/immich-folder-watch/pull/26). No merge, product release, live Immich access or scanner
 suppression is authorized by this work.
 
 The completed original scan is
@@ -21,8 +21,9 @@ The two download-file findings share one implementation but retain distinct IDs.
 ## Finding dispositions
 
 These are code-review dispositions, not a claim that Security Cloud has closed
-or rescanned them. Combined Linux validation passed; the final worker follow-up and remote CI
-status are recorded in [status](status.md). Thirteen findings are fixed in code,
+or rescanned them. Combined Linux validation and all six GitHub CI jobs passed at `cf290b6`,
+including Windows/Linux application checks and native x86_64/aarch64 Flatpak
+candidates. Exact counts and runtime limitations are recorded in [status](status.md). Thirteen findings are fixed in code,
 one is partially fixed, none is classified as false positive, and none was skipped.
 
 | Finding ID | Severity | Component | Remediation | Disposition |

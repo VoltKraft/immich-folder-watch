@@ -10,12 +10,12 @@
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
 - Brief revision: `IFW-BRIEF-20261109-01`.
-- Plan maturity: Selected security remediation plan; established application.
-- Active milestone: `M-SECURITY-REMEDIATION-20261109`.
-- Implementation request / scope: The user's 2026-11-07 request to distribute
-  Flatpaks through a GitHub Pages repository in addition to GitHub Releases,
-  including `.flatpakref` installation. Implement tooling, automation, signed
-  metadata, installation/setup documentation and the repository configuration.
+- Plan maturity: Security remediation pass delivered; draft review and one documented residual finding remain.
+- Active milestone: None; `M-SECURITY-REMEDIATION-20261109` delivered with one explicitly documented unresolved finding, as allowed by its acceptance criteria.
+- Implementation request / scope: The user's 2026-11-09 attached request to
+  investigate every open Codex Security Cloud finding, consolidate verified fixes
+  and documented unresolved items into one PR, and validate the result. The earlier
+  distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
 
@@ -49,7 +49,7 @@ release, alter published assets, or contact a live Immich installation.
 The historical distribution-only scope below describes the completed milestone;
 security remediation additionally authorizes the application and CI changes above.
 
-## Scope and boundaries
+## Historical distribution scope and boundaries
 
 - Preserve application sources, user configuration/data, API behavior, application
   dependencies, license/attribution, versions and release history. Extend only
@@ -134,7 +134,7 @@ workflow. The current distribution requirements are in its milestone below.
 - Completion boundary: No app behavior or product-version change; no Flathub
   submission changes, native UI test, or connection to Immich is required.
 
-No subsequent milestone is selected after this distribution work.
+No subsequent milestone is selected after the security remediation pass. Any continuation of this remediation should use the same PR and its documented residual filesystem work.
 
 ## Structure and tools
 
