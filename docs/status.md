@@ -1,5 +1,24 @@
 # Project Status
 
+## v3.0.1 release preparation (2026-11-11)
+
+- User authorized publishing v3.0.1 from current main `bb13a33`, including all
+  merged maintenance/security changes; selected `M-RELEASE-301-20261111`.
+- Remote v3.0.1 release/tag are unused. Local main matches origin/main and the
+  working tree was clean before preparation. Existing v3.0.0 assets are preserved.
+- Unified versions are prepared as 3.0.1 / 3.0.1.0; release notes retain every
+  Unreleased item and summarize the merged dependencies/actions and maintenance
+  records. Release date uses the user's Europe/Berlin date, 2026-11-11.
+- Publication follows successful main CI through the existing release workflow;
+  verify all four assets and downstream signed Flatpak repository before handoff.
+  No publication/build success is claimed at this preparation checkpoint.
+- Local preflight passed: version/XML/changelog consistency, AppStream validation,
+  five manifest regressions and five workflow-security tests (four PowerShell
+  cases require Windows CI), plus whitespace checks. Independent release review
+  found no blocker in the five-file preparation diff.
+- #32 and #34 remain excluded from main; auto-merge stays disabled.
+
+
 ## Release checkout fix verified on main (2026-11-10)
 
 - Published security fix `ae9558c` and Windows regression-runner correction

@@ -6,12 +6,12 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The checked-in version is `3.0.0` in
+- Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-11`.
+- Brief revision: `IFW-BRIEF-20261111-01`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: None; `M-DEPENDABOT-REFRESH-20261110` completed.
+- Active milestone: `M-RELEASE-301-20261111`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,21 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-RELEASE-301-20261111
+
+- User explicitly selected creation and publication of v3.0.1 containing all
+  changes on main at baseline `bb13a33`. This authorizes release preparation,
+  pushing the release commit and the existing release/distribution automation.
+- R301-AC01: Bump unified product/assembly/file versions, complete release notes
+  and regenerate AppStream metadata for 2026-11-11 (Europe/Berlin). Preserve
+  prior releases, compatibility requirements and dependency license evidence.
+- R301-AC02: Pass exact-commit CI and CodeQL, build all four Windows/Linux
+  x64/ARM64 assets, and verify the immutable tag and published stable release.
+- R301-AC03: Verify the signed Flatpak Pages distribution and report downstream
+  WinGet/Flathub workflow results separately from external acceptance.
+- R301-AC04: Leave #32 open/blocked, #34 open/deferred, automatic merging disabled;
+  no additional dependency update, live Immich access or installed app changes.
 
 ## Release checkout hardening (2026-11-10)
 

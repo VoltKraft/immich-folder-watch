@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-11-11
+
+Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.
+
 ### Security
 - Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path.
 
@@ -18,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
+
+### Changed
+- Update Microsoft.Extensions and Microsoft.Data.Sqlite to 11.0.0, with reviewed upstream license notices retained in Flatpak packages.
+- Update pinned artifact upload/download, Pages configuration/deployment and Node setup actions; retain manual dependency review and disabled automatic merging.
+- Record dependency compatibility reviews, validation results and deferred upgrades in the maintenance documentation.
 
 ## [3.0.0] - 2026-11-10
 
