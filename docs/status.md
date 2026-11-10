@@ -1,5 +1,50 @@
 # Project Status
 
+## Dependabot CI remediation (2026-11-10)
+
+- Selected milestone: `M-DEPENDABOT-CI-20261110`. User authorized fixes on
+  existing PR branches without merges; later explicitly deferred #32's Avalonia
+  upgrade because of incompatible embedded component licensing.
+- Isolated worktrees preserve each bot proposal and the original local main.
+  Scoped corrections are pushed without force; no update PR is merged.
+
+| PR | Cause and correction | Pushed correction | Validation |
+| --- | --- | --- | --- |
+| #27 | Concurrent watcher/poll deletion handlers read the same asset before tombstone persistence; per-path ownership and retained retry baseline prevent duplicate remote trash | `ca35782` (fix `05297b7`) | Two deterministic regressions fail against old source; 483 Core tests pass before review delta, five focused deletion cases pass after it; independent review passed; CI pending |
+| #33 | Missing reviewed supplemental notices for Microsoft.Extensions/System 11.0.0; verified exact source license and all package notices, added exact-version supplements | `c6ad2e9` | Both architecture restores and 87-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; CI pending |
+| #35 | xUnit 4 changes parallelism API, test-runner defaults and Avalonia extension ABI; retain framework 3.2.2 and compatible v2/runner upgrades, exclude incompatible future v4 proposals | `a5cbed6` | 481 Core and 53 Linux GUI/protocol cases pass with no failures/skips; schema and independent review passed; CI pending |
+| #36 | Missing reviewed supplemental notices for Microsoft.Data.Sqlite/Core 11.0.0; verified MIT source and added exact-version supplements | `2b2b186` | Both architecture restores and 81-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; CI pending |
+
+- No license guard or test assertion was disabled. SDKs: local application/tests
+  10.0.203; exact Flatpak feed restores 10.0.401. PR corrections add no release bump.
+- Next action: verify all six CI jobs on each corrected PR head and record results.
+  Keep #32 open/blocked and automatic merging disabled.
+
+### Deferred Avalonia PR #32
+
+- Baseline: Dependabot head `51898a8`, Avalonia 12.1.6. Initial CI fails NU1605:
+  Avalonia.FreeDesktop requires Tmds.DBus.Protocol >=0.94.1 while the app pins 0.92.0.
+- A local diagnostic with app/test pins at 0.94.1 passed the Linux Release build
+  (three obsolescence warnings, zero errors), 53 Linux GUI/protocol tests and 33
+  portable Linux-specific tests using SDK 10.0.203. The pin edits were reverted
+  after the user selected leaving this PR open and blocked; the bot proposal is
+  preserved. These results do not describe the unchanged PR head.
+- Exact Avalonia source `cf8e564674700348947e93ab19105f27afe859a9` retains
+  [MS-PL Calendar code](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/src/Avalonia.Controls/Calendar/Calendar.cs)
+  and [MS-PL Fluent theme resources](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/src/Avalonia.Themes.Fluent/Controls/Calendar.xaml),
+  with default compile/resource inclusion. The exact source contains 19 marked
+  controls C# files and seven marked Fluent XAML files (plus eight Simple themes).
+  Its [NOTICE](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/NOTICE.md)
+  and top-level MIT license are byte-identical to the repository's retained files;
+  preserving those notices does not establish AGPL compatibility. The
+  [GNU license list](https://www.gnu.org/licenses/license-list.html#ms-pl) identifies
+  MS-PL as GPL-incompatible. No reduced build or linking exception was found here.
+- Status: leave #32 open and blocked. No dependency/catalog approval, license-guard
+  bypass, merge or publication. A separately scoped reduced build/component review
+  or applicable licensing permission is required before proceeding. Windows and
+  native Flatpak success are not claimed. No live Immich access occurred.
+
+
 ## Dependabot completion check (2026-11-10, 20:39 Europe/Berlin)
 
 - The first [NuGet updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)

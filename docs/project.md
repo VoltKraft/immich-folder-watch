@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-05`.
-- Plan maturity: Dependabot configuration and GitHub activation selected.
-- Active milestone: `M-DEPENDABOT-20261110`.
+- Brief revision: `IFW-BRIEF-20261110-06`.
+- Plan maturity: Dependabot CI remediation selected; Avalonia upgrade deferred.
+- Active milestone: `M-DEPENDABOT-CI-20261110`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,22 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## Selected dependency maintenance (2026-11-10)
+
+### M-DEPENDABOT-CI-20261110
+
+- User selected investigation and fixes for existing Dependabot PRs #27, #32,
+  #33, #35 and #36; no merges. Scoped corrections and CI validation stay on the
+  existing PR branches, with no release/version bump or live Immich access.
+- DCI-AC01: Identify failed-job causes on exact PR heads and preserve checks,
+  security contracts, license guards and unrelated changes.
+- DCI-AC02: Fix #27's concurrent deletion propagation with a deterministic
+  regression; review exact Microsoft package license/notice sources for #33/#36;
+  keep #35's test framework compatible with the Avalonia headless extension.
+- DCI-AC03: Validate locally where applicable, independently review consequential
+  fixes, push scoped commits to existing PRs and verify their CI without merging.
+- DCI-AC04: Explicit follow-up decision: leave #32 open and blocked on Avalonia
+  component licensing. Record technical downgrade failure and license evidence;
+  do not approve the package or expand into a reduced Avalonia build.
 
 ### M-DEPENDABOT-20261110
 
