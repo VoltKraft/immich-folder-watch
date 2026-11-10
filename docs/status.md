@@ -1,6 +1,32 @@
 # Project Status
 
+## Dependabot activation (2026-11-10)
+
+- Selected milestone: `M-DEPENDABOT-20261110`, extended by explicit user request
+  to activate security alerts/updates and push configuration while disabling auto-merge.
+- Starting state: clean local `main` at `8c8bab8`; remote default branch `main`
+  remains at `64a9892`. API readback: vulnerability alerts enabled (HTTP 204),
+  automated security fixes disabled/unpaused, repository `allow_auto_merge: true`.
+- DB-AC04: Complete. Pushed configuration commit `8c8bab8` to `main` without
+  force; GitHub's branch SHA and decoded `.github/dependabot.yml` content match
+  the local commit/file. Security alerts were already enabled and remain enabled
+  (HTTP 204). Enabled automated security fixes and independently read back
+  `enabled: true`, `paused: false`. Disabled repository auto-merge and independently
+  verified `allow_auto_merge: false`.
+- Hosted evidence: GitHub queued the first [NuGet update run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)
+  and [GitHub Actions update run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487560)
+  for `8c8bab8`. Automatic NuGet dependency submission started. No Dependabot PRs
+  existed at the check; no package upgrade or merge was performed.
+- Checks: Remote content comparison and settings readback passed. Configuration
+  retains the prior schema/coverage/review evidence. Application sources, versions
+  and workflows are unchanged; no additional local runtime tests were needed.
+- Next action: Review generated dependency/security PRs with the existing license
+  and platform CI requirements. The initial bot runs and push CI are queued/running;
+  their completion is not claimed. Activation is complete; no further milestone selected.
+
 ## Dependabot implementation (2026-11-10)
+
+The following records the local checkpoint before the authorized activation above.
 
 - Selected milestone: `M-DEPENDABOT-20261110`; local implementation complete.
 - Baseline: clean local `main` at `64a9892`, whose merge commit includes PR #26
