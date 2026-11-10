@@ -26,6 +26,15 @@
 
 ## Selected dependency maintenance (2026-11-10)
 
+### Remaining Actions PR merges (2026-11-10)
+
+- User selected merging the successfully reviewed/refreshed #28/#29/#30/#31,
+  leaving #34's configuration-check recovery open for now. This supersedes the
+  earlier no-merge boundary only for these four Actions PRs.
+- Verify exact heads/checks, preserve branch rules, merge manually, and verify
+  final main CI. Leave #32 open/blocked and #34 open/deferred; retain disabled
+  auto-merge. No version bump, manual release or publication workflow dispatch.
+
 ### Dependabot configuration-check recovery (2026-11-10)
 
 - User authorized investigating and recovering #34's queued Dependabot-owned
