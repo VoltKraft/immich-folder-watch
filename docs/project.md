@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-07`.
+- Brief revision: `IFW-BRIEF-20261110-08`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: None; `M-DEPENDABOT-CI-20261110` completed with #32 deferred.
+- Active milestone: `M-DEPENDABOT-REFRESH-20261110`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,19 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## Selected dependency maintenance (2026-11-10)
+
+### M-DEPENDABOT-REFRESH-20261110
+
+- User explicitly authorized updating #28/#29/#30/#31/#34 with current remote
+  main and obtaining successful CI and CodeQL checks. This supersedes the earlier
+  read-only boundary for these branches only; keep PRs unmerged and auto-merge off.
+- DCR-AC01: Preserve each reviewed proposal and integrate current main without
+  force-pushing, altering unrelated branches or publishing local main records.
+- DCR-AC02: Verify all six CI jobs plus CodeQL's four language analyses and
+  aggregate assessment on each exact updated head. Investigate and correct scoped
+  failures without disabling checks, assertions or license/security safeguards.
+- DCR-AC03: Confirm #32 stays unchanged/open/blocked and auto-merge disabled;
+  record exact revisions and evidence. No release, deployment or live Immich use.
 
 ### Remaining Dependabot review (2026-11-10)
 
