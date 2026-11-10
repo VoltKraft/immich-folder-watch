@@ -22,6 +22,75 @@
 - Next action: commit/push this correction to PR #36 and verify both native jobs.
   No PR has been merged and no release or live Immich operation was performed.
 
+## Dependabot PR #35 compatibility repair (2026-11-10)
+
+- User requested investigation and correction of failed Dependabot CI without
+  merging. This worktree repairs PR #35 from `820cc9f` and retains its compatible
+  xUnit 2.9.3 and Visual Studio runner 4.0.1 updates.
+- Root causes: xUnit v3 framework 4.0.3 rejects the old assembly parallelism
+  property, enables MTP v2 incompatible with the current .NET 10 VSTest command,
+  and changes the extension ABI used by Avalonia.Headless.XUnit 12.0.3.
+  A diagnostic `mtp-off`/new-parallelism experiment compiled but failed discovery
+  for all 15 Avalonia GUI cases (`MissingMethodException`); 38 other tests passed.
+- Correction: retain GUI framework 3.2.2 and its serial assembly setup, defer
+  Dependabot `xunit.v3` proposals >=4 until a compatible bridge and runner path
+  are validated, and use the predicate overload of `Assert.Single` for the newer
+  xUnit v2 analyzer. No test was disabled or removed; no application code changed.
+- License evidence: official NuGet package metadata for xUnit 2.9.3 and Visual
+  Studio runner 4.0.1 declares Apache-2.0 with immutable source commits documented
+  in the Linux test README. These test-only packages are AGPL-3.0-only compatible
+  and do not enter application distribution artifacts.
+- Validation: Release Linux GUI/protocol suite passed all 53 tests and the portable
+  Core suite passed all 481 tests, with no failures/skips, using SDK 10.0.203,
+  isolated headless controls and local D-Bus. Builds reported no warnings/errors.
+  Dependabot schema, local documentation links and diff whitespace checks passed.
+- Next action: verify Windows/full CI on the corrected PR head. No merge or live
+  Immich operation is authorized or performed.
+
+## Dependabot PR #33 license correction (2026-11-10)
+
+- Scope: fix the existing Microsoft.Extensions 11.0.0 update PR's Flatpak CI
+  failure without merging, changing product versions or weakening license checks.
+- Baseline: `7fb5e63`; both native Flatpak jobs stopped at the exact-version
+  supplemental notice guard, beginning with Microsoft.Extensions.Configuration.
+- Reviewed all 32 changed Microsoft.Extensions/System 11.0.0 archives in the
+  resolved feed against their recorded `dotnet/dotnet` source revision. Added
+  version-specific MIT provenance and exact catalog entries, including four new
+  transitive System packages. All upstream third-party notices are retained.
+  Detailed source/hash and license-delta evidence is in
+  [the license review](../packaging/flatpak/licenses/README.md#microsoftextensions-1100-review-2026-11-10).
+- Validation: exact Flatpak SDK 10.0.401 restored Linux x64 and ARM64 into isolated
+  caches. The generator's official-source/SHA-512 checks passed for the combined
+  87-archive feed; the real license installer passed and all 32 updated license
+  and notice outputs matched reviewed SHA-256 values. All 15 notice-installer
+  regression tests passed, including rejection of unknown versions/tampering.
+- No application code changed. The existing Windows/Linux application CI passed
+  before this metadata correction; actual native Flatpak rerun is still required.
+- Next action: commit/push this correction to PR #33 and verify both native jobs.
+  No PR has been merged and no release or live Immich operation was performed.
+
+## Dependabot PR #27 CI correction (2026-11-10)
+
+- User authorized investigating/fixing existing PR #27 without merging. Its
+  Windows CI failed `Sync_IgnoresExcludedFileDeletionsButPropagatesMediaDeletion`
+  because one asset appeared twice in the trash requests.
+- Cause: watcher and polling handlers both read the mapping before asynchronous
+  tombstone persistence removed it. A per-path in-progress claim now gives one
+  handler ownership until completion, including exceptional exits. Polling keeps
+  missing mappings while a deletion is active or failed, preserving retryability.
+- Added deterministic concurrent watcher/poll tests with paused persistence and
+  injected persistence failure. Both assertions failed against the original
+  production code; the initial guard passed the full 483-test Core suite.
+  After independent review identified the polling retry gap, the corrected delta
+  passed all five focused deletion cases (including the original three cases).
+- Independent source review found no remaining actionable issue; handle-bound
+  absence checks and watcher shutdown draining remain unchanged. Initial restricted
+  MSBuild attempts failed without compiler diagnostics; permitted local runs passed.
+- The updated download-artifact SHA retains the upstream MIT license, verified
+  at `9000827ccba6bdab643e8b6fd33ac0654aef8333`. No dependency is added by this fix.
+- Next action: push this correction to the existing PR and verify Windows/Linux
+  and native Flatpak CI on its exact head. No merge, release or live Immich access.
+
 ## Dependabot activation (2026-11-10)
 
 - Selected milestone: `M-DEPENDABOT-20261110`, extended by explicit user request
