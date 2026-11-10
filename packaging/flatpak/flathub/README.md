@@ -170,6 +170,13 @@ Flathub application repository exists and its first build has been accepted:
 | Variable `FLATHUB_AUTOMATION_ENABLED=true` | Enables update PR submission after both native build jobs succeed. Leave unset until the first submission is accepted. |
 | Variable `FLATHUB_AUTOMERGE_ENABLED=true` | Requests GitHub automerge on update PRs. Leave unset until Flathub has explicitly granted GitHub automerge for this app. |
 
+All external Actions are pinned to full upstream commits. The Flatpak tooling
+image is pinned to a multiarchitecture OCI digest covering both native runners;
+checkout does not retain Git credentials. The submission token is supplied only
+to its credential check and pinned updater step. When updating action or image
+pins, review the upstream source/license and preserve both architectures; a tag
+comment is informational and must not replace the immutable reference.
+
 The destination is fixed to the accepted app repository's `master` branch.
 The upstream `GITHUB_TOKEN` cannot write there. See
 [GitHub's token limitations](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#fine-grained-personal-access-tokens-limitations)

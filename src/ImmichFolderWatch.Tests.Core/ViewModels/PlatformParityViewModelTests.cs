@@ -11,6 +11,20 @@ namespace ImmichFolderWatch.Tests.Core.ViewModels;
 public sealed class PlatformParityViewModelTests
 {
     [Fact]
+    public void Load_PreservesYamlHttpExceptionAcrossAccessCheckAndSave()
+    {
+        var vm = CreateViewModel(new FakeAutoStartManager());
+        vm.Load(new AppConfig { Immich = new ImmichSettings { AllowInsecureHttp = true } });
+
+        Assert.True(vm.CreateImmichCheckConfig().Immich.AllowInsecureHttp);
+        Assert.True(vm.TryCreateConfig(out var config, out var errors), string.Join(Environment.NewLine, errors));
+        Assert.True(config.Immich.AllowInsecureHttp);
+
+        vm.Load(new AppConfig());
+        Assert.False(vm.CreateImmichCheckConfig().Immich.AllowInsecureHttp);
+    }
+
+    [Fact]
     public void Constructor_UsesSuppliedPlatformLogDirectoryForInitialAndAccessCheckDefaults()
     {
         var paths = new TestPlatformPaths();

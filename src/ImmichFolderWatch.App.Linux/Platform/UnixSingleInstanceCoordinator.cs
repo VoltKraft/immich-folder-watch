@@ -14,6 +14,7 @@ public sealed class UnixSingleInstanceCoordinator : ISingleInstanceCoordinator
     private readonly string _socketPath;
     private readonly ILogger<UnixSingleInstanceCoordinator> _logger;
     private readonly Socket? _serverSocket;
+    private readonly LinuxPrivateDirectory _directory;
     private readonly bool _isPrimary;
     private CancellationTokenSource? _listenCts;
     private bool _disposed;
@@ -31,47 +32,46 @@ public sealed class UnixSingleInstanceCoordinator : ISingleInstanceCoordinator
     public UnixSingleInstanceCoordinator(string socketPath, ILogger<UnixSingleInstanceCoordinator> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(socketPath);
+        if (!OperatingSystem.IsLinux())
+        {
+            throw new PlatformNotSupportedException("Unix instance coordination requires Linux.");
+        }
         _socketPath = socketPath;
         _logger = logger;
 
         var endpoint = new UnixDomainSocketEndPoint(_socketPath);
-        var server = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        _directory = LinuxPrivateDirectory.Open(Path.GetDirectoryName(Path.GetFullPath(_socketPath))!);
+        Socket? server = null;
         try
         {
-            EnsureDirectoryExists(_socketPath);
-            server.Bind(endpoint);
+            server = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            try
+            {
+                server.Bind(endpoint);
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+            {
+                server.Dispose();
+                if (!TryReclaimStaleSocket(endpoint))
+                {
+                    _isPrimary = false;
+                    return;
+                }
+                server = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                server.Bind(endpoint);
+            }
             server.Listen(1);
             _serverSocket = server;
             _isPrimary = true;
         }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
-        {
-            server.Dispose();
-            if (TryReclaimStaleSocket(endpoint))
-            {
-                server = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-                try
-                {
-                    server.Bind(endpoint);
-                    server.Listen(1);
-                    _serverSocket = server;
-                    _isPrimary = true;
-                }
-                catch
-                {
-                    server.Dispose();
-                    _isPrimary = false;
-                }
-            }
-            else
-            {
-                _isPrimary = false;
-            }
-        }
         catch
         {
-            server.Dispose();
-            _isPrimary = false;
+            server?.Dispose();
+            if (OperatingSystem.IsLinux())
+            {
+                _directory.Dispose();
+            }
+            throw;
         }
     }
 
@@ -165,7 +165,14 @@ public sealed class UnixSingleInstanceCoordinator : ISingleInstanceCoordinator
         _listenCts?.Cancel();
         _listenCts?.Dispose();
         _serverSocket?.Dispose();
-        TryDeleteSocketFile(_socketPath);
+        if (_isPrimary)
+        {
+            TryDeleteSocketFile(_socketPath);
+        }
+        if (OperatingSystem.IsLinux())
+        {
+            _directory.Dispose();
+        }
     }
 
     private static string GetDefaultSocketPath()
@@ -173,18 +180,9 @@ public sealed class UnixSingleInstanceCoordinator : ISingleInstanceCoordinator
         var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         if (string.IsNullOrWhiteSpace(runtime))
         {
-            runtime = Path.Combine(Path.GetTempPath(), $"immich-folder-watch-{Environment.UserName}");
+            runtime = Path.Combine(new XdgPlatformPaths().GetUserDataRoot(), "runtime");
         }
         return Path.Combine(runtime, DefaultSocketName);
-    }
-
-    private static void EnsureDirectoryExists(string socketPath)
-    {
-        var directory = Path.GetDirectoryName(socketPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
     }
 
     private bool TryReclaimStaleSocket(UnixDomainSocketEndPoint endpoint)
@@ -195,7 +193,7 @@ public sealed class UnixSingleInstanceCoordinator : ISingleInstanceCoordinator
             probe.Connect(endpoint);
             return false;
         }
-        catch (SocketException)
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
         {
             TryDeleteSocketFile(_socketPath);
             return true;

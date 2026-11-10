@@ -16,7 +16,7 @@ public sealed class ConfigVerificationRunner
         var requireAlbumPermissions = RequiresAlbumPermissions(normalizedConfig);
         var requireSyncPermissions = RequiresSyncPermissions(normalizedConfig);
 
-        var urlError = AppConfigValidator.ValidateServerApiUrl(normalizedConfig.Immich.ServerApiUrl);
+        var urlError = AppConfigValidator.ValidateServerApiUrl(normalizedConfig.Immich.ServerApiUrl, normalizedConfig.Immich.AllowInsecureHttp);
         var apiKeyError = AppConfigValidator.ValidateApiKey(normalizedConfig.Immich.ApiKey);
         if (!string.IsNullOrWhiteSpace(urlError) || !string.IsNullOrWhiteSpace(apiKeyError))
         {
@@ -80,7 +80,7 @@ public sealed class ConfigVerificationRunner
 
     private static HttpClient CreateHttpClient(AppConfig normalizedConfig)
     {
-        var httpClient = new HttpClient
+        var httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
         {
             BaseAddress = new Uri(AppConfigValidator.EnsureTrailingSlash(normalizedConfig.Immich.ServerApiUrl), UriKind.Absolute),
             Timeout = TimeSpan.FromMinutes(2),

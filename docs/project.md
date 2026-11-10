@@ -6,20 +6,92 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The checked-in version is `2.11.3` in
-  [Directory.Build.props](../Directory.Build.props). This is not a fresh release
-  or an assertion about deployed installations.
-- Brief revision: `IFW-BRIEF-20261107-01`.
-- Plan maturity: Existing implementation; GitHub Pages Flatpak distribution complete.
-- Active milestone: None; `M-FLATPAK-PAGES-20261107` is complete.
-- Implementation request / scope: The user's 2026-11-07 request to distribute
-  Flatpaks through a GitHub Pages repository in addition to GitHub Releases,
-  including `.flatpakref` installation. Implement tooling, automation, signed
-  metadata, installation/setup documentation and the repository configuration.
+- Product baseline: The checked-in version is `3.0.0` in
+  [Directory.Build.props](../Directory.Build.props), prepared for the authorized
+  merge. Publication and deployed installations must be verified separately.
+- Brief revision: `IFW-BRIEF-20261110-03`.
+- Plan maturity: Security remediation complete; version preparation and merge of PR #26 selected.
+- Active milestone: `M-VERSION-MERGE-20261110`.
+- Implementation request / scope: The user's 2026-11-09 attached request to
+  investigate every open Codex Security Cloud finding, consolidate verified fixes
+  and documented unresolved items into one PR, and validate the result; the
+  2026-11-10 follow-up explicitly requires complete directory-race remediation
+  with subagents and regression tests in that same PR, without merging. The earlier
+  distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
 
-## Scope and boundaries
+## Selected security remediation (2026-11-09)
+
+Updated authorization on 2026-11-10: the user requested updating the version and
+then merging PR #26. This supersedes the earlier no-version/no-merge boundary for
+this PR. The existing successful-main-CI release automation remains in place and
+will build/publish the new version after merge; no separate manual tag or release
+dispatch is required.
+
+### M-VERSION-MERGE-20261110
+
+- Select `3.0.0`: requiring HTTPS by default changes the configuration contract
+  for existing HTTP installations, so the repository's SemVer policy requires a
+  major version. The currently published release is `v2.11.3`; `v3.0.0` is unused.
+- VM-AC01: Update the unified product/assembly/file versions through the checked-in
+  bump tool, complete changelog migration notes and regenerate AppStream metadata.
+- VM-AC02: Review version consistency and release metadata; pass relevant local
+  checks and all PR CI jobs on the exact version-preparation commit.
+- VM-AC03: Mark PR #26 ready and merge the validated head without bypassing branch
+  rules. Verify the merge and report the automatic release workflow separately
+  from actual publication. Preserve the documented external rescan limitation.
+
+The attached user request selects all open Codex Security Cloud findings for the
+current repository, `VoltKraft/immich-folder-watch`, on the latest `main` baseline.
+It authorizes one branch `security/remediate-all-findings`, scoped commits, a push,
+and exactly one consolidated PR titled `security: remediate Codex Security Cloud findings`.
+Use a draft if validation is incomplete or significant risks remain. Do not merge,
+release, alter published assets, or contact a live Immich installation.
+
+### M-SECURITY-REMEDIATION-20261109
+
+- SEC-AC01: Retrieve every available open finding and full evidence across severities;
+  inspect existing patches, deduplicate root causes, and record individual dispositions.
+- SEC-AC02: Address actionable root causes with focused changes and regression tests;
+  document unsafe-to-fix cases and residual risks without marking them fixed.
+- SEC-AC03: Run relevant Linux portable/UI tests, builds/analyzers and workflow checks;
+  independently review the combined diff. Windows-only checks require CI evidence.
+- SEC-AC04: Rescan the updated commit/branch if the available service supports it;
+  record target revision and any inability to scan the PR branch.
+- SEC-AC05: Deliver one PR with all finding IDs/severities/dispositions, dependency,
+  validation and rescan results, limitations and reviewer actions.
+- Compatibility exception explicitly approved on 2026-11-09: require HTTPS by
+  default; existing HTTP installations must explicitly opt into insecure transport.
+  Preserve the option and provide migration guidance. No version/release bump here.
+- Scan choice approved: the service's offered model with `xhigh` reasoning, as in
+  the original scan. This is not a model choice for local subagents.
+
+The historical distribution-only scope below describes the completed milestone;
+security remediation additionally authorizes the application and CI changes above.
+
+### M-WATCH-ROOT-ATOMICITY-20261110
+
+The user explicitly requested complete remediation of `csf_77f3e84ec9b70e5aff765235`
+on 2026-11-10, with subagents, regression tests and updates to existing PR #26.
+This supersedes the prior partial-fix acceptance for this finding only. No merge,
+release, version change, live Immich access or stable Flatpak publication.
+
+- WR-AC01: Pin authorized root identity for the worker lifetime. Sensitive reads,
+  deletion, download staging/finalization, timestamp changes and relevant directory
+  operations must use no-follow handle-bound access, never a validated pathname
+  reopened after an attacker can replace a component.
+- WR-AC02: Retain Linux portal mounts and Windows compatibility; reject unsafe or
+  unsupported filesystem operations before touching untrusted targets. No fallback
+  to check-then-open paths is allowed at sensitive sinks.
+- WR-AC03: Add deterministic race regressions for root/intermediate/leaf replacement,
+  upload, cleanup and download lifecycle; verify outside sentinel contents and
+  metadata remain untouched. Exercise Linux locally and Windows in CI.
+- WR-AC04: Independently review the complete boundary and integrated call sites,
+  pass relevant regression suites/builds, update documentation and the same PR.
+  Native ARM64/UNC runtime and external rescan limits remain explicitly separate.
+
+## Historical distribution scope and boundaries
 
 - Preserve application sources, user configuration/data, API behavior, application
   dependencies, license/attribution, versions and release history. Extend only
@@ -104,7 +176,8 @@ workflow. The current distribution requirements are in its milestone below.
 - Completion boundary: No app behavior or product-version change; no Flathub
   submission changes, native UI test, or connection to Immich is required.
 
-No subsequent milestone is selected after this distribution work.
+Version preparation and the authorized merge now continue the security remediation
+in the same PR. No subsequent product milestone is selected beyond that work.
 
 ## Structure and tools
 

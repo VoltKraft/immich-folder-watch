@@ -84,6 +84,16 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 - `packaging/flatpak/`: the shared Flatpak manifest, metadata, local-build
   instructions, and Flathub submission requirements
 
+### Publication workflow trust
+
+Release build jobs use read-only repository permissions and checkout does not
+persist credentials. Only the publishing job receives `contents: write`; the
+separate downstream-dispatch job receives `actions: write`. Actions are pinned
+to verified commit SHAs, the Flatpak tooling image uses a multiarchitecture OCI
+digest, and WinGet submission verifies a fixed executable SHA-256 before use.
+The pins and license evidence are described in the packaging guides and security
+remediation record. Updating pins requires upstream provenance/license verification.
+
 ## Project Conventions
 
 - Keep user-facing logs in English.

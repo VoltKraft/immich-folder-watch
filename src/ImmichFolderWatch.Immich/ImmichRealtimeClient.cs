@@ -39,6 +39,12 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
             return;
         }
 
+        var transportError = AppConfigValidator.ValidateServerApiUrl(_config.Immich.ServerApiUrl, _config.Immich.AllowInsecureHttp);
+        if (transportError is not null)
+        {
+            throw new InvalidOperationException(transportError);
+        }
+
         if (!TryBuildSocketUri(_config.Immich.ServerApiUrl, out var socketUri))
         {
             _logger.LogWarning(
@@ -61,6 +67,9 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
         };
 
         var socket = new SocketIOClient.SocketIO(socketUri, options);
+        socket.HttpClient.Dispose();
+        socket.HttpClient = new ImmichRealtimeHttpClient(socketUri);
+        socket.ClientWebSocketProvider = () => new ImmichRealtimeWebSocket(socketUri);
 
         foreach (var eventName in SubscribedEvents)
         {
@@ -107,6 +116,7 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
         }
 
         _socket.Dispose();
+        _socket.HttpClient.Dispose();
         _socket = null;
     }
 

@@ -34,7 +34,9 @@ After all four GitHub release artifacts have been published,
 3. Downloads both MSIs and extracts their SHA-256 hashes and MSI ProductCodes.
 4. Calls `tools/prepare-winget-release-manifests.py` to create a complete
    multi-file manifest with both installer nodes.
-5. Uses `wingetcreate submit` to validate the manifest and open the update pull
+5. Downloads `wingetcreate` **v1.12.13.0** from its versioned official release
+   URL and verifies SHA-256 before executing it. A hash mismatch stops submission.
+6. Uses `wingetcreate submit` to validate the manifest and open the update pull
    request in `microsoft/winget-pkgs`.
 
 The workflow fails without submitting anything when either MSI is missing or
@@ -51,6 +53,27 @@ The installer JSON must contain exactly one `x64` and one `arm64` object, each
 with `architecture`, `url`, `sha256`, and `productCode`. URLs must match the
 release asset templates; hashes and MSI ProductCodes are validated before any
 manifest is written.
+
+## Automation trust and updates
+
+Workflow inputs and release tags reach PowerShell through environment variables,
+not generated script source. Tags must match stable `vMAJOR.MINOR.PATCH` before
+checkout or workflow outputs are written. All action references are pinned to
+full upstream commit IDs, and checkout does not persist Git credentials.
+
+The pinned executable SHA-256 is
+`24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA`.
+It was verified against both the downloaded executable and the checksum published
+with [Microsoft's v1.12.13.0 release](https://github.com/microsoft/winget-create/releases/tag/v1.12.13.0).
+To update it, review the official release and its MIT license, independently
+calculate the executable hash, then change the versioned URL and expected hash
+in the same reviewed change. Do not replace them with a moving download URL or
+fetch the expected checksum dynamically during the credential-bearing workflow.
+
+`tools/tests/test_workflow_security.py` checks action/container pins and token
+boundaries. With PowerShell available, it executes the actual inline tag parser
+with command/output-injection payloads and verifies that a tampered executable
+stops the workflow. Windows CI runs these cases before the application build.
 
 ## Manual Resubmission
 

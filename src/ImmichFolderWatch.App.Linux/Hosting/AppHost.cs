@@ -226,12 +226,18 @@ public sealed class AppHost : IAsyncDisposable
         builder.Services.AddSingleton<IUploadBatchQueue, UploadBatchQueue>();
         builder.Services.AddSingleton<ISyncStateStore, SqliteSyncStateStore>();
 
+        var transportError = AppConfigValidator.ValidateServerApiUrl(config.Immich.ServerApiUrl, config.Immich.AllowInsecureHttp);
+        if (transportError is not null)
+        {
+            throw new InvalidOperationException(transportError);
+        }
         var normalizedApiUrl = AppConfigValidator.EnsureTrailingSlash(config.Immich.ServerApiUrl);
 
         builder.Services.AddSingleton<SocketsHttpHandler>(_ => new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             AutomaticDecompression = DecompressionMethods.All,
+            AllowAutoRedirect = false,
         });
 
         builder.Services.AddSingleton(sp =>

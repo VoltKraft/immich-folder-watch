@@ -39,11 +39,9 @@ public static class DownloadedFileTimestamps
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(values);
-        if (OperatingSystem.IsWindows())
-        {
-            File.SetCreationTimeUtc(path, values.CreationTimeUtc.UtcDateTime);
-        }
-
-        File.SetLastWriteTimeUtc(path, values.LastWriteTimeUtc.UtcDateTime);
+        var fullPath = Path.GetFullPath(path);
+        using var root = SecureWatchRoot.Open(Path.GetDirectoryName(fullPath)!);
+        using var file = root.OpenRead(Path.GetFileName(fullPath), writableMetadata: true);
+        file.SetTimestamps(values.CreationTimeUtc.UtcDateTime, values.LastWriteTimeUtc.UtcDateTime);
     }
 }

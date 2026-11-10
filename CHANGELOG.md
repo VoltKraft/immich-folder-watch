@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-10
+
+This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.
+
+### Security
+- Require HTTPS for Immich by default, with an explicit documented `allowInsecureHttp` migration option for trusted legacy HTTP installations.
+- Write Linux configuration containing API keys atomically with owner-only permissions; use a verified private directory for single-instance state.
+- Bound API response sizes and download resources, reject incomplete remote inventories before cleanup, and finalize downloads without replacing local files.
+- Refuse linked watch entries and scope folder-driven album mutations to newly created, explicitly recorded IDs; revoke folder authority after worker restarts and failed renames.
+- Pin watched directory identities and use retained file/directory handles for transfers, enumeration, cleanup, timestamp recovery and folder renames, preventing concurrent directory replacements from redirecting access.
+- Pin CI actions, the Flatpak build image and WinGet submission binary; restrict release job tokens and validate dispatcher tags outside executable source.
+
 ### Added
 - Signed GitHub Pages Flatpak repository for x86_64 and aarch64, with `.flatpakrepo`/`.flatpakref` installation, normal Flatpak updates, and release-triggered deployment alongside existing GitHub Release bundles.
 
 ### Changed
-- Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles; application behavior and release versions are unchanged.
+- Require supported secure filesystem primitives and reserve .ifw-internal- paths for protected transactions. Windows can block moves of active watch directories; Linux retains outer transaction containers after shutdown or cache eviction.
+- Retry a successful upload before later local cleanup after a restart or deletion failure; stored size and modification time alone no longer authorize deletion.
+- Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles.
 
 ## [2.11.3] - 2026-09-21
 

@@ -23,12 +23,25 @@ jobs:
       - name: Determine checkout ref
         id: ref
         shell: pwsh
+        env:
+          MANUAL_TAG: ${{ inputs.release_tag }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          $manualTag = "${{ inputs.release_tag }}".Trim()
-          $workflowRef = "${{ github.sha }}"
+          $ErrorActionPreference = "Stop"
+          $manualTag = ([string]$env:MANUAL_TAG).Trim()
+          $workflowRef = $env:WORKFLOW_SHA
+          $stableTagPattern = '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z'
+          if ($manualTag -and $manualTag -cnotmatch $stableTagPattern) {
+              throw "release_tag must be a stable vMAJOR.MINOR.PATCH tag."
+          }
 
-          if ("${{ github.event_name }}" -eq "release") {
-              $targetRef = "${{ github.event.release.tag_name }}"
+          if ($env:EVENT_NAME -eq "release") {
+              $targetRef = $env:EVENT_RELEASE_TAG
+              if ($targetRef -cnotmatch $stableTagPattern) {
+                  throw "The release event must use a stable vMAJOR.MINOR.PATCH tag."
+              }
               $releaseTag = $targetRef
           }
           elseif (-not [string]::IsNullOrWhiteSpace($manualTag)) {
@@ -44,8 +57,9 @@ jobs:
           "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ steps.ref.outputs.target_ref }}
 
@@ -69,13 +83,12 @@ jobs:
         if: steps.metadata.outputs.automation_enabled == 'true'
         id: version
         shell: pwsh
+        env:
+          SELECTED_TAG: ${{ steps.ref.outputs.release_tag }}
         run: |
-          $selectedTag = "${{ steps.ref.outputs.release_tag }}"
+          $selectedTag = $env:SELECTED_TAG
 
-          if ("${{ github.event_name }}" -eq "release") {
-              $version = "${{ github.event.release.tag_name }}".TrimStart('v')
-          }
-          elseif (-not [string]::IsNullOrWhiteSpace($selectedTag)) {
+          if (-not [string]::IsNullOrWhiteSpace($selectedTag)) {
               $version = $selectedTag.TrimStart('v')
           }
           else {
@@ -83,8 +96,8 @@ jobs:
               $version = $props.Project.PropertyGroup.Version
           }
 
-          if ([string]::IsNullOrWhiteSpace($version)) {
-              throw "Version could not be determined."
+          if ($version -cnotmatch '\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
+              throw "Version must be stable MAJOR.MINOR.PATCH."
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -95,9 +108,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           $ErrorActionPreference = "Stop"
-          $version = "${{ steps.version.outputs.version }}"
+          $version = $env:RELEASE_VERSION
           $releaseTag = "v$version"
           $metadata = Get-Content packaging/winget/package.metadata.json -Raw | ConvertFrom-Json
           $headers = @{
@@ -106,7 +121,7 @@ jobs:
               "User-Agent" = "immich-folder-watch-winget-release"
               "X-GitHub-Api-Version" = "2022-11-28"
           }
-          $releaseUrl = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$releaseTag"
+          $releaseUrl = "https://api.github.com/repos/$env:REPOSITORY/releases/tags/$releaseTag"
           $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
 
           if ($release.draft -or $release.tag_name -ne $releaseTag) {
@@ -261,13 +276,16 @@ jobs:
       - name: Generate multi-architecture WinGet manifests
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_DATE: ${{ steps.installers.outputs.release_date }}
         run: |
           python tools\prepare-winget-release-manifests.py `
             --metadata packaging\winget\package.metadata.json `
             --installers artifacts\winget-installers.json `
             --output-dir artifacts\winget-manifests `
-            --version "${{ steps.version.outputs.version }}" `
-            --release-date "${{ steps.installers.outputs.release_date }}"
+            --version "$env:RELEASE_VERSION" `
+            --release-date "$env:RELEASE_DATE"
 
       - name: Ensure WinGet token is available
         if: steps.metadata.outputs.automation_enabled == 'true'
@@ -281,24 +299,33 @@ jobs:
 
       - name: Setup .NET 6 for wingetcreate
         if: steps.metadata.outputs.automation_enabled == 'true'
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 6.0.x
 
-      - name: Download wingetcreate
+      - name: Download and verify pinned wingetcreate
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
         run: |
-          Invoke-WebRequest "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
+          $ErrorActionPreference = "Stop"
+          # Official v1.12.13.0 executable and release-published SHA-256, reviewed together.
+          Invoke-WebRequest "https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe" -OutFile wingetcreate.exe
+          $expectedHash = "24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA"
+          if ((Get-FileHash -LiteralPath wingetcreate.exe -Algorithm SHA256).Hash -ne $expectedHash) {
+              Remove-Item -LiteralPath wingetcreate.exe -Force
+              throw "wingetcreate SHA-256 verification failed."
+          }
 
       - name: Submit WinGet package update
         if: steps.metadata.outputs.automation_enabled == 'true'
         shell: pwsh
         env:
           WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN || secrets.WINGET }}
+          PACKAGE_IDENTIFIER: ${{ steps.metadata.outputs.package_identifier }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           .\wingetcreate.exe submit `
             artifacts\winget-manifests `
-            --prtitle "New version: ${{ steps.metadata.outputs.package_identifier }} version ${{ steps.version.outputs.version }}" `
+            --prtitle "New version: $env:PACKAGE_IDENTIFIER version $env:RELEASE_VERSION" `
             --token "$env:WINGETCREATE_TOKEN" `
             --no-open

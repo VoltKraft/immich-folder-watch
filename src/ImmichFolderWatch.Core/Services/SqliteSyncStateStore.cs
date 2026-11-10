@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.Core.Services;
 
-public sealed class SqliteSyncStateStore : ISyncStateStore
+public sealed partial class SqliteSyncStateStore : ISyncStateStore, IAlbumOwnershipStore
 {
     private const int CurrentSchemaVersion = 1;
     private const int SqliteCorrupt = 11;
@@ -472,6 +472,15 @@ public sealed class SqliteSyncStateStore : ISyncStateStore
         await using var schemaCommand = connection.CreateCommand();
         schemaCommand.Transaction = (SqliteTransaction)transaction;
         schemaCommand.CommandText = """
+            CREATE TABLE IF NOT EXISTS owned_albums (
+                account_scope TEXT NOT NULL,
+                source_key TEXT NOT NULL,
+                directory_key TEXT NOT NULL,
+                album_id TEXT NOT NULL,
+                PRIMARY KEY (account_scope, source_key, directory_key),
+                UNIQUE (account_scope, source_key, album_id)
+            );
+
             CREATE TABLE IF NOT EXISTS sync_entries (
                 account_scope TEXT NOT NULL,
                 source_path TEXT NOT NULL,

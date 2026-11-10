@@ -408,10 +408,11 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
         Assert.Equal(1, client.UploadCount);
         Assert.False(File.Exists(filePath));
-        Assert.Empty(await GetEntriesAsync(config, databasePath));
-        // File cleanup precedes the final success write; stopping early can cancel that write.
+        // File cleanup precedes state deletion and the final success write.
+        // Wait for durable completion before inspecting the database or stopping.
         await WaitUntilAsync(() => status.LastSyncCompletedUtc.HasValue, TimeSpan.FromSeconds(3));
         await worker.StopAsync(CancellationToken.None);
+        Assert.Empty(await GetEntriesAsync(config, databasePath));
 
         var lastSuccess = Assert.IsType<DateTimeOffset>(status.LastSyncCompletedUtc);
         Assert.Equal(lastSuccess, await GetLastSuccessfulSyncAsync(config, databasePath));
@@ -535,7 +536,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
     }
 
     [Fact]
-    public async Task DeleteAfterUpload_RemovesPreviouslyVerifiedUploadWithoutReuploading()
+    public async Task DeleteAfterUpload_ReuploadsBeforeDeletingPreviouslyVerifiedFile()
     {
         using var directory = new TemporaryDirectory();
         var watchDirectory = Path.Combine(directory.Path, "watch");
@@ -557,15 +558,15 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         await worker.StartAsync(CancellationToken.None);
         await WaitUntilAsync(() => !File.Exists(filePath), TimeSpan.FromSeconds(3));
 
-        Assert.Equal(1, client.UploadCount);
+        Assert.Equal(2, client.UploadCount);
         Assert.Empty(await GetEntriesAsync(cleanupConfig, databasePath));
         await worker.StopAsync(CancellationToken.None);
-        Assert.Equal(lastSuccess, status.LastSyncCompletedUtc);
-        Assert.Equal(lastSuccess, await GetLastSuccessfulSyncAsync(cleanupConfig, databasePath));
+        Assert.True(status.LastSyncCompletedUtc > lastSuccess);
+        Assert.True(await GetLastSuccessfulSyncAsync(cleanupConfig, databasePath) > lastSuccess);
     }
 
     [Fact]
-    public async Task DeleteAfterUpload_RetriesFailedDeletionWithoutReuploading()
+    public async Task DeleteAfterUpload_ReuploadsBeforeRetryingFailedDeletion()
     {
         using var directory = new TemporaryDirectory();
         var watchDirectory = Path.Combine(directory.Path, "watch");
@@ -585,7 +586,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         await client.WaitForUploadCountAsync(1, TimeSpan.FromSeconds(8));
         await WaitUntilAsync(() => !File.Exists(filePath), TimeSpan.FromSeconds(8));
 
-        Assert.Equal(1, client.UploadCount);
+        Assert.Equal(2, client.UploadCount);
         Assert.True(deletionService.AttemptCount >= 2);
         Assert.Empty(await GetEntriesAsync(config, databasePath));
         await worker.StopAsync(CancellationToken.None);
@@ -922,6 +923,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
     private sealed class AlwaysReadyChecker : IFileReadinessChecker
     {
+        public Task<bool> WaitUntilReadyAsync(SecureWatchRoot root, string relativePath, TimeSpan timeout, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<bool> WaitUntilReadyAsync(
             string filePath,
             TimeSpan timeout,
@@ -930,6 +932,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
     private sealed class NeverReadyChecker : IFileReadinessChecker
     {
+        public Task<bool> WaitUntilReadyAsync(SecureWatchRoot root, string relativePath, TimeSpan timeout, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<bool> WaitUntilReadyAsync(
             string filePath,
             TimeSpan timeout,
@@ -939,6 +942,22 @@ public sealed partial class FolderWatchWorkerPersistenceTests
     private sealed class RecordingAssetClient : IImmichAssetClient
     {
         private int _uploadCount;
+
+        public ConcurrentQueue<string> MutatedAlbums { get; } = new();
+        public bool FailAlbumRename { get; init; }
+
+        public Task<DeleteAlbumResult> DeleteAlbumByIdAsync(string albumId, CancellationToken cancellationToken)
+        {
+            MutatedAlbums.Enqueue("delete:" + albumId);
+            return Task.FromResult(DeleteAlbumResult.Success());
+        }
+
+        public Task<RenameAlbumResult> RenameAlbumByIdAsync(string albumId, string newName, CancellationToken cancellationToken)
+        {
+            MutatedAlbums.Enqueue("rename:" + albumId);
+            return Task.FromResult(FailAlbumRename
+                ? RenameAlbumResult.Failure(null, "test failure") : RenameAlbumResult.Success(albumId));
+        }
 
         public ConcurrentQueue<string> DownloadedAssets { get; } = new();
 
@@ -1005,6 +1024,14 @@ public sealed partial class FolderWatchWorkerPersistenceTests
             return DownloadAssetResult.Success();
         }
 
+        public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, SecureDownloadLease destination, CancellationToken cancellationToken)
+        {
+            await destination.Stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(assetId), cancellationToken);
+            await destination.Stream.FlushAsync(cancellationToken);
+            DownloadedAssets.Enqueue(assetId);
+            return DownloadAssetResult.Success();
+        }
+
         public Task<AlbumListResult> ListAlbumsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(AlbumListResult.Success(RemoteAlbums));
 
@@ -1054,12 +1081,14 @@ public sealed partial class FolderWatchWorkerPersistenceTests
 
         public void Delete(string filePath)
         {
-            if (Interlocked.Increment(ref _attemptCount) == 1)
-            {
-                throw new IOException("Deletion intentionally failed.");
-            }
-
+            if (Interlocked.Increment(ref _attemptCount) == 1) throw new IOException("Deletion intentionally failed.");
             File.Delete(filePath);
+        }
+
+        public void Delete(SecureWatchFile file)
+        {
+            if (Interlocked.Increment(ref _attemptCount) == 1) throw new IOException("Deletion intentionally failed.");
+            file.Delete();
         }
     }
 

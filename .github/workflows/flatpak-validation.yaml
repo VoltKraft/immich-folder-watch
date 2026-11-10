@@ -13,10 +13,10 @@ jobs:
     container:
       # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
       # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:c91a88269eee8fcdd73ecf43064232fbebe27411f926f63f38bdf70c51f2ceae
       options: --privileged
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -30,7 +30,7 @@ jobs:
           echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
 
       - name: Setup pinned .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
@@ -52,7 +52,7 @@ jobs:
             --output-dir flatpak-validation
           flatpak-builder --show-manifest flatpak-validation/io.github.voltkraft.immich-folder-watch.yml > /dev/null
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: flatpak-candidate-${{ github.sha }}
           path: flatpak-validation/
@@ -73,16 +73,16 @@ jobs:
     container:
       # Tooling image only: Builder installs the manifest's 26.08 runtime/SDK.
       # Switch the image when Flathub publishes its freedesktop-26.08 image tag.
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:c91a88269eee8fcdd73ecf43064232fbebe27411f926f63f38bdf70c51f2ceae
       options: --privileged
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: flatpak-candidate-${{ github.sha }}
           path: flatpak-validation
 
       - name: Build immutable candidate from the combined offline feed
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           manifest-path: flatpak-validation/io.github.voltkraft.immich-folder-watch.yml
           bundle: flatpak-candidate-${{ github.sha }}-${{ matrix.arch }}.flatpak

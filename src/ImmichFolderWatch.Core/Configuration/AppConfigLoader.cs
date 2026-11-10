@@ -67,6 +67,7 @@ public sealed class AppConfigLoader : IAppConfigLoader
             {
                 ServerApiUrl = config.Immich.ServerApiUrl,
                 ApiKey = config.Immich.ApiKey,
+                AllowInsecureHttp = config.Immich.AllowInsecureHttp,
             },
             Watch = new WatchSettings
             {

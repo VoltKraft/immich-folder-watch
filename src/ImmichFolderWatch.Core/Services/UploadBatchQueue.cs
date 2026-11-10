@@ -41,7 +41,7 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
             SourcePath = normalizedSourcePath,
         };
 
-        var timestamp = GetLastWriteTimeUtc(normalizedPath);
+        var timestamp = GetLastWriteTimeUtc(normalizedRequest);
         lock (_gate)
         {
             return _queuedPaths.TryAdd(normalizedPath, new QueuedUpload(normalizedRequest, timestamp, _nextSequence++));
@@ -76,12 +76,15 @@ public sealed class UploadBatchQueue : IUploadBatchQueue
         }
     }
 
-    private static DateTime? GetLastWriteTimeUtc(string path)
+    private static DateTime? GetLastWriteTimeUtc(UploadAssetRequest request)
     {
         try
         {
-            var file = new FileInfo(path);
-            return file.Exists ? file.LastWriteTimeUtc : null;
+            using var ownedRoot = request.SourceRoot is null ? SecureWatchRoot.Open(
+                string.IsNullOrWhiteSpace(request.SourcePath) ? Path.GetDirectoryName(request.FilePath)! : request.SourcePath) : null;
+            var root = request.SourceRoot ?? ownedRoot!;
+            using var file = root.OpenRead(Path.GetRelativePath(root.RootPath, request.FilePath));
+            return file.LastWriteTimeUtc;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {

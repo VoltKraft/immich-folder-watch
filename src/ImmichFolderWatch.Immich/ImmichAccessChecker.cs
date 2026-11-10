@@ -561,8 +561,8 @@ public sealed class ImmichAccessChecker
         try
         {
             using var request = requestFactory();
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var body = await BoundedResponseReader.ReadAsync(response.Content, 64 * 1024, truncate: true, TimeSpan.FromSeconds(60), cancellationToken);
             return new SendResult(response.StatusCode, TrimMessage(body));
         }
         catch (Exception ex)

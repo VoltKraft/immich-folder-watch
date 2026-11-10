@@ -87,7 +87,10 @@ or enter a name to use an album that the app creates if needed. Enable
 For bidirectional sync, an album name limits synchronization to that album and
 the source root; subfolders are ignored. With no album name, the root mirrors
 assets outside albums, and first-level subfolders mirror Immich albums. Recursion
-is automatic in this mode.
+is automatic in this mode. Folder-driven album rename/delete is limited to IDs
+created and bound during the current worker run. Existing albums and bindings
+from before a restart are preserved; manage their names/deletion in Immich. See
+[configuration](configuration.md#file-selection) for ownership and recovery details.
 
 Local deletion moves tracked assets to Immich trash. Removing an asset from the
 remote source also permanently removes its tracked local file after a complete,

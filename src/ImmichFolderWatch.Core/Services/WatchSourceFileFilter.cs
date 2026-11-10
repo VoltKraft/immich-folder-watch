@@ -42,7 +42,8 @@ public sealed class WatchSourceFileFilter
         }
 
         var normalizedPath = NormalizeFullPath(filePath);
-        if (!HasAllowedExtension(normalizedPath))
+        if (!WatchPathSafety.IsSafePath(_sourceRoot, normalizedPath, allowMissingLeaf: true)
+            || !HasAllowedExtension(normalizedPath))
         {
             return false;
         }
