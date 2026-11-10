@@ -1,5 +1,20 @@
 # Project Status
 
+## Documentation publication checkpoint (2026-11-10)
+
+- User authorized publishing the accumulated dependency-maintenance documentation
+  to main and checking the resulting CI. Earlier statements below that records
+  are local/unpushed describe their historical checkpoints, not a continuing
+  publication restriction.
+- Prepared from local checkpoint `2849aec` on remote baseline `9a84eec`; the
+  accumulated diff changes only this status, the project brief, the Dependabot
+  review and the configuration-check diagnosis. `git diff --check` passed.
+- The preceding main revision passed CI and CodeQL as recorded below. Validation
+  of the documentation push must be read from the checks attached to its exact
+  GitHub commit; earlier runs do not establish the new revision's result.
+- #32 remains open/blocked and #34 open/deferred. Automatic merging stays disabled.
+  No additional dependency update, PR merge or version bump is selected.
+
 ## Remaining Actions PR merges completed (2026-11-10)
 
 - User explicitly deferred #34 and authorized merging the other reviewed Actions

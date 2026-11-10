@@ -9,7 +9,7 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-09`.
+- Brief revision: `IFW-BRIEF-20261110-10`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
 - Active milestone: None; `M-DEPENDABOT-REFRESH-20261110` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
@@ -25,6 +25,15 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## Selected dependency maintenance (2026-11-10)
+
+### Documentation publication (2026-11-10)
+
+- User explicitly authorized pushing the accumulated local documentation to main
+  and verifying the resulting CI. This supersedes earlier local-only boundaries
+  for the dependency-maintenance records.
+- Publish the reviewed documentation history without rewriting remote history;
+  verify CI and CodeQL on the pushed revision. Keep #32 open/blocked, #34
+  open/deferred and automatic merging disabled.
 
 ### Remaining Actions PR merges (2026-11-10)
 
