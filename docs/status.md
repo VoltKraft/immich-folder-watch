@@ -1,6 +1,32 @@
 # Project Status
 
+## Version preparation checkpoint (2026-11-10)
+
+- Active milestone: `M-VERSION-MERGE-20261110`; version metadata prepared and
+  locally verified. CI and the authorized merge follow this checkpoint.
+- User authorized updating the version and then merging existing PR #26, replacing
+  the earlier no-merge instruction. The normal automatic release pipeline follows
+  successful main CI; publication must be verified separately.
+- Baseline: clean branch at `225ce88631f376dee34aebe6480607d0b8da48ea`, matching
+  origin; main remains `26a0de519ee4f7eae2e556b8da7726539d578594`.
+- Current-head CI `42760864837` is successful after rerunning only the lint job
+  that exceeded six hours during Ubuntu package retrieval. All six jobs are green.
+- Selected version: `3.0.0`, because HTTPS-by-default requires migration of existing
+  HTTP configuration. GitHub's latest published release is `v2.11.3`; no `v3.*`
+  tag exists in the refreshed repository.
+- Validation: canonical product/assembly/file versions, changelog date and exact
+  generated AppStream content agree; AppStream offline validation and diff checks
+  pass. Linux application build/analyzers pass with 0 warnings/errors. Independent
+  review found no version/packaging blocker; remote `v3.0.0` is absent.
+- Next action: validate all six CI jobs on the version-preparation commit, mark
+  PR #26 ready and merge the exact validated head. The authoritative external
+  state is the [PR checks and merge record](https://github.com/VoltKraft/immich-folder-watch/pull/26)
+  and [release workflow](https://github.com/VoltKraft/immich-folder-watch/actions/workflows/release.yaml);
+  this source checkpoint does not claim later publication. No new Goal was started.
+
 ## Directory race follow-up (2026-11-10)
+
+The following records the completed remediation handoff before merge authorization.
 
 - Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; complete. All six CI jobs
   pass on `a188722`; this final handoff changes documentation only.

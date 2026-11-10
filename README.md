@@ -99,7 +99,7 @@ when choosing a workflow.
 5. Open **Folders**, add your sources, and choose each folder's upload or bidirectional sync mode under **General**. Review its album, file filters, and deletion behavior in the [desktop interface guide](docs/user-interface.md). Set the global upload/download order under **Settings → Transfer**; newest files are processed first by default.
 6. **Save and Apply** — transfers and folder monitoring start with the selected modes.
 
-HTTPS is required by default. Existing HTTP installations need the explicit
+Starting with version 3.0.0, HTTPS is required by default. Existing HTTP installations need the explicit
 [insecure-transport migration option](docs/configuration.md#transport-security-and-http-migration).
 Watched directories retain their opened identity during synchronization; see
 [file selection and filesystem requirements](docs/configuration.md#file-selection)

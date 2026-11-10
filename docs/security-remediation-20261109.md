@@ -4,8 +4,11 @@
 
 Baseline: `26a0de519ee4f7eae2e556b8da7726539d578594` (`origin/main`, fetched
 2026-11-09). One branch: `security/remediate-all-findings`; one consolidated PR
-targets `main` in [draft PR #26](https://github.com/VoltKraft/immich-folder-watch/pull/26). No merge, product release, live Immich access or scanner
-suppression is authorized by this work.
+targets `main` in [PR #26](https://github.com/VoltKraft/immich-folder-watch/pull/26).
+The initial remediation stopped at a draft PR. On 2026-11-10 the user subsequently
+authorized the version update and merge; the existing successful-main-CI release
+automation follows that merge. See [project status](status.md) for the current
+merge/publication state. Live Immich access and scanner suppression remain excluded.
 
 The completed original scan is
 `wfr_1cb38532afa4dc13e4acdc43f5953f4ebd3b4308486bbadb640050a3194de7fb`,
@@ -92,8 +95,10 @@ previous moving binary is replaced by Microsoft's MIT-licensed fixed release;
 its published digest was independently compared with downloaded bytes. See the
 [WinGet guide](../packaging/winget/README.md) and
 [Flathub guide](../packaging/flatpak/flathub/README.md) for update procedures.
-The repository remains AGPL-3.0-only, product version `2.11.3` is unchanged, and
-changes remain Unreleased (Keep a Changelog 1.1.0 / Semantic Versioning 2.0.0).
+The repository remains AGPL-3.0-only. Version `3.0.0` is prepared under the later
+version-and-merge authorization, with changelog and regenerated AppStream metadata
+(Keep a Changelog 1.1.0 / Semantic Versioning 2.0.0). The major version reflects
+the incompatible HTTPS configuration default; no application dependency changed.
 
 ## Validation and follow-up
 

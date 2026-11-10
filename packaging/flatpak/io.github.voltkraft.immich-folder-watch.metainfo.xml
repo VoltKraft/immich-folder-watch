@@ -99,13 +99,27 @@
   </branding>
 
   <releases>
-    <release version="2.11.3" date="2026-09-21">
+    <release version="3.0.0" date="2026-11-10">
       <description>
-        <p>Fixed:</p>
+        <p>This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.</p>
+        <p>Security:</p>
         <ul>
-          <li>Check destination directory write access before downloading originals, so an unwritable sync folder reports one source error instead of retrying every pending asset. Retry the check on the next pull and keep independent sources active.</li>
-          <li>Show resolved host folder paths in overview sync errors while retaining Linux portal access paths for file operations and diagnostic logs.</li>
-          <li>Ignore native deletion events for temporary and excluded files before accessing sync state, and wait for durable completion in download-order tests to prevent Windows database cleanup races.</li>
+          <li>Require HTTPS for Immich by default, with an explicit documented `allowInsecureHttp` migration option for trusted legacy HTTP installations.</li>
+          <li>Write Linux configuration containing API keys atomically with owner-only permissions; use a verified private directory for single-instance state.</li>
+          <li>Bound API response sizes and download resources, reject incomplete remote inventories before cleanup, and finalize downloads without replacing local files.</li>
+          <li>Refuse linked watch entries and scope folder-driven album mutations to newly created, explicitly recorded IDs; revoke folder authority after worker restarts and failed renames.</li>
+          <li>Pin watched directory identities and use retained file/directory handles for transfers, enumeration, cleanup, timestamp recovery and folder renames, preventing concurrent directory replacements from redirecting access.</li>
+          <li>Pin CI actions, the Flatpak build image and WinGet submission binary; restrict release job tokens and validate dispatcher tags outside executable source.</li>
+        </ul>
+        <p>Added:</p>
+        <ul>
+          <li>Signed GitHub Pages Flatpak repository for x86_64 and aarch64, with `.flatpakrepo`/`.flatpakref` installation, normal Flatpak updates, and release-triggered deployment alongside existing GitHub Release bundles.</li>
+        </ul>
+        <p>Changed:</p>
+        <ul>
+          <li>Require supported secure filesystem primitives and reserve .ifw-internal- paths for protected transactions. Windows can block moves of active watch directories; Linux retains outer transaction containers after shutdown or cache eviction.</li>
+          <li>Retry a successful upload before later local cleanup after a restart or deletion failure; stored size and modification time alone no longer authorize deletion.</li>
+          <li>Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles.</li>
         </ul>
       </description>
     </release>
