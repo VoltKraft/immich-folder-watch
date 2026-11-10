@@ -1,5 +1,29 @@
 # Project Status
 
+## First Dependabot run check (2026-11-10, 19:24 Europe/Berlin)
+
+- Read-only GitHub inspection requested; no update PR was modified or merged.
+- [GitHub Actions updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487560)
+  completed successfully. The first [NuGet updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)
+  is still running; no NuGet update PR exists at this snapshot.
+- Created five open PRs: [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27)
+  download-artifact 7.0.0 to 8.0.2;
+  [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28)
+  upload-artifact 6.0.0 to 7.0.2;
+  [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29)
+  deploy-pages 4.0.5 to 5.0.1;
+  [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30)
+  configure-pages 5.0.0 to 6.0.0;
+  [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31)
+  setup-node 6.5.0 to 7.1.0. All are major-version proposals requiring review.
+- PR CI is queued/running for all five; no failed check is reported at this
+  snapshot. Packaging lint passed for #27/#29/#30. The successful updater run
+  does not establish upgrade compatibility or completed PR CI.
+- Verified repository `allow_auto_merge: false`, with `auto_merge: null` and
+  no merge timestamp on all five PRs. No remote mutation was performed.
+- Next action: recheck NuGet completion and PR CI, then review compatibility and
+  licensing before any separately authorized merge. This check is recorded locally.
+
 ## Dependabot activation (2026-11-10)
 
 - Selected milestone: `M-DEPENDABOT-20261110`, extended by explicit user request
