@@ -9,7 +9,13 @@ public sealed class FileReadinessChecker : IFileReadinessChecker
     public async Task<bool> WaitUntilReadyAsync(string filePath, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        var fullPath = Path.GetFullPath(filePath);
+        using var root = SecureWatchRoot.Open(Path.GetDirectoryName(fullPath)!);
+        return await WaitUntilReadyAsync(root, Path.GetFileName(fullPath), timeout, cancellationToken);
+    }
 
+    public async Task<bool> WaitUntilReadyAsync(SecureWatchRoot root, string relativePath, TimeSpan timeout, CancellationToken cancellationToken)
+    {
         if (timeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be greater than zero.");
@@ -21,19 +27,11 @@ public sealed class FileReadinessChecker : IFileReadinessChecker
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!File.Exists(filePath))
-            {
-                return false;
-            }
-
             try
             {
-                using var stream = new FileStream(
-                    filePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite);
-
+                if (!root.FileExists(relativePath)) return false;
+                using var file = root.OpenRead(relativePath);
+                var stream = file.Stream;
                 _ = stream.Length;
                 return true;
             }

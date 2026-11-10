@@ -171,14 +171,12 @@ public sealed partial class FolderWatchWorker : BackgroundService
             return;
         }
 
-        RegisterWatchers();
-
-        _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
-
         var timestampRepairFailed = false;
         var timestampRecoveryCompleted = false;
         try
         {
+            RegisterWatchers();
+            _logger.LogInformation("Folder watcher started with {SourceCount} source(s).", _watchers.Count);
             await LoadPersistedStateAsync(stoppingToken);
             await RecoverTimestampRepairsAsync(stoppingToken);
             timestampRecoveryCompleted = true;
@@ -249,32 +247,40 @@ public sealed partial class FolderWatchWorker : BackgroundService
         }
         finally
         {
-            DisposeWatchers();
-            if (_immichRealtimeClient is not null)
+            try
             {
-                _immichRealtimeClient.RemoteChangeDetected -= OnRemoteChangeDetected;
-                try
+                DisposeWatchers();
+                await DrainWatcherTasksAsync();
+                if (_immichRealtimeClient is not null)
                 {
-                    await _immichRealtimeClient.StopAsync(CancellationToken.None);
+                    _immichRealtimeClient.RemoteChangeDetected -= OnRemoteChangeDetected;
+                    try
+                    {
+                        await _immichRealtimeClient.StopAsync(CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Realtime client stop threw during shutdown.");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Realtime client stop threw during shutdown.");
-                }
-            }
 
-            if (timestampRecoveryCompleted && !timestampRepairFailed)
-            {
-                _logger.LogInformation("Flushing pending uploads before shutdown.");
-                await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
-                PromoteUploadRetries(includeNotYetEligible: true);
-                while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+                if (timestampRecoveryCompleted && !timestampRepairFailed)
                 {
-                    await FlushUploadsAsync(CancellationToken.None);
+                    _logger.LogInformation("Flushing pending uploads before shutdown.");
                     await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
                     PromoteUploadRetries(includeNotYetEligible: true);
+                    while (_uploadBatchQueue.Count > 0 || _pendingUploadRetries.Count > 0 || _debouncedFiles.Count > 0)
+                    {
+                        await FlushUploadsAsync(CancellationToken.None);
+                        await PromoteDebouncedFilesAsync(CancellationToken.None, includeNotYetMatured: true);
+                        PromoteUploadRetries(includeNotYetEligible: true);
+                    }
+                    _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
                 }
-                _syncStatusProvider.ReportPendingCount(GetPendingUploadCount());
+            }
+            finally
+            {
+                foreach (var source in _sources) source.FileSystem.Dispose();
             }
         }
     }
@@ -282,6 +288,33 @@ public sealed partial class FolderWatchWorker : BackgroundService
     private void OnRemoteChangeDetected(object? sender, EventArgs e)
     {
         Interlocked.Exchange(ref _pullRequested, 1);
+    }
+
+    private readonly object _watcherTaskGate = new();
+    private readonly List<Task> _watcherTasks = [];
+    private bool _acceptWatcherTasks = true;
+
+    private void QueueWatcherTask(Func<Task> operation)
+    {
+        lock (_watcherTaskGate)
+        {
+            if (!_acceptWatcherTasks) return;
+            _watcherTasks.RemoveAll(task => task.IsCompleted);
+            try { _watcherTasks.Add(operation()); }
+            catch (Exception ex) { _logger.LogWarning(ex, "A watcher callback failed."); }
+        }
+    }
+
+    private async Task DrainWatcherTasksAsync()
+    {
+        Task[] tasks;
+        lock (_watcherTaskGate)
+        {
+            _acceptWatcherTasks = false;
+            tasks = _watcherTasks.ToArray();
+        }
+        try { await Task.WhenAll(tasks); }
+        catch (Exception ex) { _logger.LogWarning(ex, "A watcher callback failed during shutdown."); }
     }
 
     private void RegisterWatchers()
@@ -343,64 +376,79 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 useFlatAlbum,
                 effectiveIncludeSubdirectories);
 
-            var watcher = new FileSystemWatcher(source.Path)
+            var initialWatcherCount = _watchers.Count;
+            try
             {
-                IncludeSubdirectories = effectiveIncludeSubdirectories,
-                NotifyFilter = NotifyFilters.FileName
-                    | NotifyFilters.CreationTime
-                    | NotifyFilters.LastWrite
-                    | NotifyFilters.Size,
-                EnableRaisingEvents = false,
-            };
-
-            watcher.Created += (_, e) => OnFileEvent(context, e.FullPath);
-            watcher.Changed += (_, e) => OnFileEvent(context, e.FullPath);
-
-            if (isSyncMode)
-            {
-                watcher.Renamed += (_, e) => _ = HandleRenameInSyncAsync(context, e.OldFullPath, e.FullPath);
-                watcher.Deleted += (_, e) => _ = HandleDeleteInSyncAsync(context, e.FullPath);
-            }
-            else
-            {
-                watcher.Renamed += (_, e) => OnFileEvent(context, e.FullPath);
-            }
-
-            watcher.Error += (_, e) => _logger.LogError(e.GetException(), "File watcher error for source {Path}", source.Path);
-
-            _watchers.Add(watcher);
-            _sources.Add(context);
-            _pollingBaseline[NormalizePath(source.Path)] = new Dictionary<string, FileFingerprint>(PathComparer);
-            watcher.EnableRaisingEvents = true;
-            _logger.LogInformation(
-                "Polling watcher registered for {Path}; the persistent baseline will be reconciled in the background (sweep interval = {SweepSeconds}s).",
-                source.Path,
-                (int)PollingSweepInterval.TotalSeconds);
-
-            if (useSubdirsAsAlbums)
-            {
-                var dirWatcher = new FileSystemWatcher(source.Path)
+                var watcher = new FileSystemWatcher(source.Path)
                 {
-                    IncludeSubdirectories = false,
-                    NotifyFilter = NotifyFilters.DirectoryName,
-                    EnableRaisingEvents = true,
+                    IncludeSubdirectories = effectiveIncludeSubdirectories,
+                    NotifyFilter = NotifyFilters.FileName
+                        | NotifyFilters.CreationTime
+                        | NotifyFilters.LastWrite
+                        | NotifyFilters.Size,
+                    EnableRaisingEvents = false,
                 };
 
-                dirWatcher.Created += (_, e) => _ = HandleSubdirCreatedAsync(e.FullPath);
-                dirWatcher.Deleted += (_, e) => _ = HandleSubdirDeletedAsync(e.FullPath);
-                dirWatcher.Renamed += (_, e) => _ = HandleSubdirRenamedAsync(e.OldFullPath, e.FullPath);
-                dirWatcher.Error += (_, e) => _logger.LogError(e.GetException(), "Directory watcher error for source {Path}", source.Path);
+                watcher.Created += (_, e) => QueueWatcherTask(() => { OnFileEvent(context, e.FullPath); return Task.CompletedTask; });
+                watcher.Changed += (_, e) => QueueWatcherTask(() => { OnFileEvent(context, e.FullPath); return Task.CompletedTask; });
 
-                _watchers.Add(dirWatcher);
+                if (isSyncMode)
+                {
+                    watcher.Renamed += (_, e) => QueueWatcherTask(() => HandleRenameInSyncAsync(context, e.OldFullPath, e.FullPath));
+                    watcher.Deleted += (_, e) => QueueWatcherTask(() => HandleDeleteInSyncAsync(context, e.FullPath));
+                }
+                else
+                {
+                    watcher.Renamed += (_, e) => QueueWatcherTask(() => { OnFileEvent(context, e.FullPath); return Task.CompletedTask; });
+                }
+
+                watcher.Error += (_, e) => _logger.LogError(e.GetException(), "File watcher error for source {Path}", source.Path);
+
+                _watchers.Add(watcher);
+                _sources.Add(context);
+                _pollingBaseline[NormalizePath(source.Path)] = new Dictionary<string, FileFingerprint>(PathComparer);
+                watcher.EnableRaisingEvents = true;
+                _logger.LogInformation(
+                    "Polling watcher registered for {Path}; the persistent baseline will be reconciled in the background (sweep interval = {SweepSeconds}s).",
+                    source.Path,
+                    (int)PollingSweepInterval.TotalSeconds);
+
+                if (useSubdirsAsAlbums)
+                {
+                    var dirWatcher = new FileSystemWatcher(source.Path)
+                    {
+                        IncludeSubdirectories = false,
+                        NotifyFilter = NotifyFilters.DirectoryName,
+                        EnableRaisingEvents = false,
+                    };
+
+                    dirWatcher.Created += (_, e) => QueueWatcherTask(() => HandleSubdirCreatedAsync(e.FullPath));
+                    dirWatcher.Deleted += (_, e) => QueueWatcherTask(() => HandleSubdirDeletedAsync(e.FullPath));
+                    dirWatcher.Renamed += (_, e) => QueueWatcherTask(() => HandleSubdirRenamedAsync(e.OldFullPath, e.FullPath));
+                    dirWatcher.Error += (_, e) => _logger.LogError(e.GetException(), "Directory watcher error for source {Path}", source.Path);
+
+                    _watchers.Add(dirWatcher);
+                    dirWatcher.EnableRaisingEvents = true;
+                }
+
+                _logger.LogInformation(
+                    "Watching source {Path} (Album: '{AlbumName}', SyncMode: {SyncMode}, IncludeSubdirectories: {IncludeSubdirectories}, DeleteAfterUpload: {DeleteAfterUpload}).",
+                    source.Path,
+                    source.AlbumName,
+                    syncMode,
+                    effectiveIncludeSubdirectories,
+                    context.DeleteAfterUpload);
+            }
+            catch
+            {
+                foreach (var partialWatcher in _watchers.Skip(initialWatcherCount)) partialWatcher.Dispose();
+                _watchers.RemoveRange(initialWatcherCount, _watchers.Count - initialWatcherCount);
+                _sources.Remove(context);
+                _pollingBaseline.Remove(NormalizePath(source.Path));
+                context.FileSystem.Dispose();
+                throw;
             }
 
-            _logger.LogInformation(
-                "Watching source {Path} (Album: '{AlbumName}', SyncMode: {SyncMode}, IncludeSubdirectories: {IncludeSubdirectories}, DeleteAfterUpload: {DeleteAfterUpload}).",
-                source.Path,
-                source.AlbumName,
-                syncMode,
-                effectiveIncludeSubdirectories,
-                context.DeleteAfterUpload);
         }
 
         if (_watchers.Count == 0)
@@ -590,17 +638,17 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     ? SearchOption.AllDirectories
                     : SearchOption.TopDirectoryOnly;
 
-                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*",
-                    WatchPathSafety.EnumerationOptions(context.EffectiveIncludeSubdirectories)))
+                foreach (var filePath in context.FileSystem.EnumerateFiles(context.EffectiveIncludeSubdirectories)
+                    .Select(relative => Path.Combine(context.NormalizedRoot, relative)))
                 {
                     var normalized = NormalizePath(filePath);
                     seen.Add(normalized);
-                    if (!context.Filter.IsMatch(filePath))
+                    if (SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, filePath)) || !context.Filter.IsMatch(filePath))
                     {
                         continue;
                     }
 
-                    if (!TryGetFingerprint(normalized, out var fingerprint))
+                    if (!TryGetFingerprint(context, normalized, out var fingerprint))
                     {
                         continue;
                     }
@@ -650,7 +698,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                     }
 
                     if (_uploadBatchQueue.TryEnqueue(
-                        new UploadAssetRequest(normalized, albumName, context.NormalizedRoot)))
+                        new UploadAssetRequest(normalized, albumName, context.NormalizedRoot) { SourceRoot = context.FileSystem }))
                     {
                         queuedCount++;
                     }
@@ -754,11 +802,11 @@ public sealed partial class FolderWatchWorker : BackgroundService
             try
             {
                 current = new Dictionary<string, FileFingerprint>(PathComparer);
-                foreach (var filePath in Directory.EnumerateFiles(context.Source.Path, "*",
-                    WatchPathSafety.EnumerationOptions(context.EffectiveIncludeSubdirectories)))
+                foreach (var filePath in context.FileSystem.EnumerateFiles(context.EffectiveIncludeSubdirectories)
+                    .Select(relative => Path.Combine(context.NormalizedRoot, relative)))
                 {
                     var normalized = NormalizePath(filePath);
-                    if (!TryGetFingerprint(normalized, out var fingerprint))
+                    if (!TryGetFingerprint(context, normalized, out var fingerprint))
                     {
                         continue;
                     }
@@ -919,15 +967,11 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 };
                 await _syncStateStore.UpsertAsync(tombstone, cancellationToken);
 
-                if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, entry.Key, allowMissingLeaf: true))
+                if (context.FileSystem.FileExists(GetRelativePath(context, entry.Key)))
                 {
-                    continue;
-                }
-
-                if (File.Exists(entry.Key))
-                {
+                    using var localFile = context.FileSystem.OpenRead(GetRelativePath(context, entry.Key));
                     _remoteDeletesInProgress[entry.Key] = DateTimeOffset.UtcNow;
-                    File.Delete(entry.Key);
+                    localFile.Delete();
                     _logger.LogInformation(
                         "Removed local file after remote delete (asset {AssetId} no longer on Immich): {Path}",
                         entry.Value.AssetId,
@@ -1125,10 +1169,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
             }
 
             var destinationPath = Path.Combine(targetDirectory, asset.OriginalFileName);
-            if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, destinationPath, allowMissingLeaf: true))
-            {
-                throw new IOException("Download destination contains a link or escapes its watch source.");
-            }
+            var relativeDestination = GetRelativePath(context, destinationPath);
+            if (SecureWatchRoot.IsInternalPath(relativeDestination)) continue;
             var normalized = NormalizePath(destinationPath);
 
             // Path-level tombstone catches the rare case where the
@@ -1147,9 +1189,9 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 continue;
             }
 
-            if (File.Exists(destinationPath))
+            if (context.FileSystem.FileExists(GetRelativePath(context, destinationPath)))
             {
-                if (TryGetFingerprint(normalized, out var existingFingerprint))
+                if (TryGetFingerprint(context, normalized, out var existingFingerprint))
                 {
                     var effectiveAlbum = GetEffectiveAlbum(context, normalized);
                     if (_stateByPath.TryGetValue(normalized, out var currentState)
@@ -1173,7 +1215,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                         }
 
                         currentState = await CorrectDownloadedTimestampsAsync(context, normalized, asset, currentState, cancellationToken);
-                        if (!TryGetFingerprint(normalized, out existingFingerprint) || !existingFingerprint.Matches(currentState)) continue;
+                        if (!TryGetFingerprint(context, normalized, out existingFingerprint) || !existingFingerprint.Matches(currentState)) continue;
                         _pathToAssetId[normalized] = asset.Id;
                         if (string.Equals(currentState.AlbumName, effectiveAlbum, StringComparison.Ordinal))
                         {
@@ -1202,27 +1244,23 @@ public sealed partial class FolderWatchWorker : BackgroundService
         if (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EnsureDownloadDirectoryWritable(targetDirectory);
+            EnsureDownloadDirectoryWritable(context, targetDirectory);
         }
 
         return pending;
     }
 
-    private static void EnsureDownloadDirectoryWritable(string targetDirectory)
+    private static void EnsureDownloadDirectoryWritable(WatchSourceContext context, string targetDirectory)
     {
         try
         {
-            Directory.CreateDirectory(targetDirectory);
-            // Probe once per directory before requesting any originals. A readable
-            // portal grant can still deny writes; retrying every asset cannot fix it.
-            // The unique, extensionless file cannot match a configured media extension.
-            using var probe = new FileStream(
-                Path.Combine(targetDirectory, $"ifw-write-check-{Guid.NewGuid():N}"),
-                FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
+            var relative = Path.GetRelativePath(context.NormalizedRoot, targetDirectory);
+            if (relative != ".") context.FileSystem.EnsureDirectory(relative);
+            context.FileSystem.CheckWritable(relative == "." ? "" : relative);
         }
-        catch (UnauthorizedAccessException ex)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            throw new UnauthorizedAccessException(
+            throw new IOException(
                 $"Cannot write downloads to folder '{targetDirectory}'. Check folder write permissions. "
                 + "For Flatpak, select the folder again and use Save and Apply to renew its access grant.", ex);
         }
@@ -1250,8 +1288,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 var normalized = NormalizePath(destinationPath);
                 // Collection can take time. Recheck local edits and deletions
                 // immediately before download rather than overwriting a new file.
-                if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, destinationPath, allowMissingLeaf: true)
-                    || File.Exists(destinationPath) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
+                if (context.FileSystem.FileExists(GetRelativePath(context, destinationPath)) || IsPathRecentlyDeleted(normalized) || IsRecentlyTrashed(asset.Id))
                 {
                     _syncStatusProvider.ReportDownloadSkipped();
                     continue;
@@ -1260,19 +1297,22 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 _downloadsInProgress[normalized] = 0;
                 try
                 {
-                    var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destinationPath, cancellationToken);
+                    using var destination = context.FileSystem.CreateDownload(GetRelativePath(context, destinationPath));
+                    var download = await _immichAssetClient.DownloadAssetAsync(asset.Id, destination, cancellationToken);
                     string? timestampError = null;
                     if (download.IsSuccess && DownloadedFileTimestamps.GetDesired(asset) is { } desired)
                     {
-                        try { DownloadedFileTimestamps.Apply(normalized, desired); }
+                        try { destination.SetTimestamps(desired.CreationTimeUtc.UtcDateTime, desired.LastWriteTimeUtc.UtcDateTime); }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
                         {
                             timestampError = "The original file was downloaded, but its timestamps could not be restored.";
                             _logger.LogWarning(ex, "Could not restore timestamps for downloaded asset {AssetId}; a later pull will retry.", asset.Id);
                         }
                     }
-                    if (download.IsSuccess && TryGetFingerprint(normalized, out var fingerprint))
+                    if (download.IsSuccess)
                     {
+                        destination.CompleteNoReplace();
+                        var fingerprint = new FileFingerprint(destination.Length, destination.LastWriteTimeUtc.Ticks);
                         var entry = CreateSynchronizedEntry(
                             context,
                             normalized,
@@ -1349,7 +1389,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
     private void OnFileEvent(WatchSourceContext context, string filePath)
     {
-        if (!context.Filter.IsMatch(filePath))
+        if (SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, filePath)) || !context.Filter.IsMatch(filePath))
         {
             return;
         }
@@ -1362,7 +1402,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
         if (_stateByPath.TryGetValue(normalizedPath, out var synchronized)
             && synchronized.Status == SyncEntryStatus.Synchronized
-            && TryGetFingerprint(normalizedPath, out var fingerprint)
+            && TryGetFingerprint(context, normalizedPath, out var fingerprint)
             && fingerprint.Matches(synchronized))
         {
             return;
@@ -1387,10 +1427,14 @@ public sealed partial class FolderWatchWorker : BackgroundService
         {
             var oldNormalized = NormalizePath(oldFullPath);
             var newNormalized = NormalizePath(newFullPath);
+            if (SecureWatchRoot.IsInternalPath(GetRelativePath(context, oldNormalized))
+                || SecureWatchRoot.IsInternalPath(GetRelativePath(context, newNormalized))
+                || context.FileSystem.FileExists(GetRelativePath(context, oldNormalized))) return;
             var oldAlbum = GetEffectiveAlbum(context, oldNormalized);
             var newAlbum = GetEffectiveAlbum(context, newNormalized);
             var hadAssetId = _pathToAssetId.TryRemove(oldNormalized, out var assetId);
-            var newMatches = context.Filter.IsMatch(newFullPath);
+            var newMatches = context.Filter.IsMatch(newFullPath)
+                && context.FileSystem.FileExists(GetRelativePath(context, newFullPath));
 
             _debouncedFiles.TryRemove(oldNormalized, out _);
 
@@ -1423,7 +1467,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 }
 
                 _pathToAssetId[newNormalized] = assetId!;
-                if (TryGetFingerprint(newNormalized, out var renamedFingerprint))
+                if (TryGetFingerprint(context, newNormalized, out var renamedFingerprint))
                 {
                     if (_stateByPath.TryRemove(oldNormalized, out var oldState))
                     {
@@ -1470,7 +1514,9 @@ public sealed partial class FolderWatchWorker : BackgroundService
         {
             // Native watchers also report temporary and excluded files. Match the
             // polling sweep's filter before creating tombstones or opening SQLite.
-            if (!context.Filter.IsMatch(oldFullPath))
+            if (SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, oldFullPath))
+                || !context.Filter.IsMatch(oldFullPath)
+                || context.FileSystem.FileExists(GetRelativePath(context, oldFullPath)))
             {
                 return;
             }
@@ -1539,7 +1585,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
         {
             var context = FindSourceContext(string.Empty, fullPath);
             if (context is null || !context.UseSubdirsAsAlbums
-                || !WatchPathSafety.IsSafePath(context.NormalizedRoot, fullPath)
+                || SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, fullPath))
+                || !context.FileSystem.DirectoryExists(GetRelativePath(context, fullPath))
                 || _syncStateStore is not IAlbumOwnershipStore ownership)
             {
                 return;
@@ -1585,6 +1632,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 return;
             }
 
+            if (SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, normalizedDir))) return;
             var name = Path.GetFileName(normalizedDir);
             var albumId = await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, CancellationToken.None);
             if (albumId is null)
@@ -1592,6 +1640,12 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 _logger.LogWarning("Remote album deletion refused for unowned subfolder {Path}.", fullPath);
                 return;
             }
+
+            // Recreating this pathname must not inherit an earlier directory's
+            // album authority, even when the advisory event is delayed.
+            await ownership.RemoveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, name, albumId, CancellationToken.None);
+            _albumIdToDirName.TryRemove(albumId, out _);
+            if (context.FileSystem.DirectoryExists(GetRelativePath(context, normalizedDir))) return;
 
             // Never trash all assets based on a directory name. Individual file
             // deletion events retain the existing mapped-asset synchronization policy.
@@ -1630,6 +1684,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 return;
             }
 
+            if (SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, oldDir))
+                || SecureWatchRoot.IsInternalPath(Path.GetRelativePath(context.NormalizedRoot, newDir))) return;
             var oldName = Path.GetFileName(oldDir);
             var newName = Path.GetFileName(newDir);
             var albumId = await ownership.GetOwnedAlbumAsync(_accountScope, context.NormalizedRoot, oldName, CancellationToken.None);
@@ -1638,9 +1694,11 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 // Revoke first, even when a second rename has already removed the
                 // destination or later state/network operations fail.
                 await ownership.RemoveOwnedAlbumAsync(_accountScope, context.NormalizedRoot, oldName, albumId, CancellationToken.None);
+                _albumIdToDirName.TryRemove(albumId, out _);
             }
 
-            if (!WatchPathSafety.IsSafePath(context.NormalizedRoot, newDir))
+            if (context.FileSystem.DirectoryExists(GetRelativePath(context, oldDir))
+                || !context.FileSystem.DirectoryExists(GetRelativePath(context, newDir)))
             {
                 return;
             }
@@ -1719,12 +1777,12 @@ public sealed partial class FolderWatchWorker : BackgroundService
     {
         try
         {
-            if (!Directory.Exists(oldDir))
+            if (!context.FileSystem.DirectoryExists(GetRelativePath(context, oldDir)))
             {
                 return;
             }
 
-            if (Directory.Exists(newDir))
+            if (context.FileSystem.DirectoryExists(GetRelativePath(context, newDir)))
             {
                 _logger.LogWarning(
                     "Cannot rename local subfolder '{Old}' -> '{New}' to match renamed Immich album: a folder with the new name already exists.",
@@ -1733,7 +1791,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 return;
             }
 
-            Directory.Move(oldDir, newDir);
+            context.FileSystem.RenameDirectory(GetRelativePath(context, oldDir), GetRelativePath(context, newDir));
             RekeyPathMapPrefix(oldDir, newDir);
             await RekeyPersistedStatePrefixAsync(context, oldDir, newDir, cancellationToken);
 
@@ -1851,13 +1909,14 @@ public sealed partial class FolderWatchWorker : BackgroundService
             }
 
             var path = matured.Key;
-            if (!File.Exists(path))
+            var sourceContext = FindSourceContext(pendingFile.SourcePath, path);
+            if (sourceContext is null || !sourceContext.FileSystem.FileExists(GetRelativePath(sourceContext, path)))
             {
                 _logger.LogDebug("Skipping missing file {FilePath}.", path);
                 continue;
             }
 
-            var isReady = await _fileReadinessChecker.WaitUntilReadyAsync(path, _fileReadyTimeout, cancellationToken);
+            var isReady = await _fileReadinessChecker.WaitUntilReadyAsync(sourceContext.FileSystem, GetRelativePath(sourceContext, path), _fileReadyTimeout, cancellationToken);
             if (!isReady)
             {
                 _logger.LogWarning(
@@ -1880,7 +1939,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
             if (_stateByPath.TryGetValue(path, out var synchronized)
                 && synchronized.Status == SyncEntryStatus.Synchronized
-                && TryGetFingerprint(path, out var fingerprint)
+                && TryGetFingerprint(sourceContext, path, out var fingerprint)
                 && fingerprint.Matches(synchronized))
             {
                 continue;
@@ -1888,7 +1947,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
             _pendingUploadRetries.TryRemove(path, out _);
             var queued = _uploadBatchQueue.TryEnqueue(
-                new UploadAssetRequest(path, pendingFile.AlbumName, pendingFile.SourcePath));
+                new UploadAssetRequest(path, pendingFile.AlbumName, pendingFile.SourcePath) { SourceRoot = FindSourceContext(pendingFile.SourcePath, path)?.FileSystem });
             if (queued)
             {
                 _logger.LogInformation("Queued file {FilePath} for upload (Album: {AlbumName}).", path, pendingFile.AlbumName);
@@ -1919,25 +1978,18 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 var request = batch[requestIndex];
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!File.Exists(request.FilePath))
-                {
-                    _logger.LogWarning("Skipping upload because file no longer exists: {FilePath}", request.FilePath);
-                    _syncStatusProvider.ReportUploadSkipped();
-                    continue;
-                }
-
                 var context = FindSourceContext(request.SourcePath, request.FilePath);
-                if (context is null
-                    || !WatchPathSafety.IsSafePath(context.NormalizedRoot, request.FilePath)
-                    || !TryGetFingerprint(request.FilePath, out var uploadedFingerprint))
+                using var uploadedFile = context is null ? null : TryOpenSourceFile(context, request.FilePath);
+                if (context is null || uploadedFile is null)
                 {
-                    _logger.LogWarning("Skipping upload because its watch source or file metadata is unavailable: {FilePath}", request.FilePath);
+                    _logger.LogWarning("Skipping upload because its authorized source or file is unavailable: {FilePath}", request.FilePath);
                     _syncStatusProvider.ReportUploadSkipped();
                     continue;
                 }
+                var uploadedFingerprint = new FileFingerprint(uploadedFile.Length, uploadedFile.LastWriteTimeUtc.Ticks);
 
                 _syncStatusProvider.ReportUploadStarted(request.FilePath);
-                var result = await _immichAssetClient.UploadAssetAttemptAsync(request, cancellationToken);
+                var result = await _immichAssetClient.UploadAssetAttemptAsync(request with { SourceRoot = context.FileSystem, OpenedFile = uploadedFile }, cancellationToken);
                 if (result.IsSuccess)
                 {
                     _logger.LogInformation(
@@ -1946,8 +1998,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                         request.AlbumName,
                         result.AssetId ?? "n/a");
 
-                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
-                        || currentFingerprint != uploadedFingerprint)
+                    var currentFingerprint = new FileFingerprint(uploadedFile.Length, uploadedFile.LastWriteTimeUtc.Ticks);
+                    if (!uploadedFile.IsCurrentEntry() || currentFingerprint != uploadedFingerprint)
                     {
                         _logger.LogInformation(
                             "File changed while it was being uploaded and will be queued again: {FilePath}",
@@ -1975,7 +2027,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                             context,
                             normalizedPath,
                             entry,
-                            cancellationToken);
+                            cancellationToken,
+                            uploadedFile);
                     }
 
                     var completedUtc = DateTimeOffset.UtcNow;
@@ -1987,8 +2040,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 {
                     _syncStatusProvider.ReportUploadFailed(request.FilePath, result.ErrorMessage);
 
-                    if (!TryGetFingerprint(request.FilePath, out var currentFingerprint)
-                        || currentFingerprint != uploadedFingerprint)
+                    var currentFingerprint = new FileFingerprint(uploadedFile.Length, uploadedFile.LastWriteTimeUtc.Ticks);
+                    if (!uploadedFile.IsCurrentEntry() || currentFingerprint != uploadedFingerprint)
                     {
                         _logger.LogInformation(
                             "File changed while its upload failed and will be queued as a new upload: {FilePath}",
@@ -2135,7 +2188,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
     private static string SanitizeDirectoryName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(name) || SecureWatchRoot.IsInternalPath(name))
         {
             return string.Empty;
         }
@@ -2150,26 +2203,18 @@ public sealed partial class FolderWatchWorker : BackgroundService
         return new string(buffer).Trim();
     }
 
-    private static bool TryGetFingerprint(string path, out FileFingerprint fingerprint)
+    private static SecureWatchFile? TryOpenSourceFile(WatchSourceContext context, string path, bool writableMetadata = false)
     {
-        try
-        {
-            var file = new FileInfo(path);
-            file.Refresh();
-            if (!file.Exists)
-            {
-                fingerprint = default;
-                return false;
-            }
+        try { return context.FileSystem.OpenRead(GetRelativePath(context, path), writableMetadata); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+    }
 
-            fingerprint = new FileFingerprint(file.Length, file.LastWriteTimeUtc.Ticks);
-            return true;
-        }
-        catch (Exception)
-        {
-            fingerprint = default;
-            return false;
-        }
+    private static bool TryGetFingerprint(WatchSourceContext context, string path, out FileFingerprint fingerprint)
+    {
+        using var file = TryOpenSourceFile(context, path);
+        if (file is null) { fingerprint = default; return false; }
+        fingerprint = new FileFingerprint(file.Length, file.LastWriteTimeUtc.Ticks);
+        return true;
     }
 
     private SyncStateEntry CreateSynchronizedEntry(
@@ -2236,39 +2281,31 @@ public sealed partial class FolderWatchWorker : BackgroundService
         WatchSourceContext context,
         string fullPath,
         SyncStateEntry entry,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SecureWatchFile? verifiedFile = null)
     {
-        if (!context.DeleteAfterUpload
-            || !WatchPathSafety.IsSafePath(context.NormalizedRoot, fullPath)
-            || entry.Direction != SyncTransferDirection.Upload
-            || entry.Status != SyncEntryStatus.Synchronized
-            || !TryGetFingerprint(fullPath, out var fingerprint)
-            || !fingerprint.Matches(entry))
+        if (!context.DeleteAfterUpload || entry.Direction != SyncTransferDirection.Upload
+            || entry.Status != SyncEntryStatus.Synchronized) return false;
+        if (verifiedFile is null)
         {
+            // Persisted length/mtime cannot authorize deleting a replacement inode.
+            // A retry (including after restart) must upload an anchored lease again.
+            if (context.FileSystem.FileExists(GetRelativePath(context, fullPath)))
+                _uploadBatchQueue.TryEnqueue(new UploadAssetRequest(fullPath, entry.AlbumName, context.NormalizedRoot) { SourceRoot = context.FileSystem });
             return false;
         }
-
+        var file = verifiedFile;
+        if (!new FileFingerprint(file.Length, file.LastWriteTimeUtc.Ticks).Matches(entry)) return false;
         try
         {
-            _localFileDeletionService.Delete(fullPath);
+            _localFileDeletionService.Delete(file);
         }
         catch (Exception ex)
         {
             if (_localDeleteFailures.TryAdd(fullPath, 0))
-            {
-                _logger.LogWarning(
-                    ex,
-                    "The verified upload succeeded, but the local file could not be deleted. Deletion will be retried: {FilePath}",
-                    fullPath);
-            }
+                _logger.LogWarning(ex, "The verified upload succeeded, but its authorized local file could not be deleted: {FilePath}", fullPath);
             else
-            {
-                _logger.LogDebug(
-                    ex,
-                    "Retrying deletion of a verified local upload failed: {FilePath}",
-                    fullPath);
-            }
-
+                _logger.LogDebug(ex, "Retrying deletion of a verified local upload failed: {FilePath}", fullPath);
             return false;
         }
 
@@ -2434,8 +2471,21 @@ public sealed partial class FolderWatchWorker : BackgroundService
         }
     }
 
+    public override void Dispose()
+    {
+        base.Dispose();
+        // BackgroundService.Dispose requests cancellation but does not await the
+        // worker. Active work releases its roots only in ExecuteAsync finally.
+        if (ExecuteTask is null || ExecuteTask.IsCompleted)
+        {
+            DisposeWatchers();
+            foreach (var source in _sources) source.FileSystem.Dispose();
+        }
+    }
+
     private void DisposeWatchers()
     {
+        lock (_watcherTaskGate) _acceptWatcherTasks = false;
         foreach (var watcher in _watchers)
         {
             watcher.Dispose();
@@ -2473,6 +2523,7 @@ public sealed partial class FolderWatchWorker : BackgroundService
             SyncMode = syncMode;
             Filter = filter;
             NormalizedRoot = normalizedRoot;
+            FileSystem = SecureWatchRoot.Open(normalizedRoot);
             UseSubdirsAsAlbums = useSubdirsAsAlbums;
             UseFlatAlbum = useFlatAlbum;
             EffectiveIncludeSubdirectories = effectiveIncludeSubdirectories;
@@ -2485,6 +2536,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
         public WatchSourceFileFilter Filter { get; }
 
         public string NormalizedRoot { get; }
+
+        public SecureWatchRoot FileSystem { get; }
 
         public bool UseSubdirsAsAlbums { get; }
 

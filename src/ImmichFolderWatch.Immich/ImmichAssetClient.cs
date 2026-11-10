@@ -112,15 +112,30 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
 
     public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
-
-        string? tempPath = null;
         try
         {
-            destinationPath = Path.GetFullPath(destinationPath);
-            var directory = Path.GetDirectoryName(destinationPath)!;
-            Directory.CreateDirectory(directory);
+            var fullPath = Path.GetFullPath(destinationPath);
+            var existingParent = Path.GetDirectoryName(fullPath)!;
+            while (!Directory.Exists(existingParent))
+                existingParent = Path.GetDirectoryName(existingParent)
+                    ?? throw new DirectoryNotFoundException("No authorized download ancestor is available.");
+            using var root = SecureWatchRoot.Open(existingParent);
+            using var destination = root.CreateDownload(Path.GetRelativePath(root.RootPath, fullPath));
+            var result = await DownloadAssetAsync(assetId, destination, cancellationToken);
+            if (result.IsSuccess) destination.CompleteNoReplace();
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) { return DownloadAssetResult.Failure(null, ex.Message); }
+    }
+
+    public async Task<DownloadAssetResult> DownloadAssetAsync(string assetId, SecureDownloadLease destination, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        ArgumentNullException.ThrowIfNull(destination);
+        try
+        {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(_limits.DownloadTimeout);
             using var request = new HttpRequestMessage(HttpMethod.Get, ImmichApiRoutes.AssetOriginalFile(assetId));
@@ -128,89 +143,40 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
             if (!response.IsSuccessStatusCode)
             {
                 var body = await ReadResponseAsync(response, deadline.Token);
-                return DownloadAssetResult.Failure(
-                    response.StatusCode,
-                    $"HTTP {(int)response.StatusCode}: {TrimForLog(body)}");
+                return DownloadAssetResult.Failure(response.StatusCode, $"HTTP {(int)response.StatusCode}: {TrimForLog(body)}");
             }
-
             if (response.Content.Headers.ContentLength > _limits.MaxDownloadBytes)
             {
                 return DownloadAssetResult.Failure(null, "Asset exceeds the download size limit.");
             }
 
-            var readFreeSpace = DownloadStorage.CreateFreeSpaceReader(directory);
-            EnsureFreeSpace(readFreeSpace, 0);
-            // CreateNew rejects every existing entry, including symbolic links. Never reuse a predictable partial file.
-            var candidatePath = Path.Combine(directory, $".{Guid.NewGuid():N}.downloading");
-            var options = new FileStreamOptions
+            EnsureFreeSpace(destination.GetAvailableFreeSpace, 0);
+            using var inactivity = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+            inactivity.CancelAfter(_limits.BodyInactivityTimeout);
+            await using var input = await response.Content.ReadAsStreamAsync(inactivity.Token);
+            var buffer = new byte[81920];
+            long transferred = 0;
+            while (true)
             {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-                Share = FileShare.None,
-                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
-            };
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            await using (var output = new FileStream(candidatePath, options))
-            {
-                // Cleanup is permitted only after this invocation successfully creates the entry.
-                tempPath = candidatePath;
-                using var inactivity = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
                 inactivity.CancelAfter(_limits.BodyInactivityTimeout);
-                await using var input = await response.Content.ReadAsStreamAsync(inactivity.Token);
-                var buffer = new byte[81920];
-                long transferred = 0;
-                while (true)
-                {
-                    inactivity.CancelAfter(_limits.BodyInactivityTimeout);
-                    var count = await input.ReadAsync(buffer, inactivity.Token);
-                    if (count == 0) break;
-                    if (count > _limits.MaxDownloadBytes - transferred)
-                    {
-                        throw new IOException("Asset exceeds the download size limit.");
-                    }
-
-                    EnsureFreeSpace(readFreeSpace, count);
-                    await output.WriteAsync(buffer.AsMemory(0, count), inactivity.Token);
-                    transferred += count;
-                }
-
-                if (response.Content.Headers.ContentLength is { } expected && transferred != expected)
-                {
-                    throw new IOException("Asset download ended before its declared length was received.");
-                }
+                var count = await input.ReadAsync(buffer, inactivity.Token);
+                if (count == 0) break;
+                if (count > _limits.MaxDownloadBytes - transferred)
+                    throw new IOException("Asset exceeds the download size limit.");
+                EnsureFreeSpace(destination.GetAvailableFreeSpace, count);
+                await destination.Stream.WriteAsync(buffer.AsMemory(0, count), inactivity.Token);
+                transferred += count;
             }
-
-            // No overwrite: a local producer wins any race to create the destination.
-            File.Move(tempPath, destinationPath, overwrite: false);
-            tempPath = null;
+            await destination.Stream.FlushAsync(inactivity.Token);
+            if (response.Content.Headers.ContentLength is { } expected && transferred != expected)
+                throw new IOException("Asset download ended before its declared length was received.");
             return DownloadAssetResult.Success();
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Asset download failed for {AssetId}.", assetId);
             return DownloadAssetResult.Failure(null, ex.Message);
-        }
-        finally
-        {
-            if (tempPath is not null)
-            {
-                try
-                {
-                    File.Delete(tempPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not remove an incomplete download.");
-                }
-            }
         }
     }
 
@@ -519,6 +485,24 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
 
     public async Task<UploadAssetResult> UploadAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        try
+        {
+            using var ownedRoot = request.SourceRoot is null && request.OpenedFile is null
+                ? SecureWatchRoot.Open(string.IsNullOrWhiteSpace(request.SourcePath)
+                    ? Path.GetDirectoryName(Path.GetFullPath(request.FilePath))! : request.SourcePath)
+                : null;
+            var root = request.SourceRoot ?? ownedRoot;
+            using var ownedFile = request.OpenedFile is null
+                ? root!.OpenRead(Path.GetRelativePath(root.RootPath, Path.GetFullPath(request.FilePath))) : null;
+            return await UploadPinnedAssetAsync(request with { SourceRoot = root, OpenedFile = request.OpenedFile ?? ownedFile }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) { return UploadAssetResult.Failure(null, ex.Message); }
+    }
+
+    private async Task<UploadAssetResult> UploadPinnedAssetAsync(UploadAssetRequest request, CancellationToken cancellationToken)
+    {
         for (var attempt = 1; attempt <= _retrySettings.MaxAttempts; attempt++)
         {
             var result = await UploadAssetAttemptAsync(request, cancellationToken);
@@ -546,11 +530,24 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!File.Exists(request.FilePath))
+        try
         {
-            return UploadAssetResult.Failure(null, $"File does not exist: {request.FilePath}");
+            using var ownedRoot = request.OpenedFile is null && request.SourceRoot is null
+                ? SecureWatchRoot.Open(string.IsNullOrWhiteSpace(request.SourcePath)
+                    ? Path.GetDirectoryName(Path.GetFullPath(request.FilePath))! : request.SourcePath)
+                : null;
+            var root = request.SourceRoot ?? ownedRoot;
+            using var ownedFile = request.OpenedFile is null
+                ? root!.OpenRead(Path.GetRelativePath(root.RootPath, Path.GetFullPath(request.FilePath)))
+                : null;
+            return await UploadOpenedAssetAttemptAsync(request with { OpenedFile = request.OpenedFile ?? ownedFile }, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) { return UploadAssetResult.Failure(null, ex.Message); }
+    }
 
+    private async Task<UploadAssetResult> UploadOpenedAssetAttemptAsync(UploadAssetRequest request, CancellationToken cancellationToken)
+    {
         var uploadResult = await UploadAssetFileAttemptAsync(request, cancellationToken);
         if (!uploadResult.IsSuccess)
         {
@@ -981,7 +978,9 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
         bool includeLegacyIdentifiers,
         CancellationToken cancellationToken)
     {
-        using var content = CreateUploadContent(request, includeLegacyIdentifiers);
+        var legacyId = includeLegacyIdentifiers
+            ? await CreateDeviceAssetIdAsync(request.FilePath, request.OpenedFile!, cancellationToken) : null;
+        using var content = CreateUploadContent(request, legacyId);
         using var message = new HttpRequestMessage(HttpMethod.Post, ImmichApiRoutes.AssetUpload) { Content = content };
         using var response = await _httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var responseBody = await ReadResponseAsync(response, cancellationToken);
@@ -995,36 +994,27 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
                 || responseBody.Contains("deviceId", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static MultipartFormDataContent CreateUploadContent(UploadAssetRequest request, bool includeLegacyIdentifiers)
+    private static MultipartFormDataContent CreateUploadContent(UploadAssetRequest request, string? legacyId)
     {
-        if (!string.IsNullOrWhiteSpace(request.SourcePath)
-            && !WatchPathSafety.IsSafePath(request.SourcePath, request.FilePath))
-        {
-            throw new IOException("Upload path is outside its source or contains a symbolic link or reparse point.");
-        }
-
-        var fileInfo = new FileInfo(request.FilePath);
+        var file = request.OpenedFile ?? throw new InvalidOperationException("An authorized file lease is required for uploads.");
+        var fileName = Path.GetFileName(request.FilePath);
         var multipart = new MultipartFormDataContent();
-
-        var stream = new FileStream(
-            request.FilePath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite);
+        file.Stream.Position = 0;
+        var stream = new BorrowedReadStream(file.Stream);
 
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-        multipart.Add(fileContent, "assetData", fileInfo.Name);
-        multipart.Add(new StringContent(fileInfo.Name), "filename");
-        if (includeLegacyIdentifiers)
+        multipart.Add(fileContent, "assetData", fileName);
+        multipart.Add(new StringContent(fileName), "filename");
+        if (legacyId is not null)
         {
-            multipart.Add(new StringContent(CreateDeviceAssetId(fileInfo)), "deviceAssetId");
+            multipart.Add(new StringContent(legacyId), "deviceAssetId");
             multipart.Add(new StringContent("immich-folder-watch"), "deviceId");
         }
 
-        multipart.Add(new StringContent(fileInfo.CreationTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileCreatedAt");
-        multipart.Add(new StringContent(fileInfo.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileModifiedAt");
+        multipart.Add(new StringContent(file.CreationTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileCreatedAt");
+        multipart.Add(new StringContent(file.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture)), "fileModifiedAt");
         multipart.Add(new StringContent("false"), "isFavorite");
 
         return multipart;
@@ -1063,9 +1053,14 @@ public sealed partial class ImmichAssetClient : IImmichAssetClient, IImmichConne
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
     }
 
-    private static string CreateDeviceAssetId(FileInfo fileInfo)
+    private static async Task<string> CreateDeviceAssetIdAsync(string displayPath, SecureWatchFile file, CancellationToken cancellationToken)
     {
-        var input = $"{fileInfo.FullName}|{fileInfo.Length}|{fileInfo.LastWriteTimeUtc.Ticks}";
+        // Legacy servers may deduplicate by this identifier before comparing bytes.
+        // Equal size/mtime replacements therefore require content-bound identity.
+        file.Stream.Position = 0;
+        var contentHash = await SHA256.HashDataAsync(file.Stream, cancellationToken);
+        file.Stream.Position = 0;
+        var input = $"{displayPath}|{file.Length}|{file.LastWriteTimeUtc.Ticks}|{Convert.ToHexString(contentHash)}";
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }

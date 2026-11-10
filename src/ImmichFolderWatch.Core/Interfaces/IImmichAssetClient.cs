@@ -1,4 +1,5 @@
 using ImmichFolderWatch.Core.Models;
+using ImmichFolderWatch.Core.Services;
 
 namespace ImmichFolderWatch.Core.Interfaces;
 
@@ -15,6 +16,10 @@ public interface IImmichAssetClient
     Task<AlbumAssetsResult> GetAlbumAssetsAsync(string albumName, CancellationToken cancellationToken);
 
     Task<DownloadAssetResult> DownloadAssetAsync(string assetId, string destinationPath, CancellationToken cancellationToken);
+
+    /// <summary>Writes remote bytes to an already authorized staging handle. The caller publishes and disposes the lease.</summary>
+    Task<DownloadAssetResult> DownloadAssetAsync(string assetId, SecureDownloadLease destination, CancellationToken cancellationToken) =>
+        Task.FromResult(DownloadAssetResult.Failure(null, "Handle-bound downloads are unavailable."));
 
     Task<AlbumListResult> ListAlbumsAsync(CancellationToken cancellationToken);
 

@@ -2,20 +2,46 @@
 
 ## Directory race follow-up (2026-11-10)
 
-- Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; implementation in progress.
+- Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; implementation and local
+  validation complete; Windows CI and PR update pending.
 - Baseline: clean local and remote PR head `d922bfa86df14408185e811e230167705354dc7c`.
   PR #26 is open, draft, unmerged, targeting `main`; existing branch is reused.
 - User scope: completely close the remaining watch-directory race, with subagents
   and regression tests in the same PR. No merge or release.
 - Ownership: native filesystem abstraction and platform tests; worker/API integration;
   independent security review. Parent owns records, integration checks and commits.
-- Acceptance: WR-AC01 through WR-AC04 in the brief. Previous "partial" disposition
-  remains until the integrated handle-bound implementation passes validation.
-- Next action: implement and audit anchored filesystem operations, validate local
-  and Windows CI race tests, update PR #26.
+- WR-AC01: Pinned native Linux/Windows filesystem primitives and worker/API
+  integration cover enumeration, absence, reads, downloads, exact-file cleanup,
+  timestamps and both ends of directory moves. Roots outlive callbacks/retries.
+- WR-AC02: Linux local validation passes; Windows runtime CI remains required.
+  Capability checks fail closed. The [watch-root contract](watch-root-security.md)
+  documents retained Linux containers, bounded cache and Windows sharing locks.
+- WR-AC03: 33 added regression cases (20 native, 5 API, 8 worker), including
+  deterministic root/parent/leaf changes, same-fingerprint replacement cleanup,
+  legacy content IDs, journal recovery, remote cleanup and shutdown lifetime.
+- WR-AC04: Independent review found no remaining actionable source issue after
+  corrections for identity, bounded handle caching, stale cleanup/album authority,
+  retries and lifecycle. Documentation is updated; same-PR push and CI pending.
+- Next action: push the reviewed implementation to PR #26 and validate Windows
+  and native package CI. Retain draft status; no merge or release.
 - Goal controls: no new Goal requested or started; prior run remains historical.
 
-## Active security remediation (2026-11-09)
+### Directory race validation (2026-11-10)
+
+| Check | Result | Limits |
+| --- | --- | --- |
+| Portable Core suite | 481 passed, 0 failed/skipped | Linux x86_64, SDK 10.0.203; final album-cache revocation delta then passed 10 targeted album/security cases |
+| Native focused suite | 20 passed, including LRU eviction with active leases and exclusive writer locks | Windows implementation compiles; runtime CI pending |
+| Linux GUI/protocol suite | 53 passed, 0 failed/skipped | Headless/local sockets and D-Bus; no live Immich |
+| Linux application build/analyzers | Passed | Debug; generated branding remains ignored |
+| Independent source review | Passed with no remaining actionable finding | Windows/UNC and ARM64 runtime are separate evidence requirements |
+| Diagnostic full run | 468 passed / 4 failed before corrections | Fixed Linux writer-lock handling, retained-container assertions and friendly write-permission errors; subsequent full run passed |
+| Security Cloud rescan | Not executed; exposed connector still has no branch/commit selector | No finding was marked closed in the service; exact-commit scan remains outstanding |
+
+## Previous security remediation handoff (2026-11-09)
+
+This section records the earlier partial handoff; the follow-up above supersedes
+its filesystem disposition and next action.
 
 - Milestone: `M-SECURITY-REMEDIATION-20261109`; remediation pass delivered in draft PR #26, with one explicitly open residual finding.
 - Goal run: requested and executed in chat `01a1c1ee-b279-76d2-8529-eaf116140007`, created

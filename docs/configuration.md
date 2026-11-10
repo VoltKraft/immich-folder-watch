@@ -233,11 +233,21 @@ when no downloads are needed. An empty scan does not clear an upload error.
 
 ### File selection
 
-Linked files and reparse-point directories beneath watch roots are rejected;
-recursive polling does not traverse them. Pathname checks are repeated at transfer
-and cleanup boundaries, but do not provide atomic protection against a concurrent
-attacker swapping directory entries. Use sources writable only by trusted users;
-complete handle-bound authorization remains an open security remediation.
+Linked files and reparse-point directories beneath watch roots are rejected.
+Each running source retains an opened directory identity: replacing its pathname
+does not redirect synchronization into the replacement. On Windows, attempts to
+move a pinned directory can fail until synchronization releases its handles.
+Restart synchronization after intentionally replacing a source directory.
+
+Components beginning with `.ifw-internal-` are reserved for protected download
+staging and deletion transactions and are excluded from file and album discovery.
+Filesystems must support the required secure operations; unsupported operations
+report an error without falling back to pathname access. See the
+[watch-root security contract](watch-root-security.md) for platform behavior,
+retained quarantine data and validation status.
+If local cleanup after an upload fails or the app restarts before cleanup, a new
+upload attempt is required before deleting the retained file. Stored size and
+modification time alone cannot authorize deleting a possible replacement.
 
 
 - File extensions are case-insensitive.

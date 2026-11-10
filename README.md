@@ -101,6 +101,9 @@ when choosing a workflow.
 
 HTTPS is required by default. Existing HTTP installations need the explicit
 [insecure-transport migration option](docs/configuration.md#transport-security-and-http-migration).
+Watched directories retain their opened identity during synchronization; see
+[file selection and filesystem requirements](docs/configuration.md#file-selection)
+before replacing a source directory or using a filesystem with limited capabilities.
 
 Each Windows user has their own configuration. The app autostarts at login by default.
 `winget install VoltKraft.ImmichFolderWatch` selects the matching x64 or ARM64

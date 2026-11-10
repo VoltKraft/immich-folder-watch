@@ -14,6 +14,7 @@
 - `ImmichFolderWatch.Core`
   - Configuration models, loader, writer, validation
   - File-readiness and batching primitives
+  - Handle-bound watch-root filesystem access (`Services/SecureFileSystem`)
   - `FolderWatchWorker` (hosted service) and `WatchSourceFileFilter`
   - Versioned SQLite sync-state store shared by every watched source
   - `SyncStatusProvider` (INotifyPropertyChanged push surface)
@@ -49,8 +50,11 @@ API inventories and transfer streams have finite resource limits. An incomplete
 remote inventory cannot authorize local cleanup. Linux secret configuration uses
 owner-validated private directories and descriptor-relative atomic writes.
 Folder-driven album mutations require recorded creation provenance and an exact
-album ID; worker startup revokes old pathname authority. Linked watch entries are
-rejected, with concurrent directory-swap races still an explicit limitation.
+album ID; worker startup revokes old pathname authority. Each running source pins
+its directory identity. Reads, enumeration, deletion, download staging/publication,
+timestamp recovery and local directory renames use retained handles and reject
+link traversal. See the [watch-root contract](watch-root-security.md) for lifetime,
+replacement semantics, filesystem capabilities and validation boundaries.
 See [configuration](configuration.md) and the
 [security remediation record](security-remediation-20261109.md) for contracts,
 migration details and remaining work.

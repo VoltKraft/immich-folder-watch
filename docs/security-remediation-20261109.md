@@ -21,16 +21,17 @@ The two download-file findings share one implementation but retain distinct IDs.
 ## Finding dispositions
 
 These are code-review dispositions, not a claim that Security Cloud has closed
-or rescanned them. Combined Linux validation and all six GitHub CI jobs passed at `cf290b6`,
-including Windows/Linux application checks and native x86_64/aarch64 Flatpak
-candidates. Exact counts and runtime limitations are recorded in [status](status.md). Thirteen findings are fixed in code,
-one is partially fixed, none is classified as false positive, and none was skipped.
+or rescanned them. The November 10 follow-up implements the remaining filesystem
+race fix with pinned directory/file handles and independent review. All fourteen
+findings are now addressed in code; none is classified as false positive or
+skipped. Current validation, revisions and platform limits are recorded in
+[status](status.md); the follow-up's Windows CI is still pending at this checkpoint.
 
 | Finding ID | Severity | Component | Remediation | Disposition |
 | --- | --- | --- | --- | --- |
-| `csf_204d80f4dba65ad2200a0f52` | Medium | Download staging | Unpredictable same-directory staging with exclusive creation; cleanup only the created staging path. | Fixed; targeted tests pass |
+| `csf_204d80f4dba65ad2200a0f52` | Medium | Download staging | Protected handle-bound staging, exclusive creation and cleanup through retained directory handles. | Fixed; targeted tests pass |
 | `csf_e072282d3540054e0caa735a` | Medium | Publication actions | Full verified commit SHAs; multiarchitecture build-image digest. | Fixed; workflow tests/review pass |
-| `csf_77f3e84ec9b70e5aff765235` | Medium | Watch-root filesystem access | Reject linked entries/components and skip recursive reparse points; recheck upload/download/delete boundaries. | **Partially fixed; concurrent directory replacement remains open** |
+| `csf_77f3e84ec9b70e5aff765235` | Medium | Watch-root filesystem access | Pin source identities; no-follow handle-bound enumeration, transfers, cleanup, timestamps and directory moves; retain capabilities through retries and shutdown. | Fixed in code; local race regressions and independent review pass; Windows CI pending |
 | `csf_c793af7c8b73e70cd9cef253` | Medium | Linux secret configuration | Owner-validated private directories, descriptor-relative exclusive 0600 temporary write and atomic replacement. | Fixed; targeted tests pass |
 | `csf_3d1deaf494d68bcd8705352c` | Medium | Remote album mutation | Record creation-returned IDs scoped to account/source; refuse pre-existing adoption; mutate by ID; revoke old-path/restart authority. | Fixed; targeted tests pass |
 | `csf_740910544257761f129c14fc` | Medium | Download finalization | Atomic no-overwrite move; preserve destinations that appear during transfer. | Fixed; targeted tests pass |
@@ -55,12 +56,18 @@ one is partially fixed, none is classified as false positive, and none was skipp
   albums remain readable/uploadable; rename/delete them in Immich. A failed local
   rename also revokes authority rather than allowing a recreated old path to
   inherit it. No destructive database migration is performed.
-- The watch-path mitigation does **not** close the race between checking a pathname
-  and opening/deleting it. Full remediation needs platform handle-relative no-follow
-  reads/deletes anchored to an authorized root, including Windows reparse-point
-  handling and Linux portal compatibility, plus adversarial race regression tests.
-  Shared folders writable by untrusted principals remain outside a safe trust
-  boundary. This finding must remain open; the PR must remain a draft.
+- Watch-root access now follows the identity opened at worker startup, including
+  enumeration and absence checks before remote deletion. Linux uses descriptor-
+  relative no-follow operations and protected transactions; Windows uses relative
+  native opens, reparse rejection, directory sharing locks and handle operations.
+  A replacement path never redirects access. Unsupported filesystem operations
+  fail closed. Exact identity, lifecycle, cache bounds, retained Linux containers,
+  per-user threat boundary and compatibility details are defined in the
+  [watch-root contract](watch-root-security.md).
+- Cleanup after a restart or a failed deletion requires a fresh upload through a
+  retained file handle; size/mtime alone do not authorize deletion. Legacy upload
+  IDs additionally include a digest from the same handle. Delayed directory events
+  revoke stale album ownership and cached mappings before checking current paths.
 - Default transfer ceilings: 16 MiB per REST metadata response, 64 KiB diagnostic
   prefix, 500 search pages / 125,000 entries / 128 MiB aggregate metadata, 100 GiB
   per download, 1 GiB free-space reserve, 60-second inactivity and 6-hour overall
@@ -71,9 +78,9 @@ one is partially fixed, none is classified as false positive, and none was skipp
   quota or automatic stale-partial cleanup is implemented. Normal error/cancellation
   paths remove staging files. No live storage-pressure test is claimed.
 - Native Linux filesystem behavior was exercised on x86_64. ARM64 constants and
-  ABI were checked against upstream headers but require actual ARM64 runtime/CI
-  evidence. Windows/UNC behavior requires Windows tests; local Linux tests do not
-  establish it. No visible UI layout changed.
+  ABI were checked against upstream headers but require actual ARM64 runtime
+  evidence. Windows and UNC evidence are recorded separately in status; local
+  Linux tests do not establish either. No visible UI layout changed.
 
 ## Dependencies and provenance
 

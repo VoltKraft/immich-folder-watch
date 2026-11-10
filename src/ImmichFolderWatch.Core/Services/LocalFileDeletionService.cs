@@ -6,6 +6,8 @@ public sealed class LocalFileDeletionService : ILocalFileDeletionService
 {
     public void Delete(string filePath)
     {
-        File.Delete(filePath);
+        var fullPath = Path.GetFullPath(filePath);
+        using var root = SecureWatchRoot.Open(Path.GetDirectoryName(fullPath)!);
+        root.DeleteFile(Path.GetFileName(fullPath));
     }
 }

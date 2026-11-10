@@ -155,7 +155,8 @@ workflow. The current distribution requirements are in its milestone below.
 - Completion boundary: No app behavior or product-version change; no Flathub
   submission changes, native UI test, or connection to Immich is required.
 
-No subsequent milestone is selected after the security remediation pass. Any continuation of this remediation should use the same PR and its documented residual filesystem work.
+The directory-race follow-up above continues the security remediation in the same
+PR. No subsequent milestone is selected beyond that follow-up.
 
 ## Structure and tools
 
