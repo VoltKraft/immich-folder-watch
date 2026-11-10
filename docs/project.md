@@ -26,6 +26,17 @@
 
 ## Selected dependency maintenance (2026-11-10)
 
+### Dependabot configuration-check recovery (2026-11-10)
+
+- User authorized investigating and recovering #34's queued Dependabot-owned
+  configuration check, preserving #32's block and disabled auto-merge; no merges.
+- Validate the exact config, distinguish service dispatch from application CI,
+  attempt a supported retry and, if unavailable, retrigger validation without
+  changing configuration semantics. Verify the resulting current-head check plus
+  CI/CodeQL; do not fabricate a status or weaken required checks.
+- Outcome: repository validation passes; recovery is externally blocked on the
+  owning GitHub service. See [diagnosis](dependabot-config-check-20261110.md).
+
 ### M-DEPENDABOT-REFRESH-20261110
 
 - User explicitly authorized updating #28/#29/#30/#31/#34 with current remote

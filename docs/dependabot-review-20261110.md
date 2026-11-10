@@ -2,6 +2,10 @@
 
 ## Follow-up integration validation
 
+A later [configuration-check recovery attempt](dependabot-config-check-20261110.md)
+advanced #34 to `f22797e` with an explanatory comment only. Its CI/CodeQL pass,
+but the Dependabot service check remains queued; no recovery is claimed.
+
 The subsequent authorized branch refresh incorporated main `13e93da` into all
 five PRs. Every new head passed all six CI jobs, four CodeQL language analyses
 and the aggregate CodeQL check. See [the current validation record](status.md#remaining-dependabot-refresh-completed-2026-11-10)

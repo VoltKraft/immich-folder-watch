@@ -1,5 +1,32 @@
 # Project Status
 
+## Dependabot configuration-check recovery blocked externally (2026-11-10)
+
+- User authorized recovery of #34's queued Dependabot check without merges.
+  Investigation and permitted recovery attempts are recorded in
+  [the diagnosis and support handoff](dependabot-config-check-20261110.md).
+- No config defect was identified: the original blob matches successful #28/#31
+  validation, schema validation passes, and a comment-only retrigger preserves
+  parsed YAML exactly. The evidence points to stalled GitHub Dependabot service
+  processing; internal logs/root cause are unavailable and remediation is not claimed.
+- REST retry returned 404; GraphQL explicitly restricts suite retries to GitHub
+  Apps. After the user signed in, the actual Dependabot check UI still offered no
+  rerun action. These are GitHub capability limits, not automatic approval rejection.
+- Pushed only explanatory-comment commit `f22797ed4d452e1940493bf09d44b25b931b2ee8`
+  to #34. New check `130148023423` remains queued, as does the superseded original
+  `130138962423`; neither supplies diagnostic output. No further speculative
+  commits, config changes, forged statuses or protection bypasses were performed.
+- The new head has [all six CI jobs successful](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42907159639),
+  including Windows/Linux and x86_64/ARM64 Flatpak, plus [all four CodeQL analyses](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42907153860),
+  the aggregate CodeQL check and NuGet submission successful. Twelve checks pass;
+  the separate configuration check is the sole unfinished check.
+- PR #34 remains open/unmerged; #32 remains unchanged/open/blocked at `51898a8`,
+  and repository auto-merge stays disabled. No main push, release or deployment.
+- Remaining prerequisite: the owning GitHub service must process/requeue the
+  validator. The linked handoff contains exact run/suite IDs, timestamps and
+  reproduction evidence for GitHub support. No support request was sent. Local
+  documentation is committed separately from the pushed PR comment.
+
 ## Remaining Dependabot refresh completed (2026-11-10)
 
 - Milestone `M-DEPENDABOT-REFRESH-20261110` completed. User authorized updating
