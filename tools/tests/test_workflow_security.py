@@ -72,6 +72,13 @@ class ReleaseCheckoutSecurityTests(unittest.TestCase):
         self.assertNotIn("${{", self.script)
 
     def test_guard_accepts_only_exact_checked_out_commit_before_execution(self):
+        # Windows also exposes a WSL bash launcher; use Git Bash for this native
+        # temporary checkout, matching the shell used by Actions' bash steps.
+        bash = shutil.which("bash")
+        if os.name == "nt":
+            git_path = Path(shutil.which("git") or "")
+            bash = str(git_path.parent.parent / "bin" / "bash.exe")
+        self.assertTrue(bash and Path(bash).is_file(), "A working Bash executable is required")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             def git(*args):
@@ -91,11 +98,11 @@ class ReleaseCheckoutSecurityTests(unittest.TestCase):
                     sentinel = root / "executed"
                     sentinel.unlink(missing_ok=True)
                     result = subprocess.run(
-                        ["bash", "-c", self.script + "\ntouch executed\n"],
+                        [str(bash), "-c", self.script + "\ntouch executed\n"],
                         cwd=root, env={**os.environ, "TARGET_SHA": target},
                         capture_output=True, text=True, timeout=10,
                     )
-                    self.assertEqual(result.returncode == 0, allowed, result.stderr)
+                    self.assertEqual(result.returncode == 0, allowed, result.stdout + result.stderr)
                     self.assertEqual(sentinel.exists(), allowed)
                     self.assertFalse((root / "injected").exists())
 

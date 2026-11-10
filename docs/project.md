@@ -26,6 +26,9 @@
 
 ## Release checkout hardening (2026-11-10)
 
+- Follow-up authorization: push the validated fix to main and verify CI, CodeQL
+  and both alert states. Keep #32/#34 open and automatic merging disabled.
+
 - User requested verification and remediation of CodeQL alerts #11/#12 in
   `release.yaml`. Both flag repository script execution after the Flatpak job's
   dynamic checkout. Scope: focused workflow hardening, regression tests and docs.

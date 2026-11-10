@@ -1,5 +1,21 @@
 # Project Status
 
+## Release checkout fix published; Windows test runner correction (2026-11-10)
+
+- User explicitly authorized publishing the fix and verifying CI, CodeQL and
+  alert closure. Pushed `ae9558ce07b93183c11c878d96aab0940488c37d` to main.
+- CodeQL automatically marked alerts #11 and #12 `fixed` at 22:38:28 UTC;
+  no dismissal was performed. The Actions analysis passed on the pushed fix.
+- Initial [CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916337435)
+  exposed a Windows-only test harness problem: the new Bash regression's valid
+  commit case failed before application build; all four PowerShell cases passed.
+  Select Git for Windows' Bash explicitly instead of the ambiguous PATH launcher,
+  and include stdout in assertion diagnostics. Release behavior and assertions
+  remain unchanged. Fresh exact-head CI is required for this correction.
+- #32/#34 remain open at their original heads, with `auto_merge: null`;
+  repository `allow_auto_merge` is false. No PR merge or release dispatch.
+
+
 ## Release checkout alerts hardened locally (2026-11-10)
 
 - Live CodeQL alerts [#11](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/11)
