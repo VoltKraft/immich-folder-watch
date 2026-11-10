@@ -24,9 +24,14 @@
   builds. No guard, assertion or branch rule was bypassed.
 - #32 remains open at unchanged head `51898a8`, blocked by the previously recorded
   technical and license issues. No Avalonia upgrade or reduced build was included.
-- Remote main is `13e93da`. Its new [post-merge CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42895589381)
-  was queued at handoff; PR validation is complete, but this additional run is
-  not claimed to have finished. No version bump or manual release was performed.
+- Follow-up live check: remote main remains `13e93da`. Its [post-merge CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42895589381)
+  completed successfully (GitHub updated at 2026-11-10 20:35:07 UTC). All six jobs
+  passed: Windows/Linux build and tests, packaging lint, candidate preparation,
+  and native x86_64/ARM64 Flatpak builds. No version bump or manual release was performed.
+- Follow-up settings readback: repository `allow_auto_merge: false`; #32 remains
+  open/unmerged at unchanged `51898a8`, with `auto_merge: null` and unsuccessful
+  checks (`mergeable_state: unstable`). Its technical/license blockers remain
+  deferred. This inspection made no remote changes or workflow reruns.
 - Local main incorporates the remote merges while preserving the earlier local
   documentation commits. This aggregate handoff remains local and is not pushed.
 - Milestone `M-DEPENDABOT-CI-20261110` is complete for the selected four PRs, with
