@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-06`.
-- Plan maturity: Dependabot CI corrections verified; selective merge authorized.
-- Active milestone: `M-DEPENDABOT-CI-20261110`.
+- Brief revision: `IFW-BRIEF-20261110-07`.
+- Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
+- Active milestone: None; `M-DEPENDABOT-CI-20261110` completed with #32 deferred.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -34,7 +34,7 @@ and blocked, leave automatic merging disabled, preserve checks/branch rules and
 verify the resulting merge records. Resolve any integration conflicts without
 discarding reviewed changes; no release/version bump is selected.
 
-- User selected investigation and fixes for existing Dependabot PRs #27, #32,
+- Original scope before the selective merge authorization: investigation and fixes for PRs #27, #32,
   #33, #35 and #36; no merges. Scoped corrections and CI validation stay on the
   existing PR branches, with no release/version bump or live Immich access.
 - DCI-AC01: Identify failed-job causes on exact PR heads and preserve checks,
@@ -43,10 +43,14 @@ discarding reviewed changes; no release/version bump is selected.
   regression; review exact Microsoft package license/notice sources for #33/#36;
   keep #35's test framework compatible with the Avalonia headless extension.
 - DCI-AC03: Validate locally where applicable, independently review consequential
-  fixes, push scoped commits to existing PRs and verify their CI without merging.
+  fixes, push scoped commits to existing PRs and verify their CI before the separately
+  authorized selective merges.
 - DCI-AC04: Explicit follow-up decision: leave #32 open and blocked on Avalonia
   component licensing. Record technical downgrade failure and license evidence;
   do not approve the package or expand into a reduced Avalonia build.
+
+- DCI-AC05: Merge only #27/#33/#35/#36 after successful exact-head checks;
+  verify merge commits, keep #32 open and preserve disabled auto-merge.
 
 ### M-DEPENDABOT-20261110
 

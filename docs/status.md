@@ -1,5 +1,41 @@
 # Project Status
 
+## Selective Dependabot merges completed (2026-11-10)
+
+- User explicitly authorized merging #27, #33, #35 and #36 only. All four were
+  merged manually with expected-head checks after every current-head check passed.
+  Repository auto-merge remains disabled (`allow_auto_merge: false`); every
+  inspected PR has `auto_merge: null`.
+- Integration preserved every reviewed package version, deletion-race fix,
+  regression test, xUnit compatibility constraint and license notice. Resolved
+  overlapping status/changelog records and adjacent package declarations;
+  removed duplicated historical status blocks without discarding history.
+  Independent read-only review of final cumulative head `9f73d91` found no issues.
+
+| PR | Validated head | Merge commit | Successful CI |
+| --- | --- | --- | --- |
+| [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27) | `ca35782` | `20cf55a` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42889338522) |
+| [#33](https://github.com/VoltKraft/immich-folder-watch/pull/33) | `d5c5170` | `4f1ff08` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894339727) |
+| [#35](https://github.com/VoltKraft/immich-folder-watch/pull/35) | `176796a` | `c705988` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894342541) |
+| [#36](https://github.com/VoltKraft/immich-folder-watch/pull/36) | `9f73d91` | `13e93da` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894348336) |
+
+- Additional CodeQL and dependency-submission checks passed on all four heads.
+  The cumulative CI covers Windows/Linux tests and native x86_64/ARM64 Flatpak
+  builds. No guard, assertion or branch rule was bypassed.
+- #32 remains open at unchanged head `51898a8`, blocked by the previously recorded
+  technical and license issues. No Avalonia upgrade or reduced build was included.
+- Remote main is `13e93da`. Its new [post-merge CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42895589381)
+  was queued at handoff; PR validation is complete, but this additional run is
+  not claimed to have finished. No version bump or manual release was performed.
+- Local main incorporates the remote merges while preserving the earlier local
+  documentation commits. This aggregate handoff remains local and is not pushed.
+- Milestone `M-DEPENDABOT-CI-20261110` is complete for the selected four PRs, with
+  #32 explicitly deferred. No further milestone is selected. Next action: a
+  separately selected licensing resolution for #32 or review of other open PRs.
+
+The following entries are historical snapshots; the merge record above supersedes
+prior statements that the selected PRs were still open or awaiting authorization.
+
 ## Dependabot CI remediation (2026-11-10)
 
 - Selected milestone: `M-DEPENDABOT-CI-20261110`. User authorized fixes on
@@ -108,6 +144,97 @@
   no merge timestamp on all five PRs. No remote mutation was performed.
 - Next action: recheck NuGet completion and PR CI, then review compatibility and
   licensing before any separately authorized merge. This check is recorded locally.
+
+## Dependabot PR #36 license correction (2026-11-10)
+
+- Scope: fix the existing Microsoft.Data.Sqlite 11.0.0 update PR's Flatpak CI
+  failure without merging, changing product versions or weakening license checks.
+- Baseline: `4a26baf`; both native Flatpak jobs stopped at the exact-version
+  supplemental notice guard for Microsoft.Data.Sqlite.
+- Inspected Microsoft.Data.Sqlite and Microsoft.Data.Sqlite.Core 11.0.0 archives:
+  both declare MIT at the same recorded `dotnet/dotnet` revision and omit license
+  text. Added an immutable version-specific MIT source and exact catalog entries;
+  updated the top-level third-party summary. Native SQLite dependencies remain
+  unchanged. Provenance is recorded in
+  [the license review](../packaging/flatpak/licenses/README.md#microsoftdatasqlite-1100-review-2026-11-10).
+- Validation: exact Flatpak SDK 10.0.401 restored Linux x64 and ARM64 into isolated
+  caches. The generator's official-source/SHA-512 checks passed for the combined
+  81-archive feed; the real license installer passed, and both new supplemental
+  outputs match the upstream SHA-256. All 15 notice-installer regression tests
+  passed, including rejection of unknown versions and modified notices.
+- No application code changed. The existing Windows/Linux application CI passed
+  before this metadata correction; actual native Flatpak rerun is still required.
+- Next action: commit/push this correction to PR #36 and verify both native jobs.
+  No PR has been merged and no release or live Immich operation was performed.
+
+## Dependabot PR #35 compatibility repair (2026-11-10)
+
+- User requested investigation and correction of failed Dependabot CI without
+  merging. This worktree repairs PR #35 from `820cc9f` and retains its compatible
+  xUnit 2.9.3 and Visual Studio runner 4.0.1 updates.
+- Root causes: xUnit v3 framework 4.0.3 rejects the old assembly parallelism
+  property, enables MTP v2 incompatible with the current .NET 10 VSTest command,
+  and changes the extension ABI used by Avalonia.Headless.XUnit 12.0.3.
+  A diagnostic `mtp-off`/new-parallelism experiment compiled but failed discovery
+  for all 15 Avalonia GUI cases (`MissingMethodException`); 38 other tests passed.
+- Correction: retain GUI framework 3.2.2 and its serial assembly setup, defer
+  Dependabot `xunit.v3` proposals >=4 until a compatible bridge and runner path
+  are validated, and use the predicate overload of `Assert.Single` for the newer
+  xUnit v2 analyzer. No test was disabled or removed; no application code changed.
+- License evidence: official NuGet package metadata for xUnit 2.9.3 and Visual
+  Studio runner 4.0.1 declares Apache-2.0 with immutable source commits documented
+  in the Linux test README. These test-only packages are AGPL-3.0-only compatible
+  and do not enter application distribution artifacts.
+- Validation: Release Linux GUI/protocol suite passed all 53 tests and the portable
+  Core suite passed all 481 tests, with no failures/skips, using SDK 10.0.203,
+  isolated headless controls and local D-Bus. Builds reported no warnings/errors.
+  Dependabot schema, local documentation links and diff whitespace checks passed.
+- Next action: verify Windows/full CI on the corrected PR head. No merge or live
+  Immich operation is authorized or performed.
+
+## Dependabot PR #33 license correction (2026-11-10)
+
+- Scope: fix the existing Microsoft.Extensions 11.0.0 update PR's Flatpak CI
+  failure without merging, changing product versions or weakening license checks.
+- Baseline: `7fb5e63`; both native Flatpak jobs stopped at the exact-version
+  supplemental notice guard, beginning with Microsoft.Extensions.Configuration.
+- Reviewed all 32 changed Microsoft.Extensions/System 11.0.0 archives in the
+  resolved feed against their recorded `dotnet/dotnet` source revision. Added
+  version-specific MIT provenance and exact catalog entries, including four new
+  transitive System packages. All upstream third-party notices are retained.
+  Detailed source/hash and license-delta evidence is in
+  [the license review](../packaging/flatpak/licenses/README.md#microsoftextensions-1100-review-2026-11-10).
+- Validation: exact Flatpak SDK 10.0.401 restored Linux x64 and ARM64 into isolated
+  caches. The generator's official-source/SHA-512 checks passed for the combined
+  87-archive feed; the real license installer passed and all 32 updated license
+  and notice outputs matched reviewed SHA-256 values. All 15 notice-installer
+  regression tests passed, including rejection of unknown versions/tampering.
+- No application code changed. The existing Windows/Linux application CI passed
+  before this metadata correction; actual native Flatpak rerun is still required.
+- Next action: commit/push this correction to PR #33 and verify both native jobs.
+  No PR has been merged and no release or live Immich operation was performed.
+
+## Dependabot PR #27 CI correction (2026-11-10)
+
+- User authorized investigating/fixing existing PR #27 without merging. Its
+  Windows CI failed `Sync_IgnoresExcludedFileDeletionsButPropagatesMediaDeletion`
+  because one asset appeared twice in the trash requests.
+- Cause: watcher and polling handlers both read the mapping before asynchronous
+  tombstone persistence removed it. A per-path in-progress claim now gives one
+  handler ownership until completion, including exceptional exits. Polling keeps
+  missing mappings while a deletion is active or failed, preserving retryability.
+- Added deterministic concurrent watcher/poll tests with paused persistence and
+  injected persistence failure. Both assertions failed against the original
+  production code; the initial guard passed the full 483-test Core suite.
+  After independent review identified the polling retry gap, the corrected delta
+  passed all five focused deletion cases (including the original three cases).
+- Independent source review found no remaining actionable issue; handle-bound
+  absence checks and watcher shutdown draining remain unchanged. Initial restricted
+  MSBuild attempts failed without compiler diagnostics; permitted local runs passed.
+- The updated download-artifact SHA retains the upstream MIT license, verified
+  at `9000827ccba6bdab643e8b6fd33ac0654aef8333`. No dependency is added by this fix.
+- Next action: push this correction to the existing PR and verify Windows/Linux
+  and native Flatpak CI on its exact head. No merge, release or live Immich access.
 
 ## Dependabot activation (2026-11-10)
 
