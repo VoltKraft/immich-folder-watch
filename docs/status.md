@@ -1,5 +1,27 @@
 # Project Status
 
+## Dependabot PR #36 license correction (2026-11-10)
+
+- Scope: fix the existing Microsoft.Data.Sqlite 11.0.0 update PR's Flatpak CI
+  failure without merging, changing product versions or weakening license checks.
+- Baseline: `4a26baf`; both native Flatpak jobs stopped at the exact-version
+  supplemental notice guard for Microsoft.Data.Sqlite.
+- Inspected Microsoft.Data.Sqlite and Microsoft.Data.Sqlite.Core 11.0.0 archives:
+  both declare MIT at the same recorded `dotnet/dotnet` revision and omit license
+  text. Added an immutable version-specific MIT source and exact catalog entries;
+  updated the top-level third-party summary. Native SQLite dependencies remain
+  unchanged. Provenance is recorded in
+  [the license review](../packaging/flatpak/licenses/README.md#microsoftdatasqlite-1100-review-2026-11-10).
+- Validation: exact Flatpak SDK 10.0.401 restored Linux x64 and ARM64 into isolated
+  caches. The generator's official-source/SHA-512 checks passed for the combined
+  81-archive feed; the real license installer passed, and both new supplemental
+  outputs match the upstream SHA-256. All 15 notice-installer regression tests
+  passed, including rejection of unknown versions and modified notices.
+- No application code changed. The existing Windows/Linux application CI passed
+  before this metadata correction; actual native Flatpak rerun is still required.
+- Next action: commit/push this correction to PR #36 and verify both native jobs.
+  No PR has been merged and no release or live Immich operation was performed.
+
 ## Dependabot PR #35 compatibility repair (2026-11-10)
 
 - User requested investigation and correction of failed Dependabot CI without
