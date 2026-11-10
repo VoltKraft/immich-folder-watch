@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
+
 ## [3.0.0] - 2026-11-10
 
 This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.

@@ -1,5 +1,32 @@
 # Project Status
 
+## Dependabot implementation (2026-11-10)
+
+- Selected milestone: `M-DEPENDABOT-20261110`; local implementation complete.
+- Baseline: clean local `main` at `64a9892`, whose merge commit includes PR #26
+  and version-preparation commit `f7fef40`. The older version checkpoint below
+  predates that merge; this task does not recheck release publication.
+- Scope: NuGet and GitHub Actions configuration and maintenance documentation;
+  no package updates, push, repository-setting changes or publication.
+- DB-AC01: `.github/dependabot.yml` covers all nine tracked C# project manifests
+  and all six GitHub Actions workflows. Related NuGet packages have family groups;
+  each ecosystem checks weekly with at most five open version-update PRs.
+- DB-AC02: PyYAML parsing and validation against the downloaded SchemaStore
+  Dependabot 2.0 JSON Schema passed. Manifest coverage, 59 local documentation link
+  targets and `git diff --check` passed. Independent review found no actionable
+  issue in configuration, existing read-only PR CI or publication boundaries.
+- DB-AC03: Development guidance, project brief, AGENTS and Unreleased changelog
+  updated. The local checkpoint hash is provided in the chat handoff.
+- Validation limits: No hosted Dependabot run, package upgrade, application build
+  or runtime test was performed; application sources and workflows are unchanged.
+  Initial sandbox download failed DNS resolution; permitted schema download passed.
+  An obsolete upstream NuGet fetcher URL returned 404; review used current upstream
+  C# discovery source instead. No production operation was attempted.
+- Next action: when publication is authorized, push the checkpoint to the default
+  branch through the normal review process and inspect the first hosted Dependabot
+  jobs/PRs. Security-update repository settings were not changed or verified.
+  No further milestone or Goal was started.
+
 ## Version preparation checkpoint (2026-11-10)
 
 - Active milestone: `M-VERSION-MERGE-20261110`; version metadata prepared and

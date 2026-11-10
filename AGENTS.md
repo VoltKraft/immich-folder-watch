@@ -156,6 +156,9 @@ to reconcile project decisions, defaults, and recorded state.
   and Linux GUI/protocol tests. A documented command is not evidence of execution.
   Builds generate branding from `assets/branding/logo.svg`; .NET analyzers run
   during builds. No separate repository formatter or lint command is established.
+- Dependabot configuration in [`.github/dependabot.yml`](.github/dependabot.yml)
+  covers NuGet and GitHub Actions. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
+  for license review, coordinated packaging pins and validation before merging updates.
 - Use four-space C# indentation, file-scoped namespaces, PascalCase types/public
   members, camelCase locals/parameters, and `Async` suffixes. Preserve enabled
   nullable reference types, implicit usings, and analyzers in Directory.Build.props.

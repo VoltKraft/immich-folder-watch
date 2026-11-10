@@ -7,12 +7,15 @@
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
 - Product baseline: The checked-in version is `3.0.0` in
-  [Directory.Build.props](../Directory.Build.props), prepared for the authorized
-  merge. Publication and deployed installations must be verified separately.
-- Brief revision: `IFW-BRIEF-20261110-03`.
-- Plan maturity: Security remediation complete; version preparation and merge of PR #26 selected.
-- Active milestone: `M-VERSION-MERGE-20261110`.
-- Implementation request / scope: The user's 2026-11-09 attached request to
+  [Directory.Build.props](../Directory.Build.props). Local `main` includes the
+  merge of PR #26; publication and deployed installations are separate evidence.
+- Brief revision: `IFW-BRIEF-20261110-04`.
+- Plan maturity: Dependabot configuration selected for implementation.
+- Active milestone: `M-DEPENDABOT-20261110`.
+- Implementation request / scope: The user's 2026-11-10 request to implement
+  Dependabot selects the repository configuration and maintenance documentation
+  described below. Earlier security scope is retained as history: the user's
+  2026-11-09 request to
   investigate every open Codex Security Cloud finding, consolidate verified fixes
   and documented unresolved items into one PR, and validate the result; the
   2026-11-10 follow-up explicitly requires complete directory-race remediation
@@ -20,6 +23,25 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## Selected dependency maintenance (2026-11-10)
+
+### M-DEPENDABOT-20261110
+
+- Outcome: Dependabot proposes reviewed updates for NuGet dependencies and pinned
+  GitHub Actions, using weekly checks and bounded pull-request volume.
+- DB-AC01: Cover all application/test projects and the branding generator, plus
+  all GitHub Actions workflows. Group related NuGet packages to keep coordinated
+  updates together; retain proposals for major upgrades for explicit review.
+- DB-AC02: Validate configuration syntax/schema and manifest coverage; review
+  compatibility with existing PR CI and preserve action SHA pins, read-only PR
+  permissions, license review and platform validation requirements.
+- DB-AC03: Document scheduling, review obligations, manually maintained packaging
+  inputs and activation on the default branch. Update status and save a local commit.
+- Boundary: Configuration and documentation only. No dependency/version changes,
+  automatic merging, repository-setting changes, push or publication. Hosted bot
+  execution can only be verified after the configuration reaches the default branch.
+- Canonical operational guidance: [Dependency updates](development.md#dependency-updates).
 
 ## Selected security remediation (2026-11-09)
 
@@ -176,8 +198,8 @@ workflow. The current distribution requirements are in its milestone below.
 - Completion boundary: No app behavior or product-version change; no Flathub
   submission changes, native UI test, or connection to Immich is required.
 
-Version preparation and the authorized merge now continue the security remediation
-in the same PR. No subsequent product milestone is selected beyond that work.
+The security and distribution milestones above preserve their historical scope.
+The current selected work is the dependency-maintenance milestone above.
 
 ## Structure and tools
 
