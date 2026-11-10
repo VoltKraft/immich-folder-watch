@@ -77,6 +77,8 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
     private readonly ConcurrentDictionary<string, byte> _localDeleteFailures = new(PathComparer);
 
+    private readonly ConcurrentDictionary<string, byte> _localDeletesInProgress = new(PathComparer);
+
     private readonly ConcurrentDictionary<string, byte> _downloadsInProgress = new(PathComparer);
 
     private readonly ConcurrentDictionary<string, DateTimeOffset> _remoteDeletesInProgress = new(PathComparer);
@@ -849,6 +851,13 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 if (context.IsSyncMode)
                 {
                     await HandleDeleteInSyncAsync(context, path);
+                    // An overlapping callback may still be persisting/trashing,
+                    // or may have restored the mapping after a failed attempt.
+                    // Retain the missing path so the next sweep can retry.
+                    if (_localDeletesInProgress.ContainsKey(path) || _pathToAssetId.ContainsKey(path))
+                    {
+                        current[path] = known[path];
+                    }
                 }
                 else
                 {
@@ -1510,6 +1519,14 @@ public sealed partial class FolderWatchWorker : BackgroundService
 
     private async Task HandleDeleteInSyncAsync(WatchSourceContext context, string oldFullPath)
     {
+        var normalized = NormalizePath(oldFullPath);
+        // Watcher callbacks and polling can observe the same mapping while its
+        // tombstone is being persisted. Only one may propagate that deletion.
+        if (!_localDeletesInProgress.TryAdd(normalized, 0))
+        {
+            return;
+        }
+
         try
         {
             // Native watchers also report temporary and excluded files. Match the
@@ -1521,7 +1538,6 @@ public sealed partial class FolderWatchWorker : BackgroundService
                 return;
             }
 
-            var normalized = NormalizePath(oldFullPath);
             _debouncedFiles.TryRemove(normalized, out _);
 
             if (_remoteDeletesInProgress.TryRemove(normalized, out _))
@@ -1573,6 +1589,10 @@ public sealed partial class FolderWatchWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle deletion of {FilePath}.", oldFullPath);
+        }
+        finally
+        {
+            _localDeletesInProgress.TryRemove(normalized, out _);
         }
     }
 

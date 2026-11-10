@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.
+- Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.
+- Restore Flatpak packaging for Microsoft.Extensions 11.0.0 updates by recording reviewed MIT supplements for the complete resolved Microsoft/System package set.
+- Prevent concurrent watcher/polling callbacks from trashing the same remote asset twice, and retain failed deletion mappings for polling retries.
+
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
 

@@ -107,7 +107,9 @@ and commits use `chore(deps)`.
 The configuration takes effect when present on GitHub's default branch. Check
 **Insights > Dependency graph > Dependabot** for the first hosted runs and their
 logs. Alerts and automatic security updates are separate repository settings;
-this file does not enable them. The weekly schedule and version-update PR limit
+both are enabled for this repository, with activation evidence in
+[project status](status.md#dependabot-activation-2026-11-10). The YAML file alone
+does not enable them. The weekly schedule and version-update PR limit
 do not govern security updates. See GitHub's
 [configuration reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 
@@ -116,8 +118,9 @@ with **AGPL-3.0-only**, refresh affected third-party notices/license catalogs, a
 require the existing Windows/Linux application and native Flatpak CI checks.
 Review Avalonia's component licensing for the proposed version. Preserve full
 commit-SHA action pins and their version comments. Dependabot PRs use the existing
-read-only `pull_request` CI without publication credentials; no automatic merge
-workflow is configured by this change.
+read-only `pull_request` CI without publication credentials. Repository auto-merge
+is disabled, and no automatic merge workflow is configured. Both security and
+version-update PRs require manual review and merging.
 
 The .NET SDK/runtime, Flatpak SDK archive URLs/checksums, build-container digest,
 and WinGet submission binary/checksum remain manually coordinated updates under

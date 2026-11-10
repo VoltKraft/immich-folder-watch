@@ -32,16 +32,29 @@ platform-dependent golden images.
 
 The test setup follows the [official Avalonia headless xUnit documentation](https://docs.avaloniaui.net/docs/testing/headless-xunit).
 `Avalonia.Headless.XUnit` is pinned to the application's Avalonia version. Version
-12.0.3 requires xUnit v3, so this test project uses xUnit 3.2.2 while the existing
-test projects retain their current versions. The Visual Studio runner preserves
-the repository's `dotnet test`/VSTest workflow.
+12.0.3 requires the xUnit v3 framework's 3.x extension API, so this test project
+retains xUnit 3.2.2 while the portable and Windows projects use xUnit 2.9.3.
+All three projects use Visual Studio runner 4.0.1, preserving the repository's
+`dotnet test`/VSTest workflow.
+
+Dependabot ignores `xunit.v3` versions 4.0.0 and newer until a compatible Avalonia
+headless bridge is selected and validated. With the current bridge, 4.0.3 fails
+GUI test discovery because `TestIntrospectionHelper.GetTestCaseDetails` changed
+its binary interface. Its default MTP v2 integration also rejects the existing
+VSTest mode on .NET 10. Merely replacing the obsolete parallelism attribute or
+using `xunit.v3.mtp-off` does not fix the bridge incompatibility. Keep assembly-wide
+test serialization for the shared Avalonia application/localization state.
 
 Dependency license review: Avalonia Headless is
 [MIT](https://github.com/AvaloniaUI/Avalonia/blob/12.0.3/licence.md);
 xUnit v3 is [Apache-2.0](https://github.com/xunit/xunit/blob/v3-3.2.2/LICENSE),
-and the xUnit Visual Studio runner 3.1.5 declares Apache-2.0 in its published
-NuGet metadata. Both licenses are compatible with this repository's AGPL-3.0-only
-license. These dependencies are used only by the test project.
+and the [xUnit Visual Studio runner 4.0.1](https://www.nuget.org/packages/xunit.runner.visualstudio/4.0.1)
+and [xUnit 2.9.3](https://www.nuget.org/packages/xunit/2.9.3) declare Apache-2.0 in
+their official published NuGet metadata. Reviewed package provenance points to
+runner commit `0f7d528729972578553fb146cbde5f95b316cdc4` and xUnit commit
+`9712244020d385955d33136b3fe3e87de43539cd`. Both licenses are compatible with this
+repository's AGPL-3.0-only license. These dependencies are test-only and are not
+included in the application packages.
 
 Linux protocol tests require `dbus-daemon` and `xdg-dbus-proxy`. They run on
 isolated buses and include the same app-ID namespace ownership and watcher
