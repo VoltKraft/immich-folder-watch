@@ -177,7 +177,7 @@ public sealed class NavigationViewModelTests
     {
         var vm = CreateViewModel();
         vm.SelectedSectionIndex = section;
-        Assert.Single(new[] { vm.IsOverviewSelected, vm.IsFoldersSelected, vm.IsConnectionSelected, vm.IsSettingsSelected }.Where(value => value));
+        Assert.Single(new[] { vm.IsOverviewSelected, vm.IsFoldersSelected, vm.IsConnectionSelected, vm.IsSettingsSelected }, value => value);
         vm.SelectedSectionIndex = -1;
         vm.SelectedSectionIndex = 4;
         Assert.Equal(section, vm.SelectedSectionIndex);
