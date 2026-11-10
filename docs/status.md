@@ -1,5 +1,30 @@
 # Project Status
 
+## Dependabot PR #35 compatibility repair (2026-11-10)
+
+- User requested investigation and correction of failed Dependabot CI without
+  merging. This worktree repairs PR #35 from `820cc9f` and retains its compatible
+  xUnit 2.9.3 and Visual Studio runner 4.0.1 updates.
+- Root causes: xUnit v3 framework 4.0.3 rejects the old assembly parallelism
+  property, enables MTP v2 incompatible with the current .NET 10 VSTest command,
+  and changes the extension ABI used by Avalonia.Headless.XUnit 12.0.3.
+  A diagnostic `mtp-off`/new-parallelism experiment compiled but failed discovery
+  for all 15 Avalonia GUI cases (`MissingMethodException`); 38 other tests passed.
+- Correction: retain GUI framework 3.2.2 and its serial assembly setup, defer
+  Dependabot `xunit.v3` proposals >=4 until a compatible bridge and runner path
+  are validated, and use the predicate overload of `Assert.Single` for the newer
+  xUnit v2 analyzer. No test was disabled or removed; no application code changed.
+- License evidence: official NuGet package metadata for xUnit 2.9.3 and Visual
+  Studio runner 4.0.1 declares Apache-2.0 with immutable source commits documented
+  in the Linux test README. These test-only packages are AGPL-3.0-only compatible
+  and do not enter application distribution artifacts.
+- Validation: Release Linux GUI/protocol suite passed all 53 tests and the portable
+  Core suite passed all 481 tests, with no failures/skips, using SDK 10.0.203,
+  isolated headless controls and local D-Bus. Builds reported no warnings/errors.
+  Dependabot schema, local documentation links and diff whitespace checks passed.
+- Next action: verify Windows/full CI on the corrected PR head. No merge or live
+  Immich operation is authorized or performed.
+
 ## Dependabot PR #33 license correction (2026-11-10)
 
 - Scope: fix the existing Microsoft.Extensions 11.0.0 update PR's Flatpak CI
