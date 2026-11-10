@@ -51,6 +51,55 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             self.assertNotIn("${{", script)
 
 
+class ReleaseCheckoutSecurityTests(unittest.TestCase):
+    def setUp(self):
+        source = (WORKFLOWS / "release.yaml").read_text()
+        self.job = source.split("  build-flatpak:\n", 1)[1].split("\n  publish-release:", 1)[0]
+        guard = self.job.split("      - name: Verify trusted release checkout\n", 1)[1]
+        guard = guard.split("\n      - name:", 1)[0]
+        self.script = "\n".join(
+            line[10:] for line in guard.split("        run: |\n", 1)[1].splitlines()
+        )
+
+    def test_trusted_checkout_and_guard_precede_repository_execution(self):
+        checkout = self.job.split("      - name: Checkout\n", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("ref: refs/heads/${{ github.event.repository.default_branch }}", checkout)
+        self.assertNotIn("needs.prepare-release.outputs.target_sha", checkout)
+        self.assertLess(self.job.index("- name: Verify trusted release checkout"),
+                        self.job.index("- name: Read pinned Flatpak SDK"))
+        self.assertIn('TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}', self.job)
+        self.assertIn('--commit "$TARGET_SHA"', self.job)
+        self.assertNotIn("${{", self.script)
+
+    def test_guard_accepts_only_exact_checked_out_commit_before_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+            git("init", "--quiet")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "--quiet", "--allow-empty", "-m", "First")
+            old = git("rev-parse", "HEAD")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "--quiet", "--allow-empty", "-m", "Second")
+            current = git("rev-parse", "HEAD")
+            cases = [(current, True), (old, False), ("f" * 40, False),
+                     ("", False), ("main", False), (current + "\n", False),
+                     ("$(touch injected)", False), ("'; touch injected; #", False)]
+            for target, allowed in cases:
+                with self.subTest(target=target):
+                    sentinel = root / "executed"
+                    sentinel.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        ["bash", "-c", self.script + "\ntouch executed\n"],
+                        cwd=root, env={**os.environ, "TARGET_SHA": target},
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertEqual(result.returncode == 0, allowed, result.stderr)
+                    self.assertEqual(sentinel.exists(), allowed)
+                    self.assertFalse((root / "injected").exists())
+
+
 @unittest.skipUnless(PWSH, "PowerShell is required; Windows CI runs these regression cases")
 class WinGetPowerShellSecurityTests(unittest.TestCase):
     def run_script(self, script: str, env: dict[str, str] | None = None):

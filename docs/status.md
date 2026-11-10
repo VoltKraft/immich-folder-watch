@@ -1,5 +1,38 @@
 # Project Status
 
+## Release checkout alerts hardened locally (2026-11-10)
+
+- Live CodeQL alerts [#11](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/11)
+  and [#12](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/12)
+  remain open on remote main `85ec9e4c45547fd353c647bf2c641550178e172f`.
+  Both report `actions/cache-poisoning/poisonable-step` after the same dynamic
+  Flatpak checkout, for `workflow_dispatch`.
+- Existing gates already restrict dispatch to main and automatic runs to successful
+  same-repository push CI on main. There is no dispatch SHA input, so no arbitrary
+  external-commit exploit was demonstrated. The
+  [CodeQL query guidance](https://codeql.github.com/codeql-query-help/actions/actions-cache-poisoning-poisonable-step/)
+  explains why read-only repository permissions alone do not remove cache risk.
+- Changed only the Flatpak release checkout to the explicit default branch, with
+  an inline exact-commit guard before any repository script. The target remains
+  manifest data. If main advances, the job stops instead of mixing SDK, manifest
+  or offline-feed inputs from different commits. Retry behavior is documented in
+  [publication workflow trust](development.md#publication-workflow-trust).
+- Validation: five workflow security tests passed, including real Git-history
+  matching/mismatched commits and malformed/injection inputs; four unrelated
+  PowerShell cases were skipped because PowerShell is unavailable locally.
+  Five manifest regression tests passed. YAML parsing/step-order checks and
+  `git diff --check` passed. Independent security review found no blocking
+  security or correctness issue; hosted CodeQL and Windows execution remain unverified.
+- This is a local correction; no push, release dispatch, remote alert dismissal
+  or hosted rescan was performed. Remote alert closure remains unverified until
+  the fix is published and CodeQL scans it. #32/#34 and auto-merge are unchanged.
+- The preceding documentation publication is complete: main `85ec9e4` passed
+  [all six CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42911044302)
+  after an explicit CI dispatch (documentation-only pushes are filtered), plus
+  [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42910956556)
+  and NuGet submission. A successful analysis job does not mean zero open alerts.
+
+
 ## Documentation publication checkpoint (2026-11-10)
 
 - User authorized publishing the accumulated dependency-maintenance documentation

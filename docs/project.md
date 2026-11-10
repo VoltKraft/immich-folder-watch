@@ -9,7 +9,7 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-10`.
+- Brief revision: `IFW-BRIEF-20261110-11`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
 - Active milestone: None; `M-DEPENDABOT-REFRESH-20261110` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
@@ -23,6 +23,20 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## Release checkout hardening (2026-11-10)
+
+- User requested verification and remediation of CodeQL alerts #11/#12 in
+  `release.yaml`. Both flag repository script execution after the Flatpak job's
+  dynamic checkout. Scope: focused workflow hardening, regression tests and docs.
+- Require an explicit trusted default-branch checkout before Flatpak scripts run;
+  reject a different release target before executing repository code, preserving
+  matching source, SDK, offline dependency feed and manifest inputs.
+- Preserve existing release gates, immutable target data, least-privilege tokens,
+  versions and published assets. Keep #32 blocked, #34 deferred and auto-merge off.
+- Validate the guard with real local Git histories and run workflow/manifest
+  regression checks. Hosted CodeQL resolution requires a later published scan;
+  do not dismiss alerts or trigger publication to manufacture that evidence.
 
 ## Selected dependency maintenance (2026-11-10)
 

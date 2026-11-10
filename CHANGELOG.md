@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path.
+
 ### Fixed
 - Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.
 - Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.

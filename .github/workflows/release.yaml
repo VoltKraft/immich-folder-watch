@@ -169,7 +169,19 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: ${{ needs.prepare-release.outputs.target_sha }}
+          ref: refs/heads/${{ github.event.repository.default_branch }}
+
+      # A moving branch must not mix newer tooling/dependencies with an older release.
+      - name: Verify trusted release checkout
+        shell: bash
+        env:
+          TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]]; then
+            echo "Release target differs from the trusted default-branch checkout. Retry from current main after CI succeeds." >&2
+            exit 1
+          fi
 
       - name: Read pinned Flatpak SDK
         id: flatpak_sdk

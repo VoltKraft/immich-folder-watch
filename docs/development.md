@@ -86,6 +86,22 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 
 ### Publication workflow trust
 
+The Flatpak release job explicitly checks out the repository's default branch and
+requires its exact HEAD to equal the resolved release target before running any
+repository script. This keeps the SDK, manifest template and generated offline
+NuGet feed consistent with the commit pinned into the release manifest. If main
+advances between target resolution and checkout, the job fails closed; after CI
+passes on current main, use its automatic release run or retry Release on main.
+Do not remove the guard or substitute an arbitrary checkout ref to retry an old
+run. Existing main/same-repository event gates and immutable release tags remain.
+
+Focused workflow and manifest regression checks:
+
+```bash
+python3 -m unittest discover -s tools/tests -p test_workflow_security.py -v
+python3 -m unittest discover -s tools/tests -p test_prepare_flatpak_release_manifest.py -v
+```
+
 Release build jobs use read-only repository permissions and checkout does not
 persist credentials. Only the publishing job receives `contents: write`; the
 separate downstream-dispatch job receives `actions: write`. Actions are pinned
