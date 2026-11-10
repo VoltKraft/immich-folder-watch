@@ -1,5 +1,26 @@
 # Project Status
 
+## Release checkout fix verified on main (2026-11-10)
+
+- Published security fix `ae9558c` and Windows regression-runner correction
+  `f1d20c3f1f802d67194d8ae620acc792c796ab7c`; remote main is the latter revision.
+- [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916629585)
+  completed successfully on `f1d20c3`: all six jobs passed, including Windows/Linux
+  builds/tests, all nine workflow security cases on Windows, and native x86_64/ARM64
+  Flatpak candidates. Selecting Git Bash resolved the initial Windows test failure.
+- [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916628594)
+  completed successfully on the same revision for all four languages. NuGet
+  dependency submission also passed. The open code-scanning alert list is empty.
+- Alerts [#11](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/11)
+  and [#12](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/12)
+  are both `fixed`, automatically recorded at 22:38:28 UTC; neither was dismissed.
+- Final remote readback: #32 and #34 remain open/unmerged, both have no auto-merge
+  request, and repository automatic merging remains disabled.
+- Requested publication and validation are complete. This final evidence-only
+  status entry is a local documentation checkpoint after the verified remote
+  revision; no further implementation work or release dispatch is selected.
+
+
 ## Release checkout fix published; Windows test runner correction (2026-11-10)
 
 - User explicitly authorized publishing the fix and verifying CI, CodeQL and
