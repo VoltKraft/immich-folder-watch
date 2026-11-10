@@ -1,5 +1,44 @@
 # Project Status
 
+## Remaining Dependabot refresh completed (2026-11-10)
+
+- Milestone `M-DEPENDABOT-REFRESH-20261110` completed. User authorized updating
+  #28/#29/#30/#31/#34 with current main and obtaining successful CI/CodeQL; no PR merges.
+- GitHub update-branch requests used each exact expected head. All five new heads
+  contain remote main `13e93dac570a49ec9e8595713c5fc9aeb2a78524`; ancestry and
+  full diff checks confirm only each original reviewed proposal remains above main.
+  No force-push, extra package change or test/check weakening was necessary.
+
+| PR | Updated head | CI | CodeQL workflow |
+| --- | --- | --- | --- |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | `c66de1e58f0bd4d31b5e004348909abcb8665f32` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904525439) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904516733) |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | `2b2bdc6c767e19beb0ebb58ae0ff32a7b8711110` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904530008) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904521815) |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | `d0062e7cccda5ec8ec19d55c58d7cf5b88074f5f` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904535257) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904528780) |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | `5ed20761e5ee96ba1fa9b16f90173273393da8c0` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904541922) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904531775) |
+| [#34](https://github.com/VoltKraft/immich-folder-watch/pull/34) | `f4412966f9e3008fb286945abcaa65a417e83996` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904546447) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904538706) |
+
+- DCR-AC01/02: All six CI jobs passed on every updated head, covering Windows/Linux
+  tests and native x86_64/ARM64 Flatpak builds. All four CodeQL analyses (Actions,
+  C#, JavaScript/TypeScript, Python) and each aggregate `CodeQL` check passed.
+  NuGet dependency submission passed too. The earlier neutral CodeQL assessment
+  is resolved by the fresh analyses; no CodeQL configuration changes were needed.
+- Separate service check: #34's `.github/dependabot.yml` check (ID 130138962423,
+  [service details](https://dependabot-api.githubapp.com)) remains queued at this
+  snapshot. It is not one of the completed CI/CodeQL jobs; no failure is reported.
+  #28/#29/#30/#31 have all 13 reported checks successful; #34 has 12 successful
+  and this one queued service check. Do not describe every #34 check as complete.
+- DCR-AC03: All five PRs remain open/unmerged. #32 remains unchanged/open/blocked
+  at `51898a8`; repository `allow_auto_merge: false`, all inspected PRs
+  `auto_merge: null`. Remote main remains `13e93da`. No merge into main, main push,
+  release, deployment or live Immich access occurred.
+- Local records preserve authorization and validation; they are not pushed.
+  No implementation milestone remains active. Next action: separately authorized
+  review/merge after checking current heads and the outstanding service check.
+
+The review below records the earlier heads; the refresh evidence above supersedes
+its pending integration-CI and neutral-CodeQL limitations. Publication-only paths
+remain outside the validation performed here.
+
 ## Remaining Dependabot review completed (2026-11-10)
 
 - Reviewed #28/#29/#30/#31/#34 without remote changes. Exact heads, CI links,

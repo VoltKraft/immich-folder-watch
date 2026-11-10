@@ -11,7 +11,7 @@
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261110-08`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: `M-DEPENDABOT-REFRESH-20261110`.
+- Active milestone: None; `M-DEPENDABOT-REFRESH-20261110` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's

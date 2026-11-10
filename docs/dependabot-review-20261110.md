@@ -1,5 +1,15 @@
 # Remaining Dependabot PR review (2026-11-10)
 
+## Follow-up integration validation
+
+The subsequent authorized branch refresh incorporated main `13e93da` into all
+five PRs. Every new head passed all six CI jobs, four CodeQL language analyses
+and the aggregate CodeQL check. See [the current validation record](status.md#remaining-dependabot-refresh-completed-2026-11-10)
+for exact heads, run links and the separately queued #34 Dependabot service check.
+The initial review below remains evidence for unchanged proposed action/package
+versions; its integration/CodeQL limitations describe the pre-refresh snapshot.
+Publication-only paths remain unexecuted. No PR was merged.
+
 ## Scope and result
 
 Reviewed the unchanged heads of #28, #29, #30, #31 and #34 for compatibility,
