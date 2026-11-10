@@ -1,5 +1,32 @@
 # Project Status
 
+## Dependabot completion check (2026-11-10, 20:39 Europe/Berlin)
+
+- The first [NuGet updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)
+  completed successfully and created five additional PRs (#32 through #36).
+  All ten Dependabot PRs remain open and unmerged. All reported checks on their
+  current heads have finished; five PRs have successful CI and five have failures.
+
+| PR | Update | Head | CI result |
+| --- | --- | --- | --- |
+| [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27) | download-artifact 7.0.0 to 8.0.2 | `27ab531` | Windows build/test job failed; remaining CI jobs passed |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | upload-artifact 6.0.0 to 7.0.2 | `339ee48` | All six CI jobs passed |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | deploy-pages 4.0.5 to 5.0.1 | `0c8975d` | All six CI jobs passed |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | configure-pages 5.0.0 to 6.0.0 | `383e170` | All six CI jobs passed |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | setup-node 6.5.0 to 7.1.0 | `9c6d43d` | All six CI jobs passed |
+| [#32](https://github.com/VoltKraft/immich-folder-watch/pull/32) | Avalonia group, five updates | `51898a8` | Windows/Linux build/test and Flatpak preparation failed; native builds skipped; NuGet submission also failed |
+| [#33](https://github.com/VoltKraft/immich-folder-watch/pull/33) | Microsoft.Extensions group, six updates | `7fb5e63` | Both native Flatpak builds failed; remaining CI jobs passed |
+| [#34](https://github.com/VoltKraft/immich-folder-watch/pull/34) | SkiaSharp group, two updates | `a92df09` | All six CI jobs passed |
+| [#35](https://github.com/VoltKraft/immich-folder-watch/pull/35) | xUnit group, three updates | `820cc9f` | Windows/Linux build/test jobs failed; remaining CI jobs passed |
+| [#36](https://github.com/VoltKraft/immich-folder-watch/pull/36) | Microsoft.Data.Sqlite 10.0.10 to 11.0.0 | `4a26baf` | Both native Flatpak builds failed; remaining CI jobs passed |
+
+- CodeQL reports neutral on all ten PRs, not a successful security scan.
+  Failure causes were not investigated in this status-only check.
+- Verified repository auto-merge remains disabled and every PR has
+  `auto_merge: null` and no merge timestamp. No remote mutation, rerun or merge.
+- Next action: investigate failed jobs and review compatibility/licenses before
+  any separately authorized merge. Evidence is saved in a local documentation commit.
+
 ## First Dependabot run check (2026-11-10, 19:24 Europe/Berlin)
 
 - Read-only GitHub inspection requested; no update PR was modified or merged.
