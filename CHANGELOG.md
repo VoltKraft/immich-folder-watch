@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
 
+### Fixed
+- Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.
+
 ## [3.0.0] - 2026-11-10
 
 This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.
