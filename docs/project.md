@@ -10,7 +10,7 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261110-06`.
-- Plan maturity: Dependabot CI corrections verified; Avalonia upgrade deferred.
+- Plan maturity: Dependabot CI corrections verified; selective merge authorized.
 - Active milestone: `M-DEPENDABOT-CI-20261110`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -27,6 +27,12 @@
 ## Selected dependency maintenance (2026-11-10)
 
 ### M-DEPENDABOT-CI-20261110
+
+Updated authorization on 2026-11-10: merge the successfully validated PRs #27,
+#33, #35 and #36. This supersedes their earlier no-merge boundary. Keep #32 open
+and blocked, leave automatic merging disabled, preserve checks/branch rules and
+verify the resulting merge records. Resolve any integration conflicts without
+discarding reviewed changes; no release/version bump is selected.
 
 - User selected investigation and fixes for existing Dependabot PRs #27, #32,
   #33, #35 and #36; no merges. Scoped corrections and CI validation stay on the
