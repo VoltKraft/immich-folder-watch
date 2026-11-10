@@ -1,5 +1,27 @@
 # Project Status
 
+## Dependabot PR #27 CI correction (2026-11-10)
+
+- User authorized investigating/fixing existing PR #27 without merging. Its
+  Windows CI failed `Sync_IgnoresExcludedFileDeletionsButPropagatesMediaDeletion`
+  because one asset appeared twice in the trash requests.
+- Cause: watcher and polling handlers both read the mapping before asynchronous
+  tombstone persistence removed it. A per-path in-progress claim now gives one
+  handler ownership until completion, including exceptional exits. Polling keeps
+  missing mappings while a deletion is active or failed, preserving retryability.
+- Added deterministic concurrent watcher/poll tests with paused persistence and
+  injected persistence failure. Both assertions failed against the original
+  production code; the initial guard passed the full 483-test Core suite.
+  After independent review identified the polling retry gap, the corrected delta
+  passed all five focused deletion cases (including the original three cases).
+- Independent source review found no remaining actionable issue; handle-bound
+  absence checks and watcher shutdown draining remain unchanged. Initial restricted
+  MSBuild attempts failed without compiler diagnostics; permitted local runs passed.
+- The updated download-artifact SHA retains the upstream MIT license, verified
+  at `9000827ccba6bdab643e8b6fd33ac0654aef8333`. No dependency is added by this fix.
+- Next action: push this correction to the existing PR and verify Windows/Linux
+  and native Flatpak CI on its exact head. No merge, release or live Immich access.
+
 ## Dependabot implementation (2026-11-10)
 
 - Selected milestone: `M-DEPENDABOT-20261110`; local implementation complete.
