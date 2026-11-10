@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `2.11.3` in
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
-- Brief revision: `IFW-BRIEF-20261109-01`.
-- Plan maturity: Security remediation pass delivered; draft review and one documented residual finding remain.
-- Active milestone: None; `M-SECURITY-REMEDIATION-20261109` delivered with one explicitly documented unresolved finding, as allowed by its acceptance criteria.
+- Brief revision: `IFW-BRIEF-20261110-01`.
+- Plan maturity: Selected follow-up to close the remaining filesystem race in PR #26.
+- Active milestone: `M-WATCH-ROOT-ATOMICITY-20261110`.
 - Implementation request / scope: The user's 2026-11-09 attached request to
   investigate every open Codex Security Cloud finding, consolidate verified fixes
   and documented unresolved items into one PR, and validate the result. The earlier
@@ -48,6 +48,27 @@ release, alter published assets, or contact a live Immich installation.
 
 The historical distribution-only scope below describes the completed milestone;
 security remediation additionally authorizes the application and CI changes above.
+
+### M-WATCH-ROOT-ATOMICITY-20261110
+
+The user explicitly requested complete remediation of `csf_77f3e84ec9b70e5aff765235`
+on 2026-11-10, with subagents, regression tests and updates to existing PR #26.
+This supersedes the prior partial-fix acceptance for this finding only. No merge,
+release, version change, live Immich access or stable Flatpak publication.
+
+- WR-AC01: Pin authorized root identity for the worker lifetime. Sensitive reads,
+  deletion, download staging/finalization, timestamp changes and relevant directory
+  operations must use no-follow handle-bound access, never a validated pathname
+  reopened after an attacker can replace a component.
+- WR-AC02: Retain Linux portal mounts and Windows compatibility; reject unsafe or
+  unsupported filesystem operations before touching untrusted targets. No fallback
+  to check-then-open paths is allowed at sensitive sinks.
+- WR-AC03: Add deterministic race regressions for root/intermediate/leaf replacement,
+  upload, cleanup and download lifecycle; verify outside sentinel contents and
+  metadata remain untouched. Exercise Linux locally and Windows in CI.
+- WR-AC04: Independently review the complete boundary and integrated call sites,
+  pass relevant regression suites/builds, update documentation and the same PR.
+  Native ARM64/UNC runtime and external rescan limits remain explicitly separate.
 
 ## Historical distribution scope and boundaries
 

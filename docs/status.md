@@ -1,5 +1,20 @@
 # Project Status
 
+## Directory race follow-up (2026-11-10)
+
+- Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; implementation in progress.
+- Baseline: clean local and remote PR head `d922bfa86df14408185e811e230167705354dc7c`.
+  PR #26 is open, draft, unmerged, targeting `main`; existing branch is reused.
+- User scope: completely close the remaining watch-directory race, with subagents
+  and regression tests in the same PR. No merge or release.
+- Ownership: native filesystem abstraction and platform tests; worker/API integration;
+  independent security review. Parent owns records, integration checks and commits.
+- Acceptance: WR-AC01 through WR-AC04 in the brief. Previous "partial" disposition
+  remains until the integrated handle-bound implementation passes validation.
+- Next action: implement and audit anchored filesystem operations, validate local
+  and Windows CI race tests, update PR #26.
+- Goal controls: no new Goal requested or started; prior run remains historical.
+
 ## Active security remediation (2026-11-09)
 
 - Milestone: `M-SECURITY-REMEDIATION-20261109`; remediation pass delivered in draft PR #26, with one explicitly open residual finding.
