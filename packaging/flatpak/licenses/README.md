@@ -53,3 +53,25 @@ and [license list](https://www.gnu.org/licenses/license-list.html) explain the
 distinction between preserving attribution, compatible software combinations,
 and separately distributed font or build-tool components. This notice packaging
 change adds no library or font dependency.
+
+## Microsoft.Extensions 11.0.0 review (2026-11-10)
+
+PR #33 resolves 32 Microsoft.Extensions/System package archives at 11.0.0 in the
+combined Linux x64/ARM64 feed. Their `.nuspec` files all declare MIT and identify
+[`dotnet/dotnet` revision `297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f`](https://github.com/dotnet/dotnet/tree/297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f).
+`Dotnet-11.0.0-LICENSE.txt` preserves that revision's complete MIT text, with its
+own immutable provenance entry even though its bytes match the older supplement.
+The exact 11.0.0 catalog entries include the newly resolved
+`System.Diagnostics.DiagnosticSource`, `System.IO.Pipelines`,
+`System.Text.Encodings.Web` and `System.Text.Json`, whose archives also omit the
+MIT text. Existing reviewed versions remain available.
+
+All 32 archives carry the same `THIRD-PARTY-NOTICES.TXT` (SHA-256
+`e3a241a6cf35167d82bf7e081de9641c59d10d2dbd8824409817bed31980d407`), which the
+installer preserves byte-for-byte. Compared with 10.0.0, the upstream notices
+correct the ASP.NET Core license to MIT, remove LinuxTracepoints, and add
+Zstandard, ANTLR 4 and Intel Decimal Floating-Point Math Library under BSD-style
+terms plus Wycheproof under Apache-2.0. These permissive additions are compatible
+with AGPL-3.0-only under the GNU compatibility guidance linked above; their
+attribution requirements remain intact. The broad upstream collection is not a
+claim that every named component is linked into the application.

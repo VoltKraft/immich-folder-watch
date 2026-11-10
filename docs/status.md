@@ -1,5 +1,27 @@
 # Project Status
 
+## Dependabot PR #33 license correction (2026-11-10)
+
+- Scope: fix the existing Microsoft.Extensions 11.0.0 update PR's Flatpak CI
+  failure without merging, changing product versions or weakening license checks.
+- Baseline: `7fb5e63`; both native Flatpak jobs stopped at the exact-version
+  supplemental notice guard, beginning with Microsoft.Extensions.Configuration.
+- Reviewed all 32 changed Microsoft.Extensions/System 11.0.0 archives in the
+  resolved feed against their recorded `dotnet/dotnet` source revision. Added
+  version-specific MIT provenance and exact catalog entries, including four new
+  transitive System packages. All upstream third-party notices are retained.
+  Detailed source/hash and license-delta evidence is in
+  [the license review](../packaging/flatpak/licenses/README.md#microsoftextensions-1100-review-2026-11-10).
+- Validation: exact Flatpak SDK 10.0.401 restored Linux x64 and ARM64 into isolated
+  caches. The generator's official-source/SHA-512 checks passed for the combined
+  87-archive feed; the real license installer passed and all 32 updated license
+  and notice outputs matched reviewed SHA-256 values. All 15 notice-installer
+  regression tests passed, including rejection of unknown versions/tampering.
+- No application code changed. The existing Windows/Linux application CI passed
+  before this metadata correction; actual native Flatpak rerun is still required.
+- Next action: commit/push this correction to PR #33 and verify both native jobs.
+  No PR has been merged and no release or live Immich operation was performed.
+
 ## Dependabot activation (2026-11-10)
 
 - Selected milestone: `M-DEPENDABOT-20261110`, extended by explicit user request
