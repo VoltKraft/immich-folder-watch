@@ -25,13 +25,14 @@ or rescanned them. The November 10 follow-up implements the remaining filesystem
 race fix with pinned directory/file handles and independent review. All fourteen
 findings are now addressed in code; none is classified as false positive or
 skipped. Current validation, revisions and platform limits are recorded in
-[status](status.md); the follow-up's Windows CI is still pending at this checkpoint.
+[status](status.md). All six CI jobs pass for the follow-up at `a188722`, including
+Windows/Linux application checks and native x86_64/aarch64 package validation.
 
 | Finding ID | Severity | Component | Remediation | Disposition |
 | --- | --- | --- | --- | --- |
 | `csf_204d80f4dba65ad2200a0f52` | Medium | Download staging | Protected handle-bound staging, exclusive creation and cleanup through retained directory handles. | Fixed; targeted tests pass |
 | `csf_e072282d3540054e0caa735a` | Medium | Publication actions | Full verified commit SHAs; multiarchitecture build-image digest. | Fixed; workflow tests/review pass |
-| `csf_77f3e84ec9b70e5aff765235` | Medium | Watch-root filesystem access | Pin source identities; no-follow handle-bound enumeration, transfers, cleanup, timestamps and directory moves; retain capabilities through retries and shutdown. | Fixed in code; local race regressions and independent review pass; Windows CI pending |
+| `csf_77f3e84ec9b70e5aff765235` | Medium | Watch-root filesystem access | Pin source identities; no-follow handle-bound enumeration, transfers, cleanup, timestamps and directory moves; retain capabilities through retries and shutdown. | Fixed; Linux/Windows regressions and independent review pass |
 | `csf_c793af7c8b73e70cd9cef253` | Medium | Linux secret configuration | Owner-validated private directories, descriptor-relative exclusive 0600 temporary write and atomic replacement. | Fixed; targeted tests pass |
 | `csf_3d1deaf494d68bcd8705352c` | Medium | Remote album mutation | Record creation-returned IDs scoped to account/source; refuse pre-existing adoption; mutate by ID; revoke old-path/restart authority. | Fixed; targeted tests pass |
 | `csf_740910544257761f129c14fc` | Medium | Download finalization | Atomic no-overwrite move; preserve destinations that appear during transfer. | Fixed; targeted tests pass |

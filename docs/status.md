@@ -2,12 +2,13 @@
 
 ## Directory race follow-up (2026-11-10)
 
-- Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; implementation and local
-  validation complete; Windows CI and PR update pending.
+- Selected milestone: `M-WATCH-ROOT-ATOMICITY-20261110`; complete. All six CI jobs
+  pass on `a188722`; this final handoff changes documentation only.
 - Baseline: clean local and remote PR head `d922bfa86df14408185e811e230167705354dc7c`.
   PR #26 is open, draft, unmerged, targeting `main`; existing branch is reused.
 - Implementation checkpoint: `b1d2eee` pushed to the existing PR; initial CI
   exposed Windows-specific native call and test-fixture issues, corrected below.
+  `eaccd17` corrects native Windows calls; `a188722` completes junction fixtures.
 - User scope: completely close the remaining watch-directory race, with subagents
   and regression tests in the same PR. No merge or release.
 - Ownership: native filesystem abstraction and platform tests; worker/API integration;
@@ -15,7 +16,7 @@
 - WR-AC01: Pinned native Linux/Windows filesystem primitives and worker/API
   integration cover enumeration, absence, reads, downloads, exact-file cleanup,
   timestamps and both ends of directory moves. Roots outlive callbacks/retries.
-- WR-AC02: Linux local validation passes; Windows runtime CI remains required.
+- WR-AC02: Linux local and CI validation and Windows x64 runtime CI pass.
   Capability checks fail closed. The [watch-root contract](watch-root-security.md)
   documents retained Linux containers, bounded cache and Windows sharing locks.
 - WR-AC03: 33 added regression cases (20 native, 5 API, 8 worker), including
@@ -23,9 +24,12 @@
   legacy content IDs, journal recovery, remote cleanup and shutdown lifetime.
 - WR-AC04: Independent review found no remaining actionable source issue after
   corrections for identity, bounded handle caching, stale cleanup/album authority,
-  retries and lifecycle. Documentation is updated; same-PR push and CI pending.
-- Next action: push the reviewed implementation to PR #26 and validate Windows
-  and native package CI. Retain draft status; no merge or release.
+  retries and lifecycle. Implementation and tests are pushed to the same PR.
+  Documentation and PR evidence are updated. All six application/packaging jobs
+  pass, including native x86_64 and aarch64 builds/validation.
+- Next action: review PR #26 and arrange an exact-commit Security Cloud scan when
+  supported. No further implementation milestone selected. PR remains draft and
+  unmerged; no release or stable repository publication occurred.
 - Goal controls: no new Goal requested or started; prior run remains historical.
 
 ### Directory race validation (2026-11-10)
@@ -33,13 +37,15 @@
 | Check | Result | Limits |
 | --- | --- | --- |
 | Portable Core suite | 481 passed, 0 failed/skipped | Linux x86_64, SDK 10.0.203; final album-cache revocation delta then passed 10 targeted album/security cases |
-| Native focused suite | 20 passed, including LRU eviction with active leases and exclusive writer locks | Windows implementation compiles; runtime CI pending |
+| Native focused suite | 20 passed, including LRU eviction with active leases and exclusive writer locks | Windows cases also pass in current CI; Linux-only cases retain platform scope |
 | Linux GUI/protocol suite | 53 passed, 0 failed/skipped | Headless/local sockets and D-Bus; no live Immich |
-| Linux application build/analyzers | Passed | Debug; generated branding remains ignored |
+| Linux application build/analyzers | Passed, 0 warnings/errors | Debug; generated branding remains ignored |
 | Independent source review | Passed with no remaining actionable finding | Windows/UNC and ARM64 runtime are separate evidence requirements |
 | Diagnostic full run | 468 passed / 4 failed before corrections | Fixed Linux writer-lock handling, retained-container assertions and friendly write-permission errors; subsequent full run passed |
 | [Initial follow-up CI 42758835923](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42758835923) | Linux application tests/build and packaging lint passed. Windows build passed, Core 434 passed / 38 failed / 9 skipped; WPF 36 passed and Linux-project tests 34 passed / 19 skipped | Corrected explicit SYNCHRONIZE access, native handle-relative rename, junction command quoting and portable test path. Independent delta review and 20 focused Linux cases pass; Windows rerun required |
 | [Windows correction CI 42759557792](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42759557792) at `eaccd17` | Native production failures resolved; Core 470 passed / 2 failed / 9 skipped; WPF 36 passed and Linux-project tests 34 passed / 19 skipped | Two junction test bodies passed but their recursive fixture cleanup failed; explicit nonrecursive junction cleanup is required before the final rerun |
+| [Final CI 42760114840](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42760114840) at `a188722` | All six jobs passed. Windows: Core 472 passed / 9 platform skips, WPF 36 passed, Linux-project 34 passed / 19 platform skips, PowerShell security 7 passed. Linux: Core 481 passed and GUI/protocol 53 passed. Both builds 0 warnings/errors; lint, candidate preparation and native x86_64/aarch64 builds/validation passed | Actual UNC/ARM64 app runtime remains untested; the final documentation-only checkpoint does not change the validated code/tests |
+| Repository handoff | Diff whitespace checks and 102 local documentation links passed; reviewed staged files contain no generated outputs | All scoped changes remain in the existing PR; no merge |
 | Security Cloud rescan | Not executed; exposed connector still has no branch/commit selector | No finding was marked closed in the service; exact-commit scan remains outstanding |
 
 ## Previous security remediation handoff (2026-11-09)

@@ -9,12 +9,14 @@
 - Product baseline: The checked-in version is `2.11.3` in
   [Directory.Build.props](../Directory.Build.props). This is not a fresh release
   or an assertion about deployed installations.
-- Brief revision: `IFW-BRIEF-20261110-01`.
-- Plan maturity: Selected follow-up to close the remaining filesystem race in PR #26.
-- Active milestone: `M-WATCH-ROOT-ATOMICITY-20261110`.
+- Brief revision: `IFW-BRIEF-20261110-02`.
+- Plan maturity: Security remediation and complete directory-race follow-up delivered in PR #26.
+- Active milestone: None; `M-WATCH-ROOT-ATOMICITY-20261110` is complete. No subsequent milestone selected.
 - Implementation request / scope: The user's 2026-11-09 attached request to
   investigate every open Codex Security Cloud finding, consolidate verified fixes
-  and documented unresolved items into one PR, and validate the result. The earlier
+  and documented unresolved items into one PR, and validate the result; the
+  2026-11-10 follow-up explicitly requires complete directory-race remediation
+  with subagents and regression tests in that same PR, without merging. The earlier
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
