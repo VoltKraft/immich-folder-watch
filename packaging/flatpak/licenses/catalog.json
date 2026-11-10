@@ -90,11 +90,17 @@
   "microsoft.data.sqlite": {
     "10.0.10": [
       "Dotnet.Sqlite-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.data.sqlite.core": {
     "10.0.10": [
       "Dotnet.Sqlite-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration": {

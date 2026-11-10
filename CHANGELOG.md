@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.
+
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
 

@@ -53,3 +53,19 @@ and [license list](https://www.gnu.org/licenses/license-list.html) explain the
 distinction between preserving attribution, compatible software combinations,
 and separately distributed font or build-tool components. This notice packaging
 change adds no library or font dependency.
+
+## Microsoft.Data.Sqlite 11.0.0 review (2026-11-10)
+
+PR #36 resolves `Microsoft.Data.Sqlite` and `Microsoft.Data.Sqlite.Core` 11.0.0.
+Both exact NuGet archives declare MIT and identify
+[`dotnet/dotnet` revision `297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f`](https://github.com/dotnet/dotnet/tree/297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f).
+Neither archive contains a license or third-party notice text. Their catalog
+entries therefore use `Dotnet-11.0.0-LICENSE.txt`, preserving the full MIT text
+from that revision with its own immutable provenance record. Its SHA-256 matches
+the older .NET supplement; the new source reference establishes the reviewed
+11.0.0 provenance without altering the retained 10.0.10 entries.
+
+MIT remains compatible with AGPL-3.0-only under the GNU guidance linked above.
+The resolved SQLitePCLRaw/native SQLite package versions and their Apache-2.0,
+public-domain and other retained upstream notices are unchanged by this PR.
+The top-level third-party dependency summary now identifies Sqlite 11.0.0.
