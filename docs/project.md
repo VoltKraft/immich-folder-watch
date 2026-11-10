@@ -10,7 +10,7 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261110-06`.
-- Plan maturity: Dependabot CI remediation selected; Avalonia upgrade deferred.
+- Plan maturity: Dependabot CI corrections verified; Avalonia upgrade deferred.
 - Active milestone: `M-DEPENDABOT-CI-20261110`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation

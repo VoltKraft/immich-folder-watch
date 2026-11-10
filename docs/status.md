@@ -10,15 +10,28 @@
 
 | PR | Cause and correction | Pushed correction | Validation |
 | --- | --- | --- | --- |
-| #27 | Concurrent watcher/poll deletion handlers read the same asset before tombstone persistence; per-path ownership and retained retry baseline prevent duplicate remote trash | `ca35782` (fix `05297b7`) | Two deterministic regressions fail against old source; 483 Core tests pass before review delta, five focused deletion cases pass after it; independent review passed; CI pending |
-| #33 | Missing reviewed supplemental notices for Microsoft.Extensions/System 11.0.0; verified exact source license and all package notices, added exact-version supplements | `c6ad2e9` | Both architecture restores and 87-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; CI pending |
-| #35 | xUnit 4 changes parallelism API, test-runner defaults and Avalonia extension ABI; retain framework 3.2.2 and compatible v2/runner upgrades, exclude incompatible future v4 proposals | `a5cbed6` | 481 Core and 53 Linux GUI/protocol cases pass with no failures/skips; schema and independent review passed; CI pending |
-| #36 | Missing reviewed supplemental notices for Microsoft.Data.Sqlite/Core 11.0.0; verified MIT source and added exact-version supplements | `2b2b186` | Both architecture restores and 81-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; CI pending |
+| #27 | Concurrent watcher/poll deletion handlers read the same asset before tombstone persistence; per-path ownership and retained retry baseline prevent duplicate remote trash | `ca35782` (fix `05297b7`) | Two deterministic regressions fail against old source; 483 Core tests pass before review delta, five focused deletion cases pass after it; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42889338522) |
+| #33 | Missing reviewed supplemental notices for Microsoft.Extensions/System 11.0.0; verified exact source license and all package notices, added exact-version supplements | `c6ad2e9` | Both architecture restores and 87-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888743407) |
+| #35 | xUnit 4 changes parallelism API, test-runner defaults and Avalonia extension ABI; retain framework 3.2.2 and compatible v2/runner upgrades, exclude incompatible future v4 proposals | `a5cbed6` | 481 Core and 53 Linux GUI/protocol cases pass with no failures/skips; schema and independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888754999) |
+| #36 | Missing reviewed supplemental notices for Microsoft.Data.Sqlite/Core 11.0.0; verified MIT source and added exact-version supplements | `2b2b186` | Both architecture restores and 81-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888749135) |
 
 - No license guard or test assertion was disabled. SDKs: local application/tests
   10.0.203; exact Flatpak feed restores 10.0.401. PR corrections add no release bump.
-- Next action: verify all six CI jobs on each corrected PR head and record results.
-  Keep #32 open/blocked and automatic merging disabled.
+- Completion: all six CI jobs pass on each of the four exact corrected heads,
+  including Windows/Linux and native x86_64/aarch64 Flatpak builds. No unfinished
+  or failed current-head check remains on #27/#33/#35/#36. All remain open with
+  `auto_merge: null`; repository `allow_auto_merge: false` was read back again.
+- Final #27 CI: Linux 483 Core + 53 GUI/protocol passed; Windows 474 Core + 36 WPF
+  + 34 portable Linux-project tests passed, with 9/19 expected platform skips.
+  Other corrected PRs: Linux 481 + 53; Windows 472 + 36 + 34 with the same skips.
+  All application builds have zero warnings/errors. Both native license logs
+  confirm 87 archives for #33 and 81 for #36.
+- PR descriptions now explain the final fixes and link exact-head validation;
+  #27/#35 titles reflect their final scope. #32 stays unchanged at `51898a8`.
+- Next action: manual review of the four validated PRs and separate authorization
+  before merging. Keep #32 open/blocked pending a separately selected licensing
+  resolution. No further implementation milestone is selected. This aggregate
+  handoff is a local documentation checkpoint; main was not pushed by this task.
 
 ### Deferred Avalonia PR #32
 
