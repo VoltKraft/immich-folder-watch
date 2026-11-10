@@ -100,136 +100,217 @@
   "microsoft.extensions.configuration": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.binder": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.commandline": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.environmentvariables": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.fileextensions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.json": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.usersecrets": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.fileproviders.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.fileproviders.physical": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.filesystemglobbing": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.hosting": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.hosting.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.configuration": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.console": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.debug": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.eventlog": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.eventsource": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options.configurationextensions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.primitives": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "shimskiasharp": {
@@ -304,9 +385,32 @@
       "Svg.Skia-LICENSE.txt"
     ]
   },
+  "system.diagnostics.diagnosticsource": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
   "system.diagnostics.eventlog": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.io.pipelines": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.text.encodings.web": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.text.json": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "tmds.dbus.protocol": {

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Restore Flatpak packaging for Microsoft.Extensions 11.0.0 updates by recording reviewed MIT supplements for the complete resolved Microsoft/System package set.
 - Prevent concurrent watcher/polling callbacks from trashing the same remote asset twice, and retain failed deletion mappings for polling retries.
 
 ### Added
