@@ -8,6 +8,7 @@ namespace ImmichFolderWatch.Tests.Core.Services;
 public sealed class SecureWatchRootTests : IDisposable
 {
     private readonly string _test = Path.Combine(Path.GetTempPath(), "ifw-root-" + Guid.NewGuid().ToString("N"));
+    private readonly List<string> _directoryLinks = [];
     private string Source => Path.Combine(_test, "source");
     private string Outside => Path.Combine(_test, "outside");
 
@@ -355,7 +356,7 @@ public sealed class SecureWatchRootTests : IDisposable
         return reader.ReadToEnd();
     }
 
-    private static bool TryReplaceDirectory(string path, string moved, string outside)
+    private bool TryReplaceDirectory(string path, string moved, string outside)
     {
         try
         {
@@ -371,9 +372,14 @@ public sealed class SecureWatchRootTests : IDisposable
         return true;
     }
 
-    private static void CreateDirectoryLink(string path, string target)
+    private void CreateDirectoryLink(string path, string target)
     {
-        if (!OperatingSystem.IsWindows()) { Directory.CreateSymbolicLink(path, target); return; }
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(path, target);
+            _directoryLinks.Add(path);
+            return;
+        }
         // Junctions exercise Windows reparse rejection without requiring symlink privileges.
         var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
         // cmd.exe parses its command string itself; ArgumentList would apply CRT escaping
@@ -382,6 +388,7 @@ public sealed class SecureWatchRootTests : IDisposable
         using var process = Process.Start(start)!;
         process.WaitForExit();
         Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd() + process.StandardOutput.ReadToEnd());
+        _directoryLinks.Add(path);
     }
 
     private static void AssertNoPayloadFiles(string directory)
@@ -392,6 +399,10 @@ public sealed class SecureWatchRootTests : IDisposable
 
     public void Dispose()
     {
+        // Remove the link entries themselves before recursive fixture cleanup. In particular,
+        // Windows junctions must never be recursively traversed to clean their targets.
+        foreach (var link in _directoryLinks.AsEnumerable().Reverse())
+            Directory.Delete(link, recursive: false);
         if (Directory.Exists(_test)) Directory.Delete(_test, recursive: true);
     }
 
