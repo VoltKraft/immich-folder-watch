@@ -10,8 +10,8 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-01`.
-- Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: `M-RELEASE-301-20261111`.
+- Plan maturity: v3.0.1 published and verified; Avalonia/SkiaSharp updates deferred.
+- Active milestone: None; `M-RELEASE-301-20261111` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,10 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-RELEASE-301-20261111
+
+Completed: v3.0.1 published from `1ab0748`; exact-head CI/CodeQL, all four release
+assets and signed Flatpak distribution verified. See [release evidence](release-3.0.1.md).
+External WinGet acceptance and Flathub onboarding are not claimed as complete.
 
 - User explicitly selected creation and publication of v3.0.1 containing all
   changes on main at baseline `bb13a33`. This authorizes release preparation,

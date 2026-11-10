@@ -1,5 +1,24 @@
 # Project Status
 
+## v3.0.1 published and verified (2026-11-11)
+
+- `M-RELEASE-301-20261111` completed. [v3.0.1](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.1)
+  is the latest stable release, tagged at `1ab074841c76b2493dc3af5d972ce229e5746edb`.
+  The release includes all previously merged main changes and the verified
+  container-ownership fix discovered during release validation.
+- R301-AC01/02: Unified versions/AppStream/changelog match; six CI jobs and all
+  four CodeQL analyses passed; both Windows MSIs and both Linux Flatpaks built,
+  published and independently downloaded with matching size/SHA-256.
+- R301-AC03: Signed Pages repository deployed; live signature/version verification
+  passed for both architectures. WinGet submission succeeded (external PR open).
+  Flathub preparation/builds passed; disabled submission was correctly skipped.
+- R301-AC04: #32/#34 remain open/unmerged, auto-merge disabled, no live Immich or
+  personal installation changes. No further milestone is selected.
+- [Detailed evidence](release-3.0.1.md) owns run links, checksums, signed refs and
+  publication limits. This final documentation checkpoint follows the immutable
+  release and is retained locally; published artifacts remain unchanged.
+
+
 ## v3.0.1 container checkout correction (2026-11-11)
 
 - Preparation commit `b475dda` passed all six [CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922983220)
