@@ -9,7 +9,7 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-08`.
+- Brief revision: `IFW-BRIEF-20261110-09`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
 - Active milestone: None; `M-DEPENDABOT-REFRESH-20261110` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
@@ -34,6 +34,7 @@
 - Verify exact heads/checks, preserve branch rules, merge manually, and verify
   final main CI. Leave #32 open/blocked and #34 open/deferred; retain disabled
   auto-merge. No version bump, manual release or publication workflow dispatch.
+- Complete: all four merged; final main CI and CodeQL passed. #32/#34 stay open.
 
 ### Dependabot configuration-check recovery (2026-11-10)
 

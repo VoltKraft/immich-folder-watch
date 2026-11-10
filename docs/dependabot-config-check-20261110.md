@@ -1,5 +1,8 @@
 # Dependabot configuration-check diagnosis (2026-11-10)
 
+The user subsequently deferred this recovery and left #34 open. No further
+retry or support contact is selected; the following records the investigation.
+
 ## Finding
 
 PR #34 has a stalled GitHub Dependabot App configuration-validation job, separate

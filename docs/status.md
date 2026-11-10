@@ -1,5 +1,34 @@
 # Project Status
 
+## Remaining Actions PR merges completed (2026-11-10)
+
+- User explicitly deferred #34 and authorized merging the other reviewed Actions
+  updates (#28/#29/#30/#31). Each exact PR head had 13 successful checks before its
+  manual merge. Expected-head checks protected against concurrent branch changes;
+  no checks or branch rules were bypassed.
+
+| PR | Validated head | Merge commit |
+| --- | --- | --- |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | `c66de1e` | `b661638d9d7535a2a92c1cbfa510dc532d7dce05` |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | `2b2bdc6` | `b5f4dc122ed8203c9a17fae9f1330b1c057bc222` |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | `d0062e7` | `5c80ddd5a12c02b3badc549a1f72f4e33c8ec404` |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | `5ed2076` | `9a84eec0a5da6f9a5e58d92c0e776bc22f707309` |
+
+- Final remote main: `9a84eec0a5da6f9a5e58d92c0e776bc22f707309`.
+  [Combined main CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42909012903)
+  and [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42909013941)
+  completed successfully on that exact final merge commit. All six CI jobs passed,
+  including Windows/Linux tests and native x86_64/ARM64 Flatpak builds; all four
+  CodeQL language analyses passed. NuGet dependency submission also succeeded.
+- #32 remains open/blocked at unchanged `51898a8`. #34 remains open/deferred at
+  `f22797e`; no further configuration-check recovery was attempted after the user
+  deferred it. Repository auto-merge remains disabled, with no PR auto-merge request.
+- Local main incorporates the remote merges without losing local documentation
+  history. No main documentation push, version bump, manual release or deployment.
+- Completed: four authorized PR merges and successful combined main validation.
+  No further milestone is selected; #32 remains blocked and #34 is explicitly
+  deferred until a later user request. Final local evidence is not pushed.
+
 ## Dependabot configuration-check recovery blocked externally (2026-11-10)
 
 - User authorized recovery of #34's queued Dependabot check without merges.
