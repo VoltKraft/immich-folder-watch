@@ -90,6 +90,15 @@ class ReleaseCheckoutSecurityTests(unittest.TestCase):
             git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
                 "commit", "--quiet", "--allow-empty", "-m", "Second")
             current = git("rev-parse", "HEAD")
+            env = {**os.environ, "GITHUB_WORKSPACE": root.as_posix(),
+                   "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1", "LC_ALL": "C",
+                   "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+            ownership_check = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=root, env=env,
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertNotEqual(ownership_check.returncode, 0)
+            self.assertIn("dubious ownership", ownership_check.stderr)
             cases = [(current, True), (old, False), ("f" * 40, False),
                      ("", False), ("main", False), (current + "\n", False),
                      ("$(touch injected)", False), ("'; touch injected; #", False)]
@@ -99,7 +108,7 @@ class ReleaseCheckoutSecurityTests(unittest.TestCase):
                     sentinel.unlink(missing_ok=True)
                     result = subprocess.run(
                         [str(bash), "-c", self.script + "\ntouch executed\n"],
-                        cwd=root, env={**os.environ, "TARGET_SHA": target},
+                        cwd=root, env={**env, "TARGET_SHA": target},
                         capture_output=True, text=True, timeout=10,
                     )
                     self.assertEqual(result.returncode == 0, allowed, result.stdout + result.stderr)

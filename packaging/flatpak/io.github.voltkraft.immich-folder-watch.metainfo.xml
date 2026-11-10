@@ -104,7 +104,7 @@
         <p>Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.</p>
         <p>Security:</p>
         <ul>
-          <li>Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path.</li>
+          <li>Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path. Scope Git ownership trust to the exact checkout workspace for container builds.</li>
         </ul>
         <p>Fixed:</p>
         <ul>

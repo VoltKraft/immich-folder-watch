@@ -178,7 +178,9 @@ jobs:
           TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
         run: |
           set -euo pipefail
-          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git rev-parse HEAD)" != "$TARGET_SHA" ]]; then
+          # Checkout and shell steps can use different users/HOME in the container.
+          # Trust only this workspace for this read; never disable ownership checks globally.
+          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" != "$TARGET_SHA" ]]; then
             echo "Release target differs from the trusted default-branch checkout. Retry from current main after CI succeeds." >&2
             exit 1
           fi

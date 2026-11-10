@@ -1,5 +1,23 @@
 # Project Status
 
+## v3.0.1 container checkout correction (2026-11-11)
+
+- Preparation commit `b475dda` passed all six [CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922983220)
+  and all four [CodeQL analyses](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922982812).
+- The first [release build](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42923750608)
+  failed before either Flatpak build: Git rejected the guard's `rev-parse` with
+  `dubious ownership`. Checkout's temporary HOME does not carry its safe-directory
+  configuration into subsequent shell steps in the privileged build container.
+  This was an ownership-check failure, not a different target SHA.
+- Scope the guard's Git trust exception to `GITHUB_WORKSPACE` for that single
+  command. Keep strict target equality and default-branch checkout; do not add a
+  global/wildcard exception. Extend the deployed-guard regression with Git's
+  different-owner simulation, checking that plain Git rejects the fixture while
+  the scoped guard accepts only its exact HEAD and rejects all other inputs.
+- No v3.0.1 tag or assets were published by the failed run. Rerun full exact-head
+  CI and release builds after this focused correction; prior versions stay intact.
+
+
 ## v3.0.1 release preparation (2026-11-11)
 
 - User authorized publishing v3.0.1 from current main `bb13a33`, including all
