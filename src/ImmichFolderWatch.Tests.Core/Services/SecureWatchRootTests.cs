@@ -66,7 +66,7 @@ public sealed class SecureWatchRootTests : IDisposable
     {
         using var root = SecureWatchRoot.Open(Source);
         root.EnsureDirectory("active");
-        using var download = root.CreateDownload("active/photo.jpg");
+        using var download = root.CreateDownload(Path.Combine("active", "photo.jpg"));
         download.Stream.Write(Encoding.UTF8.GetBytes("authorized"));
         for (var i = 0; i < SecureTransactionPool.Capacity; i++)
         {
@@ -376,9 +376,9 @@ public sealed class SecureWatchRootTests : IDisposable
         if (!OperatingSystem.IsWindows()) { Directory.CreateSymbolicLink(path, target); return; }
         // Junctions exercise Windows reparse rejection without requiring symlink privileges.
         var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
-        start.ArgumentList.Add("/d");
-        start.ArgumentList.Add("/c");
-        start.ArgumentList.Add($"mklink /J \"{path}\" \"{target}\"");
+        // cmd.exe parses its command string itself; ArgumentList would apply CRT escaping
+        // to the embedded quotes and pass backslashes into mklink's filesystem paths.
+        start.Arguments = $"/d /c mklink /J \"{path}\" \"{target}\"";
         using var process = Process.Start(start)!;
         process.WaitForExit();
         Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd() + process.StandardOutput.ReadToEnd());

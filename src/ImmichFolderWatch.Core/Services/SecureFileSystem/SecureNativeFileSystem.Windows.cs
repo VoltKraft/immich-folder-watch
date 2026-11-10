@@ -8,6 +8,7 @@ internal static partial class SecureNativeFileSystem
 {
     private const uint DirectoryAccess = 0x100081; // SYNCHRONIZE | FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES
     private const uint DeleteAccess = 0x10000;
+    private const uint SynchronizeAccess = 0x100000;
     private const uint OpenReparsePoint = 0x200000;
     private const uint SynchronousIo = 0x20;
     private static readonly object WindowsEnumerationLock = new();
@@ -47,7 +48,11 @@ internal static partial class SecureNativeFileSystem
 
     private static SafeFileHandle WindowsOpenFile(SafeFileHandle parent, string name, bool writableMetadata, bool create)
     {
-        var access = create ? 0xc0010000u : 0x80100000u | (writableMetadata ? 0x100u : 0u);
+        // NtCreateFile requires explicit SYNCHRONIZE with FILE_SYNCHRONOUS_IO_NONALERT,
+        // including creation; generic read/write flags alone do not satisfy that check.
+        var access = SynchronizeAccess | (create
+            ? 0xc0000000u | DeleteAccess
+            : 0x80000000u | (writableMetadata ? 0x100u : 0u));
         // Read leases allow replacement of their names, but retain the file identity. Private
         // staged files deny every competing open until handle-based publication and disposal.
         var handle = WindowsOpenRelative(parent, name, access, create ? 0u : 7u, create ? 2u : 1u,
@@ -174,7 +179,8 @@ internal static partial class SecureNativeFileSystem
         var rootOffset = IntPtr.Size == 8 ? 8 : 4;
         var lengthOffset = rootOffset + IntPtr.Size;
         var nameOffset = lengthOffset + 4;
-        var size = nameOffset + bytes.Length + 2;
+        // Include the native structure's tail padding as well as the name bytes.
+        var size = nameOffset + 4 + bytes.Length;
         var buffer = Marshal.AllocHGlobal(size);
         var added = false;
         destination.DangerousAddRef(ref added);
@@ -185,7 +191,10 @@ internal static partial class SecureNativeFileSystem
             Marshal.WriteInt32(buffer, lengthOffset, bytes.Length);
             Marshal.Copy(bytes, 0, buffer + nameOffset, bytes.Length);
             // ReplaceIfExists stays false, preserving any destination created concurrently.
-            if (!WindowsSetFileInformation(file, 3, buffer, (uint)size)) throw WindowsError("Publish authorized file without replacement");
+            // The NT contract directly supports a retained RootDirectory handle and a
+            // single relative filename without Win32 pathname conversion.
+            var status = WindowsNtSetInformation(file, out _, buffer, (uint)size, 10); // FileRenameInformation
+            if (status < 0) throw WindowsNtError("Publish authorized file without replacement", status);
         }
         finally
         {
@@ -298,6 +307,9 @@ internal static partial class SecureNativeFileSystem
     [DllImport("ntdll.dll", EntryPoint = "NtCreateFile")]
     private static extern int WindowsNtCreateFile(out SafeFileHandle handle, uint access, ref WindowsObjectAttributes attributes, out WindowsIoStatusBlock status,
         IntPtr allocationSize, uint fileAttributes, uint sharing, uint disposition, uint options, IntPtr extendedAttributes, uint extendedAttributesLength);
+    [DllImport("ntdll.dll", EntryPoint = "NtSetInformationFile")]
+    private static extern int WindowsNtSetInformation(SafeFileHandle file, out WindowsIoStatusBlock status,
+        IntPtr information, uint length, int informationClass);
     [DllImport("ntdll.dll", EntryPoint = "RtlNtStatusToDosError")] private static extern uint WindowsStatusToError(int status);
     [DllImport("ntdll.dll", EntryPoint = "NtQueryVolumeInformationFile")]
     private static extern int WindowsQueryVolumeInformation(SafeFileHandle file, out WindowsIoStatusBlock status, out WindowsVolumeSpace information, uint length, int informationClass);
