@@ -1,5 +1,27 @@
 # Project Status
 
+## Remaining Dependabot review completed (2026-11-10)
+
+- Reviewed #28/#29/#30/#31/#34 without remote changes. Exact heads, CI links,
+  compatibility findings and upstream license sources are retained in
+  [the review record](dependabot-review-20261110.md).
+- All five exact-head CI runs completed successfully with six passing jobs each;
+  NuGet dependency submission passed. CodeQL is neutral on every PR with
+  `4 configurations not found`, so a successful security scan is not claimed.
+- No concrete compatibility or license blocker was identified. Actions retain
+  MIT licenses; #34 changes only the branding tool's SkiaSharp packages, preserving
+  application runtime versions and native third-party notice coverage.
+- All five heads integrate conflict-free with main `13e93da` in local tree-only
+  checks. Their hosted CI predates the recent main merges. Before a later merge,
+  refresh integration CI and obtain a complete CodeQL assessment. Pages/OIDC and
+  release-only publication paths were not exercised or triggered by this review.
+- All five PRs remain open/unmerged. #32 remains unchanged at `51898a8`, open and
+  blocked; repository `allow_auto_merge: false`, with `auto_merge: null` on every
+  inspected PR. No PR rebase, push, merge, workflow rerun or publication occurred.
+- Review complete; no implementation milestone selected. Findings and scope are
+  saved in a local documentation checkpoint only. A later merge needs separate
+  authorization and current validation.
+
 ## Selective Dependabot merges completed (2026-11-10)
 
 - User explicitly authorized merging #27, #33, #35 and #36 only. All four were

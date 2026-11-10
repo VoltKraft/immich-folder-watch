@@ -26,6 +26,17 @@
 
 ## Selected dependency maintenance (2026-11-10)
 
+### Remaining Dependabot review (2026-11-10)
+
+- User selected a read-only remote review of #28, #29, #30, #31 and #34 for
+  compatibility, authoritative license provenance and exact-head CI results.
+- Compare proposed action/package changes with current use sites and distribution
+  obligations; distinguish exercised CI paths from publication-only workflows and
+  historical PR validation from integration with current main.
+- Record findings and unresolved prerequisites locally. Do not merge, push PR
+  changes, publish, or trigger deployment. Keep #32 open/blocked and automatic
+  merging disabled. This review does not select a new implementation milestone.
+
 ### M-DEPENDABOT-CI-20261110
 
 Updated authorization on 2026-11-10: merge the successfully validated PRs #27,
