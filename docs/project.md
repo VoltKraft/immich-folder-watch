@@ -9,8 +9,8 @@
 - Product baseline: The checked-in version is `3.0.0` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-04`.
-- Plan maturity: Dependabot configuration selected for implementation.
+- Brief revision: `IFW-BRIEF-20261110-05`.
+- Plan maturity: Dependabot configuration and GitHub activation selected.
 - Active milestone: `M-DEPENDABOT-20261110`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -38,9 +38,13 @@
   permissions, license review and platform validation requirements.
 - DB-AC03: Document scheduling, review obligations, manually maintained packaging
   inputs and activation on the default branch. Update status and save a local commit.
-- Boundary: Configuration and documentation only. No dependency/version changes,
-  automatic merging, repository-setting changes, push or publication. Hosted bot
-  execution can only be verified after the configuration reaches the default branch.
+- DB-AC04: The user's follow-up on 2026-11-10 authorizes pushing the configuration
+  to the default branch, enabling Dependabot alerts and security updates, and
+  keeping automatic merging disabled. Verify remote content and read back settings.
+- Boundary: Configuration, documentation and the explicitly authorized GitHub
+  settings/push only. No dependency/version changes or merging of update PRs.
+  Disable repository auto-merge and preserve manual review. Hosted bot execution
+  is separate evidence from successful activation and push.
 - Canonical operational guidance: [Dependency updates](development.md#dependency-updates).
 
 ## Selected security remediation (2026-11-09)
