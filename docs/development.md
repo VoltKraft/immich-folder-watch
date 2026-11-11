@@ -51,6 +51,12 @@ synthetic screenshots, test-only dependency licenses, and coverage boundaries.
 Portal protocol tests use an isolated `dbus-daemon` and `xdg-dbus-proxy` on Linux. Desktop-specific
 acceptance remains in [Linux smoke tests](qa/linux-smoke.md).
 
+Async autostart view-model tests must run on a single UI synchronization context,
+matching the documented UI-thread contract. `SingleThreadUiContext` pumps their
+continuations on one dedicated thread; platform fakes and property notifications
+assert thread affinity. Do not replace it with a dispatcher that treats arbitrary
+thread-pool threads as the UI thread.
+
 Worker integration tests must wait for durable completion before stopping the
 worker or removing its temporary database. A fake client's transfer counter can
 advance before timestamps and sync state have been persisted. For initial sync,

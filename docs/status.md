@@ -11,7 +11,12 @@
   analyses and NuGet succeeds. Existing-version release follow-up skips publication.
 - Prepared v3.0.3 / 3.0.3.0 and regenerated AppStream. Version/history checks,
   AppStream and focused release tests pass; independent preparation review has
-  no findings. Exact release-commit CI/builds/publication remain pending.
+  no findings. First release candidate `6c60d55` passes CodeQL/NuGet, but Windows
+  exposed an existing autostart test harness race outside the documented UI-thread
+  contract. The test-only single-thread harness correction passes 19 focused
+  tests, all 503 Core tests and 3,000 repeated ordering/cancellation scenarios.
+  Independent review confirms all original assertions remain; no production
+  changes. Fresh hosted checks/publication are pending.
   [Release evidence](release-3.0.3.md).
 
 ## PR #32 reduced Avalonia prepared and verified (2026-11-11)

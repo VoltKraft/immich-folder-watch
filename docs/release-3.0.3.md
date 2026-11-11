@@ -39,3 +39,22 @@ Windows/Linux architecture assets and verify actual reduced Linux components and
 signed Pages distribution. WinGet submission and Flathub preparation are distinct
 from external acceptance. Automatic merging remains disabled; no live Immich
 connection or application installation is part of this release verification.
+
+## Release validation follow-up
+
+The first release candidate `6c60d55` passed all four CodeQL analyses and NuGet,
+but Windows CI 43067388859 failed the existing autostart initialization test at
+the final busy-flag assertion. Independent review identified the test harness's
+UI-thread contract violation: its immediate dispatcher claimed every thread was
+the UI thread, allowing async continuations to race the pending-operation count.
+Reviewed production callers retain the real UI context; no corresponding
+production defect was established. The correction is limited to a dedicated
+single-thread test context, preserving assertions and application behavior.
+The unsuccessful candidate was not published; v3.0.3 has not been tagged yet.
+The corrected harness passes all 19 focused tests and 503 Core tests without
+skips. A scratch stress runner executes 1,000 repetitions each of initialization
+with queued disable, concurrent changes and queued initialization cancellation:
+3,000 complete scenarios pass. Independent review confirms all 58 original
+assertions are retained; two new tests verify continuation/post thread identity
+and exception propagation. No production file or package pin changed. Fresh
+exact-commit CI/CodeQL and publication remain required after this fix.
