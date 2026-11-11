@@ -28,8 +28,10 @@
   scopes it to the persistent module build directory. A real SDK regression
   restores across two disposable HOME directories and fails without this fix.
 - Hosted Linux package installation independently failed on Azure Ubuntu mirror
-  DNS. CI now falls back to the official Ubuntu archive only when that mirror
-  fails DNS resolution, retaining signed APT verification and package requirements.
+  DNS. CI falls back only when that mirror fails DNS resolution, retaining signed
+  APT verification and package requirements. A second run also failed to resolve
+  archive.ubuntu.com; the fallback now selects a resolvable HTTPS Ubuntu mirror
+  (archive.ubuntu.com or mirrors.edge.kernel.org) without changing trusted keys.
 - Published v3.0.2 and existing local main documentation remain unchanged.
   Hosted current-head CI/CodeQL and reduced-binary verification are pending.
 
