@@ -27,7 +27,8 @@
 ## M-DEPENDABOT-IGNORE-20261111
 
 The user selected correcting the xUnit ignore requirement and verifying hosted
-Dependabot NuGet runs. This authorizes publishing the scoped default-branch fix.
+Dependabot NuGet runs. Prepare a scoped PR; default-branch execution follows
+separate merge authorization after validation.
 
 - Preserve the absolute xunit.v3 exclusion of versions >= 4.0.0, including its
   security-update scope; do not change package versions or other update settings.

@@ -9,6 +9,9 @@
 - Dependabot upstream NuGet requirement handling accepts comparator syntax.
   Hosted execution on the published fix is the decisive pending validation;
   local Ruby parser execution was unavailable because Ruby is not installed.
+- Automatic approval review rejected direct publication to main and required a
+  PR or explicit push approval. The correction is prepared on a separate branch;
+  default-branch updater verification remains pending activation.
 - No dependency version, release or runtime behavior changes.
 
 ## PR #34 refresh in progress (2026-11-11)
