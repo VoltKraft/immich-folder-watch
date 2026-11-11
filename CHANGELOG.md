@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-11-11
+
+Maintenance release containing all reviewed main changes since 3.0.1. Configuration, stored data and supported integrations remain compatible; the HTTPS-by-default requirement introduced in 3.0.0 remains unchanged.
+
 ### Fixed
 - Prevent SocketIO reconnects after realtime shutdown with bounded graceful disconnect and explicit connection-lifetime guards.
 - Preserve YAML-sensitive configuration strings such as the literal `null` when saving and reloading settings.
@@ -18,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update the build-only branding generator to Svg.Skia 5.2.3 with reviewed upstream notices; application rendering dependencies remain unchanged.
 - Update pinned checkout and .NET setup actions to v7.0.1 and v6.1.0, retaining existing workflow permissions and .NET 10 support.
 - Update YAML configuration serialization to YamlDotNet 18.1.0, with regression coverage for YAML-sensitive configuration strings.
-- Align the Windows hosting package with the reviewed Microsoft.Extensions 11.0.0 dependencies while retaining .NET 10 support.
+- Align the Windows hosting package with the reviewed Microsoft.Extensions 11.0.0 dependencies while retaining .NET 10 support. (Windows)
 - Update GitHub Script to v9 and verify CommonJS helper loading and read-only GitHub API access in CI.
 - Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
 - Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.

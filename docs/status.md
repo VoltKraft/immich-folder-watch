@@ -1,5 +1,17 @@
 # Project Status
 
+## Release v3.0.2 selected (2026-11-11)
+
+- Selected `M-RELEASE-302-20261111` under explicit release authorization.
+- Baseline main `8d7afba` is synchronized and clean; latest published v3.0.1
+  remains immutable and no v3.0.2 tag exists.
+- Version/changelog/AppStream metadata and independent preparation review pass.
+  Five manifest and six workflow-security tests pass; four PowerShell cases await
+  Windows CI. Hosted CI, release builds, publication and distribution checks
+  remain pending.
+- #32 remains open/license-blocked at 51898a8; auto-merge is disabled.
+  [Release record](release-3.0.2.md).
+
 ## Verification documentation published and checked (2026-11-11)
 
 - Completed `M-DOC-PUBLISH-20261111`. Published the final report and related

@@ -6,13 +6,13 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The checked-in version is `3.0.1` in
+- Product baseline: The checked-in version is `3.0.2` in
   [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
   reviewed dependency merges through `efeda2f`; published releases and deployed
   installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-12`.
-- Plan maturity: v3.0.1 published; seven further dependency PRs merged and main verified; Avalonia remains deferred.
-- Active milestone: none; `M-DOC-PUBLISH-20261111` completed. A v3.0.2 release is recommended but not selected.
+- Brief revision: `IFW-BRIEF-20261111-13`.
+- Plan maturity: v3.0.2 release selected from verified main; Avalonia remains deferred.
+- Active milestone: `M-RELEASE-302-20261111` — publish and verify v3.0.2.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -24,6 +24,21 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-RELEASE-302-20261111
+
+The user explicitly authorized creating the current release with all new main
+changes. Prepare and publish v3.0.2 from main `8d7afba`, including the previously
+reviewed merges and documentation. This is a compatible patch release; preserve
+configuration, persistence, platform support and the existing security contract.
+
+Acceptance: consistent product/assembly/AppStream versions and release notes;
+passing exact-revision CI and CodeQL; successful x64/ARM64 Windows MSI and
+x86_64/aarch64 Flatpak release builds; immutable tag and complete public assets;
+verified signed Pages distribution. Record WinGet submission and Flathub
+preparation separately from external acceptance. Keep #32 open/license-blocked,
+automatic merging disabled, and existing releases/signing identity intact.
+[Release verification](release-3.0.2.md) owns execution evidence.
 
 ## M-DOC-PUBLISH-20261111
 
