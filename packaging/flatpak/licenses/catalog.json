@@ -464,6 +464,12 @@
       "Tmds.DBus-LICENSE.txt"
     ]
   },
+  "yamldotnet": {
+    "18.1.0": [
+      "YamlDotNet-18.1.0-LICENSE.txt",
+      "YamlDotNet-18.1.0-LICENSE-libyaml"
+    ]
+  },
   "socketioclient.common": {
     "4.0.0": [
       "SocketIOClient-4.0.0-LICENSE.txt"
