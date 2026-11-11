@@ -1,5 +1,17 @@
 # Project Status
 
+## PR #34 merged; main verification in progress (2026-11-11)
+
+- User authorized the merge and main verification. Rechecked all 14 successful
+  PR-head checks and merged exact head `1a4722c` as
+  `eeba23df3a62a6cf307684b3a1a6f4d607d7118b`, without bypass or auto-merge.
+- Main CI `43003920977`, CodeQL `43003920330` and NuGet submission
+  `43003920444` are running. Completion is not yet claimed.
+- Local documentation conflicts preserve the newer validation/release records;
+  implementation changes match remote main. No extra main push is selected.
+- #32 remains excluded and auto-merge disabled. Next: verify main checks and
+  the version-tag gate in the automatic release follow-up.
+
 ## PR #34 ready for a separate merge decision (2026-11-11)
 
 - Completed `M-PR34-20261111`; refreshed #34 from `f22797e` onto remote main

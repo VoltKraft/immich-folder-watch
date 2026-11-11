@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-04`.
+- Brief revision: `IFW-BRIEF-20261111-05`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 validated, Avalonia deferred.
-- Active milestone: None; `M-PR34-20261111` completed, awaiting a separate merge decision.
+- Active milestone: `M-PR34-MERGE-20261111`; authorized merge and main verification.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,13 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR34-MERGE-20261111
+
+The user authorized merging #34 and checking main. Merge only the verified head,
+without bypassing checks; verify main CI, CodeQL and automatic release follow-up.
+Keep #32 open/blocked, auto-merge disabled and published v3.0.1 unchanged.
+Record actual results in [PR #34 evidence](dependabot-pr34-20261111.md).
 
 ## M-PR34-20261111
 
