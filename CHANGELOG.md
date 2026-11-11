@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Include pinned, hash-verified icon metadata in generated WinGet manifests so catalog clients such as UniGetUI can discover the application icon.
+
 ## [3.0.3] - 2026-11-11
 
 Maintenance release delivering the reviewed Avalonia component-license correction and D-Bus compatibility update. Configuration, stored data and supported integrations remain compatible; no migration is required.

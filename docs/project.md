@@ -10,10 +10,11 @@
   [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-17`.
-- Plan maturity: PR #32 merged; v3.0.3 published and verified.
-- Active milestone: none; `M-RELEASE-303-20261111` completed.
-- Implementation request / scope: The user's 2026-11-10 request to implement
+- Brief revision: `IFW-BRIEF-20261111-18`.
+- Plan maturity: WinGet icon correction implemented, validated and submitted.
+- Active milestone: none; `M-WINGET-ICON-20261111` completed.
+- Implementation request / scope: The user selected the WinGet icon correction
+  and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
   2026-11-09 request to
@@ -24,6 +25,25 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-WINGET-ICON-20261111
+
+Completed: generator regression and schema checks pass; metadata-only
+[WinGet PR #477862](https://github.com/microsoft/winget-pkgs/pull/477862) is open.
+External acceptance and actual client rendering remain unverified.
+
+The user selected implementing and testing icon metadata in the WinGet generator
+and submitting the same correction for the current published version, 3.0.3.
+Use the existing project PNG at an immutable public source revision with its
+verified SHA-256. Preserve installer URLs, hashes, product codes, architectures,
+versions and existing release assets. No application release or installation.
+
+Acceptance: generated default-locale manifests contain schema-valid icon metadata;
+regression tests cover invalid metadata and output; public PNG bytes/dimensions
+and all three manifest schemas validate; submit a metadata-only WinGet PR for
+3.0.3 and verify its diff. External merge and actual UniGetUI display are separate
+acceptance evidence. Keep the generator correction locally committed; no project
+main push is selected by the WinGet submission request.
 
 ## M-RELEASE-303-20261111
 

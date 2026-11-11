@@ -1,5 +1,34 @@
 # Project Status
 
+## WinGet icon correction implemented and submitted (2026-11-11)
+
+- Completed `M-WINGET-ICON-20261111`: the generator requires and validates an
+  immutable PNG URL, SHA-256, file type, resolution and theme, and emits `Icons`
+  only in the default-locale manifest. Metadata and operator documentation updated;
+  no dependency, application version, installer or release asset changes.
+- Downloaded the public PNG pinned to `e0d1c403f261b9c906cc3853a1b7477518b64bf6`:
+  512 x 512, byte-identical to the existing tracked asset, SHA-256
+  `0A9877DB22201A4D3A133511DBE58AD667BE399F585D402E956474FFE28C3ED6`.
+  Schema 1.12.0 requires `custom` for this resolution; theme is `default`.
+- Validation: all 13 focused generator tests pass, including 17 invalid-icon
+  variants and preservation of existing output on failure. All three generated
+  manifests and all three submission manifests pass the official Microsoft
+  1.12.0 JSON schemas with the installed YAML/JSON-schema validators. Parsed
+  before/after comparison confirms only `Icons` changes; `git diff --check` passes.
+- Submitted [WinGet PR #477862](https://github.com/microsoft/winget-pkgs/pull/477862)
+  at `c50ef9e958f5c5654c8ef1890bb85468092a10d6`, based on upstream
+  `258762d8d44056e7008a315f67b8415b6d079582`. Verified OPEN, non-draft and mergeable;
+  remote diff contains exactly six additions in the existing 3.0.3 default-locale
+  file. The installer and version manifests are untouched.
+- The connector could write the fork but was denied upstream PR creation; the
+  existing authenticated GitHub CLI successfully submitted the authorized PR.
+  No upstream merge, project main push, product release or installed-app test.
+- Local schema validation does not replace WinGet's hosted validation. External
+  checks/acceptance and actual UniGetUI rendering remain pending. No Windows
+  installer execution was necessary for this metadata-only change. Generator
+  changes are locally committed; next actions are upstream acceptance/client
+  refresh and separately authorized publication of the project changes.
+
 ## UniGetUI missing-icon investigation (2026-11-11)
 
 - User reports no icon for Immich Folder Watch in UniGetUI. Read-only inspection

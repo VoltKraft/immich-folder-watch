@@ -84,3 +84,31 @@ tag. It then regenerates both architecture entries from the release assets.
 
 Do not use this to backfill `v2.7.0` or earlier releases because those releases
 do not contain the required ARM64 MSI.
+
+## Catalog icon
+
+The required `icon` object in `package.metadata.json` supplies the existing
+512 x 512 PNG through a full-commit-pinned `raw.githubusercontent.com` URL.
+Its SHA-256 binds the downloaded bytes. The generator emits `Icons` in the
+default-locale manifest; installer and version manifests are unaffected.
+`IconResolution` is `custom`, because schema 1.12.0 does not enumerate 512 x 512.
+`IconTheme: default` makes the same transparent artwork available in both themes.
+
+When changing branding, regenerate from `assets/branding/logo.svg`, publish the
+source asset normally, then update the pinned URL and hash together. Verify the
+public bytes and dimensions before submission. Do not use a moving branch URL.
+The MSI's embedded Windows icon is independent of this catalog metadata.
+
+For a metadata-only correction to an already published version, preserve the
+upstream manifest set and add only the generator's `Icons` block to its existing
+default-locale file. Validate all three files against the official matching
+[WinGet schemas](https://github.com/microsoft/winget-cli/tree/master/schemas/JSON/manifests),
+then submit a scoped PR to `microsoft/winget-pkgs`. Do not regenerate or replace
+installer fields for an icon-only correction. No product version bump is needed.
+Upstream acceptance and a refreshed client's actual display remain separate checks.
+
+Generator regression tests:
+
+```bash
+python3 -m unittest discover -s tools/tests -p test_prepare_winget_release_manifests.py -v
+```
