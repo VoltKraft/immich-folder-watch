@@ -1,5 +1,13 @@
 # Project Status
 
+## Remaining dependency merges selected (2026-11-11)
+
+- User authorized merging #38/#39/#40/#42/#43/#44/#45 and verifying main.
+- All seven exact prepared heads were freshly confirmed OPEN/CLEAN, with
+  14 or 15 successful checks each. Repository auto-merge remains false.
+- #32 is unchanged/open at `51898a8`; local unpublished documentation is
+  preserved. Integration and final main verification are in progress.
+
 ## Remaining dependency PRs prepared and verified (2026-11-11)
 
 - Completed `M-REMAINING-PRS-20261111`: #38/#39/#40/#42/#43/#44/#45 are pushed,

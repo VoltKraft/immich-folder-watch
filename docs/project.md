@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-08`.
+- Brief revision: `IFW-BRIEF-20261111-09`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: none; `M-REMAINING-PRS-20261111` completed. The prepared PRs await a separate merge decision.
+- Active milestone: `M-REMAINING-MERGE-20261111`; merge the seven prepared PRs and verify main.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,16 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-REMAINING-MERGE-20261111
+
+The user explicitly authorized merging and checking the seven prepared PRs
+#38/#39/#40/#42/#43/#44/#45. Reverify exact heads and successful checks, merge
+without bypass or automatic merging, resolve integration conflicts without
+losing reviewed changes, and verify final main CI/CodeQL and release follow-up.
+Keep #32 open/license-blocked and auto-merge disabled. No version bump, new
+release, manual deployment or publication of accumulated local documentation
+is selected. Preserve local documentation history and record actual outcomes.
 
 ## M-REMAINING-PRS-20261111
 
