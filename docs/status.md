@@ -1,5 +1,18 @@
 # Project Status
 
+## PR #34 refresh in progress (2026-11-11)
+
+- User selected `M-PR34-20261111`. Integrated remote main `2a9a96d` into
+  `f22797e` without conflicts as `41d2ab1` in an isolated worktree.
+- Fresh main/PR branding builds passed with SDK 10.0.203, zero warnings/errors.
+  Linux app restore retains SkiaSharp 3.119.4-preview.1.1; version 4 is build-only.
+  All PNG/ICO dimensions and occupied bounds match; the 512px icon differs at
+  only 19 pixels by one channel level. Smaller raster changes are under review.
+- Previous Dependabot configuration check remains queued; normal checks passed
+  on the old head. Current-head hosted CI/CodeQL and validator recovery are pending.
+- #32 stays blocked; #34 is not authorized for merge. Auto-merge and published
+  v3.0.1 remain unchanged.
+
 ## PR #37 preparation (2026-11-11)
 
 - User selected `M-PR37-20261111`, authorizing branch refresh, focused compatibility

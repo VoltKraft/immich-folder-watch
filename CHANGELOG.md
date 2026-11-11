@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
 - Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
 
 ## [3.0.1] - 2026-11-11
