@@ -11,7 +11,7 @@
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-06`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: `M-DEPENDABOT-IGNORE-20261111`; hosted updater verification running.
+- Active milestone: None; scoped `M-DEPENDABOT-IGNORE-20261111` completed with independent warnings.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,12 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-DEPENDABOT-IGNORE-20261111
+
+Completed: #41 merged as `a82216d`; actual-parser reproduction and fresh hosted
+NuGet run passed with the intended rule. Main CI/CodeQL passed. Separate
+Dependabot duplicate-PR warnings and initial automatic rebase errors remain
+recorded in [the verification report](dependabot-ignore-20261111.md); #32 remains
+license-blocked and auto-merge disabled.
 
 The user selected correcting the xUnit ignore requirement and verifying hosted
 Dependabot NuGet runs. Prepare a scoped PR; default-branch execution follows

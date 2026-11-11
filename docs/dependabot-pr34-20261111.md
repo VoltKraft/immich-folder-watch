@@ -88,6 +88,10 @@ only documentation differs from remote main. No additional main push was made.
 
 ### Separate Dependabot updater failures
 
+Subsequent xUnit rule correction and fresh hosted verification are recorded in
+[the dedicated fix report](dependabot-ignore-20261111.md). The following is the
+original post-merge finding.
+
 The merge also triggered automatic Dependabot jobs. The Actions ecosystem update
 [43003932232](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003932232)
 succeeded. Both the general NuGet update

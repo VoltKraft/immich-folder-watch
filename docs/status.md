@@ -1,8 +1,8 @@
 # Project Status
 
-## Dependabot xUnit correction merged; updater verification running (2026-11-11)
+## Dependabot xUnit correction verified; separate warnings retained (2026-11-11)
 
-- Selected `M-DEPENDABOT-IGNORE-20261111`. Replaced the rejected interval with
+- Completed scoped correction/verification `M-DEPENDABOT-IGNORE-20261111`. Replaced the interval with
   `>= 4.0.0` on isolated branch `fix/dependabot-xunit-ignore`; scope retains
   absolute version/security exclusion and changes no package versions.
 - [PR #41](https://github.com/VoltKraft/immich-folder-watch/pull/41) head
@@ -13,10 +13,17 @@
 - Automatic approval review rejected the direct main push and required a PR or
   explicit publication approval. The user then explicitly authorized merging #41;
   expected-head merge succeeded as `a82216d4251e6517b71236602ab09abfdb13f3e1`.
-  Fresh default-branch updater verification is running. #32 stays blocked; auto-merge off.
+  Main CI, CodeQL, dependency submission and config validation passed; automatic
+  release follow-up correctly skipped publication. #32 stays blocked; auto-merge off.
 - Independent source review confirms the C# updater parser supports the comparator
-  and retains explicit ignore versions for security updates. Actual hosted updater
-  verification remains required. See [investigation](dependabot-ignore-20261111.md).
+  and retains explicit ignore versions for security updates. A controlled fresh
+  NuGet run `43009535605` succeeded with the new effective rule, zero requirement
+  errors and xunit.v3 still 3.2.2. Created #42-#45 for review only.
+- Dependabot UI retains separate duplicate-PR creation warnings and initial
+  automatic version/rebase unknown errors. No successful #32 rebase is claimed.
+  Next maintenance action: investigate those service/PR-handling warnings while
+  retaining #32's license block. [Detailed evidence](dependabot-ignore-20261111.md).
+- Final evidence is saved locally; no additional main documentation push.
 
 ## PR #34 merged; main verified, separate updater issue found (2026-11-11)
 
