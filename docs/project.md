@@ -11,8 +11,8 @@
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-20`.
-- Plan maturity: Restricted icon output removed; rejected PR closed; correction CI pending.
-- Active milestone: `M-WINGET-ICON-ROLLBACK-20261111`.
+- Plan maturity: Policy correction published; CI/CodeQL pass; rejected PR closed.
+- Active milestone: none; `M-WINGET-ICON-ROLLBACK-20261111` completed.
 - Implementation request / scope: The user selected the WinGet icon correction
   and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -27,6 +27,11 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-WINGET-ICON-ROLLBACK-20261111
+
+Completed at pushed `80d0f0c`: restricted fields removed, 12 focused tests and
+three manifest schemas pass; exact-head CI passes all eight jobs, CodeQL all four
+analyses and NuGet succeeds. PR #477862 is closed without merge. Earlier icon
+implementation/publication records below are superseded by this correction.
 
 The user selected correcting the generator, closing rejected WinGet PR #477862,
 pushing the correction and checking CI. Remove manual icon metadata and its

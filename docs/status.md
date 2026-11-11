@@ -1,5 +1,25 @@
 # Project Status
 
+## WinGet policy correction published and verified (2026-11-11)
+
+- Completed `M-WINGET-ICON-ROLLBACK-20261111`. Correction pushed to main at
+  `80d0f0cbcb3280466ef787b81cf7baa78815c0fd`; manual `Icons` are no longer emitted
+  or required. Legacy icon-bearing input cannot reintroduce them.
+- [CI 43107681875](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43107681875)
+  passes all eight jobs on that exact revision: Windows/Linux build and tests,
+  packaging/tooling validation, both Pages artifact round trips, candidate
+  preparation and both native Flatpak architectures. No rerun or workflow change
+  was needed. [CodeQL 43107681491](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43107681491)
+  passes all four analyses; NuGet submission `43107681388` also succeeds.
+- Local evidence: 12 focused tests pass; all three corrected manifests pass the
+  official 1.12.0 schemas and are byte-identical to pre-icon generator output.
+- [WinGet PR #477862](https://github.com/microsoft/winget-pkgs/pull/477862) is
+  confirmed CLOSED without merge. Existing published installers and version 3.0.3
+  remain unchanged. No UniGetUI contribution or new release was performed.
+- Final verification documentation is committed locally after the checked/pushed
+  revision; no further main push is needed for the implementation. The requested
+  correction is complete. UniGetUI artwork remains a separate optional follow-up.
+
 ## WinGet icon policy correction prepared; rejected PR closed (2026-11-11)
 
 - Selected `M-WINGET-ICON-ROLLBACK-20261111` under explicit correction, PR closure,
