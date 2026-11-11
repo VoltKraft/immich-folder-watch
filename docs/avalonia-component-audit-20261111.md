@@ -98,5 +98,9 @@ The Linux test suite passes 60 cases, including protocol integration, five
 loaded-assembly exclusion checks and actual dropdown/tooltip opening in both
 themes. Full application publish provenance and installed supplemental notices pass.
 Both architecture feeds are regenerated and all 95 official archive hashes
-verified. Current-head hosted CI/CodeQL and final native candidate artifacts
-remain pending at this checkpoint. [Framework maintenance contract](reduced-avalonia.md).
+verified. Final PR head `ce0b711` passes all eight CI jobs, four CodeQL analyses,
+aggregate CodeQL and NuGet submission. Both downloaded native candidates pass
+240-assembly exclusion audits and exact reduced DLL/provenance/notice comparisons.
+See [final PR evidence](dependabot-pr32-20261111.md). Follow-up authorization merged
+#32 as `3740ce0`; [v3.0.3 release verification](release-3.0.3.md) tracks publication.
+[Framework maintenance contract](reduced-avalonia.md).

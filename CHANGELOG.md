@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-11-11
+
+Maintenance release delivering the reviewed Avalonia component-license correction and D-Bus compatibility update. Configuration, stored data and supported integrations remain compatible; no migration is required.
+
 ### Fixed
-- Align the application and protocol-test D-Bus dependencies with Avalonia 12.1.6 to resolve restore downgrades while retaining portal-based Linux integration.
+- Align the application and protocol-test D-Bus dependencies at 0.94.1 with Avalonia 12.1.6 to resolve restore downgrades while retaining portal-based Linux integration.
+- Preserve the offline NuGet cache across Flatpak build commands so final package provenance verification succeeds.
+- Recover CI system-package installation when the default Ubuntu mirror cannot resolve, while retaining signed package verification.
 
 ### Changed
-- Build the Linux UI with a reproducible reduced Avalonia 12.1.6 variant that excludes incompatible component implementations and resources; retain upstream notices and verify package provenance before distribution.
+- Build the Linux UI with reproducible reduced Avalonia/Fluent 12.1.6.1 packages from reviewed 12.1.6 sources, excluding incompatible unused component implementations and resources while preserving application controls and popup behavior.
+- Pin the reconstruction SDK, restrict private package sources and verify restored/published assembly bytes against rebuilt archives; retain upstream and supplementary license notices.
 
 ## [3.0.2] - 2026-11-11
 

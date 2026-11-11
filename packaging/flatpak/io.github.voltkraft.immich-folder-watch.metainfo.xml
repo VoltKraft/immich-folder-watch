@@ -99,25 +99,19 @@
   </branding>
 
   <releases>
-    <release version="3.0.2" date="2026-11-11">
+    <release version="3.0.3" date="2026-11-11">
       <description>
-        <p>Maintenance release containing all reviewed main changes since 3.0.1. Configuration, stored data and supported integrations remain compatible; the HTTPS-by-default requirement introduced in 3.0.0 remains unchanged.</p>
+        <p>Maintenance release delivering the reviewed Avalonia component-license correction and D-Bus compatibility update. Configuration, stored data and supported integrations remain compatible; no migration is required.</p>
         <p>Fixed:</p>
         <ul>
-          <li>Prevent SocketIO reconnects after realtime shutdown with bounded graceful disconnect and explicit connection-lifetime guards.</li>
-          <li>Preserve YAML-sensitive configuration strings such as the literal `null` when saving and reloading settings.</li>
-          <li>Retain both upstream MIT license texts for YamlDotNet 18.1.0 so native Flatpak packaging succeeds.</li>
-          <li>Correct the Dependabot xUnit ignore requirement so NuGet update jobs can run while retaining the exclusion of xUnit 4 and later.</li>
+          <li>Align the application and protocol-test D-Bus dependencies at 0.94.1 with Avalonia 12.1.6 to resolve restore downgrades while retaining portal-based Linux integration.</li>
+          <li>Preserve the offline NuGet cache across Flatpak build commands so final package provenance verification succeeds.</li>
+          <li>Recover CI system-package installation when the default Ubuntu mirror cannot resolve, while retaining signed package verification.</li>
         </ul>
         <p>Changed:</p>
         <ul>
-          <li>Adapt realtime transports to SocketIOClient 4.0.5 while preserving origin, redirect and message-size guards and retaining exact upstream MIT notices.</li>
-          <li>Update the build-only branding generator to Svg.Skia 5.2.3 with reviewed upstream notices; application rendering dependencies remain unchanged.</li>
-          <li>Update pinned checkout and .NET setup actions to v7.0.1 and v6.1.0, retaining existing workflow permissions and .NET 10 support.</li>
-          <li>Update YAML configuration serialization to YamlDotNet 18.1.0, with regression coverage for YAML-sensitive configuration strings.</li>
-          <li>Update GitHub Script to v9 and verify CommonJS helper loading and read-only GitHub API access in CI.</li>
-          <li>Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.</li>
-          <li>Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.</li>
+          <li>Build the Linux UI with reproducible reduced Avalonia/Fluent 12.1.6.1 packages from reviewed 12.1.6 sources, excluding incompatible unused component implementations and resources while preserving application controls and popup behavior.</li>
+          <li>Pin the reconstruction SDK, restrict private package sources and verify restored/published assembly bytes against rebuilt archives; retain upstream and supplementary license notices.</li>
         </ul>
       </description>
     </release>

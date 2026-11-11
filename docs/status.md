@@ -7,7 +7,12 @@
   Latest release is v3.0.2; v3.0.3 is the next compatible patch release.
 - Merged #32 with the expected-head guard as `3740ce0`. Local documentation
   history is preserved; only the newer brief/status summaries resolve conflicts.
-  Main CI/CodeQL and release publication are pending.
+  Main CI 43066118171 passes all eight jobs, CodeQL 43066119121 passes four
+  analyses and NuGet succeeds. Existing-version release follow-up skips publication.
+- Prepared v3.0.3 / 3.0.3.0 and regenerated AppStream. Version/history checks,
+  AppStream and focused release tests pass; independent preparation review has
+  no findings. Exact release-commit CI/builds/publication remain pending.
+  [Release evidence](release-3.0.3.md).
 
 ## PR #32 reduced Avalonia prepared and verified (2026-11-11)
 

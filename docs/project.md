@@ -6,7 +6,7 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The checked-in version is `3.0.2` in
+- Product baseline: The prepared version is `3.0.3` in
   [Directory.Build.props](../Directory.Build.props). PR #32 is merged as `3740ce0`;
   published v3.0.2 remains at `df48398` until v3.0.3 completes.
 - Brief revision: `IFW-BRIEF-20261111-16`.

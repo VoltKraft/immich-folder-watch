@@ -1,5 +1,13 @@
 # PR #32 reduced Avalonia verification (2026-11-11)
 
+## Authorized merge/release follow-up
+
+After the preparation results below, the user explicitly authorized merge,
+verification and a new release. #32 merged as `3740ce0`, preserving the reviewed
+head and disabled automatic merging. The earlier no-merge/local-only statements
+below describe that completed preparation checkpoint; publication evidence now
+belongs to [release v3.0.3](release-3.0.3.md).
+
 ## Scope and revision
 
 The user selected shipped-component auditing, a reduced Avalonia build and the
