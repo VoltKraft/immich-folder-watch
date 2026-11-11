@@ -42,7 +42,19 @@ terms are compatible with this repository's AGPL-3.0-only distribution.
 
 The restored net10 graph resolves the Microsoft dependencies to the existing
 11.0.0 versions; no additional Microsoft package version is introduced by this
-update. The former SocketIO.Core and SocketIO.Serializer packages are replaced
+update. The generated offline Flatpak feed also includes five 10.0.3 minimum
+versions: Microsoft.Extensions.DependencyInjection, DependencyInjection.Abstractions,
+Logging, Options and Primitives. Their exact archives all identify the MIT
+license and source revision
+[`c2435c3e0f46de784341ac3ed62863ce77e117b4`](https://github.com/dotnet/dotnet/tree/c2435c3e0f46de784341ac3ed62863ce77e117b4).
+They embed the same .NET third-party notice (SHA-256
+`6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21`),
+which the installer retains, but omit the main MIT text. The exact source's
+`Dotnet-10.0.3-LICENSE.txt` supplement supplies that text. Only versions actually
+present in the candidate feed were added to the catalog. This fixes the first
+hosted native build's missing-version notice error.
+
+The former SocketIO.Core and SocketIO.Serializer packages are replaced
 by the Common/Serializer packages above.
 
 ## Validation
@@ -53,8 +65,11 @@ by the Common/Serializer packages above.
   cancellation followed by restart, and stopping during a failed reconnect.
 - Existing synthetic redirect, origin/downgrade and oversized HTTP/fragmented
   WebSocket rejection tests pass against the new transport interfaces.
-- License-notice installer collected all three exact new NuGet archives with
-  validated source URLs and notice hashes.
+- License-notice installer collected all three exact new SocketIO archives.
+  After the first native build identified missing Microsoft 10.0.3 supplements,
+  all 89 archives in its generated candidate feed were checked against the
+  manifest SHA-512 values and passed the installer together, including the five
+  additional Microsoft versions. Source URLs and notice hashes were validated.
 - Full portable Core suite after the lifecycle fix: 486 passed. Linux
   GUI/protocol suite: 53 passed.
 - Negative control: removing the lifetime guard makes the stop-during-reconnect

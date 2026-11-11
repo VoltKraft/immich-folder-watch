@@ -173,6 +173,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection.abstractions": {
@@ -181,6 +184,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics": {
@@ -245,6 +251,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.abstractions": {
@@ -301,6 +310,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options.configurationextensions": {
@@ -317,6 +329,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "shimskiasharp": {
