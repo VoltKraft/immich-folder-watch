@@ -1,6 +1,10 @@
 using ImmichFolderWatch.Core.Configuration;
 using ImmichFolderWatch.Core.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SocketIOClient.Protocol.Http;
+using SocketIOClient.Protocol.WebSocket;
 using SocketIOClient;
 
 namespace ImmichFolderWatch.Immich;
@@ -23,6 +27,7 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
     private readonly AppConfig _config;
     private readonly ILogger<ImmichRealtimeClient> _logger;
     private SocketIOClient.SocketIO? _socket;
+    private ConnectionLifetime? _connectionLifetime;
 
     public ImmichRealtimeClient(AppConfig config, ILogger<ImmichRealtimeClient> logger)
     {
@@ -57,7 +62,6 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
         {
             Reconnection = true,
             ReconnectionAttempts = int.MaxValue,
-            ReconnectionDelay = 2000,
             ReconnectionDelayMax = 30000,
             ConnectionTimeout = TimeSpan.FromSeconds(10),
             ExtraHeaders = new Dictionary<string, string>
@@ -66,10 +70,24 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
             },
         };
 
-        var socket = new SocketIOClient.SocketIO(socketUri, options);
-        socket.HttpClient.Dispose();
-        socket.HttpClient = new ImmichRealtimeHttpClient(socketUri);
-        socket.ClientWebSocketProvider = () => new ImmichRealtimeWebSocket(socketUri);
+        var lifetime = new ConnectionLifetime(cancellationToken);
+        var socket = new SocketIOClient.SocketIO(socketUri, options, services =>
+        {
+            // Each reconnect/upgrade scope owns fresh hardened transports. SocketIO 4
+            // disposes its scopes, but not its root provider, so avoid singleton clients.
+            services.RemoveAll<IHttpClient>();
+            services.RemoveAll<IWebSocketClient>();
+            services.AddScoped<IHttpClient>(_ =>
+            {
+                lifetime.ThrowIfStopping();
+                return new ImmichRealtimeHttpClient(socketUri, lifetime.Token);
+            });
+            services.AddScoped<IWebSocketClient>(_ =>
+            {
+                lifetime.ThrowIfStopping();
+                return new ImmichRealtimeWebSocket(socketUri, lifetime.Token);
+            });
+        });
 
         foreach (var eventName in SubscribedEvents)
         {
@@ -78,6 +96,7 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
             {
                 _logger.LogDebug("Realtime event received: {Event}", localEvent);
                 RaiseRemoteChangeDetected();
+                return Task.CompletedTask;
             });
         }
 
@@ -85,9 +104,10 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
         socket.OnDisconnected += (_, reason) => _logger.LogInformation("Realtime connection disconnected: {Reason}", reason);
         socket.OnError += (_, err) => _logger.LogWarning("Realtime connection error: {Error}", err);
         socket.OnReconnectAttempt += (_, attempt) => _logger.LogDebug("Realtime reconnect attempt #{Attempt}.", attempt);
-        socket.OnReconnectFailed += (_, _) => _logger.LogWarning("Realtime reconnect failed; will continue retrying.");
+        socket.OnReconnectError += (_, _) => _logger.LogWarning("Realtime reconnect failed; will continue retrying.");
 
         _socket = socket;
+        _connectionLifetime = lifetime;
 
         try
         {
@@ -95,7 +115,14 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Realtime connection attempt failed; sync will rely on periodic polling until reconnected.");
+            lifetime.Dispose();
+            socket.Dispose();
+            if (ReferenceEquals(_socket, socket))
+            {
+                _socket = null;
+                _connectionLifetime = null;
+            }
+            _logger.LogWarning(ex, "Realtime connection attempt failed; sync will rely on periodic polling.");
         }
     }
 
@@ -106,18 +133,59 @@ public sealed class ImmichRealtimeClient : IImmichRealtimeClient
             return;
         }
 
+        var socket = _socket;
+        var lifetime = _connectionLifetime;
+        // Gate reconnect factories before graceful shutdown. Upstream 4.0.5 can
+        // otherwise create another session after Dispose releases the current one.
+        lifetime?.StopCreatingTransports();
         try
         {
-            await _socket.DisconnectAsync();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(2));
+            await socket.DisconnectAsync(timeout.Token);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Realtime disconnect threw during stop.");
         }
 
-        _socket.Dispose();
-        _socket.HttpClient.Dispose();
-        _socket = null;
+        finally
+        {
+            lifetime?.Dispose();
+            socket.Dispose();
+            _socket = null;
+            _connectionLifetime = null;
+        }
+    }
+
+    private sealed class ConnectionLifetime : IDisposable
+    {
+        private readonly CancellationTokenSource _source;
+        private int _stopping;
+        private int _disposed;
+
+        public ConnectionLifetime(CancellationToken cancellationToken)
+        {
+            _source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            Token = _source.Token;
+        }
+
+        public CancellationToken Token { get; }
+        public void StopCreatingTransports() => Interlocked.Exchange(ref _stopping, 1);
+
+        public void ThrowIfStopping()
+        {
+            if (Volatile.Read(ref _stopping) != 0) throw new OperationCanceledException(Token);
+            Token.ThrowIfCancellationRequested();
+        }
+
+        public void Dispose()
+        {
+            StopCreatingTransports();
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            _source.Cancel();
+            _source.Dispose();
+        }
     }
 
     public async ValueTask DisposeAsync()
