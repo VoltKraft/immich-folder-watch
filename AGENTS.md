@@ -156,6 +156,10 @@ to reconcile project decisions, defaults, and recorded state.
   and Linux GUI/protocol tests. A documented command is not evidence of execution.
   Builds generate branding from `assets/branding/logo.svg`; .NET analyzers run
   during builds. No separate repository formatter or lint command is established.
+- The Linux UI uses a source-built reduced Avalonia variant; follow the
+  [framework build and audit contract](docs/reduced-avalonia.md). Preserve immutable
+  source pins, exclusive private package mapping, exact compiler/provenance checks
+  and offline reconstruction. Framework updates require source-level license review.
 - Dependabot configuration in [`.github/dependabot.yml`](.github/dependabot.yml)
   covers NuGet and GitHub Actions. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
   for license review, coordinated packaging pins and validation before merging updates.

@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Diagnostics;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
@@ -25,6 +28,68 @@ namespace ImmichFolderWatch.Tests.Linux;
 
 public sealed class MainWindowBindingTests
 {
+    [AvaloniaFact]
+    public void ApiKeyTooltip_ReducedPopupTemplateDisplaysBoundText()
+    {
+        WithWindow((window, vm) =>
+        {
+            vm.SelectedSectionIndex = 2;
+            Flush(window);
+            var reveal = FindEditor<Button>(window, vm.ImmichApiKeyRevealToolTip);
+            foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            {
+                window.RequestedThemeVariant = theme;
+                try
+                {
+                    ToolTip.SetIsOpen(reveal, true);
+                    Flush(window);
+                    var tooltip = Assert.IsType<ToolTip>(reveal.GetValue(ToolTipDiagnostics.ToolTipProperty));
+                    tooltip.UpdateLayout();
+                    Assert.Equal(vm.ImmichApiKeyRevealToolTip, tooltip.Content);
+                    Assert.NotNull(TopLevel.GetTopLevel(tooltip));
+                    Assert.True(tooltip.Bounds.Width > 0);
+                    Assert.True(tooltip.Bounds.Height > 0);
+                }
+                finally
+                {
+                    ToolTip.SetIsOpen(reveal, false);
+                    Flush(window);
+                }
+                Assert.False(ToolTip.GetIsOpen(reveal));
+            }
+        });
+    }
+
+    [AvaloniaFact]
+    public void SyncModeDropdown_ReducedPopupTemplateOpensAndUpdatesSource()
+    {
+        WithWindow((window, vm) =>
+        {
+            vm.SelectedSectionIndex = 1;
+            Flush(window);
+            var modes = FindEditor<ComboBox>(window, Strings.UI_SyncMode);
+            foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            {
+                window.RequestedThemeVariant = theme;
+                modes.IsDropDownOpen = true;
+                Flush(window);
+                var popup = Assert.Single(modes.GetTemplateDescendants().OfType<Popup>());
+                Assert.True(popup.IsOpen);
+                Assert.NotNull(popup.Child);
+                Assert.True(popup.Child.Bounds.Width > 0);
+                Assert.True(popup.Child.Bounds.Height > 0);
+                modes.SelectedItem = vm.AvailableSyncModes.Single(mode => mode.Code == WatchSourceSyncModes.Sync);
+                modes.IsDropDownOpen = false;
+                Flush(window);
+                Assert.False(popup.IsOpen);
+                Assert.Equal(WatchSourceSyncModes.Sync, vm.SelectedSource!.SyncMode);
+                modes.SelectedItem = vm.AvailableSyncModes.Single(mode => mode.Code == WatchSourceSyncModes.UploadAll);
+                Flush(window);
+                Assert.Equal(WatchSourceSyncModes.UploadAll, vm.SelectedSource.SyncMode);
+            }
+        });
+    }
+
     [AvaloniaFact]
     public void NavigationAndSelectedSourceEditor_PreserveDraftEditsAcrossPages()
     {

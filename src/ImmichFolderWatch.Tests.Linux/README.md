@@ -6,6 +6,11 @@ Run the real Avalonia views with an isolated headless application:
 dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj -c Debug
 ```
 
+The [reduced framework guide](../../docs/reduced-avalonia.md) describes source
+preparation. Tests assert excluded implementations are absent from the loaded
+Controls assembly and exercise real dropdown/tooltip popup templates in both
+themes.
+
 The fixture supplies synthetic configuration and never starts the production
 application, Immich connections, folder workers, portals, or autostart services.
 Tests exercise actual controls and bindings, source draft retention, sync-mode
@@ -32,7 +37,7 @@ platform-dependent golden images.
 
 The test setup follows the [official Avalonia headless xUnit documentation](https://docs.avaloniaui.net/docs/testing/headless-xunit).
 `Avalonia.Headless.XUnit` is pinned to the application's Avalonia version. Version
-12.0.3 requires the xUnit v3 framework's 3.x extension API, so this test project
+12.1.6 requires the xUnit v3 framework's 3.x extension API, so this test project
 retains xUnit 3.2.2 while the portable and Windows projects use xUnit 2.9.3.
 All three projects use Visual Studio runner 4.0.1, preserving the repository's
 `dotnet test`/VSTest workflow.
@@ -46,7 +51,7 @@ using `xunit.v3.mtp-off` does not fix the bridge incompatibility. Keep assembly-
 test serialization for the shared Avalonia application/localization state.
 
 Dependency license review: Avalonia Headless is
-[MIT](https://github.com/AvaloniaUI/Avalonia/blob/12.0.3/licence.md);
+[MIT](https://github.com/AvaloniaUI/Avalonia/blob/12.1.6/licence.md);
 xUnit v3 is [Apache-2.0](https://github.com/xunit/xunit/blob/v3-3.2.2/LICENSE),
 and the [xUnit Visual Studio runner 4.0.1](https://www.nuget.org/packages/xunit.runner.visualstudio/4.0.1)
 and [xUnit 2.9.3](https://www.nuget.org/packages/xunit/2.9.3) declare Apache-2.0 in

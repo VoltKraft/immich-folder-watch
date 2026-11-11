@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Align the application and protocol-test D-Bus dependencies with Avalonia 12.1.6 to resolve restore downgrades while retaining portal-based Linux integration.
+
+### Changed
+- Build the Linux UI with a reproducible reduced Avalonia 12.1.6 variant that excludes incompatible component implementations and resources; retain upstream notices and verify package provenance before distribution.
+
 ## [3.0.2] - 2026-11-11
 
 Maintenance release containing all reviewed main changes since 3.0.1. Configuration, stored data and supported integrations remain compatible; the HTTPS-by-default requirement introduced in 3.0.0 remains unchanged.

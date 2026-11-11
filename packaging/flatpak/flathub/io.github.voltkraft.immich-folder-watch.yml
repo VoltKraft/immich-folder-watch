@@ -42,10 +42,22 @@ modules:
         only-arches: [aarch64]
         url: https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-linux-arm64.tar.gz
         sha512: 58ace73ced6b4360754689a686bdfb8a317f4da6cb8bb416dbc7d0ba9f47e43e3c09f5eb1f1a1cfaacbd10df9558da4882bf2a5e195d6ab56a02c1f9f76102ed
+      # Rebuilt offline; the archive hash is also verified by the source builder.
+      - type: file
+        dest: avalonia-inputs
+        dest-filename: avalonia-source.tar.gz
+        url: https://codeload.github.com/AvaloniaUI/Avalonia/tar.gz/cf8e564674700348947e93ab19105f27afe859a9
+        sha512: cc83f37e77cd343abae304656a64b59f75ce8fdc181486df66e61e018cd309a156a9332235bb15a6fa3a64866fb806137ed9c9806f216c21126bc96b6b6f11e8
       # The release updater pins the source and regenerates the complete
       # offline feed together; a tag-only checker would leave stale packages.
       - nuget-sources.json
     build-commands:
+      - |
+        python3 tools/build_reduced_avalonia.py \
+          --source-archive avalonia-inputs/avalonia-source.tar.gz \
+          --upstream-packages nuget-sources \
+          --output artifacts/reduced-avalonia/feed \
+          --work-dir artifacts/reduced-avalonia/offline-build
       - |
         case "${FLATPAK_ARCH}" in
           x86_64) dotnet_runtime=linux-x64 ;;
@@ -57,10 +69,14 @@ modules:
           --configuration Release \
           --runtime "${dotnet_runtime}" \
           --self-contained true \
-          --source ./nuget-sources \
+          -p:RestoreConfigFile="${PWD}/packaging/flatpak/NuGet.Config" \
+          -p:ReducedAvaloniaPrepared=true \
           -p:PublishSingleFile=false \
           -p:UseAppHost=true \
           --output ${FLATPAK_DEST}/lib/immich-folder-watch
+      - |
+        python3 tools/verify_reduced_avalonia.py \
+          --publish ${FLATPAK_DEST}/lib/immich-folder-watch
       - install -dm755 ${FLATPAK_DEST}/bin
       - ln -sf /app/lib/immich-folder-watch/immich-folder-watch ${FLATPAK_DEST}/bin/immich-folder-watch
       - install -Dm644 packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop
@@ -76,3 +92,10 @@ modules:
           --source-dir nuget-sources \
           --output-dir ${FLATPAK_DEST}/share/licenses/io.github.voltkraft.immich-folder-watch/nuget \
           --supplemental-dir packaging/flatpak/licenses
+      - |
+        python3 tools/install-flatpak-license-notices.py \
+          --source-dir artifacts/reduced-avalonia/feed \
+          --output-dir ${FLATPAK_DEST}/share/licenses/io.github.voltkraft.immich-folder-watch/reduced-avalonia \
+          --supplemental-dir packaging/flatpak/licenses
+      - install -Dm644 artifacts/reduced-avalonia/feed/reduced-avalonia.json
+          ${FLATPAK_DEST}/share/licenses/io.github.voltkraft.immich-folder-watch/reduced-avalonia/provenance.json

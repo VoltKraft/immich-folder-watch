@@ -5,8 +5,19 @@
 - Selected `M-PR32-REDUCED-AVALONIA-20261111` under explicit user authorization.
   Worktree `/tmp/ifw-pr32-reduced` preserves the bot commit and merges main
   `df48398` normally; no main push, PR merge, auto-merge or release is selected.
-- Independent shipped-component audit, framework reconstruction and offline/CI
-  integration are in progress. DBus pins require 0.94.1 instead of 0.92.0.
+- Shipped-component audit confirms original affected Controls/Fluent in both
+  v3.0.2 Linux bundles; Windows packages contain no Avalonia implementation.
+- Reduced 12.1.6.1 packages remove the inventoried components/resources and have
+  identical bytes across three build roots. D-Bus app/test pins are now 0.94.1.
+- 501 Core and 60 Linux tests pass, including real dropdown/tooltip behavior in
+  both themes and loaded-type exclusion checks. Actual publish provenance passes.
+- Both offline feeds generate successfully (95 combined official inputs), with
+  verified hashes and installed official/private notices. Independent review found
+  and reverified the fix binding extracted metadata/DLLs directly to rebuilt ZIP
+  bytes; the joint metadata/binary-tamper regression now fails closed.
+- 146 tooling tests pass (four PowerShell cases deferred to Windows CI). All 16
+  synthetic light/dark page previews render; inspected folders/settings images
+  show no missing templates. No live desktop/Immich acceptance is claimed.
 - Published v3.0.2 and existing local main documentation remain unchanged.
   Hosted current-head CI/CodeQL and reduced-binary verification are pending.
 

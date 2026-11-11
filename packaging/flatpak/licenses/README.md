@@ -126,3 +126,31 @@ notices from recorded SkiaSharp source revision
 Their retained native notice collection is byte-identical to the reviewed
 SkiaSharp 4.155.0 collection. See the [PR #44 evidence record](../../../docs/dependabot-pr44-20261111.md)
 for hashes, rendering comparisons and validation boundaries.
+
+## Reduced Avalonia 12.1.6.1 and D-Bus 0.94.1
+
+The reduced framework uses Avalonia source `cf8e564674700348947e93ab19105f27afe859a9`.
+Its MIT license and NOTICE are byte-identical to the existing retained upstream
+texts. The exact 12.1.6 companion packages and 12.1.6.1 private variant are recorded
+separately; this inventory does not authorize shipping the removed MS-PL code.
+The official root/theme archives remain source-build inputs in the offline feed;
+only the rebuilt Controls/theme outputs are selected for application publication.
+Private-package notices and build provenance are installed in a separate
+`reduced-avalonia` directory beside the complete official-input inventory.
+
+Retained `Avalonia.Base` sources also include SixLabors font/BiDi helpers under
+Apache-2.0 and Apple's spring solver under BSD-2-Clause. Their attribution is not
+fully represented by Avalonia's top-level MIT declaration. The full SixLabors
+license is retained at its pinned Fonts revision; the Apple supplement preserves
+the complete leading copyright/license comment from the pinned source file.
+`sources.json` explicitly records that extraction and the full source hash.
+The Apache-2.0 and BSD-2-Clause terms are compatible with this AGPL-3.0-only use;
+these notices remain in the distributed license inventory.
+
+Tmds.DBus.Protocol 0.94.1 identifies source
+`b4a7fed0b878f74cb54f7cca84d2889af4e596ba`. Its complete MIT `COPYING` text is
+retained as `Tmds.DBus-0.94.1-LICENSE.txt`, including its original UTF-8 BOM.
+
+The resolved MicroCom.Runtime 0.11.6 input identifies source
+`76785efcafd91b5902fd19dd11145f6dd655b7b4`; its complete MIT LICENSE was verified
+byte-identical to `MicroCom-LICENSE.txt` before extending the exact-version catalog.
