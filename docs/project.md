@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-18`.
+- Brief revision: `IFW-BRIEF-20261111-19`.
 - Plan maturity: WinGet icon correction implemented, validated and submitted.
-- Active milestone: none; `M-WINGET-ICON-20261111` completed.
+- Active milestone: `M-WINGET-ICON-PUBLISH-20261111`.
 - Implementation request / scope: The user selected the WinGet icon correction
   and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -25,6 +25,15 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-WINGET-ICON-PUBLISH-20261111
+
+The user explicitly authorized pushing the generator correction to the project
+repository and checking CI and WinGet PR #477862. Publish the validated local
+history without rewriting remote history, including its preceding release and
+icon investigation records. Verify CI/CodeQL on the exact pushed revision and
+report external WinGet checks and acceptance separately. No version bump, new
+release, upstream merge or installed-app operation is selected.
 
 ## M-WINGET-ICON-20261111
 

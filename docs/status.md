@@ -1,5 +1,15 @@
 # Project Status
 
+## WinGet generator publication selected (2026-11-11)
+
+- Selected `M-WINGET-ICON-PUBLISH-20261111` under explicit push authorization.
+- Clean working tree at implementation `af7bb8e`; refreshed remote main is
+  `e0d1c40` and is an ancestor. Outgoing history includes the implementation,
+  its diagnosis and the preceding v3.0.3 release-evidence record. Changes remain
+  packaging/tooling/tests/documentation only; no version or workflow changes.
+- WinGet PR #477862 remains open and mergeable at `c50ef9e`; upstream acceptance
+  is not claimed. Push and exact-revision hosted checks are pending.
+
 ## WinGet icon correction implemented and submitted (2026-11-11)
 
 - Completed `M-WINGET-ICON-20261111`: the generator requires and validates an
