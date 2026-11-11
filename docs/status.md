@@ -1,5 +1,28 @@
 # Project Status
 
+## PR #32 merged and v3.0.3 published and verified (2026-11-11)
+
+- Completed `M-RELEASE-303-20261111`: #32 merged as `3740ce0`; stable v3.0.3
+  published from `e0d1c403f261b9c906cc3853a1b7477518b64bf6` with all main changes.
+- Main and exact-release CI pass eight jobs each; final CodeQL passes all four
+  analyses and NuGet succeeds. The release passes all nine jobs and publishes
+  both Windows MSIs and both Linux Flatpaks. All four public hashes/sizes verify.
+- Corrected a release-blocking test harness race without changing production
+  code: 19 focused tests, 503 Core tests and 3,000 stress scenarios pass; all
+  original assertions remain. Final hosted Windows/Linux tests also pass.
+- Both released Linux bundles pass 240-assembly component audits plus exact
+  reduced DLL/provenance/notices checks. Independent Windows inspection verifies
+  version/architecture and no Avalonia in 415 managed assemblies per MSI.
+- Signed Pages deployment and isolated signature-verified pulls confirm 3.0.3
+  on both architectures with the existing key. WinGet #477698 is submitted and
+  awaits external acceptance. Flathub preparation/native builds pass; submission
+  remains disabled. Open CodeQL and Dependabot alert counts are zero.
+- Auto-merge stays disabled. Prior v3.0.2 tag/assets are unchanged. No installed
+  app or live Immich test was performed. Final evidence is saved locally after
+  the immutable tag, without another main push; remote main/tag remain `e0d1c40`.
+- Release scope is complete. External WinGet acceptance and optional Flathub
+  onboarding are separate follow-ups. [Final evidence](release-3.0.3.md).
+
 ## PR #32 merge and v3.0.3 release selected (2026-11-11)
 
 - Selected `M-RELEASE-303-20261111` under explicit merge/release authorization.

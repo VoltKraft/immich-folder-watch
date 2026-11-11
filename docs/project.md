@@ -6,12 +6,13 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The prepared version is `3.0.3` in
-  [Directory.Build.props](../Directory.Build.props). PR #32 is merged as `3740ce0`;
-  published v3.0.2 remains at `df48398` until v3.0.3 completes.
-- Brief revision: `IFW-BRIEF-20261111-16`.
-- Plan maturity: PR #32 merge and compatible v3.0.3 release selected.
-- Active milestone: `M-RELEASE-303-20261111` — merge #32, verify main and publish v3.0.3.
+- Product baseline: The published version is `3.0.3` in
+  [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
+  merged #32 and the verified test-harness correction; deployed installations
+  remain separate evidence.
+- Brief revision: `IFW-BRIEF-20261111-17`.
+- Plan maturity: PR #32 merged; v3.0.3 published and verified.
+- Active milestone: none; `M-RELEASE-303-20261111` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +26,14 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-RELEASE-303-20261111
+
+Completed: #32 merged as `3740ce0`; v3.0.3 is published from `e0d1c40`. Main and
+exact-release CI/CodeQL passed, all four public assets were hash-verified, both
+Linux bundles passed component/provenance/license audits, and both Windows MSIs
+passed static version/architecture/component checks. Signed Pages pulls verify
+3.0.3 on both architectures. WinGet #477698 is submitted and awaits external
+acceptance; Flathub preparation/native builds pass with submission disabled.
+Auto-merge remains disabled. [Final release evidence](release-3.0.3.md).
 
 The user explicitly authorized merging #32, checking the result and publishing a
 new release. Reverify the reviewed head, merge with the head guard, preserve local
@@ -56,9 +65,10 @@ AGPL-3.0-only, .NET 10, platform/portal/security contracts remain intact.
 
 Follow-up authorization selected merge and release. #32 is merged as `3740ce0`;
 automatic merging stays disabled. Existing v3.0.2 assets are unchanged, and the
-selected v3.0.3 release will distribute the correction.
+published v3.0.3 release distributes the correction.
 No live desktop installation or Immich acceptance is claimed. The implementation
-and detailed records are on the PR branch; this closing evidence is saved locally.
+and detailed preparation records are merged into main; final release evidence
+is saved locally after publication.
 [Final verification](dependabot-pr32-20261111.md).
 
 ## M-RELEASE-302-20261111
