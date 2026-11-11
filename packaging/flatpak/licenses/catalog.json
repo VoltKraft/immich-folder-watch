@@ -173,6 +173,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection.abstractions": {
@@ -181,6 +184,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics": {
@@ -245,6 +251,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.abstractions": {
@@ -301,6 +310,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options.configurationextensions": {
@@ -317,6 +329,9 @@
     ],
     "11.0.0": [
       "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "shimskiasharp": {
@@ -342,6 +357,9 @@
   "socketioclient": {
     "3.1.2": [
       "SocketIO-LICENSE.txt"
+    ],
+    "4.0.5": [
+      "SocketIOClient-4.0.5-LICENSE.txt"
     ]
   },
   "sqlitepclraw.bundle_e_sqlite3": {
@@ -428,6 +446,16 @@
     "18.1.0": [
       "YamlDotNet-18.1.0-LICENSE.txt",
       "YamlDotNet-18.1.0-LICENSE-libyaml"
+    ]
+  },
+  "socketioclient.common": {
+    "4.0.0": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
+    ]
+  },
+  "socketioclient.serializer": {
+    "4.0.0.1": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
     ]
   }
 }
