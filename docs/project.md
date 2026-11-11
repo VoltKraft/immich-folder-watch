@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-06`.
+- Brief revision: `IFW-BRIEF-20261111-07`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: None; scoped `M-DEPENDABOT-IGNORE-20261111` completed with independent warnings.
+- Active milestone: `M-REMAINING-PRS-20261111`; prepare #38-#40 and #42-#45, excluding #32.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,20 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-REMAINING-PRS-20261111
+
+The user selected work on all remaining open PRs except #32. Live inventory selects
+#38 checkout, #39 github-script, #40 setup-dotnet, #42 Hosting, #43 SocketIOClient,
+#44 Svg.Skia and #45 YamlDotNet, against main `a82216d`.
+
+- Review exact upstream/source and transitive licenses before accepting upgrades.
+- Refresh each PR without rewriting history, repair compatibility/packaging/CI
+  issues and validate consequential changes with focused regression coverage.
+- Require successful exact-head CI and CodeQL, or record a concrete blocker without
+  weakening security or license requirements. Keep independently reviewable PRs.
+- Push only the selected existing PR branches and update their evidence. No merge,
+  release, deployment, live Immich access or auto-merge activation. #32 stays blocked.
 
 ## M-DEPENDABOT-IGNORE-20261111
 

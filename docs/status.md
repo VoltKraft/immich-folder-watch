@@ -1,5 +1,15 @@
 # Project Status
 
+## Remaining PR preparation selected (2026-11-11)
+
+- Selected `M-REMAINING-PRS-20261111`: #38/#39/#40/#42/#43/#44/#45, excluding #32.
+  Current remote main is `a82216d`; local unpublished evidence is preserved.
+- Separate worktrees isolate Actions, SocketIO, branding, Hosting and YAML work.
+  Root brief/status and final cross-cutting evidence remain primary-owned.
+- Initial evidence: #42 application/Flatpak CI succeeds but CodeQL is neutral;
+  #44/#45 fail native Flatpak packaging; #43 has major transport API changes.
+  Exact-source license reviews and fixes are in progress. No merge is selected.
+
 ## Dependabot xUnit correction verified; separate warnings retained (2026-11-11)
 
 - Completed scoped correction/verification `M-DEPENDABOT-IGNORE-20261111`. Replaced the interval with
