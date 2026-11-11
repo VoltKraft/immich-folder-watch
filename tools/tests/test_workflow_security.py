@@ -43,6 +43,17 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         for name in ("prepare-release", "build-windows", "build-flatpak", "publish-release"):
             self.assertIn("persist-credentials: false", jobs[name], name)
 
+    def test_pages_smoke_uses_production_upload_pin_without_deployment_permissions(self):
+        production = (WORKFLOWS / "flatpak-pages.yaml").read_text()
+        smoke = (WORKFLOWS / "pages-artifact-validation.yaml").read_text()
+        pattern = r"uses: actions/upload-pages-artifact@([0-9a-f]{40})"
+        self.assertEqual(re.findall(pattern, smoke), re.findall(pattern, production))
+        self.assertIn("\npermissions:\n  contents: read\n", smoke)
+        self.assertNotRegex(smoke, r"(?m)^\s*[\w-]+: write\s*$")
+        self.assertNotIn("secrets.", smoke)
+        self.assertNotIn("environment:", smoke)
+        self.assertNotIn("uses: actions/deploy-pages@", smoke)
+
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()
         scripts = re.findall(r"^        run: \|\n((?:^          .*\n|^\n)*)", source, re.M)
