@@ -1,5 +1,394 @@
 # Project Status
 
+## v3.0.1 container checkout correction (2026-11-11)
+
+- Preparation commit `b475dda` passed all six [CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922983220)
+  and all four [CodeQL analyses](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922982812).
+- The first [release build](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42923750608)
+  failed before either Flatpak build: Git rejected the guard's `rev-parse` with
+  `dubious ownership`. Checkout's temporary HOME does not carry its safe-directory
+  configuration into subsequent shell steps in the privileged build container.
+  This was an ownership-check failure, not a different target SHA.
+- Scope the guard's Git trust exception to `GITHUB_WORKSPACE` for that single
+  command. Keep strict target equality and default-branch checkout; do not add a
+  global/wildcard exception. Extend the deployed-guard regression with Git's
+  different-owner simulation, checking that plain Git rejects the fixture while
+  the scoped guard accepts only its exact HEAD and rejects all other inputs.
+- No v3.0.1 tag or assets were published by the failed run. Rerun full exact-head
+  CI and release builds after this focused correction; prior versions stay intact.
+
+
+## v3.0.1 release preparation (2026-11-11)
+
+- User authorized publishing v3.0.1 from current main `bb13a33`, including all
+  merged maintenance/security changes; selected `M-RELEASE-301-20261111`.
+- Remote v3.0.1 release/tag are unused. Local main matches origin/main and the
+  working tree was clean before preparation. Existing v3.0.0 assets are preserved.
+- Unified versions are prepared as 3.0.1 / 3.0.1.0; release notes retain every
+  Unreleased item and summarize the merged dependencies/actions and maintenance
+  records. Release date uses the user's Europe/Berlin date, 2026-11-11.
+- Publication follows successful main CI through the existing release workflow;
+  verify all four assets and downstream signed Flatpak repository before handoff.
+  No publication/build success is claimed at this preparation checkpoint.
+- Local preflight passed: version/XML/changelog consistency, AppStream validation,
+  five manifest regressions and five workflow-security tests (four PowerShell
+  cases require Windows CI), plus whitespace checks. Independent release review
+  found no blocker in the five-file preparation diff.
+- #32 and #34 remain excluded from main; auto-merge stays disabled.
+
+
+## Release checkout fix verified on main (2026-11-10)
+
+- Published security fix `ae9558c` and Windows regression-runner correction
+  `f1d20c3f1f802d67194d8ae620acc792c796ab7c`; remote main is the latter revision.
+- [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916629585)
+  completed successfully on `f1d20c3`: all six jobs passed, including Windows/Linux
+  builds/tests, all nine workflow security cases on Windows, and native x86_64/ARM64
+  Flatpak candidates. Selecting Git Bash resolved the initial Windows test failure.
+- [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916628594)
+  completed successfully on the same revision for all four languages. NuGet
+  dependency submission also passed. The open code-scanning alert list is empty.
+- Alerts [#11](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/11)
+  and [#12](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/12)
+  are both `fixed`, automatically recorded at 22:38:28 UTC; neither was dismissed.
+- Final remote readback: #32 and #34 remain open/unmerged, both have no auto-merge
+  request, and repository automatic merging remains disabled.
+- Requested publication and validation are complete. This final evidence-only
+  status entry is a local documentation checkpoint after the verified remote
+  revision; no further implementation work or release dispatch is selected.
+
+
+## Release checkout fix published; Windows test runner correction (2026-11-10)
+
+- User explicitly authorized publishing the fix and verifying CI, CodeQL and
+  alert closure. Pushed `ae9558ce07b93183c11c878d96aab0940488c37d` to main.
+- CodeQL automatically marked alerts #11 and #12 `fixed` at 22:38:28 UTC;
+  no dismissal was performed. The Actions analysis passed on the pushed fix.
+- Initial [CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42916337435)
+  exposed a Windows-only test harness problem: the new Bash regression's valid
+  commit case failed before application build; all four PowerShell cases passed.
+  Select Git for Windows' Bash explicitly instead of the ambiguous PATH launcher,
+  and include stdout in assertion diagnostics. Release behavior and assertions
+  remain unchanged. Fresh exact-head CI is required for this correction.
+- #32/#34 remain open at their original heads, with `auto_merge: null`;
+  repository `allow_auto_merge` is false. No PR merge or release dispatch.
+
+
+## Release checkout alerts hardened locally (2026-11-10)
+
+- Live CodeQL alerts [#11](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/11)
+  and [#12](https://github.com/VoltKraft/immich-folder-watch/security/code-scanning/12)
+  remain open on remote main `85ec9e4c45547fd353c647bf2c641550178e172f`.
+  Both report `actions/cache-poisoning/poisonable-step` after the same dynamic
+  Flatpak checkout, for `workflow_dispatch`.
+- Existing gates already restrict dispatch to main and automatic runs to successful
+  same-repository push CI on main. There is no dispatch SHA input, so no arbitrary
+  external-commit exploit was demonstrated. The
+  [CodeQL query guidance](https://codeql.github.com/codeql-query-help/actions/actions-cache-poisoning-poisonable-step/)
+  explains why read-only repository permissions alone do not remove cache risk.
+- Changed only the Flatpak release checkout to the explicit default branch, with
+  an inline exact-commit guard before any repository script. The target remains
+  manifest data. If main advances, the job stops instead of mixing SDK, manifest
+  or offline-feed inputs from different commits. Retry behavior is documented in
+  [publication workflow trust](development.md#publication-workflow-trust).
+- Validation: five workflow security tests passed, including real Git-history
+  matching/mismatched commits and malformed/injection inputs; four unrelated
+  PowerShell cases were skipped because PowerShell is unavailable locally.
+  Five manifest regression tests passed. YAML parsing/step-order checks and
+  `git diff --check` passed. Independent security review found no blocking
+  security or correctness issue; hosted CodeQL and Windows execution remain unverified.
+- This is a local correction; no push, release dispatch, remote alert dismissal
+  or hosted rescan was performed. Remote alert closure remains unverified until
+  the fix is published and CodeQL scans it. #32/#34 and auto-merge are unchanged.
+- The preceding documentation publication is complete: main `85ec9e4` passed
+  [all six CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42911044302)
+  after an explicit CI dispatch (documentation-only pushes are filtered), plus
+  [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42910956556)
+  and NuGet submission. A successful analysis job does not mean zero open alerts.
+
+
+## Documentation publication checkpoint (2026-11-10)
+
+- User authorized publishing the accumulated dependency-maintenance documentation
+  to main and checking the resulting CI. Earlier statements below that records
+  are local/unpushed describe their historical checkpoints, not a continuing
+  publication restriction.
+- Prepared from local checkpoint `2849aec` on remote baseline `9a84eec`; the
+  accumulated diff changes only this status, the project brief, the Dependabot
+  review and the configuration-check diagnosis. `git diff --check` passed.
+- The preceding main revision passed CI and CodeQL as recorded below. Validation
+  of the documentation push must be read from the checks attached to its exact
+  GitHub commit; earlier runs do not establish the new revision's result.
+- #32 remains open/blocked and #34 open/deferred. Automatic merging stays disabled.
+  No additional dependency update, PR merge or version bump is selected.
+
+## Remaining Actions PR merges completed (2026-11-10)
+
+- User explicitly deferred #34 and authorized merging the other reviewed Actions
+  updates (#28/#29/#30/#31). Each exact PR head had 13 successful checks before its
+  manual merge. Expected-head checks protected against concurrent branch changes;
+  no checks or branch rules were bypassed.
+
+| PR | Validated head | Merge commit |
+| --- | --- | --- |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | `c66de1e` | `b661638d9d7535a2a92c1cbfa510dc532d7dce05` |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | `2b2bdc6` | `b5f4dc122ed8203c9a17fae9f1330b1c057bc222` |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | `d0062e7` | `5c80ddd5a12c02b3badc549a1f72f4e33c8ec404` |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | `5ed2076` | `9a84eec0a5da6f9a5e58d92c0e776bc22f707309` |
+
+- Final remote main: `9a84eec0a5da6f9a5e58d92c0e776bc22f707309`.
+  [Combined main CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42909012903)
+  and [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42909013941)
+  completed successfully on that exact final merge commit. All six CI jobs passed,
+  including Windows/Linux tests and native x86_64/ARM64 Flatpak builds; all four
+  CodeQL language analyses passed. NuGet dependency submission also succeeded.
+- #32 remains open/blocked at unchanged `51898a8`. #34 remains open/deferred at
+  `f22797e`; no further configuration-check recovery was attempted after the user
+  deferred it. Repository auto-merge remains disabled, with no PR auto-merge request.
+- Local main incorporates the remote merges without losing local documentation
+  history. No main documentation push, version bump, manual release or deployment.
+- Completed: four authorized PR merges and successful combined main validation.
+  No further milestone is selected; #32 remains blocked and #34 is explicitly
+  deferred until a later user request. Final local evidence is not pushed.
+
+## Dependabot configuration-check recovery blocked externally (2026-11-10)
+
+- User authorized recovery of #34's queued Dependabot check without merges.
+  Investigation and permitted recovery attempts are recorded in
+  [the diagnosis and support handoff](dependabot-config-check-20261110.md).
+- No config defect was identified: the original blob matches successful #28/#31
+  validation, schema validation passes, and a comment-only retrigger preserves
+  parsed YAML exactly. The evidence points to stalled GitHub Dependabot service
+  processing; internal logs/root cause are unavailable and remediation is not claimed.
+- REST retry returned 404; GraphQL explicitly restricts suite retries to GitHub
+  Apps. After the user signed in, the actual Dependabot check UI still offered no
+  rerun action. These are GitHub capability limits, not automatic approval rejection.
+- Pushed only explanatory-comment commit `f22797ed4d452e1940493bf09d44b25b931b2ee8`
+  to #34. New check `130148023423` remains queued, as does the superseded original
+  `130138962423`; neither supplies diagnostic output. No further speculative
+  commits, config changes, forged statuses or protection bypasses were performed.
+- The new head has [all six CI jobs successful](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42907159639),
+  including Windows/Linux and x86_64/ARM64 Flatpak, plus [all four CodeQL analyses](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42907153860),
+  the aggregate CodeQL check and NuGet submission successful. Twelve checks pass;
+  the separate configuration check is the sole unfinished check.
+- PR #34 remains open/unmerged; #32 remains unchanged/open/blocked at `51898a8`,
+  and repository auto-merge stays disabled. No main push, release or deployment.
+- Remaining prerequisite: the owning GitHub service must process/requeue the
+  validator. The linked handoff contains exact run/suite IDs, timestamps and
+  reproduction evidence for GitHub support. No support request was sent. Local
+  documentation is committed separately from the pushed PR comment.
+
+## Remaining Dependabot refresh completed (2026-11-10)
+
+- Milestone `M-DEPENDABOT-REFRESH-20261110` completed. User authorized updating
+  #28/#29/#30/#31/#34 with current main and obtaining successful CI/CodeQL; no PR merges.
+- GitHub update-branch requests used each exact expected head. All five new heads
+  contain remote main `13e93dac570a49ec9e8595713c5fc9aeb2a78524`; ancestry and
+  full diff checks confirm only each original reviewed proposal remains above main.
+  No force-push, extra package change or test/check weakening was necessary.
+
+| PR | Updated head | CI | CodeQL workflow |
+| --- | --- | --- | --- |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | `c66de1e58f0bd4d31b5e004348909abcb8665f32` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904525439) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904516733) |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | `2b2bdc6c767e19beb0ebb58ae0ff32a7b8711110` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904530008) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904521815) |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | `d0062e7cccda5ec8ec19d55c58d7cf5b88074f5f` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904535257) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904528780) |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | `5ed20761e5ee96ba1fa9b16f90173273393da8c0` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904541922) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904531775) |
+| [#34](https://github.com/VoltKraft/immich-folder-watch/pull/34) | `f4412966f9e3008fb286945abcaa65a417e83996` | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904546447) | [Success](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42904538706) |
+
+- DCR-AC01/02: All six CI jobs passed on every updated head, covering Windows/Linux
+  tests and native x86_64/ARM64 Flatpak builds. All four CodeQL analyses (Actions,
+  C#, JavaScript/TypeScript, Python) and each aggregate `CodeQL` check passed.
+  NuGet dependency submission passed too. The earlier neutral CodeQL assessment
+  is resolved by the fresh analyses; no CodeQL configuration changes were needed.
+- Separate service check: #34's `.github/dependabot.yml` check (ID 130138962423,
+  [service details](https://dependabot-api.githubapp.com)) remains queued at this
+  snapshot. It is not one of the completed CI/CodeQL jobs; no failure is reported.
+  #28/#29/#30/#31 have all 13 reported checks successful; #34 has 12 successful
+  and this one queued service check. Do not describe every #34 check as complete.
+- DCR-AC03: All five PRs remain open/unmerged. #32 remains unchanged/open/blocked
+  at `51898a8`; repository `allow_auto_merge: false`, all inspected PRs
+  `auto_merge: null`. Remote main remains `13e93da`. No merge into main, main push,
+  release, deployment or live Immich access occurred.
+- Local records preserve authorization and validation; they are not pushed.
+  No implementation milestone remains active. Next action: separately authorized
+  review/merge after checking current heads and the outstanding service check.
+
+The review below records the earlier heads; the refresh evidence above supersedes
+its pending integration-CI and neutral-CodeQL limitations. Publication-only paths
+remain outside the validation performed here.
+
+## Remaining Dependabot review completed (2026-11-10)
+
+- Reviewed #28/#29/#30/#31/#34 without remote changes. Exact heads, CI links,
+  compatibility findings and upstream license sources are retained in
+  [the review record](dependabot-review-20261110.md).
+- All five exact-head CI runs completed successfully with six passing jobs each;
+  NuGet dependency submission passed. CodeQL is neutral on every PR with
+  `4 configurations not found`, so a successful security scan is not claimed.
+- No concrete compatibility or license blocker was identified. Actions retain
+  MIT licenses; #34 changes only the branding tool's SkiaSharp packages, preserving
+  application runtime versions and native third-party notice coverage.
+- All five heads integrate conflict-free with main `13e93da` in local tree-only
+  checks. Their hosted CI predates the recent main merges. Before a later merge,
+  refresh integration CI and obtain a complete CodeQL assessment. Pages/OIDC and
+  release-only publication paths were not exercised or triggered by this review.
+- All five PRs remain open/unmerged. #32 remains unchanged at `51898a8`, open and
+  blocked; repository `allow_auto_merge: false`, with `auto_merge: null` on every
+  inspected PR. No PR rebase, push, merge, workflow rerun or publication occurred.
+- Review complete; no implementation milestone selected. Findings and scope are
+  saved in a local documentation checkpoint only. A later merge needs separate
+  authorization and current validation.
+
+## Selective Dependabot merges completed (2026-11-10)
+
+- User explicitly authorized merging #27, #33, #35 and #36 only. All four were
+  merged manually with expected-head checks after every current-head check passed.
+  Repository auto-merge remains disabled (`allow_auto_merge: false`); every
+  inspected PR has `auto_merge: null`.
+- Integration preserved every reviewed package version, deletion-race fix,
+  regression test, xUnit compatibility constraint and license notice. Resolved
+  overlapping status/changelog records and adjacent package declarations;
+  removed duplicated historical status blocks without discarding history.
+  Independent read-only review of final cumulative head `9f73d91` found no issues.
+
+| PR | Validated head | Merge commit | Successful CI |
+| --- | --- | --- | --- |
+| [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27) | `ca35782` | `20cf55a` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42889338522) |
+| [#33](https://github.com/VoltKraft/immich-folder-watch/pull/33) | `d5c5170` | `4f1ff08` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894339727) |
+| [#35](https://github.com/VoltKraft/immich-folder-watch/pull/35) | `176796a` | `c705988` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894342541) |
+| [#36](https://github.com/VoltKraft/immich-folder-watch/pull/36) | `9f73d91` | `13e93da` | [All six jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42894348336) |
+
+- Additional CodeQL and dependency-submission checks passed on all four heads.
+  The cumulative CI covers Windows/Linux tests and native x86_64/ARM64 Flatpak
+  builds. No guard, assertion or branch rule was bypassed.
+- #32 remains open at unchanged head `51898a8`, blocked by the previously recorded
+  technical and license issues. No Avalonia upgrade or reduced build was included.
+- Follow-up live check: remote main remains `13e93da`. Its [post-merge CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42895589381)
+  completed successfully (GitHub updated at 2026-11-10 20:35:07 UTC). All six jobs
+  passed: Windows/Linux build and tests, packaging lint, candidate preparation,
+  and native x86_64/ARM64 Flatpak builds. No version bump or manual release was performed.
+- Follow-up settings readback: repository `allow_auto_merge: false`; #32 remains
+  open/unmerged at unchanged `51898a8`, with `auto_merge: null` and unsuccessful
+  checks (`mergeable_state: unstable`). Its technical/license blockers remain
+  deferred. This inspection made no remote changes or workflow reruns.
+- Local main incorporates the remote merges while preserving the earlier local
+  documentation commits. This aggregate handoff remains local and is not pushed.
+- Milestone `M-DEPENDABOT-CI-20261110` is complete for the selected four PRs, with
+  #32 explicitly deferred. No further milestone is selected. Next action: a
+  separately selected licensing resolution for #32 or review of other open PRs.
+
+The following entries are historical snapshots; the merge record above supersedes
+prior statements that the selected PRs were still open or awaiting authorization.
+
+## Dependabot CI remediation (2026-11-10)
+
+- Selected milestone: `M-DEPENDABOT-CI-20261110`. User authorized fixes on
+  existing PR branches without merges; later explicitly deferred #32's Avalonia
+  upgrade because of incompatible embedded component licensing.
+- Isolated worktrees preserve each bot proposal and the original local main.
+  Scoped corrections are pushed without force; no update PR is merged.
+
+| PR | Cause and correction | Pushed correction | Validation |
+| --- | --- | --- | --- |
+| #27 | Concurrent watcher/poll deletion handlers read the same asset before tombstone persistence; per-path ownership and retained retry baseline prevent duplicate remote trash | `ca35782` (fix `05297b7`) | Two deterministic regressions fail against old source; 483 Core tests pass before review delta, five focused deletion cases pass after it; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42889338522) |
+| #33 | Missing reviewed supplemental notices for Microsoft.Extensions/System 11.0.0; verified exact source license and all package notices, added exact-version supplements | `c6ad2e9` | Both architecture restores and 87-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888743407) |
+| #35 | xUnit 4 changes parallelism API, test-runner defaults and Avalonia extension ABI; retain framework 3.2.2 and compatible v2/runner upgrades, exclude incompatible future v4 proposals | `a5cbed6` | 481 Core and 53 Linux GUI/protocol cases pass with no failures/skips; schema and independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888754999) |
+| #36 | Missing reviewed supplemental notices for Microsoft.Data.Sqlite/Core 11.0.0; verified MIT source and added exact-version supplements | `2b2b186` | Both architecture restores and 81-archive combined feed verified; real notice installer and 15 guard regression tests pass; independent review passed; [all six CI jobs passed](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42888749135) |
+
+- No license guard or test assertion was disabled. SDKs: local application/tests
+  10.0.203; exact Flatpak feed restores 10.0.401. PR corrections add no release bump.
+- Completion: all six CI jobs pass on each of the four exact corrected heads,
+  including Windows/Linux and native x86_64/aarch64 Flatpak builds. No unfinished
+  or failed current-head check remains on #27/#33/#35/#36. All remain open with
+  `auto_merge: null`; repository `allow_auto_merge: false` was read back again.
+- Final #27 CI: Linux 483 Core + 53 GUI/protocol passed; Windows 474 Core + 36 WPF
+  + 34 portable Linux-project tests passed, with 9/19 expected platform skips.
+  Other corrected PRs: Linux 481 + 53; Windows 472 + 36 + 34 with the same skips.
+  All application builds have zero warnings/errors. Both native license logs
+  confirm 87 archives for #33 and 81 for #36.
+- PR descriptions now explain the final fixes and link exact-head validation;
+  #27/#35 titles reflect their final scope. #32 stays unchanged at `51898a8`.
+- Next action: manual review of the four validated PRs and separate authorization
+  before merging. Keep #32 open/blocked pending a separately selected licensing
+  resolution. No further implementation milestone is selected. This aggregate
+  handoff is a local documentation checkpoint; main was not pushed by this task.
+
+### Deferred Avalonia PR #32
+
+- Baseline: Dependabot head `51898a8`, Avalonia 12.1.6. Initial CI fails NU1605:
+  Avalonia.FreeDesktop requires Tmds.DBus.Protocol >=0.94.1 while the app pins 0.92.0.
+- A local diagnostic with app/test pins at 0.94.1 passed the Linux Release build
+  (three obsolescence warnings, zero errors), 53 Linux GUI/protocol tests and 33
+  portable Linux-specific tests using SDK 10.0.203. The pin edits were reverted
+  after the user selected leaving this PR open and blocked; the bot proposal is
+  preserved. These results do not describe the unchanged PR head.
+- Exact Avalonia source `cf8e564674700348947e93ab19105f27afe859a9` retains
+  [MS-PL Calendar code](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/src/Avalonia.Controls/Calendar/Calendar.cs)
+  and [MS-PL Fluent theme resources](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/src/Avalonia.Themes.Fluent/Controls/Calendar.xaml),
+  with default compile/resource inclusion. The exact source contains 19 marked
+  controls C# files and seven marked Fluent XAML files (plus eight Simple themes).
+  Its [NOTICE](https://github.com/AvaloniaUI/Avalonia/blob/cf8e564674700348947e93ab19105f27afe859a9/NOTICE.md)
+  and top-level MIT license are byte-identical to the repository's retained files;
+  preserving those notices does not establish AGPL compatibility. The
+  [GNU license list](https://www.gnu.org/licenses/license-list.html#ms-pl) identifies
+  MS-PL as GPL-incompatible. No reduced build or linking exception was found here.
+- Status: leave #32 open and blocked. No dependency/catalog approval, license-guard
+  bypass, merge or publication. A separately scoped reduced build/component review
+  or applicable licensing permission is required before proceeding. Windows and
+  native Flatpak success are not claimed. No live Immich access occurred.
+
+
+## Dependabot completion check (2026-11-10, 20:39 Europe/Berlin)
+
+- The first [NuGet updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)
+  completed successfully and created five additional PRs (#32 through #36).
+  All ten Dependabot PRs remain open and unmerged. All reported checks on their
+  current heads have finished; five PRs have successful CI and five have failures.
+
+| PR | Update | Head | CI result |
+| --- | --- | --- | --- |
+| [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27) | download-artifact 7.0.0 to 8.0.2 | `27ab531` | Windows build/test job failed; remaining CI jobs passed |
+| [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28) | upload-artifact 6.0.0 to 7.0.2 | `339ee48` | All six CI jobs passed |
+| [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29) | deploy-pages 4.0.5 to 5.0.1 | `0c8975d` | All six CI jobs passed |
+| [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30) | configure-pages 5.0.0 to 6.0.0 | `383e170` | All six CI jobs passed |
+| [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31) | setup-node 6.5.0 to 7.1.0 | `9c6d43d` | All six CI jobs passed |
+| [#32](https://github.com/VoltKraft/immich-folder-watch/pull/32) | Avalonia group, five updates | `51898a8` | Windows/Linux build/test and Flatpak preparation failed; native builds skipped; NuGet submission also failed |
+| [#33](https://github.com/VoltKraft/immich-folder-watch/pull/33) | Microsoft.Extensions group, six updates | `7fb5e63` | Both native Flatpak builds failed; remaining CI jobs passed |
+| [#34](https://github.com/VoltKraft/immich-folder-watch/pull/34) | SkiaSharp group, two updates | `a92df09` | All six CI jobs passed |
+| [#35](https://github.com/VoltKraft/immich-folder-watch/pull/35) | xUnit group, three updates | `820cc9f` | Windows/Linux build/test jobs failed; remaining CI jobs passed |
+| [#36](https://github.com/VoltKraft/immich-folder-watch/pull/36) | Microsoft.Data.Sqlite 10.0.10 to 11.0.0 | `4a26baf` | Both native Flatpak builds failed; remaining CI jobs passed |
+
+- CodeQL reports neutral on all ten PRs, not a successful security scan.
+  Failure causes were not investigated in this status-only check.
+- Verified repository auto-merge remains disabled and every PR has
+  `auto_merge: null` and no merge timestamp. No remote mutation, rerun or merge.
+- Next action: investigate failed jobs and review compatibility/licenses before
+  any separately authorized merge. Evidence is saved in a local documentation commit.
+
+## First Dependabot run check (2026-11-10, 19:24 Europe/Berlin)
+
+- Read-only GitHub inspection requested; no update PR was modified or merged.
+- [GitHub Actions updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487560)
+  completed successfully. The first [NuGet updater](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42874487345)
+  is still running; no NuGet update PR exists at this snapshot.
+- Created five open PRs: [#27](https://github.com/VoltKraft/immich-folder-watch/pull/27)
+  download-artifact 7.0.0 to 8.0.2;
+  [#28](https://github.com/VoltKraft/immich-folder-watch/pull/28)
+  upload-artifact 6.0.0 to 7.0.2;
+  [#29](https://github.com/VoltKraft/immich-folder-watch/pull/29)
+  deploy-pages 4.0.5 to 5.0.1;
+  [#30](https://github.com/VoltKraft/immich-folder-watch/pull/30)
+  configure-pages 5.0.0 to 6.0.0;
+  [#31](https://github.com/VoltKraft/immich-folder-watch/pull/31)
+  setup-node 6.5.0 to 7.1.0. All are major-version proposals requiring review.
+- PR CI is queued/running for all five; no failed check is reported at this
+  snapshot. Packaging lint passed for #27/#29/#30. The successful updater run
+  does not establish upgrade compatibility or completed PR CI.
+- Verified repository `allow_auto_merge: false`, with `auto_merge: null` and
+  no merge timestamp on all five PRs. No remote mutation was performed.
+- Next action: recheck NuGet completion and PR CI, then review compatibility and
+  licensing before any separately authorized merge. This check is recorded locally.
+
 ## Dependabot PR #36 license correction (2026-11-10)
 
 - Scope: fix the existing Microsoft.Data.Sqlite 11.0.0 update PR's Flatpak CI

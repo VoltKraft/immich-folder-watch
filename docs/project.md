@@ -6,12 +6,12 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The checked-in version is `3.0.0` in
+- Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261110-05`.
-- Plan maturity: Dependabot configuration and GitHub activation selected.
-- Active milestone: `M-DEPENDABOT-20261110`.
+- Brief revision: `IFW-BRIEF-20261111-01`.
+- Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
+- Active milestone: `M-RELEASE-301-20261111`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -24,7 +24,119 @@
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
 
+## M-RELEASE-301-20261111
+
+- User explicitly selected creation and publication of v3.0.1 containing all
+  changes on main at baseline `bb13a33`. This authorizes release preparation,
+  pushing the release commit and the existing release/distribution automation.
+- R301-AC01: Bump unified product/assembly/file versions, complete release notes
+  and regenerate AppStream metadata for 2026-11-11 (Europe/Berlin). Preserve
+  prior releases, compatibility requirements and dependency license evidence.
+- R301-AC02: Pass exact-commit CI and CodeQL, build all four Windows/Linux
+  x64/ARM64 assets, and verify the immutable tag and published stable release.
+- R301-AC03: Verify the signed Flatpak Pages distribution and report downstream
+  WinGet/Flathub workflow results separately from external acceptance.
+- R301-AC04: Leave #32 open/blocked, #34 open/deferred, automatic merging disabled;
+  no additional dependency update, live Immich access or installed app changes.
+
+## Release checkout hardening (2026-11-10)
+
+- Follow-up authorization: push the validated fix to main and verify CI, CodeQL
+  and both alert states. Keep #32/#34 open and automatic merging disabled.
+
+- User requested verification and remediation of CodeQL alerts #11/#12 in
+  `release.yaml`. Both flag repository script execution after the Flatpak job's
+  dynamic checkout. Scope: focused workflow hardening, regression tests and docs.
+- Require an explicit trusted default-branch checkout before Flatpak scripts run;
+  reject a different release target before executing repository code, preserving
+  matching source, SDK, offline dependency feed and manifest inputs.
+- Preserve existing release gates, immutable target data, least-privilege tokens,
+  versions and published assets. Keep #32 blocked, #34 deferred and auto-merge off.
+- Validate the guard with real local Git histories and run workflow/manifest
+  regression checks. Hosted CodeQL resolution requires a later published scan;
+  do not dismiss alerts or trigger publication to manufacture that evidence.
+
 ## Selected dependency maintenance (2026-11-10)
+
+### Documentation publication (2026-11-10)
+
+- User explicitly authorized pushing the accumulated local documentation to main
+  and verifying the resulting CI. This supersedes earlier local-only boundaries
+  for the dependency-maintenance records.
+- Publish the reviewed documentation history without rewriting remote history;
+  verify CI and CodeQL on the pushed revision. Keep #32 open/blocked, #34
+  open/deferred and automatic merging disabled.
+
+### Remaining Actions PR merges (2026-11-10)
+
+- User selected merging the successfully reviewed/refreshed #28/#29/#30/#31,
+  leaving #34's configuration-check recovery open for now. This supersedes the
+  earlier no-merge boundary only for these four Actions PRs.
+- Verify exact heads/checks, preserve branch rules, merge manually, and verify
+  final main CI. Leave #32 open/blocked and #34 open/deferred; retain disabled
+  auto-merge. No version bump, manual release or publication workflow dispatch.
+- Complete: all four merged; final main CI and CodeQL passed. #32/#34 stay open.
+
+### Dependabot configuration-check recovery (2026-11-10)
+
+- User authorized investigating and recovering #34's queued Dependabot-owned
+  configuration check, preserving #32's block and disabled auto-merge; no merges.
+- Validate the exact config, distinguish service dispatch from application CI,
+  attempt a supported retry and, if unavailable, retrigger validation without
+  changing configuration semantics. Verify the resulting current-head check plus
+  CI/CodeQL; do not fabricate a status or weaken required checks.
+- Outcome: repository validation passes; recovery is externally blocked on the
+  owning GitHub service. See [diagnosis](dependabot-config-check-20261110.md).
+
+### M-DEPENDABOT-REFRESH-20261110
+
+- User explicitly authorized updating #28/#29/#30/#31/#34 with current remote
+  main and obtaining successful CI and CodeQL checks. This supersedes the earlier
+  read-only boundary for these branches only; keep PRs unmerged and auto-merge off.
+- DCR-AC01: Preserve each reviewed proposal and integrate current main without
+  force-pushing, altering unrelated branches or publishing local main records.
+- DCR-AC02: Verify all six CI jobs plus CodeQL's four language analyses and
+  aggregate assessment on each exact updated head. Investigate and correct scoped
+  failures without disabling checks, assertions or license/security safeguards.
+- DCR-AC03: Confirm #32 stays unchanged/open/blocked and auto-merge disabled;
+  record exact revisions and evidence. No release, deployment or live Immich use.
+
+### Remaining Dependabot review (2026-11-10)
+
+- User selected a read-only remote review of #28, #29, #30, #31 and #34 for
+  compatibility, authoritative license provenance and exact-head CI results.
+- Compare proposed action/package changes with current use sites and distribution
+  obligations; distinguish exercised CI paths from publication-only workflows and
+  historical PR validation from integration with current main.
+- Record findings and unresolved prerequisites locally. Do not merge, push PR
+  changes, publish, or trigger deployment. Keep #32 open/blocked and automatic
+  merging disabled. This review does not select a new implementation milestone.
+
+### M-DEPENDABOT-CI-20261110
+
+Updated authorization on 2026-11-10: merge the successfully validated PRs #27,
+#33, #35 and #36. This supersedes their earlier no-merge boundary. Keep #32 open
+and blocked, leave automatic merging disabled, preserve checks/branch rules and
+verify the resulting merge records. Resolve any integration conflicts without
+discarding reviewed changes; no release/version bump is selected.
+
+- Original scope before the selective merge authorization: investigation and fixes for PRs #27, #32,
+  #33, #35 and #36; no merges. Scoped corrections and CI validation stay on the
+  existing PR branches, with no release/version bump or live Immich access.
+- DCI-AC01: Identify failed-job causes on exact PR heads and preserve checks,
+  security contracts, license guards and unrelated changes.
+- DCI-AC02: Fix #27's concurrent deletion propagation with a deterministic
+  regression; review exact Microsoft package license/notice sources for #33/#36;
+  keep #35's test framework compatible with the Avalonia headless extension.
+- DCI-AC03: Validate locally where applicable, independently review consequential
+  fixes, push scoped commits to existing PRs and verify their CI before the separately
+  authorized selective merges.
+- DCI-AC04: Explicit follow-up decision: leave #32 open and blocked on Avalonia
+  component licensing. Record technical downgrade failure and license evidence;
+  do not approve the package or expand into a reduced Avalonia build.
+
+- DCI-AC05: Merge only #27/#33/#35/#36 after successful exact-head checks;
+  verify merge commits, keep #32 open and preserve disabled auto-merge.
 
 ### M-DEPENDABOT-20261110
 

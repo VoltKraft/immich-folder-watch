@@ -99,27 +99,29 @@
   </branding>
 
   <releases>
-    <release version="3.0.0" date="2026-11-10">
+    <release version="3.0.1" date="2026-11-11">
       <description>
-        <p>This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.</p>
+        <p>Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.</p>
         <p>Security:</p>
         <ul>
-          <li>Require HTTPS for Immich by default, with an explicit documented `allowInsecureHttp` migration option for trusted legacy HTTP installations.</li>
-          <li>Write Linux configuration containing API keys atomically with owner-only permissions; use a verified private directory for single-instance state.</li>
-          <li>Bound API response sizes and download resources, reject incomplete remote inventories before cleanup, and finalize downloads without replacing local files.</li>
-          <li>Refuse linked watch entries and scope folder-driven album mutations to newly created, explicitly recorded IDs; revoke folder authority after worker restarts and failed renames.</li>
-          <li>Pin watched directory identities and use retained file/directory handles for transfers, enumeration, cleanup, timestamp recovery and folder renames, preventing concurrent directory replacements from redirecting access.</li>
-          <li>Pin CI actions, the Flatpak build image and WinGet submission binary; restrict release job tokens and validate dispatcher tags outside executable source.</li>
+          <li>Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path. Scope Git ownership trust to the exact checkout workspace for container builds.</li>
+        </ul>
+        <p>Fixed:</p>
+        <ul>
+          <li>Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.</li>
+          <li>Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.</li>
+          <li>Restore Flatpak packaging for Microsoft.Extensions 11.0.0 updates by recording reviewed MIT supplements for the complete resolved Microsoft/System package set.</li>
+          <li>Prevent concurrent watcher/polling callbacks from trashing the same remote asset twice, and retain failed deletion mappings for polling retries.</li>
         </ul>
         <p>Added:</p>
         <ul>
-          <li>Signed GitHub Pages Flatpak repository for x86_64 and aarch64, with `.flatpakrepo`/`.flatpakref` installation, normal Flatpak updates, and release-triggered deployment alongside existing GitHub Release bundles.</li>
+          <li>Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.</li>
         </ul>
         <p>Changed:</p>
         <ul>
-          <li>Require supported secure filesystem primitives and reserve .ifw-internal- paths for protected transactions. Windows can block moves of active watch directories; Linux retains outer transaction containers after shutdown or cache eviction.</li>
-          <li>Retry a successful upload before later local cleanup after a restart or deletion failure; stored size and modification time alone no longer authorize deletion.</li>
-          <li>Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles.</li>
+          <li>Update Microsoft.Extensions and Microsoft.Data.Sqlite to 11.0.0, with reviewed upstream license notices retained in Flatpak packages.</li>
+          <li>Update pinned artifact upload/download, Pages configuration/deployment and Node setup actions; retain manual dependency review and disabled automatic merging.</li>
+          <li>Record dependency compatibility reviews, validation results and deferred upgrades in the maintenance documentation.</li>
         </ul>
       </description>
     </release>
