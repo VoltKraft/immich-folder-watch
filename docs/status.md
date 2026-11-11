@@ -1,5 +1,22 @@
 # Project Status
 
+## PR #37 ready for a separate merge decision (2026-11-11)
+
+- `M-PR37-20261111` completed. Updated [PR #37](https://github.com/VoltKraft/immich-folder-watch/pull/37)
+  from `c8989d6` to `d79d3f30376f2993a185bfc62dd55e87865f943d`, integrating main
+  `1ab0748` without force-push and adding focused Pages upload/download validation.
+- All eight CI jobs, all four CodeQL analyses, aggregate CodeQL and NuGet submission
+  passed: 14 successful checks. Actual upload/download passed with both hidden-file
+  modes; no deployment rights, environment or signing secrets were used.
+- License/compatibility review and independent review found no blocker. GitHub
+  reports the PR clean and mergeable. Its description contains exact-head run links.
+- #37 remains open/unmerged; #32/#34 are unchanged/open, repository auto-merge off.
+  Main/release v3.0.1 are unchanged. A merge requires a later user decision.
+- [Detailed PR evidence](dependabot-pr37-20261111.md) records action source/license
+  links, test coverage, uploaded fixture IDs and remaining deployment limitation.
+  Final evidence is a local documentation checkpoint; only PR #37 was pushed.
+
+
 ## v3.0.1 published and verified (2026-11-11)
 
 - `M-RELEASE-301-20261111` completed. [v3.0.1](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.1)

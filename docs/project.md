@@ -9,7 +9,7 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-01`.
+- Brief revision: `IFW-BRIEF-20261111-02`.
 - Plan maturity: v3.0.1 published and verified; Avalonia/SkiaSharp updates deferred.
 - Active milestone: None; `M-RELEASE-301-20261111` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
@@ -23,6 +23,15 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR37-20261111
+
+Completed: the user selected refreshing and validating PR #37 without merging.
+Integrated current main, reviewed exact upstream MIT licenses/compatibility and
+added a read-only CI artifact round trip with synthetic data. All eight CI jobs,
+four CodeQL analyses and all 14 PR checks passed at `d79d3f3`.
+See [PR #37 evidence](dependabot-pr37-20261111.md). Production deployment is not
+claimed. #32/#34 remain deferred, auto-merge disabled; no merge is authorized.
 
 ## M-RELEASE-301-20261111
 
