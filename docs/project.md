@@ -11,7 +11,7 @@
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-04`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: `M-PR34-20261111`.
+- Active milestone: `M-DEPENDABOT-IGNORE-20261111`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,19 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-DEPENDABOT-IGNORE-20261111
+
+The user selected correcting the xUnit ignore requirement and verifying hosted
+Dependabot NuGet runs. Prepare a scoped PR; default-branch execution follows
+separate merge authorization after validation.
+
+- Preserve the absolute xunit.v3 exclusion of versions >= 4.0.0, including its
+  security-update scope; do not change package versions or other update settings.
+- Validate YAML and the targeted diff, then verify the general NuGet job and
+  existing Avalonia PR refresh no longer fail on the requirement parser.
+- Record actual hosted outcomes and any independent blockers. Keep #32 open and
+  license-blocked, automatic merging disabled and release v3.0.1 unchanged.
 
 ## M-PR34-20261111
 
