@@ -11,7 +11,7 @@
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-01`.
 - Plan maturity: Selected Dependabot updates merged; Avalonia upgrade deferred.
-- Active milestone: `M-RELEASE-301-20261111`.
+- Active milestone: `M-PR37-20261111`.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,19 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR37-20261111
+
+- User selected completing the preparation of PR #37: update against current main,
+  verify upstream licenses/compatibility and obtain successful CI/CodeQL. No merge.
+- P37-AC01: Preserve the proposed SHA-pinned upload-pages-artifact v5 update and
+  integrate current main without rewriting branch history or including #32/#34.
+- P37-AC02: Exercise the actual Pages upload and artifact download using harmless
+  fixtures; validate tar layout, bytes, hidden-file policy and dereferenced links.
+  Use read-only repository permissions with no deployment, signing secret or Pages
+  environment. Distinguish artifact validation from a real Pages deployment.
+- P37-AC03: Verify all PR-head CI/CodeQL checks and record license/source evidence.
+  Keep #32 blocked, #34 deferred, auto-merge disabled and release v3.0.1 unchanged.
 
 ## M-RELEASE-301-20261111
 

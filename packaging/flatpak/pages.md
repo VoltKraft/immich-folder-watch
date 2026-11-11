@@ -118,8 +118,10 @@ Immich connections are not needed to verify this distribution layer.
 - [GitHub Pages workflow permissions and artifacts](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 - [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits).
 - New CI-only actions: [configure-pages v5](https://github.com/actions/configure-pages/blob/v5/LICENSE),
-  [upload-pages-artifact v4](https://github.com/actions/upload-pages-artifact/blob/v4/LICENSE),
+  [upload-pages-artifact v5](https://github.com/actions/upload-pages-artifact/blob/fc324d3547104276b827a68afc52ff2a11cc49c9/LICENSE),
   [deploy-pages v4](https://github.com/actions/deploy-pages/blob/v4/LICENSE).
-  Their upstream MIT licenses were verified on 2026-11-07. They are compatible
+  Their initial upstream MIT licenses were verified on 2026-11-07; the v5 uploader
+  and its embedded upload-artifact v7 were reviewed on 2026-11-11 (see
+  [PR #37 validation](../../docs/dependabot-pr37-20261111.md)). They are compatible
   build tooling for this AGPL-3.0-only project and are not shipped in the app.
   No application dependencies are added or updated.

@@ -1,5 +1,16 @@
 # Project Status
 
+## PR #37 preparation (2026-11-11)
+
+- User selected `M-PR37-20261111`, authorizing branch refresh, focused compatibility
+  validation and successful CI/CodeQL without merging or deployment.
+- Integrated remote main `1ab0748` into original PR head `c8989d6` in an isolated
+  worktree. No force-push; the root checkout's local v3.0.1 evidence is preserved.
+- Add an actual upload/download smoke check for the Pages action using synthetic
+  files only, read-only repository permissions and no publishing job/secrets.
+- #32/#34 and disabled automatic merging are outside the mutation scope.
+
+
 ## v3.0.1 container checkout correction (2026-11-11)
 
 - Preparation commit `b475dda` passed all six [CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/42922983220)

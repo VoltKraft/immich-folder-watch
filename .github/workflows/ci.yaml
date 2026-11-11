@@ -19,6 +19,10 @@ permissions:
   contents: read
 
 jobs:
+  validate-pages-artifact:
+    name: Validate Pages artifact
+    uses: ./.github/workflows/pages-artifact-validation.yaml
+
   validate-flatpak:
     name: Validate native Flatpak packages
     uses: ./.github/workflows/flatpak-validation.yaml

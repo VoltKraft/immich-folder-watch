@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
+
 ## [3.0.1] - 2026-11-11
 
 Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.
