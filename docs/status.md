@@ -1,5 +1,16 @@
 # Project Status
 
+## Verification documentation publication selected (2026-11-11)
+
+- User authorized pushing the final evidence to main and verifying CI. The
+  accumulated local history changes only nine documentation files relative to
+  main `efeda2f`; implementation and workflow files remain identical.
+- The CI push filter skips Markdown/docs changes, so the existing manual CI
+  entry point will validate the published revision explicitly.
+- Release assessment: v3.0.2 is a suitable compatible maintenance release,
+  notably delivering the pre-existing YAML string-preservation fix. No release
+  preparation/publication is selected; #32 stays blocked and auto-merge disabled.
+
 ## Selected dependency PRs merged and main verified (2026-11-11)
 
 - Completed `M-REMAINING-MERGE-20261111`: #38/#39/#40/#42/#43/#44/#45 merged

@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
   reviewed dependency merges through `efeda2f`; published releases and deployed
   installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-10`.
+- Brief revision: `IFW-BRIEF-20261111-11`.
 - Plan maturity: v3.0.1 published; seven further dependency PRs merged and main verified; Avalonia remains deferred.
-- Active milestone: none; `M-REMAINING-MERGE-20261111` completed. No further merge or release is selected.
+- Active milestone: `M-DOC-PUBLISH-20261111`; publish the final evidence and verify CI. A new release is advisory only.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -24,6 +24,21 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-DOC-PUBLISH-20261111
+
+The user explicitly authorized publishing the final verification documentation
+on main and checking CI. This includes the accumulated, related maintenance and
+release-evidence history; the net change is documentation only. Preserve history
+and existing safeguards, verify the pushed revision, and explicitly dispatch the
+existing CI workflow because its path filter skips documentation-only pushes.
+Keep #32 open/license-blocked and automatic merging disabled.
+
+The user also asked whether a new release is worthwhile. Recommend a compatible
+patch release, v3.0.2, based on the YAML string-preservation fix and reviewed
+maintenance/dependency updates since v3.0.1. This recommendation does not select
+version changes, a tag, release creation or publication. Existing release v3.0.1
+remains immutable.
 
 ## M-REMAINING-MERGE-20261111
 

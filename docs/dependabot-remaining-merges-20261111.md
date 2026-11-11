@@ -98,3 +98,18 @@ Local main incorporates remote main through merge `abe5ad4`, retaining all prior
 unpublished documentation. Every local changelog line was mechanically verified
 as present in the remote complete changelog before resolving that local conflict.
 Only documentation differs from remote main; production files match exactly.
+
+## Documentation publication follow-up
+
+The user subsequently authorized publishing this final report and the related
+local maintenance evidence on main. The net publication diff changes only nine
+documentation files; it introduces no additional product or workflow change.
+The existing CI workflow supports manual dispatch and skips documentation-only
+pushes, so an explicit CI run will verify the published revision.
+
+A new release is recommended as v3.0.2: the YAML writer correction fixes existing
+string-value loss, while the reviewed dependency/build changes preserve the
+application's compatibility contract. Under the repository's
+[Semantic Versioning policy](https://semver.org/spec/v2.0.0.html), these changes
+fit a patch release. This is an assessment, not release authorization; version,
+release tag and published artifacts remain unchanged.
