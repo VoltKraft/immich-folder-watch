@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
   reviewed dependency merges through `efeda2f`; published releases and deployed
   installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-11`.
+- Brief revision: `IFW-BRIEF-20261111-12`.
 - Plan maturity: v3.0.1 published; seven further dependency PRs merged and main verified; Avalonia remains deferred.
-- Active milestone: `M-DOC-PUBLISH-20261111`; publish the final evidence and verify CI. A new release is advisory only.
+- Active milestone: none; `M-DOC-PUBLISH-20261111` completed. A v3.0.2 release is recommended but not selected.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -26,6 +26,12 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-DOC-PUBLISH-20261111
+
+Completed: final evidence and related documentation were published as `ef6f394`.
+Explicit CI 43025624807 passes all eight jobs, CodeQL 43025461040 passes all four
+languages, and NuGet submission succeeds. The closing evidence update remains
+documentation only, with identical product/workflow content. No release created.
+[Publication evidence](dependabot-remaining-merges-20261111.md#documentation-publication-follow-up).
 
 The user explicitly authorized publishing the final verification documentation
 on main and checking CI. This includes the accumulated, related maintenance and

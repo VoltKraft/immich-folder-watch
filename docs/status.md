@@ -1,15 +1,23 @@
 # Project Status
 
-## Verification documentation publication selected (2026-11-11)
+## Verification documentation published and checked (2026-11-11)
 
-- User authorized pushing the final evidence to main and verifying CI. The
-  accumulated local history changes only nine documentation files relative to
-  main `efeda2f`; implementation and workflow files remain identical.
-- The CI push filter skips Markdown/docs changes, so the existing manual CI
-  entry point will validate the published revision explicitly.
-- Release assessment: v3.0.2 is a suitable compatible maintenance release,
-  notably delivering the pre-existing YAML string-preservation fix. No release
-  preparation/publication is selected; #32 stays blocked and auto-merge disabled.
+- Completed `M-DOC-PUBLISH-20261111`. Published the final report and related
+  maintenance evidence as `ef6f394693353b9103ecf92c811051e69b04d35b`; the net
+  change from application main `efeda2f` consists only of nine Markdown files.
+- Explicit CI 43025624807 passes all eight jobs, including Windows/Linux and
+  both native Flatpak architectures. CodeQL 43025461040 passes all four language
+  analyses; NuGet 43025461060 succeeds. Manual dispatch was needed because the
+  normal CI push path filter excludes Markdown/docs changes.
+- The final record adds these verified results without changing any product or
+  workflow file. This documentation-only closing update uses the same tested
+  code; another full application build is not required for the record itself.
+- Release follow-up 43026470636 is correctly skipped for the manually dispatched
+  CI. Published v3.0.1 remains unchanged. A compatible v3.0.2 maintenance release
+  is recommended for the YAML value-preservation fix and reviewed updates; no
+  version change, new tag or publication is selected.
+- #32 remains open/license-blocked at 51898a8, automatic merging disabled.
+  [Published evidence and run links](dependabot-remaining-merges-20261111.md#documentation-publication-follow-up).
 
 ## Selected dependency PRs merged and main verified (2026-11-11)
 

@@ -102,10 +102,19 @@ Only documentation differs from remote main; production files match exactly.
 ## Documentation publication follow-up
 
 The user subsequently authorized publishing this final report and the related
-local maintenance evidence on main. The net publication diff changes only nine
-documentation files; it introduces no additional product or workflow change.
-The existing CI workflow supports manual dispatch and skips documentation-only
-pushes, so an explicit CI run will verify the published revision.
+local maintenance evidence on main. Published revision: `ef6f394693353b9103ecf92c811051e69b04d35b`.
+The net publication diff changes only nine documentation files and introduces
+no additional product or workflow change. Because the normal CI push filter
+skips documentation-only changes, validation was explicitly dispatched:
+
+- [CI 43025624807](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43025624807): all eight jobs succeeded, including Windows/Linux tests and both native Flatpak builds.
+- [CodeQL 43025461040](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43025461040): all four language analyses succeeded.
+- [NuGet 43025461060](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43025461060): dependency submission succeeded.
+- [Release follow-up 43026470636](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43026470636): correctly skipped for this manually dispatched CI; v3.0.1 remains unchanged.
+
+The closing record update adds only Markdown evidence. Product/workflow content
+remains byte-identical to the successfully tested revision; local link-target
+and whitespace checks validate the record without repeating the full build.
 
 A new release is recommended as v3.0.2: the YAML writer correction fixes existing
 string-value loss, while the reviewed dependency/build changes preserve the
