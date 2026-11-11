@@ -1,5 +1,27 @@
 # Project Status
 
+## Avalonia baseline license reassessment (2026-11-11)
+
+- Read-only follow-up on #32 confirms the unchanged open head `51898a8`, failed
+  build/restore checks and neutral aggregate CodeQL. No dependency edit, merge,
+  workflow rerun or remote publication was performed.
+- Correction to the earlier upgrade-only framing: the official source commit for
+  installed Avalonia 12.0.3, `21e816874efa142bf9903b51fd323d1f35e56ab3`, already
+  contains MS-PL headers in [Calendar.cs](https://github.com/AvaloniaUI/Avalonia/blob/21e816874efa142bf9903b51fd323d1f35e56ab3/src/Avalonia.Controls/Calendar/Calendar.cs)
+  and [Fluent Calendar.xaml](https://github.com/AvaloniaUI/Avalonia/blob/21e816874efa142bf9903b51fd323d1f35e56ab3/src/Avalonia.Themes.Fluent/Controls/Calendar.xaml).
+  The same headers were freshly verified at proposed 12.1.6 commit `cf8e564`.
+  Source revisions come from the corresponding NuGet nuspec repository metadata.
+- Staying on 12.0.3 does not resolve this source-license concern. v3.0.2 retains
+  that dependency; its successful tests/publication do not establish component
+  license compatibility. A complete released-binary inclusion audit was not
+  performed in this follow-up, so no new definitive distribution finding is claimed.
+- Options: reproducible source reduction/replacement with package and GUI audits;
+  applicable permission from rights holders; or an explicitly reviewed licensing
+  change with all necessary rights. Deferral alone is only temporary containment.
+  Recommended next decision: a scoped baseline/component audit and reduced-build
+  feasibility assessment. No remediation option is selected yet; #32 stays blocked
+  and automatic merging remains disabled.
+
 ## Release v3.0.2 published and verified (2026-11-11)
 
 - Completed `M-RELEASE-302-20261111`: v3.0.2 is published from main/release
