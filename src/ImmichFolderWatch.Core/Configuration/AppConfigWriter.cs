@@ -15,6 +15,7 @@ public sealed class AppConfigWriter
         var legacyExtensions = config.Watch.Extensions.ToList();
 
         var serializer = new SerializerBuilder()
+            .WithQuotingNecessaryStrings()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
 

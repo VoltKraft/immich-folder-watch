@@ -90,151 +90,256 @@
   "microsoft.data.sqlite": {
     "10.0.10": [
       "Dotnet.Sqlite-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.data.sqlite.core": {
     "10.0.10": [
       "Dotnet.Sqlite-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.binder": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.commandline": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.environmentvariables": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.fileextensions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.json": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.configuration.usersecrets": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.dependencyinjection.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.diagnostics.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.fileproviders.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.fileproviders.physical": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.filesystemglobbing": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.hosting": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.hosting.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.abstractions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.configuration": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.console": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.debug": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.eventlog": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.logging.eventsource": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "microsoft.extensions.options.configurationextensions": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "microsoft.extensions.primitives": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ],
+    "10.0.3": [
+      "Dotnet-10.0.3-LICENSE.txt"
     ]
   },
   "shimskiasharp": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
     ]
   },
   "socketio.core": {
@@ -255,6 +360,9 @@
   "socketioclient": {
     "3.1.2": [
       "SocketIO-LICENSE.txt"
+    ],
+    "4.0.5": [
+      "SocketIOClient-4.0.5-LICENSE.txt"
     ]
   },
   "sqlitepclraw.bundle_e_sqlite3": {
@@ -289,29 +397,87 @@
       "SQLitePCLRaw-3.0.5-NOTICE.txt"
     ]
   },
+  "svg.animation": {
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
+    ]
+  },
   "svg.custom": {
     "3.6.0": [
       "Svg.Custom-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Custom-5.2.3-LICENSE.txt"
     ]
   },
   "svg.model": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
+    ]
+  },
+  "svg.scenegraph": {
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
     ]
   },
   "svg.skia": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
+    ]
+  },
+  "system.diagnostics.diagnosticsource": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "system.diagnostics.eventlog": {
     "10.0.0": [
       "Dotnet-LICENSE.txt"
+    ],
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.io.pipelines": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.text.encodings.web": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
+    ]
+  },
+  "system.text.json": {
+    "11.0.0": [
+      "Dotnet-11.0.0-LICENSE.txt"
     ]
   },
   "tmds.dbus.protocol": {
     "0.92.0": [
       "Tmds.DBus-LICENSE.txt"
+    ]
+  },
+  "yamldotnet": {
+    "18.1.0": [
+      "YamlDotNet-18.1.0-LICENSE.txt",
+      "YamlDotNet-18.1.0-LICENSE-libyaml"
+    ]
+  },
+  "socketioclient.common": {
+    "4.0.0": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
+    ]
+  },
+  "socketioclient.serializer": {
+    "4.0.0.1": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
     ]
   }
 }

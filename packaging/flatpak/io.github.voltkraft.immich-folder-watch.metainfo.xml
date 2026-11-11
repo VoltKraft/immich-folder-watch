@@ -99,27 +99,25 @@
   </branding>
 
   <releases>
-    <release version="3.0.0" date="2026-11-10">
+    <release version="3.0.2" date="2026-11-11">
       <description>
-        <p>This major release requires migration for existing HTTP connections: use HTTPS or explicitly enable immich.allowInsecureHttp. Review the configuration and watch-root security documentation before upgrading installations that depend on linked folders or limited filesystem capabilities.</p>
-        <p>Security:</p>
+        <p>Maintenance release containing all reviewed main changes since 3.0.1. Configuration, stored data and supported integrations remain compatible; the HTTPS-by-default requirement introduced in 3.0.0 remains unchanged.</p>
+        <p>Fixed:</p>
         <ul>
-          <li>Require HTTPS for Immich by default, with an explicit documented `allowInsecureHttp` migration option for trusted legacy HTTP installations.</li>
-          <li>Write Linux configuration containing API keys atomically with owner-only permissions; use a verified private directory for single-instance state.</li>
-          <li>Bound API response sizes and download resources, reject incomplete remote inventories before cleanup, and finalize downloads without replacing local files.</li>
-          <li>Refuse linked watch entries and scope folder-driven album mutations to newly created, explicitly recorded IDs; revoke folder authority after worker restarts and failed renames.</li>
-          <li>Pin watched directory identities and use retained file/directory handles for transfers, enumeration, cleanup, timestamp recovery and folder renames, preventing concurrent directory replacements from redirecting access.</li>
-          <li>Pin CI actions, the Flatpak build image and WinGet submission binary; restrict release job tokens and validate dispatcher tags outside executable source.</li>
-        </ul>
-        <p>Added:</p>
-        <ul>
-          <li>Signed GitHub Pages Flatpak repository for x86_64 and aarch64, with `.flatpakrepo`/`.flatpakref` installation, normal Flatpak updates, and release-triggered deployment alongside existing GitHub Release bundles.</li>
+          <li>Prevent SocketIO reconnects after realtime shutdown with bounded graceful disconnect and explicit connection-lifetime guards.</li>
+          <li>Preserve YAML-sensitive configuration strings such as the literal `null` when saving and reloading settings.</li>
+          <li>Retain both upstream MIT license texts for YamlDotNet 18.1.0 so native Flatpak packaging succeeds.</li>
+          <li>Correct the Dependabot xUnit ignore requirement so NuGet update jobs can run while retaining the exclusion of xUnit 4 and later.</li>
         </ul>
         <p>Changed:</p>
         <ul>
-          <li>Require supported secure filesystem primitives and reserve .ifw-internal- paths for protected transactions. Windows can block moves of active watch directories; Linux retains outer transaction containers after shutdown or cache eviction.</li>
-          <li>Retry a successful upload before later local cleanup after a restart or deletion failure; stored size and modification time alone no longer authorize deletion.</li>
-          <li>Updated the contributor workflow with maintained project/status records, automatic checkpoint guidance, and focused Codex agent profiles.</li>
+          <li>Adapt realtime transports to SocketIOClient 4.0.5 while preserving origin, redirect and message-size guards and retaining exact upstream MIT notices.</li>
+          <li>Update the build-only branding generator to Svg.Skia 5.2.3 with reviewed upstream notices; application rendering dependencies remain unchanged.</li>
+          <li>Update pinned checkout and .NET setup actions to v7.0.1 and v6.1.0, retaining existing workflow permissions and .NET 10 support.</li>
+          <li>Update YAML configuration serialization to YamlDotNet 18.1.0, with regression coverage for YAML-sensitive configuration strings.</li>
+          <li>Update GitHub Script to v9 and verify CommonJS helper loading and read-only GitHub API access in CI.</li>
+          <li>Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.</li>
+          <li>Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.</li>
         </ul>
       </description>
     </release>

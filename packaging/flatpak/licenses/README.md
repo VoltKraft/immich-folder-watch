@@ -53,3 +53,76 @@ and [license list](https://www.gnu.org/licenses/license-list.html) explain the
 distinction between preserving attribution, compatible software combinations,
 and separately distributed font or build-tool components. This notice packaging
 change adds no library or font dependency.
+
+## Microsoft.Extensions 11.0.0 review (2026-11-10)
+
+PR #33 resolves 32 Microsoft.Extensions/System package archives at 11.0.0 in the
+combined Linux x64/ARM64 feed. Their `.nuspec` files all declare MIT and identify
+[`dotnet/dotnet` revision `297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f`](https://github.com/dotnet/dotnet/tree/297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f).
+`Dotnet-11.0.0-LICENSE.txt` preserves that revision's complete MIT text, with its
+own immutable provenance entry even though its bytes match the older supplement.
+The exact 11.0.0 catalog entries include the newly resolved
+`System.Diagnostics.DiagnosticSource`, `System.IO.Pipelines`,
+`System.Text.Encodings.Web` and `System.Text.Json`, whose archives also omit the
+MIT text. Existing reviewed versions remain available.
+
+All 32 archives carry the same `THIRD-PARTY-NOTICES.TXT` (SHA-256
+`e3a241a6cf35167d82bf7e081de9641c59d10d2dbd8824409817bed31980d407`), which the
+installer preserves byte-for-byte. Compared with 10.0.0, the upstream notices
+correct the ASP.NET Core license to MIT, remove LinuxTracepoints, and add
+Zstandard, ANTLR 4 and Intel Decimal Floating-Point Math Library under BSD-style
+terms plus Wycheproof under Apache-2.0. These permissive additions are compatible
+with AGPL-3.0-only under the GNU compatibility guidance linked above; their
+attribution requirements remain intact. The broad upstream collection is not a
+claim that every named component is linked into the application.
+
+## Microsoft.Data.Sqlite 11.0.0 review (2026-11-10)
+
+PR #36 resolves `Microsoft.Data.Sqlite` and `Microsoft.Data.Sqlite.Core` 11.0.0.
+Both exact NuGet archives declare MIT and identify
+[`dotnet/dotnet` revision `297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f`](https://github.com/dotnet/dotnet/tree/297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f).
+Neither archive contains a license or third-party notice text. Their catalog
+entries therefore use `Dotnet-11.0.0-LICENSE.txt`, preserving the full MIT text
+from that revision with its own immutable provenance record. Its SHA-256 matches
+the older .NET supplement; the new source reference establishes the reviewed
+11.0.0 provenance without altering the retained 10.0.10 entries.
+
+MIT remains compatible with AGPL-3.0-only under the GNU guidance linked above.
+The resolved SQLitePCLRaw/native SQLite package versions and their Apache-2.0,
+public-domain and other retained upstream notices are unchanged by this PR.
+The top-level third-party dependency summary now identifies Sqlite 11.0.0.
+
+### YamlDotNet 18.1.0
+
+The NuGet archive declares MIT but omits license texts. Preserve both the project
+MIT license and the retained libyaml MIT license from the package's exact source
+revision `748334a8fa7c227740018b284b71ad95cc6b7fc7`. The immutable URLs and SHA-256
+checksums are recorded in `sources.json`; the supplement applies only to 18.1.0.
+Both permissive licenses are compatible with the application's AGPL-3.0-only
+distribution when their notices are retained. The package has no dependencies
+and supplies a native `net10.0` assembly. See
+[the PR review](../../../docs/dependabot-pr45-20261111.md).
+
+## Svg.Skia 5.2.3 build-tool review (2026-11-11)
+
+PR #44 updates the separate branding generator to Svg.Skia 5.2.3 while retaining
+SkiaSharp 4.155.0. The six updated Svg-family packages identify
+[`wieslawsoltes/Svg.Skia` revision `7910666415a96a09643d1729eb5da5d115d75748`](https://github.com/wieslawsoltes/Svg.Skia/tree/7910666415a96a09643d1729eb5da5d115d75748)
+and omit license text from their archives. Exact catalog entries now retain that
+revision's MIT text for `Svg.Skia`, `Svg.Model`, `Svg.SceneGraph`, `Svg.Animation`
+and `ShimSkiaSharp`, plus its MS-PL text for `Svg.Custom`. The texts are unchanged
+from the previously retained 3.6.0 notices; their new provenance is version-specific.
+
+The MS-PL package remains confined to the separately executed build tool. It is
+not linked into or shipped as an application assembly; this is not approval to
+combine MS-PL code with the AGPL-3.0-only application. A local Linux publish
+confirmed no Svg, ShimSkiaSharp or BrandAssetGen assemblies or package references
+in the runtime output. Application SkiaSharp stays at 3.119.4-preview.1.1 and
+HarfBuzzSharp at 8.3.1.3.
+
+New build-only HarfBuzzSharp 14.2.0 archives include MIT license text and native
+notices from recorded SkiaSharp source revision
+[`4e4ce7af7ea8702593af5aeb25d05c65ffb74e90`](https://github.com/mono/SkiaSharp/tree/4e4ce7af7ea8702593af5aeb25d05c65ffb74e90).
+Their retained native notice collection is byte-identical to the reviewed
+SkiaSharp 4.155.0 collection. See the [PR #44 evidence record](../../../docs/dependabot-pr44-20261111.md)
+for hashes, rendering comparisons and validation boundaries.

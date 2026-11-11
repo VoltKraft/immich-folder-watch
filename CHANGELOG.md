@@ -7,8 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-11-11
+
+Maintenance release containing all reviewed main changes since 3.0.1. Configuration, stored data and supported integrations remain compatible; the HTTPS-by-default requirement introduced in 3.0.0 remains unchanged.
+
+### Fixed
+- Prevent SocketIO reconnects after realtime shutdown with bounded graceful disconnect and explicit connection-lifetime guards.
+- Preserve YAML-sensitive configuration strings such as the literal `null` when saving and reloading settings.
+- Retain both upstream MIT license texts for YamlDotNet 18.1.0 so native Flatpak packaging succeeds.
+- Correct the Dependabot xUnit ignore requirement so NuGet update jobs can run while retaining the exclusion of xUnit 4 and later.
+
+### Changed
+- Adapt realtime transports to SocketIOClient 4.0.5 while preserving origin, redirect and message-size guards and retaining exact upstream MIT notices.
+- Update the build-only branding generator to Svg.Skia 5.2.3 with reviewed upstream notices; application rendering dependencies remain unchanged.
+- Update pinned checkout and .NET setup actions to v7.0.1 and v6.1.0, retaining existing workflow permissions and .NET 10 support.
+- Update YAML configuration serialization to YamlDotNet 18.1.0, with regression coverage for YAML-sensitive configuration strings.
+- Align the Windows hosting package with the reviewed Microsoft.Extensions 11.0.0 dependencies while retaining .NET 10 support. (Windows)
+- Update GitHub Script to v9 and verify CommonJS helper loading and read-only GitHub API access in CI.
+- Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
+- Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
+
+## [3.0.1] - 2026-11-11
+
+Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.
+
+### Security
+- Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path. Scope Git ownership trust to the exact checkout workspace for container builds.
+
+### Fixed
+- Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.
+- Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.
+- Restore Flatpak packaging for Microsoft.Extensions 11.0.0 updates by recording reviewed MIT supplements for the complete resolved Microsoft/System package set.
+- Prevent concurrent watcher/polling callbacks from trashing the same remote asset twice, and retain failed deletion mappings for polling retries.
+
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
+
+### Changed
+- Update Microsoft.Extensions and Microsoft.Data.Sqlite to 11.0.0, with reviewed upstream license notices retained in Flatpak packages.
+- Update pinned artifact upload/download, Pages configuration/deployment and Node setup actions; retain manual dependency review and disabled automatic merging.
+- Record dependency compatibility reviews, validation results and deferred upgrades in the maintenance documentation.
 
 ## [3.0.0] - 2026-11-10
 

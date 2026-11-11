@@ -1,3 +1,4 @@
+# Repository settings keep auto-merge disabled; this file only schedules update PRs.
 version: 2
 
 updates:
@@ -13,6 +14,13 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore(deps)
+    # Avalonia.Headless.XUnit 12.0.3 uses the pre-4.0 xUnit extension API.
+    # Revisit when its bridge supports xUnit 4.x and the VSTest workflow is validated.
+    # Use comparator syntax: the hosted updater rejects the interval form [4.0.0,).
+    ignore:
+      - dependency-name: xunit.v3
+        versions:
+          - ">= 4.0.0"
     # Keep related packages aligned across application, test and tool projects.
     groups:
       avalonia:

@@ -69,6 +69,10 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
   workflow takes its source commit directly from the caller's `github.sha`
   event context; it does not accept a separate source-ref input. Checkout,
   manifest preparation and artifact names all use that same commit.
+- `pages-artifact-validation.yaml`: called by CI with read-only repository
+  permissions; uploads synthetic Pages fixtures through the production action pin,
+  downloads them by artifact ID and verifies tar contents, hidden-file selection
+  and link dereferencing. It never deploys Pages or accesses signing secrets.
 - `release.yaml`: build x64 and ARM64 Windows MSIs and Linux Flatpaks from the
   same immutable commit, then publish all four only after successful CI on
   `main` and only when the version tag does not already exist
@@ -85,6 +89,22 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
   instructions, and Flathub submission requirements
 
 ### Publication workflow trust
+
+The Flatpak release job explicitly checks out the repository's default branch and
+requires its exact HEAD to equal the resolved release target before running any
+repository script. This keeps the SDK, manifest template and generated offline
+NuGet feed consistent with the commit pinned into the release manifest. If main
+advances between target resolution and checkout, the job fails closed; after CI
+passes on current main, use its automatic release run or retry Release on main.
+Do not remove the guard or substitute an arbitrary checkout ref to retry an old
+run. Existing main/same-repository event gates and immutable release tags remain.
+
+Focused workflow and manifest regression checks:
+
+```bash
+python3 -m unittest discover -s tools/tests -p test_workflow_security.py -v
+python3 -m unittest discover -s tools/tests -p test_prepare_flatpak_release_manifest.py -v
+```
 
 Release build jobs use read-only repository permissions and checkout does not
 persist credentials. Only the publishing job receives `contents: write`; the
@@ -112,6 +132,13 @@ both are enabled for this repository, with activation evidence in
 does not enable them. The weekly schedule and version-update PR limit
 do not govern security updates. See GitHub's
 [configuration reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+
+The `xunit.v3` ignore rule uses `>= 4.0.0` until the Avalonia headless bridge
+supports xUnit 4 and the VSTest workflow is validated. Keep this absolute version
+exclusion for both version and security updates. The hosted updater rejects the
+interval spelling `[4.0.0,)` with `illformed_requirement`, even though the separate
+YAML configuration check accepts it. Validate updater runs after changing ignore
+requirements; a green configuration check alone is insufficient.
 
 Before merging any proposal, verify upstream provenance and license compatibility
 with **AGPL-3.0-only**, refresh affected third-party notices/license catalogs, and
