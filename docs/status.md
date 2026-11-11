@@ -1,5 +1,46 @@
 # Project Status
 
+## Generator pushed; WinGet publisher-policy blocker confirmed (2026-11-11)
+
+- Pushed implementation `af7bb8e` and its documentation history to project main
+  at `6d05b17907ad8a603fa01ffeeb7463ce7e10d70f` under explicit authorization.
+- Exact-head CI [43103171839](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43103171839)
+  attempt 1 completed with seven successful jobs: Windows/Linux build/tests,
+  packaging lint, Flatpak preparation, both native Flatpak builds and the
+  hidden=true Pages round trip. The hidden=false Pages job uploaded artifact
+  `13892548202`, then failed because the immediate download did not find that ID.
+  This suggests transient artifact visibility, not a proven root cause.
+- Requested a targeted rerun of job `130799588814` after attempt 1 finished.
+  Attempt 2 remains queued after repeated checks; no passing rerun is claimed.
+  The original failure and outstanding runner scheduling prevent an all-green
+  CI conclusion. No workflow changes or disabled checks were used.
+- NuGet submission and all four CodeQL analyses in
+  [43103172344](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43103172344)
+  pass. Automatic Release follow-up `43104262729` is skipped; no release created.
+- WinGet PR #477862 is OPEN but its hosted Manifest Validation fails with
+  `FieldRequireVerifiedPublisher: Field usage requires verified publishers. (Icons)`.
+  Verified in check `130798904294` on PR head `c50ef9e`; subsequent validation
+  stages were skipped. The initial PR validation and CLA pass. The overall
+  "Validation Completed" check does not mean that manifest validation passed.
+- Correction to the initial diagnosis/remediation: the JSON schema accepts the
+  fields, but a separate publisher-policy prerequisite prevents this package
+  from using them. The generator is implemented and pushed, but its icon-bearing
+  output is not currently acceptable to WinGet. Existing published 3.0.3 and its
+  installers are unchanged; no upstream merge or actual client rendering.
+- The [official WinGet policy](https://github.com/microsoft/winget-pkgs/blob/master/doc/manifest/schema/1.28.0/defaultLocale.md#icons---the-icons-for-the-package)
+  says icons are populated during validation and must not be authored in PRs.
+  Therefore absence in the source manifest alone did not prove absence in the
+  served catalog; the initial diagnosis overstated this evidence. A maintainer
+  [explains icon extraction](https://github.com/microsoft/winget-pkgs/issues/360963#issuecomment-4254042938)
+  from Settings > Apps. No public publisher-verification onboarding was established.
+- Final verification records are local only after the published `6d05b17`;
+  remote main contains the requested implementation. Next CI action: inspect
+  attempt 2 after runner scheduling.
+- Recommended follow-up: revise/gate generator icon emission before another
+  release submission and contribute to UniGetUI's separate icon database.
+  No publisher claim, policy bypass, PR closure or additional external
+  contribution was performed.
+
 ## WinGet generator publication selected (2026-11-11)
 
 - Selected `M-WINGET-ICON-PUBLISH-20261111` under explicit push authorization.

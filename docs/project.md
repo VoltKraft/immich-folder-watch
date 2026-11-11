@@ -11,8 +11,8 @@
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-19`.
-- Plan maturity: WinGet icon correction implemented, validated and submitted.
-- Active milestone: `M-WINGET-ICON-PUBLISH-20261111`.
+- Plan maturity: Generator pushed; CI retry queued; WinGet icon policy blocks submission.
+- Active milestone: `M-WINGET-ICON-PUBLISH-20261111` (CI retry pending).
 - Implementation request / scope: The user selected the WinGet icon correction
   and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -28,6 +28,12 @@
 
 ## M-WINGET-ICON-PUBLISH-20261111
 
+Published at `6d05b17`; CodeQL/NuGet and seven CI jobs pass. One Pages artifact
+job failed and its targeted retry is queued. WinGet PR #477862 remains open with
+`FieldRequireVerifiedPublisher` failure. Official policy says icon metadata must
+not be manually authored in PRs; the implemented approach must be revised before
+a future WinGet release submission. See [current evidence](status.md).
+
 The user explicitly authorized pushing the generator correction to the project
 repository and checking CI and WinGet PR #477862. Publish the validated local
 history without rewriting remote history, including its preceding release and
@@ -39,7 +45,9 @@ release, upstream merge or installed-app operation is selected.
 
 Completed: generator regression and schema checks pass; metadata-only
 [WinGet PR #477862](https://github.com/microsoft/winget-pkgs/pull/477862) is open.
-External acceptance and actual client rendering remain unverified.
+Follow-up hosted validation rejected `Icons` under publisher policy; the earlier
+schema-only acceptance does not establish a usable catalog correction.
+Actual client rendering remains unverified.
 
 The user selected implementing and testing icon metadata in the WinGet generator
 and submitting the same correction for the current published version, 3.0.3.

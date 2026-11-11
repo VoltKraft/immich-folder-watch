@@ -87,6 +87,17 @@ do not contain the required ARM64 MSI.
 
 ## Catalog icon
 
+**Known publication blocker:** WinGet PR #477862 failed hosted validation with
+`FieldRequireVerifiedPublisher: Field usage requires verified publishers. (Icons)`.
+The [official repository policy](https://github.com/microsoft/winget-pkgs/blob/master/doc/manifest/schema/1.28.0/defaultLocale.md#icons---the-icons-for-the-package)
+says icon metadata is populated during validation and must not be authored in PRs.
+Local JSON-schema validity does not establish publication eligibility. The current
+icon-bearing generator output cannot pass this package's WinGet validation and
+must be revised before another release submission. Existing published 3.0.3 is
+unaffected. A separate UniGetUI icon-database contribution is a possible follow-up;
+no public publisher-verification procedure has been established here.
+See [status](../../docs/status.md).
+
 The required `icon` object in `package.metadata.json` supplies the existing
 512 x 512 PNG through a full-commit-pinned `raw.githubusercontent.com` URL.
 Its SHA-256 binds the downloaded bytes. The generator emits `Icons` in the
@@ -99,7 +110,8 @@ source asset normally, then update the pinned URL and hash together. Verify the
 public bytes and dimensions before submission. Do not use a moving branch URL.
 The MSI's embedded Windows icon is independent of this catalog metadata.
 
-For a metadata-only correction to an already published version, preserve the
+The rejected submission was prepared as follows; do not repeat it while the
+publisher-policy blocker above remains. For a metadata-only correction, preserve the
 upstream manifest set and add only the generator's `Icons` block to its existing
 default-locale file. Validate all three files against the official matching
 [WinGet schemas](https://github.com/microsoft/winget-cli/tree/master/schemas/JSON/manifests),
