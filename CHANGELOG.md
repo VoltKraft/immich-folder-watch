@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
+
+## [3.0.1] - 2026-11-11
+
+Maintenance release containing the reviewed updates and fixes merged since 3.0.0. The HTTPS-by-default migration requirement introduced in 3.0.0 remains unchanged.
+
+### Security
+- Restrict Flatpak release tooling to the trusted default-branch checkout and reject a different release target before executing repository scripts, preventing mixed release inputs and removing the dynamic-checkout cache-poisoning path. Scope Git ownership trust to the exact checkout workspace for container builds.
+
 ### Fixed
 - Restore Flatpak packaging for Microsoft.Data.Sqlite 11.0.0 by preserving the exact upstream MIT license for both Sqlite packages and refreshing attribution.
 - Retain the xUnit v3 framework version compatible with Avalonia headless tests while updating xUnit v2 and the Visual Studio test runner; preserve serial GUI execution and the existing VSTest workflow.
@@ -15,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Weekly Dependabot checks for NuGet packages and SHA-pinned GitHub Actions, with related NuGet packages grouped for review and bounded open update PRs.
+
+### Changed
+- Update Microsoft.Extensions and Microsoft.Data.Sqlite to 11.0.0, with reviewed upstream license notices retained in Flatpak packages.
+- Update pinned artifact upload/download, Pages configuration/deployment and Node setup actions; retain manual dependency review and disabled automatic merging.
+- Record dependency compatibility reviews, validation results and deferred upgrades in the maintenance documentation.
 
 ## [3.0.0] - 2026-11-10
 
