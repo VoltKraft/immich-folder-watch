@@ -11,7 +11,7 @@
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-06`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: `M-DEPENDABOT-IGNORE-20261111`; PR validation and activation pending.
+- Active milestone: `M-DEPENDABOT-IGNORE-20261111`; hosted updater verification running.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
