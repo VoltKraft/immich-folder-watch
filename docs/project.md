@@ -7,11 +7,12 @@
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
 - Product baseline: The checked-in version is `3.0.1` in
-  [Directory.Build.props](../Directory.Build.props). Local `main` includes the
-  merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-09`.
-- Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: `M-REMAINING-MERGE-20261111`; merge the seven prepared PRs and verify main.
+  [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
+  reviewed dependency merges through `efeda2f`; published releases and deployed
+  installations remain separate evidence.
+- Brief revision: `IFW-BRIEF-20261111-10`.
+- Plan maturity: v3.0.1 published; seven further dependency PRs merged and main verified; Avalonia remains deferred.
+- Active milestone: none; `M-REMAINING-MERGE-20261111` completed. No further merge or release is selected.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +26,11 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-REMAINING-MERGE-20261111
+
+Completed: all seven selected PRs merged through `efeda2f`; final main CI,
+four CodeQL analyses and NuGet submission pass. Automatic release follow-up
+correctly skips existing v3.0.1. #32 remains open/license-blocked and auto-merge
+disabled. [Final evidence](dependabot-remaining-merges-20261111.md).
 
 The user explicitly authorized merging and checking the seven prepared PRs
 #38/#39/#40/#42/#43/#44/#45. Reverify exact heads and successful checks, merge

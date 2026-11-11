@@ -1,19 +1,26 @@
 # Project Status
 
-## All selected dependency PRs merged; main verification running (2026-11-11)
+## Selected dependency PRs merged and main verified (2026-11-11)
 
-- User-authorized #38/#39/#40/#42/#43/#44/#45 have merged. Final remote main:
-  `efeda2ffb6ec975188d2b1454c39dd718c00e540`, with tree identical to the reviewed
-  combined integration. Each merge used an exact-head guard and successful checks.
-- Additive changelog/notice conflicts preserve both sides. The combined source
-  passes 501 portable tests and independent review; its 24 license hashes and 109
-  version mappings validate. The final ancestry-only refresh restored GitHub's
-  MERGEABLE/CLEAN state, passed 14 fresh checks and merged normally.
-- Main CI 43021602143, CodeQL 43021602894 and NuGet 43021602079 are running;
-  release follow-up remains to be verified. No new version/release is selected.
-- Local synchronization `abe5ad4` preserves previous unpublished documents;
-  only documentation differs from remote main. #32 remains excluded and
-  automatic merging disabled. [Merge evidence](dependabot-remaining-merges-20261111.md).
+- Completed `M-REMAINING-MERGE-20261111`: #38/#39/#40/#42/#43/#44/#45 merged
+  through guarded requests after successful exact-head checks. Final main
+  `efeda2ffb6ec975188d2b1454c39dd718c00e540` exactly matches the reviewed integration.
+- Additive conflict resolutions preserve all reviewed changes and license data.
+  Combined 501 portable tests pass; independent review confirms the exact source
+  edit union, 24 license hashes and 109 version mappings. GitHub's stale conflicting
+  state was resolved by a tree-identical normal merge and 14 fresh successful checks.
+- Final main CI 43021602143 passes all eight jobs; CodeQL 43021602894 passes all
+  four languages; NuGet 43021602079 succeeds. All 13 validation checks are green.
+  Open Dependabot and code-scanning alert counts are zero after analysis.
+- Release follow-up 43022515575 succeeds, detects existing v3.0.1 and skips all
+  builds/publication/downstream updates. Published tag 1ab0748 and four assets
+  remain unchanged; no new release or deployment occurred.
+- Only #32 remains open at unchanged 51898a8, still license-blocked. Repository
+  auto-merge is false. No live Immich test was performed.
+- Local main incorporates remote main while preserving unpublished documentation;
+  production files match exactly and only docs remain ahead. No extra main push.
+- Scope complete; no further merge or release selected. [Full merge and validation
+  evidence](dependabot-remaining-merges-20261111.md).
 
 ## Remaining dependency PRs prepared and verified (2026-11-11)
 

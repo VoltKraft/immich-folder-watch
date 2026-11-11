@@ -74,8 +74,25 @@ assets; no version or publication change was made.
 The final #45 head passed all 14 checks and GitHub confirmed MERGEABLE/CLEAN;
 the expected-head merge then succeeded as `efeda2f`. Its tree exactly equals
 the reviewed and tested integration tree `edb08a47b902211878b3625c6935d60957481d57`.
-All seven authorized PRs have merged. Main runs CI 43021602143,
-CodeQL 43021602894 and NuGet 43021602079 are in progress.
+All seven authorized PRs have merged. Final main validation succeeds:
+
+- [CI 43021602143](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43021602143): all eight jobs pass, including Windows/Linux tests, both native Flatpak architectures and Pages artifact validation.
+- [CodeQL 43021602894](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43021602894): all four language analyses pass.
+- [NuGet 43021602079](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43021602079): automatic dependency submission succeeds.
+- All 13 main validation checks succeed. Open code-scanning and Dependabot alert queries both return zero after analysis.
+
+[Release follow-up 43022515575](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43022515575)
+succeeds. Its prepare job checks out the exact final main commit, detects that
+`v3.0.1` already exists and explicitly skips artifact builds/publication. Windows
+and Flatpak release builds, GitHub publication, Flathub, Flatpak repository and
+WinGet update jobs are skipped. The release remains published with four assets,
+original timestamp 2026-11-10T23:43:06Z and unchanged tag commit
+`1ab074841c76b2493dc3af5d972ce229e5746edb`.
+
+Final GitHub reads confirm all seven selected PRs MERGED with the recorded
+commits. Only #32 remains OPEN at unchanged `51898a8`; its license block remains.
+Repository `allow_auto_merge` is false and #32 has no auto-merge request.
+No live Immich access or additional publication was performed.
 
 Local main incorporates remote main through merge `abe5ad4`, retaining all prior
 unpublished documentation. Every local changelog line was mechanically verified
