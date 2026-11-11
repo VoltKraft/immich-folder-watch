@@ -1,5 +1,40 @@
 # Project Status
 
+## PR #32 reduced Avalonia remediation selected (2026-11-11)
+
+- Selected `M-PR32-REDUCED-AVALONIA-20261111` under explicit user authorization.
+  Worktree `/tmp/ifw-pr32-reduced` preserves the bot commit and merges main
+  `df48398` normally; no main push, PR merge, auto-merge or release is selected.
+- Shipped-component audit confirms original affected Controls/Fluent in both
+  v3.0.2 Linux bundles; Windows packages contain no Avalonia implementation.
+- Reduced 12.1.6.1 packages remove the inventoried components/resources and have
+  identical bytes across three build roots. D-Bus app/test pins are now 0.94.1.
+- 501 Core and 60 Linux tests pass, including real dropdown/tooltip behavior in
+  both themes and loaded-type exclusion checks. Actual publish provenance passes.
+- Both offline feeds generate successfully (95 combined official inputs), with
+  verified hashes and installed official/private notices. Independent review found
+  and reverified the fix binding extracted metadata/DLLs directly to rebuilt ZIP
+  bytes; the joint metadata/binary-tamper regression now fails closed.
+- 146 tooling tests pass (four PowerShell cases deferred to Windows CI). All 16
+  synthetic light/dark page previews render; inspected folders/settings images
+  show no missing templates. No live desktop/Immich acceptance is claimed.
+- First hosted NuGet run 43059604936 failed because GitHub selected SDK 10.0.404
+  from the old root roll-forward policy, while reconstruction correctly required
+  10.0.401. Root global.json now pins 10.0.401 with roll-forward disabled, so managed
+  tooling installs the same reviewed compiler as CI and Flatpak.
+- Current hosted Windows, all four CodeQL analyses and automatic NuGet submission
+  pass. Native Flatpak compilation succeeds, but subsequent verification exposed
+  an ephemeral default NuGet cache across build commands; the offline config now
+  scopes it to the persistent module build directory. A real SDK regression
+  restores across two disposable HOME directories and fails without this fix.
+- Hosted Linux package installation independently failed on Azure Ubuntu mirror
+  DNS. CI falls back only when that mirror fails DNS resolution, retaining signed
+  APT verification and package requirements. A second run also failed to resolve
+  archive.ubuntu.com; the fallback now selects a resolvable HTTPS Ubuntu mirror
+  (archive.ubuntu.com or mirrors.edge.kernel.org) without changing trusted keys.
+- Published v3.0.2 and existing local main documentation remain unchanged.
+  Hosted current-head CI/CodeQL and reduced-binary verification are pending.
+
 ## Release v3.0.2 selected (2026-11-11)
 
 - Selected `M-RELEASE-302-20261111` under explicit release authorization.

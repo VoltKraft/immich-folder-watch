@@ -2,6 +2,12 @@
 
 ## Build
 
+The Linux UI uses the [reduced Avalonia build](reduced-avalonia.md). Python 3.11+
+and the exact SDK pinned in `packaging/avalonia-reduced/inputs.json` are required
+for its source reconstruction. Normal restore prepares the private packages;
+CI also runs explicit preparation and provenance verification. Follow that guide
+for offline feeds, cache boundaries and future framework updates.
+
 ```bash
 dotnet restore
 dotnet build ImmichFolderWatch.sln -c Debug

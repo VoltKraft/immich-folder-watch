@@ -128,6 +128,57 @@ class FeedValidationTests(unittest.TestCase):
             self.collect()
 
 
+    def private_package(self) -> tuple[Path, Path]:
+        archive = self.package("avalonia", "12.1.6.1")
+        feed = self.root / "reduced-feed"
+        feed.mkdir()
+        built = feed / archive.name
+        built.write_bytes(archive.read_bytes())
+        metadata = archive.parent / ".nupkg.metadata"
+        metadata.write_text(json.dumps({"source": str(feed.resolve())}))
+        self.assets["libraries"]["Avalonia/12.1.6.1"] = {"type": "package"}
+        self.write_assets()
+        return archive, feed
+
+    def test_private_archives_must_equal_fresh_source_build_and_are_not_download_inputs(self) -> None:
+        archive, feed = self.private_package()
+        sources = MODULE.collect_sources(self.packages, self.artifacts, "linux-x64", feed, "12.1.6.1")
+        self.assertEqual(2, len(sources))
+        self.assertFalse(any("avalonia" in source["url"] for source in sources))
+        (feed / archive.name).write_bytes(b"another source build")
+        with self.assertRaisesRegex(MODULE.GeneratorError, "differs from the fresh source build"):
+            MODULE.collect_sources(self.packages, self.artifacts, "linux-x64", feed, "12.1.6.1")
+
+    def test_private_archives_reject_wrong_version_and_origin(self) -> None:
+        archive, feed = self.private_package()
+        with self.assertRaisesRegex(MODULE.GeneratorError, "unexpected private Avalonia version"):
+            MODULE.collect_sources(self.packages, self.artifacts, "linux-x64", feed, "12.1.6.2")
+        (archive.parent / ".nupkg.metadata").write_text(json.dumps({"source": MODULE.NUGET_INDEX}))
+        with self.assertRaisesRegex(MODULE.GeneratorError, "did not originate"):
+            MODULE.collect_sources(self.packages, self.artifacts, "linux-x64", feed, "12.1.6.1")
+
+    def test_private_archive_requires_available_rebuilt_reference(self) -> None:
+        archive, feed = self.private_package()
+        (feed / archive.name).unlink()
+        with self.assertRaisesRegex(MODULE.GeneratorError, "newly built private package is missing"):
+            MODULE.collect_sources(self.packages, self.artifacts, "linux-x64", feed, "12.1.6.1")
+
+    def test_bootstrap_inputs_merge_without_conflicting_pins(self) -> None:
+        source = self.collect()[0]
+        self.assertEqual([source], MODULE.merge_official_inputs([source], [source]))
+        with self.assertRaisesRegex(MODULE.GeneratorError, "conflicting official bootstrap input"):
+            MODULE.merge_official_inputs([source], [{**source, "sha512": "0" * 128}])
+
+    def test_private_source_mapping_is_exclusive_and_escapes_paths(self) -> None:
+        import xml.etree.ElementTree as ET
+        feed = self.root / 'feed & "quoted"'
+        config = ET.fromstring(MODULE.restore_config(feed))
+        private = config.find("packageSources/add[@key='reduced-avalonia']")
+        self.assertEqual(str(feed.resolve()), private.get("value"))
+        mapping = config.find("packageSourceMapping/packageSource[@key='reduced-avalonia']")
+        self.assertEqual({"Avalonia", "Avalonia.Themes.Fluent"}, {item.get("pattern") for item in mapping})
+
+
 FAKE_DOTNET = '''#!/usr/bin/env python3
 import base64, hashlib, json, os, sys
 from pathlib import Path

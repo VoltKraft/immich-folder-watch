@@ -43,13 +43,19 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.401
+
+      - name: Build reduced Avalonia from pinned sources
+        run: python tools/prepare_reduced_avalonia.py
 
       - name: Restore
         run: dotnet restore ImmichFolderWatch.sln
 
       - name: Build
         run: dotnet build ImmichFolderWatch.sln --configuration Release --no-restore
+
+      - name: Verify reduced Avalonia package provenance
+        run: python tools/verify_reduced_avalonia.py
 
       - name: Test
         run: dotnet test ImmichFolderWatch.sln --configuration Release --no-build
@@ -67,10 +73,23 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.401
 
       - name: Install portal protocol test tools
-        run: sudo apt-get update && sudo apt-get install -y dbus-daemon xdg-dbus-proxy
+        run: |
+          # Retain Ubuntu's signing keys while avoiding an unavailable runner mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ] && ! getent hosts azure.archive.ubuntu.com >/dev/null; then
+            mirror=""
+            for candidate in archive.ubuntu.com mirrors.edge.kernel.org; do
+              if getent hosts "$candidate" >/dev/null; then mirror="$candidate"; break; fi
+            done
+            if [ -z "$mirror" ]; then echo "No Ubuntu mirror resolves on this runner" >&2; exit 1; fi
+            printf 'https://%s/ubuntu\n' "$mirror" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          sudo apt-get update && sudo apt-get install -y dbus-daemon xdg-dbus-proxy
+
+      - name: Build reduced Avalonia from pinned sources
+        run: python3 tools/prepare_reduced_avalonia.py
 
       - name: Restore Linux-portable projects
         run: |
@@ -83,6 +102,9 @@ jobs:
           dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj --configuration Release --no-restore
           dotnet build src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --no-restore
           dotnet build src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj --configuration Release --no-restore
+
+      - name: Verify reduced Avalonia package provenance
+        run: python3 tools/verify_reduced_avalonia.py
 
       - name: Test
         run: |
@@ -116,6 +138,15 @@ jobs:
 
       - name: Install validators
         run: |
+          # Retain Ubuntu's signing keys while avoiding an unavailable runner mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ] && ! getent hosts azure.archive.ubuntu.com >/dev/null; then
+            mirror=""
+            for candidate in archive.ubuntu.com mirrors.edge.kernel.org; do
+              if getent hosts "$candidate" >/dev/null; then mirror="$candidate"; break; fi
+            done
+            if [ -z "$mirror" ]; then echo "No Ubuntu mirror resolves on this runner" >&2; exit 1; fi
+            printf 'https://%s/ubuntu\n' "$mirror" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             appstream \
@@ -149,7 +180,7 @@ jobs:
           from pathlib import Path
           manifest = json.loads(Path('/tmp/flatpak-manifest.json').read_text())
           sources = manifest['modules'][0]['sources']
-          assert [source['type'] for source in sources] == ['git', 'archive', 'archive', 'inline']
+          assert [source['type'] for source in sources] == ['git', 'archive', 'archive', 'file', 'inline']
           PY
 
       - name: Validate shared SDK pins
@@ -163,6 +194,11 @@ jobs:
             echo "Unsupported Flatpak runtime was accepted." >&2
             exit 1
           fi
+
+      - name: Setup pinned SDK for source-builder regression tests
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
 
       - name: Test release tooling
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py' -v

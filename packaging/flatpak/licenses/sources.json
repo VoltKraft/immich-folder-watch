@@ -94,5 +94,19 @@
   "Svg.Custom-5.2.3-LICENSE.txt": {
     "url": "https://raw.githubusercontent.com/wieslawsoltes/Svg.Skia/7910666415a96a09643d1729eb5da5d115d75748/src/Svg.Custom/LICENSE.TXT",
     "sha256": "d0ab1d6a97c328acf658b57141b6f2863d7eaf0066e42a9fd0792df0c4fd2521"
+  },
+  "Tmds.DBus-0.94.1-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/tmds/Tmds.DBus/b4a7fed0b878f74cb54f7cca84d2889af4e596ba/COPYING",
+    "sha256": "aca3b49277abcc7886ccb2f115603a9f5b15fc3f96019a10c00f2974098b210c"
+  },
+  "Avalonia-SixLabors-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/SixLabors/Fonts/034a440aece357341fcc6b02db58ffbe153e54ef/LICENSE",
+    "sha256": "f38dc2765451fd2b19d7e0f47ed655f3a1cb889b28341ea6266efd75d8425a6f"
+  },
+  "Avalonia-Apple-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/cf8e564674700348947e93ab19105f27afe859a9/src/Avalonia.Base/Utilities/SpringSolver.cs",
+    "sha256": "696f17436cd30cb4c02c0343cb58c91e685d1b67fae528bab6d84514e3c0c3bf",
+    "extraction": "Unmodified leading Apple copyright and BSD-2-Clause comment; application code excluded.",
+    "upstream_sha256": "f10c8be8167c90c8a686d6994ea76412c69e349d8294de9ea84cac862a679be4"
   }
 }
