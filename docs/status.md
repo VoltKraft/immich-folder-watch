@@ -1,5 +1,16 @@
 # Project Status
 
+## Dependabot xUnit ignore correction selected (2026-11-11)
+
+- User selected `M-DEPENDABOT-IGNORE-20261111`: fix the requirement parse error
+  and verify hosted NuGet updater jobs. #32 remains license-blocked; auto-merge off.
+- Replaced `[4.0.0,)` with `>= 4.0.0`, retaining the absolute version exclusion.
+  YAML parse and before/after semantic comparison passed; other settings match.
+- Dependabot upstream NuGet requirement handling accepts comparator syntax.
+  Hosted execution on the published fix is the decisive pending validation;
+  local Ruby parser execution was unavailable because Ruby is not installed.
+- No dependency version, release or runtime behavior changes.
+
 ## PR #34 refresh in progress (2026-11-11)
 
 - User selected `M-PR34-20261111`. Integrated remote main `2a9a96d` into

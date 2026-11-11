@@ -133,6 +133,13 @@ does not enable them. The weekly schedule and version-update PR limit
 do not govern security updates. See GitHub's
 [configuration reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 
+The `xunit.v3` ignore rule uses `>= 4.0.0` until the Avalonia headless bridge
+supports xUnit 4 and the VSTest workflow is validated. Keep this absolute version
+exclusion for both version and security updates. The hosted updater rejects the
+interval spelling `[4.0.0,)` with `illformed_requirement`, even though the separate
+YAML configuration check accepts it. Validate updater runs after changing ignore
+requirements; a green configuration check alone is insufficient.
+
 Before merging any proposal, verify upstream provenance and license compatibility
 with **AGPL-3.0-only**, refresh affected third-party notices/license catalogs, and
 require the existing Windows/Linux application and native Flatpak CI checks.
