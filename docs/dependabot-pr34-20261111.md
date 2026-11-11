@@ -60,3 +60,50 @@ contains the exact-head evidence. No recreation or support contact was needed.
 
 PR #32 stays blocked and unchanged; automatic merging remains disabled. No main
 push, release, Pages deployment or live application/Immich test was performed.
+
+## Authorized merge and main verification
+
+The user subsequently authorized merging #34 and verifying main. All 14 checks
+were rechecked on `1a4722cc8ddf4d34ff0588627e804c7f9e3f8a59`; expected-head merge
+succeeded as `eeba23df3a62a6cf307684b3a1a6f4d607d7118b`. No protection bypass
+or automatic merge was used. Earlier no-merge statements above describe preparation.
+
+- [Main CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003920977):
+  all eight jobs succeeded, including Windows/Linux tests, both native Flatpak
+  candidates, packaging lint/preparation and both Pages artifact jobs.
+- [Main CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003920330):
+  all four language analyses succeeded. Open code-scanning alert count is zero.
+- [NuGet submission](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003920444): success.
+- Dependabot configuration CheckRun `130466569912`, CheckSuite `116455918336`,
+  succeeded at 2026-11-11 10:28:38 UTC on the merge commit, with output
+  `All changes look good`. This is positive validation of the current main
+  configuration; it does not retroactively complete the two historical queued runs.
+- Release v3.0.1 retains publication timestamp 2026-11-10 23:43:06 UTC.
+  [Release follow-up](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43004699915)
+  succeeded in preparation; all artifact builds, publication and downstream
+  deployment/submission jobs were correctly skipped because the tag exists.
+
+Local merge reconciliation preserves newer verification/release documentation;
+only documentation differs from remote main. No additional main push was made.
+
+### Separate Dependabot updater failures
+
+The merge also triggered automatic Dependabot jobs. The Actions ecosystem update
+[43003932232](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003932232)
+succeeded. Both the general NuGet update
+[43003931719](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003931719)
+and Avalonia refresh
+[43003935654](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43003935654)
+failed with `illformed_requirement`, message `[4.0.0,)`.
+
+Logs identify the source as the pre-existing `xunit.v3` ignore condition in
+`.github/dependabot.yml`. This requirement is unchanged by #34 apart from its
+unrelated comment. The successful configuration check does not establish that
+this ecosystem-specific requirement parses in the updater. These failures are
+separate from successful application CI, CodeQL and dependency submission.
+
+No updater fix was applied during the requested merge-and-check assignment.
+Next action: correct and validate the ignore requirement while preserving the
+xUnit 4 compatibility exclusion, rerun both NuGet update paths, and retain #32's
+license block. Final readback: #34 closed/merged; #32 open at unchanged `51898a8`,
+no auto-merge request; repository auto-merge remains disabled.

@@ -4,13 +4,19 @@ The user initially deferred recovery, then selected renewed work on #34 on
 2026-11-11. See [the refreshed-head evidence](dependabot-pr34-20261111.md).
 The following records the original investigation. No support contact was sent.
 
+After the authorized #34 merge, the new main configuration check succeeded:
+CheckRun `130466569912`, suite `116455918336`, commit `eeba23d`, completed
+2026-11-11 10:28:38 UTC. The prior queued checks remain historical; the internal
+cause is still unknown. Current configuration validation is no longer blocked.
+
 ## Finding
 
 PR #34 has a stalled GitHub Dependabot App configuration-validation job, separate
 from GitHub Actions CI and CodeQL. No repository configuration defect was found.
 The available evidence points to service-side dispatch/processing, but GitHub's
 internal job logs are unavailable and the underlying implementation fault is
-not established. Recovery has not been verified.
+not established. At the original investigation, recovery was not verified;
+current-main validation subsequently succeeded as recorded above.
 
 ## Evidence
 

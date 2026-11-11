@@ -1,16 +1,24 @@
 # Project Status
 
-## PR #34 merged; main verification in progress (2026-11-11)
+## PR #34 merged; main verified, separate updater issue found (2026-11-11)
 
 - User authorized the merge and main verification. Rechecked all 14 successful
   PR-head checks and merged exact head `1a4722c` as
   `eeba23df3a62a6cf307684b3a1a6f4d607d7118b`, without bypass or auto-merge.
-- Main CI `43003920977`, CodeQL `43003920330` and NuGet submission
-  `43003920444` are running. Completion is not yet claimed.
+- Main CI `43003920977` passed all eight jobs; CodeQL `43003920330` passed
+  all four analyses; NuGet submission `43003920444` succeeded. Open code-scanning
+  alerts: zero. Dependabot configuration check `130466569912` also succeeded.
+- Release follow-up `43004699915` succeeded and correctly skipped publication
+  because v3.0.1 exists. No new release, Pages deployment or downstream submission.
+- Separate automatic NuGet updater runs failed with `illformed_requirement` for
+  the existing xunit.v3 ignore range `[4.0.0,)`. Merge/verification completed;
+  updater maintenance remains open. [Detailed evidence](dependabot-pr34-20261111.md).
 - Local documentation conflicts preserve the newer validation/release records;
   implementation changes match remote main. No extra main push is selected.
-- #32 remains excluded and auto-merge disabled. Next: verify main checks and
-  the version-tag gate in the automatic release follow-up.
+- #32 remains open/blocked at unchanged `51898a8`; #34 is closed/merged and
+  auto-merge disabled. Next maintenance action: validate/correct the xUnit ignore
+  requirement and rerun NuGet updater jobs while preserving compatibility blocks.
+  No configuration fix or additional remote push was performed in this assignment.
 
 ## PR #34 ready for a separate merge decision (2026-11-11)
 

@@ -10,8 +10,8 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-05`.
-- Plan maturity: v3.0.1 published; SkiaSharp PR #34 validated, Avalonia deferred.
-- Active milestone: `M-PR34-MERGE-20261111`; authorized merge and main verification.
+- Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
+- Active milestone: None; `M-PR34-MERGE-20261111` completed with a separate updater finding.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,11 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-PR34-MERGE-20261111
+
+Completed: #34 merged as `eeba23d`; all eight main CI jobs and all four CodeQL
+analyses passed. Release publication was correctly skipped. A separate pre-existing
+xUnit ignore-range parse error was identified in automatic NuGet updater jobs;
+it remains a maintenance follow-up, not an application CI failure.
 
 The user authorized merging #34 and checking main. Merge only the verified head,
 without bypassing checks; verify main CI, CodeQL and automatic release follow-up.
