@@ -26,3 +26,10 @@ deferred to Windows CI), all 5 release-manifest regression cases passed, and
 parameters, and the existing Flathub helper tests passed under Node.js. Exact-head remote CI, CodeQL and
 Dependabot status are recorded in the PR description and shared project status
 after completion. Publication-only jobs are not triggered for validation.
+
+The first refreshed head `263b1ab` passed all 14 CI/CodeQL/dependency-submission
+checks, including the actual v9 smoke test. The independent Dependabot app check
+`130500249152` remained queued with no output; its authenticated checks page
+provided no restart control. This final changelog checkpoint requests fresh
+checks naturally without modifying the validated Dependabot configuration or
+bypassing the outstanding service result.
