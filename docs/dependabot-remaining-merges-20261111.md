@@ -20,6 +20,8 @@ publication of accumulated local documentation is selected.
 | #40 | `a758f1422e84c4a517504a768e74a8b7cdb7fd32` | `294300144d485c329bbe520b934bf5ad744f8c24` |
 | #39 | `395225d662b52dbd1214c53d029be23476a65614` | `de55f2dabd48a0d5f7a9fbea4dec7f54b87ba1df` |
 | #43 | `564269d33adffbbf7984f00d23eb54bd5e734a38` | `6a99ed310a3257695c65a8634be291e77ebb2fe3` |
+| #42 | `d1ebef8940e2bf35f678b8684ac89c61513983e2` | `f00eb5a12ed5848cf180ba8ff6d18f2a496cd4b1` |
+| #44 | `17bfa335bd61e7894d0a490a39f19b0637df446b` | `9a353d3e2e18a89cd62a21523e23b165b9033e42` |
 
 ## Conflict resolution and combined validation
 
@@ -49,5 +51,19 @@ the complete license/source inventory and additive documentation resolutions.
 | #44 | `17bfa335bd61e7894d0a490a39f19b0637df446b` | 43018930238 / 43018923364 / 43018919857 |
 | #45 | `190f86edf9fb27bdd4b6b808933524387407fca8` | 43019305657 / 43019297562 / 43019295715 |
 
-These refreshed checks and the final hosted main evidence remain pending at
-this checkpoint.
+All three refreshed heads passed all 14 checks. #42 and #44 then merged.
+GitHub still reported #45 DIRTY against the older 6a99ed3 base despite actual
+main being 9a353d3. Automatic approval review rejected merging while that service
+state was conflicting. Local `git merge-tree` against actual main succeeded and
+produced exactly the already reviewed tree
+`edb08a47b902211878b3625c6935d60957481d57`.
+
+To resolve the inconsistent mergeability state safely, a normal main merge
+creates #45 head `68ce4fedb731b30da7be3fb2beff4afa274eeb34`. Its entire tree is
+identical to 190f86e (`git diff --exit-code` passes); no code, configuration or
+license change is introduced. This head receives a fresh hosted check cycle
+before another expected-head merge attempt. No rejection or check is bypassed.
+GitHub now confirms MERGEABLE against current main 9a353d3. The fresh runs are
+CI 43020656839, CodeQL 43020650278 and NuGet 43020648053. Final hosted main evidence
+remains pending. Existing release v3.0.1 still points to 1ab0748 with four published
+assets; no version or publication change was made.
