@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-07`.
+- Brief revision: `IFW-BRIEF-20261111-08`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: `M-REMAINING-PRS-20261111`; prepare #38-#40 and #42-#45, excluding #32.
+- Active milestone: none; `M-REMAINING-PRS-20261111` completed. The prepared PRs await a separate merge decision.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -25,6 +25,12 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-REMAINING-PRS-20261111
+
+Completed: all seven selected PRs are pushed, OPEN/CLEAN and pass their current
+CI/CodeQL checks. Compatibility fixes, exact-source license notices and
+independent SocketIO security review are recorded in the
+[final verification record](dependabot-remaining-prs-20261111.md).
+No merge or publication occurred; #32 remains excluded and auto-merge disabled.
 
 The user selected work on all remaining open PRs except #32. Live inventory selects
 #38 checkout, #39 github-script, #40 setup-dotnet, #42 Hosting, #43 SocketIOClient,

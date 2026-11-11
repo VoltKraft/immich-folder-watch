@@ -62,7 +62,7 @@ exist on local main before a merge.
 | #39 | `395225d662b52dbd1214c53d029be23476a65614` | 43015710092 | 43015701228 | 43015699961 | 14/14 success |
 | #40 | `a758f1422e84c4a517504a768e74a8b7cdb7fd32` | 43013976112 | 43013969114 | 43013967089 | 15/15 success, including separate Dependabot configuration check |
 | #42 | `2e36f9a851bfefeddde51660f7621ed7982bfb06` | 43014323712 | 43014318220 | 43014316031 | 14/14 success |
-| #43 | `564269d33adffbbf7984f00d23eb54bd5e734a38` | 43017085757 | 43017077392 | 43017074878 | Final hosted checks pending |
+| #43 | `564269d33adffbbf7984f00d23eb54bd5e734a38` | 43017085757 | 43017077392 | 43017074878 | 14/14 success |
 | #44 | `19e72f6723ec7c4f0f5b15d9042c5decdf9d9a5e` | 43014159821 | 43014150502 | 43014148229 | 14/14 success |
 | #45 | `9fe9d2790b3b837d7ff539c4b64bd90ca4ada07c` | 43015402572 | 43015397613 | 43015395383 | 14/14 success |
 
@@ -85,5 +85,15 @@ check is attached to this documentation-only follow-up commit.
 
 ## Handoff
 
-All selected PRs remain open for a separate merge decision. Root project
-records are saved locally, preserving earlier unpublished documentation.
+Final live verification on 2026-11-11 confirms all seven selected heads are
+OPEN/CLEAN with all current checks successful. Each PR description carries its
+final evidence and links. Repository `allow_auto_merge` is false and every PR's
+`autoMergeRequest` is null. #32 remains open at unchanged
+`51898a8d128327a1f58d8f392c898d18c7b9923a`, with its license block retained.
+Open Dependabot and code-scanning alert queries both return zero.
+
+Remote main remains `a82216d4251e6517b71236602ab09abfdb13f3e1`; no merge,
+main push, release or deployment occurred. All selected PRs remain open for a
+separate merge decision. Root project records are saved locally, preserving
+earlier unpublished documentation. Final source/license and synthetic test
+evidence supports preparation; no live Immich integration is claimed.

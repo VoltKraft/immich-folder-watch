@@ -1,26 +1,26 @@
 # Project Status
 
-## Remaining PR fixes prepared; final verification in progress (2026-11-11)
+## Remaining dependency PRs prepared and verified (2026-11-11)
 
-- #38, #40, #42 and #44 are pushed and pass their exact-head CI and all four
-  CodeQL analyses. Both native Flatpak architectures succeed; #38/#40 also
-  pass their separate Dependabot configuration checks.
-- #39 passes CI/CodeQL, including a new read-only v9 runtime smoke test. Its
-  first Dependabot app check stayed queued without output or a restart control.
-  The final changelog checkpoint `395225d` starts a fresh ordinary check cycle.
-- #45 `9fe9d27` restores both exact-source MIT notices and fixes a discovered
-  YAML string round-trip defect reproduced on both old and new versions.
-  All 498 portable Core tests, 15 license tests and all 14 hosted checks pass.
-- #39 final head `395225d` now also passes all 14 checks; its old queued app
-  check belongs to the previous head and is not claimed successful.
-- Independent security review of #43 identified and verified the fix for a
-  stop/reconnect lifetime gap in SocketIO 4. Head `63f1f9a` passes Windows/Linux
-  and CodeQL but native Flatpak exposes missing 10.0.3 notices in the broader
-  offline feed. Final repair `564269d` adds only those five exact-source MIT
-  versions; all 89 CI-feed archives pass checksum and notice installation.
-  Final hosted CI/CodeQL runs are active.
-- #32 remains open at unchanged `51898a8`; all PR auto-merge requests remain
-  null. No merge, main push, release, deployment or live Immich test performed.
+- Completed `M-REMAINING-PRS-20261111`: #38/#39/#40/#42/#43/#44/#45 are pushed,
+  OPEN/CLEAN and pass all current checks. #38/#40 have 15 successful checks;
+  the other five have 14. Every set includes Windows/Linux, both native Flatpak
+  architectures, all four CodeQL analyses, aggregate CodeQL and NuGet submission.
+- Exact-source license/compatibility reviews and fixes are complete. Key repairs:
+  SocketIO 4 hardened adapters and independently reviewed shutdown/reconnect
+  lifetime fix; complete 89-package offline notice coverage; Svg build-tool
+  notices/runtime isolation; YAML notices and ambiguous-string round trips.
+- #39's historical queued Dependabot app check belongs to its previous head.
+  Its final changelog commit passes all current checks; no requirement was
+  disabled or bypassed. The old service check is not claimed successful.
+- Final live checks: zero open Dependabot/code-scanning alerts, repository
+  auto-merge false and every PR auto-merge request null. #32 remains open and
+  license-blocked at unchanged `51898a8`. Remote main remains `a82216d`.
+- No PR merged, main pushed, release/deployment performed or live Immich server
+  contacted. Root evidence/changelog is committed locally; branch-specific
+  reports and updated PR bodies are remote. Prior unpublished records preserved.
+- Next action: separate user merge decision for the seven prepared PRs, then
+  integration/main verification. [Exact heads, runs and evidence](dependabot-remaining-prs-20261111.md).
 
 ## Remaining PR preparation selected (2026-11-11)
 
