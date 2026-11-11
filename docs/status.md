@@ -18,6 +18,10 @@
 - 146 tooling tests pass (four PowerShell cases deferred to Windows CI). All 16
   synthetic light/dark page previews render; inspected folders/settings images
   show no missing templates. No live desktop/Immich acceptance is claimed.
+- First hosted NuGet run 43059604936 failed because GitHub selected SDK 10.0.404
+  from the old root roll-forward policy, while reconstruction correctly required
+  10.0.401. Root global.json now pins 10.0.401 with roll-forward disabled, so managed
+  tooling installs the same reviewed compiler as CI and Flatpak.
 - Published v3.0.2 and existing local main documentation remain unchanged.
   Hosted current-head CI/CodeQL and reduced-binary verification are pending.
 

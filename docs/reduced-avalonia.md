@@ -32,7 +32,7 @@ SixLabors Apache-2.0 and Apple BSD-2-Clause attribution is packaged separately.
 
 Python 3.11+ and the **exact .NET SDK version in
 [`inputs.json`](../packaging/avalonia-reduced/inputs.json)** are required (currently
-10.0.401, aligned with the Flatpak SDK). Install that SDK alongside other SDKs;
+10.0.401, aligned with the Flatpak SDK and root `global.json`). Install that SDK alongside other SDKs;
 preparation must not silently substitute a newer compiler.
 
 Explicit preparation, used by CI:
