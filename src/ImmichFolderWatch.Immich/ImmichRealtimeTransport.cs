@@ -1,24 +1,23 @@
-using System.Net;
 using System.Net.WebSockets;
-using SocketIOClient.Transport;
-using SocketIOClient.Transport.Http;
-using SocketIOClient.Transport.WebSockets;
-using SocketWebSocketState = SocketIOClient.Transport.WebSockets.WebSocketState;
-using SocketReceiveResult = SocketIOClient.Transport.WebSockets.WebSocketReceiveResult;
+using SocketIOClient.Protocol.Http;
+using SocketIOClient.Protocol.WebSocket;
+using WebSocketMessageType = System.Net.WebSockets.WebSocketMessageType;
 
 namespace ImmichFolderWatch.Immich;
 
 /// <summary>Socket.IO polling transport with an origin boundary, no redirects and bounded responses.</summary>
-public sealed class ImmichRealtimeHttpClient : IHttpClient
+public sealed class ImmichRealtimeHttpClient : IHttpClient, IDisposable
 {
     public const int MaximumMessageBytes = 4 * 1024 * 1024;
     private readonly Uri _origin;
     private readonly HttpClientHandler _handler = new() { AllowAutoRedirect = false };
     private readonly HttpClient _client;
+    private readonly CancellationToken _lifetimeToken;
 
-    public ImmichRealtimeHttpClient(Uri origin)
+    public ImmichRealtimeHttpClient(Uri origin, CancellationToken lifetimeToken = default)
     {
         _origin = origin;
+        _lifetimeToken = lifetimeToken;
         _client = new HttpClient(_handler)
         {
             MaxResponseContentBufferSize = MaximumMessageBytes,
@@ -26,30 +25,56 @@ public sealed class ImmichRealtimeHttpClient : IHttpClient
         };
     }
 
-    public void AddHeader(string name, string value)
+    public void SetDefaultHeader(string name, string value)
     {
         _client.DefaultRequestHeaders.Remove(name);
         _client.DefaultRequestHeaders.Add(name, value);
     }
 
-    public void SetProxy(IWebProxy proxy) => _handler.Proxy = proxy;
-
-    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    public TimeSpan Timeout
     {
-        RequireSameOrigin(_origin, request.RequestUri);
-        return _client.SendAsync(request, cancellationToken);
+        get => _client.Timeout;
+        set => _client.Timeout = value;
     }
 
-    public Task<HttpResponseMessage> PostAsync(string requestUri, HttpContent content, CancellationToken cancellationToken)
+    public async Task<IHttpResponse> SendAsync(HttpRequest request, CancellationToken cancellationToken)
     {
-        RequireSameOrigin(_origin, new Uri(requestUri, UriKind.Absolute));
-        return _client.PostAsync(requestUri, content, cancellationToken);
+        RequireSameOrigin(_origin, request.Uri);
+        using var message = new HttpRequestMessage(request.Method == RequestMethod.Get ? HttpMethod.Get : HttpMethod.Post, request.Uri);
+        if (request.Method == RequestMethod.Post)
+        {
+            message.Content = request.BodyType == RequestBodyType.Bytes
+                ? new ByteArrayContent(request.BodyBytes ?? [])
+                : new StringContent(request.BodyText ?? string.Empty);
+        }
+        foreach (var header in request.Headers)
+        {
+            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase) && message.Content is not null)
+            {
+                message.Content.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(header.Value);
+            }
+            else
+            {
+                message.Headers.Add(header.Key, header.Value);
+            }
+        }
+
+        // ResponseContentRead enforces the byte bound for declared and streamed bodies.
+        // The upstream response interface has no disposal contract, so detach its bounded
+        // contents here and release both native HTTP messages before handing it back.
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetimeToken);
+        using var response = await _client.SendAsync(message, linked.Token).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return new BufferedResponse(
+            response.Content.Headers.ContentType?.MediaType,
+            await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false),
+            await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
     }
 
-    public Task<string> GetStringAsync(Uri requestUri)
+    private sealed record BufferedResponse(string? MediaType, byte[] Bytes, string Text) : IHttpResponse
     {
-        RequireSameOrigin(_origin, requestUri);
-        return _client.GetStringAsync(requestUri);
+        public Task<byte[]> ReadAsByteArrayAsync() => Task.FromResult(Bytes);
+        public Task<string> ReadAsStringAsync() => Task.FromResult(Text);
     }
 
     public void Dispose() => _client.Dispose();
@@ -68,21 +93,23 @@ public sealed class ImmichRealtimeHttpClient : IHttpClient
 }
 
 /// <summary>Socket.IO WebSocket adapter that rejects redirects and oversized fragmented messages.</summary>
-public sealed class ImmichRealtimeWebSocket : IClientWebSocket
+public sealed class ImmichRealtimeWebSocket : IWebSocketClient
 {
     private readonly Uri _origin;
     private readonly ClientWebSocket _socket = new();
     private readonly SocketsHttpHandler _handler = new() { AllowAutoRedirect = false };
     private readonly HttpMessageInvoker _invoker;
     private int _messageBytes;
+    private readonly CancellationTokenRegistration _lifetimeRegistration;
 
-    public ImmichRealtimeWebSocket(Uri origin)
+    public ImmichRealtimeWebSocket(Uri origin, CancellationToken lifetimeToken = default)
     {
         _origin = origin;
         _invoker = new HttpMessageInvoker(_handler);
+        _lifetimeRegistration = lifetimeToken.Register(_socket.Abort);
     }
 
-    public SocketWebSocketState State => (SocketWebSocketState)_socket.State;
+    public WebSocketState State => _socket.State;
 
     public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
@@ -90,36 +117,29 @@ public sealed class ImmichRealtimeWebSocket : IClientWebSocket
         return _socket.ConnectAsync(uri, _invoker, cancellationToken);
     }
 
-    public Task DisconnectAsync(CancellationToken cancellationToken) =>
-        _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, cancellationToken);
+    public Task CloseAsync(WebSocketCloseStatus closeStatus, string description, CancellationToken cancellationToken) =>
+        _socket.CloseAsync(closeStatus, description, cancellationToken);
 
-    public Task SendAsync(byte[] bytes, TransportMessageType type, bool endOfMessage, CancellationToken cancellationToken) =>
-        _socket.SendAsync(new ArraySegment<byte>(bytes), (WebSocketMessageType)type, endOfMessage, cancellationToken);
+    public Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType type, bool endOfMessage, CancellationToken cancellationToken) =>
+        _socket.SendAsync(buffer, type, endOfMessage, cancellationToken);
 
-    public async Task<SocketReceiveResult> ReceiveAsync(int bufferSize, CancellationToken cancellationToken)
+    public async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
     {
-        var buffer = new byte[Math.Clamp(bufferSize, 1, 65536)];
-        var result = await _socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken).ConfigureAwait(false);
+        var result = await _socket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
         if (result.Count > ImmichRealtimeHttpClient.MaximumMessageBytes - _messageBytes)
         {
             _socket.Abort();
             throw new WebSocketException("Realtime message exceeded the configured byte limit.");
         }
         _messageBytes = result.EndOfMessage ? 0 : _messageBytes + result.Count;
-        return new SocketReceiveResult
-        {
-            Buffer = buffer,
-            Count = result.Count,
-            EndOfMessage = result.EndOfMessage,
-            MessageType = (TransportMessageType)result.MessageType,
-        };
+        return result;
     }
 
-    public void AddHeader(string name, string value) => _socket.Options.SetRequestHeader(name, value);
-    public void SetProxy(IWebProxy proxy) => _handler.Proxy = proxy;
+    public void SetDefaultHeader(string name, string value) => _socket.Options.SetRequestHeader(name, value);
 
     public void Dispose()
     {
+        _lifetimeRegistration.Dispose();
         _socket.Dispose();
         _invoker.Dispose();
     }

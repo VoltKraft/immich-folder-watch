@@ -41,7 +41,7 @@ jobs:
     steps:
       # Tooling comes from main so manual preparation can target older releases.
       # Application sources and packaging always come from the selected tag.
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           path: automation
@@ -49,7 +49,7 @@ jobs:
 
       - name: Read published release
         id: release
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         with:
@@ -65,7 +65,7 @@ jobs:
             require('node:fs').writeFileSync('release.json', JSON.stringify(release));
             core.setOutput('tag', tag);
 
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ steps.release.outputs.tag }}
           fetch-depth: 0
@@ -84,7 +84,7 @@ jobs:
           echo "version=$sdk_version" >> "$GITHUB_OUTPUT"
 
       - name: Setup pinned .NET SDK
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: ${{ steps.flatpak_sdk.outputs.version }}
 
@@ -157,7 +157,7 @@ jobs:
       (github.event_name == 'release' || inputs.submit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
@@ -177,7 +177,7 @@ jobs:
           fi
 
       - name: Create or reuse release update pull request
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           # Enable only after Flathub has granted GitHub automerge for the app.
