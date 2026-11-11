@@ -32,7 +32,8 @@ added a read-only CI artifact round trip with synthetic data. All eight CI jobs,
 four CodeQL analyses and all 14 PR checks passed at `d79d3f3`.
 See [PR #37 evidence](dependabot-pr37-20261111.md). Production deployment is not
 claimed. Follow-up authorization: the user selected merging #37 and verifying
-main CI/CodeQL. The merge was executed as `2a9a96d`; #32/#34 remain deferred and
+main CI/CodeQL. The merge was executed as `2a9a96d`; all eight main CI jobs and CodeQL passed.
+#32/#34 remain deferred and
 automatic merging stays disabled. Earlier no-merge scope below is historical.
 
 - User selected completing the preparation of PR #37: update against current main,

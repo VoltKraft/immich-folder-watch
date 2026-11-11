@@ -1,5 +1,16 @@
 # Dependabot PR #37 validation
 
+## Authorized merge follow-up
+
+The user subsequently authorized merging #37. Expected-head merge of `d79d3f3`
+created `2a9a96d18ead49682804cdbe61e444b8c5f99703`. All eight
+[main CI jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43000078507)
+and all four [CodeQL analyses](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43000084573)
+passed; no open code-scanning alerts remain. Release publication/deployment was
+correctly skipped because v3.0.1 already exists. PR #32/#34 remain open and
+unchanged; auto-merge is disabled. The remaining sections preserve pre-merge
+review evidence and the original no-merge scope.
+
 ## Scope and source review
 
 PR [#37](https://github.com/VoltKraft/immich-folder-watch/pull/37) upgrades only the

@@ -1,15 +1,25 @@
 # Project Status
 
-## PR #37 merged; main validation running (2026-11-11)
+## PR #37 merged and main verified (2026-11-11)
 
-- User explicitly authorized merging #37 and checking the resulting main.
-  Rechecked all 14 successful checks at `d79d3f3`; merged with expected-head
-  protection as `2a9a96d18ead49682804cdbe61e444b8c5f99703`. No check bypass.
-- Main CI and CodeQL started on that exact merge revision. #32/#34 remain
-  unchanged/open/unmerged and repository automatic merging remains disabled.
-- Local synchronization reconciles the PR preparation records with the newer
-  local verification evidence; no implementation conflict occurred. Final
-  exact-main results will be recorded after all jobs complete.
+- User authorized merging #37 and verifying main. All 14 PR-head checks passed
+  at `d79d3f3`; expected-head merge succeeded as
+  `2a9a96d18ead49682804cdbe61e444b8c5f99703`, without bypassing checks.
+- [Main CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43000078507)
+  passed all eight jobs, including Windows/Linux tests, both native Flatpak
+  candidates and both actual Pages upload/download modes.
+  [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43000084573)
+  passed all four analyses; NuGet submission succeeded. Open code-scanning
+  alert count remains zero.
+- [Release follow-up](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43000811523)
+  succeeded in preparation and correctly skipped builds/publication because the
+  v3.0.1 tag already exists. No release, Pages deployment or downstream submission
+  was performed by this merge; published v3.0.1 remains unchanged.
+- Final readback: #37 merged/closed; #32/#34 open/unmerged with no auto-merge
+  requests, repository auto-merge disabled. Requested merge/validation completed.
+- Local main includes the merge and preserves local v3.0.1/PR verification records.
+  Documentation-only conflicts were reconciled without implementation changes.
+  Final evidence is committed locally; no additional main documentation push.
 
 
 ## PR #37 ready for a separate merge decision (2026-11-11)
