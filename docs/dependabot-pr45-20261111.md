@@ -44,3 +44,15 @@ local tests do not claim a live Immich integration test.
 
 The PR stays open for an explicit merge decision; #32 remains excluded and
 automatic merging disabled. No release or deployment is performed.
+
+## Authorized integration and merge follow-up
+
+The user subsequently authorized merging all seven prepared PRs except #32.
+After #38/#39/#40/#43 merged, normal merges bring #42 and #44's refreshed heads
+into this final PR so its CI tests the entire selected dependency set. Additive
+changelog and notice conflicts preserve both sides. The combined inventory
+validates all 24 upstream SHA-256 hashes and all 109 exact-version mappings;
+all 15 license-helper tests pass. The versioned SVG notice's original trailing
+space is explicitly recognized by Git attributes without changing its bytes.
+The final changelog includes the previously reviewed changes from all seven PRs.
+Main merges remain sequential and contingent on successful current-head checks.
