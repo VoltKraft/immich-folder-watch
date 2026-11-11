@@ -99,6 +99,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate GitHub Script runtime compatibility
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // Exercise the release scripts' APIs without changing remote state.
+            const updateFlathubPullRequest = require('./tools/update-flathub-pr.cjs');
+            if (typeof updateFlathubPullRequest !== 'function') {
+              throw new Error('The Flathub helper must remain loadable as CommonJS.');
+            }
+            const { data: repository } = await github.rest.repos.get(context.repo);
+            if (repository.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              throw new Error('The GitHub client returned an unexpected repository.');
+            }
+            core.setOutput('default_branch', repository.default_branch);
+
       - name: Install validators
         run: |
           sudo apt-get update
