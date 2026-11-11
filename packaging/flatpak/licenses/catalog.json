@@ -342,6 +342,9 @@
   "socketioclient": {
     "3.1.2": [
       "SocketIO-LICENSE.txt"
+    ],
+    "4.0.5": [
+      "SocketIOClient-4.0.5-LICENSE.txt"
     ]
   },
   "sqlitepclraw.bundle_e_sqlite3": {
@@ -422,6 +425,16 @@
   "tmds.dbus.protocol": {
     "0.92.0": [
       "Tmds.DBus-LICENSE.txt"
+    ]
+  },
+  "socketioclient.common": {
+    "4.0.0": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
+    ]
+  },
+  "socketioclient.serializer": {
+    "4.0.0.1": [
+      "SocketIOClient-4.0.0-LICENSE.txt"
     ]
   }
 }
