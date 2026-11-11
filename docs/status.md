@@ -1,5 +1,26 @@
 # Project Status
 
+## UniGetUI missing-icon investigation (2026-11-11)
+
+- User reports no icon for Immich Folder Watch in UniGetUI. Read-only inspection
+  confirms the published WinGet 3.0.3 default-locale manifest has no `Icons`;
+  the repository manifest generator likewise emits no icon metadata.
+- Windows installer source already declares its icon and `ARPPRODUCTICON`.
+  UniGetUI's current native WinGet icon resolver reads catalog `Icons` URLs and
+  hashes. Its current supplementary database contains no key matching `immich`
+  or `voltkraft`. This explains missing catalog artwork, but the user's exact
+  UniGetUI version, cache and installed Windows UI were not inspected.
+- Sources: [published manifest](https://github.com/microsoft/winget-pkgs/blob/master/manifests/v/VoltKraft/ImmichFolderWatch/3.0.3/VoltKraft.ImmichFolderWatch.locale.en-US.yaml),
+  [native icon resolver](https://github.com/Devolutions/UniGetUI/blob/main/src/UniGetUI.PackageEngine.Managers.WinGet/ClientHelpers/WinGetIconsHelper.cs),
+  [supplementary database](https://github.com/Devolutions/UniGetUI/blob/main/WebBasedData/screenshot-database-v2.json).
+- Next action: add immutable public PNG icon metadata to the WinGet generator,
+  validate generated manifests, then submit a separately authorized metadata
+  update upstream. Consider the UniGetUI database route for versions that do not
+  use native catalog icons. No application release is inherently needed for a
+  catalog metadata correction; no external write or application change occurred.
+- This live check also confirms 3.0.3 now exists in the WinGet default branch,
+  superseding the earlier pending-acceptance observation below.
+
 ## PR #32 merged and v3.0.3 published and verified (2026-11-11)
 
 - Completed `M-RELEASE-303-20261111`: #32 merged as `3740ce0`; stable v3.0.3
