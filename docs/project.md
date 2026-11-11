@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
   reviewed dependency merges through `efeda2f`; published releases and deployed
   installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-13`.
-- Plan maturity: v3.0.2 release selected from verified main; Avalonia remains deferred.
-- Active milestone: `M-RELEASE-302-20261111` — publish and verify v3.0.2.
+- Brief revision: `IFW-BRIEF-20261111-14`.
+- Plan maturity: v3.0.2 published; reduced Avalonia remediation selected for PR #32.
+- Active milestone: `M-PR32-REDUCED-AVALONIA-20261111` — remediate and validate PR #32 without merging.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -24,6 +24,32 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR32-REDUCED-AVALONIA-20261111
+
+The user explicitly selected auditing the shipped components, building a reduced
+Avalonia variant, fixing the D-Bus conflict and obtaining successful CI/CodeQL
+on PR #32. This supersedes the earlier deferral for preparation only; merging,
+automatic merging and release publication remain excluded. Preserve AGPL-3.0-only,
+.NET 10, Windows/Linux support, portal access and existing security boundaries.
+
+Acceptance:
+- Audit actual published v3.0.2 Linux binaries/resources against exact Avalonia
+  sources; distinguish existing 12.0.3 exposure from the proposed 12.1.6 update.
+- Produce pinned, reproducible reduced Avalonia/Fluent packages from reviewed
+  source, removing incompatible implementations/resources while preserving notices.
+  No official-package fallback, unreviewed license allowlist or opaque binary feed.
+- Align D-Bus app/test pins with Avalonia requirements after source-license review.
+- Preserve used controls and popup behavior with regression tests. Validate package
+  provenance, online/offline restore, Windows/Linux and native Flatpak architectures.
+- Push only #32, require successful current-head CI/CodeQL and retain no auto-merge.
+  Record outstanding GUI/live-service limitations without claiming unrun acceptance.
+
+Work is isolated in `/tmp/ifw-pr32-reduced`, starting at bot head `51898a8` with a
+normal merge of published main `df48398`. Existing local main documentation is
+preserved. Primary owns integration, app/test pins, documentation and commits;
+separate agents own framework reconstruction, packaging integration and independent
+component audit. The final audit and implementation records own detailed evidence.
 
 ## M-RELEASE-302-20261111
 

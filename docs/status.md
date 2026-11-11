@@ -1,5 +1,15 @@
 # Project Status
 
+## PR #32 reduced Avalonia remediation selected (2026-11-11)
+
+- Selected `M-PR32-REDUCED-AVALONIA-20261111` under explicit user authorization.
+  Worktree `/tmp/ifw-pr32-reduced` preserves the bot commit and merges main
+  `df48398` normally; no main push, PR merge, auto-merge or release is selected.
+- Independent shipped-component audit, framework reconstruction and offline/CI
+  integration are in progress. DBus pins require 0.94.1 instead of 0.92.0.
+- Published v3.0.2 and existing local main documentation remain unchanged.
+  Hosted current-head CI/CodeQL and reduced-binary verification are pending.
+
 ## Release v3.0.2 selected (2026-11-11)
 
 - Selected `M-RELEASE-302-20261111` under explicit release authorization.
