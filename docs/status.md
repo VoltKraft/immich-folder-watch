@@ -1,5 +1,29 @@
 # Project Status
 
+## PR #32 reduced Avalonia prepared and verified (2026-11-11)
+
+- Completed `M-PR32-REDUCED-AVALONIA-20261111` for preparation/validation. Pushed
+  only #32 through `ce0b711d33f6fa07c364445b96fb2bbc831b9354`; no merge or main push.
+- Shipped-component audit confirms the existing issue in both v3.0.2 Linux
+  bundles. Reduced 12.1.6.1 removes the identified implementations/resources and
+  retains attribution; D-Bus 0.94.1 resolves the restore conflict.
+- All eight CI jobs, four CodeQL analyses, aggregate CodeQL and NuGet submission
+  succeed: 14 current PR checks green. Both downloaded native candidates pass
+  exact DLL/provenance/license checks and a 240-assembly exclusion audit each.
+- Linux passes 501 Core and 60 Linux tests; hosted packaging passes all 147 tooling
+  tests. Windows passes with its documented platform skips. One unchanged Windows
+  rerun passed after the existing short file-lock test timed out; a stalled Linux
+  package-download attempt was replaced. Detailed outcomes are retained.
+- Independent review verified package provenance and the extracted-cache tamper
+  fix. Future Avalonia upgrades require coordinated source review/reconstruction.
+- #32 is OPEN/CLEAN, auto-merge request null and repository auto-merge false.
+  Remote main remains `df48398`; published v3.0.2 assets are unchanged. No new
+  release, deployment, installed desktop test or live Immich connection occurred.
+- PR description contains final hosted evidence. This closing record is local
+  documentation only, preserving previous unpublished records. Next action:
+  explicit merge authorization, followed separately by a release decision.
+  [Final verification and artifact hashes](dependabot-pr32-20261111.md).
+
 ## Avalonia baseline license reassessment (2026-11-11)
 
 - Read-only follow-up on #32 confirms the unchanged open head `51898a8`, failed

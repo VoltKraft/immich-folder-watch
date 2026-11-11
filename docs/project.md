@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.2` in
   [Directory.Build.props](../Directory.Build.props). Published v3.0.2 at `df48398` includes
   all reviewed main changes; deployed installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-13`.
-- Plan maturity: v3.0.2 published and verified; Avalonia remains deferred.
-- Active milestone: none; `M-RELEASE-302-20261111` completed.
+- Brief revision: `IFW-BRIEF-20261111-15`.
+- Plan maturity: v3.0.2 published; reduced Avalonia PR #32 prepared and verified.
+- Active milestone: none; `M-PR32-REDUCED-AVALONIA-20261111` completed for preparation and validation.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,26 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR32-REDUCED-AVALONIA-20261111
+
+Completed for preparation and validation at PR head `ce0b711`. The user explicitly
+selected auditing shipped components, reconstructing reduced Avalonia and fixing
+D-Bus, followed by CI/CodeQL. Actual v3.0.2 Linux bundles confirm the existing
+component issue; Windows packages contain no Avalonia implementation.
+
+Acceptance is met in the PR: pinned reproducible reduced 12.1.6.1 packages,
+retained attribution, D-Bus 0.94.1, exclusive private mapping, regression coverage,
+Windows/Linux and both native Flatpak builds, actual candidate binary/provenance
+and notice checks, all eight CI jobs, four CodeQL analyses and NuGet submission.
+AGPL-3.0-only, .NET 10, platform/portal/security contracts remain intact.
+
+#32 remains open and requires separate merge authorization; automatic merging
+stays disabled. Remote main and existing v3.0.2 assets are unchanged. A new release
+is needed after a separately authorized merge to distribute the correction.
+No live desktop installation or Immich acceptance is claimed. The implementation
+and detailed records are on the PR branch; this closing evidence is saved locally.
+[Final verification](dependabot-pr32-20261111.md).
 
 ## M-RELEASE-302-20261111
 
