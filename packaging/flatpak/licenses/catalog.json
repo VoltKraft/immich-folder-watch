@@ -423,5 +423,11 @@
     "0.92.0": [
       "Tmds.DBus-LICENSE.txt"
     ]
+  },
+  "yamldotnet": {
+    "18.1.0": [
+      "YamlDotNet-18.1.0-LICENSE.txt",
+      "YamlDotNet-18.1.0-LICENSE-libyaml"
+    ]
   }
 }

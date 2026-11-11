@@ -8,3 +8,6 @@ packaging/flatpak/licenses/Avalonia-NOTICE.md whitespace=-blank-at-eol
 packaging/flatpak/licenses/SQLitePCLRaw-2.1.11-NOTICE.txt whitespace=-blank-at-eol,-blank-at-eof
 packaging/flatpak/licenses/SQLitePCLRaw-3.0.5-NOTICE.txt whitespace=-blank-at-eol,-blank-at-eof
 packaging/flatpak/licenses/Svg.Custom-LICENSE.txt whitespace=-blank-at-eol
+
+# Preserve upstream CRLF in the retained libyaml notice.
+packaging/flatpak/licenses/YamlDotNet-18.1.0-LICENSE-libyaml whitespace=cr-at-eol

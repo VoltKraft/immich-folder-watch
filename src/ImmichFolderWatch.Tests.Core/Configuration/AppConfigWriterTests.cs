@@ -110,6 +110,54 @@ public sealed class AppConfigWriterTests
         }
     }
 
+    [Theory]
+    [InlineData("yes")]
+    [InlineData("null")]
+    [InlineData("Null")]
+    [InlineData("NULL")]
+    [InlineData("~")]
+    [InlineData("true")]
+    [InlineData("00123")]
+    [InlineData("2026-11-11")]
+    [InlineData("12:34")]
+    [InlineData("#family")]
+    [InlineData("album: holiday")]
+    [InlineData(@"\photos\2026")]
+    [InlineData(@"C:\Photos\Family")]
+    [InlineData(@"\\server\photos")]
+    [InlineData("Urlaub/日本語")]
+    public void Serialize_PreservesYamlSensitiveConfigurationStrings(string value)
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("ifw-config-scalars-");
+        try
+        {
+            var config = new AppConfig
+            {
+                Immich = new ImmichSettings
+                {
+                    ServerApiUrl = "https://immich.example.com/api",
+                    ApiKey = value,
+                },
+                Watch = new WatchSettings
+                {
+                    Sources = { new WatchSourceSettings { Path = value, AlbumName = value } },
+                },
+            };
+            var configPath = Path.Combine(tempRoot.FullName, "config.yaml");
+            File.WriteAllText(configPath, new AppConfigWriter().Serialize(config));
+
+            var restored = new AppConfigLoader().LoadForEditing(configPath);
+
+            Assert.Equal(value, restored.Immich.ApiKey);
+            Assert.Equal(value, restored.Watch.Sources[0].Path);
+            Assert.Equal(value, restored.Watch.Sources[0].AlbumName);
+        }
+        finally
+        {
+            tempRoot.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void Serialize_MissingLocalization_EmitsAutoDefault()
     {

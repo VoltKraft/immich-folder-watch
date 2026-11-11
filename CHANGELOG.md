@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Preserve YAML-sensitive configuration strings such as the literal `null` when saving and reloading settings.
+- Retain both upstream MIT license texts for YamlDotNet 18.1.0 so native Flatpak packaging succeeds.
 - Correct the Dependabot xUnit ignore requirement so NuGet update jobs can run while retaining the exclusion of xUnit 4 and later.
 
 ### Changed
+- Update YAML configuration serialization to YamlDotNet 18.1.0, with regression coverage for YAML-sensitive configuration strings.
 - Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
 - Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
 

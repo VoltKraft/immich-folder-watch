@@ -91,3 +91,14 @@ MIT remains compatible with AGPL-3.0-only under the GNU guidance linked above.
 The resolved SQLitePCLRaw/native SQLite package versions and their Apache-2.0,
 public-domain and other retained upstream notices are unchanged by this PR.
 The top-level third-party dependency summary now identifies Sqlite 11.0.0.
+
+### YamlDotNet 18.1.0
+
+The NuGet archive declares MIT but omits license texts. Preserve both the project
+MIT license and the retained libyaml MIT license from the package's exact source
+revision `748334a8fa7c227740018b284b71ad95cc6b7fc7`. The immutable URLs and SHA-256
+checksums are recorded in `sources.json`; the supplement applies only to 18.1.0.
+Both permissive licenses are compatible with the application's AGPL-3.0-only
+distribution when their notices are retained. The package has no dependencies
+and supplies a native `net10.0` assembly. See
+[the PR review](../../../docs/dependabot-pr45-20261111.md).
