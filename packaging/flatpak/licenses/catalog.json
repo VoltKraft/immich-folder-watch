@@ -322,6 +322,9 @@
   "shimskiasharp": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
     ]
   },
   "socketio.core": {
@@ -376,19 +379,38 @@
       "SQLitePCLRaw-3.0.5-NOTICE.txt"
     ]
   },
+  "svg.animation": {
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
+    ]
+  },
   "svg.custom": {
     "3.6.0": [
       "Svg.Custom-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Custom-5.2.3-LICENSE.txt"
     ]
   },
   "svg.model": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
+    ]
+  },
+  "svg.scenegraph": {
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
     ]
   },
   "svg.skia": {
     "3.6.0": [
       "Svg.Skia-LICENSE.txt"
+    ],
+    "5.2.3": [
+      "Svg.Skia-5.2.3-LICENSE.txt"
     ]
   },
   "system.diagnostics.diagnosticsource": {
