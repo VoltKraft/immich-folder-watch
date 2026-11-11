@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-03`.
-- Plan maturity: v3.0.1 published and verified; Avalonia/SkiaSharp updates deferred.
-- Active milestone: None; `M-RELEASE-301-20261111` completed.
+- Brief revision: `IFW-BRIEF-20261111-04`.
+- Plan maturity: v3.0.1 published; SkiaSharp PR #34 validated, Avalonia deferred.
+- Active milestone: None; `M-PR34-20261111` completed, awaiting a separate merge decision.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,25 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-PR34-20261111
+
+Completed: refreshed PR #34 at `1a4722c`; all 14 current-head checks succeeded,
+branding/license review passed, and GitHub reports clean mergeability. Historical
+queued Dependabot checks are not current-head checks; their internal cause remains
+unknown. See [renewed evidence](dependabot-pr34-20261111.md). No merge or release.
+
+The user selected refreshing and validating PR #34, without merging or releasing.
+
+- P34-AC01: Integrate current main without force-pushing; preserve the build-only
+  SkiaSharp 4.155.0 proposal and application runtime dependency isolation.
+- P34-AC02: Renew exact-package license review and validate generated branding
+  against the current main baseline, including PNG pixels and ICO frames.
+- P34-AC03: Verify all current-head CI and CodeQL checks and investigate the
+  separate Dependabot configuration validator. Record service limitations honestly;
+  do not fabricate checks or weaken protection to clear a queued check.
+- P34-AC04: Leave #32 open/blocked, auto-merge disabled and v3.0.1 unchanged.
+  A merge requires a separate user decision.
 
 ## M-PR37-20261111
 

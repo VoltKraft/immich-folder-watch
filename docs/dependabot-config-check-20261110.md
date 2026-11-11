@@ -1,7 +1,8 @@
 # Dependabot configuration-check diagnosis (2026-11-10)
 
-The user subsequently deferred this recovery and left #34 open. No further
-retry or support contact is selected; the following records the investigation.
+The user initially deferred recovery, then selected renewed work on #34 on
+2026-11-11. See [the refreshed-head evidence](dependabot-pr34-20261111.md).
+The following records the original investigation. No support contact was sent.
 
 ## Finding
 

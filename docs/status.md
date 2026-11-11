@@ -1,5 +1,20 @@
 # Project Status
 
+## PR #34 ready for a separate merge decision (2026-11-11)
+
+- Completed `M-PR34-20261111`; refreshed #34 from `f22797e` onto remote main
+  `2a9a96d` and pushed `1a4722c` without force-push or merging.
+- Branding builds, pixel/ICO comparison and runtime-isolation verification pass;
+  renewed license review found no blocker. All eight CI jobs, all four CodeQL
+  analyses, aggregate CodeQL and NuGet submission succeeded: 14 successful checks.
+- GitHub reports `MERGEABLE` / `CLEAN`; zero open code-scanning alerts. PR body
+  contains exact-head evidence. Next action requires a separate user merge decision.
+- No Dependabot configuration suite has appeared on the new head; the old queued
+  checks remain historical, not successfully rerun. See [renewed evidence](dependabot-pr34-20261111.md).
+- #32 remains blocked, auto-merge disabled, remote main and release v3.0.1 unchanged.
+  Final evidence is saved locally; only the #34 branch and its description were
+  updated remotely. No main documentation push.
+
 ## PR #37 merged and main verified (2026-11-11)
 
 - User authorized merging #37 and verifying main. All 14 PR-head checks passed
