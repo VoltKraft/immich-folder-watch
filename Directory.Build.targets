@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <ReducedAvaloniaPython Condition="'$(ReducedAvaloniaPython)' == '' and '$(OS)' == 'Windows_NT'">python</ReducedAvaloniaPython>
+    <ReducedAvaloniaPython Condition="'$(ReducedAvaloniaPython)' == ''">python3</ReducedAvaloniaPython>
+    <_ReducedAvaloniaDotnet Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_ReducedAvaloniaDotnet>
+    <_ReducedAvaloniaDotnet Condition="'$(_ReducedAvaloniaDotnet)' == ''">dotnet</_ReducedAvaloniaDotnet>
+  </PropertyGroup>
+
+  <!-- GitHub-managed dependency submission and IDE restores cannot run CI's
+       explicit bootstrap step. Prepare only the project consuming the private
+       packages, before NuGet collects its references. The bootstrap serializes
+       concurrent calls and verifies recipe/input/archive fingerprints.
+       Offline feed generation sets ReducedAvaloniaPrepared only after building
+       its isolated feed and verifies the restored bytes separately. -->
+  <Target Name="PrepareReducedAvaloniaForRestore"
+          BeforeTargets="CollectPackageReferences"
+          Condition="'$(MSBuildProjectName)' == 'ImmichFolderWatch.App.Linux' and '$(ReducedAvaloniaPrepared)' != 'true'">
+    <Exec WorkingDirectory="$(MSBuildThisFileDirectory)"
+          Command="&quot;$(ReducedAvaloniaPython)&quot; &quot;$(MSBuildThisFileDirectory)tools/prepare_reduced_avalonia.py&quot; --source-root &quot;$(MSBuildThisFileDirectory).&quot; --dotnet &quot;$(_ReducedAvaloniaDotnet)&quot; --if-needed" />
+  </Target>
+</Project>

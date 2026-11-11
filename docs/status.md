@@ -5,8 +5,9 @@
 - Selected `M-RELEASE-303-20261111` under explicit merge/release authorization.
 - Reverified #32 at `ce0b711`: OPEN/CLEAN, all 14 checks successful, no auto-merge.
   Latest release is v3.0.2; v3.0.3 is the next compatible patch release.
-- Preserve the three local documentation commits and reconcile them with the
-  merged implementation. Main validation and release publication are pending.
+- Merged #32 with the expected-head guard as `3740ce0`. Local documentation
+  history is preserved; only the newer brief/status summaries resolve conflicts.
+  Main CI/CodeQL and release publication are pending.
 
 ## PR #32 reduced Avalonia prepared and verified (2026-11-11)
 

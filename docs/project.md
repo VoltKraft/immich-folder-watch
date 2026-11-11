@@ -7,8 +7,8 @@
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
 - Product baseline: The checked-in version is `3.0.2` in
-  [Directory.Build.props](../Directory.Build.props). Published v3.0.2 at `df48398` includes
-  all reviewed main changes; deployed installations remain separate evidence.
+  [Directory.Build.props](../Directory.Build.props). PR #32 is merged as `3740ce0`;
+  published v3.0.2 remains at `df48398` until v3.0.3 completes.
 - Brief revision: `IFW-BRIEF-20261111-16`.
 - Plan maturity: PR #32 merge and compatible v3.0.3 release selected.
 - Active milestone: `M-RELEASE-303-20261111` — merge #32, verify main and publish v3.0.3.
@@ -54,9 +54,9 @@ Windows/Linux and both native Flatpak builds, actual candidate binary/provenance
 and notice checks, all eight CI jobs, four CodeQL analyses and NuGet submission.
 AGPL-3.0-only, .NET 10, platform/portal/security contracts remain intact.
 
-#32 remains open and requires separate merge authorization; automatic merging
-stays disabled. Remote main and existing v3.0.2 assets are unchanged. A new release
-is needed after a separately authorized merge to distribute the correction.
+Follow-up authorization selected merge and release. #32 is merged as `3740ce0`;
+automatic merging stays disabled. Existing v3.0.2 assets are unchanged, and the
+selected v3.0.3 release will distribute the correction.
 No live desktop installation or Immich acceptance is claimed. The implementation
 and detailed records are on the PR branch; this closing evidence is saved locally.
 [Final verification](dependabot-pr32-20261111.md).

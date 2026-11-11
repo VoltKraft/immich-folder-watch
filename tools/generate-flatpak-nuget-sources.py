@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 
 NUGET_INDEX = "https://api.nuget.org/v3/index.json"
@@ -80,7 +81,8 @@ def required_packages(artifacts: Path, package_cache: Path) -> set[tuple[str, st
     return required
 
 
-def collect_sources(package_cache: Path, artifacts: Path, runtime: str) -> list[dict[str, str]]:
+def collect_sources(package_cache: Path, artifacts: Path, runtime: str,
+                    private_feed: Path | None = None, private_version: str | None = None) -> list[dict[str, str]]:
     """Verify the complete fresh cache and produce official NuGet download entries."""
     required = required_packages(artifacts, package_cache)
     found: set[tuple[str, str]] = set()
@@ -96,8 +98,6 @@ def collect_sources(package_cache: Path, artifacts: Path, runtime: str) -> list[
         if any(path.is_symlink() or not path.is_file() for path in (archive, hash_file, metadata_file)):
             raise GeneratorError(f"package archive or checksum metadata is missing: {package}/{version}")
         metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
-        if metadata.get("source") != NUGET_INDEX:
-            raise GeneratorError(f"package was not restored from the official NuGet source: {package}/{version}")
         with archive.open("rb") as source:
             digest = hashlib.file_digest(source, "sha512").digest()
         # .nupkg.metadata contentHash excludes the signing file and is not an
@@ -109,6 +109,23 @@ def collect_sources(package_cache: Path, artifacts: Path, runtime: str) -> list[
         if len(expected) != 64 or digest != expected:
             raise GeneratorError(f"NuGet archive checksum mismatch: {package}/{version}")
         found.add((package, version))
+        if private_feed is not None and package in ("avalonia", "avalonia.themes.fluent"):
+            if version != private_version:
+                raise GeneratorError(f"unexpected private Avalonia version: {package}/{version}")
+            built = private_feed / filename
+            if built.is_symlink() or not built.is_file():
+                raise GeneratorError(f"newly built private package is missing: {filename}")
+            if metadata.get("source") != str(private_feed.resolve()):
+                raise GeneratorError(f"private package did not originate in the fresh source build: {filename}")
+            with built.open("rb") as source:
+                expected_private = hashlib.file_digest(source, "sha512").digest()
+            if digest != expected_private:
+                raise GeneratorError(f"private package differs from the fresh source build: {filename}")
+            # Rebuild these packages from pinned sources inside Flatpak; never
+            # turn a developer-produced binary into a downloadable build input.
+            continue
+        if metadata.get("source") != NUGET_INDEX:
+            raise GeneratorError(f"package was not restored from the official NuGet source: {package}/{version}")
         sources.append({
             "type": "file",
             "url": f"https://api.nuget.org/v3-flatcontainer/{package}/{version}/{filename}",
@@ -124,6 +141,49 @@ def collect_sources(package_cache: Path, artifacts: Path, runtime: str) -> list[
     if not any(package == f"microsoft.netcore.app.runtime.{runtime}" for package, _ in found):
         raise GeneratorError(f"self-contained runtime pack is missing for {runtime}")
     return sorted(sources, key=lambda source: source["dest-filename"])
+
+
+def reduced_builder(source_root: Path):
+    """Load the selected source revision's locked bootstrap, if it has one.
+
+    Older published releases do not have a reduced-framework bootstrap and keep
+    their original packaging behavior when prepared by newer automation.
+    """
+    if not (source_root / "packaging/avalonia-reduced/inputs.json").is_file():
+        return None
+    script = source_root / "tools/prepare_reduced_avalonia.py"
+    spec = importlib.util.spec_from_file_location("prepare_reduced_avalonia", script)
+    if spec is None or spec.loader is None:
+        raise GeneratorError("cannot load the selected source's reduced-framework bootstrap")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def restore_config(private_feed: Path | None) -> str:
+    """Map rebuilt framework IDs exclusively to the fresh private feed."""
+    private_source = ""
+    mappings = ""
+    if private_feed is not None:
+        private_source = '<add key="reduced-avalonia" value="' + escape(str(private_feed.resolve()), {'"': '&quot;'}) + '"/>'
+        mappings = ('<packageSourceMapping><packageSource key="reduced-avalonia">'
+                    '<package pattern="Avalonia"/><package pattern="Avalonia.Themes.Fluent"/>'
+                    '</packageSource><packageSource key="nuget.org"><package pattern="*"/>'
+                    '</packageSource></packageSourceMapping>')
+    return ('<configuration><packageSources><clear/>' + private_source
+            + '<add key="nuget.org" value="' + NUGET_INDEX + '"/></packageSources>'
+            + '<fallbackPackageFolders><clear/></fallbackPackageFolders>' + mappings + '</configuration>')
+
+
+def merge_official_inputs(sources: list[dict[str, str]], inputs: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Include source-build NuGets without accepting conflicting archive pins."""
+    merged = {source["dest-filename"]: source for source in sources}
+    for source in inputs:
+        filename = source["dest-filename"]
+        if filename in merged and merged[filename] != source:
+            raise GeneratorError(f"conflicting official bootstrap input: {filename}")
+        merged[filename] = source
+    return [merged[name] for name in sorted(merged)]
 
 
 def generate_sources(source_root: Path, runtime: str, output: Path) -> int:
@@ -147,11 +207,6 @@ def generate_sources(source_root: Path, runtime: str, output: Path) -> int:
             "sdk": {"version": version, "rollForward": "disable", "allowPrerelease": False}
         }), encoding="utf-8")
         config = root / "NuGet.Config"
-        config.write_text(
-            '<configuration><packageSources><clear/><add key="nuget.org" value="'
-            + NUGET_INDEX + '"/></packageSources><fallbackPackageFolders><clear/>'
-            '</fallbackPackageFolders></configuration>', encoding="utf-8"
-        )
         environment = {
             **os.environ,
             "DOTNET_CLI_HOME": str(root / "cli"),
@@ -169,16 +224,34 @@ def generate_sources(source_root: Path, runtime: str, output: Path) -> int:
         )
         if sdk.returncode != 0 or sdk.stdout.strip() != version:
             raise GeneratorError(f"the exact Flatpak SDK {version} must be installed and selected")
+        builder = reduced_builder(source_root)
+        private_feed = root / "reduced-feed" if builder is not None else None
+        lock = None
+        if builder is not None:
+            lock = builder.read_lock(source_root)
+            if lock["sdkVersion"] != version:
+                raise GeneratorError("reduced Avalonia and Flatpak SDK pins differ")
+            result = subprocess.run([
+                sys.executable, str(source_root / "tools/prepare_reduced_avalonia.py"),
+                "--source-root", str(source_root), "--work-dir", str(root / "reduced-build"),
+                "--output", str(private_feed), "--dotnet", dotnet,
+            ], cwd=root, env=environment)
+            if result.returncode:
+                raise GeneratorError("reduced Avalonia source bootstrap failed")
+        config.write_text(restore_config(private_feed), encoding="utf-8")
         print(f"Restoring {runtime} with pinned .NET SDK {version} into a fresh package cache.", flush=True)
         result = subprocess.run([
             dotnet, "restore", str(project), "--runtime", runtime,
-            "-p:SelfContained=true", "--packages", str(packages),
+            "-p:SelfContained=true", "-p:ReducedAvaloniaPrepared=true", "--packages", str(packages),
             "--artifacts-path", str(artifacts), "--configfile", str(config),
-            "--source", NUGET_INDEX, "--force", "--no-http-cache", "--disable-build-servers",
+            "--force", "--no-http-cache", "--disable-build-servers",
         ], cwd=root, env=environment)
         if result.returncode != 0:
             raise GeneratorError(f"dotnet restore failed for {runtime} (exit code {result.returncode})")
-        sources = collect_sources(packages, artifacts, runtime)
+        sources = collect_sources(packages, artifacts, runtime, private_feed,
+                                  lock["packageVersion"] if lock else None)
+        if builder is not None:
+            sources = merge_official_inputs(sources, builder.official_sources(lock))
 
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
