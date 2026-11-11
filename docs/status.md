@@ -1,5 +1,23 @@
 # Project Status
 
+## Dependabot xUnit correction merged; updater verification running (2026-11-11)
+
+- Selected `M-DEPENDABOT-IGNORE-20261111`. Replaced the rejected interval with
+  `>= 4.0.0` on isolated branch `fix/dependabot-xunit-ignore`; scope retains
+  absolute version/security exclusion and changes no package versions.
+- [PR #41](https://github.com/VoltKraft/immich-folder-watch/pull/41) head
+  `ed1a5f624970fd1e046a0584fc363d47c5372925` contains the fix and focused docs.
+  YAML semantic comparison and all 14 PR CI/CodeQL checks passed. The actual
+  upstream C# parser reproduced the old failure and passed all five version
+  boundary cases for the correction.
+- Automatic approval review rejected the direct main push and required a PR or
+  explicit publication approval. The user then explicitly authorized merging #41;
+  expected-head merge succeeded as `a82216d4251e6517b71236602ab09abfdb13f3e1`.
+  Fresh default-branch updater verification is running. #32 stays blocked; auto-merge off.
+- Independent source review confirms the C# updater parser supports the comparator
+  and retains explicit ignore versions for security updates. Actual hosted updater
+  verification remains required. See [investigation](dependabot-ignore-20261111.md).
+
 ## PR #34 merged; main verified, separate updater issue found (2026-11-11)
 
 - User authorized the merge and main verification. Rechecked all 14 successful

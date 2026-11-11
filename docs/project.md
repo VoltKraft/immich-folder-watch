@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-05`.
+- Brief revision: `IFW-BRIEF-20261111-06`.
 - Plan maturity: v3.0.1 published; SkiaSharp PR #34 merged, Avalonia deferred.
-- Active milestone: None; `M-PR34-MERGE-20261111` completed with a separate updater finding.
+- Active milestone: `M-DEPENDABOT-IGNORE-20261111`; PR validation and activation pending.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,21 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-DEPENDABOT-IGNORE-20261111
+
+The user selected correcting the xUnit ignore requirement and verifying hosted
+Dependabot NuGet runs. Prepare a scoped PR; default-branch execution follows
+separate merge authorization after validation. The user then explicitly
+authorized merging #41 and verifying the hosted NuGet runs; merge `a82216d`
+activates the correction.
+
+- Preserve the absolute xunit.v3 exclusion of versions >= 4.0.0, including its
+  security-update scope; do not change package versions or other update settings.
+- Validate YAML and the targeted diff, then verify the general NuGet job and
+  existing Avalonia PR refresh no longer fail on the requirement parser.
+- Record actual hosted outcomes and any independent blockers. Keep #32 open and
+  license-blocked, automatic merging disabled and release v3.0.1 unchanged.
 
 ## M-PR34-MERGE-20261111
 
