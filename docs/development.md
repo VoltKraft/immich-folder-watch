@@ -69,6 +69,10 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
   workflow takes its source commit directly from the caller's `github.sha`
   event context; it does not accept a separate source-ref input. Checkout,
   manifest preparation and artifact names all use that same commit.
+- `pages-artifact-validation.yaml`: called by CI with read-only repository
+  permissions; uploads synthetic Pages fixtures through the production action pin,
+  downloads them by artifact ID and verifies tar contents, hidden-file selection
+  and link dereferencing. It never deploys Pages or accesses signing secrets.
 - `release.yaml`: build x64 and ARM64 Windows MSIs and Linux Flatpaks from the
   same immutable commit, then publish all four only after successful CI on
   `main` and only when the version tag does not already exist

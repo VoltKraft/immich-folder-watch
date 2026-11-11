@@ -1,5 +1,17 @@
 # Project Status
 
+## PR #37 merged; main validation running (2026-11-11)
+
+- User explicitly authorized merging #37 and checking the resulting main.
+  Rechecked all 14 successful checks at `d79d3f3`; merged with expected-head
+  protection as `2a9a96d18ead49682804cdbe61e444b8c5f99703`. No check bypass.
+- Main CI and CodeQL started on that exact merge revision. #32/#34 remain
+  unchanged/open/unmerged and repository automatic merging remains disabled.
+- Local synchronization reconciles the PR preparation records with the newer
+  local verification evidence; no implementation conflict occurred. Final
+  exact-main results will be recorded after all jobs complete.
+
+
 ## PR #37 ready for a separate merge decision (2026-11-11)
 
 - `M-PR37-20261111` completed. Updated [PR #37](https://github.com/VoltKraft/immich-folder-watch/pull/37)
@@ -34,6 +46,17 @@
 - [Detailed evidence](release-3.0.1.md) owns run links, checksums, signed refs and
   publication limits. This final documentation checkpoint follows the immutable
   release and is retained locally; published artifacts remain unchanged.
+
+
+## PR #37 preparation (2026-11-11)
+
+- User selected `M-PR37-20261111`, authorizing branch refresh, focused compatibility
+  validation and successful CI/CodeQL without merging or deployment.
+- Integrated remote main `1ab0748` into original PR head `c8989d6` in an isolated
+  worktree. No force-push; the root checkout's local v3.0.1 evidence is preserved.
+- Add an actual upload/download smoke check for the Pages action using synthetic
+  files only, read-only repository permissions and no publishing job/secrets.
+- #32/#34 and disabled automatic merging are outside the mutation scope.
 
 
 ## v3.0.1 container checkout correction (2026-11-11)

@@ -9,7 +9,7 @@
 - Product baseline: The checked-in version is `3.0.1` in
   [Directory.Build.props](../Directory.Build.props). Local `main` includes the
   merge of PR #26; publication and deployed installations are separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-02`.
+- Brief revision: `IFW-BRIEF-20261111-03`.
 - Plan maturity: v3.0.1 published and verified; Avalonia/SkiaSharp updates deferred.
 - Active milestone: None; `M-RELEASE-301-20261111` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
@@ -31,7 +31,20 @@ Integrated current main, reviewed exact upstream MIT licenses/compatibility and
 added a read-only CI artifact round trip with synthetic data. All eight CI jobs,
 four CodeQL analyses and all 14 PR checks passed at `d79d3f3`.
 See [PR #37 evidence](dependabot-pr37-20261111.md). Production deployment is not
-claimed. #32/#34 remain deferred, auto-merge disabled; no merge is authorized.
+claimed. Follow-up authorization: the user selected merging #37 and verifying
+main CI/CodeQL. The merge was executed as `2a9a96d`; #32/#34 remain deferred and
+automatic merging stays disabled. Earlier no-merge scope below is historical.
+
+- User selected completing the preparation of PR #37: update against current main,
+  verify upstream licenses/compatibility and obtain successful CI/CodeQL. No merge.
+- P37-AC01: Preserve the proposed SHA-pinned upload-pages-artifact v5 update and
+  integrate current main without rewriting branch history or including #32/#34.
+- P37-AC02: Exercise the actual Pages upload and artifact download using harmless
+  fixtures; validate tar layout, bytes, hidden-file policy and dereferenced links.
+  Use read-only repository permissions with no deployment, signing secret or Pages
+  environment. Distinguish artifact validation from a real Pages deployment.
+- P37-AC03: Verify all PR-head CI/CodeQL checks and record license/source evidence.
+  Keep #32 blocked, #34 deferred, auto-merge disabled and release v3.0.1 unchanged.
 
 ## M-RELEASE-301-20261111
 
