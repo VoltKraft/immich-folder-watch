@@ -22,6 +22,14 @@
   from the old root roll-forward policy, while reconstruction correctly required
   10.0.401. Root global.json now pins 10.0.401 with roll-forward disabled, so managed
   tooling installs the same reviewed compiler as CI and Flatpak.
+- Current hosted Windows, all four CodeQL analyses and automatic NuGet submission
+  pass. Native Flatpak compilation succeeds, but subsequent verification exposed
+  an ephemeral default NuGet cache across build commands; the offline config now
+  scopes it to the persistent module build directory. A real SDK regression
+  restores across two disposable HOME directories and fails without this fix.
+- Hosted Linux package installation independently failed on Azure Ubuntu mirror
+  DNS. CI now falls back to the official Ubuntu archive only when that mirror
+  fails DNS resolution, retaining signed APT verification and package requirements.
 - Published v3.0.2 and existing local main documentation remain unchanged.
   Hosted current-head CI/CodeQL and reduced-binary verification are pending.
 

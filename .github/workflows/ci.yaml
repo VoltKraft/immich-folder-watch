@@ -76,7 +76,12 @@ jobs:
           dotnet-version: 10.0.401
 
       - name: Install portal protocol test tools
-        run: sudo apt-get update && sudo apt-get install -y dbus-daemon xdg-dbus-proxy
+        run: |
+          # Preserve signed APT verification if the hosted runner's Azure mirror has a DNS outage.
+          if [ -f /etc/apt/apt-mirrors.txt ] && ! getent hosts azure.archive.ubuntu.com >/dev/null; then
+            sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get update && sudo apt-get install -y dbus-daemon xdg-dbus-proxy
 
       - name: Build reduced Avalonia from pinned sources
         run: python3 tools/prepare_reduced_avalonia.py
@@ -128,6 +133,10 @@ jobs:
 
       - name: Install validators
         run: |
+          # Preserve signed APT verification if the hosted runner's Azure mirror has a DNS outage.
+          if [ -f /etc/apt/apt-mirrors.txt ] && ! getent hosts azure.archive.ubuntu.com >/dev/null; then
+            sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             appstream \
