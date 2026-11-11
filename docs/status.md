@@ -10,10 +10,15 @@
   The final changelog checkpoint `395225d` starts a fresh ordinary check cycle.
 - #45 `9fe9d27` restores both exact-source MIT notices and fixes a discovered
   YAML string round-trip defect reproduced on both old and new versions.
-  All 498 portable Core tests and 15 license tests pass; hosted CI is running.
-- Independent security review of #43 identified a stop/reconnect lifetime gap
-  in SocketIO 4. The worker is fixing it with lifetime cancellation, transport
-  guards and a synthetic shutdown regression before any push.
+  All 498 portable Core tests, 15 license tests and all 14 hosted checks pass.
+- #39 final head `395225d` now also passes all 14 checks; its old queued app
+  check belongs to the previous head and is not claimed successful.
+- Independent security review of #43 identified and verified the fix for a
+  stop/reconnect lifetime gap in SocketIO 4. Head `63f1f9a` passes Windows/Linux
+  and CodeQL but native Flatpak exposes missing 10.0.3 notices in the broader
+  offline feed. Final repair `564269d` adds only those five exact-source MIT
+  versions; all 89 CI-feed archives pass checksum and notice installation.
+  Final hosted CI/CodeQL runs are active.
 - #32 remains open at unchanged `51898a8`; all PR auto-merge requests remain
   null. No merge, main push, release, deployment or live Immich test performed.
 
