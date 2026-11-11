@@ -1,5 +1,13 @@
 # Project Status
 
+## PR #32 merge and v3.0.3 release selected (2026-11-11)
+
+- Selected `M-RELEASE-303-20261111` under explicit merge/release authorization.
+- Reverified #32 at `ce0b711`: OPEN/CLEAN, all 14 checks successful, no auto-merge.
+  Latest release is v3.0.2; v3.0.3 is the next compatible patch release.
+- Preserve the three local documentation commits and reconcile them with the
+  merged implementation. Main validation and release publication are pending.
+
 ## PR #32 reduced Avalonia prepared and verified (2026-11-11)
 
 - Completed `M-PR32-REDUCED-AVALONIA-20261111` for preparation/validation. Pushed

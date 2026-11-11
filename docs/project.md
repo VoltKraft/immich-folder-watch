@@ -9,9 +9,9 @@
 - Product baseline: The checked-in version is `3.0.2` in
   [Directory.Build.props](../Directory.Build.props). Published v3.0.2 at `df48398` includes
   all reviewed main changes; deployed installations remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-15`.
-- Plan maturity: v3.0.2 published; reduced Avalonia PR #32 prepared and verified.
-- Active milestone: none; `M-PR32-REDUCED-AVALONIA-20261111` completed for preparation and validation.
+- Brief revision: `IFW-BRIEF-20261111-16`.
+- Plan maturity: PR #32 merge and compatible v3.0.3 release selected.
+- Active milestone: `M-RELEASE-303-20261111` — merge #32, verify main and publish v3.0.3.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -23,6 +23,23 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-RELEASE-303-20261111
+
+The user explicitly authorized merging #32, checking the result and publishing a
+new release. Reverify the reviewed head, merge with the head guard, preserve local
+documentation history, and require successful main CI/CodeQL before publishing
+compatible patch v3.0.3. This supersedes the previous no-merge/no-release boundary
+for #32; automatic merging remains disabled.
+
+Acceptance: merged reviewed implementation; exact-revision main and release CI,
+four CodeQL analyses and NuGet submission; consistent 3.0.3 / 3.0.3.0 versions,
+changelog and AppStream; successful x64/ARM64 Windows MSI and Linux Flatpak builds;
+immutable tag and complete public assets; reduced DLL/provenance/notices audited
+in both published Linux bundles; signed Pages pulls on both architectures using
+the existing key. Report WinGet submission and Flathub preparation separately
+from external acceptance. Preserve existing releases, security contracts and
+user data; no application installation or live Immich connection.
 
 ## M-PR32-REDUCED-AVALONIA-20261111
 
