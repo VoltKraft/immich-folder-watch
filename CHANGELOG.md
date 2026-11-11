@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct the Dependabot xUnit ignore requirement so NuGet update jobs can run while retaining the exclusion of xUnit 4 and later.
 
 ### Changed
+- Update the build-only branding generator to Svg.Skia 5.2.3 with reviewed upstream notices; application rendering dependencies remain unchanged.
+- Update pinned checkout and .NET setup actions to v7.0.1 and v6.1.0, retaining existing workflow permissions and .NET 10 support.
 - Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
 - Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
 

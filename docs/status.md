@@ -1,5 +1,22 @@
 # Project Status
 
+## Remaining PR fixes prepared; final verification in progress (2026-11-11)
+
+- #38, #40, #42 and #44 are pushed and pass their exact-head CI and all four
+  CodeQL analyses. Both native Flatpak architectures succeed; #38/#40 also
+  pass their separate Dependabot configuration checks.
+- #39 passes CI/CodeQL, including a new read-only v9 runtime smoke test. Its
+  first Dependabot app check stayed queued without output or a restart control.
+  The final changelog checkpoint `395225d` starts a fresh ordinary check cycle.
+- #45 `9fe9d27` restores both exact-source MIT notices and fixes a discovered
+  YAML string round-trip defect reproduced on both old and new versions.
+  All 498 portable Core tests and 15 license tests pass; hosted CI is running.
+- Independent security review of #43 identified a stop/reconnect lifetime gap
+  in SocketIO 4. The worker is fixing it with lifetime cancellation, transport
+  guards and a synthetic shutdown regression before any push.
+- #32 remains open at unchanged `51898a8`; all PR auto-merge requests remain
+  null. No merge, main push, release, deployment or live Immich test performed.
+
 ## Remaining PR preparation selected (2026-11-11)
 
 - Selected `M-REMAINING-PRS-20261111`: #38/#39/#40/#42/#43/#44/#45, excluding #32.
