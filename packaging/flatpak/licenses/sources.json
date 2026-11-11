@@ -66,5 +66,17 @@
   "Dotnet-11.0.0-LICENSE.txt": {
     "url": "https://raw.githubusercontent.com/dotnet/dotnet/297acf930fb0f5c07fd4e51d78e521b4ad2e5d1f/LICENSE.TXT",
     "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  "SocketIOClient-4.0.5-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/doghappy/socket.io-client-csharp/9deebcfe8079164d269ec4f22ba58589366014fb/LICENSE",
+    "sha256": "e97ff25fc8529385c2a1a12a3a780f07322c32d95f2b00b5a277e7855a900fb8"
+  },
+  "SocketIOClient-4.0.0-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/doghappy/socket.io-client-csharp/167500202fedc2801e6ee42dfe69b61d0bfc7d25/LICENSE",
+    "sha256": "e97ff25fc8529385c2a1a12a3a780f07322c32d95f2b00b5a277e7855a900fb8"
+  },
+  "Dotnet-10.0.3-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/LICENSE.TXT",
+    "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
   }
 }

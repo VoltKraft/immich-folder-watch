@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Align the Windows hosting package with the reviewed Microsoft.Extensions 11.0.0 dependencies while retaining .NET 10 support.
+- Update GitHub Script to v9 and verify CommonJS helper loading and read-only GitHub API access in CI.
 - Update the build-only branding generator to SkiaSharp 4.155.0; application rendering dependencies remain unchanged.
 - Update the pinned Pages artifact uploader to v5 and validate upload/download archive compatibility in CI without deploying the website.
 
