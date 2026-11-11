@@ -1,16 +1,23 @@
 # Project Status
 
-## Release v3.0.2 selected (2026-11-11)
+## Release v3.0.2 published and verified (2026-11-11)
 
-- Selected `M-RELEASE-302-20261111` under explicit release authorization.
-- Baseline main `8d7afba` is synchronized and clean; latest published v3.0.1
-  remains immutable and no v3.0.2 tag exists.
-- Version/changelog/AppStream metadata and independent preparation review pass.
-  Five manifest and six workflow-security tests pass; four PowerShell cases await
-  Windows CI. Hosted CI, release builds, publication and distribution checks
-  remain pending.
-- #32 remains open/license-blocked at 51898a8; auto-merge is disabled.
-  [Release record](release-3.0.2.md).
+- Completed `M-RELEASE-302-20261111`: v3.0.2 is published from main/release
+  commit `df4839852bb84efef35a83cc429d51ce55b9ed1e`, including all new main changes.
+- CI passes eight jobs; CodeQL passes all four languages; NuGet submission passes.
+  Release passes all nine jobs, with both Windows MSIs and both Linux Flatpaks.
+- Downloaded all four public assets and verified exact sizes/SHA-256 hashes;
+  tag, versions and release notes match the selected commit/changelog.
+- Signed Pages deployment passes. Isolated signature-verified OSTree pulls return
+  3.0.2 for x86_64 and aarch64 using the unchanged persistent signing identity.
+- WinGet #477568 is submitted and awaits external acceptance. Flathub preparation
+  and both native builds pass; submission is correctly skipped while disabled.
+- #32 remains open/license-blocked at 51898a8, auto-merge disabled, and open
+  CodeQL/Dependabot alert counts zero. No application installation or live Immich
+  connection was performed. Existing v3.0.1 is unchanged.
+- Final evidence is saved locally after the immutable tag; no extra main push.
+  Release scope is complete; external distributor acceptance is separate.
+  [Release evidence, hashes and run links](release-3.0.2.md).
 
 ## Verification documentation published and checked (2026-11-11)
 

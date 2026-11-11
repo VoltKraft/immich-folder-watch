@@ -7,12 +7,11 @@
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
 - Product baseline: The checked-in version is `3.0.2` in
-  [Directory.Build.props](../Directory.Build.props). Local `main` incorporates
-  reviewed dependency merges through `efeda2f`; published releases and deployed
-  installations remain separate evidence.
+  [Directory.Build.props](../Directory.Build.props). Published v3.0.2 at `df48398` includes
+  all reviewed main changes; deployed installations remain separate evidence.
 - Brief revision: `IFW-BRIEF-20261111-13`.
-- Plan maturity: v3.0.2 release selected from verified main; Avalonia remains deferred.
-- Active milestone: `M-RELEASE-302-20261111` — publish and verify v3.0.2.
+- Plan maturity: v3.0.2 published and verified; Avalonia remains deferred.
+- Active milestone: none; `M-RELEASE-302-20261111` completed.
 - Implementation request / scope: The user's 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
@@ -26,6 +25,13 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-RELEASE-302-20261111
+
+Completed: v3.0.2 published from `df48398` with all four verified public assets.
+Exact-revision CI/CodeQL and all release/distribution workflows passed; signed
+Pages pulls verify 3.0.2 on both architectures. WinGet #477568 is submitted and
+awaits external acceptance; Flathub builds pass with submission disabled. #32
+remains open/license-blocked and auto-merge disabled. Final evidence is saved
+locally after the published tag; no product changes remain unreleased.
 
 The user explicitly authorized creating the current release with all new main
 changes. Prepare and publish v3.0.2 from main `8d7afba`, including the previously
