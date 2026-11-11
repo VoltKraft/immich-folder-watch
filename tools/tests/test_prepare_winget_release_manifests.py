@@ -41,18 +41,6 @@ class PrepareWinGetReleaseManifestsTests(unittest.TestCase):
             "installerLocale": "en-US",
             "installerType": "wix",
             "manifestVersion": "1.12.0",
-            "icon": {
-                "url": (
-                    "https://raw.githubusercontent.com/VoltKraft/immich-folder-watch/"
-                    + "c" * 40
-                    + "/packaging/flatpak/icons/512x512/apps/"
-                    "io.github.voltkraft.immich-folder-watch.png"
-                ),
-                "sha256": "d" * 64,
-                "fileType": "png",
-                "resolution": "custom",
-                "theme": "default",
-            },
             "releaseAssetNameTemplates": {
                 "x64": "immich-folder-watch-{version}-win-x64.msi",
                 "arm64": "immich-folder-watch-{version}-win-arm64.msi",
@@ -179,70 +167,22 @@ class PrepareWinGetReleaseManifestsTests(unittest.TestCase):
             )
         )
 
-    def test_icon_is_rendered_only_in_default_locale(self) -> None:
-        outputs = self.prepare()
-        locale = next(path for path in outputs if ".locale." in path.name)
-        content = locale.read_text(encoding="utf-8")
-        icon_lines = content.split("Icons:\n", 1)[1].split("ReleaseNotesUrl:", 1)[0]
-        fields = {}
-        for line in icon_lines.splitlines():
-            key, value = line.strip().removeprefix("- ").split(": ", 1)
-            fields[key] = json.loads(value)
-        self.assertEqual(
-            {
-                "IconUrl": self.metadata["icon"]["url"],
-                "IconFileType": "png",
-                "IconResolution": "custom",
-                "IconTheme": "default",
-                "IconSha256": "D" * 64,
-            },
-            fields,
-        )
-        for path in outputs:
-            if path != locale:
-                self.assertNotIn("Icons:", path.read_text(encoding="utf-8"))
+    def test_manifests_do_not_author_restricted_catalog_icons(self) -> None:
+        for path in self.prepare():
+            self.assertNotIn("Icons:", path.read_text(encoding="utf-8"))
 
-    def test_rejects_invalid_icon_before_writing_manifests(self) -> None:
-        valid_icon = self.metadata["icon"].copy()
-        invalid_icons = [
-            None,
-            [],
-            {},
-            {**valid_icon, "unexpected": "value"},
-            {**valid_icon, "sha256": None},
-            {**valid_icon, "sha256": "d" * 63},
-            {**valid_icon, "sha256": "g" * 64},
-            {**valid_icon, "fileType": "svg"},
-            {**valid_icon, "resolution": "512x512"},
-            {**valid_icon, "theme": "dark"},
-        ]
-        url = valid_icon["url"]
-        invalid_icons.extend(
-            {**valid_icon, "url": bad_url}
-            for bad_url in (
-                url.replace("https:", "http:"),
-                url.replace("c" * 40, "main"),
-                url.replace("c" * 40, "c" * 7),
-                url.replace("VoltKraft", "someone-else"),
-                url.replace("raw.githubusercontent.com", "raw.githubusercontent.com.evil.example"),
-                url + "?download=1",
-                url + "\nInjected: value",
-            )
-        )
-        for invalid_icon in invalid_icons:
-            with self.subTest(icon=invalid_icon):
-                self.metadata["icon"] = invalid_icon
-                with self.assertRaises(MODULE.ManifestError):
-                    self.prepare()
-                self.assertFalse(self.output_dir.exists())
-
-    def test_missing_icon_preserves_existing_output(self) -> None:
-        outputs = self.prepare()
-        before = {path: path.read_bytes() for path in outputs}
-        del self.metadata["icon"]
-        with self.assertRaisesRegex(MODULE.ManifestError, "icon"):
-            self.prepare()
-        self.assertEqual(before, {path: path.read_bytes() for path in outputs})
+    def test_legacy_icon_metadata_cannot_reintroduce_restricted_fields(self) -> None:
+        self.metadata["icon"] = {
+            "url": "https://example.invalid/icon.png",
+            "sha256": "d" * 64,
+            "fileType": "png",
+            "resolution": "custom",
+            "theme": "default",
+        }
+        for path in self.prepare():
+            content = path.read_text(encoding="utf-8")
+            self.assertNotIn("Icons:", content)
+            self.assertNotIn("https://example.invalid/icon.png", content)
 
     def test_rejects_missing_architecture(self) -> None:
         self.installers = self.installers[:1]

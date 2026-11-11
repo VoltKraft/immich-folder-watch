@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Include pinned, hash-verified icon metadata in generated WinGet manifests so catalog clients such as UniGetUI can discover the application icon.
+- Keep generated WinGet manifests free of manually authored icon metadata, which the community repository rejects under its publisher policy.
 
 ## [3.0.3] - 2026-11-11
 

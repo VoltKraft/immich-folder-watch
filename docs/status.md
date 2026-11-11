@@ -1,5 +1,26 @@
 # Project Status
 
+## WinGet icon policy correction prepared; rejected PR closed (2026-11-11)
+
+- Selected `M-WINGET-ICON-ROLLBACK-20261111` under explicit correction, PR closure,
+  push and CI-verification authorization. Removed the generator's icon requirement
+  and emission and the metadata object; updated the changelog/operator guidance.
+  Embedded Windows branding, installer fields, versions and release assets remain
+  unchanged. No UniGetUI database contribution is selected.
+- All 12 focused regression tests pass, including no authored `Icons` and legacy
+  icon input suppression. Generated all three manifests for 3.0.3: each passes
+  its official 1.12.0 schema and is byte-identical to the pre-icon generator output
+  at `169f788`. `git diff --check` passes.
+- [WinGet PR #477862](https://github.com/microsoft/winget-pkgs/pull/477862) is
+  confirmed CLOSED with `mergedAt: null`. The connector was denied; the existing
+  authenticated CLI completed the explicitly authorized closure. Branch retained.
+- Rechecked previous CI `43103171839`: attempt 2 has now completed successfully,
+  resolving the queued Pages retry without source changes. Previous CodeQL/NuGet
+  passed as recorded below. The current correction still needs its own pushed
+  revision's CI; previous checks are not reused as that evidence.
+- Remote main was refreshed at `6d05b17`; it is an ancestor of local HEAD.
+  Push will preserve the prior local evidence commit `cfaccd7` and this correction.
+
 ## Generator pushed; WinGet publisher-policy blocker confirmed (2026-11-11)
 
 - Pushed implementation `af7bb8e` and its documentation history to project main

@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-19`.
-- Plan maturity: Generator pushed; CI retry queued; WinGet icon policy blocks submission.
-- Active milestone: `M-WINGET-ICON-PUBLISH-20261111` (CI retry pending).
+- Brief revision: `IFW-BRIEF-20261111-20`.
+- Plan maturity: Restricted icon output removed; rejected PR closed; correction CI pending.
+- Active milestone: `M-WINGET-ICON-ROLLBACK-20261111`.
 - Implementation request / scope: The user selected the WinGet icon correction
   and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -25,6 +25,17 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-WINGET-ICON-ROLLBACK-20261111
+
+The user selected correcting the generator, closing rejected WinGet PR #477862,
+pushing the correction and checking CI. Remove manual icon metadata and its
+requirement from the generator; retain regression coverage that no `Icons` can
+be emitted even from legacy icon-bearing input. Preserve installer metadata,
+versions, release assets and the embedded MSI icon. No UniGetUI contribution or
+new release is selected. Acceptance: focused tests and schema checks pass, PR
+confirmed closed without merge, exact pushed revision passes CI/CodeQL or a
+concrete external blocker is reported. Preserve the earlier investigation history.
 
 ## M-WINGET-ICON-PUBLISH-20261111
 

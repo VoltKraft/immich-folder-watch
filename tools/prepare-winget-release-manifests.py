@@ -111,32 +111,6 @@ def validate_metadata(metadata: dict[str, object]) -> dict[str, object]:
     if normalized["installerType"] != "wix":
         raise ManifestError("metadata field 'installerType' must be 'wix'")
 
-    icon = metadata.get("icon")
-    icon_keys = {"url", "sha256", "fileType", "resolution", "theme"}
-    if not isinstance(icon, dict) or set(icon) != icon_keys:
-        raise ManifestError(
-            "metadata field 'icon' must contain exactly url, sha256, fileType, "
-            "resolution, and theme"
-        )
-    if any(not isinstance(value, str) for value in icon.values()):
-        raise ManifestError("icon fields must all be strings")
-    repository = re.escape(str(normalized["repository"]))
-    icon_url_pattern = (
-        rf"https://raw\.githubusercontent\.com/{repository}/[0-9a-f]{{40}}/"
-        r"packaging/flatpak/icons/512x512/apps/"
-        r"io\.github\.voltkraft\.immich-folder-watch\.png"
-    )
-    if not re.fullmatch(icon_url_pattern, icon["url"]):
-        raise ManifestError("icon URL must reference the repository PNG at a full commit SHA")
-    if not SHA256_RE.fullmatch(icon["sha256"]):
-        raise ManifestError("icon has an invalid SHA-256")
-    # WinGet 1.12 has no 512x512 enum value; custom describes our branding PNG.
-    if (icon["fileType"], icon["resolution"], icon["theme"]) != (
-        "png", "custom", "default"
-    ):
-        raise ManifestError("icon must use png, custom resolution, and default theme")
-    normalized["icon"] = {**icon, "sha256": icon["sha256"].upper()}
-
     return normalized
 
 
@@ -268,18 +242,7 @@ def render_locale_manifest(metadata: dict[str, object], version: str) -> str:
     assert isinstance(tags, list)
     lines.append("Tags:")
     lines.extend(f"  - {yaml_string(str(tag))}" for tag in tags)
-    icon = metadata["icon"]
-    assert isinstance(icon, dict)
-    lines.extend(
-        (
-            "Icons:",
-            f"  - IconUrl: {yaml_string(str(icon['url']))}",
-            f"    IconFileType: {yaml_string(str(icon['fileType']))}",
-            f"    IconResolution: {yaml_string(str(icon['resolution']))}",
-            f"    IconTheme: {yaml_string(str(icon['theme']))}",
-            f"    IconSha256: {yaml_string(str(icon['sha256']))}",
-        )
-    )
+    # WinGet populates catalog icons during validation; authored Icons are restricted.
     repository = str(metadata["repository"])
     lines.extend(
         (
