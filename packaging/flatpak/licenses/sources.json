@@ -86,5 +86,13 @@
   "Dotnet-10.0.3-LICENSE.txt": {
     "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/LICENSE.TXT",
     "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  "Svg.Skia-5.2.3-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/wieslawsoltes/Svg.Skia/7910666415a96a09643d1729eb5da5d115d75748/LICENSE.TXT",
+    "sha256": "31fdac60ff94d9cab3afef9794905df38c47e82b6879819c025d703d3aebd953"
+  },
+  "Svg.Custom-5.2.3-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/wieslawsoltes/Svg.Skia/7910666415a96a09643d1729eb5da5d115d75748/src/Svg.Custom/LICENSE.TXT",
+    "sha256": "d0ab1d6a97c328acf658b57141b6f2863d7eaf0066e42a9fd0792df0c4fd2521"
   }
 }
