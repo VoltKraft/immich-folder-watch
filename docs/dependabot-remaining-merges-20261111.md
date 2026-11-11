@@ -22,6 +22,7 @@ publication of accumulated local documentation is selected.
 | #43 | `564269d33adffbbf7984f00d23eb54bd5e734a38` | `6a99ed310a3257695c65a8634be291e77ebb2fe3` |
 | #42 | `d1ebef8940e2bf35f678b8684ac89c61513983e2` | `f00eb5a12ed5848cf180ba8ff6d18f2a496cd4b1` |
 | #44 | `17bfa335bd61e7894d0a490a39f19b0637df446b` | `9a353d3e2e18a89cd62a21523e23b165b9033e42` |
+| #45 | `68ce4fedb731b30da7be3fb2beff4afa274eeb34` | `efeda2ffb6ec975188d2b1454c39dd718c00e540` |
 
 ## Conflict resolution and combined validation
 
@@ -67,3 +68,16 @@ GitHub now confirms MERGEABLE against current main 9a353d3. The fresh runs are
 CI 43020656839, CodeQL 43020650278 and NuGet 43020648053. Final hosted main evidence
 remains pending. Existing release v3.0.1 still points to 1ab0748 with four published
 assets; no version or publication change was made.
+
+## Final main verification
+
+The final #45 head passed all 14 checks and GitHub confirmed MERGEABLE/CLEAN;
+the expected-head merge then succeeded as `efeda2f`. Its tree exactly equals
+the reviewed and tested integration tree `edb08a47b902211878b3625c6935d60957481d57`.
+All seven authorized PRs have merged. Main runs CI 43021602143,
+CodeQL 43021602894 and NuGet 43021602079 are in progress.
+
+Local main incorporates remote main through merge `abe5ad4`, retaining all prior
+unpublished documentation. Every local changelog line was mechanically verified
+as present in the remote complete changelog before resolving that local conflict.
+Only documentation differs from remote main; production files match exactly.

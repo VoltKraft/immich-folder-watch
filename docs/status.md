@@ -1,18 +1,19 @@
 # Project Status
 
-## Remaining dependency merges selected (2026-11-11)
+## All selected dependency PRs merged; main verification running (2026-11-11)
 
-- User authorized merging #38/#39/#40/#42/#43/#44/#45 and verifying main.
-- All seven exact prepared heads were freshly confirmed OPEN/CLEAN, with
-  14 or 15 successful checks each. Repository auto-merge remains false.
-- #38/#40/#39/#43 have merged through expected-head requests; latest main
-  `6a99ed3`. Additive changelog and license conflicts in the remaining PRs are
-  resolved without dropping either side. #45 includes refreshed #42/#44 so
-  it validates all seven changes together; all 501 portable tests pass and
-  independent integration review finds no issue.
-- #32 is unchanged/open at `51898a8`; local unpublished documentation is
-  preserved. Refreshed hosted checks and final main verification are in progress.
-  [Merge record](dependabot-remaining-merges-20261111.md).
+- User-authorized #38/#39/#40/#42/#43/#44/#45 have merged. Final remote main:
+  `efeda2ffb6ec975188d2b1454c39dd718c00e540`, with tree identical to the reviewed
+  combined integration. Each merge used an exact-head guard and successful checks.
+- Additive changelog/notice conflicts preserve both sides. The combined source
+  passes 501 portable tests and independent review; its 24 license hashes and 109
+  version mappings validate. The final ancestry-only refresh restored GitHub's
+  MERGEABLE/CLEAN state, passed 14 fresh checks and merged normally.
+- Main CI 43021602143, CodeQL 43021602894 and NuGet 43021602079 are running;
+  release follow-up remains to be verified. No new version/release is selected.
+- Local synchronization `abe5ad4` preserves previous unpublished documents;
+  only documentation differs from remote main. #32 remains excluded and
+  automatic merging disabled. [Merge evidence](dependabot-remaining-merges-20261111.md).
 
 ## Remaining dependency PRs prepared and verified (2026-11-11)
 
