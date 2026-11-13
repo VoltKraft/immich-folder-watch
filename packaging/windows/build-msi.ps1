@@ -195,7 +195,8 @@ $wixProject = Join-Path $scriptRoot "ImmichFolderWatch.Setup.wixproj"
 $brandingIconPath = Join-Path $repoRoot "artifacts\branding\windows\app.ico"
 $publishRoot = Join-Path $OutputRoot "publish\$Runtime"
 $publishTempRoot = Join-Path $OutputRoot "publish-tmp\$Runtime"
-$msiOutputRoot = Join-Path $OutputRoot "package"
+$msiOutputRoot = Join-Path $OutputRoot "package\$Runtime"
+$msiIntermediateRoot = Join-Path $OutputRoot "obj\$Runtime"
 $installerVersion = Get-InstallerVersion -Value $Version
 $installerPlatform = Get-InstallerPlatform -Value $Runtime
 $msiFileName = "immich-folder-watch-$installerVersion-$Runtime.msi"
@@ -212,6 +213,9 @@ if (-not (Test-Path -LiteralPath $appProject)) {
 Reset-Directory -Path $publishRoot
 Reset-Directory -Path $publishTempRoot
 Reset-Directory -Path $msiOutputRoot
+# WiX incremental tracking does not fingerprint platform or preprocessor values.
+# Never reuse another architecture's MSI or a prior version's linked output.
+Reset-Directory -Path $msiIntermediateRoot
 
 function Publish-ProjectOutput {
     param(
@@ -264,7 +268,9 @@ $buildArgs = @(
     "-p:InstallerVersion=$installerVersion",
     "-p:PublishedAppDir=$publishRoot",
     "-p:BrandingIconPath=$brandingIconPath",
-    "-p:OutputPath=$msiOutputRoot\"
+    "-p:OutputPath=$msiOutputRoot\",
+    "-p:BaseIntermediateOutputPath=$msiIntermediateRoot\",
+    "-p:IntermediateOutputPath=$msiIntermediateRoot\"
 )
 
 Write-Host "Building MSI installer..."
@@ -280,7 +286,8 @@ if ($null -eq $builtMsi) {
 }
 
 # Validate the linked MSI, not just authoring: unreferenced fragments may be omitted.
-& (Join-Path $scriptRoot "Test-InstallerUpgradeContract.ps1") -Path $builtMsi.FullName
+& (Join-Path $scriptRoot "Test-InstallerUpgradeContract.ps1") `
+    -Path $builtMsi.FullName -ExpectedPlatform $installerPlatform -ExpectedVersion $installerVersion
 
 if (Test-Path -LiteralPath $finalMsiPath) {
     Remove-Item -LiteralPath $finalMsiPath -Force

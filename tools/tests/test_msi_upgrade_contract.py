@@ -111,5 +111,46 @@ catch {
                 self.check(mutation, succeeds=False)
 
 
+@unittest.skipUnless(PWSH, "PowerShell is required to execute the MSI identity validator")
+class MsiIdentityTests(unittest.TestCase):
+    def check(self, platform="x64", version="3.0.4", template="x64;1033",
+              actual_version="3.0.4", action_suffix="X64", *, succeeds=True):
+        source = ". '" + str(SCRIPT).replace("'", "''") + "'\n"
+        source += f"$actions = @{{ Wix4CloseApplications_{action_suffix} = @{{ Sequence = 1398 }} }}\n"
+        source += f"""
+try {{
+    Test-InstallerIdentity -Template '{template}' -ProductVersion '{actual_version}' -Actions $actions `
+        -ExpectedPlatform '{platform}' -ExpectedVersion '{version}'
+    Write-Output 'IDENTITY_ACCEPTED'
+}}
+catch {{
+    Write-Output ('IDENTITY_REJECTED: ' + $_.Exception.Message)
+    exit 23
+}}
+"""
+        result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", source],
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(0 if succeeds else 23, result.returncode, result.stdout + result.stderr)
+        self.assertIn("IDENTITY_ACCEPTED" if succeeds else "IDENTITY_REJECTED:", result.stdout)
+
+    def test_accepts_expected_x64_identity(self):
+        self.check()
+
+    def test_accepts_expected_arm64_identity(self):
+        self.check(platform="arm64", template="Arm64;1033", action_suffix="A64")
+
+    def test_rejects_x64_msi_mislabeled_as_arm64(self):
+        self.check(platform="arm64", succeeds=False)
+
+    def test_rejects_previous_product_version(self):
+        self.check(actual_version="3.0.3", succeeds=False)
+
+    def test_rejects_wrong_native_action_architecture(self):
+        self.check(action_suffix="A64", succeeds=False)
+
+    def test_rejects_itanium_template_for_x64(self):
+        self.check(template="Intel64;1033", succeeds=False)
+
+
 if __name__ == "__main__":
     unittest.main()

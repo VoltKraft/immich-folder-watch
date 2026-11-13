@@ -66,6 +66,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tools/tests -p test_msi_upgrade_contract.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools/tests -p test_installed_upgrade.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build and validate Windows MSI candidates
         run: |
@@ -74,7 +76,7 @@ jobs:
           }
 
       # Test-only MSI version; Directory.Build.props and release assets stay unchanged.
-      - name: Upgrade running installed Windows application
+      - name: Verify running-app safety and installed Windows upgrade
         run: |
           & .\packaging\windows\Test-InstalledUpgrade.ps1 `
             -CandidateMsi artifacts\windows\msi\immich-folder-watch-3.0.4-win-x64.msi `

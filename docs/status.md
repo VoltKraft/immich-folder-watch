@@ -1,5 +1,31 @@
 # Project Status
 
+## Running-application acceptance findings (2026-11-13)
+
+- Pushed `fe73b4c`; Windows run `43483904049` compiled both MSI candidates and
+  passed the compiled sequence gate. Its actual installed upgrade started public
+  3.0.3 with its app-local runtime loaded, then failed with MSI 1603 because
+  `EnsureAppClosed` detected the remaining process. No product removal began.
+  Evidence artifact: `windows-upgrade-evidence`, including verbose MSI logs.
+- The CI failure is not a successful automatic upgrade. Preserve the guard:
+  do not kill a worker or continue uninstalling loaded files. The service-hosted
+  close action could not close this desktop's process; desktop isolation is a
+  plausible explanation, not a proven diagnosis of the user's incident.
+- Extend the installed test to distinguish automatic completion from explicit
+  safe refusal. Refusal must preserve every baseline file, registration and user
+  data with no deferred file operations. After owner-desktop graceful shutdown,
+  retry the same candidate and require full payload/startup verification. Any
+  other error remains a test failure. These execution results are pending.
+- Review also identified shared WiX incremental state between architectures;
+  isolate/reset intermediate outputs and validate the compiled MSI platform and
+  version against requested values so a cached x64 package cannot pass as ARM64.
+  No new product version or release is selected.
+- Local validation: 31 focused installer/workflow tests pass, including five
+  executed refusal-evidence/native-helper test cases; diff whitespace passes.
+  Independent review found no blocking issue; HWND ownership is rechecked before
+  each native message. Windows COM and actual installation execution remain
+  pending on the next exact revision.
+
 ## Windows hosted compilation correction (2026-11-13)
 
 - Initial Windows build `43483088598` passed application and focused installer

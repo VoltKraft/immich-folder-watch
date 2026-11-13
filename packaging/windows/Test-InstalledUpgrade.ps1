@@ -66,7 +66,7 @@ function Get-PendingAppOperations {
 }
 
 function Invoke-TestMsi {
-    param([string]$Operation, [string]$Package, [string]$LogName)
+    param([string]$Operation, [string]$Package, [string]$LogName, [switch]$AllowGuardRefusal)
     $logPath = Join-Path $EvidenceDirectory $LogName
     $arguments = "$Operation `"$Package`" /qn /norestart /L*V `"$logPath`""
     $process = Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" -ArgumentList $arguments -PassThru
@@ -77,7 +77,7 @@ function Invoke-TestMsi {
         }
         $process.Refresh()
         $exitCode = $process.ExitCode
-        if ($exitCode -ne 0) {
+        if ($exitCode -ne 0 -and -not ($AllowGuardRefusal -and $exitCode -eq 1603)) {
             throw "MSI operation failed or requires a reboot (exit $exitCode); see $logName."
         }
         return $exitCode
@@ -104,6 +104,7 @@ function Wait-ForApplication {
                 if ($Process.HasExited -or -not $Process.Responding) { throw "Application did not remain responsive after startup." }
                 return [ordered]@{
                     processId = $Process.Id
+                    sessionId = $Process.SessionId
                     windowHandle = $Process.MainWindowHandle.ToInt64()
                     loadedRuntimeModules = @($modules | ForEach-Object { $_.FileName })
                 }
@@ -112,6 +113,114 @@ function Wait-ForApplication {
         Start-Sleep -Milliseconds 500
     }
     throw "Application did not expose a responsive window with app-local runtime modules within 90 seconds."
+}
+
+function Get-InstalledSnapshot {
+    $snapshot = [ordered]@{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $installDirectory -File -Recurse | Sort-Object FullName)) {
+        $relative = [IO.Path]::GetRelativePath($installDirectory, $file.FullName)
+        $snapshot[$relative] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+    }
+    if ($snapshot.Count -lt 5) { throw "Installed baseline snapshot is unexpectedly empty." }
+    return $snapshot
+}
+
+function Assert-SafeRunningRefusal {
+    param([System.Collections.IDictionary]$BaselineSnapshot, [string]$BaselineProductCode,
+        [string]$ConfigHash, [string]$SentinelHash, [Diagnostics.Process]$Process)
+    $log = Get-Content -LiteralPath (Join-Path $EvidenceDirectory "running-app-upgrade.log") -Raw
+    if ($log -notmatch '(?im)^Action ended [^\r\n]*: EnsureAppClosed\. Return value 3\.' -or
+        $log -notmatch '(?im)^Property\(S\): IFW_APP_RUNNING = 1\s*$') {
+        throw "Exit 1603 was not the expected running-application guard refusal."
+    }
+    # A generic 1603 or a rollback after removal is not evidence of safe early refusal.
+    if ($log -match '(?im)(?:Doing action: |^Action start [^\r\n]*: )(?:InstallValidate|InstallInitialize|RemoveExistingProducts|RemoveFiles|InstallFiles)(?:\.|\s|$)') {
+        throw "Running-app refusal occurred after a forbidden install/removal action began."
+    }
+    $after = Get-InstalledSnapshot
+    if ($after.Count -ne $BaselineSnapshot.Count) { throw "Safe refusal changed the installed file set." }
+    foreach ($name in $BaselineSnapshot.Keys) {
+        if (-not $after.Contains($name) -or $after[$name] -ne $BaselineSnapshot[$name]) {
+            throw "Safe refusal changed or removed baseline payload: $name"
+        }
+    }
+    $products = @(Get-InstalledProducts)
+    if ($products.Count -ne 1 -or $products[0].ProductCode -ne $BaselineProductCode -or $products[0].Version -ne "3.0.3") {
+        throw "Safe refusal changed baseline product registration."
+    }
+    if ((Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash -ne $ConfigHash -or
+        (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash -ne $SentinelHash) {
+        throw "Safe refusal changed synthetic user data."
+    }
+    if (@(Get-PendingAppOperations).Count -ne 0) { throw "Safe refusal left pending application file operations." }
+    $Process.Refresh()
+    if ($Process.HasExited) { throw "Expected refused-upgrade baseline process is no longer running." }
+}
+
+function Close-TestApplicationGracefully {
+    param([Diagnostics.Process]$Process)
+    # MSI's service context may not reach the runner desktop. Exercise the same
+    # end-session protocol from the owning desktop, without terminating the process.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+public static class UpgradeTestSessionMessages
+{
+    private delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr window);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr wParam,
+        IntPtr lParam, uint flags, uint timeout, out UIntPtr result);
+    private static bool Running(int processId)
+    {
+        try { using (var p = Process.GetProcessById(processId)) { return !p.HasExited; } }
+        catch (ArgumentException) { return false; }
+    }
+    private static bool OwnedWindow(IntPtr window, int processId)
+    {
+        if (!IsWindow(window)) return false;
+        GetWindowThreadProcessId(window, out uint owner);
+        return owner == processId;
+    }
+    public static void Close(int processId)
+    {
+        var windows = new List<IntPtr>();
+        EnumWindows((window, parameter) => {
+            GetWindowThreadProcessId(window, out uint owner);
+            if (owner == processId) windows.Add(window);
+            return true;
+        }, IntPtr.Zero);
+        if (windows.Count == 0 || windows.Count > 32)
+            throw new InvalidOperationException("Unexpected owner-desktop window count for graceful shutdown.");
+        foreach (var window in windows)
+        {
+            if (!Running(processId)) return;
+            if (!OwnedWindow(window, processId)) continue;
+            UIntPtr result;
+            if (SendMessageTimeout(window, 0x0011, UIntPtr.Zero, new IntPtr(1), 3, 5000, out result) == IntPtr.Zero)
+            {
+                if (!Running(processId)) return;
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "WM_QUERYENDSESSION failed or timed out.");
+            }
+            if (result == UIntPtr.Zero && Running(processId))
+                throw new InvalidOperationException("Application refused WM_QUERYENDSESSION.");
+            if (!Running(processId)) return;
+            if (OwnedWindow(window, processId) && SendMessageTimeout(window, 0x0016, new UIntPtr(1), new IntPtr(1), 3, 5000, out result) == IntPtr.Zero)
+            {
+                if (!Running(processId)) return;
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "WM_ENDSESSION failed or timed out.");
+            }
+        }
+    }
+}
+'@
+    [UpgradeTestSessionMessages]::Close($Process.Id)
+    if (-not $Process.WaitForExit(30000)) { throw "Application did not exit after owner-desktop session messages." }
 }
 
 function Assert-InstalledPayload {
@@ -162,12 +271,27 @@ try {
     "Synthetic upgrade preservation sentinel" | Set-Content -LiteralPath $sentinelPath -Encoding utf8
     $configHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
     $sentinelHash = (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash
+    $baselineSnapshot = Get-InstalledSnapshot
+    $baselineSnapshot | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory "baseline-payload.json") -Encoding utf8
+    $oldProducts | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory "baseline-registration.json") -Encoding utf8
     $oldProcess = Start-Process -FilePath $exePath -PassThru
     $summary.baselineApplication = Wait-ForApplication $oldProcess
     $oldProcess.Refresh()
     if ($oldProcess.HasExited) { throw "Baseline application exited before upgrade began." }
     $summary.upgradeStartedWithProcessId = $oldProcess.Id
-    $summary.upgradeExitCode = Invoke-TestMsi /i $CandidateMsi "running-app-upgrade.log"
+    $summary.runningUpgradeExitCode = Invoke-TestMsi /i $CandidateMsi "running-app-upgrade.log" -AllowGuardRefusal
+    if ($summary.runningUpgradeExitCode -eq 1603) {
+        Assert-SafeRunningRefusal -BaselineSnapshot $baselineSnapshot -BaselineProductCode $summary.baselineProductCode -ConfigHash $configHash -SentinelHash $sentinelHash -Process $oldProcess
+        $summary.runningUpgradeOutcome = "safely-refused"
+        $summary.refusalPreservedPayloadFiles = $baselineSnapshot.Count
+        $summary.refusalPreservedRegistrationAndUserData = $true
+        Close-TestApplicationGracefully -Process $oldProcess
+        $summary.ownerDesktopGracefulClose = "completed"
+        $summary.closedApplicationRetryExitCode = Invoke-TestMsi /i $CandidateMsi "closed-app-upgrade-retry.log"
+    }
+    else {
+        $summary.runningUpgradeOutcome = "completed"
+    }
     if (-not $oldProcess.WaitForExit(30000)) { throw "Old application process remained alive after upgrade." }
     $summary.oldProcessExited = $true
     $oldProcess.Dispose()

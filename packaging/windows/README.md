@@ -65,13 +65,21 @@ to exit; file-in-use/reboot behavior still requires Windows upgrade testing.
 
 `Test-InstallerUpgradeContract.ps1` reads the compiled MSI with Windows Installer's
 read-only COM API. Packaging fails if shutdown/abort/removal ordering or the
-synchronous close flags are wrong. Keep these actions in the linked `Package`:
+synchronous close flags are wrong, or if the MSI platform/version differs from
+the requested build. Each architecture uses freshly reset WiX intermediates.
+Keep these actions in the linked `Package`:
 unreferenced WiX fragments can be omitted from the output. Windows CI runs the
 checker regression tests and builds both architecture candidates with this gate.
 The x64 candidate is installed on a fresh GitHub-hosted Windows runner by
 `Test-InstalledUpgrade.ps1`: verified public 3.0.3 is launched, then upgraded
-while its WPF process has the app-local runtime loaded. The harness verifies
-all published payload hashes, replacement product registration, preserved
+while its WPF process has the app-local runtime loaded. If shutdown cannot reach
+the application, the only accepted refusal is the explicit pre-removal guard:
+the harness checks every baseline file and its registration remain unchanged,
+then requests graceful shutdown from the application's own desktop and retries.
+The JSON distinguishes `safely-refused` from `completed`; a successful retry does
+not establish automatic shutdown from the MSI service. Other installer failures
+remain failures. The harness verifies all published payload hashes, replacement
+product registration, preserved
 synthetic configuration and successful candidate startup. No Immich connection
 or personal media is configured. It uninstalls the disposable product afterward.
 MSI logs, file hashes and `upgrade-result.json` are uploaded as
@@ -87,6 +95,6 @@ The 2026-11-13 incident confirmed missing installed runtime files and recovery
 through MSI repair. The released MSI contained those files, but its explicit
 close action was sequenced after old-product removal. That ordering defect is
 corrected; the user's exact deletion mechanism remains unproven without the
-original update log. Acceptance still requires a Windows upgrade with the old
-tray process running, comparing runtime files before/after and after any reboot,
-verifying application startup and preserving per-user configuration.
+original update log. Preserve both the live-process safety check and successful
+installed-upgrade/startup checks in CI. A no-reboot pass does not establish
+behavior after a reboot or on another signed-in user's desktop.

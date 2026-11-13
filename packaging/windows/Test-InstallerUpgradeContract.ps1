@@ -1,5 +1,9 @@
 [CmdletBinding()]
-param([string]$Path)
+param(
+    [string]$Path,
+    [ValidateSet("x64", "arm64")][string]$ExpectedPlatform,
+    [string]$ExpectedVersion
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -53,6 +57,28 @@ function Test-UpgradeSequence {
     }
 }
 
+function Test-InstallerIdentity {
+    param(
+        [Parameter(Mandatory = $true)][string]$Template,
+        [Parameter(Mandatory = $true)][string]$ProductVersion,
+        [Parameter(Mandatory = $true)][hashtable]$Actions,
+        [Parameter(Mandatory = $true)][ValidateSet("x64", "arm64")][string]$ExpectedPlatform,
+        [Parameter(Mandatory = $true)][string]$ExpectedVersion
+    )
+
+    $platform = $Template.Split(';')[0]
+    if ($platform -ine $ExpectedPlatform) {
+        throw "MSI platform '$platform' does not match requested '$ExpectedPlatform'."
+    }
+    if ($ProductVersion -cne $ExpectedVersion) {
+        throw "MSI version '$ProductVersion' does not match requested '$ExpectedVersion'."
+    }
+    $suffix = if ($ExpectedPlatform -eq "arm64") { "A64" } else { "X64" }
+    if (-not $Actions.ContainsKey("Wix4CloseApplications_$suffix")) {
+        throw "MSI close action does not match requested '$ExpectedPlatform' architecture."
+    }
+}
+
 function Read-MsiRows {
     param([object]$Database, [string]$Query, [string[]]$Columns)
 
@@ -85,7 +111,11 @@ function Read-MsiRows {
 }
 
 function Test-InstallerUpgradeContract {
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][ValidateSet("x64", "arm64")][string]$ExpectedPlatform,
+        [Parameter(Mandatory = $true)][string]$ExpectedVersion
+    )
 
     $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
     $installer = $null
@@ -104,8 +134,20 @@ function Test-InstallerUpgradeContract {
         }
         $closeRows = @(Read-MsiRows $database 'SELECT `Target`, `Condition`, `Attributes`, `Property`, `Timeout` FROM `Wix4CloseApplication`' @("Target", "Condition", "Attributes", "Property", "Timeout"))
         if ($closeRows.Count -ne 1) { throw "Expected exactly one application-close definition in the MSI." }
+        $summary = $null
+        try {
+            $summary = $database.GetType().InvokeMember("SummaryInformation", "GetProperty", $null, $database, @(0))
+            $template = [string]$summary.GetType().InvokeMember("Property", "GetProperty", $null, $summary, 7)
+        }
+        finally {
+            if ($null -ne $summary) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($summary) }
+        }
+        $versions = @(Read-MsiRows $database 'SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''' @("Value"))
+        if ($versions.Count -ne 1) { throw "Expected one ProductVersion in the MSI." }
+        Test-InstallerIdentity -Template $template -ProductVersion $versions[0].Value -Actions $actions `
+            -ExpectedPlatform $ExpectedPlatform -ExpectedVersion $ExpectedVersion
         Test-UpgradeSequence -Actions $actions -CustomActions $customActions -CloseApplication $closeRows[0]
-        Write-Host "MSI upgrade contract verified: process closure precedes removal inside the transaction."
+        Write-Host "MSI upgrade contract verified for $ExpectedPlatform $ExpectedVersion`: process closure precedes removal inside the transaction."
     }
     finally {
         if ($null -ne $database) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($database) }
@@ -116,5 +158,8 @@ function Test-InstallerUpgradeContract {
 # Dot sourcing exposes the pure contract check for fixture-based regression tests.
 if ($MyInvocation.InvocationName -ne ".") {
     if ([string]::IsNullOrWhiteSpace($Path)) { throw "Specify the built MSI using -Path." }
-    Test-InstallerUpgradeContract -Path $Path
+    if ([string]::IsNullOrWhiteSpace($ExpectedPlatform) -or [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+        throw "Specify the requested MSI identity using -ExpectedPlatform and -ExpectedVersion."
+    }
+    Test-InstallerUpgradeContract -Path $Path -ExpectedPlatform $ExpectedPlatform -ExpectedVersion $ExpectedVersion
 }
