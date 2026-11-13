@@ -52,3 +52,28 @@ When upgrading from a version that installed the `ImmichFolderWatch` Windows ser
 - Autostart is enabled by default.
 
 Other Windows users on the same machine keep using the app after their first launch, which seeds a fresh per-user config.
+
+## Upgrade process safety
+
+The MSI requests application shutdown before `InstallValidate`, then aborts with
+an explanatory error if any `ImmichFolderWatch.exe` process remains. It does not
+force-terminate a worker before synchronization can finish. Close the application
+for all signed-in users before retrying an aborted update. Old-product removal
+runs immediately after `InstallInitialize`, inside the rollback transaction.
+This avoids deliberately uninstalling the old payload before asking its process
+to exit; file-in-use/reboot behavior still requires Windows upgrade testing.
+
+`Test-InstallerUpgradeContract.ps1` reads the compiled MSI with Windows Installer's
+read-only COM API. Packaging fails if shutdown/abort/removal ordering or the
+synchronous close flags are wrong. Keep these actions in the linked `Package`:
+unreferenced WiX fragments can be omitted from the output. Windows CI runs the
+checker regression tests and builds both architecture candidates with this gate.
+It does not install these candidates or connect to an Immich server.
+
+The 2026-11-13 incident confirmed missing installed runtime files and recovery
+through MSI repair. The released MSI contained those files, but its explicit
+close action was sequenced after old-product removal. That ordering defect is
+corrected; the user's exact deletion mechanism remains unproven without the
+original update log. Acceptance still requires a Windows upgrade with the old
+tray process running, comparing runtime files before/after and after any reboot,
+verifying application startup and preserving per-user configuration.

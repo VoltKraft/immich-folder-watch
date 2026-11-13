@@ -1,5 +1,46 @@
 # Project Status
 
+## Windows upgrade process-order correction prepared (2026-11-13)
+
+- User confirms repair restored startup and selects investigation/prevention.
+  Previous installed version is unknown; original upgrade log is unavailable.
+  `M-WINDOWS-UPGRADE-RUNTIME-20261113` owns this local implementation scope.
+- Parsed released 3.0.3 x64 MSI: InstallValidate 1400, RemoveExistingProducts
+  1401, InstallInitialize 1500, RemoveFiles 3500, explicit application close
+  3999, InstallFiles 4000. Closing after old-product removal exposes loaded
+  runtime files to in-use/deferred-delete behavior. This ordering is verified;
+  its role in this user's exact deletion sequence remains a hypothesis.
+- Corrected authoring: synchronous close/end-session request with 15-second
+  timeout before InstallValidate; Type19 abort if IFW_APP_RUNNING remains set.
+  No early deferred termination/elevated action. Removal after InstallInitialize
+  permits rollback of old-product removal. Actions live in linked Package scope.
+- Verified semantics against WiX 6.0.2 CloseApps.cpp and UtilCompiler.cs: flags
+  9 avoid deferred actions, detection property follows the wait, and timeout is
+  stored in milliseconds. Sources:
+  [CloseApps.cpp](https://github.com/wixtoolset/wix/blob/v6.0.2/src/ext/Util/ca/CloseApps.cpp),
+  [compiler](https://github.com/wixtoolset/wix/blob/v6.0.2/src/ext/Util/wixext/UtilCompiler.cs),
+  [rollback scheduling](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
+- Added compiled-MSI read-only COM validation of sequence, guard and close flags,
+  called by build-msi before final delivery. Windows CI now builds both MSI
+  architectures and runs checker tests. Existing installer payload and user-data
+  handling are preserved; no version bump, new dependencies, push or release.
+- Validation: 3 source-contract tests, 7 executed PowerShell checker tests
+  and 10 workflow-security tests pass. CI YAML parses;
+  diff whitespace check passes. PowerShell 7.7.0 was temporarily downloaded from
+  the official MIT-licensed project and checked against its published SHA-256.
+  Initial PowerShell setup failed on the read-only home cache; isolated XDG dirs
+  resolved it. Negative tests now require an explicit validator rejection marker
+  and exit code, so a host crash cannot count as a passing rejection test.
+- Independent review caught a close-condition allowlist mismatch; it was fixed
+  to accept the exact authored OS condition and the fixtures pass afterward.
+- Windows limitation: attempted local WiX compilation reports Windows-only
+  support and exits unsuccessfully. COM artifact validation and real upgrades
+  with a running tray process (including post-reboot file/startup verification)
+  remain unexecuted. Local tests do not establish installed-upgrade acceptance.
+- Next action: publish the scoped correction with authorization, run Windows CI,
+  then execute the running-app upgrade/reboot scenario before a new release.
+  Retain the original upgrade log if available to prove the historical mechanism.
+
 ## Windows 3.0.3 launch failure investigation (2026-11-13)
 
 - Follow-up user output confirms the installed EXE (200192 bytes) and runtimeconfig

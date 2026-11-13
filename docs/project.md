@@ -10,9 +10,9 @@
   [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261111-20`.
-- Plan maturity: Policy correction published; CI/CodeQL pass; rejected PR closed.
-- Active milestone: none; `M-WINGET-ICON-ROLLBACK-20261111` completed.
+- Brief revision: `IFW-BRIEF-20261113-21`.
+- Plan maturity: Windows upgrade ordering fix prepared; Windows validation pending.
+- Active milestone: `M-WINDOWS-UPGRADE-RUNTIME-20261113`.
 - Implementation request / scope: The user selected the WinGet icon correction
   and current-version submission below. Historical scope: the 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -25,6 +25,23 @@
   distribution assignment remains preserved in its milestone and status history.
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-WINDOWS-UPGRADE-RUNTIME-20261113
+
+The user selected investigating and correcting missing runtime files after a
+UniGetUI upgrade to 3.0.3. Repair restored application startup; the previous
+version is unknown. The published MSI includes the files, but sequences explicit
+application closure after old-product removal. Correct that verified ordering
+weakness and guard against removing files while the application remains running.
+Keep old-product removal inside the rollback transaction. Validate actual MSI
+sequence during packaging and add regression tests. Preserve per-user data,
+architecture support and published artifacts. No new release or push is selected.
+
+Acceptance: safe close/abort ordering before removal, regression coverage and a
+compiled-MSI packaging guard; document executed checks and Windows upgrade-test
+limitations. Do not equate a plausible in-use-file mechanism with a proven account
+of the user's incident without the original upgrade log. Real upgrade/reboot
+acceptance remains outstanding until executed on Windows.
 
 ## M-WINGET-ICON-ROLLBACK-20261111
 

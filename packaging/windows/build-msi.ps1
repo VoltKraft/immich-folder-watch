@@ -279,6 +279,9 @@ if ($null -eq $builtMsi) {
     throw "No MSI output was found under $msiOutputRoot."
 }
 
+# Validate the linked MSI, not just authoring: unreferenced fragments may be omitted.
+& (Join-Path $scriptRoot "Test-InstallerUpgradeContract.ps1") -Path $builtMsi.FullName
+
 if (Test-Path -LiteralPath $finalMsiPath) {
     Remove-Item -LiteralPath $finalMsiPath -Force
 }

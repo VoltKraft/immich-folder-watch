@@ -10,7 +10,7 @@
     Scope="perMachine"
     InstallerVersion="500">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="ImmichFolderWatch.ico" SourceFile="$(BrandingIconPath)" />
     <Property Id="ARPPRODUCTICON" Value="ImmichFolderWatch.ico" />
@@ -25,9 +25,28 @@
       Description="Immich Folder Watch"
       CloseMessage="yes"
       EndSessionMessage="yes"
-      TerminateProcess="10"
+      Timeout="15"
+      Property="IFW_APP_RUNNING"
       PromptToContinue="no"
       RebootPrompt="no" />
+
+    <!-- Close synchronously before validation/removal. WiX defers termination,
+         elevated messages and reboot handling, so those options cannot be used
+         here before InstallInitialize. Abort while the old product is intact
+         when a process cannot close (including one in another user session). -->
+    <CustomAction
+      Id="EnsureAppClosed"
+      Error="Immich Folder Watch is still running. Close it in all Windows sessions and retry the installation." />
+    <InstallExecuteSequence>
+      <Custom
+        Action="Wix4CloseApplications_$(sys.BUILDARCHSHORT)"
+        Before="EnsureAppClosed"
+        Condition="VersionNT &gt; 400" />
+      <Custom
+        Action="EnsureAppClosed"
+        Before="InstallValidate"
+        Condition="IFW_APP_RUNNING" />
+    </InstallExecuteSequence>
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Immich Folder Watch">

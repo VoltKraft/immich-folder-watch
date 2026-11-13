@@ -126,6 +126,21 @@ digest, and WinGet submission verifies a fixed executable SHA-256 before use.
 The pins and license evidence are described in the packaging guides and security
 remediation record. Updating pins requires upstream provenance/license verification.
 
+### Windows MSI upgrade checks
+
+Windows CI builds x64 and ARM64 MSI candidates through `build-msi.ps1`, which
+validates the compiled shutdown/abort/removal sequence with
+`Test-InstallerUpgradeContract.ps1`. Run the focused checker tests with:
+
+```powershell
+python -m unittest discover -s tools/tests -p test_windows_installer.py -v
+python -m unittest discover -s tools/tests -p test_msi_upgrade_contract.py -v
+```
+
+The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). These checks
+are not an installed upgrade test. See [Windows packaging](../packaging/windows/README.md#upgrade-process-safety)
+for the outstanding running-process and reboot acceptance scenario.
+
 ## Dependency updates
 
 [Dependabot configuration](../.github/dependabot.yml) checks NuGet packages in

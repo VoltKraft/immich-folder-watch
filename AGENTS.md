@@ -170,6 +170,11 @@ to reconcile project decisions, defaults, and recorded state.
   [the security remediation record](docs/security-remediation-20261109.md). Preserve
   HTTPS-by-default policy, bounded transfers, exact-ID album authorization, and the
   [handle-bound watch-root contract](docs/watch-root-security.md) when changing sync behavior.
+- Windows MSI upgrades must close the app or abort before old-product removal,
+  and keep removal inside the rollback transaction. Preserve the compiled-MSI
+  gate in `packaging/windows/Test-InstallerUpgradeContract.ps1`; follow the
+  [upgrade validation contract](packaging/windows/README.md#upgrade-process-safety).
+  Static/package checks do not establish a successful installed Windows upgrade.
 - Tests use xUnit and Coverlet. Match platform scope, mirror production namespaces,
   name classes `*Tests`, and use descriptive case names. Add regression coverage
   for behavior changes. Await durable worker persistence before stopping workers

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Request application shutdown and abort on remaining processes before Windows MSI upgrades remove the old payload; perform removal inside the rollback transaction and validate the compiled sequence during packaging.
 - Keep generated WinGet manifests free of manually authored icon metadata, which the community repository rejects under its publisher policy.
 
 ## [3.0.3] - 2026-11-11
