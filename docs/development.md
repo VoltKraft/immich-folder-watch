@@ -137,9 +137,12 @@ python -m unittest discover -s tools/tests -p test_windows_installer.py -v
 python -m unittest discover -s tools/tests -p test_msi_upgrade_contract.py -v
 ```
 
-The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). These checks
-are not an installed upgrade test. See [Windows packaging](../packaging/windows/README.md#upgrade-process-safety)
-for the outstanding running-process and reboot acceptance scenario.
+The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). Windows CI
+also runs `Test-InstalledUpgrade.ps1` on a fresh hosted runner for a real x64
+upgrade while the released application is running. Inspect its uploaded JSON
+and MSI logs; source/fixture tests alone are not installation acceptance.
+See [Windows packaging](../packaging/windows/README.md#upgrade-process-safety)
+for the test-only MSI version and reboot/ARM64 boundaries.
 
 ## Dependency updates
 

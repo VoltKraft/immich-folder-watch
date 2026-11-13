@@ -1,5 +1,20 @@
 # Project Status
 
+## Windows upgrade execution selected (2026-11-13)
+
+- User explicitly authorized pushing the MSI correction, checking Windows CI and
+  executing a real upgrade with the application running before any new release.
+- Pushed `a485e15ed889bb5f6eadbe063330dda657d2d78e` and its diagnosis history;
+  initial CI `43483088598` is running. No product version or release changes.
+- Preparing an isolated github-hosted Windows acceptance harness: install the
+  immutable verified 3.0.3 x64 MSI, start its actual WPF process, upgrade to a
+  test-only 3.0.4 MSI built from current sources, compare installed payload and
+  configuration, then start the upgraded process. Collect logs and JSON evidence
+  and uninstall the disposable test product. No credentials/media/server access.
+- The temporary MSI version enables a real major upgrade without changing
+  Directory.Build.props or publishing candidate assets to release channels.
+  Actual execution and acceptance remain pending.
+
 ## Windows upgrade process-order correction prepared (2026-11-13)
 
 - User confirms repair restored startup and selects investigation/prevention.

@@ -68,7 +68,20 @@ read-only COM API. Packaging fails if shutdown/abort/removal ordering or the
 synchronous close flags are wrong. Keep these actions in the linked `Package`:
 unreferenced WiX fragments can be omitted from the output. Windows CI runs the
 checker regression tests and builds both architecture candidates with this gate.
-It does not install these candidates or connect to an Immich server.
+The x64 candidate is installed on a fresh GitHub-hosted Windows runner by
+`Test-InstalledUpgrade.ps1`: verified public 3.0.3 is launched, then upgraded
+while its WPF process has the app-local runtime loaded. The harness verifies
+all published payload hashes, replacement product registration, preserved
+synthetic configuration and successful candidate startup. No Immich connection
+or personal media is configured. It uninstalls the disposable product afterward.
+MSI logs, file hashes and `upgrade-result.json` are uploaded as
+`windows-upgrade-evidence`, including on failure. MSI exit 3010 or deferred
+application file operations fail acceptance instead of claiming a reboot test.
+
+CI uses MSI version 3.0.4 solely to exercise the major-upgrade path from 3.0.3;
+it does not modify the product version or publish a release. The old and new
+runtime may have the same version, intentionally exercising runtime retention.
+ARM64 packages are compiled/validated but not executed on the x64 runner.
 
 The 2026-11-13 incident confirmed missing installed runtime files and recovery
 through MSI repair. The released MSI contained those files, but its explicit

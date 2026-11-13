@@ -70,8 +70,26 @@ jobs:
       - name: Build and validate Windows MSI candidates
         run: |
           foreach ($runtime in @("win-x64", "win-arm64")) {
-            & .\packaging\windows\build-msi.ps1 -Runtime $runtime
+            & .\packaging\windows\build-msi.ps1 -Runtime $runtime -Version 3.0.4
           }
+
+      # Test-only MSI version; Directory.Build.props and release assets stay unchanged.
+      - name: Upgrade running installed Windows application
+        run: |
+          & .\packaging\windows\Test-InstalledUpgrade.ps1 `
+            -CandidateMsi artifacts\windows\msi\immich-folder-watch-3.0.4-win-x64.msi `
+            -CandidatePublishDirectory artifacts\windows\msi\publish\win-x64 `
+            -EvidenceDirectory artifacts\windows\upgrade-evidence `
+            -CandidateVersion 3.0.4
+
+      - name: Upload Windows upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-upgrade-evidence
+          path: artifacts/windows/upgrade-evidence
+          if-no-files-found: warn
+          retention-days: 7
 
   build-linux:
     name: Build and Test (ubuntu-latest)

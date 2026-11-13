@@ -35,7 +35,9 @@ application closure after old-product removal. Correct that verified ordering
 weakness and guard against removing files while the application remains running.
 Keep old-product removal inside the rollback transaction. Validate actual MSI
 sequence during packaging and add regression tests. Preserve per-user data,
-architecture support and published artifacts. No new release or push is selected.
+architecture support and published artifacts. Follow-up authorization explicitly
+selects pushing the correction, Windows CI and an actual upgrade with the old
+application running on an isolated Windows runner. No new release is selected.
 
 Acceptance: safe close/abort ordering before removal, regression coverage and a
 compiled-MSI packaging guard; document executed checks and Windows upgrade-test
