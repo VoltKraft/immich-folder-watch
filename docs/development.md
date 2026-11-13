@@ -142,7 +142,7 @@ The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). Windows CI
 also runs `Test-InstalledUpgrade.ps1` on a fresh hosted runner for a real x64
 upgrade attempt while the released application is running. It verifies either
 completion or explicit safe refusal with the complete baseline retained, followed
-by graceful owner-desktop shutdown and a successful retry. Inspect the outcome
+by normal tray-menu Quit and a successful retry. Inspect the outcome
 and MSI logs; neither a retry nor fixture tests prove automatic MSI shutdown.
 See [Windows packaging](../packaging/windows/README.md#upgrade-process-safety)
 for the test-only MSI version and reboot/ARM64 boundaries.

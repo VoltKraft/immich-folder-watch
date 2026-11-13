@@ -95,11 +95,25 @@ catch {
             with self.subTest(mutation=mutation):
                 self.check(mutation=mutation)
 
-    def test_native_owner_desktop_shutdown_helper_compiles(self):
+    def test_native_tray_quit_helper_compiles(self):
         csharp = SOURCE.split("Add-Type -TypeDefinition @'", 1)[1].split("'@", 1)[0]
         with tempfile.TemporaryDirectory() as directory:
             script = Path(directory) / "compile.ps1"
-            script.write_text("$ErrorActionPreference='Stop'\nAdd-Type -TypeDefinition @'" + csharp + "'@\n'COMPILED'\n")
+            (Path(directory) / "harness.ps1").write_text(SOURCE)
+            ui_script = SOURCE.split('$uiScript = Join-Path', 1)[1].split("    @'\n", 1)[1].split("'@ | Set-Content", 1)[0]
+            (Path(directory) / "ui-helper.ps1").write_text(ui_script)
+            script.write_text(
+                "$ErrorActionPreference='Stop'\nAdd-Type -TypeDefinition @'" + csharp + "'@\n"
+                + r'''
+foreach ($name in @('harness.ps1', 'ui-helper.ps1')) {
+    $tokens=$null
+    $errors=$null
+    [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $name), [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw ($errors | Out-String) }
+}
+'COMPILED'
+'''
+            )
             result = subprocess.run([PWSH, "-NoProfile", "-File", str(script)], text=True,
                                     capture_output=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stderr)

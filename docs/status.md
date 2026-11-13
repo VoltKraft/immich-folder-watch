@@ -1,5 +1,23 @@
 # Project Status
 
+## Running baseline preservation verified (2026-11-13)
+
+- Pushed `1af8d80`; CI `43485903150` confirms both freshly built MSI platforms
+  and versions pass compiled validation. All other CI jobs pass.
+- Real x64 test proves the running 3.0.3 process (session 2, app-local runtime
+  modules loaded) causes the explicit guard refusal before removal. All 439
+  baseline files, product registration and synthetic user data remain intact;
+  no application file operations are deferred. The original incident mechanism
+  remains unproven.
+- The subsequent test-controlled session-message shutdown did not exit 3.0.3,
+  so the overall Windows job correctly failed before retrying the upgrade.
+  Replace that test helper with normal tray-menu Quit automation, then rerun.
+  Do not present safe refusal as automatic upgrade completion. No release.
+- Replacement test helper locates the exact PID-owned tray receiver and menu,
+  verifies Quit command ID 3, then invokes that entry with Windows UI Automation
+  in a bounded STA helper. Five regression cases and both PowerShell parsers
+  pass; compiled native helper checks pass. Actual Windows execution is pending.
+
 ## Running-application acceptance findings (2026-11-13)
 
 - Pushed `fe73b4c`; Windows run `43483904049` compiled both MSI candidates and

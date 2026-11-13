@@ -75,7 +75,8 @@ The x64 candidate is installed on a fresh GitHub-hosted Windows runner by
 while its WPF process has the app-local runtime loaded. If shutdown cannot reach
 the application, the only accepted refusal is the explicit pre-removal guard:
 the harness checks every baseline file and its registration remain unchanged,
-then requests graceful shutdown from the application's own desktop and retries.
+then invokes the normal tray-menu Quit command from the application's own
+desktop and retries.
 The JSON distinguishes `safely-refused` from `completed`; a successful retry does
 not establish automatic shutdown from the MSI service. Other installer failures
 remain failures. The harness verifies all published payload hashes, replacement
