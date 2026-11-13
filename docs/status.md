@@ -1,5 +1,25 @@
 # Project Status
 
+## Windows 3.0.3 launch failure investigation (2026-11-13)
+
+- User reports a missing .NET Desktop Runtime dialog after updating to 3.0.3
+  through UniGetUI; screenshot identifies x64 apphost 10.0.12. Installed state
+  and the actual launched executable path remain unverified.
+- Downloaded current public x64 MSI; SHA-256 matches release evidence
+  `e2559768224568eaae67db9b19b82d8390720ffb9692cfe6248f69f08042cc6c`.
+  Read MSI tables and extracted cabinet without executing Windows code.
+  EXE, hostfxr.dll, hostpolicy.dll, coreclr.dll and runtimeconfig all map to BINDIR
+  without component conditions. All four PE binaries are x64. Runtimeconfig
+  includes NETCore and WindowsDesktop 10.0.12, confirming self-contained output.
+- The published payload contains the boot files; this does not establish correct
+  installation or upgrade behavior. Existing CI did not exercise an installed
+  Windows upgrade/start. No specific installer defect is established yet.
+- Requested installed-file presence and direct-path launch checks. The first
+  user command was altered during copying and failed as PowerShell syntax;
+  no installed-file evidence resulted. Next action: a literal-path file listing,
+  then compare installed hashes/launch path and collect host trace if necessary.
+- No application, installer, release or system configuration changes performed.
+
 ## WinGet policy correction published and verified (2026-11-11)
 
 - Completed `M-WINGET-ICON-ROLLBACK-20261111`. Correction pushed to main at
