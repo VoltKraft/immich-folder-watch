@@ -1,5 +1,15 @@
 # Project Status
 
+## Hosted tray input limitation (2026-11-13)
+
+- `2f604e0` / CI `43489599940` again verifies the safe refusal and intact 439-file
+  baseline, but posted keyboard messages do not select the verified Quit entry.
+  The test fails before retrying; no successful upgrade is claimed.
+- Use actual mouse input on the disposable runner, only after checking the exact
+  Quit command's rectangle, popup ownership, cursor position and highlighted/
+  enabled state. Require normal application exit code 0 and retain all evidence.
+  This is test-driver work; the MSI protection remains unchanged. No release.
+
 ## Native tray test-driver correction (2026-11-13)
 
 - `5efa9ee` / CI `43487846302` again passes both compiled MSI checks and the

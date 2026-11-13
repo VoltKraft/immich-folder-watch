@@ -187,6 +187,21 @@ public static class UpgradeTestTrayQuit
     [DllImport("user32.dll")] private static extern int GetMenuItemCount(IntPtr menu);
     [DllImport("user32.dll")] private static extern uint GetMenuItemID(IntPtr menu, int position);
     [DllImport("user32.dll")] private static extern uint GetMenuState(IntPtr menu, uint item, uint flags);
+    [StructLayout(LayoutKind.Sequential)] private struct Point { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] private struct MouseInput
+    {
+        public int X, Y;
+        public uint MouseData, Flags, Time;
+        public UIntPtr ExtraInfo;
+    }
+    [StructLayout(LayoutKind.Sequential)] private struct Input { public uint Type; public MouseInput Mouse; }
+    [DllImport("user32.dll")] private static extern bool GetMenuItemRect(IntPtr window, IntPtr menu, uint item, out Rect rect);
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, Input[] input, int size);
     private static bool OwnedWindow(IntPtr window, int processId)
     {
         if (!IsWindow(window)) return false;
@@ -270,8 +285,16 @@ public static class UpgradeTestTrayQuit
             if (popup == IntPtr.Zero) Thread.Sleep(100);
         }
         if (popup == IntPtr.Zero) throw new InvalidOperationException("The expected tray popup menu did not appear.");
-        // Drive the real menu loop and verify the selected command before Enter.
-        PostOwned(popup, processId, 0x0100, 0x23, new IntPtr(1)); // VK_END
+        // Use actual input on this disposable runner. Never click unless the
+        // verified Quit rectangle is under this exact process-owned popup.
+        if (!GetMenuItemRect(IntPtr.Zero, menu, (uint)last, out Rect rect) ||
+            rect.Right <= rect.Left || rect.Bottom <= rect.Top)
+            throw new InvalidOperationException("Cannot locate the verified Quit menu rectangle.");
+        var point = new Point { X = rect.Left + (rect.Right - rect.Left) / 2,
+                                Y = rect.Top + (rect.Bottom - rect.Top) / 2 };
+        if (WindowFromPoint(point) != popup || !OwnedWindow(popup, processId))
+            throw new InvalidOperationException("Another window covers the verified Quit entry.");
+        if (!SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Cannot move the test cursor to Quit.");
         timer.Restart();
         bool highlighted = false;
         while (timer.ElapsedMilliseconds < 5000)
@@ -287,8 +310,16 @@ public static class UpgradeTestTrayQuit
         }
         if (!highlighted) throw new InvalidOperationException("The tray Quit item was not highlighted and enabled.");
         if (GetMenuItemID(menu, last) != 3) throw new InvalidOperationException("Tray Quit command changed.");
-        PostOwned(popup, processId, 0x0100, 0x0D, new IntPtr(1)); // VK_RETURN
-        return "tray-menu-quit; popup=" + popup + "; verifiedHighlightedCommandId=3";
+        if (!GetCursorPos(out Point actual) || actual.X != point.X || actual.Y != point.Y ||
+            WindowFromPoint(actual) != popup || !OwnedWindow(popup, processId))
+            throw new InvalidOperationException("Test cursor or popup ownership changed before Quit.");
+        var clicks = new[] {
+            new Input { Type = 0, Mouse = new MouseInput { Flags = 0x0002 } },
+            new Input { Type = 0, Mouse = new MouseInput { Flags = 0x0004 } }
+        };
+        if (SendInput(2, clicks, Marshal.SizeOf(typeof(Input))) != 2)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not click the verified Quit entry.");
+        return "tray-menu-quit; popup=" + popup + "; verifiedHighlightedCommandId=3; nativeMouseClick";
     }
 }
 '@
