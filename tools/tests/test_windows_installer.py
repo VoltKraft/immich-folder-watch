@@ -19,7 +19,7 @@ class WindowsInstallerTests(unittest.TestCase):
         # Keeping these in an unreferenced Fragment silently drops them from MSI.
         actions = self.package.findall("w:InstallExecuteSequence/w:Custom", NS)
         by_action = {action.attrib["Action"]: action for action in actions}
-        close = by_action["Wix4CloseApplications_$(sys.BUILDARCHSHORT)"]
+        close = by_action["override Wix4CloseApplications_$(sys.BUILDARCHSHORT)"]
         guard = by_action[close.attrib["Before"]]
         self.assertEqual("EnsureAppClosed", guard.attrib["Action"])
         self.assertEqual("InstallValidate", guard.attrib["Before"])

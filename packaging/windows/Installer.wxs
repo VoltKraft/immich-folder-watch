@@ -39,7 +39,7 @@
       Error="Immich Folder Watch is still running. Close it in all Windows sessions and retry the installation." />
     <InstallExecuteSequence>
       <Custom
-        Action="Wix4CloseApplications_$(sys.BUILDARCHSHORT)"
+        Action="override Wix4CloseApplications_$(sys.BUILDARCHSHORT)"
         Before="EnsureAppClosed"
         Condition="VersionNT &gt; 400" />
       <Custom

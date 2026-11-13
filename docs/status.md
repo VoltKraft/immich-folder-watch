@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows hosted compilation correction (2026-11-13)
+
+- Initial Windows build `43483088598` passed application and focused installer
+  tests but WiX compilation rejected the rescheduled virtual action (WIX7009).
+  Added the required `override` access modifier to the authored sequence action;
+  source regression now requires it. This is why source-only checks did not
+  establish compiled-MSI acceptance. No failed build was released.
+- Upgrade harness is pushed at `119aff3`; its subsequent run is superseded by
+  this compilation correction. Recheck the next exact commit before acceptance.
+
 ## Windows upgrade execution selected (2026-11-13)
 
 - User explicitly authorized pushing the MSI correction, checking Windows CI and
