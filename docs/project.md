@@ -6,14 +6,14 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: [Directory.Build.props](../Directory.Build.props) prepares
-  `3.0.4`; the current published baseline remains `3.0.3` until release CI succeeds.
-  v3.0.3 at `e0d1c40` includes
-  merged #32 and the verified test-harness correction; deployed installations
-  remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261113-23`.
-- Plan maturity: Release 3.0.4 selected from the verified MSI correction.
-- Active milestone: `M-RELEASE-3.0.4-20261113`.
+- Product baseline: published `3.0.4` at `4149763`, matching
+  [Directory.Build.props](../Directory.Build.props), delivers the verified MSI
+  protection and WinGet metadata correction. Deployed installations remain
+  separate evidence.
+- Brief revision: `IFW-BRIEF-20261113-24`.
+- Plan maturity: Release 3.0.4 published; WinGet submission awaits Microsoft validation.
+- Active milestone: None; `M-RELEASE-3.0.4-20261113` publication and submission
+  verification are complete, with external catalog acceptance pending.
 - Implementation request / scope: The user selected the Windows MSI correction,
   push and installed-upgrade checks below. The prior WinGet icon correction
   and submission scope is retained as history. The 2026-11-10 request to implement
@@ -29,6 +29,11 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-RELEASE-3.0.4-20261113
+
+Published at immutable `4149763` with all four assets and passing CI/Release
+workflows. Final MSI verification documentation `2726821` was pushed with the
+release. WinGet workflow passes and PR #479776 is submitted; external checks and
+merge are pending. See [release evidence](status.md#release-304-published-and-winget-submitted-2026-11-13).
 
 The user explicitly selects publishing 3.0.4 with the MSI correction, pushing the
 outstanding verification documentation, and checking release CI and the WinGet

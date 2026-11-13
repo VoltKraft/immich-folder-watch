@@ -1,5 +1,49 @@
 # Project Status
 
+## Release 3.0.4 published and WinGet submitted (2026-11-13)
+
+- Published [v3.0.4](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4)
+  at 2026-11-13 21:16:48 UTC. The immutable tag points to release commit
+  `4149763b7f322603a012aebad5f8a252450eb08b`, which includes the previously local
+  completion record `2726821`. Four assets are present: x64/ARM64 Windows MSIs
+  and x64/ARM64 Linux Flatpak bundles. No existing release or tag was replaced.
+- Exact-revision [CI 43507280827](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43507280827),
+  CodeQL `43507279726`, dependency submission `43507280481` and
+  [Release 43508333926](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43508333926)
+  pass. The installed x64 test was repeated with product version 3.0.4: safe
+  refusal preserved all 439 baseline files, normal tray Quit allowed a successful
+  retry, all 439 candidate payload hashes matched, and the app started with its
+  bundled runtime. Synthetic user data survived and no app file operations were
+  deferred. This is safe refusal plus retry, not automatic MSI shutdown.
+- Independently inspected the release-build MSIs and matched their full SHA-256
+  hashes to GitHub's published asset digests and WinGet entries. x64 has 439 file
+  rows, ARM64 438; both contain unconditional BINDIR entries for the EXE,
+  runtimeconfig, hostfxr.dll, hostpolicy.dll and coreclr.dll. Both compiled
+  sequences are close 1398, guard 1399, InstallValidate 1400, InstallInitialize
+  1500, RemoveExistingProducts 1501, RemoveFiles 3500. Native platform and MSI
+  ProductVersion 3.0.4 match. The direct CDN transfer was slow; identical complete
+  Actions artifacts were inspected after digest verification instead.
+- Published MSI SHA-256 values:
+  - x64: `419938C3FEC0C113BF0F33DBF1A9BD4A6748DF1E7930ACB20FEC5FC3F265A187`.
+  - ARM64: `7669E1DFA319FA012E01DD7D728456716B1A1040478429B4137C7BA7FBFD11DA`.
+- [WinGet workflow 43509275890](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43509275890)
+  passes and created [microsoft/winget-pkgs#479776](https://github.com/microsoft/winget-pkgs/pull/479776).
+  Reviewed all three manifest files: both asset URLs, hashes and distinct MSI
+  ProductCodes match; no restricted Icons are authored. At this check the PR is
+  open: CLA, PR, manifest, URL, domain, policy and catalog-content checks pass;
+  installer scan, installation/metadata validation and completion remain pending.
+  Submission is not yet WinGet catalog publication.
+- Signed [Flatpak repository deployment 43509273256](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43509273256)
+  passes. Flathub follow-up `43509274963` passes preparation and both native
+  validation builds; updating an accepted Flathub app is skipped by the existing
+  submission configuration. This is not a claim of Flathub catalog publication.
+- Release publication and the requested submission/status verification are
+  complete; Microsoft validation/merge remain external. Before updating Windows,
+  choose Quit in the tray menu and retry any guarded update. ARM64 installation,
+  automatic MSI shutdown and post-reboot behavior remain outside the executed
+  validation. Final release evidence is recorded in a documentation-only
+  checkpoint; released tag and package bytes remain immutable.
+
 ## Release 3.0.4 selected (2026-11-13)
 
 - User authorizes publication of 3.0.4, pushing the final MSI validation record

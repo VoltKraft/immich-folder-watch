@@ -87,8 +87,9 @@ MSI logs, file hashes and `upgrade-result.json` are uploaded as
 `windows-upgrade-evidence`, including on failure. MSI exit 3010 or deferred
 application file operations fail acceptance instead of claiming a reboot test.
 
-CI uses MSI version 3.0.4 solely to exercise the major-upgrade path from 3.0.3;
-it does not modify the product version or publish a release. The old and new
+CI builds a candidate MSI with version 3.0.4 to exercise the major-upgrade path
+from 3.0.3. This candidate is separate from release assets; the test itself does
+not bump the product version or publish a release. The old and new
 runtime may have the same version, intentionally exercising runtime retention.
 ARM64 packages are compiled/validated but not executed on the x64 runner.
 
@@ -100,8 +101,8 @@ original update log. Preserve both the live-process safety check and successful
 installed-upgrade/startup checks in CI. A no-reboot pass does not establish
 behavior after a reboot or on another signed-in user's desktop.
 
-Verified on 2026-11-13 at `6c62d70` in
-[Windows CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43491173118/job/132112450161):
+Verified again for release 3.0.4 on 2026-11-13 at `4149763` in
+[Windows CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43507280827/job/132168115302):
 the running-app attempt was safely refused with all 439 baseline files intact.
 After normal tray Quit, retry succeeded, all 439 candidate files matched their
 publish hashes, and the upgraded app started with its bundled runtime. No reboot
