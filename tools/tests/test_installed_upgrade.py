@@ -100,12 +100,10 @@ catch {
         with tempfile.TemporaryDirectory() as directory:
             script = Path(directory) / "compile.ps1"
             (Path(directory) / "harness.ps1").write_text(SOURCE)
-            ui_script = SOURCE.split('$uiScript = Join-Path', 1)[1].split("    @'\n", 1)[1].split("'@ | Set-Content", 1)[0]
-            (Path(directory) / "ui-helper.ps1").write_text(ui_script)
             script.write_text(
                 "$ErrorActionPreference='Stop'\nAdd-Type -TypeDefinition @'" + csharp + "'@\n"
                 + r'''
-foreach ($name in @('harness.ps1', 'ui-helper.ps1')) {
+foreach ($name in @('harness.ps1')) {
     $tokens=$null
     $errors=$null
     [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $name), [ref]$tokens, [ref]$errors)

@@ -169,12 +169,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-public sealed class UpgradeTestTrayTarget
-{
-    public long PopupHandle { get; set; }
-    public int ProcessId { get; set; }
-    public string Label { get; set; }
-}
 public static class UpgradeTestTrayQuit
 {
     private delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
@@ -192,8 +186,7 @@ public static class UpgradeTestTrayQuit
         IntPtr lParam, uint flags, uint timeout, out UIntPtr result);
     [DllImport("user32.dll")] private static extern int GetMenuItemCount(IntPtr menu);
     [DllImport("user32.dll")] private static extern uint GetMenuItemID(IntPtr menu, int position);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetMenuString(IntPtr menu, uint item, StringBuilder text, int length, uint flags);
+    [DllImport("user32.dll")] private static extern uint GetMenuState(IntPtr menu, uint item, uint flags);
     private static bool OwnedWindow(IntPtr window, int processId)
     {
         if (!IsWindow(window)) return false;
@@ -236,7 +229,7 @@ public static class UpgradeTestTrayQuit
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Popup menu query failed or timed out.");
         return new IntPtr(unchecked((long)result.ToUInt64()));
     }
-    public static UpgradeTestTrayTarget OpenQuitMenu(int processId)
+    public static string Close(int processId)
     {
         var receiver = IntPtr.Zero;
         var cursor = IntPtr.Zero;
@@ -277,61 +270,36 @@ public static class UpgradeTestTrayQuit
             if (popup == IntPtr.Zero) Thread.Sleep(100);
         }
         if (popup == IntPtr.Zero) throw new InvalidOperationException("The expected tray popup menu did not appear.");
-        var label = new StringBuilder(256);
-        if (GetMenuString(menu, (uint)last, label, label.Capacity, 0x0400) == 0)
-            throw new InvalidOperationException("The verified tray Quit entry has no label.");
-        if (!OwnedWindow(popup, processId) || MenuFor(popup, processId) != menu || GetMenuItemID(menu, last) != 3)
-            throw new InvalidOperationException("Tray popup ownership or Quit command changed.");
-        return new UpgradeTestTrayTarget { PopupHandle = popup.ToInt64(), ProcessId = processId, Label = label.ToString() };
+        // Drive the real menu loop and verify the selected command before Enter.
+        PostOwned(popup, processId, 0x0100, 0x23, new IntPtr(1)); // VK_END
+        timer.Restart();
+        bool highlighted = false;
+        while (timer.ElapsedMilliseconds < 5000)
+        {
+            if (MenuFor(popup, processId) != menu) throw new InvalidOperationException("Tray popup changed before Quit.");
+            uint state = GetMenuState(menu, (uint)last, 0x0400); // MF_BYPOSITION
+            if (state != uint.MaxValue && (state & 0x0080) != 0 && (state & 0x0003) == 0)
+            {
+                highlighted = true;
+                break;
+            }
+            Thread.Sleep(100);
+        }
+        if (!highlighted) throw new InvalidOperationException("The tray Quit item was not highlighted and enabled.");
+        if (GetMenuItemID(menu, last) != 3) throw new InvalidOperationException("Tray Quit command changed.");
+        PostOwned(popup, processId, 0x0100, 0x0D, new IntPtr(1)); // VK_RETURN
+        return "tray-menu-quit; popup=" + popup + "; verifiedHighlightedCommandId=3";
     }
 }
 '@
     $diagnosticsPath = Join-Path $EvidenceDirectory "tray-quit-windows.log"
     [UpgradeTestTrayQuit]::Describe($Process.Id) | Set-Content -LiteralPath $diagnosticsPath -Encoding utf8
-    # Windows PowerShell supplies the Windows UI Automation assemblies. A separate
-    # STA process invokes the real native menu item; it never terminates the app.
-    $uiScript = Join-Path $EvidenceDirectory "invoke-tray-quit.ps1"
-    @'
-$ErrorActionPreference = "Stop"
-Set-StrictMode -Version Latest
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-$target = Get-Content -LiteralPath (Join-Path $PSScriptRoot "tray-quit-target.json") -Raw | ConvertFrom-Json
-$popup = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$target.PopupHandle)
-if ($null -eq $popup -or $popup.Current.ProcessId -ne $target.ProcessId) { throw "UI Automation popup ownership mismatch." }
-$condition = [System.Windows.Automation.PropertyCondition]::new(
-    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-    [System.Windows.Automation.ControlType]::MenuItem)
-$items = $popup.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
-$matchingItems = @($items | Where-Object { $_.Current.Name -eq $target.Label })
-if ($matchingItems.Count -ne 1) { throw "Expected exactly one UI Automation item matching the verified Quit command." }
-$item = $matchingItems[0]
-if ($item.Current.ProcessId -ne $target.ProcessId -or -not $item.Current.IsEnabled) { throw "Tray Quit item ownership or enabled state mismatch." }
-$invoke = $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-$invoke.Invoke()
-"TRAY_QUIT_INVOKED"
-'@ | Set-Content -LiteralPath $uiScript -Encoding utf8
     try {
-        $target = [UpgradeTestTrayQuit]::OpenQuitMenu($Process.Id)
-        $target | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $EvidenceDirectory "tray-quit-target.json") -Encoding utf8
-        $uiOutput = Join-Path $EvidenceDirectory "tray-quit-ui-automation.log"
-        $uiError = Join-Path $EvidenceDirectory "tray-quit-ui-automation-error.log"
-        $windowsPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-        $uiProcess = Start-Process -FilePath $windowsPowerShell -NoNewWindow -ArgumentList "-NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File `"$uiScript`"" -PassThru -RedirectStandardOutput $uiOutput -RedirectStandardError $uiError
-        try {
-            if (-not $uiProcess.WaitForExit(15000)) {
-                # Bound a hung UI Automation provider; this is the helper, never the application.
-                $uiProcess.Kill()
-                [void]$uiProcess.WaitForExit(5000)
-                throw "Tray Quit UI Automation timed out."
-            }
-            if ($uiProcess.ExitCode -ne 0 -or (Get-Content -LiteralPath $uiOutput -Raw) -notmatch "TRAY_QUIT_INVOKED") {
-                throw "Tray Quit UI Automation failed; inspect its output and error logs."
-            }
-        }
-        finally { $uiProcess.Dispose() }
+        $interaction = [UpgradeTestTrayQuit]::Close($Process.Id)
         if (-not $Process.WaitForExit(30000)) { throw "Application did not exit after selecting the real tray Quit command." }
-        return "tray-menu-quit; popup=$($target.PopupHandle); commandId=3; UIAutomation.InvokePattern"
+        $Process.Refresh()
+        if ($Process.ExitCode -ne 0) { throw "Tray Quit ended with application exit code $($Process.ExitCode)." }
+        return $interaction
     }
     catch {
         [UpgradeTestTrayQuit]::Describe($Process.Id) | Add-Content -LiteralPath $diagnosticsPath -Encoding utf8

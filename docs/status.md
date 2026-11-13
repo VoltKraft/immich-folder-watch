@@ -1,5 +1,18 @@
 # Project Status
 
+## Native tray test-driver correction (2026-11-13)
+
+- `5efa9ee` / CI `43487846302` again passes both compiled MSI checks and the
+  actual safe refusal with all 439 baseline files preserved. The native test
+  helper finds the correct tray receiver and verifies popup command IDs 1/2/3.
+- UI Automation does not expose the expected Quit item in this hosted popup;
+  the test fails rather than claiming an upgrade. Replace that unsupported
+  provider path with native menu keyboard messages, verifying that command ID 3
+  is highlighted and enabled before Enter, then require actual process exit.
+  No installer guard weakening, forced application termination or release.
+- Five focused tests, native-helper compilation, PowerShell parsing and diff
+  whitespace checks pass locally. Windows execution remains pending.
+
 ## Running baseline preservation verified (2026-11-13)
 
 - Pushed `1af8d80`; CI `43485903150` confirms both freshly built MSI platforms
