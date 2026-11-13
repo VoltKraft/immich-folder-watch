@@ -61,7 +61,8 @@ force-terminate a worker before synchronization can finish. Close the applicatio
 for all signed-in users before retrying an aborted update. Old-product removal
 runs immediately after `InstallInitialize`, inside the rollback transaction.
 This avoids deliberately uninstalling the old payload before asking its process
-to exit; file-in-use/reboot behavior still requires Windows upgrade testing.
+to exit. Preserve installed-upgrade checks for file retention; reboot scenarios
+require separate Windows execution.
 
 `Test-InstallerUpgradeContract.ps1` reads the compiled MSI with Windows Installer's
 read-only COM API. Packaging fails if shutdown/abort/removal ordering or the
@@ -71,18 +72,17 @@ Keep these actions in the linked `Package`:
 unreferenced WiX fragments can be omitted from the output. Windows CI runs the
 checker regression tests and builds both architecture candidates with this gate.
 The x64 candidate is installed on a fresh GitHub-hosted Windows runner by
-`Test-InstalledUpgrade.ps1`: verified public 3.0.3 is launched, then upgraded
-while its WPF process has the app-local runtime loaded. If shutdown cannot reach
-the application, the only accepted refusal is the explicit pre-removal guard:
+`Test-InstalledUpgrade.ps1`: verified public 3.0.3 is launched, then an upgrade
+is attempted while its WPF process has the app-local runtime loaded. If shutdown
+cannot reach the application, the only accepted refusal is the explicit pre-removal guard:
 the harness checks every baseline file and its registration remain unchanged,
 then invokes the normal tray-menu Quit command from the application's own
 desktop and retries.
 The JSON distinguishes `safely-refused` from `completed`; a successful retry does
 not establish automatic shutdown from the MSI service. Other installer failures
 remain failures. The harness verifies all published payload hashes, replacement
-product registration, preserved
-synthetic configuration and successful candidate startup. No Immich connection
-or personal media is configured. It uninstalls the disposable product afterward.
+product registration, preserved synthetic configuration and successful candidate
+startup. No Immich connection or personal media is configured. It uninstalls the disposable product afterward.
 MSI logs, file hashes and `upgrade-result.json` are uploaded as
 `windows-upgrade-evidence`, including on failure. MSI exit 3010 or deferred
 application file operations fail acceptance instead of claiming a reboot test.
@@ -99,3 +99,11 @@ corrected; the user's exact deletion mechanism remains unproven without the
 original update log. Preserve both the live-process safety check and successful
 installed-upgrade/startup checks in CI. A no-reboot pass does not establish
 behavior after a reboot or on another signed-in user's desktop.
+
+Verified on 2026-11-13 at `6c62d70` in
+[Windows CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43491173118/job/132112450161):
+the running-app attempt was safely refused with all 439 baseline files intact.
+After normal tray Quit, retry succeeded, all 439 candidate files matched their
+publish hashes, and the upgraded app started with its bundled runtime. No reboot
+or pending application file operations occurred. Automatic MSI shutdown remains
+unverified; a refused update requires closing the application and retrying.

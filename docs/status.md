@@ -1,5 +1,42 @@
 # Project Status
 
+## Windows MSI correction pushed and exercised (2026-11-13)
+
+- Scoped correction and test harness are pushed on main through
+  `6c62d70cefd7b8f686f27534cde180037654ace5`.
+  [CI 43491173118](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43491173118)
+  passes all eight jobs on that exact revision, including Windows job
+  `132112450161`, both compiled MSI architecture/identity/sequence gates and
+  the installed-upgrade test. CodeQL `43491174454` and NuGet dependency
+  submission `43491172697` also pass.
+- Downloaded and reviewed
+  [windows-upgrade-evidence](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43491173118/artifacts/14069093498)
+  (seven-day retention). Public 3.0.3 ran as PID 5444 in session 2 with its
+  app-local runtime loaded. Attempting the candidate upgrade returned 1603 at
+  the explicit pre-removal guard; all 439 baseline files, registration and
+  synthetic user data remained intact, with no pending application file operations.
+- The test selected actual tray Quit command ID 3 using a checked native mouse
+  click and required normal exit code 0. Retrying the same MSI returned 0,
+  replaced the product registration, and matched SHA-256 for all 439 candidate
+  payload files, including hostfxr.dll, hostpolicy.dll and coreclr.dll. Candidate
+  PID 9880 started with a responsive WPF window and app-local runtime modules.
+  User data preservation, empty deferred-file queue and final uninstall pass.
+- Candidate MSI SHA-256:
+  `CEC2431D2316CA9F0E82BD556CA2CC0F646B60761E9CE88D9515CA5C25783171`.
+  Candidate MSI version 3.0.4 is test-only; Directory.Build.props and published
+  release remain 3.0.3. No new release or WinGet submission was created.
+- Evidence boundary: this proves safe refusal with a running app plus successful
+  upgrade after normal tray closure. It does not prove automatic MSI shutdown,
+  ARM64 installed execution, another user's desktop or post-reboot behavior.
+  No reboot was requested or performed. Original incident causality remains
+  unproven without its original update log. Close the tray application before
+  retrying an update that reports the running-process guard.
+- The requested push/Windows verification work is complete within these limits.
+  Next action is a separately selected release; preserve the guard and this CI
+  regression. Additional automatic-shutdown support would be separate work.
+  This final evidence update is a local documentation checkpoint after the
+  tested push, not another implementation revision or publication.
+
 ## Hosted tray input limitation (2026-11-13)
 
 - `2f604e0` / CI `43489599940` again verifies the safe refusal and intact 439-file

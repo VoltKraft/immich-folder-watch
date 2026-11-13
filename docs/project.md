@@ -10,11 +10,13 @@
   [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261113-21`.
-- Plan maturity: Windows upgrade ordering fix prepared; Windows validation pending.
-- Active milestone: `M-WINDOWS-UPGRADE-RUNTIME-20261113`.
-- Implementation request / scope: The user selected the WinGet icon correction
-  and current-version submission below. Historical scope: the 2026-11-10 request to implement
+- Brief revision: `IFW-BRIEF-20261113-22`.
+- Plan maturity: Windows upgrade protection pushed and exercised; no release selected.
+- Active milestone: None; `M-WINDOWS-UPGRADE-RUNTIME-20261113` scoped correction
+  and CI verification are complete with the validation boundaries below.
+- Implementation request / scope: The user selected the Windows MSI correction,
+  push and installed-upgrade checks below. The prior WinGet icon correction
+  and submission scope is retained as history. The 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
   described below. Earlier security scope is retained as history: the user's
   2026-11-09 request to
@@ -27,6 +29,14 @@
   The completed contributor-workflow migration remains recorded below.
 
 ## M-WINDOWS-UPGRADE-RUNTIME-20261113
+
+Completed scoped implementation/verification at pushed `6c62d70`: all eight CI
+jobs and CodeQL pass. The Windows test proves safe refusal with running 3.0.3,
+all 439 baseline files retained, normal tray Quit, successful retry, all 439
+candidate payload hashes, preserved user data and app-local-runtime startup.
+Automatic MSI shutdown and post-reboot/ARM64 installed behavior are not proven;
+no reboot was required or performed. See [status evidence](status.md#windows-msi-correction-pushed-and-exercised-2026-11-13).
+No new release is selected.
 
 The user selected investigating and correcting missing runtime files after a
 UniGetUI upgrade to 3.0.3. Repair restored application startup; the previous
@@ -42,8 +52,8 @@ application running on an isolated Windows runner. No new release is selected.
 Acceptance: safe close/abort ordering before removal, regression coverage and a
 compiled-MSI packaging guard; document executed checks and Windows upgrade-test
 limitations. Do not equate a plausible in-use-file mechanism with a proven account
-of the user's incident without the original upgrade log. Real upgrade/reboot
-acceptance remains outstanding until executed on Windows.
+of the user's incident without the original upgrade log. Additional upgrade or
+reboot scenarios remain unverified until executed on Windows.
 
 ## M-WINGET-ICON-ROLLBACK-20261111
 
