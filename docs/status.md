@@ -2,6 +2,14 @@
 
 ## Windows 3.0.3 launch failure investigation (2026-11-13)
 
+- Follow-up user output confirms the installed EXE (200192 bytes) and runtimeconfig
+  (529 bytes) exist, but hostfxr.dll, hostpolicy.dll and coreclr.dll are absent
+  from `C:\Program Files\Immich Folder Watch\bin`. Direct EXE launch also fails.
+  This establishes missing installed runtime files as the immediate startup
+  failure, not why they went missing. The published MSI contains all three.
+  Next step: repair from the verified 3.0.3 x64 MSI with forced file replacement
+  and verbose logging, then recheck files and launch. Repair not yet executed.
+
 - User reports a missing .NET Desktop Runtime dialog after updating to 3.0.3
   through UniGetUI; screenshot identifies x64 apphost 10.0.12. Installed state
   and the actual launched executable path remain unverified.
