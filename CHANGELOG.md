@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.4] - 2026-11-13
+
 ### Fixed
-- Request application shutdown and abort on remaining processes before Windows MSI upgrades remove the old payload; perform removal inside the rollback transaction and validate the compiled sequence during packaging.
-- Isolate Windows MSI build intermediates by architecture and verify the compiled platform/version to prevent reuse of stale installer output.
-- Keep generated WinGet manifests free of manually authored icon metadata, which the community repository rejects under its publisher policy.
+
+Maintenance release focused on Windows distribution; Linux application behavior is unchanged. Configuration and stored data remain compatible; no migration is required.
+
+Before updating, choose Quit in the Windows tray menu. If an application process remains running, the installer safely aborts before removing the existing version; close the application and retry. Automatic installer-driven shutdown is not guaranteed. (Windows)
+
+- Request application shutdown and abort on remaining processes before Windows MSI upgrades remove the old payload; perform removal inside the rollback transaction and validate the compiled sequence during packaging. (Windows)
+- Isolate Windows MSI build intermediates by architecture and verify the compiled platform/version to prevent reuse of stale installer output. (Windows)
+- Keep generated WinGet manifests free of manually authored icon metadata, which the community repository rejects under its publisher policy. (Windows)
 
 ## [3.0.3] - 2026-11-11
 

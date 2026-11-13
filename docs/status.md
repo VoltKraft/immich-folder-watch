@@ -1,5 +1,21 @@
 # Project Status
 
+## Release 3.0.4 selected (2026-11-13)
+
+- User authorizes publication of 3.0.4, pushing the final MSI validation record
+  (2726821), and verification of release CI and WinGet submission.
+- Refreshed origin/main: outstanding local commit is only that documentation
+  checkpoint; no remote divergence or existing 3.0.4 release was found.
+- Preparing a compatible packaging patch with existing dependency/runtime pins.
+  Release publication and WinGet acceptance remain pending. Keep main fixed
+  during the four-artifact build so its commit-pinned Flatpak guard remains valid.
+- Prepared product 3.0.4 and assembly/file 3.0.4.0, dated changelog with tray Quit
+  guidance, and generated AppStream metadata. Official SemVer 2.0.0 and Keep a
+  Changelog 1.1.0 were checked. No dependency or runtime pin changed.
+- Local checks: 12 WinGet generator tests, 18 MSI identity/sequence/refusal tests,
+  version/XML consistency and diff whitespace pass. Independent release-path
+  review found no blocker. No existing v3.0.4 tag, release or WinGet PR was found.
+
 ## Windows MSI correction pushed and exercised (2026-11-13)
 
 - Scoped correction and test harness are pushed on main through

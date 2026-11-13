@@ -6,14 +6,14 @@
   application for people uploading or synchronizing local media with Immich.
 - Applicable domain: Software. CAD and 3D printing are not part of the current
   product; their retained guides apply only if future work introduces those domains.
-- Product baseline: The published version is `3.0.3` in
-  [Directory.Build.props](../Directory.Build.props). v3.0.3 at `e0d1c40` includes
+- Product baseline: [Directory.Build.props](../Directory.Build.props) prepares
+  `3.0.4`; the current published baseline remains `3.0.3` until release CI succeeds.
+  v3.0.3 at `e0d1c40` includes
   merged #32 and the verified test-harness correction; deployed installations
   remain separate evidence.
-- Brief revision: `IFW-BRIEF-20261113-22`.
-- Plan maturity: Windows upgrade protection pushed and exercised; no release selected.
-- Active milestone: None; `M-WINDOWS-UPGRADE-RUNTIME-20261113` scoped correction
-  and CI verification are complete with the validation boundaries below.
+- Brief revision: `IFW-BRIEF-20261113-23`.
+- Plan maturity: Release 3.0.4 selected from the verified MSI correction.
+- Active milestone: `M-RELEASE-3.0.4-20261113`.
 - Implementation request / scope: The user selected the Windows MSI correction,
   push and installed-upgrade checks below. The prior WinGet icon correction
   and submission scope is retained as history. The 2026-11-10 request to implement
@@ -28,6 +28,21 @@
 - Requirement source: The current request and existing packaging/release contracts.
   The completed contributor-workflow migration remains recorded below.
 
+## M-RELEASE-3.0.4-20261113
+
+The user explicitly selects publishing 3.0.4 with the MSI correction, pushing the
+outstanding verification documentation, and checking release CI and the WinGet
+submission. Preserve the established four-artifact release pipeline, immutable
+tags, signed Flatpak distribution, dependency pins and per-user data. This is a
+compatible packaging patch; no configuration migration or dependency update.
+
+Acceptance: consistent 3.0.4 product/assembly/AppStream/changelog metadata; pushed
+release commit including documentation checkpoint 2726821; exact-revision CI and
+release builds pass; four artifacts are published under a new v3.0.4 tag; verify
+the WinGet workflow and resulting PR, distinguishing submission from catalog
+publication. Retain the tested boundary: close the application through tray Quit
+before retrying a guarded upgrade; automatic MSI shutdown remains unverified.
+
 ## M-WINDOWS-UPGRADE-RUNTIME-20261113
 
 Completed scoped implementation/verification at pushed `6c62d70`: all eight CI
@@ -36,7 +51,7 @@ all 439 baseline files retained, normal tray Quit, successful retry, all 439
 candidate payload hashes, preserved user data and app-local-runtime startup.
 Automatic MSI shutdown and post-reboot/ARM64 installed behavior are not proven;
 no reboot was required or performed. See [status evidence](status.md#windows-msi-correction-pushed-and-exercised-2026-11-13).
-No new release is selected.
+No release was selected during that completed validation assignment.
 
 The user selected investigating and correcting missing runtime files after a
 UniGetUI upgrade to 3.0.3. Repair restored application startup; the previous

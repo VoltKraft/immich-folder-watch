@@ -99,20 +99,10 @@
   </branding>
 
   <releases>
-    <release version="3.0.3" date="2026-11-11">
+    <release version="3.0.4" date="2026-11-13">
       <description>
-        <p>Maintenance release delivering the reviewed Avalonia component-license correction and D-Bus compatibility update. Configuration, stored data and supported integrations remain compatible; no migration is required.</p>
         <p>Fixed:</p>
-        <ul>
-          <li>Align the application and protocol-test D-Bus dependencies at 0.94.1 with Avalonia 12.1.6 to resolve restore downgrades while retaining portal-based Linux integration.</li>
-          <li>Preserve the offline NuGet cache across Flatpak build commands so final package provenance verification succeeds.</li>
-          <li>Recover CI system-package installation when the default Ubuntu mirror cannot resolve, while retaining signed package verification.</li>
-        </ul>
-        <p>Changed:</p>
-        <ul>
-          <li>Build the Linux UI with reproducible reduced Avalonia/Fluent 12.1.6.1 packages from reviewed 12.1.6 sources, excluding incompatible unused component implementations and resources while preserving application controls and popup behavior.</li>
-          <li>Pin the reconstruction SDK, restrict private package sources and verify restored/published assembly bytes against rebuilt archives; retain upstream and supplementary license notices.</li>
-        </ul>
+        <p>Maintenance release focused on Windows distribution; Linux application behavior is unchanged. Configuration and stored data remain compatible; no migration is required.</p>
       </description>
     </release>
   </releases>
