@@ -14,6 +14,8 @@ The [Rust rewrite analysis](docs/rust-rewrite-plan.md) and
 replacement. They are planning documents only; no Rust implementation milestone
 is selected. Existing .NET rules continue to apply to the shipping product; see
 the scope and selection boundary in the project brief before starting a rewrite.
+Keep Rust rewrite planning and development on the dedicated `rewrite/rust` branch;
+`main` retains the shipping .NET baseline until a separately selected integration.
 
 Before substantive project work:
 

@@ -10,7 +10,10 @@
   [Directory.Build.props](../Directory.Build.props), delivers the verified MSI
   protection and WinGet metadata correction. Deployed installations remain
   separate evidence.
-- Brief revision: `IFW-BRIEF-20261114-25`.
+- Brief revision: `IFW-BRIEF-20261114-26`.
+- Rust rewrite branch: `rewrite/rust`, selected by the user on 2026-11-14 for
+  all subsequent rewrite work. Planning commit `c123ce9` is preserved there;
+  local `main` retains the preceding shipping baseline `19dcbaf`.
 - Plan maturity: Rust rewrite analysis and reusable desktop-standard proposal
   completed and reviewed; implementation is explicitly deferred. Release 3.0.4
   remains the shipping baseline; external catalog status below is historical evidence.
@@ -19,7 +22,9 @@
 - Implementation request / scope: On 2026-11-14 the user requested repository
   analysis, GUI evaluation, architecture, a reusable technical standard and a
   stepwise full Rust migration plan, explicitly without implementation. See the
-  selected analysis contract below. Historical scope: the Windows MSI correction,
+  selected analysis contract below. The follow-up selects moving these changes
+  to `rewrite/rust` and using that branch for further work; implementation stages
+  remain unstarted. Historical scope: the Windows MSI correction,
   push and installed-upgrade checks below. The prior WinGet icon correction
   and submission scope is retained as history. The 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation

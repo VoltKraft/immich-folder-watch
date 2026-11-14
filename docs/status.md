@@ -1,5 +1,24 @@
 # Project Status
 
+## Rust rewrite branch established (2026-11-14)
+
+- User selected a dedicated branch for the existing rewrite changes and all
+  subsequent rewrite work. Created and checked out `rewrite/rust`, preserving
+  planning commit `c123ce9d253d72c928ac83892984a30f2748a576` unchanged.
+- Moved local `main` back to its preceding commit
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc` with an expected-old-value ref update,
+  after securing the planning commit on the new branch. No working files were
+  reset and no commit was lost. Local `main` equals the existing `origin/main`
+  tracking ref; no fetch or remote update occurred.
+- Recorded the branch in AGENTS.md and the brief. Branch/ref checks confirm that
+  the seven-file planning change is on `rewrite/rust` and absent from `main`.
+  This follow-up changes only branch guidance/status; runtime files, the detailed
+  rewrite plan and desktop standard are unchanged. No application tests are
+  required for branch organization and documentation.
+- Next action: continue review and subsequently selected implementation work on
+  `rewrite/rust`. RW-01 through RW-08 remain unstarted. No push, merge, release or
+  implementation is performed by this branch migration.
+
 ## Rust rewrite analysis and standard proposal (2026-11-14)
 
 - Selected milestone: `M-RUST-ANALYSIS-20261114` / RW-00; completed for analysis
