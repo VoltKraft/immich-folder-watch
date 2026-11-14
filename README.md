@@ -224,6 +224,11 @@ settings, and deletion behavior for each mode.
 - [Development](./docs/development.md)
 - [Project brief and selected scope](./docs/project.md)
 - [Project status and next action](./docs/status.md)
+- [Proposed Rust rewrite and migration plan](./docs/rust-rewrite-plan.md)
+- [Proposed reusable Rust desktop standard](./docs/rust-desktop-standard.md)
+
+The Rust documents are an analysis and design proposal. The released application
+continues to use .NET/WPF/Avalonia; Rust implementation has not started.
 
 For Codex-assisted work, start at [AGENTS.md](./AGENTS.md). Discuss an idea or
 request a concrete change; Codex maintains the plan and status. Once a milestone

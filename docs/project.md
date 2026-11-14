@@ -10,11 +10,16 @@
   [Directory.Build.props](../Directory.Build.props), delivers the verified MSI
   protection and WinGet metadata correction. Deployed installations remain
   separate evidence.
-- Brief revision: `IFW-BRIEF-20261113-24`.
-- Plan maturity: Release 3.0.4 published; WinGet submission awaits Microsoft validation.
-- Active milestone: None; `M-RELEASE-3.0.4-20261113` publication and submission
-  verification are complete, with external catalog acceptance pending.
-- Implementation request / scope: The user selected the Windows MSI correction,
+- Brief revision: `IFW-BRIEF-20261114-25`.
+- Plan maturity: Rust rewrite analysis and reusable desktop-standard proposal
+  completed and reviewed; implementation is explicitly deferred. Release 3.0.4
+  remains the shipping baseline; external catalog status below is historical evidence.
+- Active milestone: None; `M-RUST-ANALYSIS-20261114` is complete for analysis and
+  documentation. No Rust implementation milestone is selected.
+- Implementation request / scope: On 2026-11-14 the user requested repository
+  analysis, GUI evaluation, architecture, a reusable technical standard and a
+  stepwise full Rust migration plan, explicitly without implementation. See the
+  selected analysis contract below. Historical scope: the Windows MSI correction,
   push and installed-upgrade checks below. The prior WinGet icon correction
   and submission scope is retained as history. The 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -25,8 +30,43 @@
   2026-11-10 follow-up explicitly requires complete directory-race remediation
   with subagents and regression tests in that same PR, without merging. The earlier
   distribution assignment remains preserved in its milestone and status history.
-- Requirement source: The current request and existing packaging/release contracts.
+- Requirement source: The 2026-11-14 Rust analysis request, its clarification of
+  Rust-only application code, and existing product/security/packaging contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-RUST-ANALYSIS-20261114
+
+Completed for analysis/documentation; see [validation and handoff](status.md#rust-rewrite-analysis-and-standard-proposal-2026-11-14).
+Implementation and native qualification remain unstarted.
+
+Selected outcome: assess the existing application and recommend a concrete full
+Rust rewrite architecture and staged migration, also usable as the basis for
+future desktop applications. Deliver the [detailed analysis/plan](rust-rewrite-plan.md)
+and [proposed Rust Desktop Standard](rust-desktop-standard.md), preserving product
+history and distinguishing proposed design from implemented capability.
+
+| ID | Selected requirement / acceptance |
+| --- | --- |
+| RUST-AC01 | Inventory actual feature, architecture, configuration, SQLite, security and distribution contracts against local baseline `19dcbaf`; identify migration/rollback risks and source evidence. |
+| RUST-AC02 | Evaluate egui/eframe against credible alternatives using current primary sources, including exact-source licenses, fonts/features, accessibility, background lifecycle and ARM64 constraints. |
+| RUST-AC03 | Design first-party application and GUI entirely in Rust, without WebView/JavaScript/Electron. User explicitly permits native OS libraries and SQLite dependencies. |
+| RUST-AC04 | Preserve Windows/Linux x64/ARM64, AGPL-3.0-only, functions/config/SQLite data, portal/per-user boundaries and at-least-equivalent filesystem/data-loss protections; cover tray/autostart/notifications/background operation. |
+| RUST-AC05 | Define reusable boundaries/project structure, automated GitHub Actions builds/tests/distribution, phased dependencies, observable acceptance gates and controlled cutover/rollback. |
+| RUST-AC06 | Save and review planning documents and relevant entry/status links; no Rust scaffold, source/dependency/workflow change, installation, live Immich use, push or publication. |
+
+Design recommendation, pending feasibility evidence: egui/eframe as the first GUI
+candidate, independent application/domain layers, one supervised per-user process,
+native platform adapters, compatible YAML/SQLite codecs, and an isolated handle-based
+filesystem boundary. This is a proposed replacement for the existing .NET stack;
+the .NET preservation rules continue to govern the shipping code. The future
+implementation may change the stack only after that work is explicitly selected.
+No first-party implementation, version change or release is authorized now.
+
+RW-00 maps to this analysis milestone. RW-01 through RW-08 in the detailed plan
+are proposed stages, not active assignments. The next action after analysis is
+review/selection of the plan; a generic continuation must not bypass the explicit
+no-implementation boundary. Native spikes, final dependency/font clearance and
+runtime acceptance remain unexecuted requirements for later stages.
 
 ## M-RELEASE-3.0.4-20261113
 
@@ -620,8 +660,8 @@ workflow. The current distribution requirements are in its milestone below.
 - Completion boundary: No app behavior or product-version change; no Flathub
   submission changes, native UI test, or connection to Immich is required.
 
-The security and distribution milestones above preserve their historical scope.
-The current selected work is the dependency-maintenance milestone above.
+The security, distribution and dependency milestones above preserve their
+historical scope. Current selection is the Rust analysis milestone at the top.
 
 ## Structure and tools
 
@@ -635,9 +675,9 @@ The current selected work is the dependency-maintenance milestone above.
 | `src/ImmichFolderWatch.Tests.Core`, `src/ImmichFolderWatch.Tests`, `src/ImmichFolderWatch.Tests.Linux` | Portable, Windows-specific, and Linux GUI/protocol tests respectively |
 | `packaging/`, `assets/`, `tools/` | Distribution definitions, authoritative branding sources, maintenance/build utilities |
 
-The required SDK is selected by [global.json](../global.json): `10.0.100` with
-`latestFeature` roll-forward. This is a repository requirement, not confirmation
-of an installed SDK. Inspect available runtimes/tools before using them.
+The required SDK is selected by [global.json](../global.json): `10.0.401` with
+roll-forward disabled (verified 2026-11-14). This is a repository requirement,
+not confirmation of an installed SDK. Inspect available runtimes/tools before using them.
 
 ### Commands and manual workflows
 
@@ -658,6 +698,8 @@ Do not duplicate their command lists or run publication as routine validation.
 ## Canonical specifications and evidence
 
 - [Architecture](architecture.md): component boundaries and significant design decisions.
+- [Rust rewrite proposal](rust-rewrite-plan.md) and [reusable desktop standard](rust-desktop-standard.md):
+  analysis-only target design; no implementation selected.
 - [Configuration](configuration.md): settings, modes, permissions, persistence,
   and deletion semantics. Bidirectional sync has consequential deletion behavior.
 - [User interface](user-interface.md), [Windows installation](installation-windows.md),

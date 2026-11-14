@@ -9,6 +9,11 @@ Immich API; it must never write directly to Immich storage. See
 for the existing architecture, canonical specifications, and selected scope.
 The project is initialized. Preserve its implementation, data, and history;
 do not restart template onboarding or infer a new product plan from maintenance.
+The [Rust rewrite analysis](docs/rust-rewrite-plan.md) and
+[proposed desktop standard](docs/rust-desktop-standard.md) describe a future
+replacement. They are planning documents only; no Rust implementation milestone
+is selected. Existing .NET rules continue to apply to the shipping product; see
+the scope and selection boundary in the project brief before starting a rewrite.
 
 Before substantive project work:
 

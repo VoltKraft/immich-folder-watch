@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Document the proposed full Rust rewrite, GUI/library assessment, compatibility and security gates, staged migration, and reusable desktop architecture standard. No application implementation or runtime behavior changes.
+
 ## [3.0.4] - 2026-11-13
 
 ### Fixed

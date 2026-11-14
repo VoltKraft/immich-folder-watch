@@ -1,5 +1,44 @@
 # Project Status
 
+## Rust rewrite analysis and standard proposal (2026-11-14)
+
+- Selected milestone: `M-RUST-ANALYSIS-20261114` / RW-00; completed for analysis
+  and planning only, `RUST-AC01` through `RUST-AC06` met. User explicitly defers
+  implementation and confirms that all first-party application/GUI code must be
+  Rust while native libraries and SQLite are allowed.
+  No Goal was requested or started.
+- Baseline inspected: clean local `main` at
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`, product 3.0.4 and SDK 10.0.401 with
+  roll-forward disabled. No fetch; historical CI/catalog evidence is not renewed.
+- Prepared [rewrite assessment and migration plan](rust-rewrite-plan.md) and
+  [Rust Desktop Standard proposal](rust-desktop-standard.md), with current source
+  evidence for egui/eframe, alternatives and native integration. Preferred egui
+  selection remains conditional on actual lifecycle/accessibility/GPU/native
+  tests, full dependency/license inventory and independently reviewed fonts.
+- Recorded exact YAML/SQLite identity/codec contracts, startup authority revocation,
+  retained-handle filesystem invariants, single-instance interoperability,
+  backup/cutover/rollback rules, four-target packaging and phased acceptance.
+  The Windows Event Log message-resource dependency and incomplete notification
+  parity are explicitly included. No existing residual risk is marked repaired.
+- Updated project/entry/README links and the Unreleased documentation entry;
+  corrected the brief's stale SDK description against `global.json`. Product
+  sources, build files, dependency pins, versions, release history and runtime
+  user data remain unchanged. No Rust scaffold, build, test execution, installation,
+  live Immich request, push or publication occurred.
+- Validation: independent security/compatibility and GUI/license/reuse reviews
+  completed. Incorporated cross-session Windows writer-exclusion and exact startup
+  ordering gates; corrected native-toolkit language eligibility and kept locales
+  product-configurable. The security reviewer verified the corrections. Local
+  Markdown target/anchor checks, code-fence balance, documentation-only scope and
+  `git diff --check` pass. Product tests are intentionally not run for this
+  documentation-only assignment; no native spike or resolved-graph license
+  certification is implied. Keep the final local checkpoint hash in the chat
+  handoff; no push is selected.
+- Next action: user review/selection of the proposed plan. After explicit
+  implementation selection, start RW-01. RW-01 through RW-08 are proposed and
+  unstarted; do not infer implementation authorization from these documents or a generic
+  continuation prompt.
+
 ## Release 3.0.4 published and WinGet submitted (2026-11-13)
 
 - Published [v3.0.4](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4)
