@@ -54,6 +54,28 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn("environment:", smoke)
         self.assertNotIn("uses: actions/deploy-pages@", smoke)
 
+    def test_rust_reference_is_branch_bound_and_cannot_publish(self):
+        source = (WORKFLOWS / "rust-compatibility.yaml").read_text()
+        self.assertIn("branches: [rewrite/rust]", source)
+        self.assertIn("if: github.ref == 'refs/heads/rewrite/rust'", source)
+        self.assertIn("\npermissions:\n  contents: read\n", source)
+        self.assertNotRegex(source, r"(?m)^\s*[\w-]+: write\s*$")
+        self.assertNotIn("secrets.", source)
+        self.assertNotIn("secrets: inherit", source)
+        self.assertNotIn("environment:", source)
+        self.assertIn("persist-credentials: false", source)
+        self.assertIn("${{ github.sha }}", source)
+        actions = re.findall(r"^\s*- uses: (\S+)|^\s*uses: (\S+)", source, re.M)
+        self.assertEqual({(first or second).split("@", 1)[0] for first, second in actions},
+                         {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        # Release listens to the exact CI workflow name. This reference workflow
+        # must remain outside that publication event chain even if it succeeds.
+        name = re.search(r"^name: (.+)$", source, re.M).group(1)
+        release = (WORKFLOWS / "release.yaml").read_text()
+        trigger = release.split("\npermissions:", 1)[0]
+        self.assertNotIn(name, trigger)
+        self.assertNotRegex(source, r"(?i)gh\s+(release|workflow)|dispatches|deploy-pages|flatpak\s+build-update-repo")
+
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()
         scripts = re.findall(r"^        run: \|\n((?:^          .*\n|^\n)*)", source, re.M)

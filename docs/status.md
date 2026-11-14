@@ -1,5 +1,41 @@
 # Project Status
 
+## RW-01 local compatibility baseline verified (2026-11-14)
+
+- Goal remains active under `M-RUST-IMPLEMENTATION-20261114`; selection checkpoint
+  `8d517342b0ebc9d0a6379be67ac32272269abded`. RW-01 remains in progress until native
+  platform outputs are collected/reviewed. RW-02 dependency research is independent
+  preparation; no later gate is declared passed.
+- Added the [storage oracle](rust/rw01-storage-contract.md): 29 generated Linux
+  files and 215 assertions, with hashes of 10 C#/oracle sources and 28 payloads.
+  Added [63 behavior cases](rust/rw01-behavior-contract.md) and five real-view
+  [window lifecycle traces](rust/rw01-parity.md). All inputs are synthetic; production
+  application code, configuration, state and package dependencies are unchanged.
+- Local native Linux x64 checks with SDK 10.0.401/runtime 10.0.12: existing portable
+  suite 503/503; existing Linux headless/protocol suite 60/60; new behavior corpus
+  63/63; new lifecycle corpus 5/5. Storage export and independent verification pass;
+  an intentional ARM64 assertion on x64 fails before fixture generation. Reduced
+  Avalonia provenance verification passes. Existing obsolete D-Bus/Bitmap API
+  warnings remain; oracle restore reported NU1900 when advisory retrieval was
+  unavailable. No skipped application tests in these four executed suites.
+- Raw TRX/log evidence is in ignored `artifacts/rust/baseline-results/`,
+  `artifacts/rust/behavior/results/` and `artifacts/rust/`. Commands and fixture
+  limits are in [development](development.md#rust-rewrite-reference-corpus).
+- Independent read-only review checked oracle/test isolation, native architecture
+  assertion, source/payload hashes and candidate workflow. No open blocking finding.
+  Renamed a success-only journal observation so it does not claim failure atomicity.
+  [Security mapping](rust/rw01-security-contract.md) explicitly retains legacy
+  future-schema WAL mutation, Windows cross-session writer and config durability,
+  IPC deadline and parser-bound gaps as stronger Rust acceptance requirements.
+- Prepared `Rust compatibility reference` workflow: four native OS/architecture
+  lanes, read-only permissions, exact action/SDK pins, source-SHA artifact names,
+  branch/job restriction to `rewrite/rust`, no signing/publication path. New and
+  existing workflow security checks: seven passed; four PowerShell-only cases
+  skipped locally and retained for Windows CI. Workflow preparation is not execution.
+- Next action: commit/push this reference checkpoint, create the authorized single
+  draft PR, collect native C# reference evidence including Windows golden output,
+  review platform differences, and close RW-01 only after its evidence is sufficient.
+
 ## Rust implementation Goal selected (2026-11-14)
 
 - Active milestone: `M-RUST-IMPLEMENTATION-20261114`; fixed RI-AC01 through RI-AC10

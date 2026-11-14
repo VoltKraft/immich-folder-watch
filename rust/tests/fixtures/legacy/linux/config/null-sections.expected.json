@@ -1,0 +1,57 @@
+{
+  "Editable": {
+    "Immich": {
+      "AllowInsecureHttp": false,
+      "ServerApiUrl": "",
+      "ApiKey": ""
+    },
+    "Watch": {
+      "Sources": [],
+      "TransferOrder": "newestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 5,
+      "BaseDelayMilliseconds": 500
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "eventLog",
+      "LogDirectory": "logs"
+    },
+    "Localization": {
+      "Language": "auto"
+    }
+  },
+  "Runtime": {
+    "Immich": {
+      "AllowInsecureHttp": false,
+      "ServerApiUrl": "",
+      "ApiKey": ""
+    },
+    "Watch": {
+      "Sources": [],
+      "TransferOrder": "newestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 5,
+      "BaseDelayMilliseconds": 500
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "eventLog",
+      "LogDirectory": "$PROFILE/logs"
+    },
+    "Localization": {
+      "Language": "auto"
+    }
+  },
+  "RuntimePathToken": "$PROFILE"
+}

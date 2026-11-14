@@ -1,5 +1,51 @@
 # Development
 
+## Rust rewrite reference corpus
+
+The selected RW-01 through RW-07 goal and its gates live in the
+[project brief](project.md#m-rust-implementation-20261114) and
+[acceptance record](rust/acceptance.md). Work only on `rewrite/rust`.
+The shipping .NET sources remain the behavioral reference. The C# oracle is
+development tooling; it is never part of the Rust candidate runtime.
+
+Run from the repository root with the exact SDK selected by `global.json`:
+
+```bash
+dotnet run --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
+dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj -c Release --filter FullyQualifiedName~RustRewriteBehaviorContractTests
+dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj -c Release --filter FullyQualifiedName~RustRewriteLifecycleContractTests
+```
+
+Golden verification requires the reviewed corpus for the current OS. Generate
+new candidate output using `export artifacts/rust/oracle`, review it and compare
+an independent `verify artifacts/rust/oracle` run before adding golden fixtures.
+Export-then-verify proves repeatability, not equivalence to an already reviewed
+baseline. See [storage provenance and limits](rust/rw01-storage-contract.md).
+No command takes a production profile/database; all profiles/media are synthetic.
+
+`IFW_ORACLE_EXPECT_ARCH=x64` or `arm64` requires matching OS/process architecture
+and prevents emulated/cross-target runs from being counted as native evidence.
+The behavior/lifecycle tests find fixtures by walking their repository ancestors;
+`IFW_COMPATIBILITY_REPOSITORY` can identify the source checkout for relocated
+test binaries. It selects fixtures, never an application profile.
+
+Use separate `--artifacts-path artifacts/rust/<lane>` directories for concurrent
+reference builds. A local exact SDK is available in the existing ignored cache at
+`artifacts/flatpak-local-2.11.2/sdk/dotnet` on the current development machine;
+this is local convenience, not a portable install prerequisite. `DOTNET_CLI_HOME`
+can isolate SDK state; set `DOTNET_GENERATE_ASPNET_CERTIFICATE=false` and
+`DOTNET_CLI_TELEMETRY_OPTOUT=1`. Test-host/MSBuild sockets and isolated D-Bus
+protocol tests need local IPC access; a sandbox rejection is not a failed behavior test.
+
+`rust-compatibility.yaml` runs on `rewrite/rust` for corpus/source changes and
+manual dispatch on that branch only, using native Windows/Linux x64/ARM64 runners.
+It uploads reference evidence under the exact source SHA, has read-only repository
+permissions and cannot publish releases. SDK architecture selection is supported
+by the [pinned setup action](https://github.com/actions/setup-dotnet/blob/0f4a354dd5547a28c70b7853dbd95d5b67886e73/action.yml);
+runner availability follows the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Actual runs, missing platforms and independent workflow review belong in the
+acceptance record. Native reference tests do not qualify the future Rust GUI.
+
 ## Build
 
 The Linux UI uses the [reduced Avalonia build](reduced-avalonia.md). Python 3.11+

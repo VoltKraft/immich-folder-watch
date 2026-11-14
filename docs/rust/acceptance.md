@@ -21,6 +21,11 @@ is permitted. The C# oracle is development tooling, never a candidate runtime.
 
 ## Work-package gates
 
+The [RW-01 feature/lifecycle mapping](rw01-parity.md),
+[storage contract](rw01-storage-contract.md),
+[behavior contract](rw01-behavior-contract.md) and
+[security mapping](rw01-security-contract.md) own individual reference cases.
+
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | In progress | Generated legacy config/DB fixtures, C# behavioral/protocol runs, full public/security/lifecycle case mapping and provenance |
@@ -54,9 +59,30 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- | --- | --- |
 | Windows x64 | Pending | Pending | Pending | Pending |
 | Windows ARM64 | Pending | Pending | Pending | Pending |
-| Linux x64 | Pending | Pending | Pending (X11/Wayland, GNOME/KDE) | Pending |
+| Linux x64 | Local C# baseline and synthetic corpora passed; hosted confirmation pending | Pending | C# headless/protocol passed; Rust/native desktop pending | Pending |
 | Linux ARM64 | Pending | Pending | Pending (X11/Wayland) | Pending |
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.
 Record capabilities actually exercised and unsupported checks explicitly.
+
+## RW-01 local execution record (2026-11-14)
+
+Reference application source remains exactly `19dcbaf`; oracle/test additions were
+reviewed over selection checkpoint `8d51734`. Platform: native Fedora 45 x86_64,
+.NET SDK 10.0.401, runtime 10.0.12. No production application startup or profile access.
+
+| Check | Actual result | Evidence / limit |
+| --- | --- | --- |
+| Existing Core suite | 503 passed, zero failed/skipped | `artifacts/rust/baseline-results/core-baseline.trx` |
+| Existing Linux GUI/protocol suite | 60 passed, zero failed/skipped | `artifacts/rust/baseline-results/linux-reference.trx`; isolated headless views/D-Bus, not real desktop acceptance |
+| New behavior corpus | 63 passed, zero failed/skipped | `artifacts/rust/behavior/results/rw01-behavior-linux-x64.trx` |
+| New window corpus | Five passed, zero failed/skipped | `artifacts/rust/baseline-results/rw01-lifecycle.trx` |
+| Storage/config export and independent verify | 29 files, 215 assertions, all source/payload hashes match | Checked-in Linux manifest; native Windows output pending |
+| Architecture negative control | ARM64 requirement on x64 refused before generation | No emulated native-pass claim |
+| Reduced Avalonia provenance | Passed | Exact rebuilt package/assembly hashes against Linux test restore |
+| Workflow security | Seven passed, four PowerShell-only skipped | Existing and new publication-isolation regressions; native Windows run pending |
+| Independent test/workflow review | No open blocking finding | Read-only source/hash audit; actual Rust security review remains open |
+
+Existing obsolete D-Bus/Bitmap API warnings and an unavailable NuGet advisory
+fetch during oracle restore are recorded; no dependency update is inferred.

@@ -1,0 +1,73 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-NORM-01",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": null,
+      "expectedMode": "uploadNew",
+      "order": null,
+      "expectedOrder": "newestFirst"
+    },
+    {
+      "id": "BEH-NORM-02",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": "",
+      "expectedMode": "uploadNew",
+      "order": "",
+      "expectedOrder": "newestFirst"
+    },
+    {
+      "id": "BEH-NORM-03",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": " uploadNEW ",
+      "expectedMode": "uploadNew",
+      "order": " NEWESTFIRST ",
+      "expectedOrder": "newestFirst"
+    },
+    {
+      "id": "BEH-NORM-04",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": " UPLOADALL ",
+      "expectedMode": "uploadAll",
+      "order": " OLDESTFIRST ",
+      "expectedOrder": "oldestFirst"
+    },
+    {
+      "id": "BEH-NORM-05",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": " Sync ",
+      "expectedMode": "sync",
+      "order": "unknown",
+      "expectedOrder": "newestFirst"
+    },
+    {
+      "id": "BEH-NORM-06",
+      "parity": [
+        "PAR-01",
+        "PAR-03"
+      ],
+      "mode": "unknown",
+      "expectedMode": "uploadNew",
+      "order": "oldestFirst",
+      "expectedOrder": "oldestFirst"
+    }
+  ]
+}
