@@ -10,21 +10,22 @@
   [Directory.Build.props](../Directory.Build.props), delivers the verified MSI
   protection and WinGet metadata correction. Deployed installations remain
   separate evidence.
-- Brief revision: `IFW-BRIEF-20261114-26`.
+- Brief revision: `IFW-BRIEF-20261114-27`.
 - Rust rewrite branch: `rewrite/rust`, selected by the user on 2026-11-14 for
   all subsequent rewrite work. Planning commit `c123ce9` is preserved there;
   local `main` retains the preceding shipping baseline `19dcbaf`.
-- Plan maturity: Rust rewrite analysis and reusable desktop-standard proposal
-  completed and reviewed; implementation is explicitly deferred. Release 3.0.4
-  remains the shipping baseline; external catalog status below is historical evidence.
-- Active milestone: None; `M-RUST-ANALYSIS-20261114` is complete for analysis and
-  documentation. No Rust implementation milestone is selected.
-- Implementation request / scope: On 2026-11-14 the user requested repository
+- Plan maturity: Rust analysis completed; the user's explicit 2026-11-14 follow-up
+  selects the complete RW-01 through RW-07 implementation and reusable foundation.
+  Release 3.0.4 remains the shipping reference. Native acceptance is outstanding.
+- Active milestone: `M-RUST-IMPLEMENTATION-20261114`; RW-01 is the first work
+  package. This goal continues across all seven packages; RW-08 is excluded.
+- Implementation request / scope: The attached 2026-11-14 implementation request
+  supersedes the earlier analysis-only boundary for RW-01 through RW-07. Its fixed
+  contract follows below. Historical scope: On 2026-11-14 the user requested repository
   analysis, GUI evaluation, architecture, a reusable technical standard and a
   stepwise full Rust migration plan, explicitly without implementation. See the
   selected analysis contract below. The follow-up selects moving these changes
-  to `rewrite/rust` and using that branch for further work; implementation stages
-  remain unstarted. Historical scope: the Windows MSI correction,
+  to `rewrite/rust` and using that branch for further work. Earlier scope: the Windows MSI correction,
   push and installed-upgrade checks below. The prior WinGet icon correction
   and submission scope is retained as history. The 2026-11-10 request to implement
   Dependabot selects the repository configuration and maintenance documentation
@@ -35,14 +36,72 @@
   2026-11-10 follow-up explicitly requires complete directory-race remediation
   with subagents and regression tests in that same PR, without merging. The earlier
   distribution assignment remains preserved in its milestone and status history.
-- Requirement source: The 2026-11-14 Rust analysis request, its clarification of
+- Requirement source: The explicit 2026-11-14 full implementation Goal request,
+  the 2026-11-14 Rust analysis request, its clarification of
   Rust-only application code, and existing product/security/packaging contracts.
   The completed contributor-workflow migration remains recorded below.
+
+## M-RUST-IMPLEMENTATION-20261114
+
+Selected on 2026-11-14 by the user's explicit full implementation request.
+This is one overall milestone with RW-01 through RW-07 as ordered work packages,
+not seven separately selected goals. The [rewrite plan](rust-rewrite-plan.md)
+owns their detailed prerequisites and exit evidence; the
+[acceptance record](rust/acceptance.md) maps them to actual checks. Complete the
+next eligible package autonomously after the preceding gate passes. The goal
+must not complete at a prototype, partial feature, or merely prepared workflow.
+
+Outcome: a fully functional Rust release candidate for Windows x64/ARM64 and
+Linux x64/ARM64, preserving product behavior/data/security and proving a reusable
+desktop foundation through an isolated second consumer. The existing .NET app
+remains a behavioral oracle throughout; the candidate cannot require its runtime.
+egui/eframe is the preferred candidate, subject to RW-02 feasibility. Normal
+implementation decisions are delegated; fundamental changes require documented
+failed requirements and an evidence-based alternative, without relaxing criteria.
+
+The following acceptance criteria are fixed for this run. Their evidence is
+conjunctive: a missing required platform/test/artifact remains open.
+
+| ID | Required result and evidence |
+| --- | --- |
+| RI-AC01 | RW-01 through RW-07 meet every prerequisite/exit gate in the plan; all PAR-01 through PAR-10 behaviors are implemented and verified against synthetic baseline cases. Test doubles never substitute for production functionality. |
+| RI-AC02 | All first-party application/GUI runtime code is Rust; no WebView, JavaScript frontend, Electron or .NET runtime. Reviewed native OS libraries and SQLite are allowed. Four native Windows/Linux x64/ARM64 candidates are built from one revision. |
+| RI-AC03 | Existing YAML and all SQLite state survive both C#→Rust and Rust→C# reads/writes: identities, repairs, tombstones, exact album provenance and transfer history. Consistent backups include WAL; crash, write failure and full-disk recovery pass. Unknown formats fail without destructive bootstrap. |
+| RI-AC04 | Handle-bound authorization covers reads, enumeration, absence, deletion, staging, publication, rename and timestamps, with no path fallback. Complete inventory and exact-ID authorization gates, startup revocation, live-file deletion authority, HTTPS/explicit HTTP, origin/redirect and streaming/time/message limits meet or exceed the reference. Independent boundary and call-site review plus adversarial native tests pass. |
+| RI-AC05 | One controlled per-user writer, including same Windows user across sessions and old/new interoperation; bounded channels, supervised tasks, durable shutdown and DB ownership. Native tray/reconnect, autostart, notifications, background/activation and logging pass platform tests. |
+| RI-AC06 | Full UI/draft/apply/status/error/log flows, DE/EN, keyboard, accessibility, DPI and Unicode/IME pass. Hidden startup, close/reopen/Quit, tray/portal denial, GPU failure and actually tested fallbacks pass on all targets. Visible/hidden resource budgets are selected from same-machine baseline measurements and verified. |
+| RI-AC07 | Generic desktop crates stay independent of Immich/its profile. An isolated second desktop application proves lifecycle, settings, logs and synthetic background work on all four targets. Domain/sync/storage/platform interfaces remain independent of egui types. |
+| RI-AC08 | Automated Actions builds/tests produce four candidate packages; offline reconstruction and actual installation, upgrade, repair, uninstall and rollback after synthetic upload/download/deletion/repair activity pass. A database restore is never represented as undoing external side effects. |
+| RI-AC09 | Exact compiler, lockfile, feature/transitive/native/font graph and build inputs are pinned/audited for AGPL-3.0-only distribution. Notices, license inventory, SBOM and source/reconstruction artifacts exist. No inspection/control server is included in production. |
+| RI-AC10 | Independent migration and final integration reviews have no unresolved acceptance-blocking findings. Documentation, commits, draft PR, artifact manifest and acceptance matrix accurately distinguish executed/pass/fail/unavailable evidence. |
+
+Authorization and boundaries for this goal:
+
+- Work only on `rewrite/rust` in this existing repository; preserve history and
+  unrelated changes. Do not modify/merge `main`, force-push or rewrite published history.
+- Local saves/commits, pushes only to the existing origin's `rewrite/rust`, one
+  draft PR against `main`, and associated candidate Actions are authorized.
+  Audit workflow triggers before the first push and retain publication isolation.
+- No release tags, GitHub Releases, stable Pages/Flatpak distribution, WinGet or
+  Flathub submission, production installation, signing-identity modification or
+  changes to existing published artifacts. RW-08 needs a separate assignment.
+- Synthetic media and isolated test profiles only; no personal media, production
+  configuration/database or production Immich. Isolated installer/migration test
+  systems are permitted. Use suitable agents with exclusive file ownership;
+  the primary owns shared decisions, integration, records and commits.
+- Existing .NET rules continue to govern the reference implementation; Rust
+  follows the [desktop standard](rust-desktop-standard.md). No product version
+  bump is selected; implementation checkpoints remain under Unreleased.
+- Unavailable native environments or external prerequisites are explicit missing
+  evidence. Continue independent work but do not bypass gates or mark the goal
+  complete. The actual Goal controls own active/blocked/complete state; status
+  records the run reference rather than implicitly activating future chats.
 
 ## M-RUST-ANALYSIS-20261114
 
 Completed for analysis/documentation; see [validation and handoff](status.md#rust-rewrite-analysis-and-standard-proposal-2026-11-14).
-Implementation and native qualification remain unstarted.
+Historical analysis contract; implementation is now selected by the milestone
+above. Its analysis-only constraints describe the earlier completed assignment.
 
 Selected outcome: assess the existing application and recommend a concrete full
 Rust rewrite architecture and staged migration, also usable as the basis for
@@ -65,13 +124,13 @@ native platform adapters, compatible YAML/SQLite codecs, and an isolated handle-
 filesystem boundary. This is a proposed replacement for the existing .NET stack;
 the .NET preservation rules continue to govern the shipping code. The future
 implementation may change the stack only after that work is explicitly selected.
-No first-party implementation, version change or release is authorized now.
+No first-party implementation, version change or release was authorized by that
+analysis assignment; the implementation selection above supersedes only the
+RW-01 through RW-07 implementation restriction.
 
-RW-00 maps to this analysis milestone. RW-01 through RW-08 in the detailed plan
-are proposed stages, not active assignments. The next action after analysis is
-review/selection of the plan; a generic continuation must not bypass the explicit
-no-implementation boundary. Native spikes, final dependency/font clearance and
-runtime acceptance remain unexecuted requirements for later stages.
+RW-00 maps to this completed analysis milestone. RW-01 through RW-07 are now
+selected work packages; RW-08 remains unselected. Native spikes, exact dependency/
+font clearance and runtime acceptance are mandatory evidence, not inherited passes.
 
 ## M-RELEASE-3.0.4-20261113
 
@@ -666,7 +725,7 @@ workflow. The current distribution requirements are in its milestone below.
   submission changes, native UI test, or connection to Immich is required.
 
 The security, distribution and dependency milestones above preserve their
-historical scope. Current selection is the Rust analysis milestone at the top.
+historical scope. Current selection is the Rust implementation milestone at the top.
 
 ## Structure and tools
 
@@ -703,8 +762,9 @@ Do not duplicate their command lists or run publication as routine validation.
 ## Canonical specifications and evidence
 
 - [Architecture](architecture.md): component boundaries and significant design decisions.
-- [Rust rewrite proposal](rust-rewrite-plan.md) and [reusable desktop standard](rust-desktop-standard.md):
-  analysis-only target design; no implementation selected.
+- [Rust rewrite plan](rust-rewrite-plan.md) and [reusable desktop standard](rust-desktop-standard.md):
+  selected RW-01 through RW-07 design and mandatory gates; actual evidence in the
+  [acceptance record](rust/acceptance.md).
 - [Configuration](configuration.md): settings, modes, permissions, persistence,
   and deletion semantics. Bidirectional sync has consequential deletion behavior.
 - [User interface](user-interface.md), [Windows installation](installation-windows.md),

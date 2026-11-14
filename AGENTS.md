@@ -9,11 +9,13 @@ Immich API; it must never write directly to Immich storage. See
 for the existing architecture, canonical specifications, and selected scope.
 The project is initialized. Preserve its implementation, data, and history;
 do not restart template onboarding or infer a new product plan from maintenance.
-The [Rust rewrite analysis](docs/rust-rewrite-plan.md) and
-[proposed desktop standard](docs/rust-desktop-standard.md) describe a future
-replacement. They are planning documents only; no Rust implementation milestone
-is selected. Existing .NET rules continue to apply to the shipping product; see
-the scope and selection boundary in the project brief before starting a rewrite.
+The [Rust rewrite plan](docs/rust-rewrite-plan.md) and
+[desktop standard](docs/rust-desktop-standard.md) govern the selected
+`M-RUST-IMPLEMENTATION-20261114` goal: RW-01 through RW-07 form one complete
+implementation assignment. Follow its fixed contract in the project brief and
+[acceptance record](docs/rust/acceptance.md); advance through verified prerequisites,
+without treating an intermediate stage as goal completion. RW-08/publication is
+excluded. Existing .NET rules continue to apply to the shipping reference product.
 Keep Rust rewrite planning and development on the dedicated `rewrite/rust` branch;
 `main` retains the shipping .NET baseline until a separately selected integration.
 
@@ -153,6 +155,14 @@ to reconcile project decisions, defaults, and recorded state.
 
 ## Project-specific engineering rules
 
+- Rust work follows the selected [desktop standard](docs/rust-desktop-standard.md)
+  and stage gates. Keep first-party runtime and GUI code in Rust, with domain,
+  synchronization, storage and native adapters independent of egui. The C# oracle
+  is development-only. Use synthetic isolated profiles; do not read personal
+  configuration/media or connect to production Immich. Audit exact dependencies,
+  features, native libraries and fonts before adoption; pin compiler and lockfile.
+  Required native runtime/GUI evidence on four targets cannot be replaced by a
+  cross-build. Independently review filesystem, migration and final integration.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

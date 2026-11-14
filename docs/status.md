@@ -1,5 +1,37 @@
 # Project Status
 
+## Rust implementation Goal selected (2026-11-14)
+
+- Active milestone: `M-RUST-IMPLEMENTATION-20261114`; fixed RI-AC01 through RI-AC10
+  in the [brief](project.md#m-rust-implementation-20261114), RW-01 through RW-07 as
+  one assignment. The user's full implementation request supersedes the historical
+  analysis-only scope. RW-08/publication remains excluded.
+- Actual Goal control returned `active`; run/chat reference
+  `01a1db8f-b8ef-7903-8dfc-932f9b39c743`, created 2026-11-14. No token budget was
+  requested. This record does not activate or transfer a goal in another chat.
+- Verified before changes: `rewrite/rust`, clean tree, HEAD
+  `009246552cb4c0091196bab9a58cd64d44e5b629`. Local and live GitHub `main` remain
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`; no existing rewrite PR was found.
+- Persisted goal boundaries and [acceptance matrix](rust/acceptance.md). RW-01
+  synthetic storage/config oracle, behavior fixtures and independent security/
+  workflow-trigger audit are assigned with disjoint ownership. No Rust capability
+  or native acceptance is claimed at selection.
+- Environment: .NET/Rust tools are absent from PATH; `/home/jan/.dotnet` supplies
+  only SDK 10.0.203, which correctly refuses the pinned 10.0.401 project. Verified
+  `artifacts/flatpak-local-2.11.2/sdk/dotnet --info`: SDK 10.0.401, runtime 10.0.12,
+  Linux x64. Baseline tests use this existing SDK and isolated outputs; `global.json`
+  is unchanged. The sandbox refused MSBuild's local IPC sockets; an authorized
+  execution outside that restriction is running, without application/profile startup.
+- Independent static workflow audit: existing `rewrite/rust` pushes trigger no
+  shipping CI; PR CI is read-only. Release requires successful same-repository
+  push CI on `main` (or explicit dispatch on `main`); downstream publication has
+  separate release/manual triggers. No publication workflow is dispatched.
+  Local workflow-security suite: six passed, four PowerShell-only cases skipped.
+- Next action: finish and run RW-01 fixtures against the C# reference, map every
+  parity/security rule, independently review the evidence and then begin RW-02.
+  Audit publication triggers before the first authorized branch push/draft PR.
+- Template cleanup was already completed on 2026-10-16; no reinitialization.
+
 ## Rust rewrite branch established (2026-11-14)
 
 - User selected a dedicated branch for the existing rewrite changes and all

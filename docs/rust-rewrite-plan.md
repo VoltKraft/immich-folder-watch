@@ -6,11 +6,12 @@ initially clean; product **3.0.4**, .NET SDK **10.0.401** pinned with roll-forwa
 disabled. Local origin tracking matched HEAD; no remote fetch or new verification
 of historical release/catalog status was needed for this analysis.
 
-**Scope: analysis and proposed design only.** No application, database, dependency,
-workflow or installed system is changed. No Rust prototype was built and no
-personal media/Immich service was accessed. The user selected the intended Rust
-direction but explicitly deferred implementation. Future stages below require
-implementation selection; their presence is not authorization to execute them.
+**Selection update, 2026-11-14:** the user explicitly selected RW-01 through RW-07
+under `M-RUST-IMPLEMENTATION-20261114`, including the reusable desktop foundation.
+The [fixed goal contract](project.md#m-rust-implementation-20261114) supersedes the
+original analysis-only boundary. RW-08/publication remains excluded. The original
+assessment created no prototype/dependency graph or runtime evidence; all stage
+gates below still require execution. See the [acceptance record](rust/acceptance.md).
 
 The [project brief](project.md) owns requirements/selection and [status](status.md)
 owns completion evidence. [Rust Desktop Standard](rust-desktop-standard.md) defines
@@ -426,10 +427,11 @@ selected by this plan.
 
 ## Staged implementation proposal
 
-Only **RW-00** is selected now. Later stages are proposed, ordered work packages;
-completion of this document does not start RW-01. The current product remains
-maintained and releasable throughout the migration. Track fixes made to the .NET
-baseline after RW-01 in the parity corpus before cutting over.
+**RW-00** is complete. **RW-01 through RW-07** are selected as ordered work packages
+of one implementation goal; **RW-08** is excluded. The current .NET product remains
+the shipping reference throughout the migration. Track fixes made to that baseline
+after RW-01 in the parity corpus before cutting over. A work package may prepare
+independent later evidence, but its prerequisites cannot be declared passed by inference.
 
 | Stage | Deliverable and dependency | Exit evidence / stop condition |
 | --- | --- | --- |

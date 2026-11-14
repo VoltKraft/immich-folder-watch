@@ -1,10 +1,10 @@
-# Rust Desktop Standard — proposed revision 0.1
+# Rust Desktop Standard — revision 0.1
 
-Status: design proposal, 2026-11-14. No Rust implementation or dependency graph
-exists in this repository yet. The [project brief](project.md) owns selection and
+Status: selected implementation standard, revision 0.1, 2026-11-14. Selection does
+not certify implemented capability or a dependency graph. The [project brief](project.md) owns selection and
 authorization; the [rewrite plan](rust-rewrite-plan.md) applies this standard to
 Immich Folder Watch. Existing .NET engineering rules remain applicable to the
-shipping product until an implementation milestone is selected.
+shipping reference product; Rust uses this standard under the selected milestone.
 
 ## Purpose and boundaries
 
