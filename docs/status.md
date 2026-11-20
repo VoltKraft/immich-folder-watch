@@ -2,6 +2,12 @@
 
 ## Real portal grants, SMB and desktop input (2026-11-20)
 
+Three Fedora grant runs added an in-grant symlink to a readable control. The
+adapter's own policy refused both existing symlinks. Independent review closed
+the earlier ambiguous refusal and verified the private daemon builds, source
+bindings and YAML archive. The [service evidence index](../tools/rust-qa/linux-services/evidence.sha256)
+binds the strengthened runs on the stock, pristine and patched daemons.
+
 On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
 when requesting their shared upload lock through a real Documents grant.
 Both acquired it on a private build of 1.22.1 with the upstream flock fix.

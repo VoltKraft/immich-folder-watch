@@ -4,7 +4,7 @@
 use safe_fs::{Directory, EntryKind};
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -67,10 +67,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let path = mount.join("by-app").join(APP).join(id).join(basename);
     println!("GRANT_PATH {}", path.display());
     if view == "revoked" {
-        if Directory::open_root(&path).is_ok() {
-            return Err("Revoked document still accessible".into());
+        let error = Directory::open_root(&path)
+            .err()
+            .ok_or("Revoked document still accessible")?;
+        if !matches!(
+            error.kind(),
+            ErrorKind::NotFound | ErrorKind::PermissionDenied
+        ) {
+            return Err(error.into());
         }
-        println!("REVOKED");
+        println!("REVOKED {error}");
         return Ok(());
     }
     let dir = Directory::open_root(&path)?;
@@ -98,18 +104,54 @@ fn main() -> Result<(), Box<dyn Error>> {
         Err(other) => return Err(other.into()),
     }
     let links = dir.open_directory(OsStr::new("links"))?;
-    if dir.open_directory(OsStr::new("..")).is_ok()
-        || links.open_file(OsStr::new("outside-link")).is_ok()
-    {
-        return Err("Grant traversal or symlink was accepted".into());
+    let traversal = dir
+        .open_directory(OsStr::new(".."))
+        .err()
+        .ok_or("Parent component was accepted")?;
+    if traversal.kind() != ErrorKind::InvalidInput {
+        return Err(traversal.into());
     }
-    println!("TRAVERSAL_REFUSED");
+    // The control resolves entirely inside this synthetic grant. A missing
+    // backing path or unsupported media lock cannot satisfy the no-follow check.
+    let control = path.join("links/in-grant-link");
+    let mut payload = Vec::new();
+    std::fs::File::open(&control)?
+        .take(64)
+        .read_to_end(&mut payload)?;
+    if payload != b"Synthetic in-grant link target\n" {
+        return Err("Ordinary grant-relative read did not reach the known link target".into());
+    }
+    for name in ["in-grant-link", "outside-link"] {
+        if !path
+            .join("links")
+            .join(name)
+            .symlink_metadata()?
+            .is_symlink()
+        {
+            return Err("Expected an observable synthetic symbolic link".into());
+        }
+        let refusal = links
+            .open_file(OsStr::new(name))
+            .err()
+            .ok_or("Symbolic link was accepted")?;
+        if refusal.kind() != ErrorKind::PermissionDenied || refusal.raw_os_error().is_some() {
+            return Err(refusal.into());
+        }
+        println!("LINK_REFUSED {name} {refusal}");
+    }
+    println!("TRAVERSAL_REFUSED {traversal}");
     match view.as_str() {
         "read-only" => {
             let error = dir
                 .begin_download(OsStr::new("forbidden.jpg"))
                 .err()
                 .ok_or("Read-only grant accepted a write")?;
+            if !matches!(
+                error.kind(),
+                ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem
+            ) {
+                return Err(error.into());
+            }
             println!("WRITE_REFUSED {error}");
         }
         "read-write" => {

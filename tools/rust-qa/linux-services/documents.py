@@ -48,6 +48,8 @@ def probe(stack, expected_lock):
     unsafe_entries = backing / "links"
     unsafe_entries.mkdir()
     (unsafe_entries / "outside-link").symlink_to(sentinel)
+    (unsafe_entries / "control.jpg").write_bytes(b"Synthetic in-grant link target\n")
+    (unsafe_entries / "in-grant-link").symlink_to("control.jpg")
     descriptor = os.open(backing, os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
     try:
         handles = Gio.UnixFDList.new()

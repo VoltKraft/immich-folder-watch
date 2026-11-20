@@ -59,6 +59,20 @@ network, PID, mount, IPC and user namespaces, a private bus and a synthetic home
 | Read and write | Published a synthetic download. A second no-replace commit returned `AlreadyExists` and preserved the destination. Cancellation removed its payload. The backing observer verified the bytes, the empty mode-0700 transaction container and the unchanged outside sentinel. Shared media reads still returned `ENOSYS`. |
 | Revoked | A fresh consumer could no longer open the granted root. The producer deleted the transient document. |
 
+Independent review identified that a hidden target could also explain the original
+external-link refusal. Three stronger runs exercised a second link inside the
+grant. An ordinary open followed that link and verified 31 known bytes. The
+handle-bound adapter refused both existing links with its policy error and
+rejected parent traversal as invalid input. Creating staging at read-only access
+returned `EACCES`. A fresh consumer got `ENOENT` after revocation.
+These results held on the packaged daemon (`documents-p53fojfi`), the pristine
+1.22.1 build (`documents-wpog1n7i`) and the upstream backport
+(`documents-uo8auzxl`). Independent rereview closed the finding after checking
+the controls, both source trees and the three native records. The evidence index
+includes the input, observations, lock results and daemon trace for each run.
+[Reviewed grant probe](../../tools/rust-qa/linux-services/src/bin/grant.rs)
+and [run hashes](../../tools/rust-qa/linux-services/evidence.sha256).
+
 The granted directory was real. The producer supplied its synthetic selection
 directly using `AddFull`. This run exercised the per-application FUSE view in a
 private Linux namespace. Installed Flatpak identity and an interactive chooser
