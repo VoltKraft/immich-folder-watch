@@ -94,7 +94,7 @@ class Windows:
             raise ctypes.WinError(ctypes.get_last_error())
 
 
-def run_case(binary, output, name, background, tray, reopen):
+def run_case(binary, output, name, background, tray, reopen, speech_cues=None):
     log = output / (name + ".log")
     actions = []
     with tempfile.TemporaryDirectory(prefix="gui-profile-", dir=output) as scratch:
@@ -168,9 +168,10 @@ def run_case(binary, output, name, background, tray, reopen):
                             subprocess.run([program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
                                             "-ExecutionPolicy", "Bypass", "-File", str(driver),
                                             "-SubjectId", str(process.pid), "-WindowHandle", str(hwnd),
-                                            "-SubjectLog", str(log), "-OutputFile", str(evidence)],
+                                            "-SubjectLog", str(log), "-OutputFile", str(evidence),
+                                            *(["-SpeechCues", str(speech_cues)] if speech_cues else [])],
                                            env=env, cwd=profile, stdin=subprocess.DEVNULL, stdout=observed, stderr=subprocess.STDOUT,
-                                           timeout=80, check=True)
+                                           timeout=130 if speech_cues else 80, check=True)
                         record = json.loads(evidence.read_text(encoding="utf-8"))
                         if record.get("status") != "passed" or record["processId"] != process.pid:
                             raise ValueError("UI Automation observation did not verify the tested process")
@@ -205,10 +206,13 @@ def main():
     parser.add_argument("output", type=Path, help="new evidence directory on the disposable host")
     parser.add_argument("--isolated-vm", action="store_true", help="confirm a dedicated synthetic desktop")
     parser.add_argument("--input-only", action="store_true", help="exercise UI Automation and foreground keyboard input")
+    parser.add_argument("--speech-cues", type=Path, help="wait for observed NVDA announcements in a private fixture")
     args = parser.parse_args()
     if os.name != "nt" or not (args.isolated_vm or os.getenv("RUNNER_ENVIRONMENT") == "github-hosted"):
         parser.error("A disposable native Windows GUI test host is required")
     binary = args.binary.resolve(strict=True)
+    if args.speech_cues and (not args.input_only or not args.speech_cues.is_dir()):
+        parser.error("the private speech observer requires the keyboard scenario")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     report = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
@@ -226,7 +230,7 @@ def main():
         report["observerHostSelectorSha256"] = hashlib.sha256(selector.read_bytes()).hexdigest()
     for case in cases:
         try:
-            report["cases"].append(run_case(binary, output, *case))
+            report["cases"].append(run_case(binary, output, *case, speech_cues=args.speech_cues))
         finally:
             (output / "results.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"{case[0]} passed", flush=True)

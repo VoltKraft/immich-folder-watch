@@ -205,6 +205,13 @@ jobs:
           python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
           python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
 
+      - name: Observe portable NVDA announcing the owned Windows GUI
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/windows-reader/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            --output "artifacts/rust/windows-reader/native-$NATIVE_TARGET"
+
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
         run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
@@ -220,6 +227,8 @@ jobs:
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-reader/native-*/result.json
+            artifacts/rust/windows-reader/native-*/gui/*.json
             artifacts/rust/windows-imports/runs/*/result.json
             artifacts/rust/linux-services/inputs.json
             artifacts/rust/linux-services/documents-*/*.json

@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory)][int]$SubjectId,
     [Parameter(Mandatory)][long]$WindowHandle,
     [Parameter(Mandatory)][string]$SubjectLog,
-    [Parameter(Mandatory)][string]$OutputFile
+    [Parameter(Mandatory)][string]$OutputFile,
+    [string]$SpeechCues
 )
 
 $ErrorActionPreference = 'Stop'
@@ -102,6 +103,17 @@ function Get-AccessibleName($Element) {
     $label = $Element.Current.LabeledBy
     if ($null -ne $label) { return $label.Current.Name }
     return ''
+}
+
+function Wait-ReaderCue([string]$Name) {
+    if (-not $SpeechCues) { return }
+    $file = Join-Path $SpeechCues $Name
+    $until = [DateTime]::UtcNow.AddSeconds(10)
+    while ([DateTime]::UtcNow -lt $until) {
+        if ([IO.File]::Exists($file)) { return }
+        Start-Sleep -Milliseconds 70
+    }
+    throw "Missing NVDA speech observation for $Name."
 }
 
 function Get-Field([string]$Name, $Role) {
@@ -213,6 +225,7 @@ try {
     for ($i = 0; $i -lt 7; $i++) {
         $name = Get-SubjectFocus
         if ($name -cin @('Dateiname','Kennwort','English')) { $result.focus += $name }
+        if ($name -cin @('Dateiname', 'Kennwort')) { Wait-ReaderCue $name }
         if ($name -ceq 'Kennwort') { break }
         Send-SubjectKeys '{TAB}'
         Start-Sleep -Milliseconds 125
@@ -226,6 +239,7 @@ try {
         [void](Wait-Observation {
             Test-SubjectLogLine "EDIT masked chars=$length"
         } 'password edit length')
+        Wait-ReaderCue "mask-$length"
     }
     $result.passwordCharactersTyped = $length
     # A protected provider may reject access, omit a pattern, or return masks.
@@ -254,6 +268,7 @@ try {
     Send-SubjectKeys '{TAB}'
     [void](Wait-Observation { (Get-SubjectFocus) -ceq 'English' } 'language button focus')
     $result.focus += 'English'
+    Wait-ReaderCue 'English'
     Send-SubjectKeys ' '
     $file = Wait-Observation { Get-Field 'Filename' $edit } 'English filename label'
     $password = Wait-Observation { Get-Field 'Password' $edit } 'English password label'
@@ -261,6 +276,7 @@ try {
     Send-SubjectKeys '{TAB}'
     [void](Wait-Observation { (Get-SubjectFocus) -ceq 'Filename' } 'translated filename focus')
     $result.focus += 'Filename'
+    Wait-ReaderCue 'Filename'
     $expected = 'Gr' + [char]0xfc + [char]0xdf + 'e ' + [char]0x2013 + ' Sommer.jpg'
     if ((Get-FieldText $file) -cne $expected) { throw 'Synthetic Unicode filename differs before copy.' }
     $before = [IfwObservedWindow]::GetClipboardSequenceNumber()

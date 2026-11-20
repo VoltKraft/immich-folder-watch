@@ -193,6 +193,10 @@ SHA-256 `cb2d3533ca1ee0ea2077fdd0c94887e49311a1a133208830ee57a69340f83eac`
 and `20e7ef5cbb8bce2fa72358b614616735f914b13a9ba9499bf65ea3cea9479922`.
 [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871).
 
+The separate [portable NVDA assessment](rw02-windows-reader.md) coordinates
+the foreground driver with actual screen-reader announcements and records the
+source of protected-character feedback.
+
 Use a native pinned Rust toolchain and the reviewed font files under
 `rust/assets/fonts`. Supply a Cargo registry cache containing the locked crates.
 Run the Linux checks from the repository root.

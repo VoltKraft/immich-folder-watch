@@ -1,5 +1,13 @@
 # Project Status
 
+## Windows screen reader fixture (2026-11-20)
+
+The new disposable Windows scenario pairs UI Automation with NVDA 2026.3.1
+speech records. Three local regression tests passed for ordered labels,
+protected utterances and partial log writes. The native x64 and ARM64 runs
+must still demonstrate actual reader output.
+[Inputs, isolated profile and evidence requirements](rust/rw02-windows-reader.md).
+
 ## GNOME Wayland composition and mixed monitor scaling (2026-11-20)
 
 Fedora x64 completed real IBus Anthy composition in the Rust filename field
