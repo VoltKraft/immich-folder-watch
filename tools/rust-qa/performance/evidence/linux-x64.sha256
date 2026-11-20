@@ -1,0 +1,9 @@
+b9053259a00df1e783ddb34af05d1ec7cb584c984f52cb9f0fe1e224dda384d1  artifacts/rust/performance/dotnet-linux-x64-xvnc-20261120.json
+1b77f0420ca6efaf9c2e560e8419bbfd5dc36178217120ef3be0ce780861df30  artifacts/rust/performance/dotnet-linux-x64-paired-20261120.json
+6b2a4b6d6ce73a1acdaf18b5cb57161522de8fa7c5a3cde1bcda8f6f87d92a92  artifacts/rust/performance/rust-linux-x64-paired-controls-20261120.json
+51da6bd468804e8579a4ee9f0a05c7e076f39d6f31555bf3fbea66f9e0f3c885  artifacts/rust/performance/rust-linux-x64-paired-map-20261120.json
+86b4ebcbda9f4be6be8c23e467d853bb2d5a89e1268b67742bb32b3914c11c68  artifacts/rust/performance/native-map-confirmed-worker-hidden.json
+4f1298a72b41795674e61c9b5dedb7e46a6c153c7211e19c0abfe882d13603d3  artifacts/rust/performance/subjects/native-map-confirmed/native-gui-assessment.inputs.json
+d893491fcf135ca4db9b19430282cd43768819e11395c9de065d91dd871acc11  artifacts/rust/performance/subjects/native-map-confirmed/worker.inputs.json
+6ea08960393ea2fd6095f3ba9c98eca9b5b9537e90ae2f0451d8ed4ce618c2ed  artifacts/rust/gui-run/x11-a04v4vmf/results.json
+544cdd86b3e1e4c170bf6619dcfb365564ff96ecf9c0b33477b7ec9b4095c71c  artifacts/rust/gui-run/wayland-e3zm579m/results.json

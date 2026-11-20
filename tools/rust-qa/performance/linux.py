@@ -13,6 +13,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import sysconfig
 import tempfile
 
 
@@ -49,7 +50,7 @@ def system_identity():
             "host_match_key": host_key}
 
 
-def namespace(work, app, runtime):
+def namespace(work, app, runtime, desktop_spike=False):
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
                "--ro-bind", "/usr", "/usr", "--dev", "/dev", "--proc", "/proc",
                "--tmpfs", "/tmp", "--dir", "/etc", "--bind", str(work), "/qa",
@@ -85,6 +86,17 @@ def namespace(work, app, runtime):
                    "LANG": "C.UTF-8", "PATH": "/usr/bin:/bin", "LIBGL_ALWAYS_SOFTWARE": "1",
                    "PYTHONDONTWRITEBYTECODE": "1", "DOTNET_ROOT": "/runtime",
                    "DOTNET_CLI_TELEMETRY_OPTOUT": "1", "DOTNET_NOLOGO": "1"}
+    if desktop_spike:
+        drivers = Path("/usr/share/vulkan/icd.d")
+        software = next((p for p in [drivers / f"lvp_icd.{platform.machine()}.json", drivers / "lvp_icd.json"]
+                         if p.is_file()), None)
+        loader = next((p for p in (Path("/usr/lib64/libvulkan.so.1"),
+                       Path("/usr/lib") / str(sysconfig.get_config_var("MULTIARCH")) / "libvulkan.so.1")
+                       if p.is_file()), None)
+        if not software or not loader:
+            raise ValueError("A native software Vulkan ICD and system loader are required")
+        command += ["--ro-bind", str(loader.resolve()), "/qa-vulkan-system.so.1"]
+        environment.update(IFW_QA_ISOLATED="1", IFW_QA_BENCHMARK="1", VK_DRIVER_FILES=str(software))
     for key, value in environment.items():
         command += ["--setenv", key, value]
     return command + ["--chdir", "/qa", "--", "/usr/bin/python3", "/driver/session.py"]
@@ -153,6 +165,7 @@ def measure(args):
         raise ValueError("Use a filename label for --name")
     if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
         raise ValueError("Use a full lower-case Git revision")
+    subprocess.run(["git", "cat-file", "-e", args.revision + "^{commit}"], cwd=REPO, check=True)
     if not 1 <= args.files <= 100_000 or not 1 <= args.trials <= 20 or not 1 <= args.seconds <= 300:
         raise ValueError("Use 1..100000 files, 1..20 trials and 1..300 seconds")
     if not 1 <= args.passes <= 10 or not args.start_marker.strip() or not args.finish_marker.strip():
@@ -160,21 +173,27 @@ def measure(args):
     result = OUTPUT / f"{args.name}.json"
     if result.exists():
         raise FileExistsError(f"Choose a fresh label; {result} already exists")
+    if args.desktop_spike and (runtime or not (entry.parent / "ifw-performance-worker").is_file()):
+        raise ValueError("Use the staged native GUI and its audited worker")
+    if not 5 <= args.input_interval_ms <= 1000:
+        raise ValueError("Use a 5..1000 ms interval between observed window transitions")
     workload = {"files": args.files, "trials": args.trials, "seconds": args.seconds,
+                "input_interval_ms": args.input_interval_ms,
                 "profile": "offline-uploadNew-empty-idle-and-prefilled-scan",
                 "display": "private-X11-1280x900x24-software"}
-    harness_files = [*HERE.glob("*.py"), HERE / "StartupHook.cs"]
+    harness_files = [*HERE.glob("*.py"), HERE / "StartupHook.cs", HERE / "present.rs"]
     harness_digest = fingerprint(HERE, harness_files)
     application_digest = fingerprint(entry.parent)
     entry_digest = sha256(entry)
     with tempfile.TemporaryDirectory(prefix="ifw-rust-perf-", dir="/tmp") as directory:
         work = Path(directory)
         spec = dict(workload, entry=entry.name, managed=runtime is not None, passes=args.passes,
+                    desktop_spike=args.desktop_spike,
                     measure_render_passes=bool(args.frame_counter or runtime),
                     start_marker=args.start_marker, finish_marker=args.finish_marker,
                     outer_namespaces={k: os.readlink(f"/proc/self/ns/{k}") for k in ("net", "mnt", "pid", "ipc", "user")})
         (work / "spec.json").write_text(json.dumps(spec))
-        subprocess.run(namespace(work, entry.parent, runtime), check=True,
+        subprocess.run(namespace(work, entry.parent, runtime, args.desktop_spike), check=True,
                        timeout=60 + args.trials * (600 + 4 * args.seconds))
         observed = json.loads((work / "results.json").read_text())
     if fingerprint(HERE, harness_files) != harness_digest:
@@ -190,7 +209,13 @@ def measure(args):
     report["summary"] = summarize(report["trials"])
     report["eligible"] = eligible(report)
     if runtime and report["eligible"]:
-        report["budget"] = budgets(report["summary"], args.seconds)
+        if args.budget_from:
+            fixed = json.loads(args.budget_from.read_text())
+            if not fixed.get("eligible") or not fixed.get("runtime_versions") or set(fixed["budget"]) != set(report["summary"]):
+                raise ValueError("Expected a complete, eligible .NET budget record")
+            report["budget"], report["budget_source_sha256"] = fixed["budget"], sha256(args.budget_from)
+        else:
+            report["budget"] = budgets(report["summary"], args.seconds)
     OUTPUT.mkdir(parents=True, exist_ok=True)
     with result.open("x") as out:
         json.dump(report, out, indent=2)
@@ -232,6 +257,9 @@ def main():
     run.add_argument("--seconds", type=int, default=15)
     run.add_argument("--passes", type=int, default=2)
     run.add_argument("--frame-counter", action="store_true", help="Count native render passes in a separate run")
+    run.add_argument("--desktop-spike", action="store_true", help="Run the isolated native supervisor and inventory worker")
+    run.add_argument("--input-interval-ms", type=int, default=100)
+    run.add_argument("--budget-from", type=Path, help="Carry forward the original .NET comparison limits")
     run.add_argument("--start-marker", default="Folder watcher started with 1 source(s).")
     run.add_argument("--finish-marker", default="Persistent reconciliation for uploadNew queued 0 changed file(s)")
     run.set_defaults(action=measure)

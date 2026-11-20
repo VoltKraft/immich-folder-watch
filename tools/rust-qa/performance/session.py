@@ -4,6 +4,7 @@ from collections import deque
 from contextlib import ExitStack
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import socket
@@ -122,21 +123,33 @@ class Subject:
     def __init__(self, stack, spec, profile, media, frames):
         environment = fresh_profile(profile, media)
         self.frames = frames
+        self.desktop_spike = spec["desktop_spike"]
+        self.max_processes = 0
+        if self.desktop_spike:
+            from gi.repository import Gio, GLib
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+            self.gio, self.glib = Gio, GLib
+            # The native probe requires this canonical private HOME. Its application and
+            # driver caches use the fresh per-launch XDG directories established above.
+            environment["HOME"] = "/tmp/home"
         if frames:
             environment["IFW_QA_RENDER_FD"] = str(frames.writer)
             if spec["managed"]:
                 environment["DOTNET_STARTUP_HOOKS"] = "/qa/AvaloniaFrameProbe.dll"
+            elif self.desktop_spike:
+                environment["LD_LIBRARY_PATH"] = "/app/observer"
         self.socket = profile / "runtime/immich-folder-watch.sock"
         self.log = profile / "subject.log"
         self.started = None
         self.completed = []
+        self.inventories = []
         self.tail = deque(maxlen=5)
         self.start_time = clock()
         command = ["/runtime/dotnet", "/app/" + spec["entry"]] if spec["managed"] else ["/app/" + spec["entry"]]
         self.process = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, text=True, errors="replace",
                                         pass_fds=(frames.writer,) if frames else ())
-        stack.callback(stop, self.process)
+        stack.callback(self.stop)
 
         def consume():
             with self.log.open("w", buffering=1) as out, self.process.stdout as stream:
@@ -148,6 +161,10 @@ class Subject:
                         self.started = observed
                     if spec["finish_marker"] in line:
                         self.completed.append(observed)
+                        if self.desktop_spike:
+                            match = re.fullmatch(r"INVENTORY_COMPLETE files=(\d+) changed=(\d+) pass=(\d+)", line.strip())
+                            if match:
+                                self.inventories.append(tuple(map(int, match.groups())))
 
         self.reader = threading.Thread(target=consume, daemon=True)
         self.reader.start()
@@ -161,19 +178,54 @@ class Subject:
         return fn()
 
     def show(self):
+        if self.desktop_spike:
+            self.bus_call("Activate", self.glib.Variant("(a{sv})", ({},)))
+            return
         with socket.socket(socket.AF_UNIX) as stream:
             stream.settimeout(1)
             stream.connect(str(self.socket))
             stream.sendall(b"SHOW_GUI")
 
+    def bus_call(self, method, parameters):
+        self.bus.call_sync("org.example.IfwGuiProbe", "/org/example/IfwGuiProbe",
+                           "org.freedesktop.Application", method, parameters, None,
+                           self.gio.DBusCallFlags.NO_AUTO_START, 3000, None)
+
+    def stop(self):
+        if not self.desktop_spike or self.process.poll() is not None:
+            stop(self.process)
+            return
+        try:
+            self.bus_call("ActivateAction", self.glib.Variant("(sava{sv})", ("quit", [], {})))
+            if self.process.wait(timeout=8):
+                raise RuntimeError("Native supervisor failed to drain its worker")
+        finally:
+            stop(self.process)
+
     def usage(self):
-        directory = Path("/proc") / str(self.process.pid)
-        fields = (directory / "stat").read_text().rsplit(")", 1)[1].split()
-        ticks = int(fields[11]) + int(fields[12])  # utime + stime, fields 14 and 15
-        for line in (directory / "status").read_text().splitlines():
-            if line.startswith("VmRSS:"):
-                return ticks, int(line.split()[1])
-        raise RuntimeError("Subject has no VmRSS")
+        # These private PID namespaces contain only the subject, driver and display services.
+        processes = {}
+        for stat in Path("/proc").glob("[0-9]*/stat"):
+            try:
+                fields = stat.read_text().rsplit(")", 1)[1].split()
+            except ProcessLookupError:
+                continue
+            except FileNotFoundError:
+                continue
+            processes[int(stat.parent.name)] = (int(fields[1]), sum(map(int, fields[11:15])))
+        members = {self.process.pid}
+        while extra := {pid for pid, (parent, _) in processes.items() if parent in members} - members:
+            members.update(extra)
+        ticks = sum(processes[pid][1] for pid in members)
+        rss = 0
+        for pid in members:
+            info = Path("/proc") / str(pid) / "status"
+            try:
+                rss += sum(int(line.split()[1]) for line in info.read_text().splitlines() if line.startswith("VmRSS:"))
+            except (FileNotFoundError, ProcessLookupError):
+                pass
+        self.max_processes = max(self.max_processes, len(members))
+        return ticks, rss
 
 
 def action(subject, display, show):
@@ -253,7 +305,10 @@ def run_trial(spec, display, trial, media, phase):
             action(subject, display, True)
             # Check this observer really detects presentation changes on the selected server.
             damage_control = wait_for(display.drain, 3, "Show control produced no XDamage")
+            if subject.desktop_spike and subject.max_processes < 2:
+                raise RuntimeError("The native worker was missing from subject resource samples")
             result = {"startup_ms": startup_ms, "shown": shown, "hidden": hidden,
+                      "max_subject_processes": subject.max_processes,
                       "show_control_damage_rectangles": damage_control}
             if frames:
                 result["show_control_render_passes"] = wait_for(lambda: frames.read() - before_show, 3,
@@ -272,17 +327,20 @@ def scan_response(subject, display, spec, startup_ms, initial_damage, reads):
         visible = not visible
         events.append((before, after, "show" if visible else "close"))
         damage += display.drain()
-        time.sleep(0.1)
+        time.sleep(spec["input_interval_ms"] / 1000)
     if len(subject.completed) < spec["passes"]:
         raise TimeoutError("Reconciliation did not finish before the scan deadline")
     end = subject.completed[spec["passes"] - 1]
     first_read, last_read, directories = reads.scan_bounds(subject.started, end)
+    if subject.desktop_spike and subject.inventories[:2] != [(spec["files"], spec["files"], 0), (spec["files"], 0, 1)]:
+        raise RuntimeError(f"Unexpected secure inventory counts {subject.inventories[:2]}")
     active = [{"input": kind, "at_ms": round(1000 * (before - subject.started), 2),
                "latency_ms": round(1000 * (after - before), 2), "finished_during_directory_reads": after <= last_read}
               for before, after, kind in events if first_read <= before <= last_read]
     return {"startup_ms": startup_ms, "scan_window_seconds": round(end - subject.started, 4),
             "pass_completion_seconds": [round(t - subject.started, 4) for t in subject.completed[:spec["passes"]]],
             "directories_observed": directories,
+            "worker_inventories": subject.inventories[:spec["passes"]],
             "directory_read_interval_ms": [round(1000 * (t - subject.started), 2) for t in (first_read, last_read)],
             "damage_rectangles_through_last_input": damage,
             "input_samples": active}

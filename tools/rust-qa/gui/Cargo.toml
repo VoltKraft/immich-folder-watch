@@ -14,6 +14,7 @@ eframe = { version = "=0.37.0", default-features = false, features = ["accesskit
 wgpu = { version = "=30.0.0", default-features = false, features = ["std", "parking_lot", "wgsl"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+winit = { version = "=0.30.13", default-features = false }
 futures-lite = "=2.6.1"
 zbus = { version = "=5.19.0", default-features = false, features = ["async-io"] }
 eframe = { version = "=0.37.0", default-features = false, features = ["x11", "wayland"] }

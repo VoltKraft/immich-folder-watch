@@ -133,16 +133,27 @@ def run_case(stack, observer, name, background, tray, controls):
             mark("SNI Activate")
             call(BUS_NAME, "/StatusNotifierItem", "org.kde.StatusNotifierItem.Activate", "0", "0")
             show()
+        previous_window = alive()
+        is_x11 = isinstance(observer, X11Observer)
+
+        def observed_transition(start, kind):
+            return any(event['event'] == kind and (not is_x11 or event['window'] == previous_window)
+                       for event in observer.events[start:])
+
+        before_close = len(observer.events)
         mark(observer.close())
-        wait_for(lambda: not alive() and "WINDOW_RELEASED" in log.read_text(),
-                 10, f"Closing the native window did not return control to the supervisor. See {log}")
+        expected = "WINDOW_HIDDEN" if is_x11 else "WINDOW_RELEASED"
+        wait_for(lambda: not alive() and expected in log.read_text() and observed_transition(before_close, 'unmap'),
+                 10, f"The closed native window did not reach {expected}. See {log}")
         after_close = len(observer.events)
         quiet(.25)
         if any(e["event"] == "map" for e in observer.events[after_close:]):
             raise RuntimeError("A hidden window briefly remapped after close")
+        before_open = len(observer.events)
         mark("desktop Activate")
         call(BUS_NAME, APP_PATH, "org.freedesktop.Application.Activate", "{}")
-        show()
+        wait_for(lambda: alive() and observed_transition(before_open, 'map'), 10,
+                 f"The desktop activation did not remap the application window. See {log}")
     mark("desktop Quit")
     action("quit")
     process.wait(timeout=10)

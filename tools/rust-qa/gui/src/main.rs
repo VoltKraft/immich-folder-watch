@@ -2,7 +2,11 @@
 #![forbid(unsafe_code)]
 
 #[cfg(target_os = "linux")]
+mod benchmark;
+#[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+mod native_window;
 
 use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
 use eframe::egui;
@@ -22,14 +26,25 @@ enum Command {
 #[derive(Clone)]
 struct Control {
     sender: SyncSender<Command>,
-    window: Arc<Mutex<Option<egui::Context>>>,
+    window: Arc<Mutex<Option<Wake>>>,
+}
+
+struct Wake {
+    context: egui::Context,
+    #[cfg(target_os = "linux")]
+    x11: Option<Arc<winit::window::Window>>,
 }
 
 impl Control {
     fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
         self.sender.try_send(command)?;
-        if let Some(ctx) = &*self.window.lock().expect("window wake mutex poisoned") {
-            ctx.request_repaint();
+        if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
+            #[cfg(target_os = "linux")]
+            if let Some(window) = &wake.x11 {
+                window.request_redraw();
+                return Ok(());
+            }
+            wake.context.request_repaint();
         }
         Ok(())
     }
@@ -57,6 +72,7 @@ impl Model {
 struct Window {
     model: Rc<RefCell<Model>>,
     control: Control,
+    can_hide: bool,
 }
 
 impl Window {
@@ -100,11 +116,25 @@ impl Window {
                 info.backend, info.device_type, info.name
             );
         }
-        *control.window.lock().expect("window wake mutex poisoned") =
-            Some(creation.egui_ctx.clone());
-        // The first frame drains any commands queued before the context was attached.
-        creation.egui_ctx.request_repaint();
-        Self { model, control }
+        // Winit's X11 backend reports actual visibility and supports unmap/remap. Its
+        // Wayland backend reports None and needs a fresh toplevel after a close.
+        let can_hide = cfg!(target_os = "linux")
+            && creation
+                .winit_window()
+                .is_some_and(|w| w.is_visible().is_some());
+        *control.window.lock().expect("window wake mutex poisoned") = Some(Wake {
+            context: creation.egui_ctx.clone(),
+            #[cfg(target_os = "linux")]
+            x11: creation.winit_window().filter(|_| can_hide).cloned(),
+        });
+        if !can_hide {
+            creation.egui_ctx.request_repaint();
+        }
+        Self {
+            model,
+            control,
+            can_hide,
+        }
     }
 }
 
@@ -120,7 +150,6 @@ impl Drop for Window {
 
 impl eframe::App for Window {
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        let mut model = self.model.borrow_mut();
         // Count native composition stages without disclosing entered text.
         ctx.input(|i| {
             for event in &i.events {
@@ -135,17 +164,20 @@ impl eframe::App for Window {
                 }
             }
         });
-        if ctx.input(|i| i.viewport().close_requested()) {
-            if model.lifecycle.shutdown() == Shutdown::Running {
-                model.lifecycle.close_window();
-            }
-            // Allow this native window session to end. The supervisor continues to receive activation.
+        if self.can_hide {
+            return; // The X11 native event handler owns the top-level controls.
+        }
+        let mut model = self.model.borrow_mut();
+        if ctx.input(|i| i.viewport().close_requested())
+            && model.lifecycle.shutdown() == Shutdown::Running
+        {
+            model.lifecycle.close_window();
             return;
         }
         while let Ok(command) = model.commands.try_recv() {
             match model.command(command) {
                 Some(HostCommand::ShowAndFocus) => {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus)
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
                 }
                 Some(HostCommand::Hide | HostCommand::StopBackground) => {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -184,6 +216,8 @@ impl eframe::App for Window {
 }
 
 fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn Error>> {
+    #[cfg(target_os = "linux")]
+    let mut event_loop = None;
     loop {
         let intent = model.borrow().lifecycle.window_intent();
         if model.borrow().lifecycle.shutdown() != Shutdown::Running {
@@ -201,12 +235,13 @@ fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn
                 ..Default::default()
             };
             let current = Rc::clone(&model);
-            let control = control.clone();
-            eframe::run_native(
-                "Desktop input probe",
-                options,
-                Box::new(move |ctx| Ok(Box::new(Window::new(ctx, current, control)))),
-            )?;
+            let window_control = control.clone();
+            let create: eframe::AppCreator<'_> =
+                Box::new(move |ctx| Ok(Box::new(Window::new(ctx, current, window_control))));
+            #[cfg(target_os = "linux")]
+            native_window::run(&mut event_loop, options, create, &model, control)?;
+            #[cfg(target_os = "windows")]
+            eframe::run_native("Desktop input probe", options, create)?;
             let mut model = model.borrow_mut();
             // Some compositors end the window session without a prior CloseRequested event.
             if model.lifecycle.window_intent() == WindowIntent::Visible {
@@ -255,7 +290,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         german: true,
         passes: 0,
     }));
+    #[cfg(target_os = "linux")]
+    let assessment = benchmark::Benchmark::start()?;
     let result = supervise(Rc::clone(&model), &control);
+    #[cfg(target_os = "linux")]
+    assessment.finish()?;
     #[cfg(target_os = "linux")]
     futures_lite::future::block_on(native.graceful_shutdown());
     #[cfg(target_os = "windows")]

@@ -1,5 +1,18 @@
 # Project Status
 
+## Native X11 resource comparison (2026-11-20)
+
+Under three 100,000-file scans, the Rust GUI and synthetic inventory worker
+met all 11 precommitted reference bounds on Fedora x64/X11. Median startup
+was 176.99 ms. Visible and hidden RSS were 125.617 MiB. The median of the
+three close p95s was 10.51 ms, with one individual p95 at 15.76 ms against
+a 15.61 ms bound. Reopen was 1.44 ms. Native presentation and XDamage
+counters both stayed at zero during idle and rose after reopen. The hidden
+worker found a newly created file after 4.82 seconds and drained at Quit.
+The exact executable passed all four lifecycle cases and keyboard checks on
+X11 and Wayland. The other native environments and graphics recovery remain
+open. [Paired runs, rule and artifact hashes](rust/rw02-performance.md#paired-x11-measurements).
+
 ## Real portal grants, SMB and desktop input (2026-11-20)
 
 Three Fedora grant runs added an in-grant symlink to a readable control. The
