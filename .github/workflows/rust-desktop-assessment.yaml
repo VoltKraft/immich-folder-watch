@@ -94,12 +94,7 @@ jobs:
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
         run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-          $vs = & $vswhere -latest -products '*' -property installationPath
-          if (-not $vs) { throw 'Native Visual Studio installation required' }
-          Import-Module (Join-Path $vs 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
-          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments "-arch=$env:NATIVE_ARCH -host_arch=$env:NATIVE_ARCH"
-          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
           python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
@@ -107,7 +102,7 @@ jobs:
         if: ${{ !cancelled() && matrix.target == 'aarch64-pc-windows-msvc' && steps.windows_transport.outcome == 'success' }}
         shell: pwsh
         run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture arm64
           python tools/rust-qa/windows-imports/run.py --acquire --native --transport
           exit $LASTEXITCODE
 

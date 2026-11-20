@@ -130,18 +130,27 @@ def compiler_environment(work):
     active = selected(os.environ, os.environ.get("VSCMD_ARG_HOST_ARCH", "active-shell"))
     if active:
         return active
+    # subprocess list quoting escapes embedded quotes for a C argv parser. cmd.exe
+    # parses its /c argument differently. Invoke a fixed local batch basename so
+    # paths such as Program Files are quoted only by the batch language itself.
+    if any(character in str(setup) for character in '"%\r\n'):
+        raise ValueError("Unsupported Visual Studio setup path")
+    activate = work / "ifw-arm64-tools.cmd"
+    attempts = []
     for host in ("arm64", "amd64"):
-        cmd = f'call "{setup}" -no_logo -arch=arm64 -host_arch={host} >nul && set'
-        try:
-            stdout = run([os.environ["COMSPEC"], "/d", "/u", "/c", cmd], work)
-        except RuntimeError:
+        activate.write_bytes((f'@call "{setup}" -no_logo -arch=arm64 -host_arch={host} >nul\r\n'
+                              '@if errorlevel 1 exit /b 1\r\n@set\r\n').encode('mbcs'))
+        process = subprocess.run([os.environ["COMSPEC"], "/d", "/u", "/c", activate.name], cwd=work,
+                                 stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
+        attempts.append(f"{host} returned {process.returncode}")
+        if process.returncode:
             continue
-        values = dict(line.split("=", 1) for line in stdout.decode("utf-16-le").splitlines()
+        values = dict(line.split("=", 1) for line in process.stdout.decode("utf-16-le").splitlines()
                       if "=" in line and not line.startswith("="))
         found = selected({**os.environ, **values}, host)
         if found:
             return found
-    raise ValueError("Could not activate the installed Visual Studio ARM64 environment")
+    raise ValueError("Could not locate the ARM64 compiler and librarian after setup: " + ", ".join(attempts))
 
 
 def original_generator(compiler, source, args, work, env):

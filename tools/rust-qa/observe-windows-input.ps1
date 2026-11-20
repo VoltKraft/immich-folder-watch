@@ -17,6 +17,9 @@ public static class IfwObservedWindow {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
+    [DllImport("kernel32.dll")] public static extern uint WTSGetActiveConsoleSessionId();
+    [DllImport("user32.dll", SetLastError=true)] static extern bool SetWindowPos(IntPtr window, IntPtr order,
+        int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", SetLastError=true)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
@@ -54,6 +57,15 @@ public static class IfwObservedWindow {
         uint owner;
         return found != IntPtr.Zero && GetAncestor(found, 2) == window
             && GetWindowThreadProcessId(found, out owner) != 0 && owner == expectedPid;
+    }
+    public static bool SubjectAt(IntPtr window, uint expectedPid, int x, int y) {
+        return IsSubjectAt(new Point {x=x, y=y}, window, expectedPid);
+    }
+    public static bool OrderOwnTestWindow(IntPtr window, uint expectedPid, bool topmost) {
+        uint owner;
+        if (!OnInputDesktop() || GetWindowThreadProcessId(window, out owner) == 0 || owner != expectedPid) return false;
+        // Move only this synthetic window in the Z order, without moving, resizing or activating it.
+        return SetWindowPos(window, new IntPtr(topmost ? -1 : -2), 0, 0, 0, 0, 0x0013);
     }
     public static bool ClickOwnedControl(IntPtr window, uint expectedPid, int x, int y) {
         var target = new Point { x=x, y=y };
@@ -170,6 +182,8 @@ try {
     }
     if (-not $result.passwordProperty) { throw 'Password editor lacks its UI Automation protected property.' }
     $result.onInputDesktop = [IfwObservedWindow]::OnInputDesktop()
+    $result.session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+    $result.activeConsoleSession = [IfwObservedWindow]::WTSGetActiveConsoleSessionId()
     $result.activation = [ordered]@{ setForeground = [IfwObservedWindow]::SetForegroundWindow($handle) }
     if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle -and $result.onInputDesktop) {
         try { $file.SetFocus(); $result.activation.uiaFocus = 'requested' }
@@ -177,8 +191,21 @@ try {
         if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle) {
             $rect = $file.Current.BoundingRectangle
             if (-not $rect.IsEmpty -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
-                $result.activation.ownedControlClick = [IfwObservedWindow]::ClickOwnedControl(
-                    $handle, $SubjectId, [int]($rect.Left + $rect.Width / 2), [int]($rect.Top + $rect.Height / 2))
+                $targetX = [int]($rect.Left + $rect.Width / 2)
+                $targetY = [int]($rect.Top + $rect.Height / 2)
+                $result.activation.ownedAtPoint = [IfwObservedWindow]::SubjectAt($handle, $SubjectId, $targetX, $targetY)
+                $result.activation.fieldCenter = @($targetX, $targetY)
+                $raised = $false
+                try {
+                    if (-not $result.activation.ownedAtPoint) {
+                        $raised = [IfwObservedWindow]::OrderOwnTestWindow($handle, $SubjectId, $true)
+                        $result.activation.raisedOwnWindow = $raised
+                        if ($raised) { Start-Sleep -Milliseconds 125 }
+                    }
+                    $result.activation.ownedControlClick = [IfwObservedWindow]::ClickOwnedControl($handle, $SubjectId, $targetX, $targetY)
+                } finally {
+                    if ($raised) { [void][IfwObservedWindow]::OrderOwnTestWindow($handle, $SubjectId, $false) }
+                }
             }
         }
     }
@@ -193,6 +220,7 @@ try {
     if ((Get-SubjectFocus) -cne 'Kennwort') { throw 'Tab did not reach the password editor.' }
     $length = 0
     foreach ($key in @('x','y','z')) {
+        if ((Get-SubjectFocus) -cne 'Kennwort') { throw 'The synthetic password editor lost focus.' }
         Send-SubjectKeys $key
         $length++
         [void](Wait-Observation {

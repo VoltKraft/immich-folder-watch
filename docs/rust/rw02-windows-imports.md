@@ -102,3 +102,12 @@ Candidate packaging still needs to select the actual archive, include its
 corresponding sources, notices and build recipe in the combined offline
 distribution and record the resulting product graph. Raw acquisition caches
 are private build inputs.
+
+At `2e7ed89` the Windows ARM64 runner checked all 20,551 signatures and
+produced the same LLVM archive twice, SHA-256
+`20a536fcdb075d5a2ff93d1977d7a4420503396acba98c712d39ab3928fd1830`.
+The separate reconstruction step did not inherit the previous step's Visual
+Studio environment. It stopped before the MSVC build and transport relink.
+The retry initializes and verifies the compiler and librarian in each step.
+The independent command-shell fallback uses a local batch file for the quoted
+installation path. [Native ARM64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871).

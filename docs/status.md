@@ -1,5 +1,20 @@
 # Project Status
 
+## Hosted Windows input and Ubuntu portal results (2026-11-20)
+
+At `2e7ed89`, Windows x64 passed the entire keyboard, password and Unicode
+clipboard scenario. On ARM64, UI Automation returned the expected names and
+protection, while the observer could not acquire the foreground. It sent no
+keys. Native ARM64 reconstructed the same LLVM import archive twice, then
+stopped before MSVC setup. Both Ubuntu architectures passed the tray and
+real FUSE tests and encountered a missing host Registry in the separate chooser
+case. All four standard Rust jobs and eight general PR jobs passed. The desktop
+workflow recorded one passing and three failing jobs. The follow-up initializes
+the ARM64 build shell per step and retries foreground only on the owned window.
+[Desktop results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871),
+[standard Rust checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363958)
+and [PR checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828375760).
+
 ## Native old/new activation and file guard (2026-11-20)
 
 Two Fedora x64 runs passed six process-level observations. The shipping .NET

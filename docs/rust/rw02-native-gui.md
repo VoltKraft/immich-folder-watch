@@ -179,6 +179,20 @@ and [native speech observer](../../tools/rust-qa/gui/screen_reader.py).
 
 ## Reproduction
 
+At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed
+Dateiname, Kennwort, English and Filename. Three keystrokes produced three
+masks in both UI Automation patterns, the translated controls appeared, and a
+Unicode filename completed a real clipboard round trip. Windows ARM64 confirmed
+the same German names, password protection and access to the input desktop.
+Its foreground request and coordinate-checked click did not acquire the test
+window, so the observer withheld all keystrokes. Both desktops measured 96 DPI
+on one 1024 × 768 monitor. The retry records the click location and active
+console session. It can raise only the synthetic window before repeating the
+owner/point checks. The corresponding downloaded x64 and ARM64 archives had
+SHA-256 `cb2d3533ca1ee0ea2077fdd0c94887e49311a1a133208830ee57a69340f83eac`
+and `20e7ef5cbb8bce2fa72358b614616735f914b13a9ba9499bf65ea3cea9479922`.
+[Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871).
+
 Use a native pinned Rust toolchain and the reviewed font files under
 `rust/assets/fonts`. Supply a Cargo registry cache containing the locked crates.
 Run the Linux checks from the repository root.

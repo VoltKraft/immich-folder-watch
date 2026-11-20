@@ -134,6 +134,18 @@ build identities and control run](rw02-portal-upstream.md).
 
 ## Reproduction and evidence
 
+Both native Ubuntu 24.04 runners at `2e7ed89` passed the tray and Documents
+cases. Each mounted `fuse.portal`, checked the private per-app view, refused a
+read-only write, published and cancelled staging work, protected both links
+and the outside sentinel, and observed `ENOENT` after revocation. Both the
+shipping .NET 10.0.15 reader and Rust received `ENOSYS` for the required shared
+media lock through the distribution's portal. Direct backing-file contention
+returned `EAGAIN`, and the backing writer succeeded after release. The separate
+folder chooser jobs failed when the older frontend lacked the host Registry.
+Downloaded archive SHA-256 was `08ea99fc1afb7ad5b5692f51fbb357269a7922afc46c9d98ba22d52076db4959`
+for x64 and `beabdb7315e2eb4f754585696275468f16c532706ad19fa0e7de94e41b0094b5`
+for ARM64. [Native job and artifacts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871).
+
 The standalone workspace uses Rust 1.100.0, edition 2024 and frozen inputs.
 All 85 registry lock records match the GUI assessment. The Linux normal/build
 tree activates 67 third-party packages. The build driver compared their feature
