@@ -71,6 +71,10 @@ returned `ENOSYS` for the required upload lock. The private upstream backport
 enforced it across the actual grant and backing views. [SMB results](rw02-filesystem.md#four-native-hosts)
 and [portal and tray results](rw02-linux-services.md).
 
+Fedora x64 exercised native Orca speech output and three protected keystrokes
+on X11 and Wayland. X11 also produced an actual Anthy composition and Japanese
+commit in the Rust filename field. [IME and screen-reader observations](rw02-native-gui.md#native-composition-and-screen-reader-output).
+
 The [YAML probe](rw02-yaml.md) added 38 paired cases on local Linux x64.
 The Rust reader/writer matched 183 assertions. The production C# reader made
 116 assertions against Rust output. Its four-target hosted run is pending.

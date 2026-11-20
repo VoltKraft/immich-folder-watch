@@ -145,14 +145,37 @@ adapter. The stack decision still requires testing display timing and renderer
 selection on the supported hardware and desktops. The index lists the default
 input observation and both raw compositor traces.
 
-The optional X11 IME run established an IBus XIM selection on the private
-server. A Unicode-entry shortcut with the US engine produced literal digits.
-Selecting the installed Anthy engine returned a closed-connection error before
-a composition reached egui, including with a synthetic configuration for its
-system dictionary. Native preedit, commit and visual CJK coverage remain open.
-Orca speech, hardware keyboards, mixed-direction editing and selections in
-additional scripts still require explicit runs. The fixture embeds the
-reviewed Latin Sans and Mono fonts.
+### Native composition and screen-reader output
+
+On Fedora x64 the X11 fixture started the actual Anthy 1.5.18 engine and
+registered it on the private IBus 1.5.35 instance. Direct engine selection
+and readback confirmed Anthy's `default` keyboard layout. The IBus CLI also
+attempts a layout switch, which returned failure for that layout. A native
+key press produced a nonempty IME preedit. Return produced a one-character
+IME commit, and an independent AT-SPI client read `あ` from the filename
+field. The fixture's two Latin fonts still require a CJK rendering check.
+[IBus CLI implementation](https://github.com/ibus/ibus/blob/1.5.35/tools/main.vala#L477-L552).
+
+Under both X11 and Wayland, Orca 51.1 followed the actual keyboard focus and
+sent the control names and roles to Speech Dispatcher 0.12.1. It announced
+the German filename and password, the English language button and the
+renamed Filename field. The three password keystrokes produced exactly three
+spoken mask symbols. eSpeak NG 1.52 generated non-silent samples for a
+private ALSA file device. The sample-prefix hashes can be checked against
+the retained raw files. These tests exercise the native accessibility and
+speech stack with synthetic input and a software audio sink.
+
+| Fedora x64 run | Native input and speech | Observed audio bytes |
+| --- | --- | ---: |
+| `x11-m34b3ex8` | Four lifecycle cases, AT-SPI, Anthy preedit and commit, Orca | 939,144 |
+| `wayland-eoyrquw0` | Four lifecycle cases, AT-SPI and Orca under Mutter with Mailbox presentation | 743,308 |
+
+Both runs used the measured executable SHA-256
+`5bd230d24989fc251b789bb152afdf78e5a4353fda1150e809f6a250ef61af3f`.
+Wayland composition, mixed-direction editing, other monitor configurations
+and assistive technology on the remaining targets still require observations.
+[Source-bound desktop evidence](../../tools/rust-qa/gui/evidence/native-linux-x64.sha256)
+and [native speech observer](../../tools/rust-qa/gui/screen_reader.py).
 
 ## Reproduction
 
@@ -183,6 +206,8 @@ Use the Wayland command without the present-mode option for the default
 presentation diagnostic. Add `--capture` to attach a private PipeWire/GStreamer
 consumer to the virtual monitor. The optional XIM diagnostic uses
 `--backend x11 --input --ime` with IBus, ibus-x11, Anthy and xprop installed.
+Add `--screen-reader` to an input run with Orca, Speech Dispatcher, its eSpeak NG
+module and its ALSA plugin installed to exercise native synthesized output.
 The ordinary Linux observers use bubblewrap, Xvfb or Xvnc, libX11, libXdamage,
 libXtst, gdbus, PyGObject and Mesa lavapipe. Wayland additionally uses Mutter's
 headless, virtual-monitor and RemoteDesktop interfaces. The accessibility

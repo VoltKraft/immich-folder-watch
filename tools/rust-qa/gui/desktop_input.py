@@ -63,7 +63,7 @@ def shortcut(observer, key, *modifiers):
 def ibus_start(stack):
     os.environ.update(IBUS_ADDRESS="unix:path=/tmp/ibus-probe", XMODIFIERS="@im=ibus")
     log = Path("/qa/ibus.log")
-    ibus = checked_start(stack, ["ibus-daemon", "--single", "--xim", "--emoji-extension=disable", "--cache=none",
+    ibus = checked_start(stack, ["ibus-daemon", "--single", "--xim", "--verbose", "--emoji-extension=disable", "--cache=none",
                                  "--address=unix:path=/tmp/ibus-probe"], log)
     wait_for(lambda: check_alive(ibus, log) or Path("/tmp/ibus-probe").is_socket(),
              5, "Private IBus daemon did not create its socket")
@@ -74,7 +74,7 @@ def ibus_start(stack):
     wait_for(owns_xim, 5, "IBus XIM server did not own its native X selection")
 
 
-def check_input(stack, observer, backend, ime):
+def check_input(stack, observer, backend, ime, screen_reader=False):
     # The private session deliberately has no dconf writer. The launcher owns
     # this setting for its entire lifetime, including application registration.
     os.environ["GSETTINGS_BACKEND"] = "memory"
@@ -99,6 +99,10 @@ def check_input(stack, observer, backend, ime):
         return value is True
     wait_for(enabled, 3, "The private accessibility service did not enable AT-SPI")
     Atspi.set_timeout(1500, 2500)
+    reader = None
+    if screen_reader:
+        from screen_reader import ScreenReader
+        reader = ScreenReader(stack)
     if ime:
         ibus_start(stack)
     log = Path("/qa/input-app.log")
@@ -159,10 +163,25 @@ def check_input(stack, observer, backend, ime):
     details["clipboard"] = {"text": original, "native_owner_or_selection_serial": owner}
     if ime:
         shortcut(observer, ord("a"), 0xffe3)
-        subprocess.run(["ibus", "engine", "anthy"], check=True, timeout=5)
-        engine = subprocess.check_output(["ibus", "engine"], text=True, timeout=5).strip()
-        if engine != "anthy":
-            raise RuntimeError(f"The active private IBus engine was {engine!r}")
+        engine_log = Path("/qa/anthy.log")
+        native_engine = checked_start(stack, ["/usr/libexec/ibus-engine-anthy"], engine_log)
+        gi.require_version("IBus", "1.0")
+        from gi.repository import IBus
+        engine_bus = IBus.Bus.new()
+        def registered():
+            check_alive(native_engine, engine_log)
+            return any(e.get_name() == "anthy" for e in engine_bus.list_active_engines())
+        wait_for(registered, 10, "Anthy did not register on the private IBus connection")
+        # The IBus CLI also tries to replace the XKB layout. Anthy uses the
+        # existing private layout, so ask and verify the daemon directly.
+        if not engine_bus.set_global_engine("anthy"):
+            raise RuntimeError("The private IBus daemon refused the Anthy engine")
+        engine = engine_bus.get_global_engine()
+        if engine is None or engine.get_name() != "anthy":
+            raise RuntimeError("The active private IBus engine did not change to Anthy")
+        Path("/qa/ime-selection.json").write_text(json.dumps({
+            "engine": engine.get_name(), "layout": engine.get_layout(), "connected": engine_bus.is_connected(),
+        }, indent=2))
         tap(observer, ord("a"))
         wait_for(lambda: "IME preedit chars=1" in log.read_text(), 4, "No native Anthy preedit reached egui")
         tap(observer, 0xff0d)  # Return
@@ -174,6 +193,8 @@ def check_input(stack, observer, backend, ime):
         if "IME commit chars=1" not in stages:
             raise RuntimeError("No native composition commit for the single Japanese character")
         details["ime"] = {"engine": "IBus Anthy via XIM", "text": "あ", "events": stages}
+    if reader is not None:
+        details["screen_reader"] = reader.result()
     action("quit")
     if app.wait(timeout=8) != 0:
         raise RuntimeError("Input fixture failed to shut down")

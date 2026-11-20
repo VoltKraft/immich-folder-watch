@@ -1,5 +1,15 @@
 # Project Status
 
+## X11 composition and native Orca output (2026-11-20)
+
+At the GUI source in `6c953e3`, the private Fedora X11 test received
+a nonempty preedit and committed `あ` from IBus Anthy. Independent AT-SPI
+read the committed text. Both X11 and Wayland runs passed the keyboard and
+language scenarios with Orca speaking the expected labels and protected
+input. Both produced real eSpeak samples on a private ALSA file device.
+Wayland composition, broader font coverage and accessibility on the other
+native targets remain open. [Desktop input evidence](rust/rw02-native-gui.md#native-composition-and-screen-reader-output).
+
 ## Native X11 resource comparison (2026-11-20)
 
 Under three 100,000-file scans, the Rust GUI and synthetic inventory worker

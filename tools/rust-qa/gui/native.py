@@ -169,7 +169,7 @@ def run_case(stack, observer, name, background, tray, controls):
             "application": messages, "exit": process.returncode}
 
 
-def inside(backend, input_checks, ime, present_mode, capture):
+def inside(backend, input_checks, ime, present_mode, capture, screen_reader=False):
     sys.path.insert(0, "/driver")
     from session import checked_start, check_alive, private_session, wait_for
     if (Path.home() != Path("/tmp/home") or os.environ["DISPLAY"] != ":93"
@@ -218,7 +218,7 @@ def inside(backend, input_checks, ime, present_mode, capture):
         record("foreground", False, True, True)
         if input_checks:
             from desktop_input import check_input
-            evidence["input"] = check_input(stack, observer, backend, ime)
+            evidence["input"] = check_input(stack, observer, backend, ime, screen_reader=screen_reader)
             Path("/qa/results.json").write_text(json.dumps(evidence, indent=2) + "\n")
 
 
@@ -265,6 +265,7 @@ def launch(args):
         "--chdir", "/qa", "--",
         "/usr/bin/python3", "/gui/native.py", "--inside", "--backend", args.backend,
         *(["--input"] if args.input else []), *(["--ime"] if args.ime else []),
+        *(["--screen-reader"] if args.screen_reader else []),
         *(["--present-mode", args.present_mode] if args.present_mode else []), *(["--capture"] if args.capture else [])]
     return subprocess.run(command).returncode
 
@@ -275,6 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--binary", type=Path, help="A native assessment executable from a release build")
     parser.add_argument("--input", action="store_true", help="Use the private AT-SPI registry and inject keyboard input")
     parser.add_argument("--ime", action="store_true", help="Exercise a private IBus XIM composition on X11")
+    parser.add_argument("--screen-reader", action="store_true", help="Run Orca with a private Speech Dispatcher and ALSA sink")
     parser.add_argument("--present-mode", choices=("immediate", "mailbox", "fifo"),
                         help="Diagnostic Mesa Vulkan WSI override on this private software renderer")
     parser.add_argument("--capture", action="store_true", help="Attach a private PipeWire consumer to Mutter's virtual monitor")
@@ -282,4 +284,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.ime and (not args.input or args.backend != "x11"):
         parser.error("--ime requires --backend x11 --input")
-    sys.exit(inside(args.backend, args.input, args.ime, args.present_mode, args.capture) if args.inside else launch(args))
+    if args.screen_reader and not args.input:
+        parser.error("--screen-reader requires --input")
+    sys.exit(inside(args.backend, args.input, args.ime, args.present_mode, args.capture, args.screen_reader)
+             if args.inside else launch(args))
