@@ -54,8 +54,8 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn("environment:", smoke)
         self.assertNotIn("uses: actions/deploy-pages@", smoke)
 
-    def test_rust_reference_is_branch_bound_and_cannot_publish(self):
-        source = (WORKFLOWS / "rust-compatibility.yaml").read_text()
+    def check_rust_workflow(self, filename, expected_actions):
+        source = (WORKFLOWS / filename).read_text()
         self.assertIn("branches: [rewrite/rust]", source)
         self.assertIn("if: github.ref == 'refs/heads/rewrite/rust'", source)
         self.assertIn("\npermissions:\n  contents: read\n", source)
@@ -66,15 +66,22 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", source)
         self.assertIn("${{ github.sha }}", source)
         actions = re.findall(r"^\s*- uses: (\S+)|^\s*uses: (\S+)", source, re.M)
-        self.assertEqual({(first or second).split("@", 1)[0] for first, second in actions},
-                         {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
-        # Release listens to the exact CI workflow name. This reference workflow
+        self.assertEqual({(first or second).split("@", 1)[0] for first, second in actions}, expected_actions)
+        # Release listens to the exact CI workflow name. Rust feasibility work
         # must remain outside that publication event chain even if it succeeds.
         name = re.search(r"^name: (.+)$", source, re.M).group(1)
         release = (WORKFLOWS / "release.yaml").read_text()
         trigger = release.split("\npermissions:", 1)[0]
         self.assertNotIn(name, trigger)
         self.assertNotRegex(source, r"(?i)gh\s+(release|workflow)|dispatches|deploy-pages|flatpak\s+build-update-repo")
+
+    def test_rust_reference_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-compatibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_rust_feasibility_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-feasibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()

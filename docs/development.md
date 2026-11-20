@@ -46,6 +46,38 @@ runner availability follows the [GitHub runner reference](https://docs.github.co
 Actual runs, missing platforms and independent workflow review belong in the
 acceptance record. Native reference tests do not qualify the future Rust GUI.
 
+## Rust feasibility workspace
+
+Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished
+workspace version `0.0.0`. Product release numbering remains in
+`Directory.Build.props`. Pin the compiler in `rust/rust-toolchain.toml` and the
+upstream distribution hashes in `rust/toolchain-inputs.json`. Keep `rust/Cargo.lock`
+under version control. The workspace currently exercises native feasibility.
+
+From the repository root on Linux x64, install the pinned distribution into
+the ignored build directory and run the same probes as the native workflow:
+
+```bash
+bash tools/rust-qa/install-toolchain.sh x86_64-unknown-linux-gnu
+export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+export CARGO_HOME="$PWD/artifacts/rust/cargo-home"
+python3 tools/rust-qa/test-native.py x86_64-unknown-linux-gnu
+```
+
+Use the matching target from the inputs file on Linux ARM64 and on Windows
+with Git Bash and MSVC build tools. The installer requires curl, sha256sum,
+tar with XZ support and Python 3.11+. It checks the archive before extracting
+and installs under `artifacts/rust/toolchain`. A host with an equivalent native
+compiler can supply it through `PATH`. The test driver checks the release, full
+compiler revision and native host. Its logs and per-step results live under
+`artifacts/rust/feasibility/<target>/`. `Rust native feasibility` runs the
+same commands and retains evidence under the source SHA. The five C# window
+traces exercise the Rust policy. Native window, tray and assistive-technology
+observations have separate entries in the [acceptance record](rust/acceptance.md).
+The same run compares Rust path, timestamp and casing observations to a native
+.NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
+comparison. See the [legacy checks](rust/rw02-legacy.md).
+
 ## Build
 
 The Linux UI uses the [reduced Avalonia build](reduced-avalonia.md). Python 3.11+

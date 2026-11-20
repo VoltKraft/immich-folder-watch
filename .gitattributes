@@ -17,3 +17,10 @@ packaging/flatpak/licenses/Svg.Custom-5.2.3-LICENSE.txt whitespace=-blank-at-eol
 
 # The compatibility oracle emits UTF-8 with LF on both native platforms.
 rust/tests/fixtures/legacy/** text eol=lf
+
+# Rustfmt and the native compiler installer use identical source on all runners.
+rust/**/*.rs text eol=lf
+rust/**/*.toml text eol=lf
+rust/Cargo.lock text eol=lf
+tools/rust-qa/*.sh text eol=lf
+tools/rust-qa/legacy/licenses/* -text

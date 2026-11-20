@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | Native GUI/platform/filesystem/codec/Socket.IO feasibility on four targets and exact dependency/font graph review |
+| RW-02 | In progress | Linux x64 [filesystem](rw02-filesystem.md), [codec](rw02-legacy.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md) and [realtime framing](rw02-realtime.md). Four-host and native desktop gates remain open. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -59,7 +59,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- | --- | --- |
 | Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
 | Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | Pending | C# headless/protocol passed. Rust/native desktop pending | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | Rust 1.100.0 ran 27 tests, including 13 handle-bound filesystem cases, plus 5,844 C#/Rust scalar comparisons | Five Rust policy traces matched the C# window observations. .NET X11 performance measured. Actual Rust GUI pending. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | Pending | Pending (X11/Wayland) | Pending |
 
 Hosted runners can supply native process evidence but are not assumed to provide

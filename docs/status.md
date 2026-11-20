@@ -1,5 +1,25 @@
 # Project Status
 
+## RW-02 first Rust native probes (2026-11-20)
+
+The four native Rust distributions are pinned to 1.100.0, compiler
+`0ef1bc386059596dada8fb65b50425aab2ea637a`. The verified Linux x64 distribution
+ran the workspace locally. Rustfmt, Clippy with warnings denied, 27 tests,
+release probe builds, five C# window trace comparisons and 5,844 native scalar
+comparisons passed. The workspace lock contains four unpublished first-party
+crates. The accepted .NET resource reference is checkpoint `4245831`.
+
+The [filesystem tests](rust/rw02-filesystem.md) ran on tmpfs and Btrfs. The
+[legacy scalar probe](rust/rw02-legacy.md) tested both SQLite casing modes and
+1,335 reference timestamps. The [realtime assessment](rust/rw02-realtime.md)
+identified transport settings that rule out unmodified rust_socketio 0.6.0.
+The [GUI review](rust/rw02-gui-dependencies.md) identifies exact source and
+notice inputs. Native desktop, network-session, database/YAML and manual
+accessibility evidence remain open. The new four-host workflow records Rust
+results and regenerated oracle comparisons at the source SHA. Verify its
+first run, review the filesystem boundary independently and continue the GUI
+and transport assessments.
+
 ## RW-02 Linux performance reference measured (2026-11-20)
 
 The Linux x64 .NET reference completed three isolated 100,000-file scans with

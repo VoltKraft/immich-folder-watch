@@ -163,6 +163,9 @@ to reconcile project decisions, defaults, and recorded state.
   features, native libraries and fonts before adoption; pin compiler and lockfile.
   Required native runtime/GUI evidence on four targets cannot be replaced by a
   cross-build. Independently review filesystem, migration and final integration.
+- The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
+  toolchain. Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
+  and retain source-bound observations for each target in the acceptance record.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version
