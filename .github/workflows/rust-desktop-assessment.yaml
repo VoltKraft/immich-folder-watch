@@ -95,6 +95,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Verify the GUI graph and build with the pinned native compiler
         id: gui
@@ -118,6 +119,10 @@ jobs:
         run: |
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
+
+      - name: Remove the job-specific namespace launcher
+        if: ${{ always() && runner.os == 'Linux' }}
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
 
       - name: Retain native assessment evidence
         if: always()

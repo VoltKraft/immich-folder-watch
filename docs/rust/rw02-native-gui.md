@@ -10,6 +10,14 @@ and dependency edges match the assessed dependency graph. The fixture adds
 direct Linux references to the already selected futures-lite 2.6.1 and zbus
 5.19.0 with its asynchronous I/O features.
 
+The first hosted Ubuntu builds at `167a03d` authenticated the locked GUI
+inputs and reached the isolated build launcher. Both architectures received
+`RTM_NEWADDR: Operation not permitted` during loopback setup. The hosted
+fixture now checks the caller UID and private namespace capability before
+building. It can provision a temporary, root-owned test launcher with an
+AppArmor user-namespace grant specific to that executable on the disposable
+VM. [Hosted run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

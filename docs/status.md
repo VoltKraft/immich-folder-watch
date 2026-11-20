@@ -1,5 +1,24 @@
 # Project Status
 
+## First hosted desktop and storage assessment (2026-11-20)
+
+At `167a03d` the SQLite and network steps passed on Windows and Linux x64 and
+ARM64. The GUI on the two Ubuntu runners reached Clippy and then Bubblewrap
+was denied the operation to set up the private loopback interface. The GUI
+executable did not run there. The job now probes the distribution launcher
+and, on restricted disposable Ubuntu hosts, provisions an owner-controlled
+copy of the launcher with Ubuntu's per-executable user-namespace permission.
+It verifies the caller UID, runs the existing isolated fixture, and removes
+the temporary profile and executable at job end. The rerun is the evidence
+for this provisioning change. [Assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612)
+and [Ubuntu user-namespace policy](https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890/1).
+
+The [general PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44815614962)
+passed all eight jobs at `7ba7056`. Its hidden=false smoke check exercised the
+retry against the exact uploaded ID. All eight passed again at `167a03d`,
+alongside all four [compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389013)
+and [filesystem/codec](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389480) jobs.
+
 ## Native GUI, storage and transport assessments (2026-11-20)
 
 The development fixtures now exercise three RW-02 paths on a native Linux x64
