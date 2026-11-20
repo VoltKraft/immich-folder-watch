@@ -1,5 +1,16 @@
 # Project Status
 
+## Bidirectional filename editing (2026-11-20)
+
+The released egui 0.37 selected the wrong logical character in mixed Arabic
+filenames. With the upstream caret correction, Linux x64 passed the same four
+native text cases, including Japanese glyphs, mixed digits, pointer deletion
+and left/right movement. The selected candidate adds one runtime dependency,
+`unicode-bidi` 0.3.18. Its Unicode table was reconstructed from upstream data.
+The four-host workflow now runs the corrected fixture. Integration in the
+shared GUI and repeat measurements remain open. [Native comparison, original
+fonts and exact source review](rust/rw02-font-coverage.md).
+
 ## Hosted Windows input and Ubuntu portal results (2026-11-20)
 
 At `2e7ed89`, Windows x64 passed the entire keyboard, password and Unicode

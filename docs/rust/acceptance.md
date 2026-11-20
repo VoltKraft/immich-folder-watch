@@ -87,6 +87,12 @@ Fedora x64 exercised native Orca speech output and three protected keystrokes
 on X11 and Wayland. X11 also produced an actual Anthy composition and Japanese
 commit in the Rust filename field. [IME and screen-reader observations](rw02-native-gui.md#native-composition-and-screen-reader-output).
 
+The released egui 0.37 text editor deleted the wrong visible Arabic character
+in two mixed-direction cases. A narrowly scoped upstream correction passed
+the same pointer, keyboard and GPU readback tests on Linux x64, including
+numbers inside a right-to-left run. The other three native hosts and integration
+into the full GUI remain open. [Font and caret evidence](rw02-font-coverage.md).
+
 The [YAML probe](rw02-yaml.md) passed on all four native targets at
 `11e4e6f`. Each produced 183 Rust assertions and 116 production C# readback
 assertions across 38 paired cases and the same offline source tar.

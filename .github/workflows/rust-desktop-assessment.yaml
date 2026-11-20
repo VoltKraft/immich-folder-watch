@@ -46,6 +46,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # Source-bound controls also replay the original GUI commit.
 
       - name: Install the reviewed native Rust distribution
         id: install
@@ -115,7 +116,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
-            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils
+            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Observe Windows Shell services and per-user Startup shortcuts
@@ -191,6 +192,14 @@ jobs:
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows-input" --input-only
 
+      - name: Observe rendered font coverage and mixed-direction editing on the native desktop
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
+          python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
+
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
         run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
@@ -221,5 +230,9 @@ jobs:
             artifacts/rust/gui-run/*/*.json
             artifacts/rust/gui-run/*/*.log
             artifacts/rust/gui-build/release/*.inputs.json
+            artifacts/rust/font-coverage/*/result.json
+            artifacts/rust/font-coverage/*/*/native.log
+            artifacts/rust/font-coverage/*/*/observed.ppm
+            artifacts/rust/font-coverage/subjects/*/subject.json
           if-no-files-found: error
           retention-days: 14
