@@ -57,10 +57,10 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | First toolchain setup failed before Rust execution, rerun pending | Pending | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | First toolchain setup failed before Rust execution, rerun pending | Pending | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | Rust 1.100.0 ran 27 tests, including 13 handle-bound filesystem cases, plus 5,844 C#/Rust scalar comparisons | Five Rust policy traces matched the C# window observations. .NET X11 performance measured. Actual Rust GUI pending. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Pending | Pending (X11/Wayland) | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 27 Rust tests, five window-policy traces and 5,844 native scalar comparisons passed at `2ff9880` | Pending (X11/Wayland) | Pending |
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.

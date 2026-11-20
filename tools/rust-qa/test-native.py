@@ -49,7 +49,7 @@ def main():
         "compiler": [sys.executable, str(QA / "check-toolchain.py"), args.target],
         "format": ["cargo", "fmt", "--all", "--check"],
         "clippy": ["cargo", "clippy", "--frozen", "--workspace", "--all-targets", "--", "-D", "warnings"],
-        "tests": ["cargo", "test", "--frozen", "--workspace"],
+        "tests": ["cargo", "test", "--frozen", "--workspace", "--", "--show-output"],
         "release-probes": ["cargo", "build", "--frozen", "--workspace", "--release", "--examples", "--bins"],
         "window-reference": [
             sys.executable, str(QA / "replay-window.py"),
@@ -79,6 +79,11 @@ def main():
                 status = 124
                 stream.write(b"Timed out after 900 seconds.\n")
         result["steps"][name] = {"exitCode": status, "log": log.name}
+        if name == "tests" and os.name == "nt":
+            observations = [line.removeprefix("distinct_short_name=") for line
+                            in log.read_text(encoding="utf-8", errors="replace").splitlines()
+                            if line.startswith("distinct_short_name=")]
+            result["windowsDistinctShortName"] = {"observation": observations, "verified": observations == ["true"]}
         (evidence / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(log.read_text(encoding="utf-8", errors="replace"), end="", flush=True)
         if status:

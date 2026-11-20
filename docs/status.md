@@ -1,5 +1,22 @@
 # Project Status
 
+## First hosted Rust results (2026-11-20)
+
+At `2ff988095045739b6eeb0735750f5ec9aa9baca6` both Linux hosts passed all 27
+Rust tests, five window-policy traces and 5,844 scalar comparisons. The two
+Ubuntu references each produced 1,449 non-identity Unicode scalar mappings.
+The Fedora reference produced 1,504. Each probe used its native reference map.
+Migration must preserve stored keys and qualify conversion across legacy
+environments before choosing a production normalizer.
+[Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44808944620).
+
+The first Windows runs stopped during toolchain installation. Native Python's
+CRLF output appended a carriage return to the checksum field read by Bash.
+The installer now emits a binary ASCII record, exercised with simulated
+Windows newlines. Subsequent Windows jobs must supply the native results.
+Independent source review requested explicit reconciliation after an
+unacknowledged rename and observable coverage of distinct NTFS short names.
+
 ## RW-02 first Rust native probes (2026-11-20)
 
 The four native Rust distributions are pinned to 1.100.0, compiler

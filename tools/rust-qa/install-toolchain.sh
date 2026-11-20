@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 
 archive = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["targets"][sys.argv[2]]["rust"]
-print(archive["url"], archive["sha256"])
+# Git Bash reads these bytes even when the runner's Python uses CRLF on stdout.
+sys.stdout.buffer.write(f"{archive['url']} {archive['sha256']}\n".encode("ascii"))
 PY
 )
 archive=${url##*/}

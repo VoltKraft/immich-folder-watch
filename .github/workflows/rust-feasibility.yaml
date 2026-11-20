@@ -48,7 +48,10 @@ jobs:
 
       - name: Install the checksum-pinned compiler and tools in the checkout
         shell: bash
-        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+        run: |
+          set -o pipefail
+          mkdir -p "artifacts/rust/feasibility/$NATIVE_TARGET"
+          bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET" 2>&1 | tee "artifacts/rust/feasibility/$NATIVE_TARGET/install.log"
 
       - name: Select the native development-only compatibility oracle SDK
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0

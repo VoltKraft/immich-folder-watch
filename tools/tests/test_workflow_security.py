@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -82,6 +84,16 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
     def test_rust_feasibility_is_branch_bound_and_cannot_publish(self):
         self.check_rust_workflow("rust-feasibility.yaml",
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_native_compiler_download_record_is_identical_with_windows_newlines(self):
+        script = (ROOT / "tools/rust-qa/install-toolchain.sh").read_text()
+        selection = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+        inputs = ROOT / "rust/toolchain-inputs.json"
+        for target, spec in json.loads(inputs.read_text())["targets"].items():
+            with self.subTest(target=target):
+                code = "import sys\nsys.stdout.reconfigure(newline='\\r\\n')\n" + selection
+                pair = subprocess.check_output([sys.executable, "-c", code, str(inputs), target])
+                self.assertEqual(pair, f"{spec['rust']['url']} {spec['rust']['sha256']}\n".encode("ascii"))
 
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()
