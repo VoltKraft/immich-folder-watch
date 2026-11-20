@@ -18,6 +18,21 @@ building. It can provision a temporary, root-owned test launcher with an
 AppArmor user-namespace grant specific to that executable on the disposable
 VM. [Hosted run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612).
 
+At `06298d9` the Ubuntu x64 and ARM64 fixtures successfully built the native
+GUI and passed all four lifecycle scenarios independently under both X11 and
+Wayland. The two executables had SHA-256
+`c9f365cf40035653bd0e0f409aace88c8fea882e4f46306fbced9b71247db9fd`
+and `54f1f14022792793f1e85b2bdbc5b051dfd41b9cd4cb0c8c167f20e268dd5a92`
+respectively. Their Actions ZIPs matched `854b44df94f8d891b152562092839eeb272bd539114504c50f4f296e4bdbcd69`
+and `ee549449e778561144fb94741953379eefb82c26cf46793d7576167aa1564366`.
+In the following input scenario the private AT-SPI launcher reported a dconf
+write failure. The observer saw only the desktop root on both backends.
+The revised fixture gives the launcher an in-memory settings backend, reads
+back its enabled state and identifies the tested application by its native
+process ID. This passed the complete keyboard, masking and clipboard checks
+on local X11 and Wayland. Hosted input results remain pending.
+[Hosted logs and retained per-backend results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44818255659).
+
 ## Four native assessment archives
 
 All four archives at `167a03dcb414ab1172713520a77b7517a6046b13` matched

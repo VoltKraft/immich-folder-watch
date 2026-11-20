@@ -5,16 +5,17 @@ import os
 from pathlib import Path
 import subprocess
 import time
+from functools import partial
 
 import gi
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi, GLib
+from gi.repository import Atspi, Gio, GLib
 
 from native import action, call
 from session import checked_start, check_alive, wait_for
 
 
-def nodes():
+def nodes(target_pid):
     context = GLib.MainContext.default()
     while context.pending():
         context.iteration(False)
@@ -25,17 +26,19 @@ def nodes():
         if not item:
             continue
         item.clear_cache()
-        if (item.get_role() == Atspi.Role.APPLICATION and item.get_name() != "native-gui-assessment"):
+        if item.get_role() == Atspi.Role.APPLICATION and item.get_process_id() != target_pid:
             continue
         result.append(item)
         queue.extend(item.get_child_at_index(i) for i in range(min(24, item.get_child_count())))
     return result
 
 
-def tree():
+def read_tree(target_pid):
     result = []
-    for item in nodes():
+    for item in nodes(target_pid):
         entry = {"role": item.get_role_name(), "name": item.get_name()}
+        if item.get_role() == Atspi.Role.APPLICATION:
+            entry["process_id"] = item.get_process_id()
         entry["focused"] = item.get_state_set().contains(Atspi.StateType.FOCUSED)
         if item.get_text_iface() is not None:
             entry["text"] = Atspi.Text.get_text(item, 0, -1)
@@ -72,6 +75,9 @@ def ibus_start(stack):
 
 
 def check_input(stack, observer, backend, ime):
+    # The private session deliberately has no dconf writer. The launcher owns
+    # this setting for its entire lifetime, including application registration.
+    os.environ["GSETTINGS_BACKEND"] = "memory"
     at_log = Path("/qa/atspi.log")
     launcher = checked_start(stack, ["/usr/libexec/at-spi-bus-launcher", "--launch-immediately"], at_log)
 
@@ -85,13 +91,23 @@ def check_input(stack, observer, backend, ime):
     wait_for(address, 5, "Private AT-SPI bus did not start")
     call("org.a11y.Bus", "/org/a11y/bus", "org.freedesktop.DBus.Properties.Set",
          "org.a11y.Status", "IsEnabled", "<true>")
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+    def enabled():
+        value, = bus.call_sync("org.a11y.Bus", "/org/a11y/bus", "org.freedesktop.DBus.Properties",
+                               "Get", GLib.Variant("(ss)", ("org.a11y.Status", "IsEnabled")),
+                               GLib.VariantType.new("(v)"), Gio.DBusCallFlags.NONE, 2000, None).unpack()
+        return value is True
+    wait_for(enabled, 3, "The private accessibility service did not enable AT-SPI")
     Atspi.set_timeout(1500, 2500)
     if ime:
         ibus_start(stack)
     log = Path("/qa/input-app.log")
     app = checked_start(stack, ["/app/native-gui-assessment"], log)
+    tree = partial(read_tree, app.pid)
     wait_for(lambda: check_alive(app, log) or observer.poll(), 10, "Input probe did not map")
     observer.focus_for_input()
+    if not enabled():
+        raise RuntimeError("The accessibility service disabled AT-SPI before window registration")
     wait_for(lambda: any(n["name"] == "Dateiname" and n["role"] in ("text", "entry")
                          for n in tree()), 8, "Editable filename missing from the accessibility tree")
     initial = tree()

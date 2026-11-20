@@ -1,5 +1,22 @@
 # Project Status
 
+## Native Linux lifecycle and SMB fixture follow-up (2026-11-20)
+
+Both Ubuntu targets passed all four native GUI lifecycle cases on X11 and
+Wayland at `06298d9`. The input observer then timed out on an empty AT-SPI
+desktop. The revised fixture uses an in-memory settings backend on its
+private bus and checks the application's accessibility tree by process ID.
+Local X11 and Wayland both passed the full input case with the change.
+[Native assessment](rust/rw02-native-gui.md).
+
+On both Windows targets the temporary SMB share passed the ACL, encryption
+configuration and UNC marker checks. The connection query then supplied a
+parameter that the runner's cmdlet does not support. Filtering the returned
+connections by the fixture's exact share name preserves the negotiated
+dialect and encryption checks. Native Rust operations over SMB still need
+the follow-up run. [SMB job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44818255768)
+and [cmdlet reference](https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbconnection).
+
 ## YAML round-trip and filtered build inputs (2026-11-20)
 
 The [YAML feasibility fixture](rust/rw02-yaml.md) passed 183 Rust differential

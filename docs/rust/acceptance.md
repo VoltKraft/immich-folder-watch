@@ -60,7 +60,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases passed on Microsoft Basic Render Driver. Accessibility and real desktop services remain open. | Pending |
 | Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Same four DX12 lifecycle cases passed on the native ARM64 executable. Accessibility and real desktop services remain open. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons | Native X11/Wayland lifecycle and AT-SPI input have local observations. .NET X11 performance measured. Candidate resource comparisons in progress. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Hosted GUI namespace setup failed at `167a03d`; X11/Wayland rerun pending. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | All four X11 and Wayland lifecycle cases passed at `06298d9`. Hosted AT-SPI input rerun pending. | Pending |
 
 All four also passed two live WAL backups, 40 production C# readback assertions
 and 15 native loopback transport cases per host. [Source-bound four-host archives](rw02-native-gui.md#four-native-assessment-archives).

@@ -8,3 +8,5 @@ d6c46b47dc07ac5eec56500ec89d113bd91610e746d435a72cecde5885a5d0d0  artifacts/rust
 914ef44aed070e699d28630ddc373b8086ff8704adda0866022fb1a1c12fb167  artifacts/rust/gui-run/wayland-feun3o6j/mutter.log
 d2523ed0ea830129c2d7c5cb7f1361007f11af331cc548ebc2820cab6f665695  artifacts/rust/gui-run/x11-fqy9zssc/ibus.log
 f2922159c33772e8cb4a6b4f82041205065a1bbf7d396d9c17fd599a92d07e5e  artifacts/rust/gui-run/x11-fqy9zssc/results.json
+57cfe5dfed18101469c6d8fdbbc783b38bba8bd0658f6b5fa5118f0482556003  artifacts/rust/gui-run/x11-yf8ushl8/results.json
+7616db547849ec0311790ab738d70401bc06078f8c24fa19b9138c11d614fb75  artifacts/rust/gui-run/wayland-d7tifi9g/results.json

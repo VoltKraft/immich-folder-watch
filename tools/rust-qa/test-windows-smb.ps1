@@ -59,7 +59,7 @@ try {
     if ([Convert]::ToHexString($received) -ne [Convert]::ToHexString($marker)) {
         throw 'The UNC reader did not reach the owned backing directory.'
     }
-    $connections = @(Get-SmbConnection -ShareName $name)
+    $connections = @(Get-SmbConnection | Where-Object { $_.ShareName -eq $name })
     if ($connections.Count -eq 0 -or @($connections | Where-Object { -not $_.Encrypted }).Count -gt 0) {
         throw 'The expected encrypted SMB client connection was not observed.'
     }
