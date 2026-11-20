@@ -1,0 +1,283 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -5,0 +6 @@
++mod graphics;
+@@ -23,0 +25 @@
++    DestroyGraphics,
+@@ -29,0 +32,2 @@
++    #[cfg(target_os = "linux")]
++    graphics_attention: Arc<std::sync::atomic::AtomicBool>,
+@@ -52,0 +57,7 @@
++#[derive(Clone, Copy, PartialEq)]
++enum ControlId {
++    Filename,
++    Password,
++    Language,
++}
++
+@@ -59,0 +71,3 @@
++    graphics: graphics::Graphics,
++    last_focus: Option<ControlId>,
++    restore_focus: bool,
+@@ -67,0 +82,4 @@
++            Command::DestroyGraphics => {
++                self.graphics.request_test_fault();
++                None
++            }
+@@ -111,0 +130 @@
++        model.borrow_mut().graphics.attach(creation);
+@@ -199,0 +219,3 @@
++            if let Some(notice) = model.graphics.notice(de) {
++                ui.label(notice);
++            }
+@@ -201 +223,2 @@
+-            ui.text_edit_singleline(&mut model.filename)
++            let filename = ui
++                .text_edit_singleline(&mut model.filename)
+@@ -204 +227 @@
+-            if ui
++            let password = ui
+@@ -206,3 +229,2 @@
+-                .labelled_by(label.id)
+-                .changed()
+-            {
++                .labelled_by(label.id);
++            if password.changed() {
+@@ -211 +233,2 @@
+-            if ui.button(if de { "English" } else { "Deutsch" }).clicked() {
++            let language = ui.button(if de { "English" } else { "Deutsch" });
++            if language.clicked() {
+@@ -213,0 +237,17 @@
++            let controls = [
++                (ControlId::Filename, filename),
++                (ControlId::Password, password),
++                (ControlId::Language, language),
++            ];
++            if model.restore_focus && ui.input(|input| input.focused) {
++                if let Some((_, response)) = controls
++                    .iter()
++                    .find(|(id, _)| Some(*id) == model.last_focus)
++                {
++                    response.request_focus();
++                }
++                model.restore_focus = false;
++            }
++            if let Some((id, _)) = controls.iter().find(|(_, response)| response.has_focus()) {
++                model.last_focus = Some(*id);
++            }
+@@ -215,4 +255,9 @@
+-    }
+-}
+-
+-fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn Error>> {
++        model.graphics.finish_ui_for_test();
++    }
++}
++
++fn supervise(
++    model: Rc<RefCell<Model>>,
++    control: &Control,
++    #[cfg(target_os = "linux")] native: &zbus::Connection,
++) -> Result<(), Box<dyn Error>> {
+@@ -227 +272 @@
+-            let options = eframe::NativeOptions {
++            let mut options = eframe::NativeOptions {
+@@ -236,0 +282 @@
++            model.borrow_mut().graphics.configure(&mut options);
+@@ -239,2 +285,5 @@
+-            let create: eframe::AppCreator<'_> =
+-                Box::new(move |ctx| Ok(Box::new(Window::new(ctx, current, window_control))));
++            let create: eframe::AppCreator<'_> = Box::new(move |ctx| {
++                #[cfg(target_os = "linux")]
++                linux::graphics_attention(native, &window_control, false);
++                Ok(Box::new(Window::new(ctx, current, window_control)))
++            });
+@@ -242 +291 @@
+-            native_window::run(&mut event_loop, options, create, &model, control)?;
++            let outcome = native_window::run(&mut event_loop, options, create, &model, control);
+@@ -244 +293,2 @@
+-            eframe::run_native("Desktop input probe", options, create)?;
++            let outcome = eframe::run_native("Desktop input probe", options, create)
++                .map_err(Into::<Box<dyn Error>>::into);
+@@ -245,0 +296,21 @@
++            // An internal post-frame eframe exit can leave the model visible despite a dead renderer.
++            let failed = model.lifecycle.shutdown() == Shutdown::Running
++                && (outcome.is_err()
++                    || model.graphics.lost()
++                    || model.lifecycle.window_intent() == WindowIntent::Visible);
++            if failed {
++                model.restore_focus = true;
++                println!(
++                    "GRAPHICS_ERROR device_lost={} detail={:?}",
++                    model.graphics.lost(),
++                    outcome.err().map(|e| e.to_string())
++                );
++            }
++            let retry = model.graphics.finish(failed);
++            if retry && model.lifecycle.window_intent() == WindowIntent::Visible {
++                continue;
++            }
++            #[cfg(target_os = "linux")]
++            if failed && !retry {
++                linux::graphics_attention(native, control, true);
++            }
+@@ -272,0 +344,2 @@
++        #[cfg(target_os = "linux")]
++        graphics_attention: Arc::default(),
+@@ -291,0 +365,3 @@
++        graphics: graphics::Graphics::new(),
++        last_focus: None,
++        restore_focus: false,
+@@ -295 +371,6 @@
+-    let result = supervise(Rc::clone(&model), &control);
++    let result = supervise(
++        Rc::clone(&model),
++        &control,
++        #[cfg(target_os = "linux")]
++        &native,
++    );
+--- a/src/linux.rs
++++ b/src/linux.rs
+@@ -3,0 +4 @@
++use std::sync::atomic::Ordering;
+@@ -8,0 +10,2 @@
++const STATUS_ITEM: &str = "org.kde.StatusNotifierItem";
++const NO_DISPLAY: &str = "Graphics unavailable. Activate to retry. Background work continues.";
+@@ -34,0 +38 @@
++            "qa-destroy-graphics" => dispatch(&self.0, Command::DestroyGraphics),
+@@ -49 +53,5 @@
+-        "Desktop input probe"
++        if self.0.graphics_attention.load(Ordering::Acquire) {
++            NO_DISPLAY
++        } else {
++            "Desktop input probe"
++        }
+@@ -53 +61,5 @@
+-        "Active"
++        if self.0.graphics_attention.load(Ordering::Acquire) {
++            "NeedsAttention"
++        } else {
++            "Active"
++        }
+@@ -60,0 +73,38 @@
++    }
++}
++
++pub(super) fn graphics_attention(connection: &Connection, control: &Control, unavailable: bool) {
++    if control
++        .graphics_attention
++        .swap(unavailable, Ordering::AcqRel)
++        == unavailable
++    {
++        return;
++    }
++    let status = if unavailable {
++        "NeedsAttention"
++    } else {
++        "Active"
++    };
++    let result = futures_lite::future::block_on(async {
++        connection
++            .emit_signal(
++                None::<&str>,
++                "/StatusNotifierItem",
++                STATUS_ITEM,
++                "NewStatus",
++                &status,
++            )
++            .await?;
++        connection
++            .emit_signal(
++                None::<&str>,
++                "/StatusNotifierItem",
++                STATUS_ITEM,
++                "NewTitle",
++                &(),
++            )
++            .await
++    });
++    if let Err(error) = result {
++        println!("GRAPHICS_TRAY_STATUS {error}");
+--- a/src/native_window.rs
++++ b/src/native_window.rs
+@@ -4,0 +5 @@
++use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+@@ -21 +22,29 @@
+-impl Handler<'_> {
++impl<'a> Handler<'a> {
++    fn dispatch(
++        &mut self,
++        event_loop: &ActiveEventLoop,
++        run: impl FnOnce(&mut eframe::EframeWinitApplication<'a>),
++    ) {
++        if self.model.borrow().graphics.lost() {
++            event_loop.exit();
++            return;
++        }
++        if let Err(panic) = catch_unwind(AssertUnwindSafe(|| run(&mut self.eframe))) {
++            let message = panic
++                .downcast_ref::<String>()
++                .map(String::as_str)
++                .or_else(|| panic.downcast_ref::<&str>().copied());
++            // Pinned egui-wgpu 0.37 uses a panic for this failed staging allocation.
++            // A matching message alone cannot turn an unconfirmed UI failure into device recovery.
++            if self.model.borrow().graphics.lost()
++                && message.is_some_and(|m| {
++                    m.starts_with("Failed to create staging buffer for index data. Index count: ")
++                })
++            {
++                println!("GRAPHICS_RENDER_INTERRUPTED");
++                event_loop.exit();
++            } else {
++                resume_unwind(panic);
++            }
++        }
++    }
+@@ -52,0 +82,4 @@
++        if model.graphics.lost() {
++            event_loop.exit();
++            return false;
++        }
+@@ -57,2 +90,4 @@
+-        for event in self.mapping_events.drain(..) {
+-            self.eframe.window_event(event_loop, window.id(), event);
++        for event in std::mem::take(&mut self.mapping_events) {
++            self.dispatch(event_loop, |app| {
++                app.window_event(event_loop, window.id(), event)
++            });
+@@ -67,0 +103,4 @@
++        if self.model.borrow().graphics.lost() {
++            event_loop.exit();
++            return;
++        }
+@@ -107 +146 @@
+-        self.eframe.window_event(event_loop, id, event);
++        self.dispatch(event_loop, |app| app.window_event(event_loop, id, event));
+@@ -111 +150 @@
+-        self.eframe.resumed(event_loop);
++        self.dispatch(event_loop, |app| app.resumed(event_loop));
+@@ -114 +153 @@
+-        self.eframe.new_events(event_loop, cause);
++        self.dispatch(event_loop, |app| app.new_events(event_loop, cause));
+@@ -117 +156 @@
+-        self.eframe.user_event(event_loop, event);
++        self.dispatch(event_loop, |app| app.user_event(event_loop, event));
+@@ -120 +159 @@
+-        self.eframe.device_event(event_loop, id, event);
++        self.dispatch(event_loop, |app| app.device_event(event_loop, id, event));
+@@ -122,0 +162,4 @@
++        if self.model.borrow().graphics.lost() {
++            event_loop.exit();
++            return;
++        }
+@@ -126 +169 @@
+-        self.eframe.about_to_wait(event_loop);
++        self.dispatch(event_loop, |app| app.about_to_wait(event_loop));
+@@ -129 +172 @@
+-        self.eframe.suspended(event_loop);
++        self.dispatch(event_loop, |app| app.suspended(event_loop));
+@@ -131,0 +175 @@
++        self.model.borrow().graphics.drain_lost_device();
+@@ -135 +179 @@
+-        self.eframe.memory_warning(event_loop);
++        self.dispatch(event_loop, |app| app.memory_warning(event_loop));

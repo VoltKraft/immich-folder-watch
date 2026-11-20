@@ -1,5 +1,15 @@
 # Project Status
 
+## Native Linux graphics loss and recovery (2026-11-20)
+
+Fourteen X11/Wayland cases on Fedora x64 exercised initial adapter failure,
+device destruction, a software-driver `VK_ERROR_DEVICE_LOST`, repeat failure
+and an unrelated application panic. The isolated recovery variant retained the
+worker, draft and focus across an Intel-to-llvmpipe switch. New input produced
+observable frames. All 71 indexed artifacts matched their hashes. Integration
+in the shared build and Windows DX12 recovery remain open.
+[Adapters, controls and native evidence](rust/rw02-graphics.md).
+
 ## Bidirectional filename editing (2026-11-20)
 
 The released egui 0.37 selected the wrong logical character in mixed Arabic

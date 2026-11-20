@@ -93,6 +93,11 @@ the same pointer, keyboard and GPU readback tests on Linux x64, including
 numbers inside a right-to-left run. The other three native hosts and integration
 into the full GUI remain open. [Font and caret evidence](rw02-font-coverage.md).
 
+The isolated Fedora graphics variant passed 14 cases across X11 and Wayland.
+It recovered from a process-local Vulkan device loss and a controlled Intel
+to CPU transition while retaining the worker, edited value and focused field.
+[Real adapters, driver events and frame evidence](rw02-graphics.md).
+
 The [YAML probe](rw02-yaml.md) passed on all four native targets at
 `11e4e6f`. Each produced 183 Rust assertions and 116 production C# readback
 assertions across 38 paired cases and the same offline source tar.
