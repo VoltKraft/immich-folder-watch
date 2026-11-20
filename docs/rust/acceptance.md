@@ -53,6 +53,11 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | RI-AC09 | Open | Audited resolved graph/assets, notices, SBOM and reconstructible source inputs |
 | RI-AC10 | Open | Independent final review with no unresolved acceptance blocker and truthful complete handoff |
 
+Fedora x64 confirmed old/new local activation in both directions and exclusion
+between two cooperative Rust writers. The shipping coordinator could still
+start with the new guard held. Installed handover and Windows cross-session
+exclusion remain open. [Native process evidence](rw02-instance.md).
+
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |

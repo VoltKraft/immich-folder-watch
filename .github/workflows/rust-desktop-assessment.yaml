@@ -75,6 +75,11 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
 
+      - name: Exchange activation with the shipping coordinator and observe native writer locks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET"
+
       - name: Exercise Linux TLS, polling and WebSocket loopback sessions
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
         shell: bash
@@ -202,6 +207,7 @@ jobs:
           name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
           path: |
             artifacts/rust/storage-native/
+            artifacts/rust/instance-native/${{ matrix.target }}/result.json
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/

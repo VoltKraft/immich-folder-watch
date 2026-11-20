@@ -1,5 +1,14 @@
 # Project Status
 
+## Native old/new activation and file guard (2026-11-20)
+
+Two Fedora x64 runs passed six process-level observations. The shipping .NET
+coordinator and Rust fixture activated each other, a second Rust writer was
+refused, and orderly and abrupt exit both released the native file lock. The
+shipping program could still start while the Rust file guard was held. The
+four-host assessment now includes the same fixture. Windows cross-session
+handover remains open. [Source and run receipt](rust/rw02-instance.md).
+
 ## Installed Flatpak dialogs, notifications and autostart (2026-11-20)
 
 Five Fedora x64 runs exercised the real GTK portal and a temporary installed

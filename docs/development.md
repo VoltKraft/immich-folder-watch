@@ -97,6 +97,7 @@ the matching toolchains on `PATH`. Use fresh output directories for each run.
 ```bash
 python3 tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --output artifacts/rust/storage-native/test
 python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/rust/yaml-assessment/runs/test
+python3 tools/rust-qa/instance/run.py x86_64-unknown-linux-gnu --output artifacts/rust/instance-native/test
 python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
 python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
 python3 tools/rust-qa/gui/native.py --backend x11 --input
@@ -110,6 +111,10 @@ control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
+
+The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
+and exercises both protocol directions and file guard ownership in separate processes.
+Windows runs it only on the disposable rewrite runner because the legacy names contain the actual account SID.
 
 The [YAML assessment](rust/rw02-yaml.md) uses the shipping C# reader in both
 directions. Upload only its individual run output. The separate private cache

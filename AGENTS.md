@@ -173,6 +173,8 @@ to reconcile project decisions, defaults, and recorded state.
   Use the dedicated native service fixtures with disposable profiles. The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.
+  Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
+  shipping sources. The actual Windows IPC names require a disposable runner.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version
