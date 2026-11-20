@@ -18,6 +18,34 @@ building. It can provision a temporary, root-owned test launcher with an
 AppArmor user-namespace grant specific to that executable on the disposable
 VM. [Hosted run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612).
 
+## Four native assessment archives
+
+All four archives at `167a03dcb414ab1172713520a77b7517a6046b13` matched
+the SHA-256 sums published by Actions. Both Windows machines rendered with
+the DX12 Microsoft Basic Render Driver and the system FXC compiler. Each
+passed foreground startup, fallback after tray refusal, hidden startup followed
+by activation, and quitting before the first show. An independent WinEvent
+hook saw zero show events in the last case and the subject recorded zero UI
+passes. The three visible cases each closed through WM_CLOSE and reopened.
+The tray availability input in these cases came from the test pipe. The
+[Windows services fixture](rw02-windows-services.md) exercises the Shell
+registration and shortcut APIs independently.
+
+| Native host | GUI result | Actions archive SHA-256 |
+| --- | --- | --- |
+| Windows Server 2025 x64, build 26100 | Four DX12 lifecycle cases, executable `e5c15f31ade5ae35e91f31dc0688e737be3052a241ae5d40c8387d21a1b6e960` | `6e98768bea3bdf722d5f8d094ada0244c38f57ab47b16d180d62536e59b7737d` |
+| Windows 11 ARM64, build 26200 | Four DX12 lifecycle cases, executable `efc7152a5ccd79d8533484709786cc24bcad7e024175d55045e541d9fe2d3840` | `8a00a511eaa349ff6fcbfc40316fd488f61a9c30d476a0c12e1e5df25afb4d0f` |
+| Ubuntu x64 | Namespace setup denied before GUI execution | `ef9d072a8f6b65a3ca6b096b4122279bf32a8ec1921ba64ae192f1a3094921e6` |
+| Ubuntu ARM64 | Namespace setup denied before GUI execution | `d93e9b44e39aba80c1e90a2083b4aed7d39729cf32b4bba020c1f04cb74a57df` |
+
+On each of these hosts the [SQLite workload](rw02-storage-inputs.md) backed
+up both live 24,752-byte WALs. The production C# readers using .NET 10.0.15
+and SQLite 3.53.4 passed 40 assertions per host. All 15 independent
+[transport scenarios](rw02-realtime-transport.md) passed per host. The
+redirect target recorded zero requests and zero credentials. Verification
+covered the 253 Windows or 254 Linux storage evidence files and all ten
+indexed transport outputs in each archive.
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

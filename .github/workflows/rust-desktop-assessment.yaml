@@ -97,6 +97,14 @@ jobs:
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
+      - name: Observe Windows Shell services and per-user Startup shortcuts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
+            --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
+
       - name: Verify the GUI graph and build with the pinned native compiler
         id: gui
         if: ${{ !cancelled() && steps.install.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
@@ -132,6 +140,7 @@ jobs:
           path: |
             artifacts/rust/storage-native/
             artifacts/rust/realtime-native/
+            artifacts/rust/windows-services/native-*/
             artifacts/rust/gui-native/
             artifacts/rust/gui-run/*/*.json
             artifacts/rust/gui-run/*/*.log

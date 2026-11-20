@@ -1,5 +1,21 @@
 # Project Status
 
+## Windows desktop lifecycle and native service probes (2026-11-20)
+
+Windows x64 and ARM64 each passed all four native DX12 lifecycle cases at
+`167a03d`. A separate Windows observer confirmed zero show events on a
+never-activated background start. The four downloaded assessment archives
+matched the Actions digests and the nested SQLite and network evidence
+hashes. All four hosts backed up both live WALs, passed 40 C# readback
+assertions, and completed 15 isolated TLS/polling/WebSocket cases.
+[Per-host results and archive digests](rust/rw02-native-gui.md#four-native-assessment-archives).
+
+The [Windows services fixture](rust/rw02-windows-services.md) adds real Shell
+icon/notification requests, a private-desktop fallback and per-user COM
+shortcuts with independent WScript and UI Automation observations. Both
+target ABIs passed cross-Clippy and the three recovery cases passed locally.
+Native service results come from its dedicated Windows job steps.
+
 ## First hosted desktop and storage assessment (2026-11-20)
 
 At `167a03d` the SQLite and network steps passed on Windows and Linux x64 and

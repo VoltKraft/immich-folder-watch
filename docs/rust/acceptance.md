@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md), [native desktop](rw02-native-gui.md) and [realtime transport](rw02-realtime-transport.md). Four-target GUI, service integration, network and storage qualification remains in progress. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md), [native desktop](rw02-native-gui.md) and [realtime transport](rw02-realtime-transport.md). Four hosts passed the SQLite and transport probes. Desktop, resource, filesystem and dependency qualification continues. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -57,10 +57,13 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, including 13 filesystem cases and distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Pending | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Pending | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Local SQLite WAL backup, 40 C# readback checks and 15 synthetic network sessions passed. | Native X11/Wayland lifecycle and AT-SPI input have local observations. .NET X11 performance measured. Candidate resource comparisons in progress. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Pending (X11/Wayland) | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases passed on Microsoft Basic Render Driver. Accessibility and real desktop services remain open. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Same four DX12 lifecycle cases passed on the native ARM64 executable. Accessibility and real desktop services remain open. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons | Native X11/Wayland lifecycle and AT-SPI input have local observations. .NET X11 performance measured. Candidate resource comparisons in progress. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Hosted GUI namespace setup failed at `167a03d`; X11/Wayland rerun pending. | Pending |
+
+All four also passed two live WAL backups, 40 production C# readback assertions
+and 15 native loopback transport cases per host. [Source-bound four-host archives](rw02-native-gui.md#four-native-assessment-archives).
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.
