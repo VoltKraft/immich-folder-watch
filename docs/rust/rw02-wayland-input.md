@@ -1,0 +1,129 @@
+# GNOME Wayland input, monitors and scale
+
+The native Linux x64 assessment received Japanese composition from GNOME Shell
+and IBus Anthy on a virtual Wayland seat with Mesa Mailbox presentation. The
+same 640 × 400 logical window committed buffers at 100%, 200% and 125%.
+GNOME's default presentation run retained all four monitor observations and
+ended at the Japanese commit deadline.
+
+## Input method
+
+The private desktop used GNOME Shell and Mutter 51.1, IBus 1.5.35, ibus-anthy
+1.5.18, Anthy Unicode 1.0.0.20260213, AT-SPI 2.62.1, libwayland 1.26.0 and
+Mesa lavapipe 26.2.7. The tested native release executable has SHA-256
+`5bd230d24989fc251b789bb152afdf78e5a4353fda1150e809f6a250ef61af3f`.
+Its build record binds the Rust 1.100.0 toolchain, locked graph, application
+sources and fonts. The test driver adds operating-system processes. Its Python
+code is development-only. [Base GUI assessment](rw02-native-gui.md).
+
+A disposable GNOME profile configured the installed `anthy` IBus source. The
+driver checked the active global engine, focused input-context path and
+running Anthy engine process. A Mutter RemoteDesktop virtual keyboard tabbed
+to the titled application's filename field and cleared it. Pressing the Latin
+`a` key produced `zwp_text_input_v3.preedit_string("あ", 3, 3)`. The cursor
+offsets count UTF-8 bytes. Return produced `commit_string("あ")` on that
+same object. Both the compositor and the app recorded these events. The
+object had entered the app's titled surface and the app had enabled text
+input. egui reported a nonempty one-character preedit and one-character
+commit. An independent AT-SPI read returned `あ` in the focused entry
+`Dateiname`. The recorded cursor rectangle uses surface-local coordinates.
+
+Without the Mesa presentation override, the same binary and synthetic keystrokes
+also produced a Japanese preedit. The client then disabled and re-enabled its
+Wayland text input. The traces show ordinary Return key events and no Japanese
+commit string. Six seconds later the filename entry was empty. This observed
+sequence leaves the timing and focus failure open for the candidate stack.
+Physical IME hardware, additional engines and visible Japanese glyph shapes
+require their own evidence.
+
+## Monitor transitions
+
+The driver configured two independent Mutter virtual connectors through
+`DisplayConfig.ApplyMonitorsConfig` with temporary scope. Native
+Super+Shift+Right and Super+Shift+Left moved the focused window. Between the
+two keystrokes the driver changed the occupied display's scale while the
+window stayed on that connector. The table gives one combined run.
+
+| Action | Connector | Logical display origin | Logical display size | Preferred scale (120ths) | Committed client buffer |
+| --- | --- | --- | --- | ---: | --- |
+| Open on primary | Meta-1 | 0, 0 | 2560 × 1440 | 120 | 640 × 400 |
+| Move right | Meta-0 | 2560, 0 | 960 × 540 | 240 | 1280 × 800 |
+| Rescale the secondary | Meta-0 | 2560, 0 | 1536 × 864 | 150 | 800 × 500 |
+| Move left | Meta-1 | 0, 0 | 2560 × 1440 | 120 | 640 × 400 |
+
+For each row, the client's xdg-output position and size matched Mutter's
+current configuration. The same titled root surface received the
+`wp_fractional_scale_v1.preferred_scale` values. The client issued
+`wl_shm_pool.create_buffer`, attached that buffer to the root surface and
+committed it. The server trace corroborated buffer creation, attachment,
+commit and the advertised scale. The viewport stayed 640 × 400 logical
+units. The two moves each had an output leave and enter. The focused Wayland
+keyboard objects were recorded separately from output membership.
+
+AT-SPI reported frame origin (0, 0) in both SCREEN and WINDOW coordinates at
+all four positions, including on the output whose logical origin was
+(2560, 0). Its reported width and height followed the four physical buffer
+sizes. Clients can observe output geometry, surface-local geometry and the
+compositor's output choice. The pinned winit 0.30.13 Wayland adapter returns
+`NotSupportedError` from `inner_position` and `outer_position`, and its
+`set_outer_position` method has an empty body. AccessKit's winit 0.34.2
+Unix adapter uses a default origin when the winit query fails. The observed
+AT-SPI screen origin cannot establish a global window position or its
+restoration. A physical display, cable hotplug and hardware GPU were outside
+this virtual test. [Reviewed graph](../../tools/rust-qa/gui/Cargo.lock).
+
+## Reproduction and provenance
+
+From the repository root, use the native assessment executable and its
+adjacent `.inputs.json` build record. The existing `--input`, `--ime` and
+`--screen-reader` paths retain their separate X11/bare-Mutter lifecycle and
+accessibility runs. These optional GNOME modes start their own private
+session and share a single native window when both are selected.
+
+```sh
+subject=artifacts/rust/performance/subjects/native-map-confirmed/native-gui-assessment
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --present-mode mailbox
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --monitor-changes
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --monitor-changes --present-mode mailbox
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --monitor-changes
+```
+
+The launcher uses Bubblewrap with a fresh home, settings, session bus, private
+network, display and PID namespace for each invocation. GNOME Shell uses the
+private bus for system-service lookups too. The subject receives only Wayland
+display connectivity. The existing Xvfb/Xvnc helper runs inside the same
+namespace for driver bootstrap. `driver.json` binds driver inputs to hashes,
+`native-inputs.json` records the active compositor, Wayland libraries, Mesa
+driver and engine inputs, and `results.json` preserves a failed observation
+when the command exits nonzero. The two protocol logs, display service states
+and accessible snapshots stay under `artifacts/rust/gui-run/`. Run
+`sha256sum -c evidence.sha256` from a GNOME run directory to verify its files.
+
+## Local evidence
+
+| Run directory | Observation | Indexed file | SHA-256 |
+| --- | --- | --- | --- |
+| `wayland-ery0jasw` | GNOME, combined Mailbox pass | `evidence.sha256` | `9ccc71f308a6ee8d908a994bee47641ee54e69c3e0144957a38746e38b174add` |
+| `wayland-mq_big0r` | GNOME, default presentation, monitors pass | `evidence.sha256` | `12b92c62c316e2f1a8684de0cc885c25682296430abbb2e9d134ea8b96ca82c0` |
+| `wayland-1huz160e` | GNOME, one monitor, Mailbox IME pass | `evidence.sha256` | `c226b921ca8bcfffc71a21725de28fba7fab3099e12df6b7115d515ae244dc24` |
+| `wayland-7lzck8wo` | GNOME, default presentation, native IME commit failed | `evidence.sha256` | `1142cfecbf0e8767526367e9f52aa18f5dce94555736874cd6c67d5632aa6def` |
+| `x11-hcgul15m` | X11 lifecycle, XIM and Orca pass | `results.json` | `9772b15eb6fa33ff218c3fa4c6f138e3ab201645dab7f25c3e7cbf269a921a65` |
+| `wayland-si6_x0pe` | Bare Mutter lifecycle, AT-SPI and Orca pass | `results.json` | `2e0ea2a3c551dd939b77bf8b878861873aa2d03c0be686aba3682ff859a1a5ae` |
+
+The legacy runs each passed all four lifecycle cases, named keyboard and
+clipboard checks, and the real private Orca speech check. The X11 run also
+passed Anthy via XIM. The final driver snapshots match the indexed source
+files across all six executions.
+
+## Ubuntu 24.04 runner prerequisites
+
+Alongside the existing Linux GUI test packages, provide `gnome-shell`, `ibus`,
+`gir1.2-ibus-1.0`, `ibus-anthy` and the `anthy-common` dictionary. Ubuntu's
+GNOME Shell 46 package uses Mutter 46. The probes require the native
+RemoteDesktop and DisplayConfig services, headless virtual monitors,
+text-input-v3, viewporter and fractional-scale-v1. The driver requests the
+private Mutter framebuffer-scaling setting on releases that expose that
+feature. Fedora x64 supplied the executions recorded here. Ubuntu x64/ARM64
+need independent hosted runs. [Ubuntu GNOME Shell package](https://packages.ubuntu.com/noble/gnome-shell),
+[Ubuntu IBus packages](https://packages.ubuntu.com/ibus),
+[Ubuntu Anthy dictionary](https://packages.ubuntu.com/noble/anthy-common).

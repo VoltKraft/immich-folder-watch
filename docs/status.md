@@ -1,5 +1,15 @@
 # Project Status
 
+## GNOME Wayland composition and mixed monitor scaling (2026-11-20)
+
+Fedora x64 completed real IBus Anthy composition in the Rust filename field
+with Mesa Mailbox. A single window moved between monitors and produced the
+expected 100%, 200%, 125% and 100% buffers. The default presentation case
+lost the composition after preedit. All four GNOME indexes and both existing
+Orca regression receipts matched the retained files. The Ubuntu jobs now
+exercise the combined scenario on both native architectures.
+[Wayland observations and open compositor limits](rust/rw02-wayland-input.md).
+
 ## Native Linux graphics loss and recovery (2026-11-20)
 
 Fourteen X11/Wayland cases on Fedora x64 exercised initial adapter failure,

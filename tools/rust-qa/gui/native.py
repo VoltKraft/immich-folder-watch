@@ -169,7 +169,7 @@ def run_case(stack, observer, name, background, tray, controls):
             "application": messages, "exit": process.returncode}
 
 
-def inside(backend, input_checks, ime, present_mode, capture, screen_reader=False):
+def inside(backend, input_checks, ime, present_mode, capture, screen_reader=False, wayland_ime=False, monitors=False):
     sys.path.insert(0, "/driver")
     from session import checked_start, check_alive, private_session, wait_for
     if (Path.home() != Path("/tmp/home") or os.environ["DISPLAY"] != ":93"
@@ -185,8 +185,11 @@ def inside(backend, input_checks, ime, present_mode, capture, screen_reader=Fals
         display, server = private_session(stack)
         if backend == "wayland":
             from wayland import WaylandObserver
-            observer = WaylandObserver(stack, capture)
-            server = "Mutter headless virtual monitor"
+            if wayland_ime or monitors:
+                from wayland_input import prepare_shell
+                prepare_shell(stack, wayland_ime, monitors)
+            observer = WaylandObserver(stack, capture, shell=wayland_ime or monitors, two_monitors=monitors)
+            server = "GNOME Shell headless Wayland" if wayland_ime or monitors else "Mutter headless virtual monitor"
         else:
             observer = X11Observer(display)
         with Path("/app/native-gui-assessment").open("rb") as app_file:
@@ -200,6 +203,17 @@ def inside(backend, input_checks, ime, present_mode, capture, screen_reader=Fals
                 evidence[label] = json.loads(metadata.read_text())
         if "build" in evidence and digest != evidence["build"]["binary_sha256"]:
             raise RuntimeError("Executable differs from the bound source record")
+        if wayland_ime or monitors:
+            from wayland_input import exercise
+            evidence["requested"] = {"wayland_ime": wayland_ime, "monitor_changes": monitors}
+            try:
+                evidence["gnome_desktop"] = exercise(stack, observer, ime=wayland_ime, monitors=monitors)
+            except Exception as exc:
+                evidence["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                Path("/qa/results.json").write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n")
+            return
 
         def record(name, background, tray, controls):
             with ExitStack() as child:
@@ -250,7 +264,7 @@ def launch(args):
     if software is None:
         raise RuntimeError(f"No native Mesa lavapipe Vulkan manifest in {drivers}")
     ime_mounts = []
-    if args.ime:
+    if args.ime or args.wayland_ime:
         for name in ("anthy-unicode", "anthy"):
             dictionary = Path("/usr/share") / name / "anthy.dic"
             if dictionary.is_file():
@@ -266,8 +280,17 @@ def launch(args):
         "/usr/bin/python3", "/gui/native.py", "--inside", "--backend", args.backend,
         *(["--input"] if args.input else []), *(["--ime"] if args.ime else []),
         *(["--screen-reader"] if args.screen_reader else []),
+        *(["--wayland-ime"] if args.wayland_ime else []), *(["--monitor-changes"] if args.monitor_changes else []),
         *(["--present-mode", args.present_mode] if args.present_mode else []), *(["--capture"] if args.capture else [])]
-    return subprocess.run(command).returncode
+    status = subprocess.run(command).returncode
+    if args.wayland_ime or args.monitor_changes:
+        with (output / "evidence.sha256").open("x") as manifest:
+            for path in sorted(output.glob("*")):
+                if path.is_file() and path.name != "evidence.sha256":
+                    with path.open("rb") as stream:
+                        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                    manifest.write(f"{digest}  {path.name}\n")
+    return status
 
 
 if __name__ == "__main__":
@@ -276,6 +299,8 @@ if __name__ == "__main__":
     parser.add_argument("--binary", type=Path, help="A native assessment executable from a release build")
     parser.add_argument("--input", action="store_true", help="Use the private AT-SPI registry and inject keyboard input")
     parser.add_argument("--ime", action="store_true", help="Exercise a private IBus XIM composition on X11")
+    parser.add_argument("--wayland-ime", action="store_true", help="Run the dedicated GNOME Shell / IBus Wayland composition check")
+    parser.add_argument("--monitor-changes", action="store_true", help="Run the dedicated GNOME Shell dual-monitor scaling check")
     parser.add_argument("--screen-reader", action="store_true", help="Run Orca with a private Speech Dispatcher and ALSA sink")
     parser.add_argument("--present-mode", choices=("immediate", "mailbox", "fifo"),
                         help="Diagnostic Mesa Vulkan WSI override on this private software renderer")
@@ -286,5 +311,8 @@ if __name__ == "__main__":
         parser.error("--ime requires --backend x11 --input")
     if args.screen_reader and not args.input:
         parser.error("--screen-reader requires --input")
-    sys.exit(inside(args.backend, args.input, args.ime, args.present_mode, args.capture, args.screen_reader)
+    if (args.wayland_ime or args.monitor_changes) and (args.backend != "wayland" or args.input):
+        parser.error("--wayland-ime and --monitor-changes use a dedicated --backend wayland session")
+    sys.exit(inside(args.backend, args.input, args.ime, args.present_mode, args.capture, args.screen_reader,
+                    args.wayland_ime, args.monitor_changes)
              if args.inside else launch(args))

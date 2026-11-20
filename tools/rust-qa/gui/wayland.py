@@ -9,8 +9,13 @@ import time
 from session import checked_start, check_alive, stop, wait_for
 
 
+def protocol(text):
+    # libwayland used @ between the interface and object ID before 1.24.
+    return re.sub(r"\b((?:wl|xdg|zxdg|zwp|wp)_[a-z0-9_]+)@(?=\d+)", r"\1#", text)
+
+
 class WaylandObserver:
-    def __init__(self, stack, capture=False):
+    def __init__(self, stack, capture=False, *, shell=False, two_monitors=False):
         import gi
         gi.require_version("Gio", "2.0")
         from gi.repository import Gio, GLib
@@ -23,15 +28,16 @@ class WaylandObserver:
         self.mapped = set()
         self.focused_surface = None
         self.clipboard_serial = None
-        env = dict(os.environ, WAYLAND_DEBUG="server", GSETTINGS_BACKEND="memory",
+        env = dict(os.environ, WAYLAND_DEBUG="server", GSETTINGS_BACKEND="keyfile" if shell else "memory",
                    DBUS_SYSTEM_BUS_ADDRESS=os.environ["DBUS_SESSION_BUS_ADDRESS"])
         if capture:
             pipe_log = Path("/qa/pipewire.log")
             pipe = checked_start(stack, ["pipewire"], pipe_log)
             wait_for(lambda: check_alive(pipe, pipe_log) or Path("/tmp/runtime/pipewire-0").is_socket(),
                      5, "Private PipeWire server did not create its socket")
-        self.mutter = subprocess.Popen(["mutter", "--wayland", "--headless", "--no-x11",
-                                      "--virtual-monitor=1280x900", "--wayland-display=ifw-test"],
+        monitors = ["1920x1080", "2560x1440"] if two_monitors else ["1280x900"]
+        self.mutter = subprocess.Popen(["gnome-shell" if shell else "mutter", "--wayland", "--headless", "--no-x11",
+                                      *["--virtual-monitor=" + mode for mode in monitors], "--wayland-display=ifw-test"],
                                       env=env, stdout=stack.enter_context(self.log.open("w")),
                                       stderr=subprocess.STDOUT)
         stack.callback(stop, self.mutter)
@@ -117,8 +123,7 @@ class WaylandObserver:
     def poll(self):
         check_alive(self.mutter, self.log)
         for line in self.trace:
-            # libwayland used @ before version 1.24. Match both debug spellings.
-            line = line.replace("@", "#")
+            line = protocol(line)
             if match := re.search(r"get_xdg_surface\(new id xdg_surface#(\d+), wl_surface#(\d+)\)", line):
                 self.surface[match[1]] = match[2]
             elif match := re.search(r"xdg_surface#(\d+)\.get_toplevel\(new id xdg_toplevel#(\d+)\)", line):

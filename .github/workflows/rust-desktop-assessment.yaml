@@ -116,7 +116,8 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
-            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin
+            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin \
+            gnome-shell ibus ibus-anthy gir1.2-ibus-1.0 anthy-common
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Observe Windows Shell services and per-user Startup shortcuts
@@ -142,6 +143,10 @@ jobs:
       - name: Observe native Wayland lifecycle and AT-SPI using the tested Mesa presentation mode
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+
+      - name: Observe GNOME Wayland composition and changes between monitor scales
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes --present-mode mailbox
 
       - name: Build the offline native Linux service probes
         id: linux_services
@@ -229,6 +234,8 @@ jobs:
             artifacts/rust/gui-native/
             artifacts/rust/gui-run/*/*.json
             artifacts/rust/gui-run/*/*.log
+            artifacts/rust/gui-run/*/*.conf
+            artifacts/rust/gui-run/*/evidence.sha256
             artifacts/rust/gui-build/release/*.inputs.json
             artifacts/rust/font-coverage/*/result.json
             artifacts/rust/font-coverage/*/*/native.log

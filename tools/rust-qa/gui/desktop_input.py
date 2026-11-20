@@ -74,10 +74,7 @@ def ibus_start(stack):
     wait_for(owns_xim, 5, "IBus XIM server did not own its native X selection")
 
 
-def check_input(stack, observer, backend, ime, screen_reader=False):
-    # The private session deliberately has no dconf writer. The launcher owns
-    # this setting for its entire lifetime, including application registration.
-    os.environ["GSETTINGS_BACKEND"] = "memory"
+def start_accessibility(stack):
     at_log = Path("/qa/atspi.log")
     launcher = checked_start(stack, ["/usr/libexec/at-spi-bus-launcher", "--launch-immediately"], at_log)
 
@@ -99,6 +96,13 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
         return value is True
     wait_for(enabled, 3, "The private accessibility service did not enable AT-SPI")
     Atspi.set_timeout(1500, 2500)
+    return enabled
+
+
+def check_input(stack, observer, backend, ime, screen_reader=False):
+    # The private session deliberately has no dconf writer.
+    os.environ["GSETTINGS_BACKEND"] = "memory"
+    enabled = start_accessibility(stack)
     reader = None
     if screen_reader:
         from screen_reader import ScreenReader

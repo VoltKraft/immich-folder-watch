@@ -87,6 +87,11 @@ Fedora x64 exercised native Orca speech output and three protected keystrokes
 on X11 and Wayland. X11 also produced an actual Anthy composition and Japanese
 commit in the Rust filename field. [IME and screen-reader observations](rw02-native-gui.md#native-composition-and-screen-reader-output).
 
+GNOME Wayland on Fedora x64 committed the same Japanese character from Anthy
+with Mesa Mailbox. The same window presented 640 × 400, 1280 × 800 and 800 × 500
+buffers as its monitor changed. Default presentation lost the commit after
+preedit. [Native protocol, field and buffer observations](rw02-wayland-input.md).
+
 The released egui 0.37 text editor deleted the wrong visible Arabic character
 in two mixed-direction cases. A narrowly scoped upstream correction passed
 the same pointer, keyboard and GPU readback tests on Linux x64, including

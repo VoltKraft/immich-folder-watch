@@ -102,6 +102,7 @@ python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifact
 python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
 python3 tools/rust-qa/gui/native.py --backend x11 --input
 python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes --present-mode mailbox
 ```
 
 The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
@@ -111,6 +112,12 @@ control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
+
+The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
+Shell, IBus Anthy and separate compositor/client traces. The [graphics recovery
+fixture](rust/rw02-graphics.md) records presentation and input across device
+replacement. The [text editing fixture](rust/rw02-font-coverage.md) compares
+the released and corrected mixed-direction caret against actual rendered glyphs.
 
 The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
 and exercises both protocol directions and file guard ownership in separate processes.
