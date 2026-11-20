@@ -2,42 +2,11 @@ use safe_fs::{Directory, EntryKind, PublishError};
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-struct Synthetic(PathBuf);
-
-impl Synthetic {
-    fn new() -> Self {
-        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-        loop {
-            let serial = SEQUENCE.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir()
-                .join(format!("ifw-rust-fs-test-{}-{serial}", std::process::id()));
-            let builder = fs::DirBuilder::new();
-            #[cfg(unix)]
-            let mut builder = builder;
-            #[cfg(unix)]
-            std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-            match builder.create(&path) {
-                Ok(()) => return Self(path),
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(e) => panic!("create synthetic profile: {e}"),
-            }
-        }
-    }
-
-    fn root(&self) -> Directory {
-        Directory::open_root(&self.0).unwrap()
-    }
-}
-
-impl Drop for Synthetic {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.0).expect("clean up the synthetic profile");
-    }
-}
+mod support;
+use support::Synthetic;
 
 fn sample_time(seconds: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
@@ -269,12 +238,30 @@ fn competing_stages_publish_one_complete_payload_without_overwriting() {
     second.write_all(b"other content").unwrap();
     assert!(root.entries(10).unwrap().is_empty());
     first.publish().unwrap();
-    assert!(matches!(
-        second.publish(),
-        Err(PublishError::BeforeRename(_))
-    ));
+    let error = second.publish().unwrap_err();
+    assert!(!error.requires_reconciliation());
+    assert!(matches!(error, PublishError::BeforeRename(e)
+        if e.kind() == std::io::ErrorKind::AlreadyExists));
     assert_eq!(fs::read(profile.0.join(dest)).unwrap(), b"winner");
     assert_eq!(root.entries(10).unwrap().len(), 1);
+    assert!(profile.transaction_directories().is_empty());
+}
+
+#[test]
+fn acknowledged_publication_with_cleanup_failure_keeps_both_destination_and_unrelated_entry() {
+    let profile = Synthetic::new();
+    let root = profile.root();
+    let mut download = root.begin_download(OsStr::new("image")).unwrap();
+    download.write_all(b"published").unwrap();
+    let directories = profile.transaction_directories();
+    assert_eq!(directories.len(), 1);
+    let extra = directories[0].join("extra");
+    fs::write(&extra, b"preserve unrelated contents").unwrap();
+    let error = download.publish().unwrap_err();
+    assert!(matches!(error, PublishError::AfterRename(_)));
+    assert!(error.requires_reconciliation());
+    assert_eq!(fs::read(profile.0.join("image")).unwrap(), b"published");
+    assert_eq!(fs::read(extra).unwrap(), b"preserve unrelated contents");
 }
 
 #[test]
@@ -423,6 +410,7 @@ fn changed_container_protection_stops_new_stages() {
 #[test]
 fn reported_windows_short_name_cannot_authorize_a_reserved_directory() {
     use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    use std::path::PathBuf;
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GetShortPathNameW(path: *const u16, short: *mut u16, capacity: u32) -> u32;
@@ -430,6 +418,7 @@ fn reported_windows_short_name_cannot_authorize_a_reserved_directory() {
     let profile = Synthetic::new();
     let internal = profile.0.join(".ifw-internal-existing");
     fs::create_dir(&internal).unwrap();
+    fs::write(internal.join("marker"), b"reserved alias target").unwrap();
     let input: Vec<_> = internal.as_os_str().encode_wide().chain([0]).collect();
     let mut units = vec![0u16; 32768];
     // SAFETY: input terminates in NUL and the output array has the indicated capacity.
@@ -438,15 +427,32 @@ fn reported_windows_short_name_cannot_authorize_a_reserved_directory() {
             as usize;
     assert!(result != 0 && result < units.len());
     let short = PathBuf::from(std::ffi::OsString::from_wide(&units[..result]));
-    // Volumes with 8.3 generation disabled return the original spelling.
-    println!(
-        "distinct_short_name={}",
-        short.file_name() != internal.file_name()
+    let alias = short.file_name().unwrap();
+    let long = internal.file_name().unwrap();
+    let distinct = !alias
+        .as_encoded_bytes()
+        .eq_ignore_ascii_case(long.as_encoded_bytes());
+    println!("distinct_short_name={distinct}");
+    let setting = std::env::var_os("IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME");
+    let required = match setting.as_deref().map(OsStr::as_encoded_bytes) {
+        None | Some(b"0") => false,
+        Some(b"1") => true,
+        _ => panic!("IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME must be 0 or 1"),
+    };
+    if !distinct {
+        // Volumes with 8.3 generation disabled return the original spelling.
+        println!("short_name_denial_verified=false");
+        assert!(
+            !required,
+            "the provisioned NTFS fixture must produce a distinct 8.3 alias"
+        );
+        return;
+    }
+    assert_eq!(
+        fs::read(profile.0.join(alias).join("marker")).unwrap(),
+        b"reserved alias target"
     );
-    assert!(
-        profile
-            .root()
-            .open_directory(short.file_name().unwrap())
-            .is_err()
-    );
+    let error = profile.root().open_directory(alias).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    println!("short_name_denial_verified=true");
 }

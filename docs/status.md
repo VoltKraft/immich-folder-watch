@@ -1,5 +1,22 @@
 # Project Status
 
+## RW-02 filesystem review and hosted follow-up (2026-11-20)
+
+The independent [filesystem re-review](rust/rw02-filesystem.md#independent-review-of-the-feasibility-boundary)
+closed the staging-acknowledgement and short-name coverage findings in source.
+The corrected implementation passed 16 Linux filesystem tests on tmpfs and
+Btrfs, including a real rename followed by an injected lost acknowledgement.
+The native Windows workflow now requires a distinct working alias and the
+protected API's denial. The first follow-up Windows run installed the pinned
+compiler and reached Clippy, which requested typed two-byte UTF-16 chunks.
+The implementation now uses that form. [Windows follow-up](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44810590778).
+
+Both Linux artifacts of the original hosted feasibility run matched their
+published ZIP digests and recorded clean `2ff9880` sources. Their uppercase
+maps are byte-identical. Direct comparison to Fedora found 55 differing scalar
+mappings. U+019B stays U+019B on the hosted references and maps to U+A7DC on
+the local reference. The existing stored key is authoritative during migration.
+
 ## First hosted Rust results (2026-11-20)
 
 At `2ff988095045739b6eeb0735750f5ec9aa9baca6` both Linux hosts passed all 27

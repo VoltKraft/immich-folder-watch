@@ -61,6 +61,8 @@ jobs:
 
       - name: Exercise the release probes on their native host
         shell: bash
+        env:
+          IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           export CARGO_HOME="$PWD/artifacts/rust/cargo-home"

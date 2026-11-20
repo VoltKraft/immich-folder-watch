@@ -41,11 +41,27 @@ component, including when the caller supplies an 8.3 alias. Linux requires the
 legacy `statx` result mask plus ctime. Protected directories also require reported
 owner and mode. Unsupported identity or protection aborts that operation.
 
-`Download::publish` flushes the payload before rename. Linux also syncs both
-affected directories. A post-rename error is distinct from failure to publish.
-`Download::cancel` returns cleanup errors. Dropping an unfinished lease attempts
-the same cleanup. Crash recovery of persisted effects still requires the RW-03
-and RW-07 integration tests.
+`Download::publish` flushes the payload, checks the destination and prepares
+the native request. The atomic no-replace operation handles a competing arrival
+after this check. Reconciliation follows the point of failure.
+
+| Publication result | Caller and filesystem behavior |
+| --- | --- |
+| `BeforeRename` | The request was never submitted. This includes an already-occupied name. Dropping the lease attempts ordinary private-stage cleanup. |
+| `RenameOutcomeUnknown` | The submitted native call returned an error. The destination may already contain the payload. The implementation releases its handles and preserves the transaction exactly as found. The caller must reconcile its transfer intent and destination before retrying or recording completion. |
+| `AfterRename` | The filesystem acknowledged the rename. A subsequent directory sync or cleanup failed. Reconcile the published destination and outstanding cleanup. |
+
+Linux syncs the source and destination directories after an acknowledged rename.
+A filesystem server may complete a rename and lose the acknowledgement. Any error
+from the submitted operation follows the uncertain-outcome policy across both
+platforms. Closing a Windows handle that was explicitly marked for deletion
+after an uncertain result could remove the newly published file. The cancellation
+path therefore relinquishes its payload before submitting the native request.
+See the [Linux rename documentation on RPC recovery](https://man7.org/linux/man-pages/man2/rename.2.html#BUGS).
+
+`Download::cancel` reports cleanup errors while the stage is still private.
+The engine's durable intent, recovery after process death and post-activity
+rollback remain RW-03 and RW-07 integration gates.
 
 The backend uses the Rust standard library, the Linux C library, procfs and
 Windows system DLLs. It introduces no third-party Cargo package. See
@@ -68,7 +84,12 @@ refusal, repeated batched scans, reserved names, bounded enumeration, competing
 publication and explicit or dropped-stage cancellation. Linux also exercises the
 writer lock, a special file, changed container mode/name and active leases across
 cache eviction. The Windows alias test reports whether its volume supplied a
-distinct 8.3 spelling. Run `cargo test -p safe-fs`
+distinct 8.3 spelling with `distinct_short_name` and actual denial with
+`short_name_denial_verified`. With `IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME=1`,
+absence of an actual distinct alias fails the test. A successful alias check
+also verifies that an ordinary OS access through that alias reaches the fixture's
+marker and that the public media lease refuses the same directory.
+Run `cargo test -p safe-fs`
 with the [pinned toolchain](../../rust/rust-toolchain.toml). Target-specific
 execution evidence belongs in the [acceptance record](acceptance.md).
 
@@ -79,8 +100,40 @@ passed without skips. Locked offline Clippy on all crate targets with
 `-D warnings` and the crate's rustfmt check passed. The host kernel reported
 `7.3.4-300.fc45.x86_64`.
 
+Following independent review of `2ff9880`, both local Linux filesystems passed
+the updated 16 checks on 2026-11-20. The suite includes two unit cases and
+14 integration cases in each profile. One test injects a lost acknowledgement
+after a real native rename and verifies the published bytes and retained
+transaction after all handles close. Another inserts a successful competing
+publication between preflight and the actual native no-replace call. Both
+the incumbent and the losing stage survive. A nonempty transaction directory
+exercises acknowledged publication followed by a real cleanup failure. Locked
+offline Clippy with warnings denied and rustfmt also passed. The injected fault
+models the acknowledgement boundary. Actual SMB and portal/FUSE recovery
+remain native-environment acceptance items.
+
 RW-02 still requires native results on the other target filesystems and desktop
 environments. A hosted NTFS or Linux local test cannot establish UNC or
 portal/FUSE behavior. Verified destructive cleanup, directory moves, transfer
 and timestamp-journal call sites and independent filesystem review remain RW-03
 and engine integration gates.
+
+## Independent review of the feasibility boundary
+
+The independent review of `2ff988095045739b6eeb0735750f5ec9aa9baca6`
+identified two issues. A filesystem can complete a rename and return an
+error before its acknowledgement reaches the process. Windows may also return
+the original spelling from `GetShortPathNameW`. A successful generic denial
+could then conceal missing 8.3 coverage.
+
+The reviewer examined the corrected staging state machine and native handle
+cleanup. A submitted call that loses its acknowledgement consumes the stage
+and requires reconciliation. Plain handle disposal leaves the destination and
+the protected transaction intact. The real-rename fault-injection test
+observes both after the handles close. The Windows fixture checks access
+through an actual distinct alias and requires the protected API to deny it.
+The native workflow requires and retains both observations on Windows.
+The re-review found both source issues resolved. Its reviewed staging file
+has SHA-256 `42ae0f4f31f3bd0553abd53357ee8bfd039bdaf13f282ddd24707ac17a3594a4`.
+Native SMB/FUSE interruption, Windows output and future engine call sites
+have separate acceptance records.

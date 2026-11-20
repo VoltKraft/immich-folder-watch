@@ -400,10 +400,8 @@ fn dir_records(
         let name = bytes
             .get(NAME_OFFSET..NAME_OFFSET + length)
             .ok_or_else(malformed)?;
-        let wide: Vec<_> = name
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = name.as_chunks::<2>();
+        let wide: Vec<_> = pairs.iter().copied().map(u16::from_le_bytes).collect();
         visit(OsString::from_wide(&wide))?;
         if next == 0 {
             return Ok(());
@@ -467,14 +465,13 @@ fn mark_delete(file: &File) -> io::Result<()> {
     Ok(())
 }
 
-fn rename_handle(file: &File, destination: &File, name: &OsStr) -> io::Result<()> {
-    let text: Vec<_> = name.encode_wide().collect();
-    let name_bytes = u16::try_from(text.len().saturating_mul(2)).map_err(|_| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "destination name exceeds the NT name limit",
-        )
-    })?;
+pub(super) struct RenameName {
+    text: Vec<u16>,
+    name_bytes: u16,
+}
+
+fn rename_handle(file: &File, destination: &File, name: RenameName) -> io::Result<()> {
+    let RenameName { text, name_bytes } = name;
     let offset = std::mem::offset_of!(RenameInformation, first_unit);
     let size = (offset + usize::from(name_bytes)).max(size_of::<RenameInformation>());
     let mut record = vec![0usize; size.div_ceil(size_of::<usize>())];
@@ -537,9 +534,20 @@ impl Transaction {
         &self,
         file: &File,
         destination: &File,
-        name: &OsStr,
+        name: RenameName,
     ) -> io::Result<()> {
         rename_handle(file, destination, name)
+    }
+
+    pub(super) fn prepare_rename(&self, _file: &File, name: &OsStr) -> io::Result<RenameName> {
+        let text: Vec<_> = name.encode_wide().collect();
+        let name_bytes = u16::try_from(text.len().saturating_mul(2)).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "destination name exceeds the NT name limit",
+            )
+        })?;
+        Ok(RenameName { text, name_bytes })
     }
 
     pub(super) fn remove_payload(&self, file: &File) -> io::Result<()> {

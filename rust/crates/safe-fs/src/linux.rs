@@ -275,6 +275,8 @@ pub(super) struct Transaction {
     name: OsString,
 }
 
+pub(super) type RenameName = CString;
+
 impl Transaction {
     pub(super) fn new(parent: &Directory) -> io::Result<Self> {
         let outer = parent.0.containers.for_parent(&parent.0.file)?;
@@ -291,15 +293,18 @@ impl Transaction {
         open_at(&self.directory, OsStr::new("payload"), 2 | 0x40 | 0x80) // O_RDWR | O_CREAT | O_EXCL
     }
 
-    pub(super) fn rename_payload(
-        &self,
-        file: &File,
-        destination: &File,
-        name: &OsStr,
-    ) -> io::Result<()> {
+    pub(super) fn prepare_rename(&self, file: &File, name: &OsStr) -> io::Result<RenameName> {
         require_private(&self.directory)?;
         check_entry(&self.directory, OsStr::new("payload"), file)?;
-        let name = CString::new(name.as_bytes())?;
+        Ok(CString::new(name.as_bytes())?)
+    }
+
+    pub(super) fn rename_payload(
+        &self,
+        _file: &File,
+        destination: &File,
+        name: RenameName,
+    ) -> io::Result<()> {
         // SAFETY: the source name is inside the protected directory. Both
         // directories are pinned. RENAME_NOREPLACE is the atomic collision gate.
         if unsafe {

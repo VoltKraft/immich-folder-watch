@@ -24,9 +24,13 @@ mod native;
 
 mod staging;
 pub use staging::{Download, PublishError};
+
 #[cfg(windows)]
 #[path = "windows.rs"]
 mod native;
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+mod test_support;
 
 const INTERNAL_PREFIX: &[u8] = b".ifw-internal-";
 

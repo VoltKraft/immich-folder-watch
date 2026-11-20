@@ -80,10 +80,15 @@ def main():
                 stream.write(b"Timed out after 900 seconds.\n")
         result["steps"][name] = {"exitCode": status, "log": log.name}
         if name == "tests" and os.name == "nt":
-            observations = [line.removeprefix("distinct_short_name=") for line
-                            in log.read_text(encoding="utf-8", errors="replace").splitlines()
-                            if line.startswith("distinct_short_name=")]
-            result["windowsDistinctShortName"] = {"observation": observations, "verified": observations == ["true"]}
+            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+            observations = {marker: [line.removeprefix(marker + "=") for line in lines if line.startswith(marker + "=")]
+                            for marker in ("distinct_short_name", "short_name_denial_verified")}
+            verified = all(values == ["true"] for values in observations.values())
+            result["windowsDistinctShortName"] = {**observations, "verified": verified}
+            if not status and env.get("IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME") == "1" and not verified:
+                status = 1
+                result["steps"][name]["exitCode"] = status
+                print("Required Windows short-name observation is missing.")
         (evidence / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(log.read_text(encoding="utf-8", errors="replace"), end="", flush=True)
         if status:
