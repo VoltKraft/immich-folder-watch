@@ -38,10 +38,17 @@ def build_reference(root, here, artifacts, output, sha):
         if Path(path).exists():
             command += ["--ro-bind", path, path]
     project = root / "src/ImmichFolderWatch.Core"
-    for source in (project, here / "dotnet", root / "Directory.Build.props", root / "Directory.Build.targets", root / "global.json"):
+    # Bind the same tracked input files on a clean runner and a used checkout.
+    # MSBuild places all generated files in /out through --artifacts-path.
+    paths = subprocess.check_output(["git", "ls-files", "-z", "--", project.relative_to(root),
+                                    (here / "dotnet").relative_to(root)], cwd=root).split(b"\0")
+    sources = [root / os.fsdecode(path) for path in paths if path]
+    sources += [root / "Directory.Build.props", root / "Directory.Build.targets", root / "global.json"]
+    for source in sources:
+        if source.is_symlink() or not source.is_file():
+            raise ValueError(f"Expected a regular reference source at {source.relative_to(root)}")
         command += ["--ro-bind", str(source), f"/repo/{source.relative_to(root)}"]
-    command += ["--tmpfs", "/repo/src/ImmichFolderWatch.Core/obj", "--tmpfs", "/repo/src/ImmichFolderWatch.Core/bin",
-                "--dir", "/tmp/sdk-home", "--setenv", "PATH", "/runtime:/usr/bin", "--setenv", "HOME", "/tmp/sdk-home",
+    command += ["--dir", "/tmp/sdk-home", "--setenv", "PATH", "/runtime:/usr/bin", "--setenv", "HOME", "/tmp/sdk-home",
                 "--setenv", "DOTNET_CLI_HOME", "/tmp/sdk-home", "--setenv", "DOTNET_ROOT", "/runtime",
                 "--setenv", "NUGET_PACKAGES", "/tmp/sdk-home/packages", "--setenv", "DOTNET_NOLOGO", "1",
                 "--setenv", "MSBuildEnableWorkloadResolver", "false", "--setenv", "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE", "true",
@@ -54,9 +61,6 @@ def build_reference(root, here, artifacts, output, sha):
     subprocess.run(command, check=True, timeout=100)
     actual = destination / "bin/PortalReference/release"
     manifest = json.loads((destination / "obj/ImmichFolderWatch.Core/project.assets.json").read_text())
-    core_sources = [p for p in sorted(project.rglob("*.cs")) if not {"obj", "bin"}.intersection(p.relative_to(project).parts)]
-    sources = [*(here / "dotnet").glob("*"), project / "ImmichFolderWatch.Core.csproj", *core_sources,
-               root / "Directory.Build.props", root / "Directory.Build.targets", root / "global.json"]
     record = {"sdk": pin, "project_reference": "src/ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj",
               "restored_packages_sha512": {name: item["sha512"] for name, item in manifest["libraries"].items() if item["type"] == "package"},
               "source": {str(p.relative_to(root)): sha(p) for p in sources},

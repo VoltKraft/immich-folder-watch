@@ -1,5 +1,17 @@
 # Project Status
 
+## Native Ubuntu tray results and clean reference build (2026-11-20)
+
+At `11e4e6f` both Ubuntu architectures passed the eight-step tray-owner
+test and the full 183/116-assertion YAML comparison. All 204 files in each
+YAML evidence index matched their hashes. The Documents oracle failed before
+launch because bubblewrap could not create a mount point under read-only
+Core sources on a clean checkout. Binding only tracked source files fixed
+the build locally and preserved both reference DLL digests. Semantic FUSE
+results for Ubuntu still require the rerun.
+[CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977)
+and [Linux service evidence](rust/rw02-linux-services.md).
+
 ## Windows ARM64 import reconstruction (2026-11-20)
 
 All 20,551 symbols in Microsoft's original ARM64 import library matched the

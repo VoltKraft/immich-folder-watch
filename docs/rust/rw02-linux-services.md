@@ -28,6 +28,11 @@ The service subscribes to `NameOwnerChanged` before reading the current owner,
 addresses registrations to the unique owner and confirms ownership before
 accepting the result. The observed panel was the controllable protocol peer.
 Visual integration with GNOME, Plasma and released Flatpak packages is outstanding.
+At `11e4e6f` both native Ubuntu architectures passed all eight steps. Each
+observed the window after registration refusal, loss, replacement, delayed
+acknowledgement and final Quit. Both completed the SNI test independently
+of the later Documents reference-build failure.
+[Native Ubuntu jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977).
 The separate GUI assessment covers native window close and Wayland presentation.
 [Native GUI evidence](rw02-native-gui.md)
 
@@ -143,6 +148,14 @@ and the offline Core NuGet cache. The distro trial additionally requires
 bubblewrap, an independent Xvfb or Xvnc server, the session D-Bus daemon, PyGObject
 with GIO, a native software Vulkan implementation, and user-namespace FUSE mounting.
 On this Fedora system the launcher used the portal services under `/usr/libexec`.
+
+The first clean Ubuntu checkouts lacked the shipping project's generated
+`bin` and `obj` directories. Bubblewrap refused to create mounts for them
+inside a read-only source tree before either Documents test ran. The revised
+builder individually mounts the tracked source and project files, and places
+all generated files under its private output. A fresh Fedora offline build
+reproduced both the previous shipping Core and caller DLLs byte for byte
+from the same 81 inputs.
 
 ```sh
 python3 tools/rust-qa/linux-services/native.py build
