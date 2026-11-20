@@ -71,6 +71,13 @@ returned `ENOSYS` for the required upload lock. The private upstream backport
 enforced it across the actual grant and backing views. [SMB results](rw02-filesystem.md#four-native-hosts)
 and [portal and tray results](rw02-linux-services.md).
 
+On Fedora x64 an installed test Flatpak selected a real Documents grant
+through a parented GTK chooser under both X11 and Wayland. A fresh process
+received `ENOENT` after revocation. Private GNOME Shell displayed and withdrew
+the notification. The Background portal created and removed the app's autostart
+file, then refused a new request after explicit denial.
+[Installed Flatpak and GNOME evidence](rw02-portal-dialog.md).
+
 Fedora x64 exercised native Orca speech output and three protected keystrokes
 on X11 and Wayland. X11 also produced an actual Anthy composition and Japanese
 commit in the Rust filename field. [IME and screen-reader observations](rw02-native-gui.md#native-composition-and-screen-reader-output).

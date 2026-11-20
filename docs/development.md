@@ -125,6 +125,10 @@ fix on exact release sources in an offline SDK. It writes the executable to
 the ignored test area for the private namespace. The
 [Windows service tests](rust/rw02-windows-services.md) exercise per-user
 shortcut registration, Shell notifications and independent UI Automation.
+The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises
+X11 and Wayland parents, selection and denial. The local Flatpak variant
+installs an isolated test app in a temporary repository. The GNOME variant
+checks its on-screen notification and autostart registration and removal.
 
 ## Build
 

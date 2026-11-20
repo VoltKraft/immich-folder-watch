@@ -1,5 +1,16 @@
 # Project Status
 
+## Installed Flatpak dialogs, notifications and autostart (2026-11-20)
+
+Five Fedora x64 runs exercised the real GTK portal and a temporary installed
+Flatpak. X11 and Wayland both verified the parent window, cancellation and
+selection. A fresh process lost access to the selected grant after revocation.
+GNOME Shell displayed and withdrew the notification. Its Background portal
+created and removed the app's autostart file and respected explicit denial.
+All 25 indexed evidence files matched their hashes. The next native Ubuntu
+runs cover the registered host application's folder picker on both architectures.
+[Reproduction, images and source evidence](rust/rw02-portal-dialog.md).
+
 ## Four native YAML runs and Windows input (2026-11-20)
 
 At `11e4e6f` all four native YAML runs passed with identical filtered sources

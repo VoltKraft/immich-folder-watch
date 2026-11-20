@@ -170,7 +170,9 @@ to reconcile project decisions, defaults, and recorded state.
   when changing the candidate desktop profile.
   Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
-  Use the dedicated native service fixtures with disposable profiles.
+  Use the dedicated native service fixtures with disposable profiles. The
+  [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
+  a private desktop and installs only into its disposable test repository.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version
