@@ -9,6 +9,21 @@ component is an oracle, not a required Rust runtime.
 
 ## Reviewed inputs and corresponding sources
 
+At `11e4e6f7f385e8b69f1404a18fae82c02780c7d4` all four native hosts
+completed the 13-step YAML assessment. Every host matched 183 Rust assertions
+and 116 production C# readback assertions and rebuilt using the same canonical
+tar SHA-256 `f4caf0051b7bfd73f366bf3918721ddc6f0ebd35dd526fed1ddbd1335a8cab05`.
+All 204 indexed files in each downloaded report matched their hashes.
+The native artifacts also contain the separately reported desktop results.
+[Native jobs and artifacts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977).
+
+| Hosted target | Downloaded artifact SHA-256 |
+| --- | --- |
+| Windows x64 | `264fd206affaa301a48c9e450c8a262b9530c0b38e3a3235ee029f774f9fe5b5` |
+| Windows ARM64 | `4a685bc7d7ce7754fb3867edc1a5001e7db9352f09142dacc8c30b63e447ffd6` |
+| Linux x64 | `2055ef6dabe058d476a71b0cd4a6273412ec957bad788bb8450b469f9f0b583a` |
+| Linux ARM64 | `2156eb5fdd40c72792b4f74d72fe71f8bebccaf1d54cb42a76f98b882a46a2fc` |
+
 The exact candidate is `serde-saphyr = 2.2.0`, default features disabled, with only
 `deserialize` and `serialize`. Direct dependencies also pin `serde = 1.0.229`
 (`std`, `derive`, defaults off) and `serde_json = 1.0.154` (`std`, defaults off).
@@ -24,9 +39,8 @@ records archive checksums, supplied notices, original assets, build-script paths
 selected licenses, filtered source identities and all four target feature graphs.
 Its original audit inventory hash is
 `710c5b3cde154c5df53e03944908edfb7162b805f9cce69be3745806d4dbcb66`.
-The x64 graphs select 30 external packages; both ARM64 graphs select 29, without
-the x64 `core_detect` dependency. These are resolved native-target graphs, not
-claims of native execution on the other three hosts.
+The x64 graphs select 30 external packages. Both ARM64 graphs select 29.
+The x64 `core_detect` dependency accounts for the difference.
 
 The selected graph contains Rust implementations and CPU intrinsics, with no
 additional native C library, bundled executable or font. Its nine build scripts
@@ -234,8 +248,8 @@ Exact local command, with the pinned Rust `bin` directory on `PATH`:
 python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/rust/yaml-assessment/runs/maintained-linux-x64-01 --cargo-home artifacts/rust/storage-assessment/cargo-home --dotnet artifacts/flatpak-local-2.11.2/sdk/dotnet --offline
 ```
 
-Choose a fresh output name for another run. Three other native executions and
-independent review remain required. This bounded result does not approve all
-YAML 1.1/1.2 edge cases, unrestricted Windows namespaces, a shipping casing table,
-atomic profile publication, crash/full-disk recovery or migration. The
-[acceptance record](acceptance.md) owns the remaining RW-02/RW-03 gates.
+Choose a fresh output name for another run. The four native executions and
+independent filtered-source review cover the tested corpus. Additional YAML
+edge cases, Windows namespaces, the shipping casing policy, atomic profile
+publication, crash/full-disk recovery and migration retain their own scope.
+The [acceptance record](acceptance.md) owns the remaining RW-02/RW-03 gates.

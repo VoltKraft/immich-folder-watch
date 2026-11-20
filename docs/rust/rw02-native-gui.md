@@ -225,5 +225,16 @@ password field and verifies a Unicode clipboard round trip. Each keyboard
 operation requires the observed HWND to own foreground input. The report
 retains the observed DPI, monitor size, protected-pattern behavior and the
 last completed input checks if the host cannot supply interactive input.
-Its result requires a native Windows run.
+At `11e4e6f` both Windows UI Automation clients identified Dateiname, Kennwort
+and English and the protected password property, on a 1024 × 768, 96 DPI monitor.
+On x64, Tab reached both edit controls and the native application received
+one synthetic password character. The observer then met a Windows sharing
+violation reading the application's active log. The observer now uses a
+shared read handle and matches complete lines. On ARM64 the test window
+failed the foreground check before any keystroke. The follow-up records the
+input desktop, requests focus through the owned UI Automation element and
+can click its bounds only after checking the live screen point against that
+HWND and PID. Each keystroke still requires the input desktop and foreground
+window to match. [Native inputs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977)
+and [Windows foreground rules](https://learn.microsoft.com/windows/win32/winmsg/window-features).
 [Windows UI Automation observer](../../tools/rust-qa/observe-windows-input.ps1).

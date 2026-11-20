@@ -17,6 +17,55 @@ public static class IfwObservedWindow {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
+    [DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll", SetLastError=true)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+    [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr desktop);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern bool GetUserObjectInformation(
+        IntPtr handle, int index, System.Text.StringBuilder value, uint bytes, out uint needed);
+    static string DesktopName(IntPtr desktop) {
+        var name = new System.Text.StringBuilder(256);
+        uint needed;
+        return GetUserObjectInformation(desktop, 2, name, 512, out needed) ? name.ToString() : null;
+    }
+    public static bool OnInputDesktop() {
+        var input = OpenInputDesktop(0, false, 1);  // DESKTOP_READOBJECTS
+        if (input == IntPtr.Zero) return false;
+        try {
+            var current = DesktopName(GetThreadDesktop(GetCurrentThreadId()));
+            return current != null && String.Equals(current, DesktopName(input), StringComparison.OrdinalIgnoreCase);
+        } finally { CloseDesktop(input); }
+    }
+    [StructLayout(LayoutKind.Sequential)] struct Point { public int x, y; }
+    [StructLayout(LayoutKind.Sequential)] struct Mouse {
+        public int x, y;
+        public uint data, flags, time;
+        public UIntPtr extra;
+    }
+    // Both supported Windows targets use a 64-bit pointer. MOUSEINPUT is the largest INPUT union member.
+    [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public Mouse mouse; }
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flag);
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint count, Input[] inputs, int size);
+    static bool IsSubjectAt(Point point, IntPtr window, uint expectedPid) {
+        var found = WindowFromPoint(point);
+        uint owner;
+        return found != IntPtr.Zero && GetAncestor(found, 2) == window
+            && GetWindowThreadProcessId(found, out owner) != 0 && owner == expectedPid;
+    }
+    public static bool ClickOwnedControl(IntPtr window, uint expectedPid, int x, int y) {
+        var target = new Point { x=x, y=y };
+        if (!OnInputDesktop() || !IsSubjectAt(target, window, expectedPid) || !SetCursorPos(x, y)) return false;
+        Point actual;
+        if (!GetCursorPos(out actual) || actual.x != x || actual.y != y || !IsSubjectAt(actual, window, expectedPid)) return false;
+        var click = new[] {new Input { mouse=new Mouse { flags=2 } }, new Input { mouse=new Mouse { flags=4 } }};
+        int size = Marshal.SizeOf(typeof(Input));
+        uint sent = SendInput(2, click, size);
+        if (sent == 1) SendInput(1, new[] { click[1] }, size);
+        return sent == 2;
+    }
 }
 '@
 
@@ -63,7 +112,8 @@ function Get-SubjectFocus {
 function Send-SubjectKeys([string]$Keys) {
     [uint32]$owner = 0
     [void][IfwObservedWindow]::GetWindowThreadProcessId($handle, [ref]$owner)
-    if ($owner -ne $SubjectId -or [IfwObservedWindow]::GetForegroundWindow() -ne $handle) {
+    if ($owner -ne $SubjectId -or -not [IfwObservedWindow]::OnInputDesktop() -or
+        [IfwObservedWindow]::GetForegroundWindow() -ne $handle) {
         throw 'The synthetic window does not own foreground input.'
     }
     [Windows.Forms.SendKeys]::SendWait($Keys)
@@ -78,6 +128,23 @@ function Get-FieldText($Element) {
         return $pattern.DocumentRange.GetText(64)
     }
     throw 'The filename editor provides neither ValuePattern nor TextPattern.'
+}
+
+function Test-SubjectLogLine([string]$Line) {
+    $stream = [IO.File]::Open($SubjectLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    try {
+        $reader = [IO.StreamReader]::new($stream)
+        try {
+            while ($null -ne ($entry = $reader.ReadLine())) {
+                if ($entry -ceq $Line) { return $true }
+            }
+            return $false
+        } finally {
+            $reader.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
 }
 
 try {
@@ -102,7 +169,19 @@ try {
         if (-not $element.Current.IsKeyboardFocusable) { throw 'A named control is not keyboard focusable.' }
     }
     if (-not $result.passwordProperty) { throw 'Password editor lacks its UI Automation protected property.' }
-    [void][IfwObservedWindow]::SetForegroundWindow($handle)
+    $result.onInputDesktop = [IfwObservedWindow]::OnInputDesktop()
+    $result.activation = [ordered]@{ setForeground = [IfwObservedWindow]::SetForegroundWindow($handle) }
+    if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle -and $result.onInputDesktop) {
+        try { $file.SetFocus(); $result.activation.uiaFocus = 'requested' }
+        catch { $result.activation.uiaFocus = 'unavailable' }
+        if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle) {
+            $rect = $file.Current.BoundingRectangle
+            if (-not $rect.IsEmpty -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
+                $result.activation.ownedControlClick = [IfwObservedWindow]::ClickOwnedControl(
+                    $handle, $SubjectId, [int]($rect.Left + $rect.Width / 2), [int]($rect.Top + $rect.Height / 2))
+            }
+        }
+    }
     $result.foreground = Wait-Observation { [IfwObservedWindow]::GetForegroundWindow() -eq $handle } 'owned foreground'
     for ($i = 0; $i -lt 7; $i++) {
         $name = Get-SubjectFocus
@@ -117,7 +196,7 @@ try {
         Send-SubjectKeys $key
         $length++
         [void](Wait-Observation {
-            [IO.File]::ReadAllText($SubjectLog).Contains("EDIT masked chars=$length")
+            Test-SubjectLogLine "EDIT masked chars=$length"
         } 'password edit length')
     }
     $result.passwordCharactersTyped = $length

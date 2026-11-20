@@ -57,8 +57,8 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases passed on Microsoft Basic Render Driver. Accessibility and real desktop services remain open. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Same four DX12 lifecycle cases passed on the native ARM64 executable. Accessibility and real desktop services remain open. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases, independent Startup readbacks, Shell registration and balloon callback passed. UI Automation observed German names and password protection. Full input and screen-reader results remain open. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Four native DX12 lifecycle cases and independent Startup readbacks passed. UI Automation observed German names and password protection. Hosted foreground and tray registration remain open. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. Fedora X11 measurements met all [11 reference limits](rw02-performance.md#paired-x11-measurements). | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Same four native X11/Wayland lifecycle cases and full AT-SPI input run on both backends at `4961746`. | Pending |
 
@@ -75,9 +75,9 @@ Fedora x64 exercised native Orca speech output and three protected keystrokes
 on X11 and Wayland. X11 also produced an actual Anthy composition and Japanese
 commit in the Rust filename field. [IME and screen-reader observations](rw02-native-gui.md#native-composition-and-screen-reader-output).
 
-The [YAML probe](rw02-yaml.md) added 38 paired cases on local Linux x64.
-The Rust reader/writer matched 183 assertions. The production C# reader made
-116 assertions against Rust output. Its four-target hosted run is pending.
+The [YAML probe](rw02-yaml.md) passed on all four native targets at
+`11e4e6f`. Each produced 183 Rust assertions and 116 production C# readback
+assertions across 38 paired cases and the same offline source tar.
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.

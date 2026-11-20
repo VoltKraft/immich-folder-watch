@@ -1,5 +1,16 @@
 # Project Status
 
+## Four native YAML runs and Windows input (2026-11-20)
+
+At `11e4e6f` all four native YAML runs passed with identical filtered sources
+and independently checked evidence. Both Windows hosts passed WScript
+readback of the private and known Startup shortcuts. Both observed German
+UI Automation names and password protection. The x64 input test encountered
+a sharing violation while reading a live log. The ARM64 observer could not
+foreground the owned window, so it sent no keys. The follow-up reads the active
+log with read/write sharing and checks the input desktop as well as the HWND
+and PID. [YAML evidence](rust/rw02-yaml.md) and [Windows input and Shell results](rust/rw02-native-gui.md#reproduction).
+
 ## Native Ubuntu tray results and clean reference build (2026-11-20)
 
 At `11e4e6f` both Ubuntu architectures passed the eight-step tray-owner

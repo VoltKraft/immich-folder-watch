@@ -84,6 +84,15 @@ records the last completed observer phase on timeout. The input fixture uses
 the same UI Automation host selection. Interactive notification and activation
 remain open on both targets.
 
+At `11e4e6f` the ARM64 launcher measured the Windows PowerShell 5.1 WScript
+startup timeout, then successfully instantiated WScript with PowerShell
+7.6.10. Both independent shortcut readbacks passed. Windows PowerShell 5.1
+loaded the ARM64 UI Automation assemblies in 23.429 seconds. Both service
+jobs completed and showed the fallback on the private shell-less desktop.
+ARM64 Explorer still declined the tray icon. The x64 shell again registered
+and removed it and delivered a balloon-show callback. All indexed service
+files matched their hashes after download. [Artifacts for both Windows targets](rw02-yaml.md#reviewed-inputs-and-corresponding-sources).
+
 ## Dependency review and local evidence
 
 The standalone lock SHA-256 is
