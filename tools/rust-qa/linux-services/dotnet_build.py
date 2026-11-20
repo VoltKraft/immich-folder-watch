@@ -6,9 +6,16 @@ from pathlib import Path
 import subprocess
 
 
+def reference_sdk(artifacts):
+    default = artifacts.parent / "flatpak-local-2.11.2/sdk"
+    return Path(os.environ.get("IFW_QA_REFERENCE_SDK", default)).resolve(strict=True)
+
+
 def build_reference(root, here, artifacts, output, sha):
-    sdk = artifacts.parent / "flatpak-local-2.11.2/sdk"
-    packages = artifacts.parent / "nuget-packages"
+    sdk = reference_sdk(artifacts)
+    packages = Path(os.environ.get("IFW_QA_REFERENCE_PACKAGES", artifacts.parent / "nuget-packages")).resolve(strict=True)
+    if not packages.is_relative_to(artifacts.parent) or packages == artifacts.parent:
+        raise ValueError("Select a dedicated package cache below the project artifacts directory")
     pin = json.loads((root / "global.json").read_text())["sdk"]["version"]
     if not (sdk / "sdk" / pin).is_dir():
         raise RuntimeError(f"Missing isolated reference SDK {pin} under {sdk}")

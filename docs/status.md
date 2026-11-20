@@ -8,6 +8,11 @@ the earlier ambiguous refusal and verified the private daemon builds, source
 bindings and YAML archive. The [service evidence index](../tools/rust-qa/linux-services/evidence.sha256)
 binds the strengthened runs on the stock, pristine and patched daemons.
 
+The native Ubuntu assessment now includes the same tray ownership and FUSE
+grant tests, with a separate read-only offline .NET reference build. The
+Fedora reference build completed with zero compiler warnings or errors.
+Hosted observations for these two new steps remain pending.
+
 On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
 when requesting their shared upload lock through a real Documents grant.
 Both acquired it on a private build of 1.22.1 with the upstream flock fix.

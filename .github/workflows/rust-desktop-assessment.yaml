@@ -60,6 +60,8 @@ jobs:
 
       - name: Exercise the legacy writers, WAL backup and production readers
         shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
@@ -67,6 +69,8 @@ jobs:
       - name: Round-trip legacy YAML with the filtered offline source bundle
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
@@ -101,7 +105,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
-            xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config
+            xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
+            xdg-desktop-portal fuse3
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Observe Windows Shell services and per-user Startup shortcuts
@@ -127,6 +132,26 @@ jobs:
       - name: Observe native Wayland lifecycle and AT-SPI using the tested Mesa presentation mode
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+
+      - name: Build the offline native Linux service probes
+        id: linux_services
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/linux-services/native.py lint
+          python3 tools/rust-qa/linux-services/native.py build
+
+      - name: Observe StatusNotifierItem loss, replacement and activation
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        run: python3 tools/rust-qa/linux-services/native.py tray
+
+      - name: Observe real Documents grants and the distribution's file lock behavior
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        env:
+          IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 tools/rust-qa/linux-services/native.py oracle
+          python3 tools/rust-qa/linux-services/native.py documents --expect-lock enosys
 
       - name: Observe native Windows show events, close and reopen
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
@@ -156,6 +181,11 @@ jobs:
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
+            artifacts/rust/linux-services/inputs.json
+            artifacts/rust/linux-services/documents-*/*.json
+            artifacts/rust/linux-services/documents-*/*.log
+            artifacts/rust/linux-services/tray-*/*.json
+            artifacts/rust/linux-services/tray-*/*.log
             artifacts/rust/gui-native/
             artifacts/rust/gui-run/*/*.json
             artifacts/rust/gui-run/*/*.log

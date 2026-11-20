@@ -132,7 +132,8 @@ def launch(part, portal=None, expectation=None):
         (work / "etc/passwd").write_text("root:x:0:0:Synthetic portal user:/tmp/home:/bin/false\n")
         (work / "etc/group").write_text("root:x:0:\n")
         runtime = "/run/user/0"
-        sdk = ART.parent / "flatpak-local-2.11.2/sdk"
+        from dotnet_build import reference_sdk
+        sdk = reference_sdk(ART)
         additions += ["--dir", "/runtime"]
         for entry in ("dotnet", "host", "shared"):
             additions += ["--ro-bind", str(sdk / entry), f"/runtime/{entry}"]

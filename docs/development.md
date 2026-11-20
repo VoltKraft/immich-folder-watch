@@ -114,7 +114,12 @@ measured presentation modes and remaining checks.
 The [YAML assessment](rust/rw02-yaml.md) uses the shipping C# reader in both
 directions. Upload only its individual run output. The separate private cache
 contains original third-party archives. The [Linux service tests](rust/rw02-linux-services.md)
-exercise tray-owner changes and actual synthetic Documents grants. The
+exercise tray-owner changes and actual synthetic Documents grants. On a native
+Linux builder, set `IFW_QA_REFERENCE_SDK` to the root of the pinned .NET SDK
+and `IFW_QA_REFERENCE_PACKAGES` to a populated NuGet cache below `artifacts/`.
+The grant oracle mounts both read-only and restores offline. The hosted job
+populates this package cache while building the earlier storage and YAML oracles.
+The
 [portal comparison builder](rust/rw02-portal-upstream.md) replays one upstream
 fix on exact release sources in an offline SDK. It writes the executable to
 the ignored test area for the private namespace. The
