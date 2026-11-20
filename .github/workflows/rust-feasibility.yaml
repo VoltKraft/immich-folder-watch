@@ -68,6 +68,13 @@ jobs:
           export CARGO_HOME="$PWD/artifacts/rust/cargo-home"
           python3 tools/rust-qa/test-native.py "$NATIVE_TARGET"
 
+      - name: Exercise handle-bound operations over an actual loopback SMB share
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          ./tools/rust-qa/test-windows-smb.ps1 -Target $env:NATIVE_TARGET
+
       - name: Retain native observations
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

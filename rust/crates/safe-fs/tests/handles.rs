@@ -130,10 +130,19 @@ fn linked_directory_and_disguised_root_fail_closed_during_enumeration() {
     std::os::unix::fs::symlink("real", profile.0.join("link")).unwrap();
     #[cfg(windows)]
     {
-        // A junction fixture works with ordinary Windows user privileges.
+        // cmd.exe cannot use a UNC current directory. Only create the junction
+        // on the dedicated backing volume. All tested lease calls use the UNC.
+        let directory = match support::smb_fixture_name() {
+            Some(name) => std::path::PathBuf::from(
+                std::env::var_os("RUNNER_TEMP").expect("disposable SMB backing directory"),
+            )
+            .join(name)
+            .join(profile.0.file_name().unwrap()),
+            None => profile.0.clone(),
+        };
         let result = std::process::Command::new("cmd.exe")
             .args(["/d", "/c", "mklink", "/j", "link", "real"])
-            .current_dir(&profile.0)
+            .current_dir(directory)
             .output()
             .unwrap();
         assert!(

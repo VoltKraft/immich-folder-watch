@@ -5,13 +5,26 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub(crate) struct Synthetic(pub(crate) PathBuf);
 
+#[cfg(windows)]
+pub(crate) fn smb_fixture_name() -> Option<String> {
+    let id = std::env::var_os("IFW_RUST_SMB_FIXTURE")?;
+    let id = id.to_str().expect("ASCII SMB fixture identifier");
+    assert!(id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()));
+    Some(format!("IfwRustQa{id}"))
+}
+
 impl Synthetic {
     pub(crate) fn new() -> Self {
         static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let base = std::env::temp_dir();
+        #[cfg(windows)]
+        let base = smb_fixture_name().map_or(base, |name| {
+            println!("smb_fixture={name}");
+            PathBuf::from(format!(r"\\localhost\{name}$"))
+        });
         loop {
             let serial = SEQUENCE.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir()
-                .join(format!("ifw-rust-fs-test-{}-{serial}", std::process::id()));
+            let path = base.join(format!("ifw-rust-fs-test-{}-{serial}", std::process::id()));
             let builder = fs::DirBuilder::new();
             #[cfg(unix)]
             let mut builder = builder;

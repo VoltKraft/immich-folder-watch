@@ -136,6 +136,17 @@ The next filesystem observations require native UNC and portal/FUSE roots.
 Verified destructive cleanup, directory moves, engine call sites and their
 independent review remain RW-03 and subsequent integration gates.
 
+The Windows [SMB fixture](../../tools/rust-qa/test-windows-smb.ps1) creates
+an empty temporary share on a disposable host. It verifies its encryption,
+single-account ACL and backing directory before populating it. A read through
+the loopback UNC and the Windows client's negotiated SMB dialect establish
+the path used by the tests. A Rust-only fixture selector accepts a random
+32-hex identifier and constructs the localhost share name. Each test owns a
+new directory there. The junction setup uses the local backing directory
+because cmd.exe cannot take a UNC working directory. The production leases
+operate through the UNC path. Evidence includes cleanup outcomes. Hosted
+results must verify that these operations are supported by each Windows host.
+
 ## Independent review of the feasibility boundary
 
 The independent review of `2ff988095045739b6eeb0735750f5ec9aa9baca6`
