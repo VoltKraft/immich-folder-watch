@@ -1,0 +1,21 @@
+immich:
+  serverApiUrl: "  https://immich.example.invalid/api/  "
+  apiKey: " RW01-SYNTHETIC-NOT-A-CREDENTIAL "
+watch:
+  extensions: [JPG, .jpg, png, " "]
+  transferOrder: " OLDESTFIRST "
+  sources:
+    - path: " media/../Média "
+      albumName: "  Legacy album  "
+      syncMode: " unknown-future-mode "
+      excludeDirectories: [" temp ", TEMP, " "]
+      excludeFileNames: ["*.tmp", "*.TMP"]
+    - path: "second"
+      extensions: [.HEIC]
+      syncMode: " UPLOADALL "
+localization:
+  language: " DE "
+logging:
+  target: " JOURNALD "
+  logDirectory: " logs/../logs "
+unknownFutureProperty: ignored

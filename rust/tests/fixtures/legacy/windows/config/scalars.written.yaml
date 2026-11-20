@@ -1,0 +1,53 @@
+immich:
+  allowInsecureHttp: true
+  serverApiUrl: https://immich.example.invalid/api
+  apiKey: RW01-SYNTHETIC-NOT-A-CREDENTIAL
+watch:
+  sources:
+  - path: C:\Pictures\2024
+    albumName: "null"
+    includeSubdirectories: true
+    extensions:
+    - .jpg
+    - .mov
+    excludeDirectories: []
+    excludeFileNames: []
+    syncMode: sync
+    deleteAfterUpload: false
+  - path: "001"
+    albumName: "123"
+    includeSubdirectories: false
+    extensions: []
+    excludeDirectories: []
+    excludeFileNames: []
+    syncMode: uploadAll
+    deleteAfterUpload: true
+  - path: "Média/日本語/\U0001F600"
+    albumName: "true"
+    includeSubdirectories: false
+    extensions: []
+    excludeDirectories: []
+    excludeFileNames: []
+    syncMode: uploadNew
+    deleteAfterUpload: false
+  - path: 'colon: hash#'
+    albumName: 'a: b # c'
+    includeSubdirectories: false
+    extensions: []
+    excludeDirectories: []
+    excludeFileNames: []
+    syncMode: uploadNew
+    deleteAfterUpload: false
+  transferOrder: newestFirst
+  batchIntervalSeconds: 5
+  maxBatchSize: 25
+  fileReadyTimeoutSeconds: 30
+retry:
+  maxAttempts: 7
+  baseDelayMilliseconds: 123
+logging:
+  level: Information
+  target: file
+  logDirectory: logs
+localization:
+  language: en

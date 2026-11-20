@@ -14,3 +14,6 @@ packaging/flatpak/licenses/YamlDotNet-18.1.0-LICENSE-libyaml whitespace=cr-at-eo
 
 # Preserve the original upstream trailing space in the versioned SVG notice.
 packaging/flatpak/licenses/Svg.Custom-5.2.3-LICENSE.txt whitespace=-blank-at-eol
+
+# The compatibility oracle emits UTF-8 with LF on both native platforms.
+rust/tests/fixtures/legacy/** text eol=lf

@@ -5,6 +5,7 @@ on:
     branches: [rewrite/rust]
     paths:
       - '.github/workflows/rust-compatibility.yaml'
+      - '.gitattributes'
       - 'global.json'
       - 'Directory.Build.*'
       - 'NuGet.Config'
@@ -50,6 +51,11 @@ jobs:
     steps:
       - name: Checkout exact candidate revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The reference hashes the exact compiler inputs, including native source line endings.
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: ${{ runner.os == 'Windows' && 'true' || 'false' }}
         with:
           persist-credentials: false
 
@@ -73,12 +79,9 @@ jobs:
       - name: Verify independently regenerated platform reference
         run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify artifacts/rust/oracle
 
-      - name: Verify reviewed Linux golden corpus
-        if: matrix.platform == 'linux'
+      - name: Verify reviewed native golden corpus
         run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
 
-      # The first native Windows outputs are review inputs, not a pre-certified golden.
-      # Add a checked-in Windows comparison only after reviewing the exported corpus.
       - name: Execute portable behavior and security reference
         run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --logger "trx;LogFileName=core-reference.trx" --results-directory artifacts/rust/test-results
 

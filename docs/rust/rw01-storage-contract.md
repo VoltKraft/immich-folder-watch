@@ -37,11 +37,14 @@ The console reports both architectures and the executing .NET runtime. This guar
 does not establish GPU, screen-reader, desktop or installer acceptance.
 
 The reviewed [Linux corpus](../../rust/tests/fixtures/legacy/linux/manifest.json)
-was produced on native Linux x64. Native Windows output must be independently
-generated, reviewed and retained. The case-insensitive mode on Linux exercises
-the store's explicit casing switch; it does **not** emulate Windows path parsing,
-UNC access, drive roots or Windows filesystem behavior. Four-target execution and
-native Windows corpus review remain separate evidence in the main status record.
+and [Windows corpus](../../rust/tests/fixtures/legacy/windows/manifest.json)
+were each reproduced on native x64 and ARM64. CI checks out the C# reference
+sources with the line endings used to compile each original oracle, LF on Linux
+and CRLF on Windows. The generated fixture files themselves use LF on both.
+On a local checkout with different source bytes, inspect the manifest mismatch
+or use a disposable native checkout with the CI settings. Native Windows
+path parsing includes drive/UNC strings. Access to an actual UNC share still
+requires a separate filesystem test. See the [run evidence](rw01-native-reference.md).
 
 ## Fixture mapping
 

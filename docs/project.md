@@ -17,8 +17,8 @@
 - Plan maturity: Rust analysis completed; the user's explicit 2026-11-14 follow-up
   selects the complete RW-01 through RW-07 implementation and reusable foundation.
   Release 3.0.4 remains the shipping reference. Native acceptance is outstanding.
-- Active milestone: `M-RUST-IMPLEMENTATION-20261114`; RW-01 is the first work
-  package. This goal continues across all seven packages; RW-08 is excluded.
+- Active milestone: `M-RUST-IMPLEMENTATION-20261114`. RW-01 met its reference
+  gate on 2026-11-20. RW-02 is active under the same seven-package goal.
 - Implementation request / scope: The attached 2026-11-14 implementation request
   supersedes the earlier analysis-only boundary for RW-01 through RW-07. Its fixed
   contract follows below. Historical scope: On 2026-11-14 the user requested repository

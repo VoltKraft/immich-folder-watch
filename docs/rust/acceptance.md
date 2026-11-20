@@ -28,8 +28,8 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
-| RW-01 | In progress | Generated legacy config/DB fixtures, C# behavioral/protocol runs, full public/security/lifecycle case mapping and provenance |
-| RW-02 | Not started | RW-01 accepted; exact audited toolchain/dependency/font graph; native GUI/platform/filesystem/codec/Socket.IO feasibility on four targets |
+| RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
+| RW-02 | In progress | Native GUI/platform/filesystem/codec/Socket.IO feasibility on four targets and exact dependency/font graph review |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -57,10 +57,10 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Pending | Pending | Pending | Pending |
-| Windows ARM64 | Pending | Pending | Pending | Pending |
-| Linux x64 | Local C# baseline and synthetic corpora passed; hosted confirmation pending | Pending | C# headless/protocol passed; Rust/native desktop pending | Pending |
-| Linux ARM64 | Pending | Pending | Pending (X11/Wayland) | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Pending | Pending | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | Pending | C# headless/protocol passed. Rust/native desktop pending | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Pending | Pending (X11/Wayland) | Pending |
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.

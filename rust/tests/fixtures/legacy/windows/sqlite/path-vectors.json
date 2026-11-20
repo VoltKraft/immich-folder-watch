@@ -1,0 +1,330 @@
+{
+  "NativePlatform": "windows",
+  "Boundary": "String/key normalization only. These synthetic path strings are never opened as media; they confer no filesystem authorization.",
+  "Vectors": [
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\ifw-synthetic",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\ifw-synthetic",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\ifw-synthetic",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00E9dia",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "c:\\ifw-synthetic\\M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "c:\\ifw-synthetic\\M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "c:\\ifw-synthetic\\M\u00E9dia",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\server.invalid\\share",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\server.invalid\\share",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\server.invalid\\share",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\",
+      "SourceKey": "C:\\",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\IFW-SYNTHETIC",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\IFW-SYNTHETIC",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\ifw-synthetic",
+      "SourceKey": "C:\\IFW-SYNTHETIC",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "C:\\ifw-synthetic\\..\\M\u00E9dia",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "C:\\M\u00E9dia",
+      "SourceKey": "C:\\M\u00C9DIA",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "C:\\IFW-SYNTHETIC\\M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "C:\\IFW-SYNTHETIC\\M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "c:/ifw-synthetic/M\u00E9dia/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "c:\\ifw-synthetic\\M\u00E9dia",
+      "SourceKey": "C:\\IFW-SYNTHETIC\\M\u00C9DIA",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE\\STRA\u00DFE",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE\\STRA\u00DFE",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "\\\\server.invalid\\share\\Stra\u00DFe\\",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "\\\\server.invalid\\share\\Stra\u00DFe",
+      "SourceKey": "\\\\SERVER.INVALID\\SHARE\\STRA\u00DFE",
+      "RelativePath": ".\\\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": ".\\\u03A3\u03A3-\uD801\uDC00.JPG"
+    }
+  ]
+}

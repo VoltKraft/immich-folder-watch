@@ -1,5 +1,26 @@
 # Project Status
 
+## RW-01 accepted and RW-02 started (2026-11-20)
+
+The user resumed `M-RUST-IMPLEMENTATION-20261114` in its original Goal run.
+The active chat, branch and open [draft PR #46](https://github.com/VoltKraft/immich-folder-watch/pull/46)
+were verified at source `3ca5b0a89d266e61e219239f84d896dc71528ba0`.
+
+The [native reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634286661)
+passed on all four targets. Both Windows architectures produced identical golden
+files, as did both Linux architectures. The four downloaded archives matched
+GitHub's digests. The [native evidence](rust/rw01-native-reference.md) records
+the platform path/encoding differences and the nine Linux-specific tests skipped
+on Windows. All nine passed on both Linux architectures. The existing
+[PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634333824)
+also passed. Every PAR row and security rule has a reference or an explicit
+stronger candidate requirement in the [parity mapping](rust/rw01-parity.md).
+
+RW-02 is active. Its first work covers the GUI feature and font audit, the
+native filesystem and legacy codecs, and an isolated .NET desktop resource
+baseline for side-by-side measurement. The [acceptance record](rust/acceptance.md)
+tracks the remaining native gates.
+
 ## RW-01 local compatibility baseline verified (2026-11-14)
 
 - Goal remains active under `M-RUST-IMPLEMENTATION-20261114`; selection checkpoint
