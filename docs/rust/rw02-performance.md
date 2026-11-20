@@ -73,6 +73,19 @@ The Fedora package receipts for the executed test host identify Python 3.15.2 (`
 
 ## Replay
 
+The integrated Linux x64 GUI at `417a897` passed all 11 original budgets
+in three further 100,000-file trials on the same Fedora X11 host. The median
+startup was 177.91 ms and both visible and hidden median RSS were 127.355 MiB.
+The idle windows recorded zero CPU ticks, render passes and XDamage events.
+During the scans, the median of the trial p95 latencies was 1.50 ms to reopen
+and 10.66 ms to close. The native executable SHA-256 was
+`80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`.
+The report `rust-linux-x64-integrated-graphics-final.json` in the performance
+artifact directory has SHA-256
+`eb5813215acc30fa22fd9f436001a9f4060da7fabf85a8c4af1b6658fe1da986`.
+The Ubuntu jobs build the shipping .NET reference on each fresh host, save
+its measured budgets, then run the same workload on the Rust subject.
+
 Use a Release build of the Linux desktop application from the source reference. The commands below use this checkout's isolated reference build, SDK, checksum-pinned Rust toolchain, inspected GUI registry and filtered YAML sources. Each run requires a fresh output label. Preserve the original fixed-budget report and verify its SHA-256 against the value above before replaying the pair. Select the full Git revision of the built Rust source. Each staged binary also carries a receipt binding its exact source-file hashes.
 
 ```sh

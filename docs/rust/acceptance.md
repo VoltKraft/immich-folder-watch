@@ -53,7 +53,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | RI-AC09 | Open | Audited resolved graph/assets, notices, SBOM and reconstructible source inputs |
 | RI-AC10 | Open | Independent final review with no unresolved acceptance blocker and truthful complete handoff |
 
-Fedora x64 confirmed old/new local activation in both directions and exclusion
+All four native targets confirmed old/new local activation in both directions and exclusion
 between two cooperative Rust writers. The shipping coordinator could still
 start with the new guard held. Installed handover and Windows cross-session
 exclusion remain open. [Native process evidence](rw02-instance.md).
@@ -67,8 +67,13 @@ exclusion remain open. [Native process evidence](rw02-instance.md).
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. Fedora X11 measurements met all [11 reference limits](rw02-performance.md#paired-x11-measurements). | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Same four native X11/Wayland lifecycle cases and full AT-SPI input run on both backends at `4961746`. | Pending |
 
-All four also passed two live WAL backups, 40 production C# readback assertions
-and 15 native loopback transport cases per host. [Source-bound four-host archives](rw02-native-gui.md#four-native-assessment-archives).
+All four also passed two live WAL backups, 40 production C# readback assertions,
+15 native loopback transport cases and six old/new activation and file-lock
+observations per host. Windows ARM64 repeated all 15 transport cases after a
+confirmed link against the reconstructed import library.
+[Four-host archives](rw02-native-gui.md#four-native-assessment-archives),
+[native activation](rw02-instance.md#native-results-on-all-four-targets)
+and [ARM64 reconstruction](rw02-windows-imports.md).
 
 Both Windows targets passed all 13 filesystem cases over a verified, encrypted
 SMB 3.1.1 loopback share. On Fedora x64 the distribution's document portal
@@ -89,8 +94,10 @@ commit in the Rust filename field. [IME and screen-reader observations](rw02-nat
 
 GNOME Wayland on Fedora x64 committed the same Japanese character from Anthy
 with Mesa Mailbox. The same window presented 640 × 400, 1280 × 800 and 800 × 500
-buffers as its monitor changed. Default presentation lost the commit after
-preedit. [Native protocol, field and buffer observations](rw02-wayland-input.md).
+buffers as its monitor changed. The integrated GUI now selects the observed
+surface mode itself for this Mesa software backend. Both Fedora Anthy and
+the signed Ubuntu Mozc engine committed `あ` on the Fedora compositor with
+the ordinary application settings. [Native protocol, field and buffer observations](rw02-wayland-input.md).
 
 The released egui 0.37 text editor deleted the wrong visible Arabic character
 in two mixed-direction cases. A narrowly scoped upstream correction passed

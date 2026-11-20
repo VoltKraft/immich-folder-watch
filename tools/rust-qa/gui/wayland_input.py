@@ -5,8 +5,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 
 from gi.repository import Gio, GLib
 
@@ -22,9 +24,22 @@ KEY_RIGHT = 0xff53
 KEY_LEFT = 0xff51
 SHIFT = 0xffe1
 SUPER = 0xffeb
+ENGINE_IDS = {"anthy": "anthy", "mozc": "mozc-jp"}
 
 
-def prepare_shell(stack, ime, monitors):
+def component(ibus_engine):
+    path = Path("/usr/share/ibus/component") / (ibus_engine + ".xml")
+    record = ET.parse(path).getroot()
+    arguments = shlex.split(record.findtext("exec", ""))
+    if not arguments:
+        raise RuntimeError(f"Missing {ibus_engine} component executable")
+    program = Path(arguments[0])
+    if not program.is_absolute() or program.name != "ibus-engine-" + ibus_engine:
+        raise RuntimeError(f"Unexpected {ibus_engine} component executable: {program}")
+    return path, program, record.findtext("name"), record.findtext("version")
+
+
+def prepare_shell(stack, ime, monitors, ibus_engine):
     os.environ.update(XDG_CURRENT_DESKTOP="GNOME", XDG_SESSION_TYPE="wayland", GSETTINGS_BACKEND="keyfile")
     shell_version = subprocess.check_output(["gnome-shell", "--version"], text=True, timeout=5).split()[-1]
     Gio.Settings.new("org.gnome.desktop.interface").set_boolean("enable-animations", False)
@@ -39,11 +54,26 @@ def prepare_shell(stack, ime, monitors):
     Gio.Settings.sync()
     if not ime:
         return
-    # The keyfile and both buses belong to the new namespace. GNOME and Anthy
+    # The keyfile and both buses belong to the new namespace. GNOME and its engine
     # must share the same settings even though they run in separate processes.
     os.environ["IBUS_ADDRESS"] = "unix:path=/tmp/ibus-wayland"
+    engine_id = ENGINE_IDS[ibus_engine]
+    if ibus_engine == "mozc":
+        # Mozc starts in Direct mode by default. This per-user setting is
+        # supported by the Noble 2.28 engine, including its --xml enumeration.
+        config = Path.home() / ".config/mozc/ibus_config.textproto"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text('engines { name: "mozc-jp" longname: "Mozc" layout: "default" rank: 80 }\n'
+                          'active_on_launch: true\n')
+        _, binary, _, _ = component(ibus_engine)
+        xml = subprocess.check_output([binary, "--xml"], timeout=5)
+        reported = [n.text for n in ET.fromstring(xml).iterfind(".//engine/name")]
+        if engine_id not in reported:
+            raise RuntimeError(f"The native Mozc component did not declare {engine_id}: {reported}")
+        (WORK / "mozc-engines.xml").write_bytes(xml)
+        (WORK / "mozc-ibus-config.textproto").write_bytes(config.read_bytes())
     sources = Gio.Settings.new("org.gnome.desktop.input-sources")
-    sources.set_value("sources", GLib.Variant("a(ss)", [("ibus", "anthy")]))
+    sources.set_value("sources", GLib.Variant("a(ss)", [("ibus", engine_id)]))
     Gio.Settings.sync()
     log = WORK / "ibus.log"
     daemon = checked_start(stack, ["ibus-daemon", "--single", "--verbose", "--emoji-extension=disable",
@@ -56,7 +86,7 @@ def dump(name, data):
     (WORK / name).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
-def native_inputs(observer, app, ime):
+def native_inputs(observer, app, ibus_engine=None):
     paths = {Path("/usr/bin/gnome-shell"), Path(os.environ["VK_DRIVER_FILES"])}
     loaded = re.compile(r"lib(?:mutter-\d+|shell-\d+|wayland-(?:client|server)|vulkan_lvp|ibus-1.0)\.so(?:\..*)?$")
     for pid in (observer.mutter.pid, app.pid):
@@ -65,8 +95,11 @@ def native_inputs(observer, app, ime):
             if name.startswith("/") and loaded.fullmatch(Path(name).name):
                 paths.add(Path(name))
     engines = []
-    if ime:
-        paths.update((Path("/usr/bin/ibus-daemon"), Path("/usr/share/ibus/component/anthy.xml")))
+    description = None
+    if ibus_engine:
+        metadata, program, bus_name, version = component(ibus_engine)
+        description = {"name": bus_name, "version": version, "program": str(program)}
+        paths.update((Path("/usr/bin/ibus-daemon"), metadata, program))
         # Only the synthetic processes from our verified private PID namespace
         # are visible. Avoid recording unrelated command lines.
         for process in Path("/proc").glob("[0-9]*"):
@@ -74,20 +107,20 @@ def native_inputs(observer, app, ime):
                 arguments = (process / "cmdline").read_bytes().decode().strip("\0").split("\0")
             except FileNotFoundError:
                 continue
-            engine = [Path(a) for a in arguments if a.startswith("/usr/") and
-                      (a.endswith("/ibus-engine-anthy") or a.endswith("/ibus-anthy/engine/main.py"))]
+            engine = [Path(a) for a in arguments if a == str(program) or
+                      (ibus_engine == "anthy" and a == "/usr/share/ibus-anthy/engine/main.py")]
             if engine and "--xml" not in arguments:
                 engines.append({"pid": int(process.name), "entry": str(engine[0])})
                 paths.update(engine)
         if not engines:
-            raise RuntimeError("The active private Anthy process was missing")
+            raise RuntimeError(f"The active private {ibus_engine} process was missing")
     checksums = {}
     for path in sorted({p.resolve(strict=True) for p in paths}):
         with path.open("rb") as stream:
             checksums[str(path)] = hashlib.file_digest(stream, "sha256").hexdigest()
     return {"shell_version": subprocess.check_output(["gnome-shell", "--version"], text=True, timeout=5).strip(),
-            "ibus_version": subprocess.check_output(["ibus", "version"], text=True, timeout=5).strip() if ime else None,
-            "readonly_os_files_sha256": checksums, "private_engine_processes": engines}
+            "ibus_version": subprocess.check_output(["ibus", "version"], text=True, timeout=5).strip() if ibus_engine else None,
+            "readonly_os_files_sha256": checksums, "component": description, "private_engine_processes": engines}
 
 
 def display_state(observer):
@@ -295,7 +328,7 @@ def check_monitors(observer, log, connectors, app):
     return steps
 
 
-def check_ime(observer, log, app):
+def check_ime(observer, log, app, ibus_engine):
     import gi
     gi.require_version("IBus", "1.0")
     from gi.repository import IBus
@@ -303,8 +336,9 @@ def check_ime(observer, log, app):
     def engine():
         value = bus.get_global_engine()
         return value.get_name() if value else None
-    wait_for(lambda: bus.is_connected() and engine() == "anthy", 10,
-             "GNOME Shell did not select the configured private Anthy engine")
+    engine_id = ENGINE_IDS[ibus_engine]
+    wait_for(lambda: bus.is_connected() and engine() == engine_id, 10,
+             f"GNOME Shell did not select the configured private {engine_id} engine")
     def filename():
         return next((n for n in read_tree(app.pid) if n["name"] == "Dateiname" and n.get("focused")), None)
     for _ in range(6):
@@ -317,7 +351,7 @@ def check_ime(observer, log, app):
     context = bus.current_input_context()
     if not context or not context.startswith("/org/freedesktop/IBus/InputContext_"):
         raise RuntimeError("IBus did not report a focused input context")
-    dump("native-inputs.json", native_inputs(observer, app, True))
+    dump("native-inputs.json", native_inputs(observer, app, ibus_engine))
     shortcut(observer, ord("a"), 0xffe3)
     tap(observer, 0xff08)
     wait_for(lambda: filename() and filename()["text"] == "", 4, "The selected field did not clear")
@@ -332,7 +366,7 @@ def check_ime(observer, log, app):
     def committed():
         field = filename()
         return field and field["text"] == "あ" and "IME commit chars=1" in log.read_text()[at:]
-    wait_for(committed, 6, "The private Anthy Return did not commit あ into the focused field")
+    wait_for(committed, 6, f"The private {engine_id} Return did not commit あ into the focused field")
     trace = protocol(log.read_text())
     surface = app_surface(trace)
     stages = protocol(log.read_text()[at:])
@@ -350,14 +384,30 @@ def check_ime(observer, log, app):
     if offered[0] not in server or commit[0] not in server:
         raise RuntimeError("The compositor did not independently emit the same preedit and commit")
     field = filename()
-    return {"global_engine": engine(), "ibus_address": os.environ["IBUS_ADDRESS"], "focused_input_context": context,
+    result = {"global_engine": engine(), "ibus_address": os.environ["IBUS_ADDRESS"], "focused_input_context": context,
             "configured_sources": Gio.Settings.new("org.gnome.desktop.input-sources").get_value("sources").unpack(),
             "surface": surface, "focused_wl_keyboards": keyboards, "last_surface_local_cursor_rectangle": rectangles[-1],
             "client_and_compositor_preedit": offered[0], "client_and_compositor_commit": commit[0],
             "field": field, "egui": [s for s in stages.splitlines() if s.startswith("IME ")]}
+    if ibus_engine == "mozc":
+        # The conversion server is a separate program from the IBus adapter.
+        servers = []
+        for proc in Path("/proc").glob("[0-9]*"):
+            try:
+                executable = (proc / "exe").readlink()
+            except (FileNotFoundError, PermissionError):
+                continue
+            if executable.is_relative_to("/usr") and executable.name == "mozc_server":
+                with executable.open("rb") as stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                servers.append({"pid": int(proc.name), "program": str(executable), "sha256": digest})
+        if not servers:
+            raise RuntimeError("The Mozc conversion server was missing from the private desktop")
+        result["conversion_servers"] = servers
+    return result
 
 
-def exercise(stack, observer, *, ime, monitors):
+def exercise(stack, observer, *, ime, monitors, ibus_engine):
     result = {}
     wait_for(lambda: "GNOME Shell started at " in observer.log.read_text(), 12, "Private GNOME startup did not complete")
     def shell_property(method, args):
@@ -376,9 +426,9 @@ def exercise(stack, observer, *, ime, monitors):
     if monitors:
         result["monitor_transitions"] = check_monitors(observer, log, connectors, app)
     if ime:
-        result["composition"] = check_ime(observer, log, app)
+        result["composition"] = check_ime(observer, log, app, ibus_engine)
     else:
-        dump("native-inputs.json", native_inputs(observer, app, False))
+        dump("native-inputs.json", native_inputs(observer, app))
     action("quit")
     if app.wait(timeout=8) != 0:
         raise RuntimeError("The private GNOME assessment application did not shut down")

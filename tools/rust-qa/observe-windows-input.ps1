@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][long]$WindowHandle,
     [Parameter(Mandatory)][string]$SubjectLog,
     [Parameter(Mandatory)][string]$OutputFile,
-    [string]$SpeechCues
+    [string]$SpeechCues,
+    [ValidateSet('before','after')][string]$RecoveryPhase
 )
 
 $ErrorActionPreference = 'Stop'
@@ -116,6 +117,38 @@ function Wait-ReaderCue([string]$Name) {
     throw "Missing NVDA speech observation for $Name."
 }
 
+function Capture-SubjectField($Element, [string]$Suffix) {
+    $r = $Element.Current.BoundingRectangle
+    $x = [int][Math]::Ceiling($r.Left + 2)
+    $y = [int][Math]::Ceiling($r.Top + 2)
+    $width = [int][Math]::Floor($r.Right) - $x - 2
+    $height = [int][Math]::Floor($r.Bottom) - $y - 2
+    if ($width -lt 10 -or $width -gt 1024 -or $height -lt 5 -or $height -gt 128) {
+        throw 'Unexpected bounds for the synthetic filename field.'
+    }
+    foreach ($px in @($x, ($x + $width - 1))) {
+        foreach ($py in @($y, ($y + $height - 1))) {
+            if (-not [IfwObservedWindow]::SubjectAt($handle, $SubjectId, $px, $py)) {
+                throw 'The synthetic field is obscured on the desktop.'
+            }
+        }
+    }
+    if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle) { throw 'The synthetic window lost foreground.' }
+    $bitmap = [Drawing.Bitmap]::new($width, $height)
+    try {
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        try { $graphics.CopyFromScreen($x, $y, 0, 0, $bitmap.Size) } finally { $graphics.Dispose() }
+        $colors = [Collections.Generic.HashSet[int]]::new()
+        for ($col = 0; $col -lt $width; $col++) {
+            for ($row = 0; $row -lt $height; $row++) { [void]$colors.Add($bitmap.GetPixel($col, $row).ToArgb()) }
+        }
+        if ($colors.Count -lt 5) { throw 'Filename capture did not show a drawn text field.' }
+        $png = "$OutputFile.$Suffix.png"
+        $bitmap.Save($png, [Drawing.Imaging.ImageFormat]::Png)
+        return [ordered]@{ width=$width; height=$height; colors=$colors.Count; sha256=(Get-FileHash $png).Hash.ToLowerInvariant() }
+    } finally { $bitmap.Dispose() }
+}
+
 function Get-Field([string]$Name, $Role) {
     $condition = [Windows.Automation.PropertyCondition]::new(
         [Windows.Automation.AutomationElement]::ControlTypeProperty, $Role)
@@ -193,6 +226,14 @@ try {
         if (-not $element.Current.IsKeyboardFocusable) { throw 'A named control is not keyboard focusable.' }
     }
     if (-not $result.passwordProperty) { throw 'Password editor lacks its UI Automation protected property.' }
+    if ($RecoveryPhase -ceq 'after') {
+        $until = [DateTime]::UtcNow.AddSeconds(3)
+        do {
+            $result.focusBeforeActivation = Get-SubjectFocus
+            if ($result.focusBeforeActivation -ceq 'Dateiname') { break }
+            Start-Sleep -Milliseconds 75
+        } while ([DateTime]::UtcNow -lt $until)
+    }
     $result.onInputDesktop = [IfwObservedWindow]::OnInputDesktop()
     $result.session = [Diagnostics.Process]::GetCurrentProcess().SessionId
     $result.activeConsoleSession = [IfwObservedWindow]::WTSGetActiveConsoleSessionId()
@@ -222,6 +263,35 @@ try {
         }
     }
     $result.foreground = Wait-Observation { [IfwObservedWindow]::GetForegroundWindow() -eq $handle } 'owned foreground'
+    if ($RecoveryPhase) {
+        $draft = 'recoverydraft'
+        if ($RecoveryPhase -ceq 'before') {
+            for ($i = 0; $i -lt 6 -and (Get-SubjectFocus) -cne 'Dateiname'; $i++) {
+                Send-SubjectKeys '{TAB}'
+                Start-Sleep -Milliseconds 125
+            }
+            if ((Get-SubjectFocus) -cne 'Dateiname') { throw 'Cannot seed the focused filename.' }
+            Send-SubjectKeys '^a'
+            Send-SubjectKeys $draft
+        } else {
+            if ((Get-FieldText $file) -cne $draft) { throw 'The replacement window lost the edited filename.' }
+            if ((Get-SubjectFocus) -cne 'Dateiname') { throw 'The replacement did not focus the filename.' }
+            $result.restoredFrame = Capture-SubjectField $file 'restored'
+            Send-SubjectKeys '{END}'
+            Send-SubjectKeys 'after'
+            $draft += 'after'
+        }
+        [void](Wait-Observation { (Get-FieldText $file) -ceq $draft } 'native filename edit')
+        Start-Sleep -Milliseconds 160
+        $result.editedFrame = Capture-SubjectField $file 'edited'
+        if ($RecoveryPhase -ceq 'after') {
+            if ($result.restoredFrame.sha256 -ceq $result.editedFrame.sha256) { throw 'The filename screen pixels did not update.' }
+            if ($result.focusBeforeActivation -cne 'Dateiname') { throw 'Native focus required observer intervention after recovery.' }
+        }
+        $result.draft = $draft
+        $result.status = 'passed'
+        return
+    }
     for ($i = 0; $i -lt 7; $i++) {
         $name = Get-SubjectFocus
         if ($name -cin @('Dateiname','Kennwort','English')) { $result.focus += $name }

@@ -68,6 +68,7 @@ jobs:
           python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
 
       - name: Round-trip legacy YAML with the filtered offline source bundle
+        id: yaml
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         shell: bash
         env:
@@ -139,18 +140,22 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend x11 --input
 
-      - name: Observe native Wayland lifecycle and AT-SPI using the tested Mesa presentation mode
+      - name: Observe native Wayland lifecycle and AT-SPI with application-selected presentation
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
-        run: python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input
+
+      - name: Exercise the integrated filename editor and rendered glyphs on X11
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/profile_text.py
 
       - name: Install GNOME and its available Japanese input engine on Ubuntu
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         id: gnome_ime
         run: sudo apt-get install --yes --no-install-recommends gnome-shell ibus ibus-mozc gir1.2-ibus-1.0
 
-      - name: Observe monitor changes with GNOME Wayland
+      - name: Observe Mozc composition and monitor changes with GNOME Wayland
         if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
-        run: python3 tools/rust-qa/gui/native.py --backend wayland --monitor-changes
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --ibus-engine mozc --monitor-changes
 
       - name: Build the offline native Linux service probes
         id: linux_services
@@ -220,6 +225,13 @@ jobs:
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows-input" --input-only
 
+      - name: Verify a replacement DX12 window preserves focus, editing and screen output
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-recovery" --device-recovery
+
       - name: Observe rendered font coverage and mixed-direction editing on the native desktop
         if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
         shell: bash
@@ -234,6 +246,51 @@ jobs:
         run: |
           python3 tools/rust-qa/windows-reader/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment.exe \
             --output "artifacts/rust/windows-reader/native-$NATIVE_TARGET"
+
+      - name: Stage the integrated Linux GUI with its reviewed inventory worker and observer
+        id: worker
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.yaml.outcome == 'success' && steps.gui.outcome == 'success' }}
+        run: |
+          mkdir -p artifacts/rust/graphics/worker-vendor
+          tar -xf "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET/filtered-sources.tar" -C artifacts/rust/graphics/worker-vendor
+          python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
+          python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
+
+      - name: Observe Vulkan loss and redraw on X11
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe Vulkan loss and redraw on Wayland
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-loss-ci --case driver-loss --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe worker and tray behavior when no renderer is available
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name no-driver-ci --case unavailable --backend x11 --driver absent --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Measure the shipping Linux reference and record the same-host budgets
+        id: budget
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          reference=19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc
+          git diff --exit-code "$reference" HEAD -- src ':!src/ImmichFolderWatch.Tests.*' Directory.Build.props Directory.Build.targets global.json NuGet.Config assets/branding tools/BrandAssetGen packaging/avalonia-reduced
+          python3 tools/prepare_reduced_avalonia.py
+          dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj -c Release --artifacts-path artifacts/rust/linux-reference
+          python3 tools/rust-qa/performance/linux.py measure --name "hosted-dotnet-$NATIVE_TARGET" \
+            --entry artifacts/rust/linux-reference/bin/ImmichFolderWatch.App.Linux/release/immich-folder-watch.dll \
+            --runtime-root "$DOTNET_ROOT" --revision "$reference" --input-interval-ms 25
+
+      - name: Compare Rust startup, memory, CPU, idle rendering and response during the native scan
+        if: ${{ !cancelled() && steps.budget.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/performance/linux.py measure --name "hosted-rust-$NATIVE_TARGET" \
+            --entry artifacts/rust/performance/subjects/graphics-ci/native-gui-assessment \
+            --revision "$GITHUB_SHA" --desktop-spike --frame-counter --input-interval-ms 25 \
+            --start-marker INVENTORY_STARTED --finish-marker INVENTORY_COMPLETE
+          python3 tools/rust-qa/performance/linux.py compare \
+            "artifacts/rust/performance/hosted-dotnet-$NATIVE_TARGET.json" "artifacts/rust/performance/hosted-rust-$NATIVE_TARGET.json"
 
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
@@ -268,6 +325,10 @@ jobs:
             artifacts/rust/gui-run/*/*.log
             artifacts/rust/gui-run/*/*.conf
             artifacts/rust/gui-run/*/evidence.sha256
+            artifacts/rust/graphics/*-ci/*.json
+            artifacts/rust/graphics/*-ci/*.log
+            artifacts/rust/graphics/runtime-ci/subject/*.json
+            artifacts/rust/performance/hosted-*.json
             artifacts/rust/gui-build/release/*.inputs.json
             artifacts/rust/font-coverage/*/result.json
             artifacts/rust/font-coverage/*/*/native.log

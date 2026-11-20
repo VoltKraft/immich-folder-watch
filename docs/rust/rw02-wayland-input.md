@@ -1,12 +1,12 @@
 # GNOME Wayland input, monitors and scale
 
-The native Linux x64 assessment received Japanese composition from GNOME Shell
-and IBus Anthy on a virtual Wayland seat with Mesa Mailbox presentation. The
-same 640 × 400 logical window committed buffers at 100%, 200% and 125%.
-GNOME's default presentation run retained all four monitor observations and
-ended at the Japanese commit deadline.
+The integrated Linux x64 assessment committed Japanese input from both IBus
+Anthy and Ubuntu Noble’s Mozc on a private GNOME Wayland seat without a
+presentation override. The same 640 × 400 logical window committed buffers
+at 100%, 200% and 125%. An earlier build lost its Japanese commit in the
+default presentation run. Both revisions are indexed below.
 
-## Input method
+## Earlier Anthy comparison
 
 The private desktop used GNOME Shell and Mutter 51.1, IBus 1.5.35, ibus-anthy
 1.5.18, Anthy Unicode 1.0.0.20260213, AT-SPI 2.62.1, libwayland 1.26.0 and
@@ -31,8 +31,8 @@ commit. An independent AT-SPI read returned `あ` in the focused entry
 Without the Mesa presentation override, the same binary and synthetic keystrokes
 also produced a Japanese preedit. The client then disabled and re-enabled its
 Wayland text input. The traces show ordinary Return key events and no Japanese
-commit string. Six seconds later the filename entry was empty. This observed
-sequence leaves the timing and focus failure open for the candidate stack.
+commit string. Six seconds later the filename entry was empty. The indexed
+counterexample describes that earlier executable and driver combination.
 Physical IME hardware, additional engines and visible Japanese glyph shapes
 require their own evidence.
 
@@ -112,18 +112,70 @@ and accessible snapshots stay under `artifacts/rust/gui-run/`. Run
 
 The legacy runs each passed all four lifecycle cases, named keyboard and
 clipboard checks, and the real private Orca speech check. The X11 run also
-passed Anthy via XIM. The final driver snapshots match the indexed source
-files across all six executions.
+passed Anthy via XIM. Each input record identifies the driver source hashes used
+for its execution.
+
+## Integrated release and Ubuntu Mozc
+
+The integrated executable SHA-256
+`80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`
+passed the combined IME and monitor test with each engine. Both results
+record a null Mesa presentation override. The executable logged
+`GRAPHICS_PRESENT generation=1 mode=Mailbox driver=llvmpipe desktop=Wayland`
+on the reported Vulkan CPU adapter. Its own Wayland software-renderer
+selection supplied that mode. The packaged-engine observations are independent
+of the older failed default-presentation control.
+
+The Mozc run used the signed Ubuntu 24.04 amd64 binaries and a Fedora 45
+GNOME Shell 51.1 compositor. The private install-free overlay contained the
+Noble `ibus-mozc`, `mozc-data` and `mozc-server` packages at
+`2.28.4715.102+dfsg-2.2build7`, protobuf `3.21.12-8.2build1` and Abseil
+`20220623.1-3.1ubuntu3`. The acquisition checked the Ubuntu Archive Automatic
+Signing Key (2018) fingerprint
+`F6ECB3762474EDA9D21B7022871920D1991BC93C`, verified the signed Noble
+release, and followed its SHA-256 hashes through both package indices to the
+five original Debian archives. Only the private process saw the extracted OS
+files. The archived packages keep their distro copyright notices.
+[Canonical signing-key verification](https://documentation.ubuntu.com/security/software-integrity/image-verification/),
+[Noble signed release](https://archive.ubuntu.com/ubuntu/dists/noble/InRelease).
+
+The actual component XML identified `com.google.IBus.Mozc` and
+`/usr/lib/ibus-mozc/ibus-engine-mozc`. The engine's own `--xml` query
+reported `mozc-jp`. The test set Mozc's documented `active_on_launch`
+option in a new per-user profile, selected `mozc-jp` in the GNOME input
+sources and observed the active global engine and input context. It verified
+the running IBus process and the separate `/usr/lib/mozc/mozc_server`
+conversion process. The observed server hash was
+`bbf20e0971d85aba83ad9da75fb81b22dd95b22ae152ecb043e0e37f4e444040`.
+Typing `a` produced `preedit_string("あ", 3, 3)`. Return produced
+`commit_string("あ")` on the same focused object's client and compositor
+traces. The private AT-SPI reader read `あ` from the focused filename field.
+All four monitor geometry and buffer observations in the table above passed
+in that session. The Fedora Anthy control independently passed the same
+end-to-end checks on the same executable. [Mozc IBus configuration](https://github.com/google/mozc/blob/master/docs/configurations.md#activate-mozc-on-launch).
+
+| Integrated Linux x64 evidence | SHA-256 |
+| --- | --- |
+| `artifacts/rust/wayland-mozc-noble/runs/wayland-mtbgfe3u/evidence.sha256` | `4818fa95a0f8447ebd8755d246aa33f5c21211aef24738c44903e9c7396a0ccf` |
+| `artifacts/rust/gui-run/wayland-pz0ts8v_/evidence.sha256` (Fedora Anthy) | `f3715b0981803cd61d00dc434581835d130e5f6f50a1ebecaba4f4dd68fcf642` |
+| `artifacts/rust/wayland-mozc-noble/packages.json` (signed-index package records) | `c29c51b6040a5f3504a64a29587e9c2072bc902b120978ea4950cde558d9baaf` |
 
 ## Ubuntu 24.04 runner prerequisites
 
-Alongside the existing Linux GUI test packages, provide `gnome-shell`, `ibus`,
-`gir1.2-ibus-1.0`, `ibus-anthy` and the `anthy-common` dictionary. Ubuntu's
-GNOME Shell 46 package uses Mutter 46. The probes require the native
-RemoteDesktop and DisplayConfig services, headless virtual monitors,
-text-input-v3, viewporter and fractional-scale-v1. The driver requests the
-private Mutter framebuffer-scaling setting on releases that expose that
-feature. Fedora x64 supplied the executions recorded here. Ubuntu x64/ARM64
-need independent hosted runs. [Ubuntu GNOME Shell package](https://packages.ubuntu.com/noble/gnome-shell),
-[Ubuntu IBus packages](https://packages.ubuntu.com/ibus),
-[Ubuntu Anthy dictionary](https://packages.ubuntu.com/noble/anthy-common).
+The attempted `ibus-anthy` installation on Ubuntu 24.04 returned no installation
+candidate. On Noble, provide `gnome-shell`, `ibus`, `gir1.2-ibus-1.0` and
+`ibus-mozc` with its `mozc-server` and `mozc-data` dependencies alongside
+the normal Linux GUI-test packages. Select `--ibus-engine mozc`. Fedora's
+previously exercised selection stays available through `--ibus-engine anthy`,
+the default when `--wayland-ime` is given. The probes require native
+RemoteDesktop and DisplayConfig services, virtual monitors, text-input-v3,
+viewporter and fractional-scale-v1. The driver enables the private
+framebuffer-scaling option where Mutter exposes it. Pure Ubuntu GNOME 46
+runs on x64 and ARM64 require separate hosted receipts.
+[Ubuntu Noble GNOME Shell](https://packages.ubuntu.com/noble/gnome-shell),
+[Ubuntu Noble package archive](https://archive.ubuntu.com/ubuntu/dists/noble/InRelease).
+
+```sh
+subject=artifacts/rust/gui-build/release/native-gui-assessment
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --ibus-engine mozc --monitor-changes
+```

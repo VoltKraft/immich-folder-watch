@@ -42,8 +42,27 @@ source inputs. Both MSVC targets passed Clippy type checks on the Linux host.
 The Windows fixture uses the real local-session legacy mutex and local named
 pipe on the disposable rewrite runner. The receiving Rust process creates a
 current-account DACL and checks the connecting PID. The sending process checks
-the server PID. The oracle supplies the actual account SID. Native results and
-same-SID tests in two separate Windows sessions remain pending.
+the server PID. The oracle supplies the actual account SID.
 [Microsoft mutex semantics](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createmutexw),
 [named pipe access controls](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)
 and [pipe identity functions](https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-functions).
+
+## Native results on all four targets
+
+At `5895c0b`, all four runners passed the same six observations, including
+both directions of activation and recovery of the writer lock after process
+exit. Each runner used a shipping coordinator compiled from the exact pinned
+source. The Windows tests ran in a single logon session per runner. The archive
+checksums matched GitHub's artifact digests and the ZIP integrity checks
+passed. [Hosted native assessments](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264).
+
+| Native target | SHA-256 of the instance result |
+| --- | --- |
+| Linux x64 | `2c9ef3aa065a30a09a62bf0117e89bbb5950a2aa1a9929980642dd5a53695c16` |
+| Linux ARM64 | `4766c42832b9aa5f30f23fec388d69564f64518c3eb844a8d2cc2e19bd233524` |
+| Windows x64 | `79e484606f12ed5858f7d0b36f796816e039f9073b477b5fb057faa3bcfbed54` |
+| Windows ARM64 | `eafedcffe66eec0bbce23c62626de5c365c8b9a80d4b5b379a320b155ed2c048` |
+
+The legacy writer ignored the new lock on every target. Cross-session ownership
+for the same Windows SID and prevention of legacy restarts during installed
+handover remain open.

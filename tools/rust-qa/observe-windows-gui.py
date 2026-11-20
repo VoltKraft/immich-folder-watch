@@ -101,6 +101,8 @@ def run_case(binary, output, name, background, tray, reopen, speech_cues=None):
         profile = Path(scratch)
         env = {**os.environ, "IFW_QA_ISOLATED": "1", "WGPU_DX12_COMPILER": "Fxc",
                "USERPROFILE": scratch, "HOME": scratch, "TEMP": scratch, "TMP": scratch}
+        if name == "dx12-recovery":
+            env["IFW_QA_GRAPHICS"] = "recover"
         for key in ("APPDATA", "LOCALAPPDATA"):
             folder = profile / key
             folder.mkdir()
@@ -157,31 +159,50 @@ def run_case(binary, output, name, background, tray, reopen, speech_cues=None):
                     hwnd = wait_for(lambda window, text: window and "ADAPTER Dx12 " in text, "DX12 window visible")
                     wait_for(lambda _, text: any(e["event"] == "show" and e["hwnd"] == hwnd
                                                  for e in observer.events), "native show event observed")
-                    if name == "keyboard-accessibility":
+                    if name in ("keyboard-accessibility", "dx12-recovery"):
                         driver = Path(__file__).with_name("observe-windows-input.ps1").resolve()
-                        evidence = output / "input.json"
                         program, attempts = select_powershell(profile, "accessibility")
                         (output / "observer-hosts.json").write_text(json.dumps(attempts, indent=2), encoding="utf-8")
                         if not program:
                             raise RuntimeError("The Windows desktop observer did not start on this host")
-                        with (output / "input-observer.log").open("wb") as observed:
-                            subprocess.run([program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
-                                            "-ExecutionPolicy", "Bypass", "-File", str(driver),
-                                            "-SubjectId", str(process.pid), "-WindowHandle", str(hwnd),
-                                            "-SubjectLog", str(log), "-OutputFile", str(evidence),
-                                            *(["-SpeechCues", str(speech_cues)] if speech_cues else [])],
-                                           env=env, cwd=profile, stdin=subprocess.DEVNULL, stdout=observed, stderr=subprocess.STDOUT,
-                                           timeout=130 if speech_cues else 80, check=True)
-                        record = json.loads(evidence.read_text(encoding="utf-8"))
-                        if record.get("status") != "passed" or record["processId"] != process.pid:
-                            raise ValueError("UI Automation observation did not verify the tested process")
-                        actions.append("UI Automation and keyboard input passed")
+
+                        def check_input(window, record_name, extra):
+                            evidence = output / (record_name + ".json")
+                            with (output / (record_name + "-observer.log")).open("wb") as observed:
+                                subprocess.run([program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
+                                                "-ExecutionPolicy", "Bypass", "-File", str(driver),
+                                                "-SubjectId", str(process.pid), "-WindowHandle", str(window),
+                                                "-SubjectLog", str(log), "-OutputFile", str(evidence), *extra],
+                                               env=env, cwd=profile, stdin=subprocess.DEVNULL, stdout=observed,
+                                               stderr=subprocess.STDOUT, timeout=130 if speech_cues else 80, check=True)
+                            record = json.loads(evidence.read_text(encoding="utf-8"))
+                            if record.get("status") != "passed" or record["processId"] != process.pid:
+                                raise ValueError("UI Automation observation did not verify the tested process")
+
+                        if name == "dx12-recovery":
+                            check_input(hwnd, "before", ["-RecoveryPhase", "before"])
+                            previous = hwnd
+                            command(b"G")
+                            hwnd = wait_for(lambda window, text: window and window != previous
+                                            and text.count("ADAPTER Dx12 ") >= 2
+                                            and "GRAPHICS_LOST generation=1 reason=Destroyed" in text
+                                            and "GRAPHICS_ATTEMPT generation=2 policy=cpu" in text
+                                            and any(e["event"] == "show" and e["hwnd"] == window for e in observer.events),
+                                            "new DX12 generation and native HWND after process-local device destruction")
+                            check_input(hwnd, "after", ["-RecoveryPhase", "after"])
+                            actions.append("edited and captured the restored focused field after recovery")
+                        else:
+                            check_input(hwnd, "input", ["-SpeechCues", str(speech_cues)] if speech_cues else [])
+                            actions.append("UI Automation and keyboard input passed")
+                    trace = log.read_text(encoding="utf-8", errors="replace")
+                    releases = trace.count("WINDOW_RELEASED passes=")
+                    adapters = trace.count("ADAPTER Dx12 ")
                     observer.close_window(hwnd)
-                    wait_for(lambda window, text: window is None and "WINDOW_RELEASED passes=" in text,
+                    wait_for(lambda window, text: window is None and text.count("WINDOW_RELEASED passes=") > releases,
                              "WM_CLOSE returned to supervisor")
                     quiet(.25, allow_child_events=True)
                     command(b"O")
-                    wait_for(lambda window, text: window and text.count("ADAPTER Dx12 ") >= 2, "window reopened")
+                    wait_for(lambda window, text: window and text.count("ADAPTER Dx12 ") > adapters, "window reopened")
                 command(b"Q")
                 process.wait(timeout=20)
                 observer.pump()
@@ -207,12 +228,15 @@ def main():
     parser.add_argument("--isolated-vm", action="store_true", help="confirm a dedicated synthetic desktop")
     parser.add_argument("--input-only", action="store_true", help="exercise UI Automation and foreground keyboard input")
     parser.add_argument("--speech-cues", type=Path, help="wait for observed NVDA announcements in a private fixture")
+    parser.add_argument("--device-recovery", action="store_true", help="exercise the fixture's own DX12 device and replacement")
     args = parser.parse_args()
     if os.name != "nt" or not (args.isolated_vm or os.getenv("RUNNER_ENVIRONMENT") == "github-hosted"):
         parser.error("A disposable native Windows GUI test host is required")
     binary = args.binary.resolve(strict=True)
     if args.speech_cues and (not args.input_only or not args.speech_cues.is_dir()):
         parser.error("the private speech observer requires the keyboard scenario")
+    if args.device_recovery and args.input_only:
+        parser.error("choose the keyboard or rendering scenario")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     report = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
@@ -222,8 +246,9 @@ def main():
               "cases": []}
     cases = [("absent-tray", True, False, True), ("background-quit", True, True, False),
              ("background-activate", True, True, True), ("foreground", False, True, True)]
-    if args.input_only:
-        cases = [("keyboard-accessibility", False, True, True)]
+    if args.input_only or args.device_recovery:
+        case_name = "keyboard-accessibility" if args.input_only else "dx12-recovery"
+        cases = [(case_name, False, True, True)]
         driver = Path(__file__).with_name("observe-windows-input.ps1")
         report["inputObserverSha256"] = hashlib.sha256(driver.read_bytes()).hexdigest()
         selector = Path(__file__).with_name("windows_observer.py")

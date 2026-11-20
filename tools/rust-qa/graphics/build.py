@@ -1,12 +1,14 @@
 """Build a source-bound graphics experiment on a private copy of the native supervisor."""
 
 import argparse
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 from inputs import GUI_SOURCES, WORKER_SOURCES, sha, source_digest
@@ -16,6 +18,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 ART = ROOT / "artifacts/rust"
 BASE = ART / "performance/subjects/native-map-confirmed"
+BASE_REVISION = "6c953e32c0b2710bfe06b19805214946653480af"
 
 
 def instrument_submit(work, subject, receipt):
@@ -65,21 +68,18 @@ def build(label, base):
             or sha(base / "native-gui-assessment") != source["binary_sha256"]
             or workers["gui_sha256"] != source["binary_sha256"]):
         raise ValueError("Restore the source-bound native GUI and audited worker profile")
-    for name, wanted in source["sources"].items():
-        if sha(ROOT / name) != wanted:
-            raise ValueError(f"Changed base GUI input {name}")
     work = ART / "graphics" / label
     work.mkdir(parents=True, exist_ok=False)
     project = work / "project"
     gui = project / "tools/rust-qa/gui"
-    (gui / "src").mkdir(parents=True)
-    for name in sorted(source["sources"]):
-        if name.startswith("tools/rust-qa/gui/"):
-            shutil.copyfile(ROOT / name, project / name)
-    shutil.copyfile(HERE.parent / "gui/build.py", gui / "build.py")
-    (project / "rust").symlink_to(ROOT / "rust", target_is_directory=True)
-    for name in ("verify-gui-inputs.py", "check-toolchain.py"):
-        (gui.parent / name).symlink_to(HERE.parent / name)
+    paths = ["rust", "tools/rust-qa/gui/src", "tools/rust-qa/gui/Cargo.toml", "tools/rust-qa/gui/Cargo.lock",
+             "tools/rust-qa/gui/build.py", "tools/rust-qa/verify-gui-inputs.py", "tools/rust-qa/check-toolchain.py"]
+    archive = subprocess.check_output(["git", "archive", BASE_REVISION, *paths], cwd=ROOT)
+    with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+        members.extractall(project, filter="data")
+    for name, wanted in source["sources"].items():
+        if sha(project / name) != wanted:
+            raise ValueError(f"Archived GUI input differs from the frozen source receipt {name}")
     (project / "artifacts/rust").mkdir(parents=True)
     target = ART / "graphics/build-target"
     target.mkdir(exist_ok=True)
@@ -103,7 +103,7 @@ def build(label, base):
         (subject / name).parent.mkdir(exist_ok=True)
         shutil.copy2(base / name, subject / name)
     submit = instrument_submit(work, subject, workers)
-    provenance = dict(base_receipt=sha(receipt), base=source["binary_sha256"],
+    provenance = dict(base_receipt=sha(receipt), base_revision=BASE_REVISION, base=source["binary_sha256"],
                       patch=sha(HERE / "supervisor.patch"), graphics=sha(HERE / "graphics.rs"),
                       builder=sha(Path(__file__)), pins=sha(HERE / "inputs.py"),
                       baseline_builder=sha(gui / "build.py"), worker=workers["worker_sha256"],

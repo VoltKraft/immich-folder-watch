@@ -1,5 +1,21 @@
 # Project Status
 
+## Four-host IPC, native ARM64 relink and desktop checks (2026-11-21)
+
+All four native hosts passed six old/new activation and profile-lock
+observations at `5895c0b`. The ARM64 Microsoft toolchain reproduced the
+published Windows import library byte-for-byte. Three independently linked
+test images agreed with 64 processor feature results, and the rebuilt
+transport passed all 15 loopback cases. The four compatibility jobs, four
+Rust feasibility jobs and eight pull-request checks passed. Desktop assessment
+still had failures. Windows ARM64 could not obtain foreground input, both
+Windows font observers stopped at a Windows-1252 console write, and Ubuntu
+did not supply the requested Anthy package.
+[Old/new results](rust/rw02-instance.md#native-results-on-all-four-targets),
+[ARM64 source reconstruction](rust/rw02-windows-imports.md),
+[desktop run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264)
+and [pull-request checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831858586).
+
 ## Integrated native GUI text and rendering (2026-11-21)
 
 The same Linux x64 GUI executable, SHA-256

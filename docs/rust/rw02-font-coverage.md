@@ -170,3 +170,12 @@ Each run writes a separate result directory.
 python3 tools/rust-qa/font-coverage/build.py x86_64-unknown-linux-gnu --bidi-candidate --acquire
 python3 tools/rust-qa/font-coverage/observe.py x86_64-unknown-linux-gnu --bidi-candidate --require-bidi
 ```
+
+At `5895c0b` both Windows architectures compiled the corrected sources and
+rendered the first native DX12 control. Python then encountered an unrepresentable
+character while writing the progress line to a redirected Windows-1252
+console. The observer now stores the UTF-8 result before emitting an
+ASCII-safe progress message. The remaining Windows controls require a new
+native run. The ordinary Linux x64 GUI independently passed the integrated
+glyph and mixed-direction editing checks. [Native build and observer logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264)
+and [integrated text evidence](rw02-gui-dependencies.md).

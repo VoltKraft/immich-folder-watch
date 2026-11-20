@@ -169,7 +169,8 @@ def run_case(stack, observer, name, background, tray, controls):
             "application": messages, "exit": process.returncode}
 
 
-def inside(backend, input_checks, ime, present_mode, capture, screen_reader=False, wayland_ime=False, monitors=False):
+def inside(backend, input_checks, ime, present_mode, capture, screen_reader=False, wayland_ime=False, monitors=False,
+           ibus_engine="anthy"):
     sys.path.insert(0, "/driver")
     from session import checked_start, check_alive, private_session, wait_for
     if (Path.home() != Path("/tmp/home") or os.environ["DISPLAY"] != ":93"
@@ -187,7 +188,7 @@ def inside(backend, input_checks, ime, present_mode, capture, screen_reader=Fals
             from wayland import WaylandObserver
             if wayland_ime or monitors:
                 from wayland_input import prepare_shell
-                prepare_shell(stack, wayland_ime, monitors)
+                prepare_shell(stack, wayland_ime, monitors, ibus_engine)
             observer = WaylandObserver(stack, capture, shell=wayland_ime or monitors, two_monitors=monitors)
             server = "GNOME Shell headless Wayland" if wayland_ime or monitors else "Mutter headless virtual monitor"
         else:
@@ -206,8 +207,11 @@ def inside(backend, input_checks, ime, present_mode, capture, screen_reader=Fals
         if wayland_ime or monitors:
             from wayland_input import exercise
             evidence["requested"] = {"wayland_ime": wayland_ime, "monitor_changes": monitors}
+            if wayland_ime:
+                evidence["requested"]["ibus_engine"] = ibus_engine
             try:
-                evidence["gnome_desktop"] = exercise(stack, observer, ime=wayland_ime, monitors=monitors)
+                evidence["gnome_desktop"] = exercise(stack, observer, ime=wayland_ime, monitors=monitors,
+                                                     ibus_engine=ibus_engine)
             except Exception as exc:
                 evidence["failure"] = {"type": type(exc).__name__, "message": str(exc)}
                 raise
@@ -264,7 +268,7 @@ def launch(args):
     if software is None:
         raise RuntimeError(f"No native Mesa lavapipe Vulkan manifest in {drivers}")
     ime_mounts = []
-    if args.ime or args.wayland_ime:
+    if args.ime or (args.wayland_ime and args.ibus_engine != "mozc"):
         for name in ("anthy-unicode", "anthy"):
             dictionary = Path("/usr/share") / name / "anthy.dic"
             if dictionary.is_file():
@@ -281,6 +285,7 @@ def launch(args):
         *(["--input"] if args.input else []), *(["--ime"] if args.ime else []),
         *(["--screen-reader"] if args.screen_reader else []),
         *(["--wayland-ime"] if args.wayland_ime else []), *(["--monitor-changes"] if args.monitor_changes else []),
+        *(["--ibus-engine", args.ibus_engine] if args.ibus_engine else []),
         *(["--present-mode", args.present_mode] if args.present_mode else []), *(["--capture"] if args.capture else [])]
     status = subprocess.run(command).returncode
     if args.wayland_ime or args.monitor_changes:
@@ -300,6 +305,8 @@ if __name__ == "__main__":
     parser.add_argument("--input", action="store_true", help="Use the private AT-SPI registry and inject keyboard input")
     parser.add_argument("--ime", action="store_true", help="Exercise a private IBus XIM composition on X11")
     parser.add_argument("--wayland-ime", action="store_true", help="Run the dedicated GNOME Shell / IBus Wayland composition check")
+    parser.add_argument("--ibus-engine", choices=("anthy", "mozc"),
+                        help="Select the real private Wayland IBus engine (default: anthy)")
     parser.add_argument("--monitor-changes", action="store_true", help="Run the dedicated GNOME Shell dual-monitor scaling check")
     parser.add_argument("--screen-reader", action="store_true", help="Run Orca with a private Speech Dispatcher and ALSA sink")
     parser.add_argument("--present-mode", choices=("immediate", "mailbox", "fifo"),
@@ -309,10 +316,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.ime and (not args.input or args.backend != "x11"):
         parser.error("--ime requires --backend x11 --input")
+    if args.ibus_engine and not args.wayland_ime:
+        parser.error("--ibus-engine requires --wayland-ime")
     if args.screen_reader and not args.input:
         parser.error("--screen-reader requires --input")
     if (args.wayland_ime or args.monitor_changes) and (args.backend != "wayland" or args.input):
         parser.error("--wayland-ime and --monitor-changes use a dedicated --backend wayland session")
     sys.exit(inside(args.backend, args.input, args.ime, args.present_mode, args.capture, args.screen_reader,
-                    args.wayland_ime, args.monitor_changes)
+                    args.wayland_ime, args.monitor_changes, args.ibus_engine or "anthy")
              if args.inside else launch(args))

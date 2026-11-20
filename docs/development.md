@@ -100,9 +100,10 @@ python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/ru
 python3 tools/rust-qa/instance/run.py x86_64-unknown-linux-gnu --output artifacts/rust/instance-native/test
 python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
 python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
+python3 tools/rust-qa/gui/profile_text.py
 python3 tools/rust-qa/gui/native.py --backend x11 --input
 python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
-python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes --present-mode mailbox
+python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes
 ```
 
 The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
@@ -114,7 +115,8 @@ PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 measured presentation modes and remaining checks.
 
 The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
-Shell, IBus Anthy and separate compositor/client traces. The [graphics recovery
+Shell and separate compositor/client traces. Fedora uses IBus Anthy by
+default. Ubuntu Noble uses `--ibus-engine mozc`. The [graphics recovery
 fixture](rust/rw02-graphics.md) records presentation and input across device
 replacement. The [text editing fixture](rust/rw02-font-coverage.md) compares
 the released and corrected mixed-direction caret against actual rendered glyphs.

@@ -256,3 +256,19 @@ HWND and PID. Each keystroke still requires the input desktop and foreground
 window to match. [Native inputs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977)
 and [Windows foreground rules](https://learn.microsoft.com/windows/win32/winmsg/window-features).
 [Windows UI Automation observer](../../tools/rust-qa/observe-windows-input.ps1).
+
+At `5895c0b`, Windows x64 again passed the complete keyboard, protected text,
+language and Unicode clipboard sequence. On Windows ARM64 the process and
+active console both reported session 2. The observer could read the owned
+controls on the input desktop, but raising the test window did not make the
+filename field's screen point belong to that HWND. The observer sent zero
+keys. Native ARM64 focus, typing and screen-reader evidence remain open.
+[Windows x64 and ARM64 input records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264).
+
+The `--device-recovery` fixture edits the real filename field, captures its
+visible pixels and requests destruction of the process's own DX12 device.
+It requires an observed device-loss callback and a new HWND, a visible
+redrawn field with the original draft and native focus, and an edit that
+changes the captured pixels. The normal close, reopen and quit sequence
+must also pass after recovery. Native Windows results for this fixture are
+pending. [Observer and process-bound controls](../../tools/rust-qa/observe-windows-gui.py).

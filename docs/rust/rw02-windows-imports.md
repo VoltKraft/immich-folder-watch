@@ -111,3 +111,16 @@ Studio environment. It stopped before the MSVC build and transport relink.
 The retry initializes and verifies the compiler and librarian in each step.
 The independent command-shell fallback uses a local batch file for the quoted
 installation path. [Native ARM64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871).
+
+At `5895c0b`, native ARM64 MSVC 14.52.37025 regenerated the published
+5,210,890-byte library byte-for-byte. Its generator and the independent LLVM
+build covered 20,551 signatures from 371 DLLs. The published, regenerated
+MSVC and rebuilt LLVM libraries produced the same PE test image, SHA-256
+`7403c4ab6abc7c3436ece021a365e7ebf0a94663c0791d21b7dc4bfccfc829d3`.
+All three images ran as native ARM64, returned the same answers for 64
+processor features and confirmed ring's feature ID 30. MSVC's link response
+identified the isolated LLVM library in the separate full transport build.
+Its import table retained 145 entries, and all 15 native loopback cases
+passed. The result SHA-256 was
+`6c5363923a64b1683c12cb89a2855224fcb2512626b2281913fe87ef32afb1e5`.
+[Native reconstruction and relink](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264/job/136618468330).

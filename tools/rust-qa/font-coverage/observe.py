@@ -168,9 +168,9 @@ def run(binary, work, observer=None, display="Windows test desktop"):
         adapter = next(line.removeprefix("ADAPTER ") for line in output.splitlines() if line.startswith("ADAPTER "))
         result.update(frameSha256=digest(directory / "observed.ppm"), nativeLogSha256=digest(log), adapter=adapter)
         report["runs"].append(result)
-        print(profile, name, result["renderedCoverageMatches"], result["observedVisual"], result.get("selected"),
-              flush=True)
         (work / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(profile, name, result["renderedCoverageMatches"], ascii(result["observedVisual"]),
+              ascii(result.get("selected")), flush=True)
     return report
 
 
