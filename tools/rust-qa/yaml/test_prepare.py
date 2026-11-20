@@ -64,10 +64,13 @@ class SourceFilterTests(unittest.TestCase):
         source = self.root / "vendor"
         source.mkdir()
         (source / "LICENSE").write_bytes(b"Synthetic notice\n")
-        first, second = self.root / "first.tar.gz", self.root / "second.tar.gz"
+        first, second = self.root / "first.tar", self.root / "second.tar"
         bundle(source, {"test": digest(b"synthetic")}, first)
         bundle(source, {"test": digest(b"synthetic")}, second)
         self.assertEqual(first.read_bytes(), second.read_bytes())
+        with tarfile.open(first, "r:") as archive:
+            self.assertEqual(archive.getnames(), ["source-filter.json", "vendor/LICENSE"])
+            self.assertEqual(archive.extractfile("vendor/LICENSE").read(), b"Synthetic notice\n")
 
 
 if __name__ == "__main__":

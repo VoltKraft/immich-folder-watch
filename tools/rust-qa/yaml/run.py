@@ -121,8 +121,8 @@ def main() -> int:
         vendor = work / "vendor"
         filtered = prepare(acquisition, vendor, inputs)
         write_json(output / "source-filter.json", filtered)
-        bundle(vendor, filtered, output / "filtered-sources.tar.gz")
-        if file_digest(output / "filtered-sources.tar.gz") != inputs["filtered_bundle_sha256"]:
+        bundle(vendor, filtered, output / "filtered-sources.tar")
+        if file_digest(output / "filtered-sources.tar") != inputs["filtered_bundle_sha256"]:
             raise ValueError("filtered source bundle is not byte reproducible")
         result["filteredBundleSha256"] = inputs["filtered_bundle_sha256"]
         result["originalArchiveCount"] = len(filtered["packages"])

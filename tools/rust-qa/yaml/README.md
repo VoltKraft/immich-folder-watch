@@ -21,7 +21,7 @@ filtered directory source, and `--frozen`, even after online acquisition.
 **Upload only the exact output directory.** The sibling `private-cache` may
 contain the original upstream base64 archive with its excluded promotional logo;
 it must not be published or uploaded. `private-work` contains disposable builds.
-The uploadable output contains `filtered-sources.tar.gz`, which removes the image
+The uploadable output contains `filtered-sources.tar`, which removes the image
 and exact README promotion, retains code/notices, and records every source hash
 and both changes explicitly. No original `.crate` archives are exported.
 

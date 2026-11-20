@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import gzip
 import hashlib
 import io
 import json
@@ -108,18 +107,17 @@ def prepare(cargo_home: Path, destination: Path, inputs: dict) -> dict:
 
 
 def bundle(source: Path, manifest: dict, destination: Path) -> None:
-    """Create reproducible filtered corresponding sources, with no original archives."""
-    with destination.open("wb") as raw, gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as compressed:
-        with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
-            members = {"source-filter.json": canonical(manifest)}
-            members.update({"vendor/" + path.relative_to(source).as_posix(): path.read_bytes()
-                            for path in source.rglob("*") if path.is_file()})
-            for name, data in sorted(members.items()):
-                member = tarfile.TarInfo(name)
-                member.size = len(data)
-                member.mode = 0o644
-                member.mtime = 0
-                archive.addfile(member, io.BytesIO(data))
+    """Bind the reviewed source bytes independently of a host's DEFLATE encoder."""
+    with tarfile.open(destination, mode="w:", format=tarfile.PAX_FORMAT) as archive:
+        members = {"source-filter.json": canonical(manifest)}
+        members.update({"vendor/" + path.relative_to(source).as_posix(): path.read_bytes()
+                        for path in source.rglob("*") if path.is_file()})
+        for name, data in sorted(members.items()):
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            member.mode = 0o644
+            member.mtime = 0
+            archive.addfile(member, io.BytesIO(data))
 
 
 def main() -> None:
@@ -157,8 +155,8 @@ def main() -> None:
             "--locked", "--offline", "--filter-platform", target], cwd=ROOT))
         inputs["target_graphs"][target] = graph(metadata)
     write_json(args.output / "source-filter.json", observed)
-    bundle(args.output / "vendor", observed, args.output / "filtered-sources.tar.gz")
-    inputs["filtered_bundle_sha256"] = file_digest(args.output / "filtered-sources.tar.gz")
+    bundle(args.output / "vendor", observed, args.output / "filtered-sources.tar")
+    inputs["filtered_bundle_sha256"] = file_digest(args.output / "filtered-sources.tar")
     write_json(HERE / "inputs.json", inputs)
     print(f"Recorded {len(packages)} reviewed archives; filtered source bundle {inputs['filtered_bundle_sha256']}")
 

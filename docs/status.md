@@ -1,5 +1,16 @@
 # Project Status
 
+## Cross-platform source archive identity (2026-11-20)
+
+At `4961746` the Ubuntu YAML jobs correctly refused the compressed bundle
+digest from Fedora. Both archives contained the same 19,486,720-byte tar as
+the local reference. The source inventory now binds this canonical tar to
+`f4caf0051b7bfd73f366bf3918721ddc6f0ebd35dd526fed1ddbd1335a8cab05`.
+All package checksums, filtered files, licenses and target features matched
+the previous inventory. The new local run passed all 13 steps and verified
+all 204 indexed evidence files. Four native reruns are required for YAML.
+[Source evidence](rust/rw02-yaml.md#reviewed-inputs-and-corresponding-sources).
+
 ## Native Linux lifecycle and SMB fixture follow-up (2026-11-20)
 
 Both Ubuntu targets passed all four native GUI lifecycle cases on X11 and

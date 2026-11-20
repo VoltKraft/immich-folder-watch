@@ -19,7 +19,7 @@ reviewed [48-package storage/YAML source inventory](rw02-storage-inputs.md).
 No newly resolved archive was admitted on metadata alone.
 
 [`inputs.json`](../../tools/rust-qa/yaml/inputs.json), SHA-256
-`362786a39829d988ea14a00e5262ad9cd9c5d7257b3b802a7294389c0fe4cbdc`,
+`6b72c432d9c9330d4c72d1c46bb26c764374423fca24a30a57ee3bd69769de7f`,
 records archive checksums, supplied notices, original assets, build-script paths,
 selected licenses, filtered source identities and all four target feature graphs.
 Its original audit inventory hash is
@@ -64,17 +64,32 @@ kept only in a private acquisition cache. The deterministic
    checksum manifest and records the two changes explicitly in `source-filter.json`.
    Cargo retains the original package checksum as package identity; the separate
    filtered tree identity is explicit, not presented as an unchanged upstream tree.
-5. Emits a deterministic tar/gzip bundle with sorted members and fixed metadata.
-   No original `.crate` archive is included in that bundle or uploaded evidence.
+5. Emits an uncompressed tar with sorted members and fixed metadata. Actions
+   compresses the transport ZIP separately. Original `.crate` archives stay
+   in the private acquisition cache.
 
 The resulting base64 file-map identity is
 `1d1ab85ec3be094c4f0aeb79301b51a72f40f98ab8493cdc015f8e7822bce475`.
-The complete filtered corresponding-source bundle has SHA-256
-`b453c3cb5bc96839ae7766d40beae9b7dc97bea3ec1860150babb5b981d15714`:
-**1,571 retained upstream files**, 30 generated directory-source checksum files,
-and the explicit source-filter manifest. No code or license notice was patched.
+The 19,486,720-byte filtered tar has SHA-256
+`f4caf0051b7bfd73f366bf3918721ddc6f0ebd35dd526fed1ddbd1335a8cab05`.
+It contains **1,571 retained upstream files**, 30 generated directory-source
+checksum files and the explicit source-filter manifest. The code and license
+notices retain their upstream bytes.
 The private original archive is never silently edited. All 30 filtered trees were
 also checked for Windows case-colliding paths; none were found.
+
+The original Linux x64 assessment bound SHA-256 of the gzip wrapper
+(`b453c3cb5bc96839ae7766d40beae9b7dc97bea3ec1860150babb5b981d15714`).
+Both Ubuntu runners at `4961746` produced wrapper
+`3c00a3410ef83a1352632ca98e114c747939a2be4badf6f72a06ead9b563d79e`.
+Independent decompression of both downloaded wrappers and the Fedora wrapper
+recovered the identical tar above. The regenerated inventory changes only
+this final bundle identity. A fresh local offline run using the canonical
+tar passed all 13 stages, 183 Rust comparisons and 116 C# readback assertions.
+All 204 files indexed by `canonical-linux-x64-01/evidence-hashes.json` matched.
+Its `result.json` has SHA-256
+`965aedddf6d93324353a6a5efea3ea95d14dc15e2ca32f955264543ef05c2ffa`.
+[Original four-host run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44820760903).
 
 The runner compiles the complete normal release with a **new empty Cargo home**,
 `--frozen`, and only this filtered directory source. It verifies that every
