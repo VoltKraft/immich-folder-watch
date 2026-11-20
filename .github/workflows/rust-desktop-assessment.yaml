@@ -135,6 +135,13 @@ jobs:
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
 
+      - name: Observe Windows UI Automation and foreground keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-input" --input-only
+
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
         run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup

@@ -181,5 +181,15 @@ case uses at-spi2-core and its introspection bindings.
 
 The Windows fixture accepts an initial tray result on its inherited input pipe
 and bounded open, close or quit commands. The [Windows observer](../../tools/rust-qa/observe-windows-gui.py)
-owns the OS-specific observation. Linux results above cover the native Linux
-x64 executable only.
+owns the OS-specific observation. The local keyboard and compositor traces
+come from Fedora x64.
+
+The separate Windows `--input-only` case attaches the system UI Automation
+client to the observed HWND and checks its process ID. The client reads German
+and English control names, follows keyboard focus, checks the protected
+password field and verifies a Unicode clipboard round trip. Each keyboard
+operation requires the observed HWND to own foreground input. The report
+retains the observed DPI, monitor size, protected-pattern behavior and the
+last completed input checks if the host cannot supply interactive input.
+Its result requires a native Windows run.
+[Windows UI Automation observer](../../tools/rust-qa/observe-windows-input.ps1).

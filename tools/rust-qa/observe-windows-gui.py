@@ -155,6 +155,20 @@ def run_case(binary, output, name, background, tray, reopen):
                     hwnd = wait_for(lambda window, text: window and "ADAPTER Dx12 " in text, "DX12 window visible")
                     wait_for(lambda _, text: any(e["event"] == "show" and e["hwnd"] == hwnd
                                                  for e in observer.events), "native show event observed")
+                    if name == "keyboard-accessibility":
+                        driver = Path(__file__).with_name("observe-windows-input.ps1").resolve()
+                        evidence = output / "input.json"
+                        with (output / "input-observer.log").open("wb") as observed:
+                            subprocess.run(["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
+                                            "-ExecutionPolicy", "Bypass", "-File", str(driver),
+                                            "-SubjectId", str(process.pid), "-WindowHandle", str(hwnd),
+                                            "-SubjectLog", str(log), "-OutputFile", str(evidence)],
+                                           env=env, cwd=profile, stdout=observed, stderr=subprocess.STDOUT,
+                                           timeout=80, check=True)
+                        record = json.loads(evidence.read_text(encoding="utf-8"))
+                        if record.get("status") != "passed" or record["processId"] != process.pid:
+                            raise ValueError("UI Automation observation did not verify the tested process")
+                        actions.append("UI Automation and keyboard input passed")
                     observer.close_window(hwnd)
                     wait_for(lambda window, text: window is None and "WINDOW_RELEASED passes=" in text,
                              "WM_CLOSE returned to supervisor")
@@ -184,6 +198,7 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("output", type=Path, help="new evidence directory on the disposable host")
     parser.add_argument("--isolated-vm", action="store_true", help="confirm a dedicated synthetic desktop")
+    parser.add_argument("--input-only", action="store_true", help="exercise UI Automation and foreground keyboard input")
     args = parser.parse_args()
     if os.name != "nt" or not (args.isolated_vm or os.getenv("RUNNER_ENVIRONMENT") == "github-hosted"):
         parser.error("A disposable native Windows GUI test host is required")
@@ -195,8 +210,13 @@ def main():
               "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "trayInput": "synthetic inherited pipe", "compilerRequested": "Fxc",
               "cases": []}
-    for case in [("absent-tray", True, False, True), ("background-quit", True, True, False),
-                 ("background-activate", True, True, True), ("foreground", False, True, True)]:
+    cases = [("absent-tray", True, False, True), ("background-quit", True, True, False),
+             ("background-activate", True, True, True), ("foreground", False, True, True)]
+    if args.input_only:
+        cases = [("keyboard-accessibility", False, True, True)]
+        driver = Path(__file__).with_name("observe-windows-input.ps1")
+        report["inputObserverSha256"] = hashlib.sha256(driver.read_bytes()).hexdigest()
+    for case in cases:
         try:
             report["cases"].append(run_case(binary, output, *case))
         finally:
