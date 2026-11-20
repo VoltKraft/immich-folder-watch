@@ -1,5 +1,21 @@
 # Project Status
 
+## First four native Rust feasibility results (2026-11-20)
+
+All four archives from [the clean `4dcccb7` run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356)
+matched their published ZIP digests. Each Windows host passed 27 Rust tests,
+including distinct NTFS short-name denial. Each Linux host passed 30 tests.
+All four passed five window-policy traces and 5,844 C#/Rust scalar comparisons.
+Their .NET 10.0.15 reference casing maps are byte-identical. The Fedora map
+differs at 55 scalars. [Per-host counts and hashes](rust/rw02-filesystem.md#four-native-hosts).
+
+RW-02 continues with native window, storage, transport and desktop-service
+probes. Linux x64 observed the eframe startup flash independently on X11.
+Delaying window creation until activation passed hidden start, close, reopen,
+missing-tray startup and orderly quit on both X11 and Wayland. Broader native
+integration, accessibility, graphics fallback and the Rust resource comparison
+remain open.
+
 ## RW-02 filesystem review and hosted follow-up (2026-11-20)
 
 The independent [filesystem re-review](rust/rw02-filesystem.md#independent-review-of-the-feasibility-boundary)

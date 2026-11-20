@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | Linux x64 [filesystem](rw02-filesystem.md), [codec](rw02-legacy.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md) and [realtime framing](rw02-realtime.md). Four-host and native desktop gates remain open. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [codec](rw02-legacy.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md) and [realtime framing](rw02-realtime.md). Native integration, migration, GUI and transport feasibility still require evidence. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -57,10 +57,10 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | First toolchain setup failed before Rust execution, rerun pending | Pending | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | First toolchain setup failed before Rust execution, rerun pending | Pending | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | Rust 1.100.0 ran 27 tests, including 13 handle-bound filesystem cases, plus 5,844 C#/Rust scalar comparisons | Five Rust policy traces matched the C# window observations. .NET X11 performance measured. Actual Rust GUI pending. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 27 Rust tests, five window-policy traces and 5,844 native scalar comparisons passed at `2ff9880` | Pending (X11/Wayland) | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, including 13 filesystem cases and distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Pending | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Pending | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 Rust tests, including 16 filesystem cases, five policy traces and 5,844 scalar comparisons | .NET X11 performance measured. Local Rust lifecycle exercised on X11 and Wayland with a software Vulkan adapter. Accessibility and resource comparisons in progress. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Pending (X11/Wayland) | Pending |
 
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.

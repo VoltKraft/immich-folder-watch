@@ -112,11 +112,29 @@ offline Clippy with warnings denied and rustfmt also passed. The injected fault
 models the acknowledgement boundary. Actual SMB and portal/FUSE recovery
 remain native-environment acceptance items.
 
-RW-02 still requires native results on the other target filesystems and desktop
-environments. A hosted NTFS or Linux local test cannot establish UNC or
-portal/FUSE behavior. Verified destructive cleanup, directory moves, transfer
-and timestamp-journal call sites and independent filesystem review remain RW-03
-and engine integration gates.
+### Four native hosts
+
+On 2026-11-20 all four native jobs completed at clean source
+`4dcccb766e358db32daa266bf851efcaf51dbf9b`. Both Windows hosts read the
+controlled marker via an actual distinct NTFS 8.3 alias and recorded the
+protected directory lease's denial. All four hosts exercised a successful
+rename followed by a lost acknowledgement. The destination contained the
+staged bytes after handle cleanup, and the transaction directory remained
+available for recovery. Each archive was downloaded and verified against
+GitHub's SHA-256 digest. [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356).
+
+| Host | FS tests / total Rust tests | Evidence artifact ID | ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| Linux x64 | 16 / 30 | 14668096001 | `502dc539a5524069332a4a720b4a66e37494ae213af00ba0aede646ee454c5ac` |
+| Linux ARM64 | 16 / 30 | 14668875738 | `23bd737458911d089c546d8064e3f30971fde10657127fd0f0efa4ea9ae9e5ef` |
+| Windows x64 | 13 / 27 | 14666168586 | `e09e397e859199c09fc806f8ce35025ad6f7fae72687a93b430ec9602ddbe7de` |
+| Windows ARM64 | 13 / 27 | 14668666642 | `32dee47d5fbd8e29ff5f8d2e2ffa3a25c6462584d4f3155e7f03ecb65cbef5d1` |
+
+Every archive also contains five matched window-policy traces, 5,844 C#/Rust
+codec comparisons and its original compiler, format, Clippy and build logs.
+The next filesystem observations require native UNC and portal/FUSE roots.
+Verified destructive cleanup, directory moves, engine call sites and their
+independent review remain RW-03 and subsequent integration gates.
 
 ## Independent review of the feasibility boundary
 
@@ -135,5 +153,5 @@ through an actual distinct alias and requires the protected API to deny it.
 The native workflow requires and retains both observations on Windows.
 The re-review found both source issues resolved. Its reviewed staging file
 has SHA-256 `42ae0f4f31f3bd0553abd53357ee8bfd039bdaf13f282ddd24707ac17a3594a4`.
-Native SMB/FUSE interruption, Windows output and future engine call sites
+Native SMB/FUSE interruption and future engine call sites
 have separate acceptance records.
