@@ -1,0 +1,103 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-QUEUE-01",
+      "parity": [
+        "PAR-03"
+      ],
+      "order": "newestFirst",
+      "batchSize": 2,
+      "items": [
+        {
+          "name": "retry-new.jpg",
+          "timestamp": "2026-02-01T00:00:00Z",
+          "attempt": 2
+        },
+        {
+          "name": "missing.jpg",
+          "timestamp": null,
+          "attempt": 1
+        },
+        {
+          "name": "old.jpg",
+          "timestamp": "2025-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "new-first.jpg",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "new-second.jpg",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "retry-old.jpg",
+          "timestamp": "2025-01-01T00:00:00Z",
+          "attempt": 2
+        }
+      ],
+      "expected": [
+        "new-first.jpg",
+        "new-second.jpg",
+        "old.jpg",
+        "missing.jpg",
+        "retry-new.jpg",
+        "retry-old.jpg"
+      ]
+    },
+    {
+      "id": "BEH-QUEUE-02",
+      "parity": [
+        "PAR-03"
+      ],
+      "order": "oldestFirst",
+      "batchSize": 1,
+      "items": [
+        {
+          "name": "retry-new.jpg",
+          "timestamp": "2026-02-01T00:00:00Z",
+          "attempt": 2
+        },
+        {
+          "name": "missing.jpg",
+          "timestamp": null,
+          "attempt": 1
+        },
+        {
+          "name": "old.jpg",
+          "timestamp": "2025-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "new-first.jpg",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "new-second.jpg",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "attempt": 1
+        },
+        {
+          "name": "retry-old.jpg",
+          "timestamp": "2025-01-01T00:00:00Z",
+          "attempt": 2
+        }
+      ],
+      "expected": [
+        "old.jpg",
+        "new-first.jpg",
+        "new-second.jpg",
+        "missing.jpg",
+        "retry-old.jpg",
+        "retry-new.jpg"
+      ]
+    }
+  ]
+}

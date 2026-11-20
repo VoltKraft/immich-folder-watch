@@ -1,0 +1,70 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-HTTPS-01",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "https://immich.example.test/api",
+      "allowInsecureHttp": false,
+      "accepted": true
+    },
+    {
+      "id": "BEH-HTTPS-02",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "http://immich.example.test/api",
+      "allowInsecureHttp": false,
+      "accepted": false
+    },
+    {
+      "id": "BEH-HTTPS-03",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "http://127.0.0.1:2283/api",
+      "allowInsecureHttp": false,
+      "accepted": false
+    },
+    {
+      "id": "BEH-HTTPS-04",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "http://immich.example.test/api",
+      "allowInsecureHttp": true,
+      "accepted": true
+    },
+    {
+      "id": "BEH-HTTPS-05",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "ftp://immich.example.test/api",
+      "allowInsecureHttp": true,
+      "accepted": false
+    },
+    {
+      "id": "BEH-HTTPS-06",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "https://synthetic:credential@immich.example.test/api",
+      "allowInsecureHttp": false,
+      "accepted": false
+    },
+    {
+      "id": "BEH-HTTPS-07",
+      "parity": [
+        "PAR-05"
+      ],
+      "url": "https://immich.example.test/api?synthetic=value",
+      "allowInsecureHttp": false,
+      "accepted": false
+    }
+  ]
+}

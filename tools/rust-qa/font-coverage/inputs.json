@@ -1,0 +1,80 @@
+{
+  "guiRevision": "6c953e32c0b2710bfe06b19805214946653480af",
+  "assets": [
+    {
+      "name": "noto-OFL.txt",
+      "repository": "notofonts/noto-fonts",
+      "revision": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "path": "LICENSE",
+      "sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+    },
+    {
+      "name": "cjk-OFL.txt",
+      "repository": "notofonts/noto-cjk",
+      "revision": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+      "path": "Sans/LICENSE",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "name": "NotoSansSymbols2-Regular.ttf",
+      "repository": "notofonts/noto-fonts",
+      "revision": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "path": "hinted/ttf/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf",
+      "license": "noto-OFL.txt",
+      "sha256": "630846d528dbe4c4981370a4d0a9475a1fd1491a129bb411f8e157cdb5de13c6"
+    },
+    {
+      "name": "NotoSansArabic-Regular.ttf",
+      "repository": "notofonts/noto-fonts",
+      "revision": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "path": "hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+      "license": "noto-OFL.txt",
+      "gitBlob": "ce21d4f5ac8765b51b9eedb1bb5c0069ee8115a4",
+      "sha256": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b"
+    },
+    {
+      "name": "NotoSansCJKjp-Regular.otf",
+      "repository": "notofonts/noto-cjk",
+      "revision": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+      "path": "Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf",
+      "license": "cjk-OFL.txt",
+      "sha256": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5"
+    }
+  ],
+  "sources": {
+    "tools/rust-qa/gui/Cargo.toml": "41e0bf2c09e9401d3743ecc05dfab9e7308f2e2bd4f8f4d6a455146cbed971f4",
+    "tools/rust-qa/gui/Cargo.lock": "3d266972f104fae3eb992e8198d25eace401f5c9fe1ed282aa180612fe12cc4a",
+    "tools/rust-qa/gui/src/benchmark.rs": "ea4e770d37e340ca25a3f65149954a856c20b54a5c5343cb76973ee55559c1a8",
+    "tools/rust-qa/gui/src/linux.rs": "ed65a5e699c6a9f9c200cb52e2db22659602c9eedbbcf9f45b4958c2e22cc6a8",
+    "tools/rust-qa/gui/src/main.rs": "ba070e3174e55495bfbeb79395c845a498d42fbdc45d8523306898ba81100850",
+    "tools/rust-qa/gui/src/native_window.rs": "cdea73b1252dbf03adf05fbc248aa069d44bff349f3ac10928662f28fd53a8cf",
+    "rust/Cargo.toml": "7f4c1489640d1351a8d0fdeaea2df72fc17ad98ae3df5946fca34fa643e4e96a",
+    "rust/crates/desktop-lifecycle/Cargo.toml": "b36dd12119a0d6894f15ffb44d552c077332ece9d996487fdab879e73eb72396",
+    "rust/crates/desktop-lifecycle/src/lib.rs": "6cb571816d3e331656036f443b1c0ae26cd6f22f1957c6c9374d7596e1192587"
+  },
+  "supportSources": {
+    "tools/rust-qa/gui/build.py": "b437b9cc50915b5a42d13bdddc7719a5e4ff26abfc37dae58993d58234844402",
+    "tools/rust-qa/check-toolchain.py": "9631220cb23b3927d925b4fc9784c03a40c0fd756a05bc4d8d9de1ce9886a089",
+    "tools/rust-qa/audit-graph.py": "2b6d105a5455277156df6c276e84d47784ef9b9afa993981001b28c22256379f",
+    "tools/rust-qa/verify-gui-inputs.py": "9da75de32ef7d8d02e0e2f82adf5604ff3dd7482908da27628cbd30658f17015",
+    "tools/rust-qa/storage/evidence.py": "17d9cbc7e62cff9c29f626705bd2d239c620c219b61e6330e9891ec074ea682e",
+    "tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "rust/toolchain-inputs.json": "942619e0b7dc58c2e5439d5dd5f8bf4d185a25f799ba3f9010e809de8243b51c",
+    "rust/audit/gui-inputs.json": "a913568323bae8a52a4da6390dccbef1610973f92f14a6f0ea6f68f0a005c3de",
+    "rust/audit/gui-profile.json": "c129a0683fef2ac8b8b3ce7466b56e2f23859d573315b8ec50ee9a26952c996a",
+    "rust/audit/notices/egui-MIT": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+    "rust/audit/notices/egui-Apache-2.0": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+    "rust/audit/notices/accesskit-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "rust/audit/notices/accesskit-Apache-2.0": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+    "rust/audit/notices/accesskit-Chromium-BSD": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
+    "rust/audit/notices/tiny-skia-BSD": "6d41e05f1d54fe726997cb0334ec539f1dff50600b1d5d90462ec2b392770ced",
+    "rust/audit/notices/rspirv-Apache-2.0": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "rust/audit/notices/weston-1.5.0-COPYING": "87fd2cefa8601f7060527345fc6abf9526463dc8c8fe6cf6f536c44d7f0a39e0",
+    "rust/audit/notices/SPIRV-Headers": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613",
+    "rust/audit/notices/clipboard-win-BSL-1.0": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+    "rust/audit/notices/profiling-MIT": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333",
+    "rust/assets/fonts/OFL-1.1.txt": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+    "rust/assets/fonts/NotoSans-Regular.ttf": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+    "rust/assets/fonts/NotoSansMono-Regular.ttf": "d9e2b23d19f8230be7146f409a52b1d23117e635e28f2e2892cf91b7382f325b"
+  }
+}

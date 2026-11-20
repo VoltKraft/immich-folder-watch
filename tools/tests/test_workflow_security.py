@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -53,6 +55,55 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn("secrets.", smoke)
         self.assertNotIn("environment:", smoke)
         self.assertNotIn("uses: actions/deploy-pages@", smoke)
+        downloads = re.findall(r"uses: actions/download-artifact@([0-9a-f]{40})[^\n]*\n(.*?)(?=\n      -|\Z)", smoke, re.S)
+        self.assertEqual(len(downloads), 2)
+        self.assertEqual(downloads[0][0], downloads[1][0])
+        for _, settings in downloads:
+            self.assertIn("artifact-ids: ${{ steps.upload.outputs.artifact_id }}", settings)
+        self.assertNotIn("continue-on-error: true", smoke.split("      - name: Retry the exact", 1)[1])
+
+    def check_rust_workflow(self, filename, expected_actions):
+        source = (WORKFLOWS / filename).read_text()
+        self.assertIn("branches: [rewrite/rust]", source)
+        self.assertIn("if: github.ref == 'refs/heads/rewrite/rust'", source)
+        self.assertIn("\npermissions:\n  contents: read\n", source)
+        self.assertNotRegex(source, r"(?m)^\s*[\w-]+: write\s*$")
+        self.assertNotIn("secrets.", source)
+        self.assertNotIn("secrets: inherit", source)
+        self.assertNotIn("environment:", source)
+        self.assertIn("persist-credentials: false", source)
+        self.assertIn("${{ github.sha }}", source)
+        actions = re.findall(r"^\s*- uses: (\S+)|^\s*uses: (\S+)", source, re.M)
+        self.assertEqual({(first or second).split("@", 1)[0] for first, second in actions}, expected_actions)
+        # Release listens to the exact CI workflow name. Rust feasibility work
+        # must remain outside that publication event chain even if it succeeds.
+        name = re.search(r"^name: (.+)$", source, re.M).group(1)
+        release = (WORKFLOWS / "release.yaml").read_text()
+        trigger = release.split("\npermissions:", 1)[0]
+        self.assertNotIn(name, trigger)
+        self.assertNotRegex(source, r"(?i)gh\s+(release|workflow)|dispatches|deploy-pages|flatpak\s+build-update-repo")
+
+    def test_rust_reference_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-compatibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_rust_feasibility_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-feasibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_rust_desktop_assessment_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-desktop-assessment.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_native_compiler_download_record_is_identical_with_windows_newlines(self):
+        script = (ROOT / "tools/rust-qa/install-toolchain.sh").read_text()
+        selection = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+        inputs = ROOT / "rust/toolchain-inputs.json"
+        for target, spec in json.loads(inputs.read_text())["targets"].items():
+            with self.subTest(target=target):
+                code = "import sys\nsys.stdout.reconfigure(newline='\\r\\n')\n" + selection
+                pair = subprocess.check_output([sys.executable, "-c", code, str(inputs), target])
+                self.assertEqual(pair, f"{spec['rust']['url']} {spec['rust']['sha256']}\n".encode("ascii"))
 
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()

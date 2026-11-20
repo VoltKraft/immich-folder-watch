@@ -1,0 +1,47 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-READY-01",
+      "parity": [
+        "PAR-03"
+      ],
+      "exists": true,
+      "cancelled": false,
+      "timeoutMilliseconds": 1000,
+      "expected": "ready"
+    },
+    {
+      "id": "BEH-READY-02",
+      "parity": [
+        "PAR-03"
+      ],
+      "exists": false,
+      "cancelled": false,
+      "timeoutMilliseconds": 1000,
+      "expected": "notReady"
+    },
+    {
+      "id": "BEH-READY-03",
+      "parity": [
+        "PAR-03"
+      ],
+      "exists": true,
+      "cancelled": true,
+      "timeoutMilliseconds": 1000,
+      "expected": "cancelled"
+    },
+    {
+      "id": "BEH-READY-04",
+      "parity": [
+        "PAR-03"
+      ],
+      "exists": true,
+      "cancelled": false,
+      "timeoutMilliseconds": 0,
+      "expected": "invalidTimeout"
+    }
+  ]
+}

@@ -9,6 +9,15 @@ Immich API; it must never write directly to Immich storage. See
 for the existing architecture, canonical specifications, and selected scope.
 The project is initialized. Preserve its implementation, data, and history;
 do not restart template onboarding or infer a new product plan from maintenance.
+The [Rust rewrite plan](docs/rust-rewrite-plan.md) and
+[desktop standard](docs/rust-desktop-standard.md) govern the selected
+`M-RUST-IMPLEMENTATION-20261114` goal: RW-01 through RW-07 form one complete
+implementation assignment. Follow its fixed contract in the project brief and
+[acceptance record](docs/rust/acceptance.md); advance through verified prerequisites,
+without treating an intermediate stage as goal completion. RW-08/publication is
+excluded. Existing .NET rules continue to apply to the shipping reference product.
+Keep Rust rewrite planning and development on the dedicated `rewrite/rust` branch;
+`main` retains the shipping .NET baseline until a separately selected integration.
 
 Before substantive project work:
 
@@ -146,6 +155,26 @@ to reconcile project decisions, defaults, and recorded state.
 
 ## Project-specific engineering rules
 
+- Rust work follows the selected [desktop standard](docs/rust-desktop-standard.md)
+  and stage gates. Keep first-party runtime and GUI code in Rust, with domain,
+  synchronization, storage and native adapters independent of egui. The C# oracle
+  is development-only. Use synthetic isolated profiles; do not read personal
+  configuration/media or connect to production Immich. Audit exact dependencies,
+  features, native libraries and fonts before adoption; pin compiler and lockfile.
+  Required native runtime/GUI evidence on four targets cannot be replaced by a
+  cross-build. Independently review filesystem, migration and final integration.
+- The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
+  toolchain. Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
+  and retain source-bound observations for each target in the acceptance record.
+  Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
+  when changing the candidate desktop profile.
+  Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
+  [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  Use the dedicated native service fixtures with disposable profiles. The
+  [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
+  a private desktop and installs only into its disposable test repository.
+  Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
+  shipping sources. The actual Windows IPC names require a disposable runner.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

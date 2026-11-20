@@ -14,3 +14,30 @@ packaging/flatpak/licenses/YamlDotNet-18.1.0-LICENSE-libyaml whitespace=cr-at-eo
 
 # Preserve the original upstream trailing space in the versioned SVG notice.
 packaging/flatpak/licenses/Svg.Custom-5.2.3-LICENSE.txt whitespace=-blank-at-eol
+
+# The compatibility oracle emits UTF-8 with LF on both native platforms.
+rust/tests/fixtures/legacy/** text eol=lf
+
+# Rustfmt and the native compiler installer use identical source on all runners.
+rust/**/*.rs text eol=lf
+rust/**/*.toml text eol=lf
+rust/Cargo.lock text eol=lf
+tools/rust-qa/*.sh text eol=lf
+tools/rust-qa/legacy/licenses/* -text
+tools/rust-qa/storage/** text eol=lf
+tools/rust-qa/gui/** text eol=lf
+tools/rust-qa/instance/** text eol=lf
+tools/rust-qa/font-coverage/** text eol=lf
+tools/rust-qa/realtime/** text eol=lf
+tools/rust-qa/windows-services/** text eol=lf
+tools/rust-qa/windows-reader/** text eol=lf
+tools/rust-qa/yaml/** text eol=lf
+tools/rust-qa/linux-services/** text eol=lf
+tools/rust-qa/portal-reference/*.py text eol=lf
+tools/rust-qa/portal-reference/flock-upstream.patch -text whitespace=-blank-at-eol
+tools/rust-qa/portal-reference/LICENSE.upstream-LGPL-2.1.txt -text
+rust/audit/notices/* -text
+rust/audit/gui-text-inputs.json text eol=lf
+rust/audit/notices/SPIRV-Headers whitespace=-blank-at-eof
+rust/audit/notices/weston-1.5.0-COPYING whitespace=-blank-at-eol
+rust/assets/fonts/* -text

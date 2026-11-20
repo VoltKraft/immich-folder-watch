@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "ifw-performance-worker"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "AGPL-3.0-only"
+publish = false
+
+[dependencies]
+safe-fs = { path = "../../../../rust/crates/safe-fs" }
+serde = { version = "=1.0.229", default-features = false, features = ["std", "derive"] }
+serde-saphyr = { version = "=2.2.0", default-features = false, features = ["deserialize"] }

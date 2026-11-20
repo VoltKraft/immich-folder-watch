@@ -1,5 +1,152 @@
 # Development
 
+## Rust rewrite reference corpus
+
+The selected RW-01 through RW-07 goal and its gates live in the
+[project brief](project.md#m-rust-implementation-20261114) and
+[acceptance record](rust/acceptance.md). Work only on `rewrite/rust`.
+The shipping .NET sources remain the behavioral reference. The C# oracle is
+development tooling; it is never part of the Rust candidate runtime.
+
+Run from the repository root with the exact SDK selected by `global.json`:
+
+```bash
+dotnet run --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
+dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj -c Release --filter FullyQualifiedName~RustRewriteBehaviorContractTests
+dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj -c Release --filter FullyQualifiedName~RustRewriteLifecycleContractTests
+```
+
+Golden verification requires the reviewed corpus for the current OS. Generate
+new candidate output using `export artifacts/rust/oracle`, review it and compare
+an independent `verify artifacts/rust/oracle` run before adding golden fixtures.
+Export-then-verify proves repeatability, not equivalence to an already reviewed
+baseline. See [storage provenance and limits](rust/rw01-storage-contract.md).
+No command takes a production profile/database; all profiles/media are synthetic.
+
+`IFW_ORACLE_EXPECT_ARCH=x64` or `arm64` requires matching OS/process architecture
+and prevents emulated/cross-target runs from being counted as native evidence.
+The behavior/lifecycle tests find fixtures by walking their repository ancestors;
+`IFW_COMPATIBILITY_REPOSITORY` can identify the source checkout for relocated
+test binaries. It selects fixtures, never an application profile.
+
+Use separate `--artifacts-path artifacts/rust/<lane>` directories for concurrent
+reference builds. A local exact SDK is available in the existing ignored cache at
+`artifacts/flatpak-local-2.11.2/sdk/dotnet` on the current development machine;
+this is local convenience, not a portable install prerequisite. `DOTNET_CLI_HOME`
+can isolate SDK state; set `DOTNET_GENERATE_ASPNET_CERTIFICATE=false` and
+`DOTNET_CLI_TELEMETRY_OPTOUT=1`. Test-host/MSBuild sockets and isolated D-Bus
+protocol tests need local IPC access; a sandbox rejection is not a failed behavior test.
+
+`rust-compatibility.yaml` runs on `rewrite/rust` for corpus/source changes and
+manual dispatch on that branch only, using native Windows/Linux x64/ARM64 runners.
+It uploads reference evidence under the exact source SHA, has read-only repository
+permissions and cannot publish releases. SDK architecture selection is supported
+by the [pinned setup action](https://github.com/actions/setup-dotnet/blob/0f4a354dd5547a28c70b7853dbd95d5b67886e73/action.yml);
+runner availability follows the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Actual runs, missing platforms and independent workflow review belong in the
+acceptance record. Native reference tests do not qualify the future Rust GUI.
+
+## Rust feasibility workspace
+
+Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished
+workspace version `0.0.0`. Product release numbering remains in
+`Directory.Build.props`. Pin the compiler in `rust/rust-toolchain.toml` and the
+upstream distribution hashes in `rust/toolchain-inputs.json`. Keep `rust/Cargo.lock`
+under version control. The workspace currently exercises native feasibility.
+
+From the repository root on Linux x64, install the pinned distribution into
+the ignored build directory and run the same probes as the native workflow:
+
+```bash
+bash tools/rust-qa/install-toolchain.sh x86_64-unknown-linux-gnu
+export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+export CARGO_HOME="$PWD/artifacts/rust/cargo-home"
+python3 tools/rust-qa/test-native.py x86_64-unknown-linux-gnu
+```
+
+Use the matching target from the inputs file on Linux ARM64 and on Windows
+with Git Bash and MSVC build tools. The installer requires curl, sha256sum,
+tar with XZ support and Python 3.11+. It checks the archive before extracting
+and installs under `artifacts/rust/toolchain`. A host with an equivalent native
+compiler can supply it through `PATH`. The test driver checks the release, full
+compiler revision and native host. Its logs and per-step results live under
+`artifacts/rust/feasibility/<target>/`. `Rust native feasibility` runs the
+same commands and retains evidence under the source SHA. The five C# window
+traces exercise the Rust policy. Native window, tray and assistive-technology
+observations have separate entries in the [acceptance record](rust/acceptance.md).
+The same run compares Rust path, timestamp and casing observations to a native
+.NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
+comparison. See the [legacy checks](rust/rw02-legacy.md).
+
+Run `python3 tools/rust-qa/verify-gui-inputs.py` to verify the original font and
+supplemental notice bytes offline. `--fetch-missing` restores a missing input
+by its reviewed upstream revision and digest. For the separate development GUI
+assessment, fetch its lock once and generate one source and feature inventory
+per supported target. For example, from the repository root:
+
+```bash
+cargo fetch --locked --manifest-path tools/rust-qa/gui/Cargo.toml
+python3 tools/rust-qa/audit-graph.py tools/rust-qa/gui/Cargo.toml x86_64-unknown-linux-gnu artifacts/rust/gui-run/audit/x86_64-unknown-linux-gnu.json
+```
+
+The [desktop input review](rust/rw02-gui-dependencies.md) records embedded
+third-party code and protocol terms that require additional notices. From an
+isolated native test host, use these maintained assessment entry points with
+the matching toolchains on `PATH`. Use fresh output directories for each run.
+
+```bash
+python3 tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --output artifacts/rust/storage-native/test
+python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/rust/yaml-assessment/runs/test
+python3 tools/rust-qa/instance/run.py x86_64-unknown-linux-gnu --output artifacts/rust/instance-native/test
+python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
+python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
+python3 tools/rust-qa/gui/profile_text.py
+python3 tools/rust-qa/gui/native.py --backend x11 --input
+python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes
+```
+
+The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
+records native Rust and C# storage results, loopback sessions, graph digests,
+adapters and observed window transitions. Windows uses the fixture's inherited
+control pipe and checks real Win32 show events and `WM_CLOSE` for the child
+PID. The Linux observer runs on a private X11 or Wayland desktop. See the
+[native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
+measured presentation modes and remaining checks.
+
+The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
+Shell and separate compositor/client traces. Fedora uses IBus Anthy by
+default. Ubuntu Noble uses `--ibus-engine mozc`. The [graphics recovery
+fixture](rust/rw02-graphics.md) records presentation and input across device
+replacement. The [text editing fixture](rust/rw02-font-coverage.md) compares
+the released and corrected mixed-direction caret against actual rendered glyphs.
+
+The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
+and exercises both protocol directions and file guard ownership in separate processes.
+Windows runs it only on the disposable rewrite runner because the legacy names contain the actual account SID.
+
+The [YAML assessment](rust/rw02-yaml.md) uses the shipping C# reader in both
+directions. Upload only its individual run output. The separate private cache
+contains original third-party archives. The [Linux service tests](rust/rw02-linux-services.md)
+exercise tray-owner changes and actual synthetic Documents grants. On a native
+Linux builder, set `IFW_QA_REFERENCE_SDK` to the root of the pinned .NET SDK
+and `IFW_QA_REFERENCE_PACKAGES` to a populated NuGet cache below `artifacts/`.
+The grant oracle mounts both read-only and restores offline. The hosted job
+populates this package cache while building the earlier storage and YAML oracles.
+The
+[portal comparison builder](rust/rw02-portal-upstream.md) replays one upstream
+fix on exact release sources in an offline SDK. It writes the executable to
+the ignored test area for the private namespace. The
+[Windows service tests](rust/rw02-windows-services.md) exercise per-user
+shortcut registration, Shell notifications and independent UI Automation.
+The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises
+X11 and Wayland parents, selection and denial. The local Flatpak variant
+installs an isolated test app in a temporary repository. The GNOME variant
+checks its on-screen notification and autostart registration and removal.
+On older host portals, `--host-chooser-only` exercises the parented picker
+without app-ID registration. The disposable Ubuntu job obtains a verified
+runtime once and uses `--flatpak --hosted-runtime` for attributed app actions.
+
 ## Build
 
 The Linux UI uses the [reduced Avalonia build](reduced-avalonia.md). Python 3.11+

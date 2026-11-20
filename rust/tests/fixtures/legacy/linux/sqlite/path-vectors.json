@@ -1,0 +1,330 @@
+{
+  "NativePlatform": "linux",
+  "Boundary": "String/key normalization only. These synthetic path strings are never opened as media; they confer no filesystem authorization.",
+  "Vectors": [
+    {
+      "SourceInput": "/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/ifw-synthetic",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/ifw-synthetic",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/ifw-synthetic",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00E9dia",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00E9dia",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/ifw-synthetic/stra\u00DFe",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/ifw-synthetic/stra\u00DFe",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/ifw-synthetic/stra\u00DFe",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/ifw-synthetic/e\u0301",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "album/\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/ifw-synthetic/e\u0301",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "album\\\u00E9.jpg"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": true,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/ifw-synthetic/e\u0301",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03C3\u03C2-\uD801\uDC28.jpg"
+    },
+    {
+      "SourceInput": "/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/",
+      "SourceKey": "/",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/IFW-SYNTHETIC",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/IFW-SYNTHETIC",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic",
+      "SourceKey": "/IFW-SYNTHETIC",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00C9DIA",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/../M\u00E9dia",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/M\u00E9dia",
+      "SourceKey": "/M\u00C9DIA",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/IFW-SYNTHETIC/M\u00C9DIA",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/IFW-SYNTHETIC/M\u00C9DIA",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic//M\u00E9dia/",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "SourceKey": "/IFW-SYNTHETIC/M\u00C9DIA",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/IFW-SYNTHETIC/STRA\u00DFE",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/IFW-SYNTHETIC/STRA\u00DFE",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/stra\u00DFe",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/stra\u00DFe",
+      "SourceKey": "/IFW-SYNTHETIC/STRA\u00DFE",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "album/\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/IFW-SYNTHETIC/E\u0301",
+      "RelativePath": "album/\u00E9.jpg",
+      "RelativePathKey": "ALBUM/\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "album\\\u00E9.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/IFW-SYNTHETIC/E\u0301",
+      "RelativePath": "album\\\u00E9.jpg",
+      "RelativePathKey": "ALBUM\\\u00C9.JPG"
+    },
+    {
+      "SourceInput": "/ifw-synthetic/e\u0301",
+      "RelativeInput": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "PathsCaseSensitive": false,
+      "SourcePath": "/ifw-synthetic/e\u0301",
+      "SourceKey": "/IFW-SYNTHETIC/E\u0301",
+      "RelativePath": "./\u03C3\u03C2-\uD801\uDC28.jpg",
+      "RelativePathKey": "./\u03A3\u03A3-\uD801\uDC00.JPG"
+    }
+  ]
+}

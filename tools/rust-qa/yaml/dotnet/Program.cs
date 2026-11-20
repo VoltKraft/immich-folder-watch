@@ -1,0 +1,224 @@
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using ImmichFolderWatch.Core.Configuration;
+
+namespace ImmichFolderWatch.YamlAssessment;
+
+internal static class Program
+{
+    private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
+    private const string ChangedAlbum = "Rust – Grüße 日本語 😀: # null";
+
+    private static void Main(string[] args)
+    {
+        var expectedArchitecture = Environment.GetEnvironmentVariable("IFW_ORACLE_EXPECT_ARCH");
+        if (expectedArchitecture is not ("x64" or "arm64") ||
+            !RuntimeInformation.ProcessArchitecture.ToString().Equals(expectedArchitecture, StringComparison.OrdinalIgnoreCase) ||
+            !RuntimeInformation.OSArchitecture.ToString().Equals(expectedArchitecture, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The oracle requires the requested native process and OS architecture.");
+        }
+        if (args.Length != 3 || args[0] is not ("export" or "verify"))
+        {
+            throw new ArgumentException("Usage: YamlOracle export <reviewed-corpus> <new-output> | verify <reference> <Rust-output>");
+        }
+        if (args[0] == "export")
+        {
+            Export(Path.GetFullPath(args[1]), Isolated(args[2]));
+        }
+        else
+        {
+            Verify(Isolated(args[1]), Isolated(args[2]));
+        }
+    }
+
+    private static string Isolated(string value)
+    {
+        var path = Path.GetFullPath(value);
+        var scope = Path.GetFullPath("artifacts/rust/yaml-assessment") + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(scope, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Only synthetic YAML assessment artifacts are allowed.");
+        }
+        return path;
+    }
+
+    private static void Export(string fixtures, string output)
+    {
+        var native = OperatingSystem.IsWindows() ? "windows" : "linux";
+        var expectedFixtures = Path.GetFullPath(Path.Combine("rust", "tests", "fixtures", "legacy", native));
+        if (!fixtures.Equals(expectedFixtures, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            throw new ArgumentException("Only the reviewed native synthetic corpus is allowed.");
+        if (Directory.Exists(output)) throw new IOException("Refusing an existing output directory.");
+        Directory.CreateDirectory(output);
+        var profile = Path.Combine(output, "profile");
+        Directory.CreateDirectory(profile);
+        var cases = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var file in Directory.GetFiles(Path.Combine(fixtures, "config"), "*.yaml"))
+        {
+            cases.Add(Path.GetFileName(file).Replace(".yaml", "", StringComparison.Ordinal), File.ReadAllText(file));
+        }
+        var additional = new Dictionary<string, string>
+        {
+            ["duplicate-field"] = "retry:\n  maxAttempts: 1\n  maxAttempts: 9\n",
+            ["duplicate-section"] = "retry: {maxAttempts: 1, baseDelayMilliseconds: 7}\nretry: {maxAttempts: 9}\n",
+            ["merge-key"] = "base: &base {path: from-merge, albumName: merge}\nwatch:\n  sources:\n    - <<: *base\n      albumName: explicit\n",
+            ["unknown-keys"] = "future: {nested: [one, two]}\nwatch:\n  sources: [{path: media, future: {nested: [a, b]}}]\n",
+            ["null-values"] = "immich: {apiKey: null, serverApiUrl: null}\nlogging: {level: null, target: null, logDirectory: null}\nlocalization: {language: null}\nwatch: {sources: [null, {path: null, albumName: null, extensions: [null, jpg, ' ']}], extensions: null}\n",
+            ["unicode-filters"] = "watch:\n  extensions: [JPG, .jpg, İMG, img, Straße, STRASSE, Σ, σ, ς]\n  sources:\n    - path: 'Média/日本語/😀'\n      excludeDirectories: [' Straße ', STRASSE, σ, ς, Σ, ı, I, i, İ]\n      excludeFileNames: ['Ä.TMP', 'ä.tmp', 'ſ', S, 'K', K]\nlocalization: {language: ' DE '}\n",
+            ["unicode-trim"] = "immich: {apiKey: '\u00a0synthetic\u2003'}\nwatch: {sources: [{path: '\u2003 Fotos \u00a0', albumName: '\u2003Gruß\u00a0'}]}\n",
+            ["boolean-legacy"] = "immich: {allowInsecureHttp: yes}\nwatch: {sources: [{includeSubdirectories: ON, deleteAfterUpload: off}]}\n",
+            ["plain-string-scalars"] = "immich: {apiKey: 123, serverApiUrl: true}\nwatch: {sources: [{path: 001, albumName: false, extensions: [123, true]}]}\n",
+            ["scalar-null-versus-quoted"] = "watch: {sources: [{path: '', albumName: null}, {path: '.', albumName: 'null'}]}\n",
+            ["integer-extremes"] = "retry: {maxAttempts: -2147483648, baseDelayMilliseconds: 2147483647}\nwatch: {batchIntervalSeconds: 0, maxBatchSize: -1}\n",
+            ["integer-overflow"] = "retry: {maxAttempts: 2147483648}\n",
+            ["null-nonnullable"] = "immich: {allowInsecureHttp: null}\nretry: {maxAttempts: null, baseDelayMilliseconds: null}\nwatch: {batchIntervalSeconds: null, maxBatchSize: null, fileReadyTimeoutSeconds: null}\n",
+            ["integer-spellings"] = "retry: {maxAttempts: 010, baseDelayMilliseconds: 0x20}\nwatch: {maxBatchSize: +7}\n",
+            ["integer-underscore"] = "retry: {maxAttempts: 1_000}\n",
+            ["integer-quoted"] = "retry: {maxAttempts: '009', baseDelayMilliseconds: '+10'}\n",
+            ["boolean-invalid"] = "immich: {allowInsecureHttp: maybe}\n",
+            ["unknown-alias"] = "watch: {sources: [*missing]}\n",
+            ["explicit-strings"] = "watch: {sources: [{path: !!str 001, albumName: !!str true}]}\n",
+            ["include-tag"] = "immich: {apiKey: !include synthetic-never-read.yaml}\n",
+            ["properties-literal"] = "immich: {apiKey: '${IFW_SYNTHETIC_NEVER_EXPAND}'}\n",
+            ["multiple-documents"] = "{}\n---\nretry: {maxAttempts: 9}\n",
+            ["empty-document"] = "\n",
+            ["null-document"] = "null\n",
+            ["nonmapping-document"] = "[a, b]\n",
+            ["multiline"] = "immich:\n  apiKey: |\n    synthetic-first\n    synthetic-second\nlogging: {logDirectory: 'logs/../logs'}\n",
+            ["trailing-path-separator"] = "watch: {sources: [{path: 'media/'}]}\nlogging: {logDirectory: 'logs/'}\n",
+            ["unknown-property-casing"] = "Immich: {apiKey: ignored}\nimmich: {ApiKey: ignored-too}\n",
+        };
+        foreach (var entry in additional) cases.Add(entry.Key, entry.Value);
+        var loader = new AppConfigLoader();
+        var rows = new List<object>();
+        var corpusAssertions = 0;
+        foreach (var (name, yaml) in cases)
+        {
+            var path = Path.Combine(profile, "config.yaml");
+            File.WriteAllText(path, yaml, new UTF8Encoding(false));
+            try
+            {
+                var editable = loader.LoadForEditing(path);
+                var runtime = loader.Load(path);
+                if (name.EndsWith(".input", StringComparison.Ordinal))
+                {
+                    var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "config", name.Replace(".input", ".expected", StringComparison.Ordinal) + ".json")))!;
+                    if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(editable), expected["Editable"]))
+                        throw new InvalidOperationException("The accepted editable corpus changed.");
+                    var tokenized = JsonNode.Parse(JsonSerializer.Serialize(runtime))!;
+                    foreach (var source in tokenized["Watch"]!["Sources"]!.AsArray()) Tokenize(source!, "Path", profile);
+                    Tokenize(tokenized["Logging"]!, "LogDirectory", profile);
+                    if (!JsonNode.DeepEquals(tokenized, expected["Runtime"]))
+                        throw new InvalidOperationException("The accepted native runtime corpus changed.");
+                    corpusAssertions += 2;
+                }
+                rows.Add(new { Name = name, Yaml = yaml, Accepted = true, Editable = editable, Runtime = runtime,
+                    Written = new AppConfigWriter().Serialize(editable) });
+            }
+            catch (Exception exception) when (exception is not InvalidOperationException || !exception.Message.StartsWith("The accepted", StringComparison.Ordinal))
+            {
+                if (name.EndsWith(".input", StringComparison.Ordinal) || name.EndsWith(".written", StringComparison.Ordinal)) throw;
+                rows.Add(new { Name = name, Yaml = yaml, Accepted = false, ErrorType = exception.GetType().FullName });
+            }
+        }
+        var casing = ExportCasing();
+        Write(Path.Combine(output, "casing.json"), casing);
+        Write(Path.Combine(output, "reference.json"), new
+        {
+            Format = "ifw-rw02-yaml-reference-v1", Platform = OperatingSystem.IsWindows() ? "windows" : "linux",
+            Architecture = RuntimeInformation.ProcessArchitecture.ToString(), OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
+            Runtime = Environment.Version.ToString(), Profile = profile, CorpusAssertions = corpusAssertions,
+            CasingSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "casing.json")))), Cases = rows
+        });
+        Console.WriteLine($"C# YAML reference exported: {rows.Count} cases, {corpusAssertions} accepted-corpus assertions, all Unicode scalars.");
+    }
+
+    private static void Tokenize(JsonNode value, string property, string profile)
+    {
+        var path = value[property]!.GetValue<string>();
+        if (path.StartsWith(profile + Path.DirectorySeparatorChar, StringComparison.Ordinal)) value[property] = "$PROFILE" + path[profile.Length..];
+    }
+
+    private static object ExportCasing()
+    {
+        var classes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var lower = new List<int[]>();
+        var ordinal = new List<int[]>();
+        var whitespace = new List<int>();
+        var count = 0;
+        var batches = 0;
+        var originalBatch = new StringBuilder();
+        var lowerBatch = new StringBuilder();
+        var ordinalBatch = new StringBuilder();
+        for (var scalar = 0; scalar <= 0x10ffff; scalar++)
+        {
+            if (!Rune.IsValid(scalar)) continue;
+            var original = char.ConvertFromUtf32(scalar);
+            var lowered = original.ToLowerInvariant();
+            var loweredScalar = Rune.GetRuneAt(lowered, 0);
+            if (loweredScalar.Utf16SequenceLength != lowered.Length) throw new InvalidOperationException("Unexpected expanding lowercase.");
+            if (lowered != original) lower.Add(new[] { scalar, loweredScalar.Value });
+            if (!classes.TryGetValue(original, out var representative)) classes.Add(original, representative = scalar);
+            if (representative != scalar) ordinal.Add(new[] { scalar, representative });
+            if (original.Trim().Length == 0) whitespace.Add(scalar);
+            originalBatch.Append(original);
+            lowerBatch.Append(lowered);
+            ordinalBatch.Append(char.ConvertFromUtf32(representative));
+            count++;
+            if (count % 4096 == 0 || scalar == 0x10ffff)
+            {
+                if (originalBatch.ToString().ToLowerInvariant() != lowerBatch.ToString() ||
+                    !StringComparer.OrdinalIgnoreCase.Equals(originalBatch.ToString(), ordinalBatch.ToString()))
+                    throw new InvalidOperationException("Context-dependent string behavior in generated casing.");
+                batches++;
+                originalBatch.Clear(); lowerBatch.Clear(); ordinalBatch.Clear();
+            }
+        }
+        return new { Format = "ifw-rw02-yaml-casing-v1", Scalars = count, ContextBatches = batches,
+            Lower = lower, Ordinal = ordinal, Whitespace = whitespace };
+    }
+
+    private static void Verify(string referenceDirectory, string output)
+    {
+        var reference = JsonNode.Parse(File.ReadAllText(Path.Combine(referenceDirectory, "reference.json")))!;
+        if (reference["format"]!.GetValue<string>() != "ifw-rw02-yaml-reference-v1")
+            throw new InvalidDataException("Unknown synthetic reference format.");
+        var profile = Isolated(reference["profile"]!.GetValue<string>());
+        var loader = new AppConfigLoader();
+        var assertions = 0;
+        foreach (var row in reference["cases"]!.AsArray().Where(value => value!["accepted"]!.GetValue<bool>()))
+        {
+            var name = row!["name"]!.GetValue<string>();
+            foreach (var mutation in new[] { false, true })
+            {
+                var expected = row["editable"]!.Deserialize<AppConfig>(Json)!;
+                if (mutation)
+                {
+                    expected.Localization.Language = "de";
+                    expected.Retry.MaxAttempts = 9;
+                    expected.Watch.Sources.Add(new WatchSourceSettings { Path = "Neu/../Fotos 日本語", AlbumName = ChangedAlbum,
+                        Extensions = new List<string> { ".heic" }, IncludeSubdirectories = true, SyncMode = "sync" });
+                }
+                var yaml = File.ReadAllText(Path.Combine(output, name + (mutation ? ".changed" : ".roundtrip") + ".yaml"));
+                var path = Path.Combine(profile, "rust-written.yaml");
+                File.WriteAllText(path, yaml, new UTF8Encoding(false));
+                if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(expected, Json), JsonSerializer.SerializeToNode(loader.LoadForEditing(path), Json)))
+                    throw new InvalidOperationException($"Rust YAML editable readback differs: {name} ({mutation}).");
+                assertions++;
+                if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(AppConfigLoader.NormalizeForRuntime(expected, profile), Json),
+                    JsonSerializer.SerializeToNode(loader.Load(path), Json)))
+                    throw new InvalidOperationException($"Rust YAML runtime readback differs: {name} ({mutation}).");
+                assertions++;
+            }
+        }
+        Write(Path.Combine(output, "csharp-readback.json"), new { Format = "ifw-rw02-yaml-readback-v1", Assertions = assertions,
+            Runtime = Environment.Version.ToString(), Architecture = RuntimeInformation.ProcessArchitecture.ToString(), OSArchitecture = RuntimeInformation.OSArchitecture.ToString() });
+        Console.WriteLine($"C# YAML readback passed: {assertions} editable/runtime assertions on original and changed Rust YAML.");
+    }
+
+    private static void Write(string path, object value) => File.WriteAllText(path, JsonSerializer.Serialize(value, Json) + "\n", new UTF8Encoding(false));
+}

@@ -1,0 +1,19 @@
+immich:
+  allowInsecureHttp: false
+  serverApiUrl: ""
+  apiKey: ""
+watch:
+  sources: []
+  transferOrder: newestFirst
+  batchIntervalSeconds: 5
+  maxBatchSize: 25
+  fileReadyTimeoutSeconds: 30
+retry:
+  maxAttempts: 5
+  baseDelayMilliseconds: 500
+logging:
+  level: Information
+  target: eventLog
+  logDirectory: logs
+localization:
+  language: auto

@@ -1,0 +1,145 @@
+{
+  "Editable": {
+    "Immich": {
+      "AllowInsecureHttp": true,
+      "ServerApiUrl": "https://immich.example.invalid/api",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL"
+    },
+    "Watch": {
+      "Sources": [
+        {
+          "Path": "C:\\Pictures\\2024",
+          "AlbumName": "null",
+          "IncludeSubdirectories": true,
+          "Extensions": [
+            ".jpg",
+            ".mov"
+          ],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "sync",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "001",
+          "AlbumName": "123",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadAll",
+          "DeleteAfterUpload": true
+        },
+        {
+          "Path": "M\u00E9dia/\u65E5\u672C\u8A9E/\uD83D\uDE00",
+          "AlbumName": "true",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "colon: hash#",
+          "AlbumName": "a: b # c",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        }
+      ],
+      "TransferOrder": "newestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 7,
+      "BaseDelayMilliseconds": 123
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "file",
+      "LogDirectory": "logs"
+    },
+    "Localization": {
+      "Language": "en"
+    }
+  },
+  "Runtime": {
+    "Immich": {
+      "AllowInsecureHttp": true,
+      "ServerApiUrl": "https://immich.example.invalid/api",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL"
+    },
+    "Watch": {
+      "Sources": [
+        {
+          "Path": "$PROFILE/C:\\Pictures\\2024",
+          "AlbumName": "null",
+          "IncludeSubdirectories": true,
+          "Extensions": [
+            ".jpg",
+            ".mov"
+          ],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "sync",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "$PROFILE/001",
+          "AlbumName": "123",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadAll",
+          "DeleteAfterUpload": true
+        },
+        {
+          "Path": "$PROFILE/M\u00E9dia/\u65E5\u672C\u8A9E/\uD83D\uDE00",
+          "AlbumName": "true",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "$PROFILE/colon: hash#",
+          "AlbumName": "a: b # c",
+          "IncludeSubdirectories": false,
+          "Extensions": [],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        }
+      ],
+      "TransferOrder": "newestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 7,
+      "BaseDelayMilliseconds": 123
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "file",
+      "LogDirectory": "$PROFILE/logs"
+    },
+    "Localization": {
+      "Language": "en"
+    }
+  },
+  "RuntimePathToken": "$PROFILE"
+}

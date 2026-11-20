@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Document the proposed full Rust rewrite, GUI/library assessment, compatibility and security gates, staged migration, and reusable desktop architecture standard. No application implementation or runtime behavior changes.
+- Select the complete Rust candidate implementation on `rewrite/rust`, with a fixed RW-01 through RW-07 goal contract and explicit native, compatibility, security, licensing and reuse acceptance gates. Stable publication remains separate.
+- Add synthetic C# compatibility oracles for legacy YAML/SQLite, HTTP and synchronization behavior, and window lifecycle, with a four-platform native reference workflow isolated from publication. Shipping application behavior and dependencies are unchanged.
+- Add a pinned Rust feasibility workspace for window lifecycle, legacy value codecs, handle-bound filesystem operations and realtime framing. Add native differential tests and an isolated 100,000-file desktop benchmark.
+- Add isolated Rust desktop, SQLite and TLS/WebSocket assessments with audited inputs, native window observations and C# readback of Rust-written WAL backups.
+
 ## [3.0.4] - 2026-11-13
 
 ### Fixed

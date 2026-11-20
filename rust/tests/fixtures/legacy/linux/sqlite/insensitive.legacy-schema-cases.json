@@ -1,0 +1,168 @@
+[
+  {
+    "Name": "v0-optional-0",
+    "UserVersion": 0,
+    "RemovedTables": [],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-1",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "owned_albums"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-2",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "sync_timestamp_repairs"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-3",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_timestamp_repairs"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-4",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-5",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-6",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "sync_timestamp_repairs",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v0-optional-7",
+    "UserVersion": 0,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_timestamp_repairs",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-0",
+    "UserVersion": 1,
+    "RemovedTables": [],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-1",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "owned_albums"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-2",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "sync_timestamp_repairs"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-3",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_timestamp_repairs"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-4",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-5",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-6",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "sync_timestamp_repairs",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  },
+  {
+    "Name": "v1-optional-7",
+    "UserVersion": 1,
+    "RemovedTables": [
+      "owned_albums",
+      "sync_timestamp_repairs",
+      "sync_account_status"
+    ],
+    "ExpectedAfterInitializationVersion": 1,
+    "ExpectedLastSuccessfulSyncUtc": "2024-02-29T05:04:05.1234567+00:00",
+    "ReopeningDoesNotBackfillAgain": true
+  }
+]

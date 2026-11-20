@@ -1,7 +1,9 @@
 # Build output
 bin/
+!rust/crates/*/src/bin/
 obj/
 artifacts/
+rust/target/
 __pycache__/
 
 # User files

@@ -1,0 +1,237 @@
+{
+  "PathsCaseSensitive": true,
+  "Source": "/ifw-synthetic/M\u00E9dia",
+  "Account": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+  "OtherAccount": "16be13cf5f92d495cd2fabdb5430837edaf35d6a85482e1660dfd969dc3225b9",
+  "Entries": [
+    {
+      "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "Stra\u00DFe/\u03C3\u03C2-\uD801\uDC28.jpg",
+      "AssetId": "asset-upload",
+      "AlbumName": "null",
+      "FileSize": 9007199254740993,
+      "LastWriteTimeUtc": "2024-02-29T03:04:05.1234567+00:00",
+      "Direction": 0,
+      "Status": 0,
+      "LastSynchronizedAtUtc": "2024-02-29T04:04:05.1234567+00:00",
+      "TombstoneExpiresAtUtc": null
+    },
+    {
+      "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "download.bin",
+      "AssetId": "asset-download",
+      "AlbumName": "",
+      "FileSize": 0,
+      "LastWriteTimeUtc": "2024-02-29T03:04:05.1234567+00:00",
+      "Direction": 1,
+      "Status": 0,
+      "LastSynchronizedAtUtc": "2024-02-29T05:04:05.1234567+00:00",
+      "TombstoneExpiresAtUtc": null
+    },
+    {
+      "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+      "SourcePath": "/ifw-synthetic/M\u00E9dia",
+      "RelativePath": "removed.jpg",
+      "AssetId": null,
+      "AlbumName": "null",
+      "FileSize": 9007199254740993,
+      "LastWriteTimeUtc": "2024-02-29T03:04:05.1234567+00:00",
+      "Direction": 0,
+      "Status": 1,
+      "LastSynchronizedAtUtc": "2024-03-02T03:04:05.1234567+00:00",
+      "TombstoneExpiresAtUtc": "2024-02-29T03:06:05.1234567+00:00"
+    }
+  ],
+  "Repairs": [
+    {
+      "OriginalEntry": {
+        "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+        "SourcePath": "/ifw-synthetic/M\u00E9dia",
+        "RelativePath": "Stra\u00DFe/\u03C3\u03C2-\uD801\uDC28.jpg",
+        "AssetId": "asset-upload",
+        "AlbumName": "null",
+        "FileSize": 9007199254740993,
+        "LastWriteTimeUtc": "2024-02-29T03:04:05.1234567+00:00",
+        "Direction": 0,
+        "Status": 0,
+        "LastSynchronizedAtUtc": "2024-02-29T04:04:05.1234567+00:00",
+        "TombstoneExpiresAtUtc": null
+      },
+      "CreationTimeUtc": "2024-02-27T03:04:05.1234567+00:00",
+      "LastWriteTimeUtc": "2024-02-29T03:04:05.1234568+00:00",
+      "ContentSha256": "7879B91B74835447CAC95069F93E67B1705052D13CCBA8C6C193622D919BEA29"
+    }
+  ],
+  "LastSuccessfulSyncUtc": "2024-02-29T06:04:05.1234567+00:00",
+  "Snapshot": {
+    "UserVersion": 1,
+    "Schema": [
+      {
+        "Type": "table",
+        "Name": "owned_albums",
+        "Sql": "CREATE TABLE owned_albums (\n    account_scope TEXT NOT NULL,\n    source_key TEXT NOT NULL,\n    directory_key TEXT NOT NULL,\n    album_id TEXT NOT NULL,\n    PRIMARY KEY (account_scope, source_key, directory_key),\n    UNIQUE (account_scope, source_key, album_id)\n)"
+      },
+      {
+        "Type": "table",
+        "Name": "sync_account_status",
+        "Sql": "CREATE TABLE sync_account_status (\n    account_scope TEXT NOT NULL PRIMARY KEY,\n    last_successful_sync_utc TEXT NOT NULL\n)"
+      },
+      {
+        "Type": "table",
+        "Name": "sync_entries",
+        "Sql": "CREATE TABLE sync_entries (\n    account_scope TEXT NOT NULL,\n    source_path TEXT NOT NULL,\n    source_key TEXT NOT NULL,\n    relative_path TEXT NOT NULL,\n    relative_path_key TEXT NOT NULL,\n    asset_id TEXT NULL,\n    album_name TEXT NOT NULL,\n    file_size INTEGER NOT NULL CHECK (file_size \u003E= 0),\n    last_write_time_utc TEXT NOT NULL,\n    direction INTEGER NOT NULL CHECK (direction IN (0, 1)),\n    status INTEGER NOT NULL CHECK (status IN (0, 1)),\n    last_synchronized_at_utc TEXT NOT NULL,\n    tombstone_expires_at_utc TEXT NULL,\n    PRIMARY KEY (account_scope, source_key, relative_path_key),\n    CHECK (\n        (status = 0 AND tombstone_expires_at_utc IS NULL)\n        OR (status = 1 AND tombstone_expires_at_utc IS NOT NULL)\n    )\n)"
+      },
+      {
+        "Type": "table",
+        "Name": "sync_timestamp_repairs",
+        "Sql": "CREATE TABLE sync_timestamp_repairs (\n    account_scope TEXT NOT NULL,\n    source_key TEXT NOT NULL,\n    relative_path_key TEXT NOT NULL,\n    repair_json TEXT NOT NULL,\n    PRIMARY KEY (account_scope, source_key, relative_path_key)\n)"
+      },
+      {
+        "Type": "index",
+        "Name": "ix_sync_entries_asset_id",
+        "Sql": "CREATE INDEX ix_sync_entries_asset_id\n    ON sync_entries (account_scope, asset_id)\n    WHERE asset_id IS NOT NULL"
+      }
+    ],
+    "Tables": [
+      {
+        "Name": "owned_albums",
+        "Columns": [
+          "account_scope",
+          "source_key",
+          "directory_key",
+          "album_id"
+        ],
+        "Rows": [
+          [
+            "16be13cf5f92d495cd2fabdb5430837edaf35d6a85482e1660dfd969dc3225b9",
+            "/ifw-synthetic/M\u00E9dia",
+            "Other",
+            "album-other"
+          ],
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "/ifw-synthetic/M\u00E9dia",
+            "Stra\u00DFe",
+            "album-exact-id"
+          ]
+        ]
+      },
+      {
+        "Name": "sync_account_status",
+        "Columns": [
+          "account_scope",
+          "last_successful_sync_utc"
+        ],
+        "Rows": [
+          [
+            "16be13cf5f92d495cd2fabdb5430837edaf35d6a85482e1660dfd969dc3225b9",
+            "2024-02-29T05:04:05.1234567\u002B00:00"
+          ],
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "2024-02-29T06:04:05.1234567\u002B00:00"
+          ]
+        ]
+      },
+      {
+        "Name": "sync_entries",
+        "Columns": [
+          "account_scope",
+          "source_path",
+          "source_key",
+          "relative_path",
+          "relative_path_key",
+          "asset_id",
+          "album_name",
+          "file_size",
+          "last_write_time_utc",
+          "direction",
+          "status",
+          "last_synchronized_at_utc",
+          "tombstone_expires_at_utc"
+        ],
+        "Rows": [
+          [
+            "16be13cf5f92d495cd2fabdb5430837edaf35d6a85482e1660dfd969dc3225b9",
+            "/ifw-synthetic/M\u00E9dia",
+            "/ifw-synthetic/M\u00E9dia",
+            "other-account.jpg",
+            "other-account.jpg",
+            "asset-download",
+            "",
+            0,
+            "2024-02-29T03:04:05.1234567\u002B00:00",
+            1,
+            0,
+            "2024-02-29T05:04:05.1234567\u002B00:00",
+            null
+          ],
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "/ifw-synthetic/M\u00E9dia",
+            "/ifw-synthetic/M\u00E9dia",
+            "Stra\u00DFe/\u03C3\u03C2-\uD801\uDC28.jpg",
+            "Stra\u00DFe/\u03C3\u03C2-\uD801\uDC28.jpg",
+            "asset-upload",
+            "null",
+            9007199254740993,
+            "2024-02-29T03:04:05.1234567\u002B00:00",
+            0,
+            0,
+            "2024-02-29T04:04:05.1234567\u002B00:00",
+            null
+          ],
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "/ifw-synthetic/M\u00E9dia",
+            "/ifw-synthetic/M\u00E9dia",
+            "download.bin",
+            "download.bin",
+            "asset-download",
+            "",
+            0,
+            "2024-02-29T03:04:05.1234567\u002B00:00",
+            1,
+            0,
+            "2024-02-29T05:04:05.1234567\u002B00:00",
+            null
+          ],
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "/ifw-synthetic/M\u00E9dia",
+            "/ifw-synthetic/M\u00E9dia",
+            "removed.jpg",
+            "removed.jpg",
+            null,
+            "null",
+            9007199254740993,
+            "2024-02-29T03:04:05.1234567\u002B00:00",
+            0,
+            1,
+            "2024-03-02T03:04:05.1234567\u002B00:00",
+            "2024-02-29T03:06:05.1234567\u002B00:00"
+          ]
+        ]
+      },
+      {
+        "Name": "sync_timestamp_repairs",
+        "Columns": [
+          "account_scope",
+          "source_key",
+          "relative_path_key",
+          "repair_json"
+        ],
+        "Rows": [
+          [
+            "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13",
+            "/ifw-synthetic/M\u00E9dia",
+            "Stra\u00DFe/\u03C3\u03C2-\uD801\uDC28.jpg",
+            "{\u0022OriginalEntry\u0022:{\u0022AccountScope\u0022:\u002229975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13\u0022,\u0022SourcePath\u0022:\u0022/ifw-synthetic/M\\u00E9dia\u0022,\u0022RelativePath\u0022:\u0022Stra\\u00DFe/\\u03C3\\u03C2-\\uD801\\uDC28.jpg\u0022,\u0022AssetId\u0022:\u0022asset-upload\u0022,\u0022AlbumName\u0022:\u0022null\u0022,\u0022FileSize\u0022:9007199254740993,\u0022LastWriteTimeUtc\u0022:\u00222024-02-29T03:04:05.1234567\u002B00:00\u0022,\u0022Direction\u0022:0,\u0022Status\u0022:0,\u0022LastSynchronizedAtUtc\u0022:\u00222024-02-29T04:04:05.1234567\u002B00:00\u0022,\u0022TombstoneExpiresAtUtc\u0022:null},\u0022CreationTimeUtc\u0022:\u00222024-02-27T03:04:05.1234567\u002B00:00\u0022,\u0022LastWriteTimeUtc\u0022:\u00222024-02-29T03:04:05.1234568\u002B00:00\u0022,\u0022ContentSha256\u0022:\u00227879B91B74835447CAC95069F93E67B1705052D13CCBA8C6C193622D919BEA29\u0022}"
+          ]
+        ]
+      }
+    ]
+  }
+}

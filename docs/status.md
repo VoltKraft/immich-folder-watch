@@ -1,5 +1,553 @@
 # Project Status
 
+## Four-host IPC, native ARM64 relink and desktop checks (2026-11-21)
+
+All four native hosts passed six old/new activation and profile-lock
+observations at `5895c0b`. The ARM64 Microsoft toolchain reproduced the
+published Windows import library byte-for-byte. Three independently linked
+test images agreed with 64 processor feature results, and the rebuilt
+transport passed all 15 loopback cases. The four compatibility jobs, four
+Rust feasibility jobs and eight pull-request checks passed. Desktop assessment
+still had failures. Windows ARM64 could not obtain foreground input, both
+Windows font observers stopped at a Windows-1252 console write, and Ubuntu
+did not supply the requested Anthy package.
+[Old/new results](rust/rw02-instance.md#native-results-on-all-four-targets),
+[ARM64 source reconstruction](rust/rw02-windows-imports.md),
+[desktop run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264)
+and [pull-request checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831858586).
+
+## Integrated native GUI text and rendering (2026-11-21)
+
+The same Linux x64 GUI executable, SHA-256
+`80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`,
+passed mixed-direction selection and editing in the ordinary filename field,
+eight rendered glyph controls, and restoration of input after a controlled
+graphics loss. On GNOME Wayland it also committed Japanese text without a
+presentation override. The source review covers the exact features and inputs
+of all 235 packages on each Linux target and 135 on each Windows
+target. Native execution of this revision on the three other targets is
+pending. [Text and source receipts](rust/rw02-gui-dependencies.md) and
+[graphics observations](rust/rw02-graphics.md).
+
+## Older portal hosts and signed Flatpak test runtimes (2026-11-21)
+
+On Fedora x64, seven control runs covered both GTK chooser backends, the
+registered and unregistered host paths, real installed Flatpak grants and
+revocation, and GNOME notification and autostart. All 54 indexed files matched.
+The signed public freedesktop 26.08 metadata supplied the pinned runtime
+commits for both Linux architectures. The hosted jobs now test host selection
+separately from attributed Flatpak actions. Ubuntu 24.04 lacks `ibus-anthy`.
+Its failed package setup at `5895c0b` led to separate provisioning for GNOME
+and its available Mozc engine. Its independent IPC tests passed on both native
+Ubuntu hosts. [Portal evidence](rust/rw02-portal-dialog.md) and
+[hosted runs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264).
+
+## Windows screen reader fixture (2026-11-20)
+
+The new disposable Windows scenario pairs UI Automation with NVDA 2026.3.1
+speech records. Three local regression tests passed for ordered labels,
+protected utterances and partial log writes. The native x64 and ARM64 runs
+must still demonstrate actual reader output.
+[Inputs, isolated profile and evidence requirements](rust/rw02-windows-reader.md).
+
+## GNOME Wayland composition and mixed monitor scaling (2026-11-20)
+
+Fedora x64 completed real IBus Anthy composition in the Rust filename field
+with Mesa Mailbox. A single window moved between monitors and produced the
+expected 100%, 200%, 125% and 100% buffers. The default presentation case
+lost the composition after preedit. All four GNOME indexes and both existing
+Orca regression receipts matched the retained files. The Ubuntu jobs now
+exercise the combined scenario on both native architectures.
+[Wayland observations and open compositor limits](rust/rw02-wayland-input.md).
+
+## Native Linux graphics loss and recovery (2026-11-20)
+
+Fourteen X11/Wayland cases on Fedora x64 exercised initial adapter failure,
+device destruction, a software-driver `VK_ERROR_DEVICE_LOST`, repeat failure
+and an unrelated application panic. The isolated recovery variant retained the
+worker, draft and focus across an Intel-to-llvmpipe switch. New input produced
+observable frames. All 71 indexed artifacts matched their hashes. Integration
+in the shared build and Windows DX12 recovery remain open.
+[Adapters, controls and native evidence](rust/rw02-graphics.md).
+
+## Bidirectional filename editing (2026-11-20)
+
+The released egui 0.37 selected the wrong logical character in mixed Arabic
+filenames. With the upstream caret correction, Linux x64 passed the same four
+native text cases, including Japanese glyphs, mixed digits, pointer deletion
+and left/right movement. The selected candidate adds one runtime dependency,
+`unicode-bidi` 0.3.18. Its Unicode table was reconstructed from upstream data.
+The four-host workflow now runs the corrected fixture. Integration in the
+shared GUI and repeat measurements remain open. [Native comparison, original
+fonts and exact source review](rust/rw02-font-coverage.md).
+
+## Hosted Windows input and Ubuntu portal results (2026-11-20)
+
+At `2e7ed89`, Windows x64 passed the entire keyboard, password and Unicode
+clipboard scenario. On ARM64, UI Automation returned the expected names and
+protection, while the observer could not acquire the foreground. It sent no
+keys. Native ARM64 reconstructed the same LLVM import archive twice, then
+stopped before MSVC setup. Both Ubuntu architectures passed the tray and
+real FUSE tests and encountered a missing host Registry in the separate chooser
+case. All four standard Rust jobs and eight general PR jobs passed. The desktop
+workflow recorded one passing and three failing jobs. The follow-up initializes
+the ARM64 build shell per step and retries foreground only on the owned window.
+[Desktop results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871),
+[standard Rust checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363958)
+and [PR checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828375760).
+
+## Native old/new activation and file guard (2026-11-20)
+
+Two Fedora x64 runs passed six process-level observations. The shipping .NET
+coordinator and Rust fixture activated each other, a second Rust writer was
+refused, and orderly and abrupt exit both released the native file lock. The
+shipping program could still start while the Rust file guard was held. The
+four-host assessment now includes the same fixture. Windows cross-session
+handover remains open. [Source and run receipt](rust/rw02-instance.md).
+
+## Installed Flatpak dialogs, notifications and autostart (2026-11-20)
+
+Five Fedora x64 runs exercised the real GTK portal and a temporary installed
+Flatpak. X11 and Wayland both verified the parent window, cancellation and
+selection. A fresh process lost access to the selected grant after revocation.
+GNOME Shell displayed and withdrew the notification. Its Background portal
+created and removed the app's autostart file and respected explicit denial.
+All 25 indexed evidence files matched their hashes. The next native Ubuntu
+runs cover the registered host application's folder picker on both architectures.
+[Reproduction, images and source evidence](rust/rw02-portal-dialog.md).
+
+## Four native YAML runs and Windows input (2026-11-20)
+
+At `11e4e6f` all four native YAML runs passed with identical filtered sources
+and independently checked evidence. Both Windows hosts passed WScript
+readback of the private and known Startup shortcuts. Both observed German
+UI Automation names and password protection. The x64 input test encountered
+a sharing violation while reading a live log. The ARM64 observer could not
+foreground the owned window, so it sent no keys. The follow-up reads the active
+log with read/write sharing and checks the input desktop as well as the HWND
+and PID. [YAML evidence](rust/rw02-yaml.md) and [Windows input and Shell results](rust/rw02-native-gui.md#reproduction).
+
+## Native Ubuntu tray results and clean reference build (2026-11-20)
+
+At `11e4e6f` both Ubuntu architectures passed the eight-step tray-owner
+test and the full 183/116-assertion YAML comparison. All 204 files in each
+YAML evidence index matched their hashes. The Documents oracle failed before
+launch because bubblewrap could not create a mount point under read-only
+Core sources on a clean checkout. Binding only tracked source files fixed
+the build locally and preserved both reference DLL digests. Semantic FUSE
+results for Ubuntu still require the rerun.
+[CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977)
+and [Linux service evidence](rust/rw02-linux-services.md).
+
+## Windows ARM64 import reconstruction (2026-11-20)
+
+All 20,551 symbols in Microsoft's original ARM64 import library matched the
+three WinMD sources and 371 C baselines. Two LLVM rebuilds produced identical
+libraries. The actual Rust binding used by ring produced the same ARM64 PE
+bytes with the original and reconstructed library. The offline source replay
+checked all 152 registry archive pins in the transport graph. Its next
+Windows ARM64 assessment runs the native observer, MSVC generator and all
+15 loopback cases with the reconstructed library.
+[Reconstruction receipts and source archive](rust/rw02-windows-imports.md).
+
+## X11 composition and native Orca output (2026-11-20)
+
+At the GUI source in `6c953e3`, the private Fedora X11 test received
+a nonempty preedit and committed `あ` from IBus Anthy. Independent AT-SPI
+read the committed text. Both X11 and Wayland runs passed the keyboard and
+language scenarios with Orca speaking the expected labels and protected
+input. Both produced real eSpeak samples on a private ALSA file device.
+Wayland composition, broader font coverage and accessibility on the other
+native targets remain open. [Desktop input evidence](rust/rw02-native-gui.md#native-composition-and-screen-reader-output).
+
+## Native X11 resource comparison (2026-11-20)
+
+Under three 100,000-file scans, the Rust GUI and synthetic inventory worker
+met all 11 precommitted reference bounds on Fedora x64/X11. Median startup
+was 176.99 ms. Visible and hidden RSS were 125.617 MiB. The median of the
+three close p95s was 10.51 ms, with one individual p95 at 15.76 ms against
+a 15.61 ms bound. Reopen was 1.44 ms. Native presentation and XDamage
+counters both stayed at zero during idle and rose after reopen. The hidden
+worker found a newly created file after 4.82 seconds and drained at Quit.
+The exact executable passed all four lifecycle cases and keyboard checks on
+X11 and Wayland. The other native environments and graphics recovery remain
+open. [Paired runs, rule and artifact hashes](rust/rw02-performance.md#paired-x11-measurements).
+
+## Real portal grants, SMB and desktop input (2026-11-20)
+
+Three Fedora grant runs added an in-grant symlink to a readable control. The
+adapter's own policy refused both existing symlinks. Independent review closed
+the earlier ambiguous refusal and verified the private daemon builds, source
+bindings and YAML archive. The [service evidence index](../tools/rust-qa/linux-services/evidence.sha256)
+binds the strengthened runs on the stock, pristine and patched daemons.
+
+The native Ubuntu assessment now includes the same tray ownership and FUSE
+grant tests, with a separate read-only offline .NET reference build. The
+Fedora reference build completed with zero compiler warnings or errors.
+Hosted observations for these two new steps remain pending.
+
+On Windows x64, both independent shortcut readbacks passed. The shell accepted
+the icon, reported the notification shown, and accepted re-registration.
+The native Windows ARM64 shortcut readbacks and cleanup passed, while the
+independent PowerShell readers timed out and Explorer refused the icon.
+The next candidate run tests the scripting hosts for each capability before
+launching the native probe. Both Windows targets passed the updated cross-target
+Clippy check, and five host-selection and cleanup regressions passed locally.
+[Windows Shell evidence](rust/rw02-windows-services.md#native-observations-on-both-windows-architectures).
+
+On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
+when requesting their shared upload lock through a real Documents grant.
+Both acquired it on a private build of 1.22.1 with the upstream flock fix.
+Cross-view cooperating writers received `EAGAIN` while the reader held its
+lock and could write after release. The independent tests also verified
+write refusal, publication, cancellation and revocation through the portal.
+The native tray service recovered from watcher replacement and ignored a
+late acknowledgement from the prior owner. [Linux service and portal evidence](rust/rw02-linux-services.md).
+
+Both native Windows targets passed 13 filesystem tests over encrypted SMB
+3.1.1 at `4961746`. Both Ubuntu architectures passed four native GUI lifecycle
+cases and the complete AT-SPI keyboard, language, protected-field and
+clipboard scenario under X11 and Wayland. [Filesystem evidence](rust/rw02-filesystem.md#four-native-hosts)
+and [native desktop evidence](rust/rw02-native-gui.md).
+
+## Cross-platform source archive identity (2026-11-20)
+
+At `4961746` the Ubuntu YAML jobs correctly refused the compressed bundle
+digest from Fedora. Both archives contained the same 19,486,720-byte tar as
+the local reference. The source inventory now binds this canonical tar to
+`f4caf0051b7bfd73f366bf3918721ddc6f0ebd35dd526fed1ddbd1335a8cab05`.
+All package checksums, filtered files, licenses and target features matched
+the previous inventory. The new local run passed all 13 steps and verified
+all 204 indexed evidence files. Four native reruns are required for YAML.
+[Source evidence](rust/rw02-yaml.md#reviewed-inputs-and-corresponding-sources).
+
+## Native Linux lifecycle and SMB fixture follow-up (2026-11-20)
+
+Both Ubuntu targets passed all four native GUI lifecycle cases on X11 and
+Wayland at `06298d9`. The input observer then timed out on an empty AT-SPI
+desktop. The revised fixture uses an in-memory settings backend on its
+private bus and checks the application's accessibility tree by process ID.
+Local X11 and Wayland both passed the full input case with the change.
+[Native assessment](rust/rw02-native-gui.md).
+
+On both Windows targets the temporary SMB share passed the ACL, encryption
+configuration and UNC marker checks. The connection query then supplied a
+parameter that the runner's cmdlet does not support. Filtering the returned
+connections by the fixture's exact share name preserves the negotiated
+dialect and encryption checks. Native Rust operations over SMB still need
+the follow-up run. [SMB job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44818255768)
+and [cmdlet reference](https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbconnection).
+
+## YAML round-trip and filtered build inputs (2026-11-20)
+
+The [YAML feasibility fixture](rust/rw02-yaml.md) passed 183 Rust differential
+checks across 38 synthetic cases and 116 assertions reading the Rust-written
+files through the production .NET reader on Linux x64. Cases include repeated
+keys, aliases, explicit nulls, absent fields, unknown keys and integer
+spellings. The offline release build used a fresh Cargo home and a filtered
+source bundle with SHA-256
+`b453c3cb5bc96839ae7766d40beae9b7dc97bea3ec1860150babb5b981d15714`.
+The bundle retained 1,571 source files and 68 original notices. The source
+filter, Rust parser budgets, formatter and Clippy passed. All 203 indexed
+evidence files matched their hashes. Only the fresh run output is included in
+the hosted artifact. Results for the remaining native hosts and migration
+verification are pending.
+
+## Windows desktop lifecycle and native service probes (2026-11-20)
+
+Windows x64 and ARM64 each passed all four native DX12 lifecycle cases at
+`167a03d`. A separate Windows observer confirmed zero show events on a
+never-activated background start. The four downloaded assessment archives
+matched the Actions digests and the nested SQLite and network evidence
+hashes. All four hosts backed up both live WALs, passed 40 C# readback
+assertions, and completed 15 isolated TLS/polling/WebSocket cases.
+[Per-host results and archive digests](rust/rw02-native-gui.md#four-native-assessment-archives).
+
+The [Windows services fixture](rust/rw02-windows-services.md) adds real Shell
+icon/notification requests, a private-desktop fallback and per-user COM
+shortcuts with independent WScript and UI Automation observations. Both
+target ABIs passed cross-Clippy and the three recovery cases passed locally.
+Native service results come from its dedicated Windows job steps.
+
+## First hosted desktop and storage assessment (2026-11-20)
+
+At `167a03d` the SQLite and network steps passed on Windows and Linux x64 and
+ARM64. The GUI on the two Ubuntu runners reached Clippy and then Bubblewrap
+was denied the operation to set up the private loopback interface. The GUI
+executable did not run there. The job now probes the distribution launcher
+and, on restricted disposable Ubuntu hosts, provisions an owner-controlled
+copy of the launcher with Ubuntu's per-executable user-namespace permission.
+It verifies the caller UID, runs the existing isolated fixture, and removes
+the temporary profile and executable at job end. The rerun is the evidence
+for this provisioning change. [Assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612)
+and [Ubuntu user-namespace policy](https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890/1).
+
+The [general PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44815614962)
+passed all eight jobs at `7ba7056`. Its hidden=false smoke check exercised the
+retry against the exact uploaded ID. All eight passed again at `167a03d`,
+alongside all four [compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389013)
+and [filesystem/codec](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389480) jobs.
+
+## Native GUI, storage and transport assessments (2026-11-20)
+
+The development fixtures now exercise three RW-02 paths on a native Linux x64
+host. The [GUI](rust/rw02-native-gui.md) with its lazy window lifecycle opened,
+closed and reopened on X11 and Wayland. The Linux release build using the
+reviewed 232 external packages for that target and two Noto fonts has SHA-256
+`06abf418bfefa3a0b21011663e2ba9d234767c6ebc21d87c84f27f52c1bbd4d9`.
+The [storage assessment](rust/rw02-storage-inputs.md) verified 31 original source
+archives and exercised two live 24,752-byte WALs. The shipping C# readers made
+40 successful assertions across the originals and backups. The same WAL
+initializer refused future schema 99 before changing either synthetic database.
+The [transport](rust/rw02-realtime-transport.md) completed 15 controlled sessions
+including scoped TLS, redirects, authentication, limits and inventory recovery.
+
+The next hosted assessment exercises those probes natively with separate
+observations on Windows/Linux x64/ARM64. RW-02 also needs the remaining
+native desktop services, portal/filesystem coverage, YAML handling and
+performance evidence before stack selection.
+
+## First four native Rust feasibility results (2026-11-20)
+
+All four archives from [the clean `4dcccb7` run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356)
+matched their published ZIP digests. Each Windows host passed 27 Rust tests,
+including distinct NTFS short-name denial. Each Linux host passed 30 tests.
+All four passed five window-policy traces and 5,844 C#/Rust scalar comparisons.
+Their .NET 10.0.15 reference casing maps are byte-identical. The Fedora map
+differs at 55 scalars. [Per-host counts and hashes](rust/rw02-filesystem.md#four-native-hosts).
+
+RW-02 continues with native window, storage, transport and desktop-service
+probes. Linux x64 observed the eframe startup flash independently on X11.
+Delaying window creation until activation passed hidden start, close, reopen,
+missing-tray startup and orderly quit on both X11 and Wayland. Broader native
+integration, accessibility, graphics fallback and the Rust resource comparison
+remain open.
+
+The general PR CI twice failed to download newly finalized synthetic Pages
+artifacts at `4dcccb7`. The logs show the upload IDs and an index response
+within one second that omitted them. The API subsequently returned those IDs
+and their digests. Retrying an entire job generated new IDs and reproduced
+the failure. The nonpublishing smoke check now retries the same ID once after
+30 seconds and still requires the tar contents to verify. Its next hosted
+run must confirm the result. [Affected PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811912153).
+
+## RW-02 filesystem review and hosted follow-up (2026-11-20)
+
+The independent [filesystem re-review](rust/rw02-filesystem.md#independent-review-of-the-feasibility-boundary)
+closed the staging-acknowledgement and short-name coverage findings in source.
+The corrected implementation passed 16 Linux filesystem tests on tmpfs and
+Btrfs, including a real rename followed by an injected lost acknowledgement.
+The native Windows workflow now requires a distinct working alias and the
+protected API's denial. The first follow-up Windows run installed the pinned
+compiler and reached Clippy, which requested typed two-byte UTF-16 chunks.
+The implementation now uses that form. [Windows follow-up](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44810590778).
+
+Both Linux artifacts of the original hosted feasibility run matched their
+published ZIP digests and recorded clean `2ff9880` sources. Their uppercase
+maps are byte-identical. Direct comparison to Fedora found 55 differing scalar
+mappings. U+019B stays U+019B on the hosted references and maps to U+A7DC on
+the local reference. The existing stored key is authoritative during migration.
+
+## First hosted Rust results (2026-11-20)
+
+At `2ff988095045739b6eeb0735750f5ec9aa9baca6` both Linux hosts passed all 27
+Rust tests, five window-policy traces and 5,844 scalar comparisons. The two
+Ubuntu references each produced 1,449 non-identity Unicode scalar mappings.
+The Fedora reference produced 1,504. Each probe used its native reference map.
+Migration must preserve stored keys and qualify conversion across legacy
+environments before choosing a production normalizer.
+[Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44808944620).
+
+The first Windows runs stopped during toolchain installation. Native Python's
+CRLF output appended a carriage return to the checksum field read by Bash.
+The installer now emits a binary ASCII record, exercised with simulated
+Windows newlines. Subsequent Windows jobs must supply the native results.
+Independent source review requested explicit reconciliation after an
+unacknowledged rename and observable coverage of distinct NTFS short names.
+
+## RW-02 first Rust native probes (2026-11-20)
+
+The four native Rust distributions are pinned to 1.100.0, compiler
+`0ef1bc386059596dada8fb65b50425aab2ea637a`. The verified Linux x64 distribution
+ran the workspace locally. Rustfmt, Clippy with warnings denied, 27 tests,
+release probe builds, five C# window trace comparisons and 5,844 native scalar
+comparisons passed. The workspace lock contains four unpublished first-party
+crates. The accepted .NET resource reference is checkpoint `4245831`.
+
+The [filesystem tests](rust/rw02-filesystem.md) ran on tmpfs and Btrfs. The
+[legacy scalar probe](rust/rw02-legacy.md) tested both SQLite casing modes and
+1,335 reference timestamps. The [realtime assessment](rust/rw02-realtime.md)
+identified transport settings that rule out unmodified rust_socketio 0.6.0.
+The [GUI review](rust/rw02-gui-dependencies.md) identifies exact source and
+notice inputs. Native desktop, network-session, database/YAML and manual
+accessibility evidence remain open. The new four-host workflow records Rust
+results and regenerated oracle comparisons at the source SHA. Verify its
+first run, review the filesystem boundary independently and continue the GUI
+and transport assessments.
+
+## RW-02 Linux performance reference measured (2026-11-20)
+
+The Linux x64 .NET reference completed three isolated 100,000-file scans with
+35 close and 37 activation responses during traversal. Median startup was
+906.63 ms and median hidden RSS was 233.262 MiB. The instrumented compositor
+observed zero render passes in the 15-second idle windows and observed a render
+after each reopening. The [measurement and budgets](rust/rw02-performance.md)
+give the exact build, workload, driver, environment and raw evidence digest.
+The Rust comparison on this host and the other native desktop environments
+are pending.
+
+At `27f5b02848a51bcdb63b4cf930bc5154c74bbd82`, all four native reference
+jobs passed the checked-in golden comparison and all eight PR CI jobs passed.
+[Golden rerun](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803987836)
+and [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803996983).
+
+## RW-01 accepted and RW-02 started (2026-11-20)
+
+The user resumed `M-RUST-IMPLEMENTATION-20261114` in its original Goal run.
+The active chat, branch and open [draft PR #46](https://github.com/VoltKraft/immich-folder-watch/pull/46)
+were verified at source `3ca5b0a89d266e61e219239f84d896dc71528ba0`.
+
+The [native reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634286661)
+passed on all four targets. Both Windows architectures produced identical golden
+files, as did both Linux architectures. The four downloaded archives matched
+GitHub's digests. The [native evidence](rust/rw01-native-reference.md) records
+the platform path/encoding differences and the nine Linux-specific tests skipped
+on Windows. All nine passed on both Linux architectures. The existing
+[PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634333824)
+also passed. Every PAR row and security rule has a reference or an explicit
+stronger candidate requirement in the [parity mapping](rust/rw01-parity.md).
+
+RW-02 is active. Its first work covers the GUI feature and font audit, the
+native filesystem and legacy codecs, and an isolated .NET desktop resource
+baseline for side-by-side measurement. The [acceptance record](rust/acceptance.md)
+tracks the remaining native gates.
+
+## RW-01 local compatibility baseline verified (2026-11-14)
+
+- Goal remains active under `M-RUST-IMPLEMENTATION-20261114`; selection checkpoint
+  `8d517342b0ebc9d0a6379be67ac32272269abded`. RW-01 remains in progress until native
+  platform outputs are collected/reviewed. RW-02 dependency research is independent
+  preparation; no later gate is declared passed.
+- Added the [storage oracle](rust/rw01-storage-contract.md): 29 generated Linux
+  files and 215 assertions, with hashes of 10 C#/oracle sources and 28 payloads.
+  Added [63 behavior cases](rust/rw01-behavior-contract.md) and five real-view
+  [window lifecycle traces](rust/rw01-parity.md). All inputs are synthetic; production
+  application code, configuration, state and package dependencies are unchanged.
+- Local native Linux x64 checks with SDK 10.0.401/runtime 10.0.12: existing portable
+  suite 503/503; existing Linux headless/protocol suite 60/60; new behavior corpus
+  63/63; new lifecycle corpus 5/5. Storage export and independent verification pass;
+  an intentional ARM64 assertion on x64 fails before fixture generation. Reduced
+  Avalonia provenance verification passes. Existing obsolete D-Bus/Bitmap API
+  warnings remain; oracle restore reported NU1900 when advisory retrieval was
+  unavailable. No skipped application tests in these four executed suites.
+- Raw TRX/log evidence is in ignored `artifacts/rust/baseline-results/`,
+  `artifacts/rust/behavior/results/` and `artifacts/rust/`. Commands and fixture
+  limits are in [development](development.md#rust-rewrite-reference-corpus).
+- Independent read-only review checked oracle/test isolation, native architecture
+  assertion, source/payload hashes and candidate workflow. No open blocking finding.
+  Renamed a success-only journal observation so it does not claim failure atomicity.
+  [Security mapping](rust/rw01-security-contract.md) explicitly retains legacy
+  future-schema WAL mutation, Windows cross-session writer and config durability,
+  IPC deadline and parser-bound gaps as stronger Rust acceptance requirements.
+- Prepared `Rust compatibility reference` workflow: four native OS/architecture
+  lanes, read-only permissions, exact action/SDK pins, source-SHA artifact names,
+  branch/job restriction to `rewrite/rust`, no signing/publication path. New and
+  existing workflow security checks: seven passed; four PowerShell-only cases
+  skipped locally and retained for Windows CI. Workflow preparation is not execution.
+- Next action: commit/push this reference checkpoint, create the authorized single
+  draft PR, collect native C# reference evidence including Windows golden output,
+  review platform differences, and close RW-01 only after its evidence is sufficient.
+
+## Rust implementation Goal selected (2026-11-14)
+
+- Active milestone: `M-RUST-IMPLEMENTATION-20261114`; fixed RI-AC01 through RI-AC10
+  in the [brief](project.md#m-rust-implementation-20261114), RW-01 through RW-07 as
+  one assignment. The user's full implementation request supersedes the historical
+  analysis-only scope. RW-08/publication remains excluded.
+- Actual Goal control returned `active`; run/chat reference
+  `01a1db8f-b8ef-7903-8dfc-932f9b39c743`, created 2026-11-14. No token budget was
+  requested. This record does not activate or transfer a goal in another chat.
+- Verified before changes: `rewrite/rust`, clean tree, HEAD
+  `009246552cb4c0091196bab9a58cd64d44e5b629`. Local and live GitHub `main` remain
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`; no existing rewrite PR was found.
+- Persisted goal boundaries and [acceptance matrix](rust/acceptance.md). RW-01
+  synthetic storage/config oracle, behavior fixtures and independent security/
+  workflow-trigger audit are assigned with disjoint ownership. No Rust capability
+  or native acceptance is claimed at selection.
+- Environment: .NET/Rust tools are absent from PATH; `/home/jan/.dotnet` supplies
+  only SDK 10.0.203, which correctly refuses the pinned 10.0.401 project. Verified
+  `artifacts/flatpak-local-2.11.2/sdk/dotnet --info`: SDK 10.0.401, runtime 10.0.12,
+  Linux x64. Baseline tests use this existing SDK and isolated outputs; `global.json`
+  is unchanged. The sandbox refused MSBuild's local IPC sockets; an authorized
+  execution outside that restriction is running, without application/profile startup.
+- Independent static workflow audit: existing `rewrite/rust` pushes trigger no
+  shipping CI; PR CI is read-only. Release requires successful same-repository
+  push CI on `main` (or explicit dispatch on `main`); downstream publication has
+  separate release/manual triggers. No publication workflow is dispatched.
+  Local workflow-security suite: six passed, four PowerShell-only cases skipped.
+- Next action: finish and run RW-01 fixtures against the C# reference, map every
+  parity/security rule, independently review the evidence and then begin RW-02.
+  Audit publication triggers before the first authorized branch push/draft PR.
+- Template cleanup was already completed on 2026-10-16; no reinitialization.
+
+## Rust rewrite branch established (2026-11-14)
+
+- User selected a dedicated branch for the existing rewrite changes and all
+  subsequent rewrite work. Created and checked out `rewrite/rust`, preserving
+  planning commit `c123ce9d253d72c928ac83892984a30f2748a576` unchanged.
+- Moved local `main` back to its preceding commit
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc` with an expected-old-value ref update,
+  after securing the planning commit on the new branch. No working files were
+  reset and no commit was lost. Local `main` equals the existing `origin/main`
+  tracking ref; no fetch or remote update occurred.
+- Recorded the branch in AGENTS.md and the brief. Branch/ref checks confirm that
+  the seven-file planning change is on `rewrite/rust` and absent from `main`.
+  This follow-up changes only branch guidance/status; runtime files, the detailed
+  rewrite plan and desktop standard are unchanged. No application tests are
+  required for branch organization and documentation.
+- Next action: continue review and subsequently selected implementation work on
+  `rewrite/rust`. RW-01 through RW-08 remain unstarted. No push, merge, release or
+  implementation is performed by this branch migration.
+
+## Rust rewrite analysis and standard proposal (2026-11-14)
+
+- Selected milestone: `M-RUST-ANALYSIS-20261114` / RW-00; completed for analysis
+  and planning only, `RUST-AC01` through `RUST-AC06` met. User explicitly defers
+  implementation and confirms that all first-party application/GUI code must be
+  Rust while native libraries and SQLite are allowed.
+  No Goal was requested or started.
+- Baseline inspected: clean local `main` at
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`, product 3.0.4 and SDK 10.0.401 with
+  roll-forward disabled. No fetch; historical CI/catalog evidence is not renewed.
+- Prepared [rewrite assessment and migration plan](rust-rewrite-plan.md) and
+  [Rust Desktop Standard proposal](rust-desktop-standard.md), with current source
+  evidence for egui/eframe, alternatives and native integration. Preferred egui
+  selection remains conditional on actual lifecycle/accessibility/GPU/native
+  tests, full dependency/license inventory and independently reviewed fonts.
+- Recorded exact YAML/SQLite identity/codec contracts, startup authority revocation,
+  retained-handle filesystem invariants, single-instance interoperability,
+  backup/cutover/rollback rules, four-target packaging and phased acceptance.
+  The Windows Event Log message-resource dependency and incomplete notification
+  parity are explicitly included. No existing residual risk is marked repaired.
+- Updated project/entry/README links and the Unreleased documentation entry;
+  corrected the brief's stale SDK description against `global.json`. Product
+  sources, build files, dependency pins, versions, release history and runtime
+  user data remain unchanged. No Rust scaffold, build, test execution, installation,
+  live Immich request, push or publication occurred.
+- Validation: independent security/compatibility and GUI/license/reuse reviews
+  completed. Incorporated cross-session Windows writer-exclusion and exact startup
+  ordering gates; corrected native-toolkit language eligibility and kept locales
+  product-configurable. The security reviewer verified the corrections. Local
+  Markdown target/anchor checks, code-fence balance, documentation-only scope and
+  `git diff --check` pass. Product tests are intentionally not run for this
+  documentation-only assignment; no native spike or resolved-graph license
+  certification is implied. Keep the final local checkpoint hash in the chat
+  handoff; no push is selected.
+- Next action: user review/selection of the proposed plan. After explicit
+  implementation selection, start RW-01. RW-01 through RW-08 are proposed and
+  unstarted; do not infer implementation authorization from these documents or a generic
+  continuation prompt.
+
 ## Release 3.0.4 published and WinGet submitted (2026-11-13)
 
 - Published [v3.0.4](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4)

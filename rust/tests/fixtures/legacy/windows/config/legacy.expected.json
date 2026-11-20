@@ -1,0 +1,117 @@
+{
+  "Editable": {
+    "Immich": {
+      "AllowInsecureHttp": false,
+      "ServerApiUrl": "https://immich.example.invalid/api/",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL"
+    },
+    "Watch": {
+      "Sources": [
+        {
+          "Path": "media/../M\u00E9dia",
+          "AlbumName": "Legacy album",
+          "IncludeSubdirectories": false,
+          "Extensions": [
+            ".jpg",
+            ".png"
+          ],
+          "ExcludeDirectories": [
+            "temp"
+          ],
+          "ExcludeFileNames": [
+            "*.tmp"
+          ],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "second",
+          "AlbumName": "",
+          "IncludeSubdirectories": false,
+          "Extensions": [
+            ".heic"
+          ],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadAll",
+          "DeleteAfterUpload": false
+        }
+      ],
+      "TransferOrder": "oldestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 5,
+      "BaseDelayMilliseconds": 500
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "journald",
+      "LogDirectory": "logs/../logs"
+    },
+    "Localization": {
+      "Language": "DE"
+    }
+  },
+  "Runtime": {
+    "Immich": {
+      "AllowInsecureHttp": false,
+      "ServerApiUrl": "https://immich.example.invalid/api/",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL"
+    },
+    "Watch": {
+      "Sources": [
+        {
+          "Path": "$PROFILE\\M\u00E9dia",
+          "AlbumName": "Legacy album",
+          "IncludeSubdirectories": false,
+          "Extensions": [
+            ".jpg",
+            ".png"
+          ],
+          "ExcludeDirectories": [
+            "temp"
+          ],
+          "ExcludeFileNames": [
+            "*.tmp"
+          ],
+          "SyncMode": "uploadNew",
+          "DeleteAfterUpload": false
+        },
+        {
+          "Path": "$PROFILE\\second",
+          "AlbumName": "",
+          "IncludeSubdirectories": false,
+          "Extensions": [
+            ".heic"
+          ],
+          "ExcludeDirectories": [],
+          "ExcludeFileNames": [],
+          "SyncMode": "uploadAll",
+          "DeleteAfterUpload": false
+        }
+      ],
+      "TransferOrder": "oldestFirst",
+      "Extensions": [],
+      "BatchIntervalSeconds": 5,
+      "MaxBatchSize": 25,
+      "FileReadyTimeoutSeconds": 30
+    },
+    "Retry": {
+      "MaxAttempts": 5,
+      "BaseDelayMilliseconds": 500
+    },
+    "Logging": {
+      "Level": "Information",
+      "Target": "journald",
+      "LogDirectory": "$PROFILE\\logs"
+    },
+    "Localization": {
+      "Language": "DE"
+    }
+  },
+  "RuntimePathToken": "$PROFILE"
+}

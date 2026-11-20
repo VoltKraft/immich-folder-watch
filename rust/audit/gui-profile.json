@@ -1,0 +1,9 @@
+{
+  "lockSha256": "19aa12ab5d107dbc4b6a7257b3f0e41aa36771da335feccb079d6bba0b4da173",
+  "targetReportSha256": {
+    "aarch64-pc-windows-msvc": "149d3db519078b1987624b746695877965ec24b4870d21e9dd5715d1bcfac378",
+    "aarch64-unknown-linux-gnu": "e262d0b6bdf719c826d03daf2f3e1aa1ab017d4c55e8581e559db7173085169a",
+    "x86_64-pc-windows-msvc": "6dd4002872bf8d610f3868d779e0e0561ba3f958f6b2b27b4f8df7064b7cec84",
+    "x86_64-unknown-linux-gnu": "ac222783bb1f61ea7019a253990f736351b92b9cbc20ae6abe822cd70b3290c3"
+  }
+}

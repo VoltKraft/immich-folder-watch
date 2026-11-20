@@ -1,0 +1,93 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-APPLY-01",
+      "parity": [
+        "PAR-06",
+        "PAR-08"
+      ],
+      "scenario": "invalidLocal",
+      "success": false,
+      "saved": false,
+      "restartCalls": 0,
+      "accessCalls": 0,
+      "exception": null,
+      "events": []
+    },
+    {
+      "id": "BEH-APPLY-02",
+      "parity": [
+        "PAR-06",
+        "PAR-08"
+      ],
+      "scenario": "accessRejected",
+      "success": false,
+      "saved": false,
+      "restartCalls": 0,
+      "accessCalls": 1,
+      "exception": null,
+      "events": [
+        "access",
+        "checked"
+      ]
+    },
+    {
+      "id": "BEH-APPLY-03",
+      "parity": [
+        "PAR-06",
+        "PAR-08"
+      ],
+      "scenario": "success",
+      "success": true,
+      "saved": true,
+      "restartCalls": 1,
+      "accessCalls": 1,
+      "exception": null,
+      "events": [
+        "access",
+        "checked",
+        "saving",
+        "restart"
+      ]
+    },
+    {
+      "id": "BEH-APPLY-04",
+      "parity": [
+        "PAR-06",
+        "PAR-08"
+      ],
+      "scenario": "restartFailed",
+      "success": false,
+      "saved": true,
+      "restartCalls": 1,
+      "accessCalls": 1,
+      "exception": "InvalidOperationException",
+      "events": [
+        "access",
+        "checked",
+        "saving",
+        "restart"
+      ]
+    },
+    {
+      "id": "BEH-APPLY-05",
+      "parity": [
+        "PAR-06",
+        "PAR-08"
+      ],
+      "scenario": "cancelAfterAccess",
+      "success": false,
+      "saved": false,
+      "restartCalls": 0,
+      "accessCalls": 1,
+      "exception": "OperationCanceledException",
+      "events": [
+        "access",
+        "checked"
+      ]
+    }
+  ]
+}

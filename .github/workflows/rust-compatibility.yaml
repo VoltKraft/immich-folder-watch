@@ -1,0 +1,97 @@
+name: Rust compatibility reference
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-compatibility.yaml'
+      - '.gitattributes'
+      - 'global.json'
+      - 'Directory.Build.*'
+      - 'NuGet.Config'
+      - 'src/**'
+      - 'rust/tests/**'
+      - 'tools/RustCompatibilityOracle/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-compatibility-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reference:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Reference (${{ matrix.platform }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - runner: windows-2025
+            platform: windows
+            arch: x64
+          - runner: windows-11-arm
+            platform: windows
+            arch: arm64
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+      IFW_ORACLE_EXPECT_ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Checkout exact candidate revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The reference hashes the exact compiler inputs, including native source line endings.
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: ${{ runner.os == 'Windows' && 'true' || 'false' }}
+        with:
+          persist-credentials: false
+
+      - name: Setup native reference SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Record source and native SDK
+        run: |
+          git rev-parse HEAD
+          dotnet --info
+
+      - name: Build development-only reference oracle
+        run: dotnet build tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj --configuration Release
+
+      - name: Export synthetic platform reference
+        run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- export artifacts/rust/oracle
+
+      - name: Verify independently regenerated platform reference
+        run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify artifacts/rust/oracle
+
+      - name: Verify reviewed native golden corpus
+        run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
+
+      - name: Execute portable behavior and security reference
+        run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --logger "trx;LogFileName=core-reference.trx" --results-directory artifacts/rust/test-results
+
+      - name: Upload synthetic reference evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-reference-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            artifacts/rust/oracle/
+            artifacts/rust/test-results/
+          if-no-files-found: error
+          retention-days: 14

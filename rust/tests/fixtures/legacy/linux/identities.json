@@ -1,0 +1,67 @@
+{
+  "Accounts": [
+    {
+      "ServerApiUrl": "https://immich.example.invalid/api/",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL",
+      "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13"
+    },
+    {
+      "ServerApiUrl": "  https://immich.example.invalid/api/// ",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL",
+      "AccountScope": "29975cc6cf48f8943e4321a7c8cf9e3db160d3f68c7331bda0c2b3650c9beb13"
+    },
+    {
+      "ServerApiUrl": "https://IMMICH.example.invalid:443/api",
+      "ApiKey": "RW01-SYNTHETIC-NOT-A-CREDENTIAL",
+      "AccountScope": "943b3bda35c26074cb2aa9d36b8e6854efebb8a33264a27ef62a5662a1ab466b"
+    },
+    {
+      "ServerApiUrl": "https://immich.example.invalid/api/",
+      "ApiKey": " RW01-SYNTHETIC-NOT-A-CREDENTIAL ",
+      "AccountScope": "909ffb5139b86fb9643d8361e98dbe06ee8e3dc14bafebd7d335931f8ad0a631"
+    },
+    {
+      "ServerApiUrl": "https://immich.example.invalid/api/",
+      "ApiKey": "RW01-SYNTHETIC-\u00E4-\u65E5\u672C\u8A9E",
+      "AccountScope": "381bea6e467a882d6f8a4d8ae64caf52b34d3966440bcff7f8684b5910ecc471"
+    }
+  ],
+  "InvariantUppercase": [
+    {
+      "Input": "stra\u00DFe",
+      "Output": "STRA\u00DFE"
+    },
+    {
+      "Input": "\u00DF",
+      "Output": "\u00DF"
+    },
+    {
+      "Input": "i\u0131\u0130I",
+      "Output": "I\u0131\u0130I"
+    },
+    {
+      "Input": "\u03C3\u03C2\u03A3",
+      "Output": "\u03A3\u03A3\u03A3"
+    },
+    {
+      "Input": "\u00E9",
+      "Output": "\u00C9"
+    },
+    {
+      "Input": "e\u0301",
+      "Output": "E\u0301"
+    },
+    {
+      "Input": "\u65E5\u672C\u8A9E",
+      "Output": "\u65E5\u672C\u8A9E"
+    },
+    {
+      "Input": "\uD801\uDC28",
+      "Output": "\uD801\uDC00"
+    },
+    {
+      "Input": "\uFB03",
+      "Output": "\uFB03"
+    }
+  ]
+}

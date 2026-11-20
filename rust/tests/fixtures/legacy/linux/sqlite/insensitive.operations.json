@@ -1,0 +1,20 @@
+[
+  {
+    "Case": "tombstone-boundary",
+    "BeforeExpiry": 0,
+    "AtExpiry": 1
+  },
+  {
+    "Case": "repair-compare-and-swap",
+    "DifferentRepairRejected": true,
+    "StaleMappingRejected": true,
+    "JournalRetainedOnConflict": true,
+    "CompletionUpdatesMappingAndRemovesJournal": true
+  },
+  {
+    "Case": "authority-revocation",
+    "ExactIdRequired": true,
+    "ActiveAccountRevoked": true,
+    "OtherAccountPreserved": true
+  }
+]

@@ -1,0 +1,752 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-API-01",
+      "parity": [
+        "PAR-05"
+      ],
+      "operation": "ping",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/server/ping",
+          "status": 200,
+          "body": ""
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BEH-API-02",
+      "parity": [
+        "PAR-05"
+      ],
+      "operation": "ping",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/server/ping",
+          "status": 404,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/server-info/ping",
+          "status": 404,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/server-info",
+          "status": 200,
+          "body": ""
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BEH-API-03",
+      "parity": [
+        "PAR-05"
+      ],
+      "operation": "ping",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/server/ping",
+          "status": 503,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/server-info/ping",
+          "status": 503,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/server-info",
+          "status": 503,
+          "body": ""
+        }
+      ],
+      "success": false
+    },
+    {
+      "id": "BEH-API-04",
+      "parity": [
+        "PAR-05"
+      ],
+      "operation": "access",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/server/ping",
+          "status": 200,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 401,
+          "body": ""
+        }
+      ],
+      "urlState": "Passed",
+      "keyState": "Failed",
+      "permissionsState": "NotChecked"
+    },
+    {
+      "id": "BEH-API-05",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}, {\"id\": \"album-2\", \"albumName\": \"Camera\"}]"
+        }
+      ],
+      "success": false,
+      "missing": false,
+      "assetIds": [],
+      "errorContains": "Multiple Immich albums"
+    },
+    {
+      "id": "BEH-API-06",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[]"
+        }
+      ],
+      "success": false,
+      "missing": true,
+      "assetIds": []
+    },
+    {
+      "id": "BEH-API-07",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"asset-1\", \"originalFileName\": \"asset-1.jpg\"}], \"nextPage\": \"2\"}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 1,
+            "size": 250
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"asset-2\", \"originalFileName\": \"asset-2.jpg\"}], \"nextPage\": null}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 2,
+            "size": 250
+          }
+        }
+      ],
+      "success": true,
+      "missing": false,
+      "assetIds": [
+        "asset-1",
+        "asset-2"
+      ]
+    },
+    {
+      "id": "BEH-API-08",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [], \"nextPage\": \"2\"}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 1,
+            "size": 250
+          }
+        }
+      ],
+      "success": false,
+      "missing": false,
+      "assetIds": [],
+      "errorContains": "pagination is incomplete"
+    },
+    {
+      "id": "BEH-API-09",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "limits": {
+        "maxSearchAssets": 1
+      },
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"asset-1\", \"originalFileName\": \"asset-1.jpg\"}], \"nextPage\": \"2\"}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 1,
+            "size": 250
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"asset-2\", \"originalFileName\": \"asset-2.jpg\"}], \"nextPage\": null}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 2,
+            "size": 250
+          }
+        }
+      ],
+      "success": false,
+      "missing": false,
+      "assetIds": [],
+      "errorContains": "aggregate resource limit"
+    },
+    {
+      "id": "BEH-API-10",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "listAlbums",
+      "limits": {
+        "maxMetadataBytes": 32
+      },
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}]"
+        }
+      ],
+      "success": false,
+      "albumIds": [],
+      "errorContains": "metadata size limit"
+    },
+    {
+      "id": "BEH-API-11",
+      "parity": [
+        "PAR-05"
+      ],
+      "operation": "access",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/server/ping",
+          "status": 200,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/assets",
+          "status": 400,
+          "body": ""
+        },
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/albums",
+          "status": 400,
+          "body": "",
+          "requestJson": {}
+        },
+        {
+          "method": "PUT",
+          "path": "/api/albums/not-a-valid-id/assets",
+          "status": 400,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "not-a-valid-id"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/assets/not-a-valid-id/original",
+          "status": 400,
+          "body": ""
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 400,
+          "body": "",
+          "requestJson": {
+            "isNotInAlbum": true,
+            "size": 1
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/assets",
+          "status": 400,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "not-a-valid-id"
+            ],
+            "force": false
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/albums/not-a-valid-id/assets",
+          "status": 400,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "not-a-valid-id"
+            ]
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/albums/not-a-valid-id",
+          "status": 400,
+          "body": ""
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/albums/not-a-valid-id",
+          "status": 400,
+          "body": "",
+          "requestJson": {
+            "albumName": "probe"
+          }
+        }
+      ],
+      "urlState": "Passed",
+      "keyState": "Passed",
+      "permissionsState": "Passed",
+      "permissionNames": [
+        "asset.upload",
+        "album.read",
+        "album.create",
+        "albumAsset.create",
+        "asset.download",
+        "asset.read",
+        "asset.delete",
+        "albumAsset.delete",
+        "album.delete",
+        "album.update"
+      ]
+    },
+    {
+      "id": "BEH-API-12",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "addAssets",
+      "album": "Camera",
+      "inputAssetIds": [
+        "asset-1"
+      ],
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/albums/album-1/assets",
+          "status": 404,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "asset-1"
+            ]
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/albums/assets",
+          "status": 405,
+          "body": "",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "assetIds": [
+              "asset-1"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/albums/assets",
+          "status": 404,
+          "body": "",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "assetIds": [
+              "asset-1"
+            ]
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/albums/assets",
+          "status": 405,
+          "body": "",
+          "requestJson": {
+            "albumId": "album-1",
+            "ids": [
+              "asset-1"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/albums/assets",
+          "status": 200,
+          "body": "",
+          "requestJson": {
+            "albumId": "album-1",
+            "ids": [
+              "asset-1"
+            ]
+          }
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BEH-API-13",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "addAssets",
+      "album": "Camera",
+      "inputAssetIds": [
+        "asset-1"
+      ],
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/albums/album-1/assets",
+          "status": 403,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "asset-1"
+            ]
+          }
+        }
+      ],
+      "success": false
+    },
+    {
+      "id": "BEH-API-14",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "unassigned",
+      "steps": [
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"root-1\", \"originalFileName\": \"root.jpg\"}], \"nextPage\": null}}",
+          "requestJson": {
+            "isNotInAlbum": true,
+            "page": 1,
+            "size": 250
+          }
+        }
+      ],
+      "success": true,
+      "assetIds": [
+        "root-1"
+      ]
+    },
+    {
+      "id": "BEH-API-15",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "trash",
+      "inputAssetIds": [
+        "asset-1"
+      ],
+      "steps": [
+        {
+          "method": "DELETE",
+          "path": "/api/assets",
+          "status": 204,
+          "body": "",
+          "requestJson": {
+            "ids": [
+              "asset-1"
+            ],
+            "force": false
+          }
+        }
+      ],
+      "success": true
+    },
+    {
+      "id": "BEH-API-16",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "deleteById",
+      "albumId": "owned-1",
+      "steps": [
+        {
+          "method": "DELETE",
+          "path": "/api/albums/owned-1",
+          "status": 204,
+          "body": ""
+        }
+      ],
+      "success": true,
+      "missing": false
+    },
+    {
+      "id": "BEH-API-17",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "renameById",
+      "albumId": "owned-1",
+      "newName": "New",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"owned-1\", \"albumName\": \"Same\"}, {\"id\": \"other-2\", \"albumName\": \"Same\"}]"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/albums/owned-1",
+          "status": 200,
+          "body": "",
+          "requestJson": {
+            "albumName": "New"
+          }
+        }
+      ],
+      "success": true,
+      "missing": false
+    },
+    {
+      "id": "BEH-API-18",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "createOwned",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        }
+      ],
+      "success": false,
+      "albumId": null
+    },
+    {
+      "id": "BEH-API-19",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "createOwned",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/albums",
+          "status": 201,
+          "body": "{\"id\": \"new-owned-1\", \"albumName\": \"Camera\"}",
+          "requestJson": {
+            "albumName": "Camera"
+          }
+        }
+      ],
+      "success": true,
+      "albumId": "new-owned-1"
+    },
+    {
+      "id": "BEH-API-20",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"originalFileName\": \"missing-id.jpg\"}], \"nextPage\": null}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 1,
+            "size": 250
+          }
+        }
+      ],
+      "success": false,
+      "missing": false,
+      "assetIds": [],
+      "errorContains": "could not be parsed"
+    },
+    {
+      "id": "BEH-API-21",
+      "parity": [
+        "PAR-02",
+        "PAR-05"
+      ],
+      "operation": "albumAssets",
+      "album": "Camera",
+      "limits": {
+        "maxSearchPages": 1
+      },
+      "steps": [
+        {
+          "method": "GET",
+          "path": "/api/albums",
+          "status": 200,
+          "body": "[{\"id\": \"album-1\", \"albumName\": \"Camera\"}]"
+        },
+        {
+          "method": "POST",
+          "path": "/api/search/metadata",
+          "status": 200,
+          "body": "{\"assets\": {\"items\": [{\"id\": \"asset-1\", \"originalFileName\": \"photo.jpg\"}], \"nextPage\": \"2\"}}",
+          "requestJson": {
+            "albumIds": [
+              "album-1"
+            ],
+            "page": 1,
+            "size": 250
+          }
+        }
+      ],
+      "success": false,
+      "missing": false,
+      "assetIds": [],
+      "errorContains": "pagination is incomplete"
+    }
+  ]
+}

@@ -1,0 +1,338 @@
+name: Rust native desktop, storage and transport assessment
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-desktop-assessment.yaml'
+      - 'rust/**'
+      - 'tools/rust-qa/**'
+      - '.gitattributes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-desktop-assessment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assess:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Native assessment (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 95
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            arch: x64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout assessment sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # Source-bound controls also replay the original GUI commit.
+
+      - name: Install the reviewed native Rust distribution
+        id: install
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Select native SDK for the legacy storage oracle
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Exercise the legacy writers, WAL backup and production readers
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
+
+      - name: Round-trip legacy YAML with the filtered offline source bundle
+        id: yaml
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+
+      - name: Exchange activation with the shipping coordinator and observe native writer locks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET"
+
+      - name: Exercise Linux TLS, polling and WebSocket loopback sessions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/realtime/run.py "$NATIVE_TARGET" --output "artifacts/rust/realtime-native/$NATIVE_TARGET"
+
+      - name: Exercise native Windows TLS, polling and WebSocket loopback sessions
+        id: windows_transport
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Rebuild the ARM64 import library and relink the tested transport
+        if: ${{ !cancelled() && matrix.target == 'aarch64-pc-windows-msvc' && steps.windows_transport.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture arm64
+          python tools/rust-qa/windows-imports/run.py --acquire --native --transport
+          exit $LASTEXITCODE
+
+      - name: Install native Linux test desktop components
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        id: desktop
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
+            gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
+            xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
+            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin gir1.2-gtk-3.0
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Observe Windows Shell services and per-user Startup shortcuts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
+            --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
+
+      - name: Verify the GUI graph and build with the pinned native compiler
+        id: gui
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Observe native X11 lifecycle and AT-SPI
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input
+
+      - name: Observe native Wayland lifecycle and AT-SPI with application-selected presentation
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input
+
+      - name: Exercise the integrated filename editor and rendered glyphs on X11
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/profile_text.py
+
+      - name: Install GNOME and its available Japanese input engine on Ubuntu
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        id: gnome_ime
+        run: sudo apt-get install --yes --no-install-recommends gnome-shell ibus ibus-mozc gir1.2-ibus-1.0
+
+      - name: Observe Mozc composition and monitor changes with GNOME Wayland
+        if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --ibus-engine mozc --monitor-changes
+
+      - name: Build the offline native Linux service probes
+        id: linux_services
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/linux-services/native.py lint
+          python3 tools/rust-qa/linux-services/native.py build
+
+      - name: Observe StatusNotifierItem loss, replacement and activation
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        run: python3 tools/rust-qa/linux-services/native.py tray
+
+      - name: Observe real Documents grants and the distribution's file lock behavior
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        env:
+          IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 tools/rust-qa/linux-services/native.py oracle
+          python3 tools/rust-qa/linux-services/native.py documents --expect-lock enosys
+
+      - name: Observe native Windows show events, close and reopen
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
+
+      - name: Build the native portal dialog fixture
+        id: portal_dialog
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/portal-dialog/build.py --lint
+          python3 tools/rust-qa/portal-dialog/build.py
+
+      - name: Observe X11 folder chooser parenting, selection and refusal
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --host-chooser-only
+
+      - name: Observe Wayland folder chooser parenting, selection and refusal
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --host-chooser-only
+
+      - name: Obtain the signed freedesktop Platform for a private Flatpak profile
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        id: platform
+        run: |
+          sudo apt-get install --yes --no-install-recommends flatpak ostree
+          python3 tools/rust-qa/portal-dialog/hosted_runtime.py
+
+      - name: Observe an installed disposable Flatpak under X11
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Observe an installed disposable Flatpak under Wayland
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Observe Windows UI Automation and foreground keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-input" --input-only
+
+      - name: Verify a replacement DX12 window preserves focus, editing and screen output
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-recovery" --device-recovery
+
+      - name: Observe rendered font coverage and mixed-direction editing on the native desktop
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
+          python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
+
+      - name: Observe portable NVDA announcing the owned Windows GUI
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/windows-reader/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            --output "artifacts/rust/windows-reader/native-$NATIVE_TARGET"
+
+      - name: Stage the integrated Linux GUI with its reviewed inventory worker and observer
+        id: worker
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.yaml.outcome == 'success' && steps.gui.outcome == 'success' }}
+        run: |
+          mkdir -p artifacts/rust/graphics/worker-vendor
+          tar -xf "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET/filtered-sources.tar" -C artifacts/rust/graphics/worker-vendor
+          python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
+          python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
+
+      - name: Observe Vulkan loss and redraw on X11
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe Vulkan loss and redraw on Wayland
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-loss-ci --case driver-loss --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe worker and tray behavior when no renderer is available
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name no-driver-ci --case unavailable --backend x11 --driver absent --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Measure the shipping Linux reference and record the same-host budgets
+        id: budget
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          reference=19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc
+          git diff --exit-code "$reference" HEAD -- src ':!src/ImmichFolderWatch.Tests.*' Directory.Build.props Directory.Build.targets global.json NuGet.Config assets/branding tools/BrandAssetGen packaging/avalonia-reduced
+          python3 tools/prepare_reduced_avalonia.py
+          dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj -c Release --artifacts-path artifacts/rust/linux-reference
+          python3 tools/rust-qa/performance/linux.py measure --name "hosted-dotnet-$NATIVE_TARGET" \
+            --entry artifacts/rust/linux-reference/bin/ImmichFolderWatch.App.Linux/release/immich-folder-watch.dll \
+            --runtime-root "$DOTNET_ROOT" --revision "$reference" --input-interval-ms 25
+
+      - name: Compare Rust startup, memory, CPU, idle rendering and response during the native scan
+        if: ${{ !cancelled() && steps.budget.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/performance/linux.py measure --name "hosted-rust-$NATIVE_TARGET" \
+            --entry artifacts/rust/performance/subjects/graphics-ci/native-gui-assessment \
+            --revision "$GITHUB_SHA" --desktop-spike --frame-counter --input-interval-ms 25 \
+            --start-marker INVENTORY_STARTED --finish-marker INVENTORY_COMPLETE
+          python3 tools/rust-qa/performance/linux.py compare \
+            "artifacts/rust/performance/hosted-dotnet-$NATIVE_TARGET.json" "artifacts/rust/performance/hosted-rust-$NATIVE_TARGET.json"
+
+      - name: Remove the job-specific namespace launcher
+        if: ${{ always() && runner.os == 'Linux' }}
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
+
+      - name: Retain native assessment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-native/
+            artifacts/rust/instance-native/${{ matrix.target }}/result.json
+            artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
+            artifacts/rust/realtime-native/
+            artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-reader/native-*/result.json
+            artifacts/rust/windows-reader/native-*/gui/*.json
+            artifacts/rust/windows-imports/runs/*/result.json
+            artifacts/rust/linux-services/inputs.json
+            artifacts/rust/linux-services/documents-*/*.json
+            artifacts/rust/linux-services/documents-*/*.log
+            artifacts/rust/linux-services/tray-*/*.json
+            artifacts/rust/linux-services/tray-*/*.log
+            artifacts/rust/portal-dialog/build-inputs.json
+            artifacts/rust/portal-dialog/x11-*/*.json
+            artifacts/rust/portal-dialog/x11-*/*.log
+            artifacts/rust/portal-dialog/wayland-*/*.json
+            artifacts/rust/portal-dialog/wayland-*/*.log
+            artifacts/rust/gui-native/
+            artifacts/rust/gui-run/*/*.json
+            artifacts/rust/gui-run/*/*.log
+            artifacts/rust/gui-run/*/*.conf
+            artifacts/rust/gui-run/*/evidence.sha256
+            artifacts/rust/graphics/*-ci/*.json
+            artifacts/rust/graphics/*-ci/*.log
+            artifacts/rust/graphics/runtime-ci/subject/*.json
+            artifacts/rust/performance/hosted-*.json
+            artifacts/rust/gui-build/release/*.inputs.json
+            artifacts/rust/font-coverage/*/result.json
+            artifacts/rust/font-coverage/*/*/native.log
+            artifacts/rust/font-coverage/*/*/observed.ppm
+            artifacts/rust/font-coverage/subjects/*/subject.json
+          if-no-files-found: error
+          retention-days: 14

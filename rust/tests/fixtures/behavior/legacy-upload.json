@@ -1,0 +1,46 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-LEGACY-01",
+      "parity": [
+        "PAR-04",
+        "PAR-05"
+      ],
+      "displayPath": "/synthetic/Camera/Ünicode.jpg",
+      "contentBase64": "c3ludGhldGljIG1lZGlhIEE=",
+      "modifiedUtc": "2024-02-03T04:05:06Z",
+      "modifiedDotNetTicks": "638425299060000000",
+      "contentSha256Upper": "F07FCDC7C5A7ADB5844F6EE693E2897AB3232F1466031466304C24FED03A0966",
+      "deviceAssetId": "d1201831b2e76784cf1ec0fc3f778450a2539f353490cecccfa1af212b3f41f1"
+    },
+    {
+      "id": "BEH-LEGACY-02",
+      "parity": [
+        "PAR-04",
+        "PAR-05"
+      ],
+      "displayPath": "C:\\Synthetic\\Camera\\photo.jpg",
+      "contentBase64": "c3ludGhldGljIG1lZGlhIEE=",
+      "modifiedUtc": "2024-02-03T04:05:06Z",
+      "modifiedDotNetTicks": "638425299060000000",
+      "contentSha256Upper": "F07FCDC7C5A7ADB5844F6EE693E2897AB3232F1466031466304C24FED03A0966",
+      "deviceAssetId": "fa46f1bb77505919c9031b9aa0c0cfd3187fa2bea4c246610bf6ff0dd138bda0"
+    },
+    {
+      "id": "BEH-LEGACY-03",
+      "parity": [
+        "PAR-04",
+        "PAR-05"
+      ],
+      "displayPath": "/synthetic/Camera/Ünicode.jpg",
+      "contentBase64": "c3ludGhldGljIG1lZGlhIEI=",
+      "modifiedUtc": "2024-02-03T04:05:06Z",
+      "modifiedDotNetTicks": "638425299060000000",
+      "contentSha256Upper": "79665FD124088F455970E40EA3CEC303F3B1B95875C0262A3F6DEEB813FF7137",
+      "deviceAssetId": "d67ff7cbfa56623b2995bf6d48fcfa44408bd8922e279d50a44458cc435f8244"
+    }
+  ]
+}

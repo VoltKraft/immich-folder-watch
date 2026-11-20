@@ -1,0 +1,13 @@
+{
+  "reference": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "windows": {
+    "src/ImmichFolderWatch.App/Services/SingleInstanceCoordinator.cs": "88be65cd84e97a513352c0956545a4b797c2506ef21e5885225d7ccb52a4171f"
+  },
+  "linux": {
+    "src/ImmichFolderWatch.App.Linux/Platform/UnixSingleInstanceCoordinator.cs": "9f90d4a20f101e6c03f54bc15ff805c375c88a67f2eb9892158480c742329ed8",
+    "src/ImmichFolderWatch.Core/Platform/IPlatformPaths.cs": "5d7cdcc74091c8c257671cf5581e8ce806868c53627bb07e28f8af9be6e49a67",
+    "src/ImmichFolderWatch.Core/Platform/ISingleInstanceCoordinator.cs": "b4551f219974ef3263d86154376f7288902fcaefdb93a568822509cf8416b11d",
+    "src/ImmichFolderWatch.Core/Platform/LinuxPrivateDirectory.cs": "01bf7768f1dbb710a346b39a1cd9dac8eea4650f5c5345350f90ec620cf0f49c",
+    "src/ImmichFolderWatch.Core/Platform/XdgPlatformPaths.cs": "96d8698766d652e41eb0555edda3a3dc482f97322d1c9a1f853280e4e5f9d31e"
+  }
+}
