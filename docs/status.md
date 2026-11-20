@@ -1,5 +1,24 @@
 # Project Status
 
+## Native GUI, storage and transport assessments (2026-11-20)
+
+The development fixtures now exercise three RW-02 paths on a native Linux x64
+host. The [GUI](rust/rw02-native-gui.md) with its lazy window lifecycle opened,
+closed and reopened on X11 and Wayland. The Linux release build using the
+reviewed 232 external packages for that target and two Noto fonts has SHA-256
+`06abf418bfefa3a0b21011663e2ba9d234767c6ebc21d87c84f27f52c1bbd4d9`.
+The [storage assessment](rust/rw02-storage-inputs.md) verified 31 original source
+archives and exercised two live 24,752-byte WALs. The shipping C# readers made
+40 successful assertions across the originals and backups. The same WAL
+initializer refused future schema 99 before changing either synthetic database.
+The [transport](rust/rw02-realtime-transport.md) completed 15 controlled sessions
+including scoped TLS, redirects, authentication, limits and inventory recovery.
+
+The next hosted assessment exercises those probes natively with separate
+observations on Windows/Linux x64/ARM64. RW-02 also needs the remaining
+native desktop services, portal/filesystem coverage, YAML handling and
+performance evidence before stack selection.
+
 ## First four native Rust feasibility results (2026-11-20)
 
 All four archives from [the clean `4dcccb7` run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356)

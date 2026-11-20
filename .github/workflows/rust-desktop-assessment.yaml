@@ -1,0 +1,135 @@
+name: Rust native desktop, storage and transport assessment
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-desktop-assessment.yaml'
+      - 'rust/**'
+      - 'tools/rust-qa/**'
+      - '.gitattributes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-desktop-assessment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assess:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Native assessment (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 95
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            arch: x64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout assessment sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the reviewed native Rust distribution
+        id: install
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Select native SDK for the legacy storage oracle
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Exercise the legacy writers, WAL backup and production readers
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
+
+      - name: Exercise Linux TLS, polling and WebSocket loopback sessions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/realtime/run.py "$NATIVE_TARGET" --output "artifacts/rust/realtime-native/$NATIVE_TARGET"
+
+      - name: Exercise native Windows TLS, polling and WebSocket loopback sessions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          if (-not $vs) { throw 'Native Visual Studio installation required' }
+          Import-Module (Join-Path $vs 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments "-arch=$env:NATIVE_ARCH -host_arch=$env:NATIVE_ARCH"
+          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Install native Linux test desktop components
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        id: desktop
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
+            gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
+            xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config
+
+      - name: Verify the GUI graph and build with the pinned native compiler
+        id: gui
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Observe native X11 lifecycle and AT-SPI
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input
+
+      - name: Observe native Wayland lifecycle and AT-SPI using the tested Mesa presentation mode
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+
+      - name: Observe native Windows show events, close and reopen
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
+
+      - name: Retain native assessment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-native/
+            artifacts/rust/realtime-native/
+            artifacts/rust/gui-native/
+            artifacts/rust/gui-run/*/*.json
+            artifacts/rust/gui-run/*/*.log
+            artifacts/rust/gui-build/release/*.inputs.json
+          if-no-files-found: error
+          retention-days: 14

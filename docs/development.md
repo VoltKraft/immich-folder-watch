@@ -78,6 +78,38 @@ The same run compares Rust path, timestamp and casing observations to a native
 .NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
 comparison. See the [legacy checks](rust/rw02-legacy.md).
 
+Run `python3 tools/rust-qa/verify-gui-inputs.py` to verify the original font and
+supplemental notice bytes offline. `--fetch-missing` restores a missing input
+by its reviewed upstream revision and digest. For the separate development GUI
+assessment, fetch its lock once and generate one source and feature inventory
+per supported target. For example, from the repository root:
+
+```bash
+cargo fetch --locked --manifest-path tools/rust-qa/gui/Cargo.toml
+python3 tools/rust-qa/audit-graph.py tools/rust-qa/gui/Cargo.toml x86_64-unknown-linux-gnu artifacts/rust/gui-run/audit/x86_64-unknown-linux-gnu.json
+```
+
+The [desktop input review](rust/rw02-gui-dependencies.md) records embedded
+third-party code and protocol terms that require additional notices. From an
+isolated native test host, use these maintained assessment entry points with
+the matching toolchains on `PATH`. Use fresh output directories for each run.
+
+```bash
+python3 tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --output artifacts/rust/storage-native/test
+python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
+python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
+python3 tools/rust-qa/gui/native.py --backend x11 --input
+python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
+```
+
+The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
+records native Rust and C# storage results, loopback sessions, graph digests,
+adapters and observed window transitions. Windows uses the fixture's inherited
+control pipe and checks real Win32 show events and `WM_CLOSE` for the child
+PID. The Linux observer runs on a private X11 or Wayland desktop. See the
+[native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
+measured presentation modes and remaining checks.
+
 ## Build
 
 The Linux UI uses the [reduced Avalonia build](reduced-avalonia.md). Python 3.11+

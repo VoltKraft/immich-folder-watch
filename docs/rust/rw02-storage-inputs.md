@@ -198,6 +198,10 @@ The corrected source SHA-256 is `1ca0c0e3192a66716796b1ee6f06996c2802e46831c2c48
 In `artifacts/rust/storage-native/maintained-linux-x64-03/`, all 254 evidence
 hashes matched. The result digest is
 `19da6195eb1f5de959164d4f8fe9eb85cfa5f7899d10273f3304cc765a5c4d07`.
+Independent re-review at `f6e832823d65eb074492f5ea64d79f6561482268`
+verified both error branches and all 128 archived source hashes. It confirmed
+that the two future files retained DELETE-mode headers and had no sidecars.
+The earlier evidence-precision finding is closed.
 
 The first experiment exposed the comparator's ordering difference and stopped;
 the corrected complete rerun and C# reread passed. Final evidence is in ignored

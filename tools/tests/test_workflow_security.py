@@ -91,6 +91,10 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.check_rust_workflow("rust-feasibility.yaml",
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
+    def test_rust_desktop_assessment_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-desktop-assessment.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
     def test_native_compiler_download_record_is_identical_with_windows_newlines(self):
         script = (ROOT / "tools/rust-qa/install-toolchain.sh").read_text()
         selection = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]

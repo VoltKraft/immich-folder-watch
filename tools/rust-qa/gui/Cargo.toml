@@ -1,0 +1,23 @@
+[package]
+name = "native-gui-assessment"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+desktop-lifecycle = { path = "../../../rust/crates/desktop-lifecycle" }
+eframe = { version = "=0.37.0", default-features = false, features = ["accesskit", "clipboard", "wgpu_no_default_features"] }
+wgpu = { version = "=30.0.0", default-features = false, features = ["std", "parking_lot", "wgsl"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+futures-lite = "=2.6.1"
+zbus = { version = "=5.19.0", default-features = false, features = ["async-io"] }
+eframe = { version = "=0.37.0", default-features = false, features = ["x11", "wayland"] }
+wgpu = { version = "=30.0.0", default-features = false, features = ["vulkan"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+wgpu = { version = "=30.0.0", default-features = false, features = ["dx12"] }

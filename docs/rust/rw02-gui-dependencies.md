@@ -35,6 +35,50 @@ Both upstream revisions have identical notice bytes.
 [MIT](https://github.com/emilk/egui/blob/841a328ba2dd8f6996beb7189ebb7fc00e668a2a/LICENSE-MIT)
 and [Apache](https://github.com/emilk/egui/blob/841a328ba2dd8f6996beb7189ebb7fc00e668a2a/LICENSE-APACHE).
 
+## Locked assessment and additional rights holders
+
+The maintained native GUI probe uses 374 external locked archives. The
+normal/build tree actually selects 232 external packages on each Linux target
+and 132 on each Windows target. Their union has 252 external packages, 52 with
+a build script or procedural macro, and 449 in-archive notice files identified
+by the inventory. None contains a font with a recognized native or web font
+extension. The two explicit Noto font files are separate build inputs.
+The four reports contain no excluded egui font or inspection package or feature.
+The [graph auditor](../../tools/rust-qa/audit-graph.py) hashes each selected
+original archive against the lock and records target feature sets, native
+objects, shaders and individual notice hashes. The native build also checks
+every unpacked source against the authenticated archive and the full inventory
+against the [reviewed target digest](../../rust/audit/gui-profile.json).
+All four target inventories were verified locally. The Linux graph records 100
+Wayland protocol definitions with the SHA-256 and embedded attribution of
+each XML. Plasma's historical `fullscreen-shell.xml` lacks an inline notice.
+KDE identifies the upstream fullscreen-shell protocol. Verify the exact legacy
+file's upstream provenance before including it in a distribution source set.
+[KDE protocol history](https://api.kde.org/legacy/plasma-wayland-protocols/html/md__2builds_2websites_2api-kde-org_2sources_2plasma-wayland-protocols_2src_2protocols_2TODOKF6.html).
+
+Sixteen selected crates omit standalone notices. The [supplemental catalog](../../rust/audit/gui-inputs.json)
+pins original upstream bytes and includes the fonts and their notice. The
+following source obligations also apply to data embedded in nominally
+permissive Rust packages.
+
+| Component | Source findings and retained evidence |
+| --- | --- |
+| egui family 0.37.0 | Seven archives omit license files, including ecolor and emath. The retained release MIT and Apache files cover the matching sources. |
+| AccessKit | The selected six archives omit standalone notices. Keep MIT and Apache files, the Apache-only grant for accesskit_winit, Chromium's BSD notice, and the per-file attributions in the corresponding sources. [Upstream notices](https://github.com/AccessKit/accesskit/tree/f3026222559c7f5f46d8f25cb7404de68eb149f0) |
+| clipboard-win 5.4.3 and profiling 1.0.18 | The catalog supplies the original BSL-1.0 and MIT files for these two missing grants. |
+| Vello 0.2.0 | Pixel encoding and blending include tiny-skia adaptations in vello_common and vello_cpu. Preserve tiny-skia's three-clause BSD notice, in addition to Vello's source notices. [tiny-skia](https://github.com/linebender/tiny-skia/blob/68b198a7210a6bbf752b43d6bc4db62445730313/LICENSE) |
+| HarfRust 0.12.0 and unicode-general-category 1.1.0 | Preserve Unicode data headers and the [Unicode data license](../../tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt), SHA-256 `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`. |
+| spirv 0.4.0+sdk-1.4.341.0 | The archive omits the rspirv Apache notice. Its generated grammar also carries Khronos' MIT terms. Both upstream notices are retained. The reviewed grammar hash is `508e6677e27b0b58eac8395aa49a90ac1766a8d392c247a0aba7b03f4fdd85b9`. [Grammar](https://github.com/KhronosGroup/SPIRV-Headers/blob/04f10f650d514df88b76d25e83db360142c7b174/include/spirv/unified1/spirv.core.grammar.json) |
+| Wayland protocol bindings | Seventeen protocol XML files in wayland-protocols-plasma 0.3.12 declare LGPL-2.1-or-later. This includes `blur.xml`, used by winit's KWin blur bindings. The misc 0.3.12 copy of `server-decoration.xml` carries the same terms. Plasma's `surface-extension.xml` declares BSD-3-Clause. Retain the complete XML with individual authors and matching license texts. The archive's `COPYING.LIB` is the LGPL text. |
+
+For Linux static linking, distribute the corresponding application and library
+sources, generator inputs, notices and reproducible relink instructions. Before
+candidate acceptance, rebuild a modified library from that source and relink the
+application using exactly the distributed inputs. The installed-package
+inventory also needs the loaded system libraries, target-specific import objects
+and shader compiler. The current reports cover development inputs.
+[LGPL 2.1 section 6](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html#section6).
+
 ## Fonts
 
 The following unmodified Noto assets were checked against their embedded
