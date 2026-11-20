@@ -23,6 +23,29 @@ def sha(path):
     with path.open("rb") as data:
         return hashlib.file_digest(data, "sha256").hexdigest()
 
+def gui_reference():
+    """Resolve only the original GUI manifests used to approve the service package/feature subset."""
+    revision = "6c953e32c0b2710bfe06b19805214946653480af"
+    source = ROOT / "tools/rust-qa/gui"
+    destination = BASE / "source-reference"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, digest in (("Cargo.toml", "41e0bf2c09e9401d3743ecc05dfab9e7308f2e2bd4f8f4d6a455146cbed971f4"),
+                         ("Cargo.lock", "3d266972f104fae3eb992e8198d25eace401f5c9fe1ed282aa180612fe12cc4a")):
+        path = destination / name
+        if path.is_file() and sha(path) == digest:
+            continue
+        data = (source / name).read_bytes()
+        if hashlib.sha256(data).hexdigest() != digest:
+            data = subprocess.check_output(["git", "show", f"{revision}:tools/rust-qa/gui/{name}"], cwd=ROOT)
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise ValueError(f"Changed historical GUI {name}")
+        with tempfile.TemporaryDirectory(dir=destination) as work:
+            temp = Path(work) / name
+            temp.write_bytes(data)
+            temp.replace(path)
+    return destination
+
+
 def checked_sources(command, target, locked):
     sys.path.insert(0, str(ROOT / "tools/rust-qa"))
     from storage.evidence import verify_archive
@@ -37,6 +60,11 @@ def checked_sources(command, target, locked):
             name, version, *_ = package.split()
             result.setdefault((name, version.removeprefix("v")), set()).add(frozenset(filter(None, flags.split(","))))
         return result
+    reference = gui_reference()
+    command = list(command)
+    index = command.index("--chdir")
+    for name in ("Cargo.toml", "Cargo.lock"):
+        command[index:index] = ["--ro-bind", str(reference / name), "/project/tools/rust-qa/gui/" + name]
     existing = features("/project/tools/rust-qa/gui/Cargo.toml")
     active = features("Cargo.toml")
     records = []
@@ -63,7 +91,7 @@ def build(lint):
     def locked(path):
         return {(p["name"], p["version"]): p["checksum"] for p in tomllib.loads(path.read_text())["package"] if "source" in p}
     graph = locked(HERE / "Cargo.lock")
-    reviewed = locked(ROOT / "tools/rust-qa/gui/Cargo.lock")
+    reviewed = locked(gui_reference() / "Cargo.lock")
     if any(reviewed.get(k) != value for k, value in graph.items()):
         raise RuntimeError("The service fixture added an unassessed archive or digest")
     output = BASE / "build"

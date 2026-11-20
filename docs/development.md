@@ -141,6 +141,9 @@ The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises
 X11 and Wayland parents, selection and denial. The local Flatpak variant
 installs an isolated test app in a temporary repository. The GNOME variant
 checks its on-screen notification and autostart registration and removal.
+On older host portals, `--host-chooser-only` exercises the parented picker
+without app-ID registration. The disposable Ubuntu job obtains a verified
+runtime once and uses `--flatpak --hosted-runtime` for attributed app actions.
 
 ## Build
 

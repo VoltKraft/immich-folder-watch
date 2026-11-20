@@ -1,5 +1,18 @@
 # Project Status
 
+## Older portal hosts and signed Flatpak test runtimes (2026-11-21)
+
+On Fedora x64, seven control runs covered both GTK chooser backends, the
+registered and unregistered host paths, real installed Flatpak grants and
+revocation, and GNOME notification and autostart. All 54 indexed files matched.
+The signed public freedesktop 26.08 metadata supplied the pinned runtime
+commits for both Linux architectures. The hosted jobs now test host selection
+separately from attributed Flatpak actions. Ubuntu 24.04 lacks `ibus-anthy`.
+Its failed package setup at `5895c0b` led to separate provisioning for GNOME
+and its available Mozc engine. Its independent IPC tests passed on both native
+Ubuntu hosts. [Portal evidence](rust/rw02-portal-dialog.md) and
+[hosted runs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264).
+
 ## Windows screen reader fixture (2026-11-20)
 
 The new disposable Windows scenario pairs UI Automation with NVDA 2026.3.1

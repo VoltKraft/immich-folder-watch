@@ -205,11 +205,19 @@ async fn request(bus: &Connection, parent: &str, action: &str) -> Result<(), Fai
 }
 
 pub async fn run(action: &str, parent: &str) -> Result<(), Failure> {
+    let installed = Path::new("/.flatpak-info").is_file();
+    let chooser_only = action.strip_prefix("unregistered-host-");
+    if chooser_only.is_some_and(|name| installed || !matches!(name, "cancel" | "select")) {
+        return Err("The unregistered host mode accepts only FileChooser actions".into());
+    }
+    let action = chooser_only.unwrap_or(action);
     let bus = Builder::session()?
         .method_timeout(Duration::from_secs(4))
         .build()
         .await?;
-    if !std::path::Path::new("/.flatpak-info").is_file() {
+    if chooser_only.is_some() {
+        println!("CHOOSER_UNREGISTERED_HOST");
+    } else if !installed {
         bus.call_method(
             Some(DESKTOP),
             OBJECT,

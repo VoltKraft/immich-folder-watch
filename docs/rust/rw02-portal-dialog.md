@@ -132,3 +132,78 @@ backend/compositor logs, Flatpak grants, GNOME bus trace and screenshots under
 ignored `artifacts/rust/portal-dialog`. It covers this Fedora x86-64 assessment.
 Linux ARM64, other desktop implementations and integration into the product UI
 require separate observations. [Evidence index](../../tools/rust-qa/portal-dialog/evidence.sha256)
+
+## Host FileChooser on older frontends
+
+At `2e7ed89`, Ubuntu 24.04 x64 and ARM64 returned D-Bus
+`org.freedesktop.DBus.Error.UnknownMethod` for the host Registry before the
+X11 or Wayland dialog opened. The 1.18.4 frontend's interface list includes
+FileChooser. Host Registry is a separate API for associating a host peer with
+an application ID. [Hosted run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871),
+[1.18.4 portal interfaces](https://github.com/flatpak/xdg-desktop-portal/blob/1.18.4/data/meson.build),
+[current Registry contract](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.host.portal.Registry.html).
+
+`--host-chooser-only` runs two unregistered FileChooser requests. The client
+accepts only the explicit unregistered host select and cancel actions. Each
+dialog retains a real native parent and the independent GTK-side observation.
+The native host receives the URI of the synthetic producer directory while its
+own mount namespace blocks direct access. Capabilities requiring an
+application identity use the registered host or installed Flatpak modes.
+[FileChooser contract](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.FileChooser.html).
+
+Seven Fedora x64 runs exercised executable SHA-256
+`1d8c7dfc84959bd4581e0121eb01ceb3bb8fb914fd4804c02f4fa494f85ea9d2`:
+the two unregistered host runs (`x11-chooser-only-0hqqi0jf`,
+`wayland-chooser-only-41rk_q4w`), registered host controls
+(`x11-92phbnnj`, `wayland-mvwx3q1p`), installed Flatpak controls
+(`x11-flatpak-5scdgwhk`, `wayland-flatpak-00xnrd79`) and the real GNOME
+Shell desktop (`gnome-wayland-flatpak-5t79ycdj`). The six chooser runs
+confirmed their respective native parents and both responses. Both installed
+clients received a portal document for the selected folder and the GTK
+notification relay acknowledged their delivery and withdrawal. Following
+revocation, a fresh instance of each installed client received `ENOENT` from
+the grant-relative root open. The GNOME run exercised notification display
+and withdrawal and the private autostart allow/disable/deny sequence.
+Frozen Clippy with warnings denied, rustfmt and the native release build
+passed. The portal build reuses the hash-verified GUI manifest/lock pair from
+`6c953e3` to compare active features. The first-party Cargo graph still has
+211 locked external archives and 116 target-active external packages.
+[Local evidence index](../../tools/rust-qa/portal-dialog/evidence.sha256).
+
+## Signed runtime on hosted Linux
+
+The GitHub Actions acquisition creates a fresh `FLATPAK_USER_DIR` under
+`RUNNER_TEMP`, with separate cache, GPG home and an empty temporary system
+installation. It imports Flathub's HTTPS remote descriptor, requires GPG
+verification of the summary and commits, selects the reviewed native
+Platform ref and verifies its deployed commit. If the branch has advanced,
+the explicit commit update selects the reviewed version. An independent
+OSTree signature check and a SHA-256 of the deployment metadata are retained
+in that private acquisition directory. The launcher accepts the matching
+checksum-named deployment under that runner directory and bind-mounts that
+one directory read-only. Its sibling runtime checkouts and remote repository
+stay outside the test desktop.
+
+| Architecture | org.freedesktop.Platform 26.08 commit |
+| --- | --- |
+| x86_64 | `df26daaf9d07610b4a72cc4585566194051275ac68396597b06474396f66427c` |
+| aarch64 | `b66eec6a19d747f56191c318c11a6ec765b8d7cc45cf16e4926349a64504d620` |
+
+On a Linux Actions runner, install `flatpak` and `ostree` alongside the
+existing portal desktop prerequisites. Run the acquisition in a step with an
+ID and pass its `deployment` output through `PLATFORM_DEPLOYMENT` in the two
+Flatpak steps. The installed test application is built inside each private
+desktop and installed from its temporary offline repository. The public
+platform and the local test-application ref have independent provenance.
+The two Fedora Flatpak controls used the matching system-provided x64
+deployment. Hosted acquisition, Ubuntu native responses and Linux ARM64
+execution require their own run receipts.
+[Flatpak command reference](https://docs.flatpak.org/en/latest/flatpak-command-reference.html).
+
+```sh
+python3 tools/rust-qa/portal-dialog/hosted_runtime.py
+python3 tools/rust-qa/portal-dialog/native.py x11 --host-chooser-only
+python3 tools/rust-qa/portal-dialog/native.py wayland --host-chooser-only
+python3 tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+```

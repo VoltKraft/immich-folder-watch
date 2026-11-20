@@ -28,8 +28,10 @@ def build(lint):
     toolchain = ART / 'toolchain'
     info = subprocess.check_output([sys.executable, ROOT / 'tools/rust-qa/check-toolchain.py', target, '--rustc',
         toolchain / 'bin/rustc'], text=True)
+    sys.path.insert(0, str(ROOT / 'tools/rust-qa/linux-services'))
+    from native import checked_sources, gui_reference
     graph = checked_dependencies(HERE / 'Cargo.lock')
-    existing = checked_dependencies(ROOT / 'tools/rust-qa/gui/Cargo.lock')
+    existing = checked_dependencies(gui_reference() / 'Cargo.lock')
     if any((existing.get(p) != sha for p, sha in graph.items())):
         raise ValueError('A locked archive is absent from the reviewed GUI graph')
     output = OUT / 'build'
@@ -52,8 +54,6 @@ def build(lint):
     cmd += ['--setenv', 'PATH', '/toolchain/bin:/usr/bin', '--setenv', 'HOME', '/home/fixture', '--setenv',
         'CARGO_HOME', '/cargo', '--setenv', 'CARGO_TARGET_DIR', '/build', '--chdir',
         '/project/tools/rust-qa/portal-dialog', '--', '/toolchain/bin/cargo']
-    sys.path.insert(0, str(ROOT / 'tools/rust-qa/linux-services'))
-    from native import checked_sources
     records = checked_sources(cmd, target, graph)
     flags = ['clippy', '--all-targets', '--frozen', '--', '-D', 'warnings'] if lint else ['build', '--frozen',
         '--release', '-j', '8']

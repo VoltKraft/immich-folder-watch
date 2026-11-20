@@ -5,17 +5,23 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+from runtime_pin import COMMITS
 APP = 'org.example.IfwPortalDialog'
 
 
-def prepare():
+def prepare(commit):
     # This root is private tmpfs. The launcher binds only the public 26.08 platform deployment read-only.
     system = Path('/tmp/private-flatpak-system')
     private_home = Path('/tmp/home')
+    arch = platform.machine()
+    platform_ref = system / 'runtime/org.freedesktop.Platform' / arch / '26.08'
+    deployment = platform_ref / commit
     mounts = Path('/proc/self/mountinfo').read_text().splitlines()
     private_tmp = any(row.split()[4] == '/tmp' and ' - tmpfs ' in row for row in mounts)
+    readonly = any(row.split()[4] == str(deployment) and 'ro' in row.split()[5].split(',') for row in mounts)
     if (Path.home() != private_home or os.environ.get('FLATPAK_SYSTEM_DIR') != str(system)
-            or Path('/var/lib/flatpak').exists() or not Path('/fixture-platform/active/files').is_dir() or not private_tmp):
+            or Path('/var/lib/flatpak').exists() or not (deployment / 'files').is_dir() or not private_tmp
+            or commit != COMMITS.get(arch) or not readonly):
         raise RuntimeError('Missing dedicated Flatpak environment')
     out = Path('/qa/flatpak-prepare.log')
 
@@ -24,10 +30,8 @@ def prepare():
             log.write('+ ' + ' '.join((str(n) for n in args)) + '\n')
             log.flush()
             subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, text=True, check=True, timeout=25)
-    arch = platform.machine()
-    platform_ref = system / 'runtime/org.freedesktop.Platform' / arch
-    platform_ref.mkdir(parents=True)
-    (platform_ref / '26.08').symlink_to('/fixture-platform', target_is_directory=True)
+    # Flatpak requires the checksum-named deployment itself to be a real directory.
+    (platform_ref / 'active').symlink_to(commit, target_is_directory=True)
     run(['ostree', '--repo=/tmp/private-flatpak-system/repo', 'init', '--mode=bare-user-only'])
     app = Path('/tmp/app-build')
     (app / 'files/bin').mkdir(parents=True)

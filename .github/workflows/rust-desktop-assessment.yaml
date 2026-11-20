@@ -116,8 +116,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
-            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin \
-            gnome-shell ibus ibus-anthy gir1.2-ibus-1.0 anthy-common
+            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin gir1.2-gtk-3.0
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Observe Windows Shell services and per-user Startup shortcuts
@@ -144,9 +143,14 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mailbox
 
-      - name: Observe GNOME Wayland composition and changes between monitor scales
+      - name: Install GNOME and its available Japanese input engine on Ubuntu
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
-        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes --present-mode mailbox
+        id: gnome_ime
+        run: sudo apt-get install --yes --no-install-recommends gnome-shell ibus ibus-mozc gir1.2-ibus-1.0
+
+      - name: Observe monitor changes with GNOME Wayland
+        if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --monitor-changes
 
       - name: Build the offline native Linux service probes
         id: linux_services
@@ -184,11 +188,30 @@ jobs:
 
       - name: Observe X11 folder chooser parenting, selection and refusal
         if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
-        run: python3 tools/rust-qa/portal-dialog/native.py x11
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --host-chooser-only
 
       - name: Observe Wayland folder chooser parenting, selection and refusal
         if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
-        run: python3 tools/rust-qa/portal-dialog/native.py wayland
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --host-chooser-only
+
+      - name: Obtain the signed freedesktop Platform for a private Flatpak profile
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        id: platform
+        run: |
+          sudo apt-get install --yes --no-install-recommends flatpak ostree
+          python3 tools/rust-qa/portal-dialog/hosted_runtime.py
+
+      - name: Observe an installed disposable Flatpak under X11
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Observe an installed disposable Flatpak under Wayland
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
 
       - name: Observe Windows UI Automation and foreground keyboard input
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}

@@ -24,14 +24,15 @@ def sha(path):
         return hashlib.file_digest(fd, 'sha256').hexdigest()
 
 
-def launch(backend, flatpak, shell):
+def launch(backend, flatpak, shell, chooser_only, hosted_runtime):
     sys.path.insert(0, str(ROOT / 'tools/rust-qa/performance'))
     from linux import namespace
     record = json.loads((BASE / 'build-inputs.json').read_text())
     if any((sha(ROOT / name) != digest for name, digest in record['sources'].items())):
         raise RuntimeError('Rebuild after changing a recorded source')
     work = Path(tempfile.mkdtemp(dir=BASE,
-        prefix=('gnome-' if shell else '') + backend + ('-flatpak-' if flatpak else '-')))
+        prefix=('gnome-' if shell else '') + backend +
+        ('-flatpak-' if flatpak else '-chooser-only-' if chooser_only else '-')))
     print('Private portal-dialog evidence', work, flush=True)
     binary = BASE / 'build/release/portal-dialog-assessment'
     if sha(binary) != record['binary']:
@@ -57,13 +58,15 @@ def launch(backend, flatpak, shell):
         'runtime': {str(path): sha(path) for path in native_services},
         'drivers': {str(path.relative_to(ROOT)): sha(path) for path in drivers},
     }
-    (work / 'inputs.json').write_text(json.dumps(inputs, indent=2) + '\n')
     flatpak_paths = []
     if flatpak:
-        import platform
-        runtime = Path('/var/lib/flatpak/runtime/org.freedesktop.Platform') / platform.machine() / '26.08'
-        flatpak_paths = ['--ro-bind', str(runtime), '/fixture-platform', '--setenv', 'FLATPAK_SYSTEM_DIR',
+        from runtime_pin import deployment
+        runtime, details = deployment(hosted_runtime)
+        inputs['platform'] = details
+        destination = Path('/tmp/private-flatpak-system') / details['ref'] / details['commit']
+        flatpak_paths = ['--ro-bind', str(runtime), str(destination), '--setenv', 'FLATPAK_SYSTEM_DIR',
             '/tmp/private-flatpak-system', '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak']
+    (work / 'inputs.json').write_text(json.dumps(inputs, indent=2) + '\n')
     cmd[end:] = ['--uid', '0', '--gid', '0', '--cap-add', 'CAP_SYS_ADMIN', '--cap-add', 'CAP_SETFCAP',
         '--cap-add', 'CAP_NET_ADMIN', '--dev-bind', '/dev/fuse', '/dev/fuse', *flatpak_paths, '--dir', '/probe',
         '--ro-bind', str(binary), '/probe/portal-dialog-assessment', '--dir', '/run/user/0', '--setenv',
@@ -71,7 +74,7 @@ def launch(backend, flatpak, shell):
         'memory', '--setenv', 'XDG_CURRENT_DESKTOP', 'GNOME' if shell else 'IFWQA', '--setenv', 'GTK_USE_PORTAL',
         '0', '--setenv', 'NO_AT_BRIDGE', '1', '--setenv', 'GTK_A11Y', 'none', '--chdir', '/qa', '--',
         '/usr/bin/python3', '/app/native.py', backend, '--inside', *(['--flatpak'] if flatpak else []),
-        *(['--gnome'] if shell else [])]
+        *(['--gnome'] if shell else []), *(['--host-chooser-only'] if chooser_only else [])]
     return subprocess.run(cmd).returncode
 
 
@@ -105,7 +108,7 @@ def desktop_process(kind, backend, command):
     return [*cmd, '--', *command]
 
 
-def inside(backend, flatpak, shell):
+def inside(backend, flatpak, shell, chooser_only):
     sys.path.insert(0, '/driver')
     from session import checked_start, check_alive, wait_for, private_session
     from displays import X11, Wayland, input_action, stroke
@@ -134,8 +137,9 @@ def inside(backend, flatpak, shell):
     Path('/tmp/selection/album/fixture').write_text('Synthetic portal dialog directory\n')
     output = Path('/qa/results.json')
     result = {'backend': backend,
-        'app_identity': 'installed temporary Flatpak' if flatpak else 'registered native host application',
-        'notification_receiver': 'synthetic freedesktop notification service', 'steps': {}}
+        'app_identity': ('installed temporary Flatpak' if flatpak else
+                         'unregistered native FileChooser caller' if chooser_only else 'registered native host application'),
+        'steps': {}}
 
     def record(key, data):
         result['steps'][key] = data
@@ -175,8 +179,11 @@ def inside(backend, flatpak, shell):
                 'org.freedesktop.impl.portal.desktop.gnome')
             record('gnome', {'backend': gnome, 'notification_provider': notify})
             result['notification_receiver'] = 'GNOME Shell org.gtk.Notifications'
-        else:
+        elif not chooser_only:
             notify = agent('receiver', [sys.executable, '/app/notifications.py'], 'org.freedesktop.Notifications')
+            result['notification_receiver'] = 'synthetic freedesktop notification service'
+        else:
+            notify = None
         gtk = agent('gtk', desktop_process('gtk', backend, ['/usr/libexec/xdg-desktop-portal-gtk', '-v']), GTK)
         frontend = agent('frontend', ['/usr/libexec/xdg-desktop-portal', '-v'], FRONT)
         record('services',
@@ -184,12 +191,13 @@ def inside(backend, flatpak, shell):
             'xserver': server})
         if flatpak:
             import flatpak_fixture
-            record('flatpak', flatpak_fixture.prepare())
+            record('flatpak', flatpak_fixture.prepare(inputs['platform']['commit']))
 
         def app(action):
             path = Path('/qa') / (action + '.log')
+            client_action = 'unregistered-host-' + action if chooser_only else action
             command = flatpak_fixture.command(action) if flatpak else desktop_process('app', backend,
-                ['/probe/portal-dialog-assessment', action])
+                ['/probe/portal-dialog-assessment', client_action])
             return (checked_start(stack, command, path), path)
 
         def outcome(task, path):
@@ -218,6 +226,8 @@ def inside(backend, flatpak, shell):
                 except subprocess.TimeoutExpired:
                     stroke(display, 65293)
             lines = outcome(task, log)
+            if chooser_only and 'CHOOSER_UNREGISTERED_HOST' not in lines:
+                raise RuntimeError('The client did not use the unregistered FileChooser-only path')
             if action == 'select' and (not flatpak) and ('CHOOSER_SELECTED file:///tmp/selection/album' not in lines):
                 raise RuntimeError(f'GTK returned an unexpected selection: {lines}')
             if action == 'select' and flatpak:
@@ -239,6 +249,8 @@ def inside(backend, flatpak, shell):
                 record('revoked', {'fresh_process': denied.stdout.splitlines()})
             result['steps'][action]['client'] = lines
             record(action, result['steps'][action])
+        if chooser_only:
+            return
 
         def simple(action):
             task, log = app(action)
@@ -272,12 +284,20 @@ if __name__ == '__main__':
     parser.add_argument('--inside', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--flatpak', action='store_true',
         help='Install and run a synthetic offline Flatpak in the private home')
+    parser.add_argument('--host-chooser-only', action='store_true',
+        help='Check only host FileChooser selection and cancellation without the optional Registry API')
+    parser.add_argument('--hosted-runtime', type=Path, metavar='DEPLOYMENT',
+        help='Use the signed native Platform deployment prepared in this GitHub runner temp directory')
     parser.add_argument('--gnome', action='store_true',
         help='Assess the actual GNOME Shell notification and background services')
     args = parser.parse_args()
+    if args.host_chooser_only and args.flatpak:
+        parser.error('--host-chooser-only and --flatpak select different application identities')
+    if args.hosted_runtime and (not args.flatpak or args.inside):
+        parser.error('--hosted-runtime requires the outer --flatpak launcher')
     if args.gnome and (not args.flatpak or args.backend != 'wayland'):
         parser.error('--gnome requires wayland --flatpak')
     if args.inside:
-        inside(args.backend, args.flatpak, args.gnome)
+        inside(args.backend, args.flatpak, args.gnome, args.host_chooser_only)
     else:
-        sys.exit(launch(args.backend, args.flatpak, args.gnome))
+        sys.exit(launch(args.backend, args.flatpak, args.gnome, args.host_chooser_only, args.hosted_runtime))
