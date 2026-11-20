@@ -323,7 +323,7 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
     );
     icon.call("notification_request", NIM_MODIFY, &notice);
     std::fs::write(area.join("tray.ready"), [])?;
-    let until = Instant::now() + Duration::from_secs(40);
+    let until = Instant::now() + Duration::from_secs(75);
     let mut handled = 0;
     while !area.join("tray.observed").is_file() {
         if Instant::now() >= until {

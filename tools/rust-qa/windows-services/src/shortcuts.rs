@@ -131,7 +131,7 @@ fn roundtrip(area: &Path, dir: &Path, id: &str, label: &str, executable: &Path) 
     // An independent Windows Script Host reader checks the same shortcut
     // before the native service disables it. Never execute the shortcut.
     fs::write(area.join(format!("{label}.ready")), [])?;
-    let until = Instant::now() + Duration::from_secs(40);
+    let until = Instant::now() + Duration::from_secs(75);
     while !area.join(format!("{label}.observed")).is_file() {
         if Instant::now() >= until {
             return Err(invalid());

@@ -12,6 +12,8 @@ import subprocess
 import tempfile
 import time
 
+from windows_observer import select_powershell
+
 
 TITLE = "Desktop input probe"
 SHOW, HIDE = 0x8002, 0x8003
@@ -158,12 +160,16 @@ def run_case(binary, output, name, background, tray, reopen):
                     if name == "keyboard-accessibility":
                         driver = Path(__file__).with_name("observe-windows-input.ps1").resolve()
                         evidence = output / "input.json"
+                        program, attempts = select_powershell(profile, "accessibility")
+                        (output / "observer-hosts.json").write_text(json.dumps(attempts, indent=2), encoding="utf-8")
+                        if not program:
+                            raise RuntimeError("The Windows desktop observer did not start on this host")
                         with (output / "input-observer.log").open("wb") as observed:
-                            subprocess.run(["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
+                            subprocess.run([program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
                                             "-ExecutionPolicy", "Bypass", "-File", str(driver),
                                             "-SubjectId", str(process.pid), "-WindowHandle", str(hwnd),
                                             "-SubjectLog", str(log), "-OutputFile", str(evidence)],
-                                           env=env, cwd=profile, stdout=observed, stderr=subprocess.STDOUT,
+                                           env=env, cwd=profile, stdin=subprocess.DEVNULL, stdout=observed, stderr=subprocess.STDOUT,
                                            timeout=80, check=True)
                         record = json.loads(evidence.read_text(encoding="utf-8"))
                         if record.get("status") != "passed" or record["processId"] != process.pid:
@@ -216,6 +222,8 @@ def main():
         cases = [("keyboard-accessibility", False, True, True)]
         driver = Path(__file__).with_name("observe-windows-input.ps1")
         report["inputObserverSha256"] = hashlib.sha256(driver.read_bytes()).hexdigest()
+        selector = Path(__file__).with_name("windows_observer.py")
+        report["observerHostSelectorSha256"] = hashlib.sha256(selector.read_bytes()).hexdigest()
     for case in cases:
         try:
             report["cases"].append(run_case(binary, output, *case))

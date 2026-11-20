@@ -1,10 +1,38 @@
-"""Exercise the timeout recovery boundary using only new temporary directories."""
+"""Exercise shortcut cleanup and desktop observer selection without an installed profile."""
 
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from run import recover
+from windows_observer import select_powershell
+
+
+class ObserverSelection(unittest.TestCase):
+    def test_times_out_one_host_then_records_the_second_hosts_capability(self):
+        finished = subprocess.CompletedProcess([], 0, b"7.7.0\r\n", b"")
+        with patch("windows_observer.shutil.which", side_effect=lambda name: name), \
+             patch("windows_observer.subprocess.run", side_effect=[subprocess.TimeoutExpired("powershell", 30), finished]) as run:
+            program, attempts = select_powershell(Path.cwd(), "shortcut")
+        self.assertEqual(program, "pwsh.exe")
+        self.assertEqual([entry["status"] for entry in attempts], ["TimeoutExpired", 0])
+        self.assertEqual(attempts[1]["version"], "7.7.0")
+        for call in run.call_args_list:
+            self.assertIn("WScript.Shell", call.args[0][-1])
+            self.assertNotIn("UIAutomation", call.args[0][-1])
+            self.assertEqual(call.kwargs["stdin"], subprocess.DEVNULL)
+
+    def test_unavailable_accessibility_is_reported_without_attempting_shortcut_com(self):
+        failed = subprocess.CompletedProcess([], 1, b"", b"Unable to load assembly")
+        with patch("windows_observer.shutil.which", side_effect=[None, "pwsh.exe"]), \
+             patch("windows_observer.subprocess.run", return_value=failed) as run:
+            program, attempts = select_powershell(Path.cwd(), "accessibility")
+        self.assertIsNone(program)
+        self.assertEqual([entry["status"] for entry in attempts], ["missing", 1])
+        self.assertIn("UIAutomationClient", run.call_args.args[0][-1])
+        self.assertNotIn("WScript", run.call_args.args[0][-1])
 
 
 class ShortcutRecovery(unittest.TestCase):

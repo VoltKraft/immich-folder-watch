@@ -7,6 +7,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $result = [ordered]@{ stage = $Stage }
+$progress = Join-Path $Fixture "$Stage.observer-progress"
+[IO.File]::WriteAllText($progress, "script-start")
 if ($Stage -ne "tray") {
     $owned = [IO.File]::ReadAllText((Join-Path $Fixture "$Stage.owned"))
     $result.fileExists = [IO.File]::Exists($owned)
@@ -17,8 +19,10 @@ if ($Stage -ne "tray") {
     } else { Join-Path $Fixture "Synthetic Startup" }
     $result.directoryMatches = [IO.Path]::GetDirectoryName($owned) -ieq $expectedParent
     if (-not $result.directoryMatches) { throw "Shortcut directory did not match the fixture" }
+    [IO.File]::WriteAllText($progress, "create-wscript-object")
     $shell = New-Object -ComObject WScript.Shell
     try {
+        [IO.File]::WriteAllText($progress, "read-owned-shortcut")
         $shortcut = $shell.CreateShortcut($owned)
         try {
             $result.targetMatches = $shortcut.TargetPath -ieq $Executable
@@ -30,6 +34,7 @@ if ($Stage -ne "tray") {
         } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }
 } else {
+    [IO.File]::WriteAllText($progress, "load-uia")
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
     Add-Type -TypeDefinition @"
 using System;
@@ -39,6 +44,7 @@ public static class IfwSyntheticShellObserver {
     public static extern IntPtr FindWindow(string className, string title);
 }
 "@
+    [IO.File]::WriteAllText($progress, "observe-shell-tree")
     $result.taskbarRoots = 0
     $result.trayElementFound = $false
     $result.trayElementEnabled = $false

@@ -17,6 +17,8 @@ import uuid
 HERE = Path(__file__).resolve().parent
 QA = HERE.parent
 ROOT = QA.parents[1]
+sys.path.insert(0, str(QA))
+from windows_observer import select_powershell
 
 
 def sha(path):
@@ -66,18 +68,21 @@ def recover(area, token, known):
     return cleaned
 
 
-def observe(stage, area, token, exe):
-    command = ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+def observe(stage, area, token, exe, program):
+    if not program:
+        return {"error": "No Windows scripting host completed this observer capability check"}
+    command = [program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
                "-File", str(HERE / "observe.ps1"), "-Stage", stage, "-Fixture", str(area),
                "-Token", token, "-Executable", str(exe)]
     try:
-        proc = subprocess.run(command, cwd=area, capture_output=True, timeout=25)
+        proc = subprocess.run(command, cwd=area, stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
         if proc.returncode:
             return {"error": "PowerShell observer failed", "exitCode": proc.returncode,
                     "diagnostic": proc.stderr.decode("utf-8", errors="replace")[-2048:]}
         return json.loads(proc.stdout.decode("utf-8-sig"))
     except (subprocess.TimeoutExpired, OSError, ValueError) as err:
-        return {"error": type(err).__name__}
+        progress = area / (stage + ".observer-progress")
+        return {"error": type(err).__name__, "lastStep": progress.read_text(encoding="ascii") if progress.is_file() else "host-start"}
 
 
 def read_native(file):
@@ -100,18 +105,23 @@ def measure(exe, output, hosted, known):
     area = temp_root / ("ifw-shell-" + token)
     area.mkdir()
     recovered = []
+    observer_hosts = {}
     try:
+        programs = {}
+        for capability in ("shortcut", "accessibility"):
+            programs[capability], observer_hosts[capability] = select_powershell(area, capability)
         (area / "synthetic.fixture").write_text(token, encoding="ascii")
         mode = "--github-hosted" if hosted else "--isolated-session"
         with (output / "native.txt").open("wb") as stream:
             proc = subprocess.Popen([exe, mode, area, token, "hosted-startup" if known else "private"],
                                     cwd=area, stdout=stream, stderr=stream)
             try:
-                deadline = time.monotonic() + 150
+                deadline = time.monotonic() + 250
                 while proc.poll() is None and time.monotonic() < deadline:
                     for stage in ("private", "startup", "tray"):
                         if stage not in observations and (area / (stage + ".ready")).is_file():
-                            observations[stage] = observe(stage, area, token, exe)
+                            capability = "accessibility" if stage == "tray" else "shortcut"
+                            observations[stage] = observe(stage, area, token, exe, programs[capability])
                             (area / (stage + ".observed")).touch()
                     time.sleep(0.06)
                 if proc.poll() is None:
@@ -124,7 +134,7 @@ def measure(exe, output, hosted, known):
         try:
             recovered = recover(area, token, known)
         finally:
-            write(output / "observer.json", {"stages": observations, "recoveredOwnedLinks": recovered})
+            write(output / "observer.json", {"hosts": observer_hosts, "stages": observations, "recoveredOwnedLinks": recovered})
         shutil.rmtree(area)
     native = read_native(output / "native.txt")
     failures = []
@@ -143,7 +153,7 @@ def measure(exe, output, hosted, known):
     if native.get("tray.callbacks.synthetic_taskbar_created") != 1:
         failures.append("The receiver did not process the controlled TaskbarCreated message")
     tray = observations.get("tray", {})
-    if "error" in tray:
+    if not tray or "error" in tray:
         failures.append("Windows accessibility observer did not execute successfully")
     acknowledged = native.get("tray.initial.add") is True
     required = ("tray.initial.version4", "tray.modify", "tray.controlled_remove", "tray.synthetic_taskbar_readd.add",
@@ -200,7 +210,7 @@ def main():
               "steps": {}, "workflowRun": os.getenv("GITHUB_RUN_ID"),
               "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     files = list(HERE.glob("*")) + list((HERE / "src").glob("*.rs")) + [QA / "audit-graph.py",
-             QA / "check-toolchain.py", QA / "storage/evidence.py", ROOT / "rust/toolchain-inputs.json"]
+             QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "windows_observer.py", ROOT / "rust/toolchain-inputs.json"]
     result["sourceFiles"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(files) if p.is_file()}
 
     def step(name, cmd):

@@ -58,6 +58,32 @@ visible in their own fields. `probeCompleted` records completion of the
 assessment. Interactive notification presentation, accessibility invocation and
 an actual OS TaskbarCreated event require their own positive observations.
 
+## Native observations on both Windows architectures
+
+At `49617467a73901fb10b9735dcf7bf727e6d0b2d1`, both Windows hosts
+created their hidden message receiver, processed the targeted callbacks,
+showed a fallback HWND on a shell-less private desktop and removed their
+test-owned shortcuts. Each native COM reader recovered the recorded target,
+arguments, working directory, description and icon for both shortcuts.
+[Native runs and artifacts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44820760903).
+
+| Observation | Windows Server 2025 x64 | Windows 11 ARM64 |
+| --- | --- | --- |
+| Independent Windows Script Host readback in the synthetic and known Startup folders | Both passed | Both observer processes timed out |
+| Notification area and notification request | Shell accepted add, version, modification, request and removal, and sent a balloon-show callback | Taskbar present. Initial add returned false with raw last error `0x80004005` |
+| Re-registration after a targeted TaskbarCreated message | Shell accepted the new icon and version | Receiver handled the message. Re-registration was refused |
+| Independent UI Automation element, invocation and resulting native activation | No matching element or activation observed | Observer timed out |
+
+Neither host observed an unsolicited Explorer restart. The downloaded ZIPs
+matched SHA-256 `dbe54a2c4ec3099a1f342b3be1aaa782fef17722ed20e4967e671f8c489b5759`
+(x64) and `6274152bf583a3eda740ab17b538c8cd8800f50075eaff49bc1ec61161400387`
+(ARM64). All files indexed by each native report matched their SHA-256 values.
+For follow-up runs, the launcher probes WScript and UI Automation separately
+with each available PowerShell host, records its version or failure, and
+records the last completed observer phase on timeout. The input fixture uses
+the same UI Automation host selection. Interactive notification and activation
+remain open on both targets.
+
 ## Dependency review and local evidence
 
 The standalone lock SHA-256 is

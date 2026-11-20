@@ -13,6 +13,15 @@ grant tests, with a separate read-only offline .NET reference build. The
 Fedora reference build completed with zero compiler warnings or errors.
 Hosted observations for these two new steps remain pending.
 
+On Windows x64, both independent shortcut readbacks passed. The shell accepted
+the icon, reported the notification shown, and accepted re-registration.
+The native Windows ARM64 shortcut readbacks and cleanup passed, while the
+independent PowerShell readers timed out and Explorer refused the icon.
+The next candidate run tests the scripting hosts for each capability before
+launching the native probe. Both Windows targets passed the updated cross-target
+Clippy check, and five host-selection and cleanup regressions passed locally.
+[Windows Shell evidence](rust/rw02-windows-services.md#native-observations-on-both-windows-architectures).
+
 On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
 when requesting their shared upload lock through a real Documents grant.
 Both acquired it on a private build of 1.22.1 with the upstream flock fix.
