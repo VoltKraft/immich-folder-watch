@@ -83,6 +83,7 @@ jobs:
           python3 tools/rust-qa/realtime/run.py "$NATIVE_TARGET" --output "artifacts/rust/realtime-native/$NATIVE_TARGET"
 
       - name: Exercise native Windows TLS, polling and WebSocket loopback sessions
+        id: windows_transport
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
         shell: pwsh
         env:
@@ -95,6 +96,14 @@ jobs:
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments "-arch=$env:NATIVE_ARCH -host_arch=$env:NATIVE_ARCH"
           $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
           python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Rebuild the ARM64 import library and relink the tested transport
+        if: ${{ !cancelled() && matrix.target == 'aarch64-pc-windows-msvc' && steps.windows_transport.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          python tools/rust-qa/windows-imports/run.py --acquire --native --transport
           exit $LASTEXITCODE
 
       - name: Install native Linux test desktop components
@@ -181,6 +190,7 @@ jobs:
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-imports/runs/*/result.json
             artifacts/rust/linux-services/inputs.json
             artifacts/rust/linux-services/documents-*/*.json
             artifacts/rust/linux-services/documents-*/*.log

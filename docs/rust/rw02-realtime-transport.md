@@ -99,9 +99,12 @@ The Windows ARM64 graph also includes Microsoft's `windows_aarch64_msvc`
 Ring's ARM detector calls `kernel32!IsProcessorFeaturePresent`. The crate's
 Apache/MIT notices and upstream metadata revision
 `db06b51c2ebb743efb544d40e3064efa49f28d38` identify this platform input.
-Its umbrella library can be generated from Microsoft's three WinMD files using
-the upstream Visual Studio generator. Reproducing the import library remains
-an open distribution check. The Linux x64 test executable dynamically linked
+Reconstruction from Microsoft's three WinMD files matched all 20,551 ARM64
+imports across 371 modules. The original and LLVM-built library linked the
+actual `windows-sys` binding into byte-identical ARM64 DLLs. The native
+MSVC build, full transport relink and four-target product packaging have
+separate gates. [Reconstruction, sources and local comparisons](rw02-windows-imports.md).
+The Linux x64 test executable dynamically linked
 glibc and libgcc_s with the system ELF loader. [Metadata reader](https://github.com/microsoft/windows-rs/blob/db06b51c2ebb743efb544d40e3064efa49f28d38/crates/tools/lib/src/lib.rs)
 and [MSVC generator](https://github.com/microsoft/windows-rs/blob/db06b51c2ebb743efb544d40e3064efa49f28d38/crates/tools/msvc/src/main.rs).
 

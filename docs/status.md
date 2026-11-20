@@ -1,5 +1,16 @@
 # Project Status
 
+## Windows ARM64 import reconstruction (2026-11-20)
+
+All 20,551 symbols in Microsoft's original ARM64 import library matched the
+three WinMD sources and 371 C baselines. Two LLVM rebuilds produced identical
+libraries. The actual Rust binding used by ring produced the same ARM64 PE
+bytes with the original and reconstructed library. The offline source replay
+checked all 152 registry archive pins in the transport graph. Its next
+Windows ARM64 assessment runs the native observer, MSVC generator and all
+15 loopback cases with the reconstructed library.
+[Reconstruction receipts and source archive](rust/rw02-windows-imports.md).
+
 ## X11 composition and native Orca output (2026-11-20)
 
 At the GUI source in `6c953e3`, the private Fedora X11 test received
