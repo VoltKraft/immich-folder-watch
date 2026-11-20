@@ -55,6 +55,12 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn("secrets.", smoke)
         self.assertNotIn("environment:", smoke)
         self.assertNotIn("uses: actions/deploy-pages@", smoke)
+        downloads = re.findall(r"uses: actions/download-artifact@([0-9a-f]{40})[^\n]*\n(.*?)(?=\n      -|\Z)", smoke, re.S)
+        self.assertEqual(len(downloads), 2)
+        self.assertEqual(downloads[0][0], downloads[1][0])
+        for _, settings in downloads:
+            self.assertIn("artifact-ids: ${{ steps.upload.outputs.artifact_id }}", settings)
+        self.assertNotIn("continue-on-error: true", smoke.split("      - name: Retry the exact", 1)[1])
 
     def check_rust_workflow(self, filename, expected_actions):
         source = (WORKFLOWS / filename).read_text()

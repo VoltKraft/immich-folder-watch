@@ -16,6 +16,14 @@ missing-tray startup and orderly quit on both X11 and Wayland. Broader native
 integration, accessibility, graphics fallback and the Rust resource comparison
 remain open.
 
+The general PR CI twice failed to download newly finalized synthetic Pages
+artifacts at `4dcccb7`. The logs show the upload IDs and an index response
+within one second that omitted them. The API subsequently returned those IDs
+and their digests. Retrying an entire job generated new IDs and reproduced
+the failure. The nonpublishing smoke check now retries the same ID once after
+30 seconds and still requires the tar contents to verify. Its next hosted
+run must confirm the result. [Affected PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811912153).
+
 ## RW-02 filesystem review and hosted follow-up (2026-11-20)
 
 The independent [filesystem re-review](rust/rw02-filesystem.md#independent-review-of-the-feasibility-boundary)
