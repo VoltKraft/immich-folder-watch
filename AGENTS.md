@@ -168,6 +168,9 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
+  Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
+  [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  Use the dedicated native service fixtures with disposable profiles.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

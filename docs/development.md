@@ -96,6 +96,7 @@ the matching toolchains on `PATH`. Use fresh output directories for each run.
 
 ```bash
 python3 tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --output artifacts/rust/storage-native/test
+python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/rust/yaml-assessment/runs/test
 python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
 python3 tools/rust-qa/build-gui-probe.py x86_64-unknown-linux-gnu
 python3 tools/rust-qa/gui/native.py --backend x11 --input
@@ -109,6 +110,16 @@ control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
+
+The [YAML assessment](rust/rw02-yaml.md) uses the shipping C# reader in both
+directions. Upload only its individual run output. The separate private cache
+contains original third-party archives. The [Linux service tests](rust/rw02-linux-services.md)
+exercise tray-owner changes and actual synthetic Documents grants. The
+[portal comparison builder](rust/rw02-portal-upstream.md) replays one upstream
+fix on exact release sources in an offline SDK. It writes the executable to
+the ignored test area for the private namespace. The
+[Windows service tests](rust/rw02-windows-services.md) exercise per-user
+shortcut registration, Shell notifications and independent UI Automation.
 
 ## Build
 

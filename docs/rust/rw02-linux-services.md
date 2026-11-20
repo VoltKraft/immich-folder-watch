@@ -108,6 +108,10 @@ reader read those bytes through the grant as well.
 The result establishes a working cooperating-lock path on this specific build.
 The installed Fedora package still reproduces the refusal above. Distribution
 support and deployment with a released implementation remain open.
+Three builds of the backport produced the same executable. The pristine
+upstream release built with the identical toolchain and options reproduced
+the distribution's lock refusal through the same FUSE harness. [Source,
+build identities and control run](rw02-portal-upstream.md).
 
 ## Reproduction and evidence
 
