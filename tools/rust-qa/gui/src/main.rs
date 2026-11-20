@@ -3,9 +3,10 @@
 
 #[cfg(target_os = "linux")]
 mod benchmark;
+mod fonts;
+mod graphics;
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(target_os = "linux")]
 mod native_window;
 
 use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
@@ -21,17 +22,19 @@ enum Command {
     Open,
     Close,
     Quit,
+    DestroyGraphics,
 }
 
 #[derive(Clone)]
 struct Control {
     sender: SyncSender<Command>,
     window: Arc<Mutex<Option<Wake>>>,
+    #[cfg(target_os = "linux")]
+    graphics_attention: Arc<std::sync::atomic::AtomicBool>,
 }
 
 struct Wake {
     context: egui::Context,
-    #[cfg(target_os = "linux")]
     x11: Option<Arc<winit::window::Window>>,
 }
 
@@ -39,7 +42,6 @@ impl Control {
     fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
         self.sender.try_send(command)?;
         if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
-            #[cfg(target_os = "linux")]
             if let Some(window) = &wake.x11 {
                 window.request_redraw();
                 return Ok(());
@@ -50,6 +52,13 @@ impl Control {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ControlId {
+    Filename,
+    Password,
+    Language,
+}
+
 struct Model {
     lifecycle: DesktopLifecycle,
     commands: Receiver<Command>,
@@ -57,6 +66,9 @@ struct Model {
     password: String,
     german: bool,
     passes: u64,
+    graphics: graphics::Graphics,
+    last_focus: Option<ControlId>,
+    restore_focus: bool,
 }
 
 impl Model {
@@ -65,6 +77,10 @@ impl Model {
             Command::Open => self.lifecycle.activate(),
             Command::Close => self.lifecycle.close_window(),
             Command::Quit => self.lifecycle.request_quit(),
+            Command::DestroyGraphics => {
+                self.graphics.request_test_fault();
+                None
+            }
         }
     }
 }
@@ -108,7 +124,9 @@ impl Window {
                 .or_default()
                 .push(name.to_owned());
         }
+        fonts::add_fallbacks(&mut fonts);
         creation.egui_ctx.set_fonts(fonts);
+        model.borrow_mut().graphics.attach(creation);
         if let Some(render) = &creation.wgpu_render_state {
             let info = render.adapter.get_info();
             println!(
@@ -124,7 +142,6 @@ impl Window {
                 .is_some_and(|w| w.is_visible().is_some());
         *control.window.lock().expect("window wake mutex poisoned") = Some(Wake {
             context: creation.egui_ctx.clone(),
-            #[cfg(target_os = "linux")]
             x11: creation.winit_window().filter(|_| can_hide).cloned(),
         });
         if !can_hide {
@@ -149,7 +166,8 @@ impl Drop for Window {
 }
 
 impl eframe::App for Window {
-    fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.model.borrow_mut().graphics.apply_surface_choice(frame);
         // Count native composition stages without disclosing entered text.
         ctx.input(|i| {
             for event in &i.events {
@@ -197,26 +215,51 @@ impl eframe::App for Window {
             });
         egui::CentralPanel::default().show(ui, |ui| {
             let de = model.german;
+            if let Some(notice) = model.graphics.notice(de) {
+                ui.label(notice);
+            }
             let label = ui.label(if de { "Dateiname" } else { "Filename" });
-            ui.text_edit_singleline(&mut model.filename)
+            let filename = ui
+                .text_edit_singleline(&mut model.filename)
                 .labelled_by(label.id);
             let label = ui.label(if de { "Kennwort" } else { "Password" });
-            if ui
+            let password = ui
                 .add(egui::TextEdit::singleline(&mut model.password).password(true))
-                .labelled_by(label.id)
-                .changed()
-            {
+                .labelled_by(label.id);
+            if password.changed() {
                 println!("EDIT masked chars={}", model.password.chars().count());
             }
-            if ui.button(if de { "English" } else { "Deutsch" }).clicked() {
+            let language = ui.button(if de { "English" } else { "Deutsch" });
+            if language.clicked() {
                 model.german = !de;
             }
+            let controls = [
+                (ControlId::Filename, filename),
+                (ControlId::Password, password),
+                (ControlId::Language, language),
+            ];
+            if model.restore_focus && ui.input(|input| input.focused) {
+                if let Some((_, response)) = controls
+                    .iter()
+                    .find(|(id, _)| Some(*id) == model.last_focus)
+                {
+                    response.request_focus();
+                }
+                model.restore_focus = false;
+            }
+            if let Some((id, _)) = controls.iter().find(|(_, response)| response.has_focus()) {
+                model.last_focus = Some(*id);
+            }
         });
+        model.graphics.finish_ui_for_test();
     }
 }
 
-fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn Error>> {
-    #[cfg(target_os = "linux")]
+fn supervise(
+    model: Rc<RefCell<Model>>,
+    control: &Control,
+    #[cfg(target_os = "linux")] native: &zbus::Connection,
+) -> Result<(), Box<dyn Error>> {
     let mut event_loop = None;
     loop {
         let intent = model.borrow().lifecycle.window_intent();
@@ -224,7 +267,7 @@ fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn
             break;
         }
         if intent == WindowIntent::Visible {
-            let options = eframe::NativeOptions {
+            let mut options = eframe::NativeOptions {
                 viewport: egui::ViewportBuilder::default()
                     .with_title("Desktop input probe")
                     .with_app_id("org.example.IfwGuiProbe")
@@ -234,15 +277,37 @@ fn supervise(model: Rc<RefCell<Model>>, control: &Control) -> Result<(), Box<dyn
                 run_and_return: true,
                 ..Default::default()
             };
+            model.borrow_mut().graphics.configure(&mut options);
             let current = Rc::clone(&model);
             let window_control = control.clone();
-            let create: eframe::AppCreator<'_> =
-                Box::new(move |ctx| Ok(Box::new(Window::new(ctx, current, window_control))));
-            #[cfg(target_os = "linux")]
-            native_window::run(&mut event_loop, options, create, &model, control)?;
-            #[cfg(target_os = "windows")]
-            eframe::run_native("Desktop input probe", options, create)?;
+            let create: eframe::AppCreator<'_> = Box::new(move |ctx| {
+                #[cfg(target_os = "linux")]
+                linux::graphics_attention(native, &window_control, false);
+                Ok(Box::new(Window::new(ctx, current, window_control)))
+            });
+            let outcome = native_window::run(&mut event_loop, options, create, &model, control);
             let mut model = model.borrow_mut();
+            // An internal post-frame eframe exit can leave the model visible despite a dead renderer.
+            let failed = model.lifecycle.shutdown() == Shutdown::Running
+                && (outcome.is_err()
+                    || model.graphics.lost()
+                    || model.lifecycle.window_intent() == WindowIntent::Visible);
+            if failed {
+                model.restore_focus = true;
+                println!(
+                    "GRAPHICS_ERROR device_lost={} detail={:?}",
+                    model.graphics.lost(),
+                    outcome.err().map(|e| e.to_string())
+                );
+            }
+            let retry = model.graphics.finish(failed);
+            if retry && model.lifecycle.window_intent() == WindowIntent::Visible {
+                continue;
+            }
+            #[cfg(target_os = "linux")]
+            if failed && !retry {
+                linux::graphics_attention(native, control, true);
+            }
             // Some compositors end the window session without a prior CloseRequested event.
             if model.lifecycle.window_intent() == WindowIntent::Visible {
                 model.lifecycle.close_window();
@@ -270,6 +335,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let control = Control {
         sender,
         window: Arc::new(Mutex::new(None)),
+        #[cfg(target_os = "linux")]
+        graphics_attention: Arc::default(),
     };
     #[cfg(target_os = "linux")]
     let (native, available) = linux::start(control.clone())?;
@@ -289,10 +356,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         password: String::new(),
         german: true,
         passes: 0,
+        graphics: graphics::Graphics::new(),
+        last_focus: None,
+        restore_focus: false,
     }));
     #[cfg(target_os = "linux")]
     let assessment = benchmark::Benchmark::start()?;
-    let result = supervise(Rc::clone(&model), &control);
+    let result = supervise(
+        Rc::clone(&model),
+        &control,
+        #[cfg(target_os = "linux")]
+        &native,
+    );
     #[cfg(target_os = "linux")]
     assessment.finish()?;
     #[cfg(target_os = "linux")]
@@ -329,6 +404,13 @@ fn windows_fixture_input(
             let command = match input.read_exact(&mut next) {
                 Ok(()) if next[0] == b'O' => Command::Open,
                 Ok(()) if next[0] == b'C' => Command::Close,
+                Ok(()) if next[0] == b'G' => {
+                    if graphics::allows_test_fault() {
+                        Command::DestroyGraphics
+                    } else {
+                        continue;
+                    }
+                }
                 _ => Command::Quit,
             };
             if control.send(command).is_err() || matches!(command, Command::Quit) {

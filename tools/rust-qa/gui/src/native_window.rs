@@ -1,7 +1,8 @@
-//! Dispatch native close on the UI thread before scheduling any additional compositor frame.
+//! Own eframe callbacks and renderer teardown on the UI thread across native window lifetimes.
 use super::{Control, HostCommand, Model, Shutdown, WindowIntent};
 use std::cell::RefCell;
 use std::error::Error;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, Ime, StartCause, WindowEvent};
@@ -18,7 +19,35 @@ struct Handler<'a> {
     repaint_after_map: bool,
 }
 
-impl Handler<'_> {
+impl<'a> Handler<'a> {
+    fn dispatch(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        run: impl FnOnce(&mut eframe::EframeWinitApplication<'a>),
+    ) {
+        if self.model.borrow().graphics.lost() {
+            event_loop.exit();
+            return;
+        }
+        if let Err(panic) = catch_unwind(AssertUnwindSafe(|| run(&mut self.eframe))) {
+            let message = panic
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| panic.downcast_ref::<&str>().copied());
+            // Pinned egui-wgpu 0.37 uses a panic for this failed staging allocation.
+            // A matching message alone cannot turn an unconfirmed UI failure into device recovery.
+            if self.model.borrow().graphics.lost()
+                && message.is_some_and(|m| {
+                    m.starts_with("Failed to create staging buffer for index data. Index count: ")
+                })
+            {
+                println!("GRAPHICS_RENDER_INTERRUPTED");
+                event_loop.exit();
+            } else {
+                resume_unwind(panic);
+            }
+        }
+    }
     fn x11_root(&self) -> Option<Arc<Window>> {
         self.control
             .window
@@ -50,12 +79,18 @@ impl Handler<'_> {
                 _ => (),
             }
         }
+        if model.graphics.lost() {
+            event_loop.exit();
+            return false;
+        }
         model.lifecycle.window_intent() == WindowIntent::Visible
     }
 
     fn flush_mapping(&mut self, event_loop: &ActiveEventLoop, window: &Window) {
-        for event in self.mapping_events.drain(..) {
-            self.eframe.window_event(event_loop, window.id(), event);
+        for event in std::mem::take(&mut self.mapping_events) {
+            self.dispatch(event_loop, |app| {
+                app.window_event(event_loop, window.id(), event)
+            });
         }
         if std::mem::take(&mut self.repaint_after_map) {
             window.request_redraw();
@@ -65,6 +100,10 @@ impl Handler<'_> {
 
 impl ApplicationHandler<eframe::UserEvent> for Handler<'_> {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        if self.model.borrow().graphics.lost() {
+            event_loop.exit();
+            return;
+        }
         if let Some(window) = self.x11_root().filter(|window| window.id() == id) {
             match event {
                 WindowEvent::CloseRequested => {
@@ -104,35 +143,40 @@ impl ApplicationHandler<eframe::UserEvent> for Handler<'_> {
             }
             self.flush_mapping(event_loop, &window);
         }
-        self.eframe.window_event(event_loop, id, event);
+        self.dispatch(event_loop, |app| app.window_event(event_loop, id, event));
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.eframe.resumed(event_loop);
+        self.dispatch(event_loop, |app| app.resumed(event_loop));
     }
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
-        self.eframe.new_events(event_loop, cause);
+        self.dispatch(event_loop, |app| app.new_events(event_loop, cause));
     }
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: eframe::UserEvent) {
-        self.eframe.user_event(event_loop, event);
+        self.dispatch(event_loop, |app| app.user_event(event_loop, event));
     }
     fn device_event(&mut self, event_loop: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
-        self.eframe.device_event(event_loop, id, event);
+        self.dispatch(event_loop, |app| app.device_event(event_loop, id, event));
     }
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.model.borrow().graphics.lost() {
+            event_loop.exit();
+            return;
+        }
         if let Some(window) = self.x11_root().filter(|w| w.is_visible() == Some(true)) {
             self.flush_mapping(event_loop, &window);
         }
-        self.eframe.about_to_wait(event_loop);
+        self.dispatch(event_loop, |app| app.about_to_wait(event_loop));
     }
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
-        self.eframe.suspended(event_loop);
+        self.dispatch(event_loop, |app| app.suspended(event_loop));
     }
     fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+        self.model.borrow().graphics.drain_lost_device();
         self.eframe.exiting(event_loop);
     }
     fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
-        self.eframe.memory_warning(event_loop);
+        self.dispatch(event_loop, |app| app.memory_warning(event_loop));
     }
 }
 

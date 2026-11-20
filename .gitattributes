@@ -37,6 +37,7 @@ tools/rust-qa/portal-reference/*.py text eol=lf
 tools/rust-qa/portal-reference/flock-upstream.patch -text whitespace=-blank-at-eol
 tools/rust-qa/portal-reference/LICENSE.upstream-LGPL-2.1.txt -text
 rust/audit/notices/* -text
+rust/audit/gui-text-inputs.json text eol=lf
 rust/audit/notices/SPIRV-Headers whitespace=-blank-at-eof
 rust/audit/notices/weston-1.5.0-COPYING whitespace=-blank-at-eol
 rust/assets/fonts/* -text

@@ -37,18 +37,23 @@ and [Apache](https://github.com/emilk/egui/blob/841a328ba2dd8f6996beb7189ebb7fc0
 
 ## Locked assessment and additional rights holders
 
-The maintained native GUI probe uses 374 external locked archives. The
-normal/build tree actually selects 232 external packages on each Linux target
-and 132 on each Windows target. Their union has 252 external packages, 52 with
-a build script or procedural macro, and 449 in-archive notice files identified
-by the inventory. None contains a font with a recognized native or web font
-extension. The two explicit Noto font files are separate build inputs.
-The four reports contain no excluded egui font or inspection package or feature.
+The maintained GUI locks 372 registry archives and reconstructs three external
+source trees. Each Linux normal/build graph selects 230 registry and three
+reconstructed packages. Each Windows graph selects 130 registry and the same
+three reconstructed packages. The graphs also contain the two repository
+packages. Their union contains 253 external packages, including 52 packages
+with a build script or procedural macro. The registry archive inventory lists
+449 notice files. All five font payloads enter through explicit build paths.
+The four reports found no bundled font files in the selected crate sources and
+no excluded egui font or inspection package or feature. The earlier prototype
+at `6c953e3` used 374 registry archives and two explicit fonts.
 The [graph auditor](../../tools/rust-qa/audit-graph.py) hashes each selected
 original archive against the lock and records target feature sets, native
 objects, shaders and individual notice hashes. The native build also checks
 every unpacked source against the authenticated archive and the full inventory
 against the [reviewed target digest](../../rust/audit/gui-profile.json).
+The four reports also verify each reconstructed tree and the exact target
+feature sets independently established by the isolated text-engine comparison.
 All four target inventories were verified locally. The Linux graph records 100
 Wayland protocol definitions with the SHA-256 and embedded attribution of
 each XML. Plasma's historical `fullscreen-shell.xml` lacks an inline notice.
@@ -73,8 +78,11 @@ The separately identified libbacklight subsection applies to that component.
 [author acknowledgement](https://lists.freedesktop.org/archives/wayland-devel/2018-June/038757.html)
 and [SPDX license text](https://spdx.org/licenses/HPND-sell-variant.html).
 
-Sixteen selected crates omit standalone notices. The [supplemental catalog](../../rust/audit/gui-inputs.json)
-pins original upstream bytes and includes the fonts and their notice. The
+Sixteen selected crates in the original graph omit standalone notices. The
+[supplemental catalog](../../rust/audit/gui-inputs.json) pins their original
+upstream bytes, Noto Sans and Mono, and the shared OFL notice. The
+[text source inventory](../../rust/audit/gui-text-inputs.json) pins the other
+three fonts, the text-engine sources and their full notices. The
 following source obligations also apply to data embedded in nominally
 permissive Rust packages.
 
@@ -85,6 +93,7 @@ permissive Rust packages.
 | clipboard-win 5.4.3 and profiling 1.0.18 | The catalog supplies the original BSL-1.0 and MIT files for these two missing grants. |
 | Vello 0.2.0 | Pixel encoding and blending include tiny-skia adaptations in vello_common and vello_cpu. Preserve tiny-skia's three-clause BSD notice, in addition to Vello's source notices. [tiny-skia](https://github.com/linebender/tiny-skia/blob/68b198a7210a6bbf752b43d6bc4db62445730313/LICENSE) |
 | HarfRust 0.12.0 and unicode-general-category 1.1.0 | Preserve Unicode data headers and the [Unicode data license](../../tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt), SHA-256 `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`. |
+| unicode-bidi 0.3.18 | Preserve the original source headers, AUTHORS, COPYRIGHT, both MIT and Apache grants, the Unicode 16 UCD readme and the Unicode data license. The original generator reproduces the compiled bidirectional class and paired-bracket table from the pinned UCD bytes. [Unicode 16.0 data](https://www.unicode.org/Public/16.0.0/ucd/) |
 | spirv 0.4.0+sdk-1.4.341.0 | The archive omits the rspirv Apache notice. Its generated grammar also carries Khronos' MIT terms. Both upstream notices are retained. The reviewed grammar hash is `508e6677e27b0b58eac8395aa49a90ac1766a8d392c247a0aba7b03f4fdd85b9`. [Grammar](https://github.com/KhronosGroup/SPIRV-Headers/blob/04f10f650d514df88b76d25e83db360142c7b174/include/spirv/unified1/spirv.core.grammar.json) |
 | Wayland protocol bindings | Seventeen protocol XML files in wayland-protocols-plasma 0.3.12 declare LGPL-2.1-or-later. This includes `blur.xml`, used by winit's KWin blur bindings. The misc 0.3.12 copy of `server-decoration.xml` carries the same terms. Plasma's `surface-extension.xml` declares BSD-3-Clause. Retain the complete XML with individual authors and matching license texts. The archive's `COPYING.LIB` is the LGPL text. |
 
@@ -99,7 +108,7 @@ and shader compiler. The current reports cover development inputs.
 ## Fonts
 
 The following unmodified Noto assets were checked against their embedded
-attributions and character maps. The first three come from
+attributions and character maps. The TrueType files come from
 `notofonts/noto-fonts@ffebf8c1ee449e544955a7e813c54f9b73848eac` under
 `hinted/ttf/<family>/<file>`. The CJK file comes from
 `notofonts/noto-cjk@f8d157532fbfaeda587e826d4cd5b21a49186f7c` under
@@ -111,17 +120,65 @@ distributed font. [OFL bundling terms](https://openfontlicense.org/ofl-faq/).
 | NotoSans-Regular.ttf | 2.008 | 569208 | `b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5` |
 | NotoSansMono-Regular.ttf | 2.007 | 512836 | `d9e2b23d19f8230be7146f409a52b1d23117e635e28f2e2892cf91b7382f325b` |
 | NotoSansSymbols2-Regular.ttf | 2.003 | 656852 | `630846d528dbe4c4981370a4d0a9475a1fd1491a129bb411f8e157cdb5de13c6` |
+| NotoSansArabic-Regular.ttf | 2.009 | 240456 | `ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b` |
 | NotoSansCJKjp-Regular.otf | 2.004 | 16467736 | `68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5` |
 
 The [Noto notice](https://github.com/notofonts/noto-fonts/blob/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE)
 hash is `0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb`.
 The [CJK notice](https://github.com/notofonts/noto-cjk/blob/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/LICENSE)
 hash is `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2`.
-Sans and Mono cover the German strings. CJK, Arabic, emoji and several symbols
-require additional coverage. Epaint shapes runs with HarfRust and documents
-unfinished bidi support. Check mixed-direction filenames, selection, caret
-movement, composition and paste with the actual fonts and native input method.
-[epaint text layout](https://github.com/emilk/egui/blob/841a328ba2dd8f6996beb7189ebb7fc00e668a2a/crates/epaint/src/text/text_layout.rs)
+Sans and Mono remain the first choices in their respective families. Both
+families then use Symbols2, Arabic and CJK JP in that order. Retain the
+per-file copyright and trademark records in the text source inventory with
+the matching complete notices. The text builder reuses the original reviewed
+font files without subsetting, converting or searching installed fonts.
+
+## Bidirectional layout and native editor
+
+Unmodified egui 0.37.0 drew the connected Arabic sample but selected the wrong
+logical character after dragging over it. European digits exposed a second
+failure in the visual order of a mixed-direction filename. The maintained GUI
+uses the reviewed Rust changes from the upstream comparison between
+`fc9d66dda742d722eedaa8684d23f86369cf8e5f` and
+`e0bc7924dac211c5ff727d55922662ce371ec819`. The two original crate archives
+still supply the base sources. The build applies the selected changes to 17
+egui/epaint Rust files and provides the exact unicode-bidi 0.3.18 path input
+with only `hardcoded-data` and `std`. The reviewed unicode-bidi source matches
+its published archive at every retained source file. The compiler uses the
+reviewed local manifest. Cargo verifies the normal/build graph on every
+native host. [Upstream change](https://github.com/emilk/egui/pull/8828) and
+[original visual and editing controls](rw02-font-coverage.md).
+
+On a native Windows or Linux host, select the checked Rust toolchain and run
+`python3 tools/rust-qa/build-gui-probe.py TARGET` from the repository root.
+This fetches the pinned public originals and both locked Cargo graphs,
+verifies fonts, notices, compiler inputs and graph, runs Clippy, and builds
+the actual GUI. Run the same command with `--offline` to repeat using those
+inputs. Reconstructing the three source directories from the cached originals
+reproduced all 137 egui files, 59 epaint files and 17 unicode-bidi files,
+including the generated Unicode table. Independent negative controls rejected
+a changed Rust file, an added Rust file, an extra package root, a shortened
+font and an empty source review. The original lock and feature comparison
+for the independent service and portal fixtures use the verified manifests
+from `6c953e3`. The first online setup requires that Git revision locally.
+The sources and fonts go under ignored assessment directories. Windows needs
+the native MSVC environment selected by the [native build guide](../development.md#rust-feasibility-workspace).
+
+On Linux, `python3 tools/rust-qa/gui/profile_text.py` runs the maintained
+executable in a private X11 desktop with Mesa. The fixture requires the GTK 3
+and AT-SPI introspection libraries and XTEST. It pastes into the normal
+filename editor through the native clipboard, clicks, presses left and right,
+drags, presses Delete, and checks the resulting text and character extents
+through AT-SPI. A separate window readback compares glyph pixel masks. On
+Linux x64, Japanese, Arabic and mixed Arabic/European digits passed this
+sequence. The window produced eight distinct masks for the Latin control,
+two CJK characters, a symbol, three Arabic letters and the unmapped control.
+The [four-host acceptance record](acceptance.md) tracks native evidence outside
+this Linux x64 run, including IME and accessibility checks. The observed
+binary has SHA-256 `80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`.
+The [Linux x64 receipt](../../tools/rust-qa/gui/evidence/text-profile-linux-x64.sha256)
+binds the native results, both build records, the source graph, observation
+drivers and the application's orderly shutdown.
 
 ## Native interfaces and outstanding checks
 

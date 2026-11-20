@@ -95,8 +95,10 @@ preedit. [Native protocol, field and buffer observations](rw02-wayland-input.md)
 The released egui 0.37 text editor deleted the wrong visible Arabic character
 in two mixed-direction cases. A narrowly scoped upstream correction passed
 the same pointer, keyboard and GPU readback tests on Linux x64, including
-numbers inside a right-to-left run. The other three native hosts and integration
-into the full GUI remain open. [Font and caret evidence](rw02-font-coverage.md).
+numbers inside a right-to-left run. The integrated Linux x64 GUI also passed
+the tests in its ordinary filename field. The other three native hosts remain
+open. [Comparative font tests](rw02-font-coverage.md) and
+[integrated source and field observations](rw02-gui-dependencies.md).
 
 The isolated Fedora graphics variant passed 14 cases across X11 and Wayland.
 It recovered from a process-local Vulkan device loss and a controlled Intel

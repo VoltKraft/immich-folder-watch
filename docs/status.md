@@ -1,5 +1,18 @@
 # Project Status
 
+## Integrated native GUI text and rendering (2026-11-21)
+
+The same Linux x64 GUI executable, SHA-256
+`80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`,
+passed mixed-direction selection and editing in the ordinary filename field,
+eight rendered glyph controls, and restoration of input after a controlled
+graphics loss. On GNOME Wayland it also committed Japanese text without a
+presentation override. The source review covers the exact features and inputs
+of all 235 packages on each Linux target and 135 on each Windows
+target. Native execution of this revision on the three other targets is
+pending. [Text and source receipts](rust/rw02-gui-dependencies.md) and
+[graphics observations](rust/rw02-graphics.md).
+
 ## Older portal hosts and signed Flatpak test runtimes (2026-11-21)
 
 On Fedora x64, seven control runs covered both GTK chooser backends, the

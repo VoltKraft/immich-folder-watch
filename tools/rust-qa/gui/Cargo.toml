@@ -21,4 +21,9 @@ eframe = { version = "=0.37.0", default-features = false, features = ["x11", "wa
 wgpu = { version = "=30.0.0", default-features = false, features = ["vulkan"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+winit = { version = "=0.30.13", default-features = false }
 wgpu = { version = "=30.0.0", default-features = false, features = ["dx12"] }
+
+[patch.crates-io]
+egui = { path = "artifacts/text/egui" }
+epaint = { path = "artifacts/text/epaint" }

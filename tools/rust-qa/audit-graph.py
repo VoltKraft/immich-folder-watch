@@ -97,6 +97,29 @@ def repository_members():
     }
 
 
+def private_gui_input(root, name, approved):
+    from gui import source_profile
+    expected = source_profile.SOURCES / name
+    if root != expected or source_profile.tree_info(root) != approved["trees"][name]:
+        raise ValueError(f"Private GUI package is outside its reviewed path or changed: {name}")
+    extras = {"native": [], "shaders": [], "fonts": []}
+    for file in sorted(root.rglob("*")):
+        if file.is_file():
+            for section, suffixes in (("native", NATIVE), ("shaders", SHADER), ("fonts", FONT)):
+                if file.suffix.lower() in suffixes:
+                    extras[section].append(file.relative_to(root).as_posix())
+    if name == "unicode-bidi":
+        archive = approved["originals"]["unicode-bidi-0.3.18.crate"]["sha256"]
+        upstream = {"upstreamCommit": approved["unicodeBidiRevision"],
+                    "unicodeTableSha256": approved["reconstructedTableSha256"]}
+        notices = {k: v for k, v in approved["noticeFiles"].items() if "unicode-bidi-" in k or k.endswith(("Unicode-LICENSE.txt", "ucd-readme.txt"))}
+    else:
+        archive = approved["baseCrates"][name]
+        upstream = {"patchCommit": approved["patchHead"], "appliedRustDiffSha256": approved["appliedRustDiffSha256"]}
+        notices = {k: v for k, v in approved["noticeFiles"].items() if "/egui-" in k}
+    return {"archiveSha256": archive, "notices": notices, "reconstructedSource": dict(approved["trees"][name], **upstream),
+            **extras}
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="root Cargo.toml for the assessed workspace")
@@ -109,6 +132,10 @@ def main():
     entries = tomllib.loads(lock.read_text(encoding="utf-8"))["package"]
     locked = {(p["name"], p["version"], p["source"]): p["checksum"] for p in entries if "checksum" in p}
     manifest = args.manifest.resolve()
+    approved = None
+    if manifest == REPOSITORY / "tools/rust-qa/gui/Cargo.toml":
+        from gui import source_profile
+        approved = source_profile.validate()
     metadata = json.loads(subprocess.check_output(
         ["cargo", "metadata", "--frozen", "--format-version", "1", "--manifest-path", str(manifest)]
     ))
@@ -130,7 +157,11 @@ def main():
         entry["buildScriptsAndMacros"] = sorted(
             target["name"] for target in package["targets"] if {"custom-build", "proc-macro"} & set(target["kind"])
         )
-        if package["source"] and package["source"].startswith("registry+"):
+        if approved is not None and name in approved["trees"]:
+            if package["source"] is not None:
+                raise ValueError(f"Expected the reconstructed GUI source for {name}")
+            entry.update(private_gui_input(Path(package["manifest_path"]).resolve().parent, name, approved))
+        elif package["source"] and package["source"].startswith("registry+"):
             entry.update(archive_inputs(package, locked, args.verify_unpacked))
         elif package["source"] is None:
             path = Path(package["manifest_path"]).resolve()
@@ -147,6 +178,14 @@ def main():
         raise ValueError("Cargo tree and metadata disagree on the identity of selected packages")
     report = {"target": args.target, "lockSha256": sha256(lock), "packages": packages,
               "excludedPackagesOrFeatures": exclusions}
+    if approved is not None:
+        feature_record = {f"{name} v{version}": sorted(sets) for (name, version), sets in active.items()}
+        feature_bytes = json.dumps(feature_record, sort_keys=True, separators=(",", ":")).encode()
+        features = {"packages": len(feature_record), "nativeFeatureSetsSha256": hashlib.sha256(feature_bytes).hexdigest()}
+        if features != approved["nativeFeatureReports"][args.target]:
+            raise ValueError(f"Selected GUI features differ from the reviewed {args.target} inputs")
+        report["desktopFontAssets"] = approved["fonts"]
+        report["textNotices"] = approved["noticeFiles"]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(f"{args.target}: {len(packages)} packages, {len(exclusions)} excluded package/feature matches.")
