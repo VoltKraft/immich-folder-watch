@@ -33,6 +33,15 @@ process ID. This passed the complete keyboard, masking and clipboard checks
 on local X11 and Wayland. Hosted input results remain pending.
 [Hosted logs and retained per-backend results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44818255659).
 
+At `4961746`, both Ubuntu architectures also passed AT-SPI on both X11
+and Wayland. All four independent reports recorded focus passing through
+Dateiname, Kennwort and English, three protected bullets and the Unicode
+clipboard round trip. The x64 and ARM64 archives matched SHA-256
+`5c805eca86d2a14317477a370c8450c7a8c36ff8219e97d41d337407e8035b0d`
+and `213838cd18cea87fbf6cecfcb4cd48b977aa4ceb72e50b19c88573b38c096feb`
+respectively. A separate YAML archive comparison failed in that run.
+[Native Ubuntu results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44820760903).
+
 ## Four native assessment archives
 
 All four archives at `167a03dcb414ab1172713520a77b7517a6046b13` matched

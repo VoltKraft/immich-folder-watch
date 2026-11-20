@@ -29,6 +29,7 @@ tools/rust-qa/gui/** text eol=lf
 tools/rust-qa/realtime/** text eol=lf
 tools/rust-qa/windows-services/** text eol=lf
 tools/rust-qa/yaml/** text eol=lf
+tools/rust-qa/linux-services/** text eol=lf
 rust/audit/notices/* -text
 rust/audit/notices/SPIRV-Headers whitespace=-blank-at-eof
 rust/audit/notices/weston-1.5.0-COPYING whitespace=-blank-at-eol

@@ -59,11 +59,17 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- | --- | --- |
 | Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases passed on Microsoft Basic Render Driver. Accessibility and real desktop services remain open. | Pending |
 | Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Same four DX12 lifecycle cases passed on the native ARM64 executable. Accessibility and real desktop services remain open. | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons | Native X11/Wayland lifecycle and AT-SPI input have local observations. .NET X11 performance measured. Candidate resource comparisons in progress. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | All four X11 and Wayland lifecycle cases passed at `06298d9`. Hosted AT-SPI input rerun pending. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. .NET performance measured and Rust comparison underway. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Same four native X11/Wayland lifecycle cases and full AT-SPI input run on both backends at `4961746`. | Pending |
 
 All four also passed two live WAL backups, 40 production C# readback assertions
 and 15 native loopback transport cases per host. [Source-bound four-host archives](rw02-native-gui.md#four-native-assessment-archives).
+
+Both Windows targets passed all 13 filesystem cases over a verified, encrypted
+SMB 3.1.1 loopback share. On Fedora x64 the distribution's document portal
+returned `ENOSYS` for the required upload lock. The private upstream backport
+enforced it across the actual grant and backing views. [SMB results](rw02-filesystem.md#four-native-hosts)
+and [portal and tray results](rw02-linux-services.md).
 
 The [YAML probe](rw02-yaml.md) added 38 paired cases on local Linux x64.
 The Rust reader/writer matched 183 assertions. The production C# reader made

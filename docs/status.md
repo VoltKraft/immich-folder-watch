@@ -1,5 +1,22 @@
 # Project Status
 
+## Real portal grants, SMB and desktop input (2026-11-20)
+
+On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
+when requesting their shared upload lock through a real Documents grant.
+Both acquired it on a private build of 1.22.1 with the upstream flock fix.
+Cross-view cooperating writers received `EAGAIN` while the reader held its
+lock and could write after release. The independent tests also verified
+write refusal, publication, cancellation and revocation through the portal.
+The native tray service recovered from watcher replacement and ignored a
+late acknowledgement from the prior owner. [Linux service and portal evidence](rust/rw02-linux-services.md).
+
+Both native Windows targets passed 13 filesystem tests over encrypted SMB
+3.1.1 at `4961746`. Both Ubuntu architectures passed four native GUI lifecycle
+cases and the complete AT-SPI keyboard, language, protected-field and
+clipboard scenario under X11 and Wayland. [Filesystem evidence](rust/rw02-filesystem.md#four-native-hosts)
+and [native desktop evidence](rust/rw02-native-gui.md).
+
 ## Cross-platform source archive identity (2026-11-20)
 
 At `4961746` the Ubuntu YAML jobs correctly refused the compressed bundle

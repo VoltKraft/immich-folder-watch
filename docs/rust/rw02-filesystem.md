@@ -132,7 +132,7 @@ GitHub's SHA-256 digest. [Native run](https://github.com/VoltKraft/immich-folder
 
 Every archive also contains five matched window-policy traces, 5,844 C#/Rust
 codec comparisons and its original compiler, format, Clippy and build logs.
-The next filesystem observations require native UNC and portal/FUSE roots.
+The initial run used local volumes. Later UNC and portal/FUSE results follow.
 Verified destructive cleanup, directory moves, engine call sites and their
 independent review remain RW-03 and subsequent integration gates.
 
@@ -146,6 +146,21 @@ new directory there. The junction setup uses the local backing directory
 because cmd.exe cannot take a UNC working directory. The production leases
 operate through the UNC path. Evidence includes cleanup outcomes. Hosted
 results must verify that these operations are supported by each Windows host.
+
+Both native Windows hosts at `49617467a73901fb10b9735dcf7bf727e6d0b2d1`
+passed all 13 filesystem tests again through encrypted SMB 3.1.1. Each report
+recorded 13 opened UNC fixture roots, a successful local-to-UNC marker
+readback, removal of the share and removal of its owned scratch directory.
+The artifact ZIPs matched SHA-256
+`64ba3b7a3a9ddc8155aac62bc603b09f2e2b2f2599ca47714d734bc6df106792`
+on x64 and `4292e401d20f84e73f65e16c8c34d7aee279fedd3b6ed261cba071320bef5502`
+on ARM64. [Native SMB run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44820760908).
+
+The real Fedora Documents grant allowed enumeration, private staging,
+no-replace publication, cancellation and revocation. Its distro daemon
+returned `ENOSYS` for the shared media read lock. A private build containing
+the upstream fix enforced the lock on the underlying file while retaining
+the grant boundary. [Rust and shipping .NET observations](rw02-linux-services.md).
 
 ## Independent review of the feasibility boundary
 
