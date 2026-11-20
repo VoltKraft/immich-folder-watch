@@ -69,6 +69,15 @@ def take_files(source, prefix, names, destination):
             shutil.copyfileobj(data, output)
 
 
+def generated_table_digest(table, original):
+    # The upstream generator writes in Python text mode. Hash the emitted Unicode
+    # table in the source archive's LF encoding on both supported operating systems.
+    digest = hashlib.sha256(table.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+    if digest != sha(original):
+        raise ValueError("The published Bidi table differs from the independent Unicode 16 reconstruction")
+    return digest
+
+
 def reproduce_table(source, prefix, inputs, original):
     # A private directory contains every file the audited generator would otherwise fetch.
     with tempfile.TemporaryDirectory(dir=inputs) as scratch:
@@ -83,10 +92,7 @@ def reproduce_table(source, prefix, inputs, original):
         env = dict(os.environ, PATH=str(work), HOME=str(work), PYTHONDONTWRITEBYTECODE="1")
         subprocess.run([sys.executable, "-W", "ignore::SyntaxWarning", "tools/generate.py"],
                        cwd=work, env=env, check=True)
-        table = work / "src/char_data/tables.rs"
-        if sha(table) != sha(original):
-            raise ValueError("The published Bidi table differs from the independent Unicode 16 reconstruction")
-        return sha(table)
+        return generated_table_digest(work / "src/char_data/tables.rs", original)
 
 
 def prepare(gui, acquire):
