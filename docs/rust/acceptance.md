@@ -65,6 +65,10 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 All four also passed two live WAL backups, 40 production C# readback assertions
 and 15 native loopback transport cases per host. [Source-bound four-host archives](rw02-native-gui.md#four-native-assessment-archives).
 
+The [YAML probe](rw02-yaml.md) added 38 paired cases on local Linux x64.
+The Rust reader/writer matched 183 assertions. The production C# reader made
+116 assertions against Rust output. Its four-target hosted run is pending.
+
 Hosted runners can supply native process evidence but are not assumed to provide
 interactive screen-reader, GPU, multi-session, UNC or portal/FUSE acceptance.
 Record capabilities actually exercised and unsupported checks explicitly.

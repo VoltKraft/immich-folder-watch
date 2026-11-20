@@ -1,5 +1,20 @@
 # Project Status
 
+## YAML round-trip and filtered build inputs (2026-11-20)
+
+The [YAML feasibility fixture](rust/rw02-yaml.md) passed 183 Rust differential
+checks across 38 synthetic cases and 116 assertions reading the Rust-written
+files through the production .NET reader on Linux x64. Cases include repeated
+keys, aliases, explicit nulls, absent fields, unknown keys and integer
+spellings. The offline release build used a fresh Cargo home and a filtered
+source bundle with SHA-256
+`b453c3cb5bc96839ae7766d40beae9b7dc97bea3ec1860150babb5b981d15714`.
+The bundle retained 1,571 source files and 68 original notices. The source
+filter, Rust parser budgets, formatter and Clippy passed. All 203 indexed
+evidence files matched their hashes. Only the fresh run output is included in
+the hosted artifact. Results for the remaining native hosts and migration
+verification are pending.
+
 ## Windows desktop lifecycle and native service probes (2026-11-20)
 
 Windows x64 and ARM64 each passed all four native DX12 lifecycle cases at

@@ -64,6 +64,13 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
 
+      - name: Round-trip legacy YAML with the filtered offline source bundle
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+
       - name: Exercise Linux TLS, polling and WebSocket loopback sessions
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
         shell: bash
@@ -139,6 +146,7 @@ jobs:
           name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
           path: |
             artifacts/rust/storage-native/
+            artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
             artifacts/rust/gui-native/
