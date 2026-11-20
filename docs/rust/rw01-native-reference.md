@@ -136,6 +136,10 @@ Windows lanes. The original run verified Windows export against a fresh regenera
 but it could not compare a checked-in Windows golden that did not yet exist.
 Passing that follow-up workflow is separate evidence from this archived run.
 
+At `27f5b02848a51bcdb63b4cf930bc5154c74bbd82`, all four native jobs
+independently regenerated the corpus and passed the new comparison against the
+checked-in golden for their platform. [Executed follow-up run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803987836).
+
 ## Acceptance boundary
 
 This supplies four-target native **C# reference** execution and reviewed

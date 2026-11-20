@@ -1,5 +1,21 @@
 # Project Status
 
+## RW-02 Linux performance reference measured (2026-11-20)
+
+The Linux x64 .NET reference completed three isolated 100,000-file scans with
+35 close and 37 activation responses during traversal. Median startup was
+906.63 ms and median hidden RSS was 233.262 MiB. The instrumented compositor
+observed zero render passes in the 15-second idle windows and observed a render
+after each reopening. The [measurement and budgets](rust/rw02-performance.md)
+give the exact build, workload, driver, environment and raw evidence digest.
+The Rust comparison on this host and the other native desktop environments
+are pending.
+
+At `27f5b02848a51bcdb63b4cf930bc5154c74bbd82`, all four native reference
+jobs passed the checked-in golden comparison and all eight PR CI jobs passed.
+[Golden rerun](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803987836)
+and [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803996983).
+
 ## RW-01 accepted and RW-02 started (2026-11-20)
 
 The user resumed `M-RUST-IMPLEMENTATION-20261114` in its original Goal run.
