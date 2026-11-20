@@ -24,3 +24,9 @@ rust/**/*.toml text eol=lf
 rust/Cargo.lock text eol=lf
 tools/rust-qa/*.sh text eol=lf
 tools/rust-qa/legacy/licenses/* -text
+tools/rust-qa/storage/** text eol=lf
+tools/rust-qa/gui/** text eol=lf
+tools/rust-qa/realtime/** text eol=lf
+rust/audit/notices/* -text
+rust/audit/notices/SPIRV-Headers whitespace=-blank-at-eof
+rust/assets/fonts/* -text

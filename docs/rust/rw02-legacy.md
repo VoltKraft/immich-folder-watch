@@ -2,9 +2,10 @@
 
 The dependency-free [`ifw-legacy`](../../rust/crates/ifw-legacy) crate implements
 small legacy identity codecs. It is a feasibility component, not the completed
-storage or configuration adapter. No SQLite, YAML, JSON or cryptographic crate
-has been adopted by this work, and no .NET component is required by the Rust
-codec binary. The C# scalar oracle is development tooling only.
+storage or configuration adapter. No external dependency has been adopted by
+that crate, and no .NET component is required by its Rust codec binary. The
+separate [storage assessment](rw02-storage-inputs.md) uses reviewed SQLite/JSON/SHA
+inputs in a development-only workspace. C# oracles are development tooling only.
 
 ## Implemented boundaries
 
@@ -105,6 +106,27 @@ actual runtime and invariant sort version; it does not infer an ICU version from
 that value. The complete generated map remains in ignored artifacts until native
 Windows/Linux x64/ARM64 outputs have been compared and independently reviewed.
 
+The native Linux x64/ARM64 jobs in
+[run 44808944620](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44808944620),
+source `2ff988095045739b6eeb0735750f5ec9aa9baca6`, each exported **1,449** changed
+scalars under .NET 10.0.15, whereas the local Fedora reference has **1,504** under
+.NET 10.0.12. Each native driver passed using its own reference. This is an
+observed environment difference, not evidence that the runtime version alone
+causes it. The verified hosted Linux maps are byte-identical, SHA-256
+`02c4363688e37251e1169559be56231d6e9c398ba046ea3773cdf037df72cd2f`.
+Exactly **55 code points** differ from Fedora; for example, U+019B is unchanged
+in the hosted map but maps to U+A7DC on Fedora. The archived comparison is
+`artifacts/rust/hosted-feasibility/44808944620/casing-comparison.json`, SHA-256
+`9f77bfb9da51d3e27f853a990dedda4ed2fd574ecb005ba6a38ad9c58c6381b7`.
+The later four-native
+[run 44811901356](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356)
+at `4dcccb7` produced this same 1,449-entry map on Windows x64/ARM64 and Ubuntu
+x64/ARM64, with 5,844 requests passing on each target. Archive identities and
+source-bound native results are recorded in the [acceptance record](acceptance.md).
+These observations still do not qualify a universal map. Preserve existing
+database keys and qualify legacy variants and any new-key policy separately;
+never recompute old keys automatically from a newer Unicode table.
+
 `verify.py --unicode-data <downloaded-UnicodeData-17.0.0.txt>` optionally records
 the exact comparison without performing network access itself.
 
@@ -136,11 +158,12 @@ Linux x64 scalar behavior only; no cross-build substitutes for the other targets
 
 Required remaining RW-02/RW-03 evidence includes:
 
-- Four-target Rust execution and full casing-map equality/review before adopting
-  a shipping map; native Windows namespace cases beyond the existing corpus.
-- Audited exact SQLite/native, YAML, serde/JSON and SHA-256 dependency graphs,
-  followed by actual Rust database/YAML/repair-record reads and writes. Python's
-  container extraction above is not Rust SQLite or JSON implementation evidence.
+- Cross-environment casing policy and legacy variants before adopting a shipping
+  map; native Windows namespace cases beyond the existing corpus.
+- Four-target execution of the separately audited SQLite/JSON/SHA assessment,
+  followed by final application dependency adoption; complete YAML source-bundle
+  disposition and real parser compatibility. Python's container extraction above
+  is not Rust SQLite or JSON implementation evidence.
 - Complete configuration semantics, account/device identity hashing, unsupported
   schema read-only preflight, migration/backup, write-failure/full-disk/crash and
   C#→Rust→C# compatibility after activity.
@@ -149,3 +172,7 @@ Required remaining RW-02/RW-03 evidence includes:
 
 The broader [acceptance record](acceptance.md) remains authoritative; this bounded
 probe does not close the full legacy-persistence or RW-02 gate.
+The separate [storage input assessment](rw02-storage-inputs.md) records real Rust
+SQLite/JSON/SHA-256 execution and C# reread. Its maintained development-only
+workspace is [`tools/rust-qa/storage`](../../tools/rust-qa/storage); those
+dependencies are not adopted by the application workspace.
