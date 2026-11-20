@@ -36,6 +36,13 @@
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
     {
+      "path": "audit/notices/weston-1.5.0-COPYING",
+      "source": "https://wayland.freedesktop.org/releases/weston-1.5.0.tar.xz",
+      "archiveSha256": "06388ba04ac79aa72d685cc1a8e646ddb2b8cfe11fcc742294f9addac48b7684",
+      "archiveMember": "weston-1.5.0/COPYING",
+      "sha256": "87fd2cefa8601f7060527345fc6abf9526463dc8c8fe6cf6f536c44d7f0a39e0"
+    },
+    {
       "path": "audit/notices/SPIRV-Headers",
       "source": "https://raw.githubusercontent.com/KhronosGroup/SPIRV-Headers/04f10f650d514df88b76d25e83db360142c7b174/LICENSE",
       "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613"

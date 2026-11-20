@@ -52,9 +52,26 @@ against the [reviewed target digest](../../rust/audit/gui-profile.json).
 All four target inventories were verified locally. The Linux graph records 100
 Wayland protocol definitions with the SHA-256 and embedded attribution of
 each XML. Plasma's historical `fullscreen-shell.xml` lacks an inline notice.
-KDE identifies the upstream fullscreen-shell protocol. Verify the exact legacy
-file's upstream provenance before including it in a distribution source set.
-[KDE protocol history](https://api.kde.org/legacy/plasma-wayland-protocols/html/md__2builds_2websites_2api-kde-org_2sources_2plasma-wayland-protocols_2src_2protocols_2TODOKF6.html).
+The original KDE import explicitly names Weston 1.5. Its 9,898 bytes match
+the XML in the official release tarball, SHA-256
+`2ccd919a865e8d5cc107842a387989746d78ec6c1ff07e163ffd6aa78e3807b5`.
+Applying KDE's six subsequent spelling corrections reproduces the complete
+9,902-byte packaged input, SHA-256
+`ed7ded0629f9f05adb9326a378258255d623522b85ec4d47c787742da7fd5c7c`.
+[Original KDE import](https://github.com/KDE/plasma-wayland-protocols/commit/03d462bbbac0c292beed03d3a5682bb90c893633),
+[first correction](https://github.com/KDE/plasma-wayland-protocols/commit/f0238fc5bb038f0e15377c1ccd4a8863c1b3cf14),
+[second correction](https://github.com/KDE/plasma-wayland-protocols/commit/588d62b4c60ff0599793c20a07be5142da3a04ee)
+and [final correction](https://github.com/KDE/plasma-wayland-protocols/commit/ad543cf41905dcca8335a84d2770d76be8e0de5d).
+
+Jason Ekstrand submitted the original protocol in April 2014 and acknowledged
+the notice added to the evolved upstream protocol in 2018. For the historical
+input, preserve the [complete Weston 1.5.0 grant](../../rust/audit/notices/weston-1.5.0-COPYING)
+from the checksum-pinned release. Its main text matches HPND-sell-variant,
+including the supporting-documentation notice and advertising-name restriction.
+The separately identified libbacklight subsection applies to that component.
+[Original submission](https://lists.freedesktop.org/archives/wayland-devel/2014-April/014027.html),
+[author acknowledgement](https://lists.freedesktop.org/archives/wayland-devel/2018-June/038757.html)
+and [SPDX license text](https://spdx.org/licenses/HPND-sell-variant.html).
 
 Sixteen selected crates omit standalone notices. The [supplemental catalog](../../rust/audit/gui-inputs.json)
 pins original upstream bytes and includes the fonts and their notice. The

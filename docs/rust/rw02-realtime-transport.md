@@ -75,6 +75,12 @@ and corresponding source with candidate packaging. [ring's original archive](htt
 [Unicode license](https://www.unicode.org/license.txt), [FSF license list](https://www.gnu.org/licenses/license-list.en.html)
 and [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html).
 
+The transport also selects base64 0.23.1. Its upstream archive contains the
+CLion promotional logo identified in the [storage source review](rw02-storage-inputs.md#license-and-asset-findings).
+The native network evidence contains the inventory and hashes. The combined
+offline source bundle needs the verified logo exclusion and its edited README
+reference before redistribution.
+
 The ring archive contains 17 preassembled Windows COFF objects. Twelve are
 selected for Windows x64. On Linux x64 all twelve were independently regenerated
 from the archived Perl assembly generators with NASM 2.13.03. Their assembly
