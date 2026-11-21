@@ -26,7 +26,7 @@ pub(super) struct Graphics {
     device: Option<wgpu::Device>,
     state: Arc<AtomicU8>,
     #[cfg(target_os = "linux")]
-    mesa_mailbox: Arc<std::sync::atomic::AtomicBool>,
+    surface_has_mailbox: Arc<std::sync::atomic::AtomicBool>,
     change_surface_mode: bool,
     attempt: u8,
     generation: u64,
@@ -44,7 +44,7 @@ impl Graphics {
             device: None,
             state: Arc::new(AtomicU8::new(RELEASED)),
             #[cfg(target_os = "linux")]
-            mesa_mailbox: Arc::default(),
+            surface_has_mailbox: Arc::default(),
             change_surface_mode: false,
             attempt: 0,
             generation: 0,
@@ -77,7 +77,7 @@ impl Graphics {
             return;
         }
         #[cfg(target_os = "linux")]
-        let mailbox = Arc::clone(&self.mesa_mailbox);
+        let (mailbox, generation) = (Arc::clone(&self.surface_has_mailbox), self.generation);
         setup.native_adapter_selector = Some(Arc::new(move |adapters, surface| {
             // Rejecting an absent preferred device here exercises the real eframe initialization error.
             let supported = || {
@@ -104,18 +104,20 @@ impl Graphics {
                 hardware().or_else(cpu).or_else(|| supported().next())
             };
             #[cfg(target_os = "linux")]
-            if let Some(adapter) = selected {
-                let info = adapter.get_info();
-                let has_mode = info.backend == wgpu::Backend::Vulkan
-                    && info.device_type == wgpu::DeviceType::Cpu
-                    && info.driver.eq_ignore_ascii_case("llvmpipe")
-                    && info.driver_info.starts_with("Mesa ")
-                    && surface.is_some_and(|s| {
-                        s.get_capabilities(adapter)
-                            .present_modes
-                            .contains(&wgpu::PresentMode::Mailbox)
-                    });
-                mailbox.store(has_mode, Ordering::Release);
+            {
+                let available = selected.zip(surface).is_some_and(|(adapter, surface)| {
+                    let info = adapter.get_info();
+                    if info.backend != wgpu::Backend::Vulkan {
+                        return false;
+                    }
+                    let modes = surface.get_capabilities(adapter).present_modes;
+                    println!(
+                        "GRAPHICS_SURFACE generation={generation} driver={} offered={modes:?}",
+                        info.driver
+                    );
+                    modes.contains(&wgpu::PresentMode::Mailbox)
+                });
+                mailbox.store(available, Ordering::Release);
             }
             selected
                 .cloned()
@@ -127,7 +129,7 @@ impl Graphics {
         #[cfg(target_os = "linux")]
         {
             use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
-            self.change_surface_mode = self.mesa_mailbox.load(Ordering::Acquire)
+            self.change_surface_mode = self.surface_has_mailbox.load(Ordering::Acquire)
                 && creation
                     .winit_window()
                     .and_then(|w| w.window_handle().ok())
@@ -156,15 +158,21 @@ impl Graphics {
     }
 
     pub(super) fn apply_surface_choice(&mut self, frame: &mut eframe::Frame) {
-        // The frozen IME probe loses its Wayland text input on Mesa's software FIFO path.
-        // Change only an actual llvmpipe Wayland surface that advertised Mailbox for this adapter.
+        // On Wayland, keep the compositor's latest ready buffer without waiting for a FIFO slot.
+        // The selected Vulkan adapter must have advertised Mailbox for this exact surface.
         if std::mem::take(&mut self.change_surface_mode)
             && let Some(mut config) = frame.wgpu_surface_config()
         {
             config.present_mode = wgpu::PresentMode::Mailbox;
             frame.set_wgpu_surface_config(config);
+            let driver = frame
+                .wgpu_render_state()
+                .expect("wgpu render state")
+                .adapter
+                .get_info()
+                .driver;
             println!(
-                "GRAPHICS_PRESENT generation={} mode=Mailbox driver=llvmpipe desktop=Wayland",
+                "GRAPHICS_PRESENT generation={} mode=Mailbox driver={driver} desktop=Wayland",
                 self.generation
             );
         }

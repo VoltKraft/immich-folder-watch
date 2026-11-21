@@ -206,3 +206,28 @@ report logical layout mode 1 and the requested connector configuration.
 The independent protocol and committed-buffer checks still cover all four
 transitions. A compositor with built-in fractional scaling can pass those
 checks without an experimental settings key.
+
+Two independent native x64 sessions verified the correction under the
+Ubuntu 24.04.5 userspace on a Fedora kernel, using GNOME Shell 46.0,
+Mutter 46.2, Ubuntu Mesa and Ubuntu's Mozc engine. The offline release
+build authenticated 235 native packages, the reviewed source trees and
+fonts with the pinned Rust compiler. The executable SHA-256 was
+`a77706470f8dca72751b1cf0ecc3a52520788f21ee96d5a8b0f851799b7c5efe`.
+Both sessions left the Mesa presentation override unset. The software
+Wayland renderer selected Mailbox in the application.
+
+The monitor session read back `["scale-monitor-framebuffer"]` from the
+disposable profile. Mutter then reported logical layout mode 1 and offered
+1.25 for the secondary connector. All four logical sizes, buffer sizes
+and preferred-scale events matched the monitor table above. The independent
+IME session observed `preedit_string("あ", 3, 1)` and `commit_string("あ")`
+on the same text-input object in both traces. The real `mozc-jp` engine and
+its separate conversion server were running. The focused AT-SPI entry
+`Dateiname` contained `あ`.
+
+| Native x64 receipt under `artifacts/rust/gui-noble-native/` | SHA-256 |
+| --- | --- |
+| `gui-build/release/native-gui-assessment.inputs.json` | `6fb7f89e1d85981cf621bffc72ee987ca04b794e1c5f2790b65bf58561daa8fb` |
+| `runs/gui-run/wayland-yk6awm_6/evidence.sha256` (GNOME 46 monitor transitions) | `c833f99a1e19545128bbfc8ea0c40b0b8ab99ee105c4e0ac98ccdc17ab3b0279` |
+| `runs/gui-run/wayland-8zz7sjfe/evidence.sha256` (GNOME 46 Mozc) | `f7d8683572ba30dd3e4b3c22ad4752844ffcc6eb187db15906e92280c77c78c8` |
+| `runs/gui-run/wayland-8vqp524c/evidence.sha256` (combined monitor moves and Mozc in one window) | `3931f4be3cad415ed2ac969c7b083889006bd95ef408abe37ac2c9f2fe12e407` |

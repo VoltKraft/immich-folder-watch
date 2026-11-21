@@ -83,6 +83,10 @@ returned `ENOSYS` for the required upload lock. The private upstream backport
 enforced it across the actual grant and backing views. [SMB results](rw02-filesystem.md#four-native-hosts)
 and [portal and tray results](rw02-linux-services.md).
 
+Three native Intel-to-software Wayland recoveries preserved editing and
+worker progress. The measured visible and hidden idle intervals recorded
+zero application buffer commits. [Fedora x64 results](rw02-wayland-recovery.md).
+
 On Fedora x64 an installed test Flatpak selected a real Documents grant
 through a parented GTK chooser under both X11 and Wayland. A fresh process
 received `ENOENT` after revocation. Private GNOME Shell displayed and withdrew

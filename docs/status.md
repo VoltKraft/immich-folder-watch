@@ -1,5 +1,16 @@
 # Project Status
 
+## Intel Wayland presentation and idle checks (2026-11-21)
+
+Three independent Fedora x64 sessions recovered from loss of the Intel
+render device and resumed on llvmpipe. Both real adapters offered Mailbox on
+their Wayland surfaces. In each run the regular filename field retained
+text and focus, accepted the next key, and drew the change. The original
+worker processed a new synthetic file. Six 15-second visible or hidden
+idle intervals recorded zero application buffer commits. The output was a
+private Mutter virtual monitor driven by an Intel render node. [Native
+observations and source hashes](rust/rw02-wayland-recovery.md).
+
 ## Native log adapter and hosted desktop results (2026-11-21)
 
 The new Rust logging crate passed the native Fedora x64 file and journal

@@ -22,11 +22,56 @@ NAMESPACES = ("net", "mnt", "pid", "ipc", "user")
 HELPER_REVISION = "9e189bf06662a2286a1cbadd2efc14ac4a8e22e4"
 GRAPHICS_FREEZE = "27462474116603be88e476ed32a943b4fa1126c7"
 FIRST_INTEGRATION = "8b071ab9089a87a65ae1cc23325fcbba452fe4d2"
+# The first integrated graphics.rs recorded only software Mailbox requests.
+FIRST_SURFACE_SOURCE = "ac91c1f3d5c87471ecd6e568d529d7786e780f3c67ae6746bcf7a31b1c2ebec9"
 
 
 def archived_digest(revision, name):
     return hashlib.sha256(subprocess.check_output(
         ["git", "show", f"{revision}:tools/rust-qa/graphics/{name}"], cwd=HERE)).hexdigest()
+
+
+def surface_records(lines, name, fields):
+    rows = {}
+    for index, line in enumerate(lines):
+        if not line.startswith(name + " "):
+            continue
+        match = re.fullmatch(name + r" generation=(\d+)" + fields, line)
+        if not match or int(match[1]) in rows:
+            raise RuntimeError(f"Malformed or repeated {name} record: {line}")
+        rows[int(match[1])] = (index, *match.groups()[1:])
+    return rows
+
+
+def verify_surface_modes(lines, backend, adapters, source):
+    if not re.fullmatch("[0-9a-f]{64}", source):
+        raise RuntimeError("A verified graphics source digest is required")
+    if source == FIRST_SURFACE_SOURCE:
+        selected = sum(" mode=Mailbox driver=llvmpipe desktop=Wayland" in line for line in lines)
+        if selected != (adapters.count("Cpu") if backend == "wayland" else 0):
+            raise RuntimeError("The original integrated software-surface presentation policy differed")
+        return {"source": source, "legacy_llvmpipe_requests": selected}
+
+    attempts = surface_records(lines, "GRAPHICS_ATTEMPT", r" policy=(preferred|cpu)")
+    ready = surface_records(lines, "GRAPHICS_READY", "")
+    offered = surface_records(lines, "GRAPHICS_SURFACE", r" driver=(.+) offered=\[([^\]]*)\]")
+    chosen = surface_records(lines, "GRAPHICS_PRESENT", r" mode=(\w+) driver=(.+) desktop=(\w+)")
+    if (len(ready) != len(adapters) or ready.keys() - offered.keys() or chosen.keys() - ready.keys()
+            or offered.keys() - attempts.keys()):
+        raise RuntimeError("Graphics adapters, ready generations and observed surface capabilities disagree")
+    observations = []
+    for generation, (ready_at,) in ready.items():
+        offered_at, driver, values = offered[generation]
+        modes = values.split(", ") if values else []
+        request = chosen.get(generation)
+        should_request = backend == "wayland" and "Mailbox" in modes
+        if not modes or not attempts[generation][0] < offered_at < ready_at or bool(request) != should_request:
+            raise RuntimeError(f"Generation {generation} violated its {backend} surface capabilities")
+        if request and (request[0] <= ready_at or request[1:] != ("Mailbox", driver, "Wayland")):
+            raise RuntimeError(f"Generation {generation} selected the wrong mode, driver or window system")
+        observations.append({"generation": generation, "driver": driver, "offered": modes,
+                             "requested": request[1] if request else None})
+    return {"source": source, "generations": observations}
 
 
 def freeze_drivers(destination):
@@ -307,9 +352,9 @@ def inside():
         if actual != expected:
             raise RuntimeError(f"Observed unexpected Vulkan adapter selection {actual}, expected {expected}")
         if spec["integrated"]:
-            selected = sum(" mode=Mailbox driver=llvmpipe desktop=Wayland" in line for line in evidence["app_lines"])
-            if selected != (actual.count("Cpu") if spec["backend"] == "wayland" else 0):
-                raise RuntimeError("The application did not select presentation for precisely the observed Wayland CPU surfaces")
+            build = json.loads(Path("/app/native-gui-assessment.inputs.json").read_text())
+            evidence["surface_policy"] = verify_surface_modes(
+                evidence["app_lines"], spec["backend"], actual, build["sources"]["tools/rust-qa/gui/src/graphics.rs"])
         if spec["monitor_capture"]:
             surfaces = [evidence[tag]["native_window"] for tag in ("initial_graphics", "recovered_graphics", "explicit_retry")
                         if tag in evidence]
