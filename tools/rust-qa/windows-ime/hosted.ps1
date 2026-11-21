@@ -12,13 +12,8 @@ if (Test-Path -LiteralPath $parent) { throw 'Expected a new native IME output di
 $feature = 'Language.Basic~~~ja-JP~0.0.1.0'
 $serviced = $changedList = $false
 $report = [ordered]@{ tested=$false; passed=$false; capability=$feature; nativeTarget=$target }
-
-function LanguageState($List) {
-    $rows = @($List | ForEach-Object {
-        [ordered]@{ language=$_.LanguageTag; inputTips=@($_.InputMethodTips); handwriting=$_.Handwriting }
-    })
-    return (ConvertTo-Json -InputObject $rows -Depth 4 -Compress)
-}
+. (Join-Path $PSScriptRoot 'language-list.ps1')
+& (Join-Path $PSScriptRoot 'test_language_list.ps1')
 
 try {
     $initial = Join-Path $parent 'installed'
@@ -35,7 +30,8 @@ try {
         if (-not $current -or $current.Name -cne $feature) { throw 'This OS image does not offer Japanese Basic Typing.' }
         $report.originalCapability = $current.State.ToString()
         $original = Get-WinUserLanguageList
-        $originalState = LanguageState $original
+        $originalState = Get-IfwLanguageState $original
+        $report.originalLanguages = @(foreach ($entry in $original) { $entry.LanguageTag })
         if ($report.originalCapability -ceq 'NotPresent') {
             $serviced = $true
             $change = Add-WindowsCapability -Online -Name $feature
@@ -50,12 +46,24 @@ try {
             $_.PackageName -like 'Microsoft-Windows-LanguageFeatures-Basic-ja-jp-Package~*' -and $_.PackageState -eq 'Installed'
         } | ForEach-Object PackageName)
         $sessionList = Get-WinUserLanguageList
-        if (@($sessionList.LanguageTag) -notcontains 'ja-JP') {
-            [void]$sessionList.Add('ja-JP')
+        if (@(Get-IfwJapaneseLanguage $sessionList).Count -eq 0) {
+            $newList = New-WinUserLanguageList -Language 'ja-JP'
+            $entry = @(Get-IfwJapaneseLanguage $newList)
+            if ($entry.Count -ne 1) { throw 'Windows did not construct a Japanese input language.' }
+            [void]$sessionList.Add($entry[0])
+            if (@(Get-IfwJapaneseLanguage $sessionList).Count -ne 1) { throw 'The proposed language list is incomplete.' }
             $changedList = $true
             Set-WinUserLanguageList -LanguageList $sessionList -Force
         }
-        $language = @(Get-WinUserLanguageList | Where-Object LanguageTag -eq 'ja-JP')
+        $report.requestedLanguages = @(foreach ($entry in $sessionList) { $entry.LanguageTag })
+        $until = [DateTime]::UtcNow.AddSeconds(25)
+        do {
+            $actual = Get-WinUserLanguageList
+            $language = @(Get-IfwJapaneseLanguage $actual)
+            if ($language.Count -eq 1) { break }
+            Start-Sleep -Milliseconds 300
+        } while ([DateTime]::UtcNow -lt $until)
+        $report.currentLanguages = @(foreach ($entry in $actual) { $entry.LanguageTag })
         if ($language.Count -ne 1) { throw 'The disposable account did not acquire the Japanese locale.' }
         $report.inputTips = @($language[0].InputMethodTips)
         $after = Join-Path $parent 'japanese'
@@ -73,7 +81,7 @@ try {
         try {
             if ($changedList) {
                 Set-WinUserLanguageList -LanguageList $original -Force
-                $report.languageListRestored = (LanguageState (Get-WinUserLanguageList)) -ceq $originalState
+                $report.languageListRestored = (Get-IfwLanguageState (Get-WinUserLanguageList)) -ceq $originalState
                 if (-not $report.languageListRestored) { throw 'The original test-account language settings differ.' }
             }
         } finally {

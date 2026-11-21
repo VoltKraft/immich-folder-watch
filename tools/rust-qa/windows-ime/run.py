@@ -71,7 +71,8 @@ def eligibility(inventory):
         return None
     if not inventory.get("enumeratedTsf"):
         return "could not enumerate Japanese TSF input profiles"
-    if not any(row["category"].lower() == KEYBOARD_CATEGORY and row["enabled"] and row["type"] == 1
+    if not any(row.get("language") == 0x411 and row["category"].lower() == KEYBOARD_CATEGORY
+               and row["enabled"] and row["type"] == 1
                for row in inventory.get("profiles", [])):
         return "no enabled Japanese TSF keyboard service or loaded IMM IME"
     return None
@@ -204,7 +205,8 @@ def main():
     if args.binary.name.lower() != "native-gui-assessment.exe":
         parser.error("Use the development-only native GUI assessment binary")
     args.output.mkdir(parents=True, exist_ok=False)
-    source = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "Ime.cs",
+    source = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "hosted.ps1", HERE / "language-list.ps1",
+              HERE / "test_language_list.ps1", HERE / "Ime.cs",
               QA / "windows-desktop/worker.py", QA / "windows-desktop/win32.py", QA / "windows_observer.py",
               QA / "observe-windows-gui.py", QA / "observe-windows-input.ps1", QA / "gui/src/main.rs"]
     result = {"status": "failed", "source": os.getenv("GITHUB_SHA"), "run": os.getenv("GITHUB_RUN_ID"),

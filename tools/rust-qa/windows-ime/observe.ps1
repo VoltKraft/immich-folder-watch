@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($env:IFW_QA_ISOLATED -cne '1') { throw 'Use the disposable native GUI launcher.' }
 Add-Type -Path (Join-Path $PSScriptRoot 'Ime.cs')
+. (Join-Path $PSScriptRoot 'language-list.ps1')
 $result = [ordered]@{ status='failed'; mode=$Mode }
 
 function Save-Evidence {
@@ -40,8 +41,9 @@ if ($Mode -ceq 'inventory') {
             $result.japaneseBasicCapability = @($cap | ForEach-Object { [string]$_.State })
         } catch { $result.capabilityError = $_.Exception.GetBaseException().Message }
         try {
-            $result.japaneseUserTips = @(Get-WinUserLanguageList |
-                Where-Object { $_.LanguageTag -ieq 'ja-JP' } | ForEach-Object { $_.InputMethodTips })
+            $result.japaneseUserTips = @(foreach ($entry in (Get-IfwJapaneseLanguage (Get-WinUserLanguageList))) {
+                $entry.InputMethodTips
+            })
         } catch { $result.userTipsError = $_.Exception.GetBaseException().Message }
         $result.status = 'observed'
     } finally { Save-Evidence }

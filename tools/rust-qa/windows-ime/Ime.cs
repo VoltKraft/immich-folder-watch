@@ -66,19 +66,20 @@ namespace IfwQaIme {
             IProfileManager manager = (IProfileManager)Activator.CreateInstance(type);
             IProfiles items = null;
             try {
-                int enumerated = manager.EnumProfiles(0x0411, out items);
+                // EnumProfiles(0) enumerates all system languages. Filter the returned records explicitly.
+                int enumerated = manager.EnumProfiles(0, out items);
                 Marshal.ThrowExceptionForHR(enumerated);
                 if (enumerated == 1 && items == null) return new Profile[0];
                 if (items == null) throw new InvalidOperationException("TSF returned no profile enumerator");
                 var profiles = new List<Profile>();
-                while (profiles.Count < 256) {
+                for (int index = 0; index < 512; index++) {
                     Profile item;
                     uint fetched;
                     int status = items.Next(1, out item, out fetched);
                     Marshal.ThrowExceptionForHR(status);
                     if (fetched == 0) return profiles.ToArray();
-                    if (fetched != 1 || item.Language != 0x0411) throw new InvalidOperationException("Unexpected TSF profile");
-                    profiles.Add(item);
+                    if (fetched != 1) throw new InvalidOperationException("Unexpected TSF record count");
+                    if (item.Language == 0x0411) profiles.Add(item);
                     if (status == 1) return profiles.ToArray();  // S_FALSE
                 }
                 throw new InvalidOperationException("Unexpected TSF profile count");

@@ -13,13 +13,14 @@ from run import KEYBOARD_CATEGORY, QA, ROOT, accepted, checked_build, digest, el
 class ImeTests(unittest.TestCase):
     def test_inventory_requires_loaded_layout_and_usable_engine(self):
         row = {"language": 0x411, "immIme": False}
-        profile = {"type": 1, "enabled": True, "category": KEYBOARD_CATEGORY}
+        profile = {"type": 1, "language": 0x411, "enabled": True, "category": KEYBOARD_CATEGORY}
         observation = {"layouts": [row], "profiles": [profile], "enumeratedTsf": True}
         self.assertIsNone(eligibility(observation))
         self.assertIsNone(eligibility({"layouts": [{"language": 0x411, "immIme": True}]}))
         for changes in ({"layouts": [{"language": 0x409, "immIme": False}]},
                         {"enumeratedTsf": False}, {"profiles": [{**profile, "enabled": False}]},
                         {"profiles": [{**profile, "type": 2}]}, {"profiles": [{**profile, "category": "other"}]},
+                        {"profiles": [{**profile, "language": 0x409}]},
                         {"profiles": [], "japaneseBasicCapability": ["Installed"]}):
             with self.subTest(changes=changes):
                 self.assertIsNotNone(eligibility({**observation, **changes}))

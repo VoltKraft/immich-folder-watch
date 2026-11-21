@@ -16,6 +16,20 @@ and [test-account language list](https://learn.microsoft.com/en-us/powershell/mo
 
 A positive observation requires an ordinary virtual A key to produce a nonempty native preedit in the Rust filename field. The observer must see that preedit before pressing Enter. It then requires a distinct, one-character native commit and an independent UI Automation readback of the original filename with `あ` (U+3042) appended. The observed Windows x64 and ARM64 keyboard logs in hosted runs [44831851264](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264) and [44835826452](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452) contain zero IME events. Those earlier runs exercised a different keyboard scenario and leave Windows composition open.
 
+At `72fff40` both runners installed the Microsoft Japanese Basic Typing
+feature, version 10.0.26100.33828 on x64 and 10.0.26100.9974 on ARM64.
+Both fixtures stopped during language-list readback before starting the
+second GUI trial. Both restored the original language list and removed the
+component without requesting a restart. The follow-up enumerates the actual typed language list, checks the
+proposed entry, records the requested and observed language tags and allows
+time for the account change to become visible. It also asks TSF for all
+profiles and selects Japanese records by their returned language identifier.
+Only observed preedit, commit and independently read text count as a pass.
+[Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350/job/136971561540)
+· [Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350/job/136971561498)
+· [Windows language list](https://learn.microsoft.com/en-us/powershell/module/international/get-winuserlanguagelist?view=windowsserver2025-ps)
+· [TSF profile enumeration](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles).
+
 ## Hosted execution
 
 Run both native architectures after building the existing GUI fixture. The driver uses Windows PowerShell with UI Automation, TSF, IMM and User32 from the operating system. The checked-in C# is an external development observer. The Rust application, dependency set and normal editor use the same GUI build as the other native tests.
