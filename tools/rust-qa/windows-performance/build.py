@@ -123,7 +123,7 @@ def build(area, output, target):
                  referenceNuGetPackages=nuget,
                  wpfOutput={p.relative_to(reference).as_posix(): sha(p) for p in sorted(reference.rglob("*")) if p.is_file()},
                  guiReceiptSha256=sha(receipt), guiBinarySha256=sha(rust), observerSha256=sha(native) if native else None,
-                 drivers={p.name: sha(p) for p in sorted(HERE.iterdir()) if p.suffix in (".py", ".cpp")},
+                 drivers={p.name: sha(p) for p in sorted(HERE.iterdir()) if p.suffix in (".py", ".cpp", ".h")},
                  sharedDrivers={name: sha(HERE.parent / name) for name in
                                 ("observe-windows-gui.py", "windows_observer.py", "storage/evidence.py")})
     return wpf, rust, native, facts

@@ -3,6 +3,9 @@
 
 #[cfg(target_os = "linux")]
 mod benchmark;
+#[cfg(target_os = "windows")]
+#[path = "windows_worker.rs"]
+mod benchmark;
 mod fonts;
 mod graphics;
 #[cfg(target_os = "linux")]
@@ -341,7 +344,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(target_os = "linux")]
     let (native, available) = linux::start(control.clone())?;
     #[cfg(target_os = "windows")]
+    let mut assessment = benchmark::Benchmark::start()?;
+    #[cfg(target_os = "windows")]
     let (native, available) = windows_fixture_input(control.clone())?;
+    #[cfg(target_os = "windows")]
+    assessment.release()?;
     let mut lifecycle = DesktopLifecycle::new(background);
     lifecycle.tray_result(available);
     println!(
@@ -368,7 +375,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         #[cfg(target_os = "linux")]
         &native,
     );
-    #[cfg(target_os = "linux")]
     assessment.finish()?;
     #[cfg(target_os = "linux")]
     futures_lite::future::block_on(native.graceful_shutdown());

@@ -12,13 +12,17 @@ import socket
 from statistics import median
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 
-from build import HERE, ROOT, build, sha, write
+from build import HERE, ROOT, build, pe_machine, sha, write
 from metrics import IDLE_SECONDS, SETTLE_SECONDS, SWITCHES, TRIALS, budgets, comparison, p95, summarize
-from native import Win32, checked, hosted, sid, wpf_profile
+from native import (CleanupUnconfirmed, Win32, checked, finish_owned_trace, hosted, owned_directory,
+                    pin_path, sid, start_owned_subject, wpf_profile)
+
+sys.path.insert(0, str(HERE.parent / "windows-inventory"))
+from scan import SubjectTree, create_fixture, environment, measure as measure_scan, owned_worker
+from subject import build_subject
 
 
 def await_value(get, label, timeout=35, delay=.002):
@@ -37,14 +41,15 @@ def trace_start(stack, observer, pid, area):
         log.write_text("The Windows SDK observer did not compile; see observer-build.log.\n")
         return lambda: None, log
     stream = stack.enter_context(log.open("wb", buffering=0))
-    helper = subprocess.Popen([observer, str(pid), area / "subject.etl", "IFW-RW02-" + uuid.uuid4().hex],
+    etl, name = area / "subject.etl", "IFW-RW02-" + uuid.uuid4().hex
+    helper = subprocess.Popen([observer, str(pid), etl, name],
                               stdin=subprocess.PIPE, stdout=stream, stderr=subprocess.STDOUT, cwd=area)
+    finished = False
     def finish():
-        if helper.poll() is None:
-            helper.stdin.close()
-            helper.wait(timeout=30)
-        elif not helper.stdin.closed:
-            helper.stdin.close()
+        nonlocal finished
+        if not finished:
+            finish_owned_trace(helper, observer, area, etl, name, 30)
+            finished = True
     stack.callback(finish)
     await_value(lambda: log.read_bytes().startswith(b"READY") or helper.poll() is not None,
                 "Windows presentation observer did not start", timeout=20, delay=.02)
@@ -74,15 +79,15 @@ def wait_running(proc):
         raise RuntimeError(f"The measured subject exited unexpectedly with {status}")
 
 
-def sample_idle(api, proc, handle, windows, visible):
+def sample_idle(api, proc, tree, windows, visible):
     memory = []
     start = api.clock()
-    cpu = api.usage(handle)[0]
+    cpu = tree.usage()[0]
     while True:
         wait_running(proc)
         if bool(windows.visible()) != visible:
             raise ValueError("The measured window changed visibility during the idle interval")
-        now_cpu, working = api.usage(handle)
+        now_cpu, working = tree.usage()
         memory.append(working)
         now = api.clock()
         if now - start >= IDLE_SECONDS * api.frequency:
@@ -118,21 +123,21 @@ def stop_subject(proc, rust):
         proc.stdin.close()
 
 
-def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid, expected_machine, phase_log):
+def idle_complete(text):
+    expected = ["INVENTORY_COMPLETE files=0 changed=0 pass=0", "INVENTORY_COMPLETE files=0 changed=0 pass=1"]
+    rows = [line.rstrip("\r\n") for line in text.splitlines(keepends=True)
+            if line.startswith("INVENTORY_COMPLETE ") and line.endswith("\n")]
+    if rows[:2] != expected[:len(rows[:2])]:
+        raise ValueError("The first two idle inventory reports must be the complete, consecutive passes 0 and 1")
+    return len(rows) >= 2
+
+
+def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid, expected_machine, phase_log, owner_token):
     rust = subject == "rust"
     area.mkdir()
     media = area / "empty"
     media.mkdir()
-    env = {**os.environ, "TEMP": str(area), "TMP": str(area), "IFW_QA_ISOLATED": "1", "WGPU_DX12_COMPILER": "Fxc",
-           "HTTP_PROXY": endpoint, "HTTPS_PROXY": endpoint, "ALL_PROXY": endpoint, "NO_PROXY": "localhost,127.0.0.1,::1",
-           "DOTNET_CLI_TELEMETRY_OPTOUT": "1"}
-    env.pop("IFW_QA_GRAPHICS", None)
-    env.pop("IFW_QA_BENCHMARK", None)
-    if rust:
-        for key in ("APPDATA", "LOCALAPPDATA", "HOME", "USERPROFILE"):
-            folder = area / key
-            folder.mkdir()
-            env[key] = str(folder)
+    env = environment(area, endpoint, rust, media, owner_token)
     result = {"metrics": {}, "idleSamples": {}, "controls": {}}
     with ExitStack() as stack:
         if not rust:
@@ -140,10 +145,8 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         profile = None if rust else stack.enter_context(wpf_profile(media, endpoint))
         log = stack.enter_context(phase_log.open("wb"))
         windows_fixture.TITLE = "Desktop input probe" if rust else "Immich Folder Watch"
-        start = api.clock()
-        proc = subprocess.Popen([exe], cwd=area, env=env, stdin=subprocess.PIPE if rust else subprocess.DEVNULL,
-                                stdout=log, stderr=subprocess.STDOUT)
-        stack.callback(stop_subject, proc, rust)
+        proc = start_owned_subject(stack, api, exe, area, env, log, rust, stop_subject)
+        api.resume_owned_process(proc.pid)
         if rust:
             proc.stdin.write(b"T")
             proc.stdin.flush()
@@ -156,12 +159,21 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                 return window if state else not window
             return await_value(poll, f"{subject} did not become {'visible' if state else 'hidden'}")
         visible(True)
-        result["metrics"]["startup_ms"] = (api.clock() - start) * 1000 / api.frequency
+        result["metrics"]["startup_ms"] = (api.clock() - proc.benchmark_start_qpc) * 1000 / api.frequency
         handle = checked(api.open(0x0410, False, proc.pid))
         stack.callback(api.close, handle)
         if api.machine(handle) != (expected_machine, expected_machine):
             raise ValueError("Subject process is emulated or belongs to a different native target")
+        expected_pids = {proc.pid}
         if rust:
+            child = owned_worker(api, proc, phase_log, await_value)
+            expected_pids.add(child)
+            child_handle = checked(api.open(0x0410, False, child))
+            stack.callback(api.close, child_handle)
+            if api.machine(child_handle) != (expected_machine, expected_machine):
+                raise ValueError("The comparison worker is not native to this runner")
+            await_value(lambda: wait_running(proc) or idle_complete(phase_log.read_text(errors="replace")),
+                        "The candidate did not finish both idle inventories")
             await_value(lambda: wait_running(proc) or "ADAPTER Dx12 " in phase_log.read_text(errors="replace"),
                         "The candidate did not report its native DX12 adapter")
         else:
@@ -195,11 +207,12 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         close()
         controls = [calibrate()]
         spans = {}
+        tree = SubjectTree(api, stack, proc.pid, expected_pids)
         for name in ("visible", "hidden"):
             if name == "hidden":
                 close()
             time.sleep(SETTLE_SECONDS)
-            spans[name], samples = sample_idle(api, proc, handle, windows, name == "visible")
+            spans[name], samples = sample_idle(api, proc, tree, windows, name == "visible")
             result["idleSamples"][name] = samples
             for key in ("cpu_one_core_pct", "working_set_mib"):
                 result["metrics"][name + "_" + key] = samples[key]
@@ -222,12 +235,30 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         result["controls"]["windowEvents"] = {name: sum(e["event"] == name and e["root"] for e in windows.events)
                                                for name in ("show", "hide")}
         result["controls"]["successfulVisibilityCycles"] = SWITCHES
+        result["controls"]["wholeProcessTree"] = tree.records
         stop_subject(proc, rust)
         result["termination"] = {"method": "control-Q" if rust else "owned process terminated after sampling",
                                  "exitCode": proc.returncode}
         if rust and (proc.returncode or "DRAINED passes=" not in phase_log.read_text(errors="replace")):
             raise RuntimeError("The native Rust GUI did not drain")
     return result
+
+
+def pin_images(stack, api, area, wpf, gui, observer, file_observer, facts):
+    worker = gui.with_name("ifw-performance-worker.exe")
+    images = {gui: facts["guiBinarySha256"], worker: facts["inventory"]["worker"], wpf: facts["wpfOutput"][wpf.name]}
+    if observer:
+        images[observer] = facts["observerSha256"]
+    if file_observer:
+        images[file_observer] = facts["inventory"]["fileObserver"]
+    objects = {area, *(p.parent for p in images)}
+    records = {}
+    for path in [*sorted(objects), *images]:
+        _, identity = stack.enter_context(pin_path(api, path, path in objects))
+        records[path.relative_to(area).as_posix()] = dict(volumeSerial=identity[0], fileIndex=identity[1])
+        if path in images and sha(path) != images[path]:
+            raise ValueError("A pinned executable differs from its build receipt")
+    return records
 
 
 def run(args):
@@ -243,11 +274,19 @@ def run(args):
                        "run": os.getenv("GITHUB_RUN_ID"), "attempt": os.getenv("GITHUB_RUN_ATTEMPT")}}
     write(output / "result.json", report)
     try:
-        with tempfile.TemporaryDirectory(prefix="ifw-rw02-", dir=os.environ["RUNNER_TEMP"]) as temp:
-            area = Path(temp)
+        api = Win32()
+        with ExitStack() as resources:
+            area = resources.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
             wpf, rust, observer, facts = build(area, output, args.target)
+            rust, file_observer, facts["inventory"] = build_subject(area, output, rust, args.target, pe_machine)
+            pinned = pin_images(resources, api, area, wpf, rust, observer, file_observer, facts)
+            owner_token, facts["workload"] = create_fixture(area, resources, api)
+            for child in ("inventory.owner", "files"):
+                _, identity = resources.enter_context(pin_path(api, area / child, child == "files"))
+                pinned[child] = dict(volumeSerial=identity[0], fileIndex=identity[1])
+            facts["workload"]["pinnedObjects"] = pinned
+            facts["drivers"]["etw-owned.h"] = sha(HERE / "etw-owned.h")
             write(output / "inputs.json", facts)
-            api = Win32()
             user32 = c.WinDLL("user32")
             report["host"].update(qpcFrequency=api.frequency, computerIdSha256=hashlib.sha256(
                 os.environ["COMPUTERNAME"].encode()).hexdigest(), observerMachine=api.machine(-1),
@@ -263,8 +302,24 @@ def run(args):
                         print(f"Measuring native {subject} trial {n + 1} of {TRIALS}", flush=True)
                         name = f"{subject}-{n + 1}"
                         observation = trial(api, windows_fixture, subject, exe, observer, area / name, endpoint,
-                                            user_sid, expected, output / (name + ".log"))
+                                            user_sid, expected, output / (name + ".log"), owner_token)
                         report["trials"][subject].append(observation)
+                        write(output / "result.json", report)
+                        if file_observer is None:
+                            observation["scan"] = {"error": "File ETW observer build failed; see file-observer-build.log"}
+                        else:
+                            try:
+                                observation["scan"] = measure_scan(api, windows_fixture, subject, exe, file_observer,
+                                                                   area / (name + "-scan"), endpoint, user_sid, output,
+                                                                   await_value, stop_subject, p95, owner_token)
+                                observation["metrics"].update(observation["scan"]["metrics"])
+                            except CleanupUnconfirmed:
+                                raise
+                            except (OSError, TimeoutError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                                if CleanupUnconfirmed.in_chain(exc):
+                                    raise CleanupUnconfirmed("A scan resource could not be released safely") from exc
+                                observation["scan"] = {"error": f"{type(exc).__name__}: {exc}"}
+                                print(f"{name} scan observation incomplete: {type(exc).__name__}: {exc}", flush=True)
                         write(output / "result.json", report)
                     summary = summarize(report["trials"][subject])
                     if subject == "wpf":
@@ -281,8 +336,7 @@ def run(args):
         rows = list(report["comparison"].values())
         report["status"] = ("over-budget" if any(r["passed"] is False for r in rows) else
                             "partial" if any(r["passed"] is None for r in rows) else "measured-metrics-passed")
-        report["outstanding"] = ["Candidate inventory ownership and UI latency during a real Windows scan",
-                                 "Physical display scanout and on-screen response during a scan"]
+        report["outstanding"] = ["Physical display scanout during a scan"]
         return 0 if report["status"] == "measured-metrics-passed" else 1
     except Exception as exc:
         report["status"] = "error"

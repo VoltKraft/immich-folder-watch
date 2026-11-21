@@ -12,6 +12,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "etw-owned.h"
 
 static const GUID dxgi = {0xca11c036, 0x0102, 0x4a2d, {0xa6, 0xad, 0xf0, 0x3c, 0xfe, 0xd5, 0xd3, 0xc9}};
 static const GUID d3d9 = {0x783aca0a, 0x790e, 0x4d7f, {0x84, 0x51, 0xaa, 0x85, 0x05, 0x11, 0xc6, 0xb9}};
@@ -71,10 +72,12 @@ static ULONG enable(TRACEHANDLE session, const GUID& provider, USHORT* ids, USHO
 
 int wmain(int argc, wchar_t** argv) {
     if (argc != 4) return 2;
+    if (!wcscmp(argv[1], L"--stop-owned")) return ifw_etw::stop_owned(argv[3], argv[2], L"IFW-RW02-", L"subject.etl");
     subject = std::wcstoul(argv[1], nullptr, 10);
     if (!subject) return 2;
     const std::wstring file = argv[2], name = argv[3];
-    if (name.rfind(L"IFW-RW02-", 0) != 0 || name.size() > 80) return 2;
+    GUID identity{};
+    if (!ifw_etw::identity(name, L"IFW-RW02-", identity)) return 2;
     const auto offset = sizeof(EVENT_TRACE_PROPERTIES);
     const auto path_offset = offset + (name.size() + 1) * sizeof(wchar_t);
     const auto bytes = path_offset + (file.size() + 1) * sizeof(wchar_t);
@@ -82,6 +85,7 @@ int wmain(int argc, wchar_t** argv) {
     auto* settings = reinterpret_cast<EVENT_TRACE_PROPERTIES*>(storage.data());
     settings->Wnode.BufferSize = static_cast<ULONG>(bytes);
     settings->Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+    settings->Wnode.Guid = identity;
     settings->Wnode.ClientContext = 1;  // QueryPerformanceCounter, shared with the native measurement driver.
     settings->BufferSize = 64;
     settings->MinimumBuffers = 4;

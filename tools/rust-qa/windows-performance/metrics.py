@@ -8,6 +8,7 @@ METRICS = {
     "visible_cpu_one_core_pct": "cpu", "hidden_cpu_one_core_pct": "cpu",
     "visible_working_set_mib": "memory", "hidden_working_set_mib": "memory",
     "idle_close_p95_ms": "timing", "idle_reopen_p95_ms": "timing",
+    "scan_close_p95_ms": "timing", "scan_reopen_p95_ms": "timing",
     "visible_present_per_second": "present", "hidden_present_per_second": "present",
 }
 TRIALS = 3

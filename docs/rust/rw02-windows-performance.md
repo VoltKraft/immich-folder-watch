@@ -9,7 +9,13 @@ It verifies the 136 extracted reference files against source digest
 and records the source archive and the complete publish output by SHA-256.
 The Rust executable must match the canonical GUI build receipt. The PE
 headers and the actual processes must match the native target architecture.
-Native Windows x64 and ARM64 measurements are pending.
+The first native x64 comparison measured nine idle/startup metrics at
+`8a8adaa`. Six passed. The visible working set was 177.00 MiB against a
+143.18 MiB limit. Idle close and reopen took 139.33 and 217.50 ms at p95,
+against limits of 14.79 and 14.76 ms. Visible and hidden CPU use and
+presentation rates were zero. The hidden working set was 26.69 MiB.
+The worker-integrated scan comparison is a separate native trial.
+[Windows x64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549014).
 [Shipping publish recipe](../../packaging/windows/build-msi.ps1) · [Desktop standard](../rust-desktop-standard.md).
 
 ## Predeclared comparisons
@@ -26,6 +32,7 @@ The allowances follow the existing [Linux comparison](rw02-performance.md).
 | Visible / hidden process CPU, percentage of one core | Larger of 20% and 1 percentage point |
 | Visible / hidden median process working set, MiB | Larger of 10% and 4 MiB |
 | Close to hidden / activate to visible while idle, nearest-rank p95 of eight cycles in each trial | Larger of 20% and 10 ms |
+| Close to hidden / activate to visible during the first 100,000-file inventory, nearest-rank p95 per trial | Larger of 20% and 10 ms |
 | Visible / hidden successful presentation calls per second | One additional present in a 15-second interval |
 
 The driver observes actual HWND visibility by PID and caption. It posts
@@ -38,9 +45,16 @@ recursive JPEG source. Each idle window settles for three seconds before a
 15-second measurement, with working-set samples every 250 ms. CPU uses the
 change in process kernel plus user time divided by elapsed wall time.
 The output records the individual samples and window transitions. The
-reference retains its normal in-process engine. The current Windows Rust
-GUI provides its desktop supervisor. Windows worker ownership, inventory
-responsiveness and latency during a 100,000-file scan remain open.
+reference retains its normal in-process engine. The Windows Rust supervisor
+owns the synthetic native inventory worker and includes its PID in the CPU
+and working-set measurement. The separate scan trial ties each measured
+window transition to successful native operations within the source tree.
+The observer pairs each regular-file open and identity query with its
+completion status, requires all 100,000 expected names in each of two passes
+and checks directory enumerations independently. A private Windows job owns
+the tested process tree. Profile removal requires the original pinned
+directory and marker and a drained job. Native paired scan results are pending.
+[Scan fixture and observations](../../tools/rust-qa/windows-inventory/README.md).
 [Process CPU accounting](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes) · [Working set](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo).
 
 The source-built SDK observer starts an ETW session filtered by the owned PID
@@ -55,7 +69,8 @@ and any diagnostics. Physical scanout requires separate observation.
 
 ## Native invocation
 
-Run after the canonical native GUI build on the same GitHub-hosted runner.
+Run after the canonical native GUI build and filtered YAML source assessment
+on the same GitHub-hosted runner.
 The existing native Visual Studio toolchain, Windows SDK, Python and .NET SDK
 are sufficient. The step can use the job's `NUGET_PACKAGES` cache.
 
@@ -70,8 +85,9 @@ the real known folders for the runner's SID. Before reserving its product
 directory, the fixture refuses an existing product path, single-instance
 mutex or product Startup shortcut. It creates a synthetic config before
 launch, records filesystem/database initialization and removes its own marked
-directory after the reference exits. All media roots are temporary, empty
-and generated solely for this run. The configured Immich URL and the WPF
+directory after the reference exits. The idle trial uses an empty media
+root. The scan trial uses 100 directories of 1,000 empty JPEG files created
+for this run. The configured Immich URL and the WPF
 HTTP/HTTPS proxy use an exclusively reserved, non-listening loopback port.
 The ordinary WPF host has no Quit CLI. The recorder terminates its owned
 process after sampling. The Rust process receives Quit and must report
