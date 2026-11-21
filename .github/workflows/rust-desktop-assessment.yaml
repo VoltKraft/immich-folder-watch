@@ -22,8 +22,8 @@ jobs:
     if: github.ref == 'refs/heads/rewrite/rust'
     name: Native assessment (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
-    # Windows also records six 100,000-file WPF/Rust scans and provisions a missing test IME.
-    timeout-minutes: ${{ contains(matrix.target, 'windows') && 150 || 95 }}
+    # Windows runs three 100,000-file scans for each of WPF, ordinary Rust and retained-window Rust.
+    timeout-minutes: ${{ contains(matrix.target, 'windows') && 190 || 95 }}
     strategy:
       fail-fast: false
       matrix:
@@ -165,6 +165,25 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend wayland --input
 
+      - name: Install the reviewed Ubuntu screen reader and speech synthesizer
+        id: reader_linux
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          sudo apt-get install --yes --no-install-recommends \
+            orca=46.1-1ubuntu1 speech-dispatcher-espeak-ng=0.12.0~rc2-2build3
+
+      - name: Observe Orca announcements and synthesized audio on X11
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input --screen-reader
+
+      - name: Observe Orca announcements and synthesized audio on Wayland
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input --screen-reader
+
+      - name: Verify both recorded Orca traversals against the native Ubuntu packages
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/ubuntu-reader/verify.py "$NATIVE_TARGET"
+
       - name: Exercise the integrated filename editor and rendered glyphs on X11
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/profile_text.py
@@ -193,14 +212,28 @@ jobs:
         if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
         run: python3 tools/rust-qa/linux-services/native.py tray
 
-      - name: Observe real Documents grants and the distribution's file lock behavior
+      - name: Build the shipping Documents grant reference
+        id: portal_oracle
         if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
         env:
           IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
         run: |
           export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
           python3 tools/rust-qa/linux-services/native.py oracle
+
+      - name: Observe real Documents grants and the distribution's file lock behavior
+        if: ${{ !cancelled() && steps.portal_oracle.outcome == 'success' }}
+        env:
+          IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
           python3 tools/rust-qa/linux-services/native.py documents --expect-lock enosys
+
+      - name: Compare cooperative file locks using the Ubuntu Documents portal and its upstream fix
+        if: ${{ !cancelled() && steps.portal_oracle.outcome == 'success' }}
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
 
       - name: Observe native Windows show events, close and reopen
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
@@ -208,6 +241,11 @@ jobs:
         run: |
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
+
+      - name: Measure the native Windows display topology, window DPI and session transport
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-display/run.py "$NATIVE_TARGET"
 
       - name: Build the native portal dialog fixture
         id: portal_dialog
@@ -243,20 +281,6 @@ jobs:
           PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
         run: python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
 
-      - name: Observe Windows UI Automation and foreground keyboard input
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
-        shell: bash
-        run: |
-          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
-            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-input" --input-only
-
-      - name: Verify a replacement DX12 window preserves focus, editing and screen output
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
-        shell: bash
-        run: |
-          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
-            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-recovery" --device-recovery
-
       - name: Verify input ownership on the runner and its disposable Windows desktop
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
         shell: bash
@@ -264,25 +288,37 @@ jobs:
           python3 tools/rust-qa/windows-desktop/run.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows-desktop"
 
+      - name: Observe Windows UI Automation and foreground keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" keyboard
+
+      - name: Verify a replacement DX12 window preserves focus, editing and screen output
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" recovery
+
       - name: Observe rendered font coverage and mixed-direction editing on the native desktop
         if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
         shell: bash
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
-          python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" mixed
+          else
+            python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
+          fi
 
       - name: Observe native mixed-direction editing in the ordinary Windows filename field
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
         shell: bash
-        run: python3 tools/rust-qa/windows-text/run.py "$NATIVE_TARGET"
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" text
 
       - name: Observe portable NVDA announcing the owned Windows GUI
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
         shell: bash
-        run: |
-          python3 tools/rust-qa/windows-reader/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment.exe \
-            --output "artifacts/rust/windows-reader/native-$NATIVE_TARGET"
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" reader
 
       - name: Stage the integrated Linux GUI with its reviewed inventory worker and observer
         id: worker
@@ -300,6 +336,22 @@ jobs:
           python -m unittest discover -s tools/rust-qa/windows-performance -v
           exit $LASTEXITCODE
 
+      - name: Build the retained Windows GUI with the reviewed native dependency graph
+        id: warm
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Observe retained Windows handles, native input and DX12 allocation policy
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" warm
+
       - name: Measure the shipping WPF host and native Rust GUI on the same Windows desktop
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
@@ -309,6 +361,16 @@ jobs:
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
           python tools/rust-qa/windows-performance/run.py $env:NATIVE_TARGET --output "artifacts/rust/windows-performance/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Compare the retained Windows GUI with the previously measured WPF budgets
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET
           exit $LASTEXITCODE
 
       - name: Observe Vulkan loss and redraw on X11
@@ -358,7 +420,7 @@ jobs:
       - name: Observe Windows input-method composition with native Japanese Basic Typing
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
         shell: powershell
-        timeout-minutes: 20
+        timeout-minutes: 35
         run: ./tools/rust-qa/windows-ime/hosted.ps1
 
       - name: Remove the job-specific namespace launcher
@@ -387,6 +449,15 @@ jobs:
             artifacts/rust/linux-services/documents-*/*.log
             artifacts/rust/linux-services/tray-*/*.json
             artifacts/rust/linux-services/tray-*/*.log
+            artifacts/rust/portal-noble/runs/*/result.json
+            artifacts/rust/portal-noble/runs/*/packaged/*.json
+            artifacts/rust/portal-noble/runs/*/packaged/*.log
+            artifacts/rust/portal-noble/runs/*/unmodified/*.json
+            artifacts/rust/portal-noble/runs/*/unmodified/*.log
+            artifacts/rust/portal-noble/runs/*/backport/*.json
+            artifacts/rust/portal-noble/runs/*/backport/*.log
+            artifacts/rust/portal-noble/runs/*/development/*.json
+            artifacts/rust/portal-noble/runs/*/build/*.log
             artifacts/rust/portal-dialog/build-inputs.json
             artifacts/rust/portal-dialog/x11-*/*.json
             artifacts/rust/portal-dialog/x11-*/*.log
@@ -395,6 +466,7 @@ jobs:
             artifacts/rust/gui-native/
             artifacts/rust/gui-run/*/*.json
             artifacts/rust/gui-run/*/*.log
+            artifacts/rust/gui-run/*/orca-audio.raw
             artifacts/rust/gui-run/*/*.conf
             artifacts/rust/gui-run/*/evidence.sha256
             artifacts/rust/graphics/*-ci/*.json
@@ -402,6 +474,9 @@ jobs:
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
             artifacts/rust/windows-performance/native-*/*
+            artifacts/rust/windows-warm-window/*/build.json
+            artifacts/rust/windows-warm-window/*/observed/
+            artifacts/rust/windows-warm-window/*/measured/
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json

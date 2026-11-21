@@ -163,6 +163,8 @@ to reconcile project decisions, defaults, and recorded state.
   features, native libraries and fonts before adoption; pin compiler and lockfile.
   Required native runtime/GUI evidence on four targets cannot be replaced by a
   cross-build. Independently review filesystem, migration and final integration.
+  The [RW-02 stack decision](docs/rust/rw02-stack-decision.md) records the
+  qualified components, native resource limits and remaining desktop checks.
   Native log adapters use the [isolated host tests](docs/rust/rw02-platform-logs.md);
   the [development guide](docs/development.md#rust-feasibility-workspace)
   lists the other native feasibility entry points.

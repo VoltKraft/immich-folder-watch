@@ -60,6 +60,14 @@ actual session IDs, both exclusion directions and reacquisition. Installed
 handover and native Windows cross-session exclusion remain open.
 [Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
+The [watch adapter](rw02-watch-events.md) keeps a pending full rescan when
+its queue or the native event stream overflows. Three native Fedora x64
+runs of the reviewed adapter passed fifteen filesystem scenarios each,
+including identity reconciliation after registration and a failed partial scan. The Windows retained-window
+candidate keeps the same DX12 device on an ordinary close and selects a
+smaller allocation policy. It still needs native handle, rendering and
+budget evidence. [Windows comparison](rw02-windows-window.md).
+
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
@@ -70,6 +78,13 @@ handover and native Windows cross-session exclusion remain open.
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Four X11/Wayland lifecycle cases, protected input and clipboard passed on each backend. At `8b071ab`, all three integrated text-editing cases, eight glyph controls and both host folder choosers passed. At `8a8adaa` the 100,000-file X11 comparison met all 11 limits. | Pending |
 
 The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.
+
+At `72fff40`, both Ubuntu hosts again met all eleven X11 limits, and both
+Windows hosts passed the private-desktop keyboard and native Event Log checks.
+Windows x64 also passed ordinary mixed-direction editing. Separate Ubuntu
+and Fedora x64 observations verified actual Orca speech and synthetic
+password masking under X11 and Wayland. [Hosted follow-up](rw02-native-gui.md#native-follow-up-at-72fff40)
+and [Orca audio receipts](rw02-ubuntu-reader.md).
 
 All four also passed two live WAL backups, 40 production C# readback assertions,
 15 native loopback transport cases and six old/new activation and file-lock
@@ -84,6 +99,12 @@ SMB 3.1.1 loopback share. On Fedora x64 the distribution's document portal
 returned `ENOSYS` for the required upload lock. The private upstream backport
 enforced it across the actual grant and backing views. [SMB results](rw02-filesystem.md#four-native-hosts)
 and [portal and tray results](rw02-linux-services.md).
+
+Ubuntu Noble's published portal and its pristine rebuild also refused the
+cooperating lock on a native x64 Noble userspace and Fedora kernel. The
+private source backport passed all 42 lock operations with both the ordinary
+C# and Rust readers. A supported Ubuntu package and native Ubuntu-kernel
+results are still outstanding. [Noble controls](rw02-portal-noble.md).
 
 Three native Intel-to-software Wayland recoveries preserved editing and
 worker progress. The measured visible and hidden idle intervals recorded
@@ -102,7 +123,7 @@ commit in the Rust filename field. [IME and screen-reader observations](rw02-nat
 
 Fedora x64 matched the shipping log file payloads and journal stream for
 all six levels. A separate native journal also recovered each priority and
-message. The Windows Event Log fixture awaits both native runs.
+message. The Windows Event Log steps passed natively on x64 and ARM64 at `72fff40`. A private Ubuntu 24.04 journal also passed locally after receiving a read-only view of the test process’s cgroup.
 [Platform log observation and scope](rw02-platform-logs.md).
 
 GNOME Wayland on Fedora x64 committed the same Japanese character from Anthy

@@ -97,6 +97,51 @@ writer ran. [Paired Linux results](rw02-performance.md#hosted-linux-results-at-8
 [Windows resource comparison](rw02-windows-performance.md),
 [screen reader](rw02-windows-reader.md) and [foreground](rw02-windows-desktop.md).
 
+## Native follow-up at 72fff40
+
+Both Ubuntu desktop jobs passed the paired X11 resource check again. Each
+host ran three 100,000-file inventories per application. Each Rust summary
+met all eleven preset same-host .NET limits. Both jobs' only failure was
+the isolated systemd journal, which reported a missing cgroup root.
+Each downloaded ZIP matched the Actions digest and passed its CRC check.
+[Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350)
+and [local Ubuntu journal reproduction](rw02-platform-logs.md).
+
+| Native target | Artifact ID | Files | ZIP SHA-256 | Visible / hidden RSS | Scan show / close p95 |
+| --- | --- | ---: | --- | --- | --- |
+| Ubuntu x64 | 14724159073 | 669 | `76b99df2277ef686167d4ed18f2ca91706b2ad6b90eb97bf35cd33607e4a8da0` | 124.262 / 124.262 MiB | 0.99 / 0.40 ms |
+| Ubuntu ARM64 | 14724163459 | 669 | `e75ff65c6965dc52d8b2d13234b4941629d7283ed26eb4dac2fdf1066618e137` | 119.184 / 119.203 MiB | 0.90 / 0.36 ms |
+
+Both Windows ZIPs also matched their published SHA-256 sums and passed
+all CRCs. Each host met six of nine measured WPF limits. All six scan trials
+on each host stopped when the ETW recorder failed to compile against the
+Windows SDK. The three exceeded limits below show candidate / maximum.
+
+| Target | Artifact ID and entries | ZIP SHA-256 | Visible memory (MiB) | Idle close p95 (ms) | Idle reopen p95 (ms) |
+| --- | --- | --- | ---: | ---: | ---: |
+| Windows x64 | 14725165298 (568) | `46a87220532d869cbc3c17a36e21e3f994675c8e6f6595ec3fec41cd9f688e46` | 190.191 / 142.107 | 66.274 / 14.383 | 174.066 / 18.337 |
+| Windows ARM64 | 14724566613 (556) | `823392ebb1a04a766e68a971482d389eb8ce259d9d6bef0cbd3b3d124b510009` | 193.258 / 147.506 | 134.435 / 13.236 | 182.427 / 14.999 |
+
+Windows x64 passed the ordinary mixed-direction filename test, keyboard
+and replacement DX12 window. Both Windows architectures passed the dedicated
+private-desktop input test. Both recorded twelve file records and six
+independently formatted Event Log entries, then removed the disposable log.
+NVDA announced the seven ordered cues with the three expected password
+masks on x64. The filename stayed nonempty after Delete. On ARM64 NVDA
+announced the initial filename label among six speech entries. Windows
+installed and removed the official Japanese Basic Typing component on
+both hosts. Neither host reached a composition trial after provisioning.
+[Reader](rw02-windows-reader.md), [Japanese input](rw02-windows-ime.md)
+and [pixel replay](rw02-font-coverage.md#pixel-readback-on-windows-and-linux-at-72fff40).
+
+The original ARM64
+desktop still failed foreground keyboard input and replacement-window
+editing. The original Windows resource comparison and full reader assessment
+remain open. The compatibility, native feasibility and PR CI workflows all
+passed at this revision. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423423)
+· [Compatibility oracle](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423415)
+· [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945427967).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

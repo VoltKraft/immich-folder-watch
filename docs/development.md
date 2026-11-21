@@ -78,6 +78,10 @@ The same run compares Rust path, timestamp and casing observations to a native
 .NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
 comparison. See the [legacy checks](rust/rw02-legacy.md).
 
+The [native watch test](rust/rw02-watch-events.md) exercises the retained
+directory handles, bounded change hints and periodic inventory fallback.
+Each native feasibility job uploads the target's result and digest.
+
 The dependency-free `desktop-platform-log` crate provides the native log
 outputs assessed in RW-02. The log observer compares file bytes with the
 shipping provider, then reads back native events using the host OS. It uses
@@ -132,6 +136,9 @@ input service and an owned foreground filename field. Its hosted wrapper
 records missing components and verifies the disposable account's cleanup.
 The [ordinary Windows filename checks](rust/rw02-windows-text.md) run against
 the same native GUI and verify glyph coverage, cursor movement and selection.
+The [native Windows display check](rust/rw02-windows-display.md) records the
+current WTS transport and monitor DPI. The [Ubuntu Orca check](rust/rw02-ubuntu-reader.md)
+uses a private audio sink and verifies announcements on X11 and Wayland.
 
 The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
 and exercises both protocol directions and file guard ownership in separate processes.
@@ -148,7 +155,9 @@ populates this package cache while building the earlier storage and YAML oracles
 The
 [portal comparison builder](rust/rw02-portal-upstream.md) replays one upstream
 fix on exact release sources in an offline SDK. It writes the executable to
-the ignored test area for the private namespace. The
+the ignored test area for the private namespace. The [Noble comparison](rust/rw02-portal-noble.md)
+exercises the packaged Ubuntu daemon, a pristine Ubuntu rebuild and the
+backport with both the C# and Rust readers in the same run. The
 [Windows service tests](rust/rw02-windows-services.md) exercise per-user
 shortcut registration, Shell notifications and independent UI Automation.
 The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises

@@ -1,5 +1,57 @@
 # Project Status
 
+## Native watch hints, platform logging and Windows desktop follow-up (2026-11-21)
+
+Three Fedora x64 runs of the reviewed watch adapter passed eight unit checks
+and fifteen native scenarios each. A real inotify queue overflowed at the
+unchanged 16,384-event limit. Cancelling an inventory kept the previous
+baseline pending. A second identity check detected a directory replaced
+during watch registration, and the renewed subscription observed its next
+edit. The completed runs used the same ELF binary. Both MSVC targets passed Clippy.
+The four-target native feasibility workflow now includes this adapter.
+[Detailed observations and hashes](rust/rw02-watch-events.md).
+
+The Windows x64 and ARM64 platform log steps at `72fff40` passed. Both
+Ubuntu jobs failed their logging step. A native Ubuntu 24.04 userspace
+reproduced systemd 255.4's missing cgroup root. It delivered all six records
+after a read-only mapping of the current test process’s cgroup. The writer
+had zero effective capabilities. [Windows jobs and local Ubuntu receipt](rust/rw02-platform-logs.md).
+
+The next GUI assessment compares retained Windows handles and smaller
+DX12 allocations with the existing reference budgets. Independently reported
+writer trials exercise ordinary inherited authority and verified standard
+users across two sessions. Native results for those changes are pending.
+Both private-desktop input steps at `72fff40` passed. Replaying the earlier
+desktop reports selected the original desktop on x64 and the fixture desktop
+on ARM64. [Retained GUI](rust/rw02-windows-window.md),
+[writer authority](rust/rw02-cross-session.md) and
+[desktop selection](rust/rw02-windows-desktop.md).
+
+Both Ubuntu jobs at `72fff40` met all eleven same-host resource limits.
+The downloaded archives confirmed the same systemd failure on both native
+architectures. Windows x64 passed ordinary mixed-direction editing and
+replacement-window input. The independent compatibility, native feasibility
+and PR CI workflows passed. [Hosted measurements](rust/rw02-native-gui.md#native-follow-up-at-72fff40).
+
+All four archives at that revision matched the Actions SHA-256 sums and
+passed their CRC checks. Both Windows hosts met six of nine measured WPF
+limits. The ETW recorder's SDK compilation error prevented all scan timing
+comparisons. Windows x64 NVDA read all seven cues and the password masks.
+Both text interfaces still returned 18 characters after Delete. Both hosts
+installed and removed Japanese Basic Typing without reaching a composition trial.
+The Ubuntu Noble package and its unmodified rebuild refused read leases.
+The private backport passed 42 lock operations. Three native x64 builds
+reproduced the same executable hashes. [Windows receipts](rust/rw02-native-gui.md#native-follow-up-at-72fff40)
+and [Noble comparison](rust/rw02-portal-noble.md).
+
+Orca's four ordered field and role announcements, three password masks and
+non-silent private audio passed on both X11 and Wayland in Ubuntu Noble and
+Fedora x64. The hosted Ubuntu ARM64 speech result is pending. The Windows
+display recorder now checks the actual WTS transport and window DPI on each
+available monitor. Both older Windows desktops had a single 96-DPI screen.
+[Linux speech evidence](rust/rw02-ubuntu-reader.md) and
+[Windows display evidence](rust/rw02-windows-display.md).
+
 ## Four hosted desktop results and Windows follow-up (2026-11-21)
 
 Both Ubuntu jobs passed every step at `8a8adaa`. Each met all 11 paired
