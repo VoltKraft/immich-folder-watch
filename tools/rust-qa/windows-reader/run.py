@@ -130,6 +130,36 @@ def close_reader(process):
     return "owned child terminated"
 
 
+def verified_edit(record, pass_key_announced):
+    """Qualify the observed edit route independently of the input driver's exit."""
+    filename = "Grüße – Sommer.jpg"
+    edit = record["readerEdit"]
+    route = edit["clearedBy"]
+    states = edit["states"]
+    ordinary = "ordinaryDelete"
+    if route not in (ordinary, "nvdaPassThroughDelete") or pass_key_announced != (route != ordinary):
+        raise ValueError("The reported Delete route disagrees with NVDA's speech")
+    full_selections = ["selectedForCopy", "selectedForDelete"]
+    if route != ordinary:
+        full_selections += ["selectedForPassThrough", "afterPassAnnouncement"]
+        if (states[ordinary]["document"], states[ordinary]["value"]) != (filename, filename):
+            raise ValueError("The ordinary Delete outcome cannot be attributed to the restored original selection")
+    for phase in full_selections:
+        state = states[phase]
+        if (state["value"], state["document"], state["selected"], state["selectionCount"],
+                state["selectionStart"], state["selectionEnd"]) != (filename, filename, filename, 1, 0, len(filename)):
+            raise ValueError(f"The entire actual filename was not selected at {phase}")
+    empty = states[route]
+    if (empty["value"], empty["document"], empty["valueLength"], empty["documentLength"],
+            empty["documentCollapsed"]) != ("", "", 0, 0, True):
+        raise ValueError("The field did not expose both empty text values and equal document endpoints")
+    pasted = states["pasted"]
+    if not record["clipboardCopied"] or not record["unicodeClipboardRoundTrip"] or (
+            pasted["value"], pasted["document"], pasted["documentCollapsed"]) != (filename, filename, False):
+        raise ValueError("The native clipboard did not restore the complete Unicode filename")
+    return route
+
+
 def assess(installer, binary, output, report):
     if os.name != "nt" or any(os.getenv(key) != value for key, value in {
         "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "GITHUB_REF": "refs/heads/rewrite/rust",
@@ -187,11 +217,14 @@ def assess(installer, binary, output, report):
                 report["readerActiveAfterInput"] = reader.poll() is None
                 if report["inputDriverExit"] != 0 or not report["readerActiveAfterInput"] or tuple(speech.observed) != EXPECTED:
                     raise RuntimeError("Reader, foreground driver or ordered speech criteria did not pass")
+                record = json.loads((output / "gui" / "input.json").read_text(encoding="utf-8"))
+                report["filenameClearedBy"] = verified_edit(record, speech.pass_key_announced)
             finally:
                 stop(test)
         finally:
             report.update(announcements=speech.observed, utterancesExamined=speech.utterances,
                           orderedSpeechPassed=tuple(speech.observed) == EXPECTED,
+                          passNextKeyAnnounced=speech.pass_key_announced,
                           synth=log.synth, readerInitialized=log.initialized, readerDiagnosticModules=log.diagnostics)
             if raw_log.is_file():
                 report["privateLogSha256"] = sha(raw_log)
@@ -215,7 +248,8 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     report = {"nvda": VERSION, "installerSha256": DIGEST, "guiArchitecture": architecture(binary),
               "guiSha256": sha(binary), "passed": False, "sourceSha256": {p.name: sha(p) for p in (
-                  HERE / "run.py", HERE / "speech.py", HERE.parent / "observe-windows-input.ps1",
+                  HERE / "run.py", HERE / "speech.py", HERE / "Keyboard.cs", HERE / "clipboard.ps1",
+                  HERE.parent / "observe-windows-input.ps1",
                   HERE.parent / "observe-windows-gui.py", HERE.parent / "windows_observer.py")}}
     try:
         assess(installer, binary, output, report)

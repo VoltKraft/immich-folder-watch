@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($env:IFW_QA_ISOLATED -cne '1') { throw 'Use the disposable native GUI launcher.' }
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms
-Add-Type -TypeDefinition @'
+$windowSource = @'
 using System;
 using System.Runtime.InteropServices;
 public static class IfwObservedWindow {
@@ -82,6 +82,10 @@ public static class IfwObservedWindow {
     }
 }
 '@
+if ($SpeechCues) {
+    $windowSource += [Environment]::NewLine + [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'windows-reader/Keyboard.cs'))
+}
+Add-Type -TypeDefinition $windowSource
 
 $handle = [IntPtr]::new($WindowHandle)
 $result = [ordered]@{ processId = $SubjectId; status = 'failed'; focus = @() }
@@ -365,6 +369,12 @@ try {
     $result.focus += 'Filename'
     Wait-ReaderCue 'Filename'
     $expected = 'Gr' + [char]0xfc + [char]0xdf + 'e ' + [char]0x2013 + ' Sommer.jpg'
+    if ($SpeechCues) {
+        . (Join-Path $PSScriptRoot 'windows-reader/clipboard.ps1')
+        Test-ReaderClipboard $file $expected
+        $result.status = 'passed'
+        return
+    }
     if ((Get-FieldText $file) -cne $expected) { throw 'Synthetic Unicode filename differs before copy.' }
     $before = [IfwObservedWindow]::GetClipboardSequenceNumber()
     Send-SubjectKeys '^a'
@@ -398,5 +408,5 @@ try {
     $result.error = $_.Exception.Message
     throw
 } finally {
-    [IO.File]::WriteAllText($OutputFile, ($result | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($OutputFile, ($result | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
 }

@@ -7,6 +7,7 @@ SPEECH_HEADER = re.compile(r"^IO - speech\.(?:speech\.)?speak \(")
 MASK = re.compile(r"['\"](?:\*|•|asterisk|star|bullet)['\"]", re.IGNORECASE)
 CLEAR = re.compile(r"['\"](?:[xyz]{1,3}|[xyz](?: [xyz]){1,2})['\"]", re.IGNORECASE)
 EXPECTED = ("Dateiname", "Kennwort", "mask-1", "mask-2", "mask-3", "English", "Filename")
+PASS_NEXT_KEY = re.compile(r"""(['"])Pass next key through\1""")
 
 
 class Speech:
@@ -15,6 +16,7 @@ class Speech:
         self.observed = []
         self.utterances = 0
         self.speech_header = False
+        self.pass_key_announced = False
 
     def line(self, text):
         if not self.speech_header or not text.startswith("Speaking ["):
@@ -25,6 +27,10 @@ class Speech:
         if "Kennwort" in self.observed and "English" not in self.observed and CLEAR.search(text):
             raise ValueError("The reader spoke a clear synthetic password character")
         if len(self.observed) == len(EXPECTED):
+            if (not self.pass_key_announced and (self.cues / "request-pass-key").is_file()
+                    and PASS_NEXT_KEY.search(text)):
+                self.pass_key_announced = True
+                (self.cues / "pass-key-announced").touch(exist_ok=False)
             return
         expected = EXPECTED[len(self.observed)]
         found = MASK.search(text) if expected.startswith("mask-") else re.search(r"\b" + expected + r"\b", text)

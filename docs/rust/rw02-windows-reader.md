@@ -62,3 +62,64 @@ not reach password typing. Both readers quit through their own windows and the
 two temporary profiles were removed. The follow-up checks the full selected
 filename before Delete and reads the empty document range independently.
 [Native archives](rw02-native-gui.md#native-follow-up-at-8a8adaa).
+
+## Native selection and Delete at `72fff40`
+
+On Windows x64, OneCore again produced all seven ordered announcements,
+including three separate password masks, in 16 examined speech records.
+The foreground GUI had PID 7792. UIA confirmed the complete selection of
+`Grüße – Sommer.jpg` before Delete. Copy had placed this exact name on the
+clipboard. After the Windows Forms Delete gesture, both native text reads
+still returned length 18 and the document endpoints were distinct. The
+observer timed out. It recorded lengths only. The actual post-Delete strings,
+selection endpoints and the reader's handling of that key are unknown.
+The same GUI binary and input script completed the empty-field and Unicode
+paste checks on both x64 control desktops without NVDA. A separate x64
+normal-field test also passed extended Delete after a native drag selection.
+The x64 archive SHA-256 is
+`46a87220532d869cbc3c17a36e21e3f994675c8e6f6595ec3fec41cd9f688e46`.
+[Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350).
+
+On ARM64 the reader announced the initial German filename field in six
+examined records. The native window never obtained foreground. The
+filename center at (260, 175) did not belong to the subject, and the driver
+sent zero keys. The reader exited normally and its profile was removed.
+The ARM64 archive SHA-256 is
+`823392ebb1a04a766e68a971482d389eb8ce259d9d6bef0cbd3b3d124b510009`.
+[Native archives](rw02-native-gui.md#native-follow-up-at-72fff40).
+
+## Reader-assisted editing
+
+The native reader scenario now submits the dedicated extended Delete
+scan code E0 53 through Win32 `SendInput`. Before each gesture it checks
+the input desktop, foreground HWND, GUI thread's active and keyboard-focus
+windows, their process, and the UI Automation identity of the focused
+unprotected filename field. The isolated keyboard uses Ctrl+A, Ctrl+C and
+Ctrl+V. The driver records accepted input-event counts, the focus HWND, both
+live text values and the selection's UTF-16 start and end. It retains only
+strings from the known synthetic filename. Empty COM strings include their
+original null-BSTR flags. [Win32 keyboard input](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput)
+and [UI Automation range endpoints](https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.text.textpatternrange.moveendpointbyrange).
+
+NVDA binds Delete to an editing script that reads the caret and forwards
+the gesture. If the first native Delete leaves the exact original text in
+both patterns, the observer records that result, reselects the entire name
+and presses NVDA+F2. It waits for the portable reader's own English
+`Pass next key through` announcement and confirms the full selection again
+before repeating the same Delete. An unexpected edit or lost focus fails
+the case. The result distinguishes `ordinaryDelete` and
+`nvdaPassThroughDelete`. A successful route requires an empty ValuePattern,
+empty TextPattern document with equal endpoints, and a subsequent native
+paste of the original Unicode clipboard value into the focused field.
+Both text patterns must independently return that complete name.
+[NVDA editing script](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/editableText.py#L328-L345),
+[NVDA pass-next-key command](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/globalCommands.py#L3422-L3434)
+and [NVDA keyboard guide](https://download.nvaccess.org/documentation/userGuide.html#BasicNVDACommands).
+
+The native invocation above writes the per-gesture record to
+`gui/input.json` and the accepted edit route and NVDA acknowledgement to
+`result.json`. Eleven Python checks cover speech parsing, cleanup and
+receipt validation. On Linux, PowerShell parsed the observer and compiled
+the Win32 bridge. Disposable method doubles exercised both success routes,
+null-BSTR results, changed text, a noncollapsed empty range and focus loss.
+Native results for the new observer are pending on both architectures.
