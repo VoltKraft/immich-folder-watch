@@ -45,6 +45,8 @@ tools/rust-qa/platform-logs/** text eol=lf
 tools/rust-qa/yaml/** text eol=lf
 tools/rust-qa/linux-services/** text eol=lf
 tools/rust-qa/portal-reference/*.py text eol=lf
+tools/rust-qa/portal-noble/** text eol=lf
+tools/rust-qa/ubuntu-reader/** text eol=lf
 tools/rust-qa/portal-reference/flock-upstream.patch -text whitespace=-blank-at-eol
 tools/rust-qa/portal-reference/LICENSE.upstream-LGPL-2.1.txt -text
 rust/audit/notices/* -text

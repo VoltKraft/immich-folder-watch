@@ -173,3 +173,21 @@ managed reference. Thus the source-matched negative and positive controls hold
 the build chain constant and differ only in the original upstream C hunk.
 The original host portal binary also retains its recorded SHA-256
 `dd0b626dd10ac8673482fb00f7dcd733dad723aba0781dd8bd4966eaa1b753b1`.
+
+## Distribution availability on 2026-11-21
+
+The latest published upstream release was still 1.22.1. Fedora listed
+1.22.1-2.fc45 for Fedora 45 and Rawhide. The installed Fedora 45 x64 RPM
+matched that version and its ordinary grant returned `ENOSYS`. Debian sid
+listed 1.22.1+ds-1. Its two distribution patches change systemd activation
+and a documentation font, leaving the released FUSE implementation intact.
+Neither that published release nor those package sources establish a usable
+portal update for the tested hosts. [Upstream releases](https://github.com/flatpak/xdg-desktop-portal/releases)
+· [Fedora packages](https://packages.fedoraproject.org/pkgs/xdg-desktop-portal/xdg-desktop-portal/)
+· [Debian packaging patches](https://sources.debian.org/patches/xdg-desktop-portal/1.22.1%2Bds-1/).
+
+The Ubuntu Noble package and pristine Ubuntu rebuild both produced the same
+refusal. A private rebuild with the upstream function passed 42 ordinary
+shared/exclusive lock operations through a genuine Documents grant. Three
+builds produced byte-identical unmodified and patched executables. The
+native run used Noble x64 userspace on a Fedora kernel. [Noble package, source and lock receipts](rw02-portal-noble.md).

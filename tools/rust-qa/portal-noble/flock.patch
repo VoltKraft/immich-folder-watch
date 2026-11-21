@@ -1,0 +1,32 @@
+--- a/document-portal/document-portal-fuse.c
++++ b/document-portal/document-portal-fuse.c
+@@ -3186,16 +3186,22 @@
+ }
+
+ static void
+-xdp_fuse_flock (fuse_req_t req,
+-                fuse_ino_t ino,
++xdp_fuse_flock (fuse_req_t             req,
++                fuse_ino_t             ino,
+                 struct fuse_file_info *fi,
+-                int lock_op)
++                int                    lock_op)
+ {
+   const char *op = "FLOCK";
+-
+-  g_debug ("FLOCK %lx", ino);
+-
+-  xdp_reply_err (op, req, ENOSYS);
++  XdpFile *file = (XdpFile *)fi->fh;
++  int res;
++
++  g_debug ("FLOCK %" G_GINT64_MODIFIER "x", ino);
++
++  res = flock (file->fd, lock_op);
++  if (res < 0)
++    return xdp_reply_err (op, req, errno);
++
++  return xdp_reply_ok (op, req);
+ }
+
+ static void
