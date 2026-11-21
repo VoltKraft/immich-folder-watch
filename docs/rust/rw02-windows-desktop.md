@@ -23,6 +23,20 @@ for the guarded input on that desktop.
 [Native archives](rw02-native-gui.md#native-follow-up-at-8a8adaa) and
 [EnumDesktopWindows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdesktopwindows).
 
+The follow-up runs the passive observation before keyboard, recovery, mixed
+text, NVDA and IME. A matching build, run, attempt and evidence digest are
+required to select a private desktop. The same foreign HWND and PID must have
+covered the editor before and after its own nonactivating raise. Other cases
+use the ordinary guarded observer on the original desktop. Both routes run
+the same application and input checks. The private worker verifies the active,
+unlocked session and creates one hidden, observable window of its own. This
+keeps enumeration meaningful while the application has no visible window.
+Each case records placement, the native test exit and desktop restoration.
+Replaying the two archived observations selected the original x64 desktop and
+the private route on ARM64. Native results from this revision are outstanding.
+[Desktop selection](../../tools/rust-qa/windows-desktop/session.py) and
+[Win32 window creation](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexw).
+
 ## Native reproduction
 
 Run from the source checkout in the existing hosted Windows x64 and ARM64 jobs, after building the native GUI assessment. The fixture uses Python's standard library, the existing Windows PowerShell/UI Automation observer and Windows system DLLs. It requires the current hosted runner identity and the target-specific executable and evidence directory.

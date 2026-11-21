@@ -5,8 +5,7 @@ if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hos
     $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') { throw 'A disposable Windows rewrite job is required.' }
 $target = @{ X64='x86_64-pc-windows-msvc'; ARM64='aarch64-pc-windows-msvc' }[$env:RUNNER_ARCH]
 if (-not $target -or $env:NATIVE_TARGET -cne $target) { throw 'Expected matching Windows runner architecture.' }
-$gui = Join-Path $env:GITHUB_WORKSPACE 'artifacts\rust\gui-build\release\native-gui-assessment.exe'
-$probe = Join-Path $PSScriptRoot 'run.py'
+$session = Join-Path $env:GITHUB_WORKSPACE 'tools\rust-qa\windows-desktop\session.py'
 $parent = Join-Path $env:GITHUB_WORKSPACE "artifacts\rust\gui-native\$target\windows-ime"
 if (Test-Path -LiteralPath $parent) { throw 'Expected a new native IME output directory.' }
 [void](New-Item -ItemType Directory -Path $parent)
@@ -23,7 +22,7 @@ function LanguageState($List) {
 
 try {
     $initial = Join-Path $parent 'installed'
-    & python $probe $gui $initial
+    & python $session $target 'ime-installed'
     $status = $LASTEXITCODE
     $before = [IO.File]::ReadAllText((Join-Path $initial 'result.json')) | ConvertFrom-Json
     $report.initial = $before.status
@@ -60,7 +59,7 @@ try {
         if ($language.Count -ne 1) { throw 'The disposable account did not acquire the Japanese locale.' }
         $report.inputTips = @($language[0].InputMethodTips)
         $after = Join-Path $parent 'japanese'
-        & python $probe $gui $after
+        & python $session $target 'ime-japanese'
         $status = $LASTEXITCODE
         $observation = [IO.File]::ReadAllText((Join-Path $after 'result.json')) | ConvertFrom-Json
         $report.afterProvisioning = $observation.status

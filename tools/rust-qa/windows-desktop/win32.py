@@ -1,6 +1,7 @@
 """Read Win32 desktop/window identities and operate only on the fixture's own desktop."""
 
 import ctypes as c
+from contextlib import contextmanager
 from ctypes import wintypes as w
 import os
 from pathlib import PureWindowsPath
@@ -166,6 +167,40 @@ class Desktop:
     def surroundings(self):
         return {"foreground": self.window(self.foreground()), "shell": self.window(self.shell()),
                 "desktopWindow": self.window(self.desktop_window())}
+
+    @contextmanager
+    def enumeration_witness(self, name, report):
+        """Keep an observable, never-shown window on the fixture's otherwise empty desktop."""
+        if not name.startswith("IfwQa_") or not ordinary_console(self.context(), name):
+            raise RuntimeError("A private, active fixture desktop is required for the observation window")
+        user = c.WinDLL("user32", use_last_error=True)
+        create = bind(user, "CreateWindowExW", w.HWND, w.DWORD, w.LPCWSTR, w.LPCWSTR, w.DWORD,
+                      c.c_int, c.c_int, c.c_int, c.c_int, w.HWND, w.HMENU, w.HINSTANCE, w.LPVOID)
+        destroy = bind(user, "DestroyWindow", w.BOOL, w.HWND)
+        visit_type = c.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
+        enumerate_windows = bind(user, "EnumDesktopWindows", w.BOOL, w.HANDLE, visit_type, w.LPARAM)
+        # WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW and WS_POPUP, with no WS_VISIBLE.
+        hwnd = check(create(0x08000080, "STATIC", "IFW native test enumeration", 0x80000000,
+                            0, 0, 0, 0, None, None, None, None), "CreateWindowExW(hidden fixture)")
+        try:
+            seen = False
+
+            @visit_type
+            def visit(window, _):
+                nonlocal seen
+                seen |= window == hwnd
+                return True
+
+            selected = check(self.thread_desktop(self.thread()), "GetThreadDesktop")
+            check(enumerate_windows(selected, visit, 0), "EnumDesktopWindows(hidden fixture)")
+            if not seen or self.visible(hwnd) or self.window(hwnd)["pid"] != os.getpid():
+                raise RuntimeError("The enumeration witness must be owned, enumerable and hidden")
+            report["hiddenEnumerationWindow"] = hex(hwnd)
+            yield
+        finally:
+            report["hiddenWindowDestroyed"] = bool(destroy(hwnd))
+            if not report["hiddenWindowDestroyed"]:
+                check(False, "DestroyWindow(hidden fixture)")
 
     def dwm(self, hwnd, index, value):
         result = self.attribute(hwnd, index, c.byref(value), c.sizeof(value))

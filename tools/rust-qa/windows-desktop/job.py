@@ -28,9 +28,11 @@ class ExtendedLimits(c.Structure):
     _fields_ = [("basic", BasicLimits), ("io_counters", c.c_uint64 * 6), ("memory_limits", c.c_size_t * 4)]
 
 
-def run_worker(worker, args, desktop, cwd, record):
+def run_worker(worker, args, desktop, cwd, record, *, timeout_seconds=180):
     if (c.sizeof(Startup), c.sizeof(Process), c.sizeof(ExtendedLimits)) != (104, 24, 144):
         raise RuntimeError("Expected the native Windows x64 or ARM64 structure layout")
+    if not 1 <= timeout_seconds <= 900:
+        raise ValueError("The native desktop worker requires a bounded lifetime")
     kernel = c.WinDLL("kernel32", use_last_error=True)
     make_job = bind(kernel, "CreateJobObjectW", w.HANDLE, c.c_void_p, w.LPCWSTR)
     set_limits = bind(kernel, "SetInformationJobObject", w.BOOL, w.HANDLE, c.c_int, c.c_void_p, w.DWORD)
@@ -59,9 +61,9 @@ def run_worker(worker, args, desktop, cwd, record):
         check(assign(job, process.process), "AssignProcessToJobObject")
         assigned = True
         check(resume(process.thread) != 0xffffffff, "ResumeThread")
-        outcome = wait(process.process, 180_000)
+        outcome = wait(process.process, timeout_seconds * 1000)
         if outcome == 258:  # WAIT_TIMEOUT
-            raise TimeoutError("The desktop worker exceeded 180 seconds")
+            raise TimeoutError(f"The desktop worker exceeded {timeout_seconds} seconds")
         check(outcome == 0, "WaitForSingleObject")
         status = w.DWORD()
         check(get_status(process.process, c.byref(status)), "GetExitCodeProcess")

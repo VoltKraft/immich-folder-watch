@@ -1,6 +1,7 @@
 """Qualify foreground keyboard input on a fresh desktop of a disposable GitHub Windows runner."""
 
 import argparse
+from contextlib import contextmanager
 import ctypes as c
 import hashlib
 import json
@@ -74,7 +75,8 @@ def switch_back(api, saved, name, evidence):
         raise RuntimeError("Restoring the original input desktop could not be verified")
 
 
-def desktop_trial(api, binary, output, host, report):
+@contextmanager
+def named_input_desktop(api, report):
     report["beforeSwitch"] = api.context()
     if not ordinary_console(report["beforeSwitch"], "Default"):
         raise RuntimeError("The runner did not report an active unlocked WinSta0 Default input desktop")
@@ -100,7 +102,7 @@ def desktop_trial(api, binary, output, host, report):
                 report["afterSwitch"] = api.context()
                 if not same_name(report["afterSwitch"]["inputDesktop"], name):
                     raise RuntimeError("The new input desktop was not selected")
-                trial(report, api, binary, output / "named", name, host)
+                yield name
             finally:
                 switch_back(api, saved, name, cleanup)
         finally:
@@ -111,6 +113,11 @@ def desktop_trial(api, binary, output, host, report):
         cleanup["originalHandleClosed"] = bool(api.close(saved))
         if not cleanup["originalHandleClosed"]:
             check(False, "CloseDesktop(original)")
+
+
+def desktop_trial(api, binary, output, host, report):
+    with named_input_desktop(api, report) as name:
+        trial(report, api, binary, output / "named", name, host)
 
 
 def execute(args, target, report):

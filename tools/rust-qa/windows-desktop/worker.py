@@ -1,6 +1,7 @@
 """Observe one owned native GUI on the runner desktop or the newly created input desktop."""
 
 import argparse
+from contextlib import nullcontext
 import importlib.util
 import json
 import os
@@ -134,7 +135,8 @@ def trial(api, args, result):
     # UIA reports physical screen coordinates. Match that coordinate system for all hit tests.
     check(api.awareness(-4), "SetThreadDpiAwarenessContext(PER_MONITOR_AWARE_V2)")
     observer_type = shared_windows()
-    with tempfile.TemporaryDirectory(prefix="profile-", dir=args.output) as scratch:
+    witness = api.enumeration_witness(args.desktop, result) if named_desktop(args.desktop) else nullcontext()
+    with witness, tempfile.TemporaryDirectory(prefix="profile-", dir=args.output) as scratch:
         profile = Path(scratch)
         private = {**os.environ, "HOME": scratch, "USERPROFILE": scratch, "TMP": scratch, "TEMP": scratch,
                    "IFW_QA_ISOLATED": "1", "WGPU_DX12_COMPILER": "Fxc"}
