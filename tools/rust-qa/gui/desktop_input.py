@@ -123,6 +123,17 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     if (("password text", "Kennwort") not in names
             or not names.intersection({("push button", "English"), ("button", "English")})):
         raise RuntimeError("Password field or language button does not have its accessible name or role")
+    if reader:
+        # Start once the reader has announced the actual language button. Tab then
+        # traverses all four tested controls, including the first editable filename.
+        for _ in range(6):
+            if any(n["focused"] and n["name"] == "English" for n in tree()):
+                break
+            tap(observer, 0xff09)
+            time.sleep(.12)
+        else:
+            raise RuntimeError("Could not position native focus before the speech traversal")
+        reader.begin()
     traversal = []
     for _ in range(6):
         tap(observer, 0xff09)  # Tab
@@ -130,6 +141,8 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
         focus = [n for n in tree() if n["focused"] and n["name"] in ("Dateiname", "Kennwort", "English")]
         if focus:
             traversal.append(focus[0]["name"])
+            if reader:
+                reader.wait_label(focus[0]["name"])
         if traversal and traversal[-1] == "Kennwort":
             break
     if not traversal or traversal[-1] != "Kennwort":
@@ -147,6 +160,8 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     if not any(n["focused"] and n["name"] == "English" for n in tree()):
         raise RuntimeError("Tab did not reach the language button")
     traversal.append("English")
+    if reader:
+        reader.wait_label("English")
     tap(observer, 0x20)
     wait_for(lambda: any(n["name"] == "Filename" for n in tree()), 3, "Keyboard language switch failed")
     english = tree()
@@ -154,6 +169,8 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
                "after_keyboard_language_switch": english}
     tap(observer, 0xff09)
     wait_for(lambda: any(n["name"] == "Filename" and n["focused"] for n in tree()), 3, "Filename focus missing")
+    if reader:
+        reader.wait_label("Filename")
     shortcut(observer, ord("a"), 0xffe3)  # Control
     shortcut(observer, ord("c"), 0xffe3)
     owner = wait_for(observer.clipboard_owner, 3, "No native clipboard selection owner")
