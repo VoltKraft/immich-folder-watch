@@ -100,7 +100,7 @@ def main(target):
                   graph=graph, lock=lock, selectedFeatureRows=len(selected), canonicalInputs=ORIGINALS,
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
-                  compilerInputs={p.name: sha(p) for p in sorted((gui / "src").glob("*.rs"))},
+                  compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
                   variantInputs={p.name: sha(p) for p in (HERE / "candidate.patch", HERE / "loop_wake.rs", Path(__file__))})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")

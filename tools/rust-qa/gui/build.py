@@ -65,7 +65,7 @@ def main(args):
                         "--", "-D", "warnings"], check=True)
         return
     subprocess.run([*command, "build", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
-    sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", *sorted((HERE / "src").glob("*.rs")),
+    sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", *sorted((HERE / "src").glob("*.rs")), HERE / "src/tray-icon.argb",
                ROOT / "rust/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/Cargo.toml",
                ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]
     binary = build / "release/native-gui-assessment"

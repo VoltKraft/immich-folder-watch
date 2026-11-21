@@ -21,7 +21,7 @@ def verify(subject):
     import source_profile
     gui = json.loads((subject / "native-gui-assessment.inputs.json").read_text())
     worker = json.loads((subject / "worker.inputs.json").read_text())
-    required = {"tools/rust-qa/gui/src/" + name for name in ("main.rs", "graphics.rs", "fonts.rs", "native_window.rs", "linux.rs")}
+    required = {"tools/rust-qa/gui/src/" + name for name in ("main.rs", "graphics.rs", "fonts.rs", "native_window.rs", "linux.rs", "tray-icon.argb")}
     if (not required.issubset(gui["sources"]) or gui["binary_sha256"] != sha(subject / "native-gui-assessment")
             or worker["gui_sha256"] != gui["binary_sha256"] or source_digest(worker) != WORKER_SOURCES
             or gui.get("sourceProfileSha256") != sha(source_profile.REVIEW)):

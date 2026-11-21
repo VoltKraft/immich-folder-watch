@@ -36,7 +36,7 @@ class WarmTests(unittest.TestCase):
             self.skipTest("requires the reconstructed canonical GUI inputs")
         with tempfile.TemporaryDirectory() as temp:
             gui = builder.stage(Path(temp) / "stage")
-            for name in ("Cargo.lock", "Cargo.toml", "src/windows_worker.rs", "src/fonts.rs", "src/linux.rs"):
+            for name in ("Cargo.lock", "Cargo.toml", "src/windows_worker.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
                 self.assertEqual(builder.sha(builder.GUI / name), builder.sha(gui / name))
             self.assertEqual(builder.sha(gui / "src/loop_wake.rs"), builder.sha(builder.HERE / "loop_wake.rs"))
             for name, digest in builder.ORIGINALS.items():

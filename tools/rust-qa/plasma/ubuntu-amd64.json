@@ -1,0 +1,36 @@
+{
+  "baseFile": "ubuntu-base-24.04.5-base-amd64.tar.gz",
+  "baseBytes": 30028293,
+  "baseSha256": "e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86",
+  "archiveKeyringSha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+  "archiveSigner": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+  "signedAptInputs": {
+    "archive.ubuntu.com_ubuntu_dists_noble-security_InRelease": "b431610037d0bbf122688ae8756c5ae9ee68d62dd3be5e1f0f65ab60abaea6c3",
+    "archive.ubuntu.com_ubuntu_dists_noble-security_main_binary-amd64_Packages": "54b0bfabe9350eb7877059b7929a61d0842f18555bddc19c09777322cd330e8f",
+    "archive.ubuntu.com_ubuntu_dists_noble-security_universe_binary-amd64_Packages": "460578edf79d78ba490348e3a69306cb480d11e842f6111e76da4923e88ccb34",
+    "archive.ubuntu.com_ubuntu_dists_noble-updates_InRelease": "8be819b6d76c7d2490956220620307768159877e9d7a838508a41b0c3bfa6398",
+    "archive.ubuntu.com_ubuntu_dists_noble-updates_main_binary-amd64_Packages": "8272d1d9ba373ef38d13f3880964b8faf3e9872dfb95970b89f6f0e086629f1f",
+    "archive.ubuntu.com_ubuntu_dists_noble-updates_universe_binary-amd64_Packages": "2349f1cd7b5d285a6fc04b91b4467738c7d8a938d9b4ef54c57b0ed7f0474cbe",
+    "archive.ubuntu.com_ubuntu_dists_noble_InRelease": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+    "archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages": "8f6f71ae839c8cba390a7643fcbbdacddb0bc7d12c1583a2dd80a1f8443a30e5",
+    "archive.ubuntu.com_ubuntu_dists_noble_universe_binary-amd64_Packages": "687ffc969e7700137677b9cfe2f614ee2d638052a91a7c9bf31f3f6a3040a99a"
+  },
+  "packages": 696,
+  "packageTableSha256": "53a02fc9d53d3450ac4891c7402c6d9bad472a65a788af84002ca81e2f93ce21",
+  "keyPayloads": {
+    "usr/bin/kwin_x11": "d5e30af8664353285c9203becfcac29ee6d2647b0e5f835395b0f8223e77585f",
+    "usr/bin/kded5": "8a76f12e16be96df13788fd6937d2bbffb19dd99b0abdfcd343e310be23f8c55",
+    "usr/bin/plasmashell": "302b44a89f4557aa755189eb91319e128bd93778fba5b54de6634051dc651710",
+    "usr/lib/x86_64-linux-gnu/qt5/plugins/kf5/kded/statusnotifierwatcher.so": "7904952583f1b55f641fda5b24b83e9039b689372da0da3107db9ff950fa77ac",
+    "usr/lib/x86_64-linux-gnu/qt5/plugins/plasma/dataengine/plasma_engine_statusnotifieritem.so": "d107be41796f43f46c5fb7bba849a644f93c3b20d154b6b4dde3ebff2a9566ae",
+    "usr/lib/x86_64-linux-gnu/qt5/plugins/plasma/applets/org.kde.plasma.systemtray.so": "4b5fb000d8642cc64b6df586c22411609cf1e36d7d08b7922c9bfd1749fbd03e",
+    "usr/lib/x86_64-linux-gnu/qt5/plugins/plasma/applets/org.kde.plasma.private.systemtray.so": "67c20213a3d627600e5472b3fdc90beb2daca2dc64773c815500d7b9b573ffc9",
+    "usr/share/plasma/plasmoids/org.kde.plasma.private.systemtray/contents/ui/items/StatusNotifierItem.qml": "602815376dcd618d8c80fb02130acc041d6b73744831d496f383bf9291a90084",
+    "usr/lib/x86_64-linux-gnu/librsvg-2.so.2": "81b5db4db32c47697c7b6d7432e541544342c97bc88173df9f18bb0679279c51",
+    "usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so.0": "f9f51980f9d8978507c3637fa5d4e89f9910d01d74c91905f27158efca27279d"
+  },
+  "iconSha256": "402073a5d81779a92c54629de7fb16a511c0764391bcdec060095c691b3d0a31",
+  "imageSumsSha256": "30f23cec3a46679bcf21dbe0c0a0ab51440e9b2f5ac69b3ae1d4a7a71c0ffc69",
+  "imageSignatureSha256": "5164e25bab9ff0467fc83415c8f759bb79cbd4e0264b9a11f49ff1e6a10a4c1f",
+  "imageSigner": "843938DF228D22F7B3742BC0D94AA3F0EFE21092"
+}

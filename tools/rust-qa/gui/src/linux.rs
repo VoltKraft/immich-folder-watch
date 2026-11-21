@@ -45,7 +45,6 @@ impl Application {
     }
 }
 
-// The synthetic watcher exercises registration, item discovery and its primary activation.
 #[interface(name = "org.kde.StatusNotifierItem")]
 impl Item {
     #[zbus(property)]
@@ -71,6 +70,19 @@ impl Item {
     #[zbus(property)]
     fn category(&self) -> &str {
         "ApplicationStatus"
+    }
+    #[zbus(property)]
+    fn icon_pixmap(&self) -> Vec<(i32, i32, &'static [u8])> {
+        // The SNI interface carries straight-alpha ARGB32 bytes in network order.
+        let mut pixels = include_bytes!("tray-icon.argb").as_slice();
+        [16, 22, 32, 48, 64]
+            .into_iter()
+            .map(|size| {
+                let (frame, rest) = pixels.split_at((size * size * 4) as usize);
+                pixels = rest;
+                (size, size, frame)
+            })
+            .collect()
     }
     #[zbus(signal)]
     async fn new_status(emitter: &SignalEmitter<'_>, status: &str) -> zbus::Result<()>;

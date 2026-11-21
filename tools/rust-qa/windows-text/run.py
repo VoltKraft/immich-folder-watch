@@ -39,7 +39,7 @@ def check_build(target, binary, folder):
     runpy.run_path(str(QA / "verify-gui-inputs.py"))["verify"]()
     approved = source_profile.validate()
     manifests = read(ROOT / "rust/audit/gui-profile.json")
-    expected = [QA / "gui/Cargo.toml", *sorted((QA / "gui/src").glob("*.rs")), ROOT / "rust/Cargo.toml",
+    expected = [QA / "gui/Cargo.toml", *sorted((QA / "gui/src").glob("*.rs")), QA / "gui/src/tray-icon.argb", ROOT / "rust/Cargo.toml",
                 ROOT / "rust/crates/desktop-lifecycle/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]
     if (target != f"{native_arch}-pc-windows-msvc" or DESKTOP["pe_machine"](binary) != TARGETS[target]
             or receipt["source"] != source or (os.getenv("GITHUB_SHA") and source != os.environ["GITHUB_SHA"])

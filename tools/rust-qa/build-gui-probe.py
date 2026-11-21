@@ -54,7 +54,8 @@ def main():
               "textNotices": profile["noticeFiles"], "sourceProfileSha256": source_profile.sha(source_profile.REVIEW),
               "sourceReconstructionSha256": source_profile.sha(Path(source_profile.__file__)),
               "compilerSources": {p.relative_to(ROOT).as_posix(): source_profile.sha(p) for p in
-                                  [MANIFEST, *sorted((MANIFEST.parent / "src").glob("*.rs")), ROOT / "rust/Cargo.toml",
+                                  [MANIFEST, *sorted((MANIFEST.parent / "src").glob("*.rs")), MANIFEST.parent / "src/tray-icon.argb",
+                                   ROOT / "rust/Cargo.toml",
                                    ROOT / "rust/crates/desktop-lifecycle/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]}}
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{args.target} built {record['binarySha256']}")
