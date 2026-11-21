@@ -179,3 +179,25 @@ ASCII-safe progress message. The remaining Windows controls require a new
 native run. The ordinary Linux x64 GUI independently passed the integrated
 glyph and mixed-direction editing checks. [Native build and observer logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264)
 and [integrated text evidence](rw02-gui-dependencies.md).
+
+## Pixel readback on Windows and Linux at 72fff40
+
+Windows x64 passed the ordinary mixed-direction filename edit. Its separate
+DX12 stress test also observed the expected cursor, selection and deletion.
+The original pixel observer could not identify the final BEH. Its reference
+mask overlapped the field mask by 0.507 at the fixed origin. Giving every
+reference the same one-physical-pixel translation allowance raised BEH's
+overlap to 0.803. Its closest competitor scored 0.263. The two original
+confidence limits remain 0.60 overlap and 0.20 lead. The unmapped glyph
+also competes and can cause rejection.
+
+Replaying the archived pixels identified TEH to the left of the digits and
+BEH to their right on Windows x64 (0.797 and 0.803) and in four Ubuntu
+x64/ARM64 captures (0.830 and 0.828). Two native Fedora captures from the
+original unfixed implementation reproduced the opposite order. A fresh
+Fedora x64 execution of the corrected implementation passed all four
+interactive cases. The eight-replay receipt has SHA-256
+`0e934b2154093733d88db2a1a86d591af46c14410fbe6eeb9d8ac82a79853499`.
+The historical Windows x64 job remains failed. Windows ARM64 stopped before
+capturing this field. [Archived native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350)
+· [Pixel observer](../../tools/rust-qa/font-coverage/text_observations.py).

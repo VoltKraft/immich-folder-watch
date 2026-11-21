@@ -77,10 +77,30 @@ def masks(frame, messages):
     return result, bounds_by_code
 
 
+def identify_glyph(field, samples):
+    # Fractional cell and edit origins can round the boundary of antialiased ink differently.
+    # Give every candidate the same one-physical-pixel registration and confidence thresholds.
+    offsets = [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+    scores, alignment = {}, {}
+    for code, sample in samples.items():
+        best_score, best_offset = -1, (0, 0)
+        for dx, dy in offsets:
+            shifted = {(x + dx, y + dy) for x, y in sample}
+            score = len(field & shifted) / max(1, len(field | shifted))
+            if score > best_score:
+                best_score, best_offset = score, (dx, dy)
+        scores[code], alignment[code] = round(best_score, 3), best_offset
+    best, second, *_ = sorted(scores, key=scores.get, reverse=True)
+    observed = None
+    if best != "10FFFD" and scores[best] >= .60 and scores[best] - scores[second] >= .2:
+        observed = chr(int(best, 16))
+    return {"character": observed, "maskOverlap": scores, "referenceOffsets": alignment}
+
+
 def arabic_pixels(frame, bounds, initial):
     # These isolated characters on either side of the digits use the same shapes as the cells.
     # Classify the actual field pixels without using Galley.chr to identify their contents.
-    samples = {k: pixel_mask(frame, bounds[k]) for k in ("628", "62A", "62B")}
+    samples = {k: pixel_mask(frame, bounds[k]) for k in ("628", "62A", "62B", "10FFFD")}
     scale = (bounds["41"][3] - bounds["41"][1]) / 64
     y = initial["centerY"]
     measured = []
@@ -90,11 +110,7 @@ def arabic_pixels(frame, bounds, initial):
         xmin, xmax = round(g["x"]), round(g["x"] + g["width"])
         box = (xmin, round(y - 19 * scale), xmax, round(y + 19 * scale))
         field = pixel_mask(frame, box)
-        scores = {ch: round(len(field & sample) / max(1, len(field | sample)), 3)
-                  for ch, sample in samples.items()}
-        best, second, _ = sorted(scores, key=scores.get, reverse=True)
-        observed = chr(int(best, 16)) if scores[best] >= .60 and scores[best] - scores[second] >= .2 else None
-        measured.append({"character": observed, "maskOverlap": scores})
+        measured.append(identify_glyph(field, samples))
     return measured
 
 
