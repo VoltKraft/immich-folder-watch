@@ -28,13 +28,14 @@ def bind(library, name, result, *arguments):
 
 
 class Windows:
-    def __init__(self, pid):
+    def __init__(self, pid, desktop=None):
         user = ctypes.WinDLL("user32", use_last_error=True)
         self.pid = pid
+        self.desktop = desktop
         self.events = []
         self.enum_callback = ctypes.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
         event_proc = ctypes.WINFUNCTYPE(None, w.HANDLE, w.DWORD, w.HWND, w.LONG, w.LONG, w.DWORD, w.DWORD)
-        self.enumerate = bind(user, "EnumWindows", w.BOOL, self.enum_callback, w.LPARAM)
+        self.enumerate = bind(user, "EnumDesktopWindows", w.BOOL, w.HANDLE, self.enum_callback, w.LPARAM)
         self.owner = bind(user, "GetWindowThreadProcessId", w.DWORD, w.HWND, ctypes.POINTER(w.DWORD))
         self.caption = bind(user, "GetWindowTextW", ctypes.c_int, w.HWND, w.LPWSTR, ctypes.c_int)
         self.is_visible = bind(user, "IsWindowVisible", w.BOOL, w.HWND)
@@ -64,12 +65,15 @@ class Windows:
         while self.peek(ctypes.byref(message), None, 0, 0, 1):
             self.dispatch(ctypes.byref(message))
 
-    def visible(self, retiring=None):
+    def visible(self, retiring=None, *, waiting_for_first=False):
         self.pump()
         matching = []
+        visited = 0
 
         @self.enum_callback
         def visit(hwnd, _data):
+            nonlocal visited
+            visited += 1
             owner = w.DWORD()
             self.owner(hwnd, ctypes.byref(owner))
             if owner.value == self.pid and self.is_visible(hwnd):
@@ -79,8 +83,14 @@ class Windows:
                     matching.append(hwnd)
             return True
 
-        if not self.enumerate(visit, 0):
-            raise ctypes.WinError(ctypes.get_last_error())
+        ctypes.set_last_error(0)
+        if not self.enumerate(self.desktop, visit, 0):
+            error = ctypes.get_last_error()
+            # A newly created private desktop can have no top-level windows yet.
+            # Only a positive startup wait may retry. A hidden-state check must fail.
+            if self.desktop and waiting_for_first and not visited and not error:
+                return None
+            raise ctypes.WinError(error)
         if retiring in matching and len(matching) == 2:
             # During DX12 replacement Windows can temporarily expose both generations.
             # Wait for the old HWND to vanish before observing or sending any input.

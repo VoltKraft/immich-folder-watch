@@ -78,6 +78,12 @@ The same run compares Rust path, timestamp and casing observations to a native
 .NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
 comparison. See the [legacy checks](rust/rw02-legacy.md).
 
+The dependency-free `desktop-platform-log` crate provides the native log
+outputs assessed in RW-02. The log observer compares file bytes with the
+shipping provider, then reads back native events using the host OS. It uses
+an isolated journal on Linux and a temporary custom log on the disposable
+Windows runner. [Platform log commands and results](rust/rw02-platform-logs.md).
+
 Run `python3 tools/rust-qa/verify-gui-inputs.py` to verify the original font and
 supplemental notice bytes offline. `--fetch-missing` restores a missing input
 by its reviewed upstream revision and digest. For the separate development GUI
@@ -120,6 +126,12 @@ default. Ubuntu Noble uses `--ibus-engine mozc`. The [graphics recovery
 fixture](rust/rw02-graphics.md) records presentation and input across device
 replacement. The [text editing fixture](rust/rw02-font-coverage.md) compares
 the released and corrected mixed-direction caret against actual rendered glyphs.
+
+The [Windows IME assessment](rust/rw02-windows-ime.md) requires a native
+input service and an owned foreground filename field. Its hosted wrapper
+records missing components and verifies the disposable account's cleanup.
+The [ordinary Windows filename checks](rust/rw02-windows-text.md) run against
+the same native GUI and verify glyph coverage, cursor movement and selection.
 
 The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
 and exercises both protocol directions and file guard ownership in separate processes.

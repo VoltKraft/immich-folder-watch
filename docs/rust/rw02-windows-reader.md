@@ -36,8 +36,7 @@ python3 tools/rust-qa/windows-reader/run.py --binary artifacts/rust/gui-build/re
 
 The final command runs only on a disposable native Windows rewrite runner.
 The local parser controls passed with ordered announcements, protected input,
-split log writes and unrelated logging. Actual NVDA observations from native
-Windows x64 and ARM64 remain pending. [Fixture and input checks](../../tools/rust-qa/windows-reader/run.py).
+split log writes and unrelated logging. The hosted observations below identify which cues each native run reached. [Fixture and input checks](../../tools/rust-qa/windows-reader/run.py).
 
 At `8b071ab`, both Windows runners initialized NVDA and selected OneCore
 after the audio device rejected eSpeak. The observer required eSpeak and
@@ -51,3 +50,15 @@ announcements remain a separate acceptance requirement on both hosts.
 [Hosted observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452),
 [release configuration schema](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/config/configSpec.py)
 and [reader shutdown](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/nvda.pyw).
+
+
+At `8a8adaa` the x64 reader initialized OneCore and produced all seven
+expected announcements in 13 examined speech records. UIA confirmed three
+masks and the DE/EN focus sequence. The native clipboard contained the
+expected synthetic filename after Copy. The driver timed out waiting for
+the empty field after Backspace. On ARM64, NVDA produced the initial
+German filename label in six examined records. The owned foreground test did
+not reach password typing. Both readers quit through their own windows and the
+two temporary profiles were removed. The follow-up checks the full selected
+filename before Delete and reads the empty document range independently.
+[Native archives](rw02-native-gui.md#native-follow-up-at-8a8adaa).

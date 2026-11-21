@@ -183,12 +183,15 @@ def assess(installer, binary, output, report):
                     log.read()
                     time.sleep(.06)
                 log.read()
-                if test.poll() != 0 or reader.poll() is not None or tuple(speech.observed) != EXPECTED:
+                report["inputDriverExit"] = test.poll()
+                report["readerActiveAfterInput"] = reader.poll() is None
+                if report["inputDriverExit"] != 0 or not report["readerActiveAfterInput"] or tuple(speech.observed) != EXPECTED:
                     raise RuntimeError("Reader, foreground driver or ordered speech criteria did not pass")
             finally:
                 stop(test)
         finally:
             report.update(announcements=speech.observed, utterancesExamined=speech.utterances,
+                          orderedSpeechPassed=tuple(speech.observed) == EXPECTED,
                           synth=log.synth, readerInitialized=log.initialized, readerDiagnosticModules=log.diagnostics)
             if raw_log.is_file():
                 report["privateLogSha256"] = sha(raw_log)

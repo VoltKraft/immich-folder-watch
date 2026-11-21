@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from job import ExtendedLimits, Process, Startup
 from run import pe_machine, switch_back
 from win32 import SessionInfo, ordinary_console
-from worker import field_center, input_passed, named_desktop
+from worker import field_center, input_passed, named_desktop, shared_windows
 
 
 def active(desktop="Default"):
@@ -20,6 +20,26 @@ def active(desktop="Default"):
 
 
 class DesktopTests(unittest.TestCase):
+    def test_empty_named_desktop_can_only_retry_a_positive_window_wait(self):
+        windows = shared_windows()
+        observer = object.__new__(windows)
+        observer.pump = lambda: None
+        observer.desktop = 123
+        observer.enum_callback = lambda callback: callback
+        observer.enumerate = Mock(return_value=False)
+        with patch.object(c, "set_last_error", create=True), patch.object(c, "get_last_error", create=True, return_value=0), \
+                patch.object(c, "WinError", create=True, side_effect=OSError):
+            self.assertIsNone(observer.visible(waiting_for_first=True))
+            self.assertEqual(observer.enumerate.call_args.args[0], 123)
+            with self.assertRaises(OSError):
+                observer.visible()
+            observer.desktop = None
+            with self.assertRaises(OSError):
+                observer.visible(waiting_for_first=True)
+            observer.desktop = 123
+            with patch.object(c, "get_last_error", return_value=5), self.assertRaises(OSError):
+                observer.visible(waiting_for_first=True)
+
     def test_requires_actual_active_unlocked_desktop(self):
         self.assertTrue(ordinary_console(active("default"), "Default"))
         for changes in ({"inputDesktop": "Winlogon"}, {"threadDesktop": "Screen-saver"},

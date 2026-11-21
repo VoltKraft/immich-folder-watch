@@ -63,6 +63,16 @@ try {
         [Diagnostics.EventLog]::LogNameFromSourceName($source, '.') -ine $logName) {
         throw 'The runtime source does not resolve to its registered log and message resource.'
     }
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $channel = Get-WinEvent -ListLog $logName -ErrorAction SilentlyContinue
+        $available = $channel -and $channel.LogName -ceq $logName -and $channel.ProviderNames -contains $source
+        if ($null -ne $channel) { $channel.Dispose() }
+        if ($available) { break }
+        Start-Sleep -Milliseconds 180
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (-not $available) { throw 'The Windows Event Log service has not registered the private source.' }
+    $report.nativeChannelMatched = $true
     Invoke-Subject 'missing'
     Invoke-Subject 'mismatch'
     $report.refusedMissingAndWrongLog = $true

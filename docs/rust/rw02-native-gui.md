@@ -70,6 +70,33 @@ redirect target recorded zero requests and zero credentials. Verification
 covered the 253 Windows or 254 Linux storage evidence files and all ten
 indexed transport outputs in each archive.
 
+## Native follow-up at 8a8adaa
+
+Both Ubuntu jobs completed every assessment step. The Windows archives retain
+the successful and failed phases independently. All four downloads matched
+the Actions artifact SHA-256 and passed a full ZIP CRC check. The workflow
+used revision `8a8adaa400abc7303335c624ea68abed197158da`.
+[Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
+
+| Native target | Artifact ID / members | Archive SHA-256 |
+| --- | --- | --- |
+| Linux x64 | 14722553649 / 667 | `c2bc67a30e06733aa39442fbf46e093695cf7e22ba458a8d08c3cab80e2b02ca` |
+| Linux ARM64 | 14722697726 / 667 | `15e6cbb30eb60be6ef1b3171fe447730dfa1f3825d5ac6fbe04157945a33b321` |
+| Windows x64 | 14722303102 / 544 | `ce09fae0f455e589a50971c8db1aca44aa3f8a58171c7b149563941991c083f6` |
+| Windows ARM64 | 14722289089 / 537 | `595f39ad9e7fe6fe7227db52a5e6097374eec214977c3a919c2ea48007d409be` |
+
+Ubuntu x64 and ARM64 each passed all 11 same-host X11 resource limits, both
+Vulkan loss paths, installed Flatpak chooser/grant/revoke on X11 and Wayland,
+real Mozc composition and mixed-scale monitor moves. Windows x64 retained
+focus and the visible filename across DX12 device replacement and accepted
+the next edit. NVDA produced all seven ordered observations on x64 and the
+first German filename label on ARM64. On both Windows architectures the
+measured Rust visible working set and idle close/reopen p95 exceeded their
+limits. Both hosted Windows cross-session trials stopped before the second
+writer ran. [Paired Linux results](rw02-performance.md#hosted-linux-results-at-8a8adaa),
+[Windows resource comparison](rw02-windows-performance.md),
+[screen reader](rw02-windows-reader.md) and [foreground](rw02-windows-desktop.md).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

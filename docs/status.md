@@ -1,5 +1,28 @@
 # Project Status
 
+## Four hosted desktop results and Windows follow-up (2026-11-21)
+
+Both Ubuntu jobs passed every step at `8a8adaa`. Each met all 11 paired
+.NET limits with three 100,000-file trials. Both also passed actual renderer
+replacement, Mozc, GNOME monitor changes and installed Flatpak grant/revocation.
+On Windows x64 NVDA produced the seven expected announcements. The subsequent
+clipboard clear failed. Windows ARM64 produced the first label. A full-screen
+WWAHost window covered the test field on its active console. The private
+desktop was restored on both architectures after its initial window enumeration
+failed. Each Windows host exceeded three of nine limits, for visible working
+set, idle close and idle reopen. All four ZIP digests and CRCs were verified.
+[Archive inventory](rust/rw02-native-gui.md#native-follow-up-at-8a8adaa) and
+[stack decision and remaining work](rust/rw02-stack-decision.md).
+
+Commit `e80c205` added a real native Windows 100,000-file worker and independent
+NTFS completion checks to the paired WPF and Rust trials. The local fixture
+suite passed 23 tests with one Windows-only case. The next native jobs also
+exercise the revised selection/foreground observers, the ordinary mixed-text
+field, the native Japanese IME and the platform log readbacks. RW-02 remains
+open. [Windows performance](rust/rw02-windows-performance.md),
+[Windows text](rust/rw02-windows-text.md), [input method](rust/rw02-windows-ime.md)
+and [native logging](rust/rw02-platform-logs.md).
+
 ## Intel Wayland presentation and idle checks (2026-11-21)
 
 Three independent Fedora x64 sessions recovered from loss of the Intel

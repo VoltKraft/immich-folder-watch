@@ -55,7 +55,7 @@ Outcome: a fully functional Rust release candidate for Windows x64/ARM64 and
 Linux x64/ARM64, preserving product behavior/data/security and proving a reusable
 desktop foundation through an isolated second consumer. The existing .NET app
 remains a behavioral oracle throughout; the candidate cannot require its runtime.
-egui/eframe is the preferred candidate, subject to RW-02 feasibility. Normal
+egui/eframe is the preferred candidate, subject to the [RW-02 feasibility decision](rust/rw02-stack-decision.md). Normal
 implementation decisions are delegated; fundamental changes require documented
 failed requirements and an evidence-based alternative, without relaxing criteria.
 

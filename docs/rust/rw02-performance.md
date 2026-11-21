@@ -56,6 +56,29 @@ The same GUI binary passed the four lifecycle cases and the AT-SPI keyboard, lan
 
 In a separate live-worker check, the driver hid the real window, added one synthetic JPEG, and observed the next inventory rediscover it in 4.8202 seconds. Linux independently recorded a read on its directory while the window remained unmapped. The application then reopened the same X11 window, hid it again and drained the worker on Quit with exit 0. Verify all retained local reports with `sha256sum --check tools/rust-qa/performance/evidence/linux-x64.sha256`. [Hidden-worker observer](../../tools/rust-qa/performance/worker/check_hidden.py)
 
+## Hosted Linux results at 8a8adaa
+
+On both Ubuntu architectures the reference and candidate each completed three
+100,000-file trials on the same host. All eleven Rust metrics met the limits
+from that host’s .NET run. Each pair below gives the Rust median and maximum
+allowed by the reference. The startup endpoint is the first mapped window.
+
+| X11 measurement | Ubuntu x64, Rust / limit | Ubuntu ARM64, Rust / limit |
+| --- | ---: | ---: |
+| Startup, ms | 187.69 / 1,226.724 | 208.62 / 1,507.081 |
+| Visible idle CPU, % of one core | 0 / 2.2 | 0 / 1.667 |
+| Hidden idle CPU, % of one core | 0 / 2.333 | 0.067 / 3.0 |
+| Visible RSS, MiB | 124.562 / 248.661 | 119.309 / 252.610 |
+| Hidden RSS, MiB | 124.562 / 251.269 | 119.309 / 255.742 |
+| Visible and hidden damage rectangles and render passes, each per second | 0 / 0.067 | 0 / 0.067 |
+| Show during scan, p95 ms | 0.75 / 15.89 | 0.92 / 16.18 |
+| Close during scan, p95 ms | 0.30 / 11.04 | 0.38 / 15.59 |
+
+The files are `performance/hosted-{dotnet,rust}-<target>.json` in each archive.
+The four eligible reports retain every measurement window and the reference
+budgets. [Archive identities](rw02-native-gui.md#native-follow-up-at-8a8adaa)
+and [hosted execution](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
+
 ## Workload and isolation
 
 Each invocation creates new mount, user, PID, IPC and network namespaces. The runner creates a software-rendered X11 screen of 1280 × 900 at depth 24 and a D-Bus session with no activation directories. It binds the system libraries, fonts, the selected build output, the driver, and the selected .NET runtime components read-only. The only writable mounts are disposable test storage, private temporary files, private device nodes and the namespace's procfs. The application has its own empty HOME, all XDG locations, and a per-user activation socket for every launch. There is no portal, tray, compositor or external network endpoint. Port 9 on the private loopback is deliberately closed. This exercises the offline path, including real status updates, reconnects and update-check failure.

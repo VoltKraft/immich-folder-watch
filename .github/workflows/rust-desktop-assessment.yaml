@@ -22,7 +22,8 @@ jobs:
     if: github.ref == 'refs/heads/rewrite/rust'
     name: Native assessment (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 95
+    # Windows also records six 100,000-file WPF/Rust scans and provisions a missing test IME.
+    timeout-minutes: ${{ contains(matrix.target, 'windows') && 150 || 95 }}
     strategy:
       fail-fast: false
       matrix:
@@ -124,6 +125,21 @@ jobs:
             xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
             xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin gir1.2-gtk-3.0
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Compare native file logs and an isolated Linux journal to the shipping reference
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.desktop.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/platform-logs/observe.py "$NATIVE_TARGET" --output "artifacts/rust/platform-logs/native-$NATIVE_TARGET"
+
+      - name: Compare native file logs and read back events from a disposable Windows log
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/platform-logs/observe.py $env:NATIVE_TARGET --output "artifacts/rust/platform-logs/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
 
       - name: Observe Windows Shell services and per-user Startup shortcuts
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
@@ -256,6 +272,11 @@ jobs:
           python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
           python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
 
+      - name: Observe native mixed-direction editing in the ordinary Windows filename field
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-text/run.py "$NATIVE_TARGET"
+
       - name: Observe portable NVDA announcing the owned Windows GUI
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
         shell: bash
@@ -272,8 +293,15 @@ jobs:
           python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
           python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
 
+      - name: Verify native process ownership and cleanup in the resource fixture
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tools/rust-qa/windows-performance -v
+          exit $LASTEXITCODE
+
       - name: Measure the shipping WPF host and native Rust GUI on the same Windows desktop
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
@@ -327,6 +355,12 @@ jobs:
           python3 tools/rust-qa/performance/linux.py compare \
             "artifacts/rust/performance/hosted-dotnet-$NATIVE_TARGET.json" "artifacts/rust/performance/hosted-rust-$NATIVE_TARGET.json"
 
+      - name: Observe Windows input-method composition with native Japanese Basic Typing
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: powershell
+        timeout-minutes: 20
+        run: ./tools/rust-qa/windows-ime/hosted.ps1
+
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
         run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
@@ -368,6 +402,8 @@ jobs:
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
             artifacts/rust/windows-performance/native-*/*
+            artifacts/rust/platform-logs/native-*/*.json
+            artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json
             artifacts/rust/font-coverage/*/result.json
             artifacts/rust/font-coverage/*/*/native.log

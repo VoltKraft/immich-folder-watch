@@ -15,7 +15,12 @@ The first native x64 comparison measured nine idle/startup metrics at
 against limits of 14.79 and 14.76 ms. Visible and hidden CPU use and
 presentation rates were zero. The hidden working set was 26.69 MiB.
 The worker-integrated scan comparison is a separate native trial.
-[Windows x64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549014).
+The ARM64 host also met six of nine limits. Its visible working set was
+178.35 MiB against 146.62 MiB. Idle close and reopen took 135.77 and
+192.82 ms against 13.12 and 13.52 ms. Its retained hidden working set was
+26.84 MiB, with zero visible or hidden CPU and presents per second.
+[Windows x64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549014)
+and [Windows ARM64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549022).
 [Shipping publish recipe](../../packaging/windows/build-msi.ps1) · [Desktop standard](../rust-desktop-standard.md).
 
 ## Predeclared comparisons

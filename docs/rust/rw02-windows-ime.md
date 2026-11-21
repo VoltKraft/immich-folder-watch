@@ -1,0 +1,51 @@
+# RW-02 Windows system IME composition
+
+The hosted wrapper first runs the actual field test with the installed
+components. If the runner has an active input desktop and the native
+inventory identifies a missing Japanese input service, Windows servicing
+can add the official Japanese Basic Typing component to that disposable
+OS. The wrapper adds Japanese to the test account's language list when
+needed, reruns the full preedit, commit and UI Automation checks, then
+restores the original list and removes any component it installed. The
+receipt distinguishes the initial result, servicing state, observed
+language package, subsequent field result and cleanup. A required reboot
+or unavailable component remains visible as a failed prerequisite.
+[Hosted fixture](../../tools/rust-qa/windows-ime/hosted.ps1),
+[Microsoft language Features on Demand](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/features-on-demand-language-fod?view=windows-11)
+and [test-account language list](https://learn.microsoft.com/en-us/powershell/module/international/set-winuserlanguagelist?view=windowsserver2025-ps).
+
+A positive observation requires an ordinary virtual A key to produce a nonempty native preedit in the Rust filename field. The observer must see that preedit before pressing Enter. It then requires a distinct, one-character native commit and an independent UI Automation readback of the original filename with `あ` (U+3042) appended. The observed Windows x64 and ARM64 keyboard logs in hosted runs [44831851264](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264) and [44835826452](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452) contain zero IME events. Those earlier runs exercised a different keyboard scenario and leave Windows composition open.
+
+## Hosted execution
+
+Run both native architectures after building the existing GUI fixture. The driver uses Windows PowerShell with UI Automation, TSF, IMM and User32 from the operating system. The checked-in C# is an external development observer. The Rust application, dependency set and normal editor use the same GUI build as the other native tests.
+
+```bash
+python3 tools/rust-qa/windows-ime/run.py \
+  artifacts/rust/gui-build/release/native-gui-assessment.exe \
+  "artifacts/rust/gui-native/$NATIVE_TARGET/windows-ime"
+```
+
+The first phase reads the Japanese TSF profiles and enumerates the actual loaded input locale handles. It records the input service's class, profile, category and enabled flag. It also records any IMM description and the read-only Japanese Basic Typing capability and user input-method status where Windows exposes them. An unavailable query retains its diagnostic. The inventory process's active-profile bit describes that process alone. A loaded Japanese locale plus an enabled keyboard text service or a loaded IMM IME permits the input trial. The default command returns failure with the specific missing prerequisite when composition cannot be attempted. `--inventory-only` writes the inventory without opening the test window and labels its result accordingly. [Microsoft TSF enumeration](https://learn.microsoft.com/en-us/windows/win32/api/msctf/nf-msctf-itfinputprocessorprofilemgr-enumprofiles) and [input processor profile fields](https://learn.microsoft.com/en-us/windows/win32/api/msctf/ns-msctf-tf_inputprocessorprofile)
+
+For the second phase the launcher verifies the GUI executable, native PE machine, build receipt and exact Rust filename source. It creates a private profile and checks the active, unlocked console, session, desktop and the subject's real HWND. The observer reuses the shared Windows desktop ownership helper for foreground activation and any fallback click. It requires the owned foreground process and the focused, unprotected filename UIA element before each keyboard gesture. It requests an already loaded Japanese input locale from that window and independently observes the actual input locale of its native UI thread. This request changes the input locale for the test window through the normal window procedure. [Microsoft input-language request](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-inputlangchangerequest) and [thread input locale](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getkeyboardlayout)
+
+The driver moves to the end of `Grüße – Sommer.jpg`, sends the IME On gesture and types an ordinary A using `SendInput`. If the first attempt produces only a literal lowercase a, it removes that exact character and tries the documented Alt+Backquote gesture. The observer checks the Rust log from the byte boundary immediately before A and again immediately before Enter. Winit 0.30.13 receives Windows' composition messages and reads composing and committed strings through `ImmGetCompositionStringW`. Egui reports those events through the existing Rust logic. A pass requires the resulting Unicode field value, restoration of the original thread input locale, a clean application exit and return to the same input desktop. The driver sends no clipboard data, Unicode input packets, WM_CHAR or generated WM_IME_COMPOSITION. [Microsoft Japanese IME shortcuts](https://support.microsoft.com/en-us/windows/hardware/input-devices/microsoft-japanese-ime), [system composition message](https://learn.microsoft.com/en-us/windows/win32/intl/wm-ime-composition) and [existing Rust logging](../../tools/rust-qa/gui/src/main.rs)
+
+The results include `inventory.json`, `compose.json` when reached, the Rust trace, the binary and source hashes in `result.json`, and `evidence.sha256`. Installed capability, enabled input service, subject thread locale and observed text composition are individually traceable. The engine identity list describes installed providers. The end-to-end result attributes the observed composition to the Windows Japanese input path of the subject thread.
+
+## Separate Windows VM
+
+When the hosted image lacks the Japanese input service or an unlocked foreground, use a separately authorized, disposable Windows VM with its own test account and active console. In that VM, add Japanese under **Settings → Time & language → Language & region**. Install Basic Typing, check that Microsoft IME appears under the language's keyboards, and select the Japanese input method once in the test account if the native inventory has no loaded Japanese locale. The usual Romaji input setting maps A to `あ`. Keep a VM snapshot for disposal after the observation. [Microsoft language and keyboard setup](https://support.microsoft.com/en-us/windows/hardware/input-devices/manage-the-language-and-keyboard-input-layout-settings-in-windows) and [Microsoft Japanese IME options](https://support.microsoft.com/en-us/windows/hardware/input-devices/microsoft-japanese-ime)
+
+Run the same launcher in the matching checkout with the native binary and its build receipt. Each invocation creates a new output directory. With the normal repository layout the receipt path is inferred.
+
+```powershell
+python tools/rust-qa/windows-ime/run.py artifacts/rust/gui-build/release/native-gui-assessment.exe artifacts/rust/windows-ime-vm --isolated-vm --build-receipt artifacts/rust/gui-native/x86_64-pc-windows-msvc/build.json
+```
+
+Three portable regression tests check input-service eligibility, the independent preedit/commit/final-text conditions and the executable/source receipt. PowerShell 7.7 parsed the script and compiled both the TSF/Win32 observer and the existing shared ownership bridge. The 64-bit TSF profile structure measured 88 bytes. The local Linux workstation supplies these static checks. An actual Windows trace and UIA value are required for native acceptance.
+
+```bash
+python3 -B -m unittest discover -s tools/rust-qa/windows-ime -p 'test_*.py'
+```

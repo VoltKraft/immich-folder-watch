@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md), [native desktop](rw02-native-gui.md) and [realtime transport](rw02-realtime-transport.md). Four hosts passed the SQLite and transport probes. Desktop, resource, filesystem and dependency qualification continues. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [resource reference](rw02-performance.md), [GUI inputs](rw02-gui-dependencies.md), [native desktop](rw02-native-gui.md) and [realtime transport](rw02-realtime-transport.md). Four hosts passed the SQLite and transport probes. The [stack decision and effort estimate](rw02-stack-decision.md) records the Windows resource and foreground blockers. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -64,10 +64,12 @@ handover and native Windows cross-session exclusion remain open.
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases, independent Startup readbacks, Shell registration and balloon callback passed. [Native keyboard focus, password masking and Unicode clipboard](rw02-native-gui.md#reproduction) passed at `2e7ed89`. Screen-reader evidence remains open. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Four native DX12 lifecycle cases and independent Startup readbacks passed. UI Automation observed German names and password protection. Hosted foreground and tray registration remain open. | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. Fedora X11 measurements met all [11 reference limits](rw02-performance.md#paired-x11-measurements). | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Four X11/Wayland lifecycle cases, protected input and clipboard passed on each backend. At `8b071ab`, all three integrated text-editing cases, eight glyph controls and both host folder choosers passed. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases, independent Startup readbacks, Shell registration and balloon callback passed. [Native keyboard focus, password masking and Unicode clipboard](rw02-native-gui.md#reproduction) passed again at `8a8adaa`. At that revision the replacement DX12 window preserved the draft, restored focus and displayed the next edit. NVDA produced all seven ordered field and mask announcements. The subsequent clipboard clear failed. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Four native DX12 lifecycle cases and independent Startup readbacks passed. UI Automation observed German names and password protection. On the active console WWAHost covered the field. NVDA announced the first label. Hosted foreground and tray activation remain open. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. Fedora and hosted Ubuntu X11 measurements met all [11 reference limits](rw02-performance.md#hosted-linux-results-at-8a8adaa). | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Four X11/Wayland lifecycle cases, protected input and clipboard passed on each backend. At `8b071ab`, all three integrated text-editing cases, eight glyph controls and both host folder choosers passed. At `8a8adaa` the 100,000-file X11 comparison met all 11 limits. | Pending |
+
+The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.
 
 All four also passed two live WAL backups, 40 production C# readback assertions,
 15 native loopback transport cases and six old/new activation and file-lock
@@ -108,7 +110,7 @@ with Mesa Mailbox. The same window presented 640 × 400, 1280 × 800 and 800 × 
 buffers as its monitor changed. The integrated GUI now selects the observed
 surface mode itself for this Mesa software backend. Both Fedora Anthy and
 the signed Ubuntu Mozc engine committed `あ` on the Fedora compositor with
-the ordinary application settings. [Native protocol, field and buffer observations](rw02-wayland-input.md).
+the ordinary application settings. [Native protocol, field and buffer observations](rw02-wayland-input.md). Both native Ubuntu hosts then passed the separate Mozc field and monitor-transition checks, plus installed Flatpak grant and revocation on X11 and Wayland. [Hosted results at `8a8adaa`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
 
 The released egui 0.37 text editor deleted the wrong visible Arabic character
 in two mixed-direction cases. A narrowly scoped upstream correction passed

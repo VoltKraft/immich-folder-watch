@@ -187,6 +187,23 @@ function Get-FieldText($Element) {
     throw 'The filename editor provides neither ValuePattern nor TextPattern.'
 }
 
+function Get-FilenameTextPattern($Element) {
+    if ($Element.Current.ProcessId -ne $SubjectId -or $Element.Current.IsPassword -or
+        (Get-AccessibleName $Element) -cne 'Filename' -or (Get-SubjectFocus) -cne 'Filename') {
+        throw 'The translated synthetic filename editor does not own the current selection.'
+    }
+    $pattern = $null
+    if (-not $Element.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$pattern)) {
+        throw 'The synthetic filename editor does not expose a native text range.'
+    }
+    return $pattern
+}
+
+function Test-WholeFilenameSelected($Element, [string]$Expected) {
+    $ranges = (Get-FilenameTextPattern $Element).GetSelection()
+    return $ranges.Count -eq 1 -and $ranges[0].GetText(64) -ceq $Expected
+}
+
 function Test-SubjectLogLine([string]$Line) {
     $stream = [IO.File]::Open($SubjectLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
     try {
@@ -351,11 +368,28 @@ try {
     if ((Get-FieldText $file) -cne $expected) { throw 'Synthetic Unicode filename differs before copy.' }
     $before = [IfwObservedWindow]::GetClipboardSequenceNumber()
     Send-SubjectKeys '^a'
+    [void](Wait-Observation { Test-WholeFilenameSelected $file $expected } 'whole filename selected for copy')
     Send-SubjectKeys '^c'
     [void](Wait-Observation { [IfwObservedWindow]::GetClipboardSequenceNumber() -ne $before } 'clipboard change')
     [void](Wait-Observation { [Windows.Forms.Clipboard]::GetText() -ceq $expected } 'copied synthetic name')
-    Send-SubjectKeys '{BACKSPACE}'
-    [void](Wait-Observation { (Get-FieldText $file) -ceq '' } 'empty filename after clear')
+    $result.clipboardCopied = $true
+    # A reader can process its own selection announcements after the copy command.
+    Send-SubjectKeys '^a'
+    $result.wholeFilenameSelectedBeforeDelete = Wait-Observation {
+        Test-WholeFilenameSelected $file $expected
+    } 'whole filename selected for deletion'
+    Send-SubjectKeys '{DELETE}'
+    [void](Wait-Observation {
+        $range = (Get-FilenameTextPattern $file).DocumentRange
+        $value = Get-FieldText $file
+        $result.filenameLengthAfterDelete = ([string]$value).Length
+        $result.filenameRangeLengthAfterDelete = ([string]$range.GetText(64)).Length
+        $result.emptyDocumentRange = $range.CompareEndpoints(
+            [Windows.Automation.Text.TextPatternRangeEndpoint]::Start, $range,
+            [Windows.Automation.Text.TextPatternRangeEndpoint]::End) -eq 0
+        $result.emptyDocumentRange -and $result.filenameRangeLengthAfterDelete -eq 0 -and
+            $result.filenameLengthAfterDelete -eq 0
+    } 'empty filename after clear')
     Send-SubjectKeys '^v'
     [void](Wait-Observation { (Get-FieldText $file) -ceq $expected } 'native Unicode paste')
     $result.unicodeClipboardRoundTrip = $true

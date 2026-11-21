@@ -73,7 +73,7 @@ def observe(api, args, result, subject, host, observer, private, profile):
     while time.monotonic() < deadline:
         if subject.poll() is not None:
             raise RuntimeError("Fixture exited before its DX12 window appeared")
-        hwnd = observer.visible()
+        hwnd = observer.visible(waiting_for_first=named_desktop(args.desktop))
         if hwnd and "ADAPTER Dx12 " in log.read_text(encoding="utf-8", errors="replace"):
             break
         time.sleep(.04)
@@ -150,7 +150,9 @@ def trial(api, args, result):
                 stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW) as subject:
             observer = None
             try:
-                observer = observer_type(subject.pid)
+                # GetThreadDesktop lends the handle for this worker's lifetime.
+                desktop = check(api.thread_desktop(api.thread()), "GetThreadDesktop")
+                observer = observer_type(subject.pid, desktop)
                 observe(api, args, result, subject, host, observer, private, profile)
             finally:
                 try:

@@ -11,6 +11,18 @@ On Windows ARM64, the German filename and password editors exposed their accessi
 
 The downloaded archives are under `artifacts/rust/hosted-desktop/<run>/windows-{arm64,x64}.zip`. Their `gui-native/<target>/windows-input/results.json` binds the executable and observer source hashes. In the first run both architectures reported process session 2, active console session 2, matching thread/input desktop names, one 1024 × 768 monitor and 96 DPI. The x64 system was Windows Server 2025 build 26100. The ARM64 system was Windows 11 build 26200. These records leave the occluding HWND and the Windows session lock state unidentified. A desktop-name match can also occur in a disconnected session. [Microsoft OpenInputDesktop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop)
 
+At `8a8adaa` both native runners had an active, unlocked console in
+session 2. On ARM64, a full-screen `WWAHost.exe` window owned the field
+center before and after raising the subject. The observer sent no click at
+that point. Both architectures switched to their newly created input desktop
+and restored Default. Before a test window appeared, enumeration returned
+zero with Win32 error zero on both hosts. The observer now enumerates the
+worker’s own desktop explicitly and permits this empty result to retry only
+during a bounded wait for a visible window. A fresh native run is required
+for the guarded input on that desktop.
+[Native archives](rw02-native-gui.md#native-follow-up-at-8a8adaa) and
+[EnumDesktopWindows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdesktopwindows).
+
 ## Native reproduction
 
 Run from the source checkout in the existing hosted Windows x64 and ARM64 jobs, after building the native GUI assessment. The fixture uses Python's standard library, the existing Windows PowerShell/UI Automation observer and Windows system DLLs. It requires the current hosted runner identity and the target-specific executable and evidence directory.
@@ -29,7 +41,7 @@ python3 tools/rust-qa/windows-desktop/run.py \
 
 The report is `results.json`. The two phases write `original/observation.json` and `named/observation.json`. The latter also writes the shared observer's `input.json` when the named input trial reaches it. The top-level `evidence.sha256` covers the captured files. A missing prerequisite, an observer failure or unverified cleanup returns a failing exit status. Application, worker, keyboard observer and launcher source hashes appear in the report. System object names and window geometry are diagnostic data. A hardware keyboard, a different Windows account and a physical desktop are outside this hosted trial.
 
-The historical runs above predate the named-desktop launcher. Eight portable regression tests cover desktop/session checks, restoration ownership, field and process checks, input acceptance, native structure layout and PE machine identification. The PowerShell observer parses on the locally available PowerShell 7.7. Named-desktop runtime evidence requires the two native Windows executions.
+The historical runs above predate the named-desktop launcher. Nine portable regression tests cover desktop/session checks, restoration ownership, field and process checks, input acceptance, native structure layout and PE machine identification. The PowerShell observer parses on the locally available PowerShell 7.7. The initial hosted trials reached the newly created desktop on both architectures. Their input phase awaits a successful native rerun.
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/windows-desktop -p 'test_*.py'
