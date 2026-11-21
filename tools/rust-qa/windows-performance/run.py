@@ -336,7 +336,8 @@ def run(args):
         rows = list(report["comparison"].values())
         report["status"] = ("over-budget" if any(r["passed"] is False for r in rows) else
                             "partial" if any(r["passed"] is None for r in rows) else "measured-metrics-passed")
-        report["outstanding"] = ["Physical display scanout during a scan"]
+        report["outstanding"] = [name for name, row in report["comparison"].items() if row["passed"] is None]
+        report["outstanding"].append("Physical display scanout during a scan")
         return 0 if report["status"] == "measured-metrics-passed" else 1
     except Exception as exc:
         report["status"] = "error"

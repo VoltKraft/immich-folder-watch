@@ -305,7 +305,7 @@ int wmain(int argc, wchar_t** argv) {
     input.LogFileName = argv[3];
     input.ProcessTraceMode = PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
     input.EventRecordCallback = event_record;
-    const auto trace = OpenTraceW(&input);
+    TRACEHANDLE trace = OpenTraceW(&input);
     if (trace == INVALID_PROCESSTRACE_HANDLE) return 5;
     status = ProcessTrace(&trace, 1, nullptr, nullptr);
     CloseTrace(trace);

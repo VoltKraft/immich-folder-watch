@@ -23,6 +23,43 @@ The ARM64 host also met six of nine limits. Its visible working set was
 and [Windows ARM64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549022).
 [Shipping publish recipe](../../packaging/windows/build-msi.ps1) · [Desktop standard](../rust-desktop-standard.md).
 
+## Worker-integrated Windows run
+
+At `72fff407a964b9e28b16de45fb890018832ecb53`, each host completed
+three WPF and three Rust startup/idle trials. Each passed six of nine
+measured limits. The table gives the candidate and its frozen maximum.
+The source input and reference-budget digests in both result archives
+match the included files. [Native x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350/job/136971561540) · [Native ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350/job/136971561498)
+
+| Native host | Visible working set, MiB | Idle close p95, ms | Idle reopen p95, ms | Reference-budget SHA-256 |
+| --- | --- | --- | --- | --- |
+| x64 | 190.191 / 142.107 | 66.274 / 14.383 | 174.066 / 18.337 | `3e1c65e20ce6eaca1f5b0ec30960316e48c296a021efeaa52770dee3b4633d05` |
+| ARM64 | 193.258 / 147.506 | 134.435 / 13.236 | 182.427 / 14.999 | `819afe77d9a14202944bb590b762212dbce3b639828a567a2faabaef1c7d5a60` |
+
+All twelve scan trials stopped before file tracing began. Windows SDK
+10.0.26100.0 rejected the file observer's const handle pointer at
+`ProcessTrace` with MSVC C2664 on both targets. Both scan entries in each
+reference budget and candidate comparison remain null. The corrected
+consumer uses a mutable `TRACEHANDLE`, matching the presentation observer
+that compiled in each job. Replaying the original call against the SDK's
+pointer signature also reproduced the qualifier error with a portable C++
+compiler. The recorder now includes each unmeasured metric in its list of
+outstanding evidence. A native run must still demonstrate the corrected
+build and two complete inventories per subject in every trial.
+[File consumer](../../tools/rust-qa/windows-inventory/file-observer.cpp) · [Microsoft ProcessTrace signature](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-processtrace)
+
+The process-job and handle-bound NTFS lifecycle test passed on both
+machines. On ARM64 a separate C++ ledger self-test returned successfully
+and then failed cleanup when Windows twice refused to unlink the temporary
+`ledger.exe` with error 5. The trace identifies the file and error but
+leaves the reason for the refusal unknown. The revised test holds the
+compiled image against replacement during execution. During cleanup it
+uses a delete handle on the same volume/file ID in the pinned test directory,
+retries Windows access and sharing errors for up to ten seconds, and requires
+the name to disappear. A changed image, unexpected error or expired deadline
+fails the test and preserves the private directory. This retry runs outside
+the performance measurements. [Ledger test and cleanup controls](../../tools/rust-qa/windows-performance/test_recorder.py)
+
 ## Predeclared comparisons
 
 Each subject runs three times. The WPF trials run first. The driver persists

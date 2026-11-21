@@ -1,13 +1,18 @@
 """Boundary checks for the predeclared budgets, frame controls and reference material."""
 import json
 from contextlib import ExitStack
+import os
 from pathlib import Path
+import re
 import shutil
+import stat
 import struct
 import subprocess
 import tempfile
+import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+import uuid
 
 import build
 import metrics
@@ -15,6 +20,34 @@ import native
 from run import present_counts
 import scan
 import subject
+
+
+def remove_ledger_image(api, exe, original, timeout=10):
+    """Wait for the exited self-test image to be deletable inside its still-pinned directory."""
+    if exe.name != "ledger.exe" or not re.fullmatch("ifw-rw02-[0-9a-f]{32}", exe.parent.name):
+        raise ValueError("Expected the fixed compiler output in its private test directory")
+    deadline = time.monotonic() + timeout
+    deletion_requested = False
+    while True:
+        try:
+            handle = api.path_handle(exe, False, delete=True)
+            try:
+                attributes, identity = api.file_info(handle)
+                if identity != original or attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x10):
+                    raise native.CleanupUnconfirmed("The ledger image identity or type changed before removal")
+                api.delete_handle(handle)
+                deletion_requested = True
+            finally:
+                native.checked(api.close(handle))
+        except OSError as error:
+            code = getattr(error, "winerror", None)
+            if code == 2 and deletion_requested:
+                return
+            if code not in (5, 32, 33):
+                raise native.CleanupUnconfirmed("Could not confirm removal of the original ledger image") from error
+        if time.monotonic() >= deadline:
+            raise native.CleanupUnconfirmed("The original ledger image was still in use at the cleanup deadline")
+        time.sleep(.05)
 
 
 class RecorderTests(unittest.TestCase):
@@ -102,14 +135,59 @@ class RecorderTests(unittest.TestCase):
         compiler = shutil.which("c++") or shutil.which("cl")
         if compiler is None:
             self.skipTest("No C++ compiler is installed")
-        with tempfile.TemporaryDirectory() as tmp:
-            exe = Path(tmp) / "ledger.exe"
+        with ExitStack() as stack:
+            if os.name == "nt":
+                api = native.Win32()
+                parent = Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()).resolve(strict=True)
+                tmp = stack.enter_context(native.owned_directory(api, parent, "ifw-rw02-" + uuid.uuid4().hex))
+            else:
+                tmp = Path(stack.enter_context(tempfile.TemporaryDirectory()))
+            exe = tmp / "ledger.exe"
             if Path(compiler).name.lower() in ("cl", "cl.exe"):
                 command = [compiler, "/nologo", "/std:c++17", "/DIFW_LEDGER_SELFTEST", str(cpp), "/Fe:" + str(exe)]
             else:
                 command = [compiler, "-std=c++17", "-DIFW_LEDGER_SELFTEST", str(cpp), "-o", str(exe)]
-            subprocess.run(command, check=True, cwd=tmp, capture_output=True)
-            subprocess.run([str(exe)], check=True, cwd=tmp)
+            compiler_env = {**os.environ, "CCACHE_DISABLE": "1", "CCACHE_DIR": str(tmp / "ccache"),
+                            "TEMP": str(tmp), "TMP": str(tmp), "TMPDIR": str(tmp)}
+            subprocess.run(command, check=True, cwd=tmp, env=compiler_env, capture_output=True, timeout=90)
+            if os.name == "nt":
+                with native.pin_path(api, exe, False) as (_, original):
+                    # ExitStack performs cleanup after the deny-delete image handle has closed.
+                    stack.callback(remove_ledger_image, api, exe, original)
+                    subprocess.run([str(exe)], check=True, cwd=tmp, timeout=30)
+            else:
+                subprocess.run([str(exe)], check=True, cwd=tmp, timeout=30)
+
+    def test_ledger_cleanup_retries_only_its_pinned_id_and_requires_removal(self):
+        def windows_error(code):
+            exc = OSError("Windows test error")
+            exc.winerror = code
+            return exc
+        exe = Path("ifw-rw02-" + "a" * 32) / "ledger.exe"
+        api = Mock()
+        api.path_handle.side_effect = [windows_error(5), windows_error(32), 41, windows_error(2)]
+        api.file_info.return_value = 0x80, (3, 9)
+        with patch("time.sleep"):
+            remove_ledger_image(api, exe, (3, 9))
+        api.delete_handle.assert_called_once_with(41)
+        api.close.assert_called_once_with(41)
+        for call in api.path_handle.call_args_list:
+            self.assertEqual(call.args, (exe, False))
+            self.assertEqual(call.kwargs, {"delete": True})
+        for code in (2, 5, 87):
+            api.reset_mock()
+            api.path_handle.side_effect = windows_error(code)
+            with self.subTest(code=code), self.assertRaises(native.CleanupUnconfirmed):
+                remove_ledger_image(api, exe, (3, 9), timeout=0)
+            api.delete_handle.assert_not_called()
+        for facts in ((0x80, (3, 10)), (stat.FILE_ATTRIBUTE_REPARSE_POINT, (3, 9))):
+            api.reset_mock()
+            api.path_handle.side_effect = [42]
+            api.file_info.return_value = facts
+            with self.assertRaisesRegex(native.CleanupUnconfirmed, "identity or type"):
+                remove_ledger_image(api, exe, (3, 9))
+            api.delete_handle.assert_not_called()
+            api.close.assert_called_once_with(42)
 
     def test_windows_staging_preserves_the_reviewed_inventory_and_lock(self):
         with tempfile.TemporaryDirectory() as temp:
