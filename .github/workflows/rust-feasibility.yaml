@@ -45,8 +45,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # The watch comparison hashes the original shipping worker.
 
       - name: Install the checksum-pinned compiler and tools in the checkout
+        id: pinned
         shell: bash
         run: |
           set -o pipefail
@@ -74,6 +76,22 @@ jobs:
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
           ./tools/rust-qa/test-windows-smb.ps1 -Target $env:NATIVE_TARGET
+
+      - name: Observe bounded native watch events and complete synthetic rescans
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/watch-events/run.py "$NATIVE_TARGET"
+
+      - name: Retain native watch results
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-watch-events-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/watch-events/${{ matrix.target }}/result.json
+            artifacts/rust/watch-events/${{ matrix.target }}/evidence.sha256
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Retain native observations
         if: always()
