@@ -13,7 +13,7 @@ the operating system's Advapi32. Linux uses the existing console stream.
 | --- | --- | --- |
 | File | Append UTF-8 records with local timestamp and level, preserve multi-line text and report flush errors | Fedora x64 matched the shipping provider after normalizing timestamps. Twelve records survived two processes, twelve opens and an existing log entry. |
 | Linux journal | Write one record with syslog priority, category, event ID and text. Prevent CR, LF and NUL from splitting the record. | A separate reader recovered six ordered records with the expected text and priorities. The six-record console stream matched the .NET formatter byte for byte. |
-| Windows Event Log | Open an existing source under the expected log and submit correctly typed events with category and event ID. | Both MSVC targets passed compilation and Clippy checks. Native writing, readback, formatting and missing-source refusal are pending. |
+| Windows Event Log | Open an existing source under the expected log and submit correctly typed events with category and event ID. | The native x64 and ARM64 Actions steps passed at `72fff40`, including writing, readback, formatting, missing-source refusal and owned log cleanup. |
 
 The reference builds the shipping `FileLoggerProvider.cs` from product 3.0.4
 with .NET SDK 10.0.401 and an empty NuGet feed. Its normalized source
@@ -38,6 +38,22 @@ The receipt at `artifacts/rust/platform-logs/fedora-x64-reference-02/result.json
 had SHA-256 `0835607b2bae595ade573e42626a067c6b9b1a88074cae645a4e74ca8ce1b231`.
 [Independent observer](../../tools/rust-qa/platform-logs/observe.py) and
 [journal stream semantics](https://www.freedesktop.org/software/systemd/man/latest/systemd-cat.html).
+
+At `72fff40`, Windows x64 and ARM64 passed the native Event Log step.
+Both Ubuntu jobs failed during their log step. With the Ubuntu 24.04 userspace
+on the x64 Fedora kernel, systemd 255.4 reproduced a refused stream connection
+and reported a missing cgroup root. Its initialization resolves the cgroup of
+PID 1. Mapping the caller's own cgroup read-only inside a new cgroup namespace
+allowed the actual Ubuntu journal to receive all six messages in priority
+order. The writer had zero effective capabilities and no-new-privileges set.
+The Ubuntu archive's daemon hash was
+`ca1c6fe707f574cc0261f87ba13395fe2687169b0e02aae107a3e299d016fe1a`.
+The successful local receipt `noble-native-cgroup-01/result.json` had SHA-256
+`12e26e018ff2969a60ca78a5bf43159ebc198257754e5e60ff17de7f50fbc35b`.
+Use `--journal-system-root` to select an extracted distribution of the native
+architecture. The hosted Ubuntu checks still need a repeat with this change.
+[Hosted jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350)
+and [systemd 255 journal initialization](https://github.com/systemd/systemd/blob/v255/src/journal/journald-server.c#L2455-L2457).
 
 Install the pinned compiler in `artifacts/rust/toolchain`, put the selected
 .NET SDK on `PATH`, and run from the checkout with a fresh output directory.

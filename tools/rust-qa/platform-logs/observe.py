@@ -51,6 +51,10 @@ def inside():
     outer = json.loads((profile / "namespaces.json").read_text())
     if os.getuid() != 0 or any(os.readlink("/proc/self/ns/" + k) == outer[k] for k in NAMESPACES):
         raise RuntimeError("Private journal requires isolated Linux namespaces")
+    cgroup = Path("/sys/fs/cgroup")
+    if cgroup.exists() and (os.readlink("/proc/self/ns/cgroup") == outer["cgroup"]
+                            or not os.statvfs(cgroup).f_flag & os.ST_RDONLY):
+        raise RuntimeError("The private journal requires a read-only cgroup view in its own namespace")
     for directory in ("/run/systemd/journal", "/run/log/journal", "/etc/systemd", "/var/log", "/tmp/home"):
         Path(directory).mkdir(parents=True, exist_ok=True)
     Path("/etc/machine-id").write_text(nonce + "\n")
@@ -95,6 +99,7 @@ def inside():
             write_json(profile / "journal.json", {
                 "systemd": subprocess.check_output(["journalctl", "--version"], text=True).splitlines()[0],
                 "machineIdMatched": all(r["_MACHINE_ID"] == nonce for r in rows),
+                "readOnlyCgroupView": cgroup.is_dir(),
                 "processEffectiveCapabilities": identity["CapEff:"], "noNewPrivileges": True,
                 "records": [{"priority": p, "transport": transport, "message": msg} for p, transport, msg in observed]})
             if not all(r["_MACHINE_ID"] == nonce for r in rows):
@@ -108,18 +113,37 @@ def inside():
                 daemon.wait(timeout=3)
 
 
-def check_journal(binary, profile, output):
-    write_json(profile / "namespaces.json", {k: os.readlink("/proc/self/ns/" + k) for k in NAMESPACES})
+def current_cgroup():
+    for line in Path("/proc/self/cgroup").read_text().splitlines():
+        if line.startswith("0::/"):
+            member = Path(line[3:])
+            if ".." in member.parts:
+                return None
+            directory = Path("/sys/fs/cgroup") / member.relative_to("/")
+            if (directory / "cgroup.controllers").is_file():
+                return directory
+    return None
+
+
+def check_journal(binary, profile, output, system_root=Path("/")):
+    groups = current_cgroup()
+    spaces = (*NAMESPACES, "cgroup") if groups else NAMESPACES
+    write_json(profile / "namespaces.json", {k: os.readlink("/proc/self/ns/" + k) for k in spaces})
     cmd = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--uid", "0", "--gid", "0",
-           "--ro-bind", "/usr", "/usr", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+           "--ro-bind", str(system_root / "usr"), "/usr", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
            "--tmpfs", "/etc", "--tmpfs", "/run", "--tmpfs", "/var", "--bind", str(profile), "/qa",
            "--ro-bind", str(binary), "/subject", "--ro-bind", str(Path(__file__).resolve()), "/tools/rust-qa/platform-logs/observe.py",
            "--setenv", "HOME", "/tmp/home", "--setenv", "PATH", "/usr/bin:/usr/sbin", "--setenv", "LANG", "C.UTF-8"]
-    for path in map(Path, ("/bin", "/sbin", "/lib", "/lib64")):
+    # systemd 255 needs the cgroup filesystem type to resolve PID 1 at initialization.
+    # The only exposed subtree is the launching process's own membership, mounted read-only.
+    if groups:
+        cmd.extend(["--ro-bind", str(groups), "/sys/fs/cgroup"])
+    for name in ("bin", "sbin", "lib", "lib64"):
+        path = system_root / name
         if path.is_symlink():
-            cmd.extend(["--symlink", os.readlink(path), str(path)])
+            cmd.extend(["--symlink", os.readlink(path), "/" + name])
         elif path.is_dir():
-            cmd.extend(["--ro-bind", str(path), str(path)])
+            cmd.extend(["--ro-bind", str(path), "/" + name])
     try:
         subprocess.run([*cmd, "/usr/bin/python3", "-B", "/tools/rust-qa/platform-logs/observe.py", "--inside"],
                        check=True, timeout=35)
@@ -133,7 +157,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--journal-system-root", type=Path, help="use an extracted native Linux distribution for the private journal")
     args = parser.parse_args()
+    if args.journal_system_root and sys.platform != "linux":
+        parser.error("The journal userspace option requires native Linux")
     if os.name == "nt" and any(os.getenv(k) != v for k, v in {
         "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
         "GITHUB_REPOSITORY": "VoltKraft/immich-folder-watch", "GITHUB_REF": "refs/heads/rewrite/rust"}.items()):
@@ -178,7 +205,12 @@ def main():
                 if not report["eventLog"]["passed"]:
                     raise RuntimeError("Windows did not verify the messages and private log removal")
             else:
-                report["journal"] = check_journal(binary, profile, output)
+                system_root = (args.journal_system_root or Path("/")).resolve(strict=True)
+                report["journal"] = check_journal(binary, profile, output, system_root)
+                report["journal"]["daemonSha256"] = digest(system_root / "usr/lib/systemd/systemd-journald")
+                report["journal"]["distributionUserspace"] = [
+                    line for line in (system_root / "usr/lib/os-release").read_text().splitlines()
+                    if line.startswith(("ID=", "VERSION_ID=", "BUILD_ID="))]
         report["passed"] = True
     except Exception as error:
         report["error"] = str(error)
