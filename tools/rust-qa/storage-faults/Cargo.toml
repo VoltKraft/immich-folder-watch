@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "ifw-storage-faults"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "AGPL-3.0-only"
+publish = false
+
+[dependencies]
+rusqlite = { version = "=0.43.0", default-features = false, features = ["bundled", "backup"] }
+serde_json = { version = "=1.0.154", default-features = false, features = ["std"] }
+sha2 = { version = "=0.11.1", default-features = false }
+ifw-legacy = { path = "../../../rust/crates/ifw-legacy" }
+
+[[bin]]
+name = "ifw-reviewed-storage"
+path = "../storage/src/main.rs"
+
+[[bin]]
+name = "ifw-storage-faults"
+path = "src/main.rs"
