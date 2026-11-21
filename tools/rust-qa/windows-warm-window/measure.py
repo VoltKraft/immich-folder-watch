@@ -1,0 +1,137 @@
+"""Compare the staged warm GUI with the complete WPF trials on this very same runner."""
+import argparse
+from contextlib import ExitStack
+import hashlib
+import json
+import os
+from pathlib import Path
+import socket
+import subprocess
+import uuid
+
+from inputs import HERE, QA, ROOT, TARGETS, recorder, sha, subjects
+from build import REFERENCE, REFERENCE_SOURCE_SHA256
+from native import CleanupUnconfirmed, owned_directory, pin_path
+
+
+def measured_generation(log):
+    rows = log.read_text(encoding="utf-8", errors="replace").splitlines()
+    if ([r for r in rows if r.startswith("GRAPHICS_MEMORY ")] != ["GRAPHICS_MEMORY generation=1 hint=MemoryUsage"]
+            or [r for r in rows if r.startswith("GRAPHICS_READY ")] != ["GRAPHICS_READY generation=1"]
+            or any(r.startswith("WGPU_ALLOCATOR ") for r in rows)):
+        raise ValueError("Expected a single warm MemoryUsage device and a measurement without allocator sampling")
+    return dict(generation=1, memoryHint="MemoryUsage")
+
+
+def reference(target, metadata):
+    root = ROOT / "artifacts/rust/windows-performance" / ("native-" + target)
+    report = json.loads((root / "result.json").read_text(encoding="utf-8"))
+    inputs = json.loads((root / "inputs.json").read_text(encoding="utf-8"))
+    path = root / "reference-budget.json"
+    fixed = json.loads(path.read_text(encoding="utf-8"))
+    host = report["host"]
+    if (not metadata["run"] or host["run"] != metadata["run"] or host["attempt"] != metadata["attempt"]
+            or host["computerIdSha256"] != hashlib.sha256(os.environ["COMPUTERNAME"].encode()).hexdigest()
+            or host["runnerImage"] != os.getenv("ImageVersion") or inputs["candidateRevision"] != metadata["revision"]
+            or inputs["guiBinarySha256"] != metadata["baseline"] or inputs["target"] != target
+            or inputs["guiReceiptSha256"] != metadata["baselineReceipt"] or inputs["referenceRevision"] != REFERENCE
+            or inputs["referenceSourceSha256"] != REFERENCE_SOURCE_SHA256
+            or report["budgetSha256"] != sha(path) or fixed["sourceInputsSha256"] != sha(root / "inputs.json")
+            or recorder.summarize(report["trials"]["wpf"]) != fixed["reference"]
+            or recorder.budgets(fixed["reference"]) != fixed["maximums"]):
+        raise ValueError("No matching frozen WPF budget on this runner and revision")
+    return path, fixed, inputs, report.get("comparison", {})
+
+
+def main(target):
+    api, _, binary, base, record = subjects(target)
+    out = base / "measured"
+    out.mkdir()
+    record.update(status="running", trials=[], observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py")})
+    try:
+        if "IFW_QA_WINDOWS_RESIDENCY" in os.environ:
+            raise ValueError("Start the timed run with its default device memory hint")
+        budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
+        before = sha(budget)
+        record["referenceBudgetSha256"] = before
+        with ExitStack() as scope:
+            area = scope.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
+            gui, files, sources = recorder.build_subject(area, out, binary, target, recorder.pe_machine)
+            for key in ("compiledEntry", "approvedBundle", "packages", "sources"):
+                if sources[key] != original["inventory"][key]:
+                    raise ValueError(f"Different native inventory baseline input: {key}")
+            if sources["gui"] != record["binary"]:
+                raise ValueError("The staged warm executable differs from the native build")
+            present = area / "present.exe"
+            driver = QA / "windows-performance"
+            for name in ("present.cpp", "etw-owned.h", "run.py", "metrics.py", "native.py"):
+                if sha(driver / name) != original["drivers"][name]:
+                    raise ValueError(f"Different native observer input: {name}")
+            for name in ("observe-windows-gui.py", "windows_observer.py", "storage/evidence.py"):
+                if sha(QA / name) != original["sharedDrivers"][name]:
+                    raise ValueError(f"Different shared observer input: {name}")
+            with (out / "present-build.log").open("wb") as log:
+                subprocess.run(["cl.exe", "/nologo", "/std:c++17", "/EHsc", "/W4", "/WX", "/O2", "/utf-8",
+                                "/DUNICODE", "/D_UNICODE", str(driver / "present.cpp"), "/link", "advapi32.lib", "tdh.lib"],
+                               cwd=area, stdout=log, stderr=subprocess.STDOUT, check=True)
+            expected = 0xaa64 if target.startswith("aarch64-") else 0x8664
+            if recorder.pe_machine(present) != expected:
+                raise ValueError("Wrong presentation observer architecture")
+            worker = gui.with_name("ifw-performance-worker.exe")
+            images = {gui: sources["gui"], worker: sources["worker"], present: sha(present)}
+            if files:
+                images[files] = sources["fileObserver"]
+            for folder in {p.parent for p in images}:
+                scope.enter_context(pin_path(api, folder, True))
+            for path, digest in images.items():
+                scope.enter_context(pin_path(api, path, False))
+                if sha(path) != digest:
+                    raise ValueError("A pinned native measurement input changed")
+            token, workload = recorder.create_fixture(area, scope, api)
+            scope.enter_context(pin_path(api, area / "files", True))
+            for key, value in workload.items():
+                if original["workload"].get(key) != value:
+                    raise ValueError("Different baseline workload")
+            record["inputs"] = dict(inventory=sources, present=images[present], workload=workload)
+            fixture, user_sid = recorder.load_windows_fixture(), recorder.sid()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as offline:
+                offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                offline.bind(("127.0.0.1", 0))
+                endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
+                for number in range(1, recorder.TRIALS + 1):
+                    name = "rust-" + str(number)
+                    row = recorder.trial(api, fixture, "rust", gui, present, area / name, endpoint, user_sid,
+                                         expected, out / (name + ".log"), token)
+                    record["trials"].append(row)
+                    row["device"] = measured_generation(out / (name + ".log"))
+                    try:
+                        if not files:
+                            raise ValueError("File observer was not built")
+                        row["scan"] = recorder.measure_scan(api, fixture, "rust", gui, files, area / (name + "-scan"),
+                                                            endpoint, user_sid, out, recorder.await_value,
+                                                            recorder.stop_subject, recorder.p95, token)
+                        row["scan"]["device"] = measured_generation(out / (name + "-scan.log"))
+                        row["metrics"].update(row["scan"]["metrics"])
+                    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                        if CleanupUnconfirmed.in_chain(exc):
+                            raise
+                        row["scan"] = {"error": f"{type(exc).__name__}: {exc}"}
+                    recorder.write(out / "result.json", record)
+        if sha(budget) != before:
+            raise ValueError("The WPF budget changed during the warm comparison")
+        rows = recorder.comparison(fixed["maximums"], recorder.summarize(record["trials"]))
+        record["comparison"] = rows
+        record["status"] = ("over-budget" if any(r["passed"] is False for r in rows.values()) else
+                            "partial" if any(r["passed"] is None for r in rows.values()) else "measured-metrics-passed")
+        return int(record["status"] != "measured-metrics-passed")
+    except Exception as exc:
+        record.update(status="error", error=f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        recorder.write(out / "result.json", record)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=TARGETS)
+    raise SystemExit(main(parser.parse_args().target))

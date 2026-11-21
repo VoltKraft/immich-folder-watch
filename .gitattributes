@@ -36,6 +36,10 @@ tools/rust-qa/windows-desktop/** text eol=lf
 tools/rust-qa/windows-ime/** text eol=lf
 tools/rust-qa/windows-text/** text eol=lf
 tools/rust-qa/windows-inventory/** text eol=lf
+tools/rust-qa/windows-warm-window/** text eol=lf
+tools/rust-qa/windows-warm-window/candidate.patch text eol=lf whitespace=-blank-at-eol
+tools/rust-qa/windows-display/** text eol=lf
+tools/rust-qa/watch-events/** text eol=lf
 tools/rust-qa/performance/worker/** text eol=lf
 tools/rust-qa/platform-logs/** text eol=lf
 tools/rust-qa/yaml/** text eol=lf
