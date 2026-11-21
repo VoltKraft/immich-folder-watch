@@ -1,5 +1,24 @@
 # Project Status
 
+## Native GUI checks at the integrated revision (2026-11-21)
+
+At `8b071ab` the four native GUI builds reproduced their reviewed package
+and feature inventories. Ubuntu x64 and ARM64 passed all three filename
+editing cases and eight glyph controls in the integrated UI, and both
+passed X11 and Wayland lifecycle, accessibility and host folder chooser
+checks. All four compatibility jobs, all four Rust feasibility jobs and
+all eight PR checks passed. The separate desktop assessment still has
+failures. The Ubuntu jobs stopped before the paired performance measurements
+and installed Flatpak selection. Windows x64 received the device-loss
+callback and created a replacement WARP device, then exposed two HWNDs
+during teardown. ARM64 still refused foreground input. NVDA initialized
+with OneCore on both hosts but did not reach the application's speech checks.
+The new Windows fixtures measure desktop availability and same-host WPF
+budgets. Their native results are pending.
+[Assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452),
+[Windows desktop fixture](rust/rw02-windows-desktop.md)
+and [resource measurements](rust/rw02-windows-performance.md).
+
 ## Four-host IPC, native ARM64 relink and desktop checks (2026-11-21)
 
 All four native hosts passed six old/new activation and profile-lock
