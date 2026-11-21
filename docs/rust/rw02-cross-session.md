@@ -1,37 +1,50 @@
 # RW-02 same-account writer ownership across Windows sessions
 
-The Windows feasibility probe runs the existing Rust `writer` on a local file shared by two processes with the same Windows account SID and distinct OS session IDs. Its second session uses an on-demand Task Scheduler S4U logon. Both directions have to reject a contender while the other session holds the guard. The replacement must then acquire and release the same file. The existing same-session old/new activation and installation evidence remain separate. [Native instance assessment](rw02-instance.md)
+The native writer opens one pre-existing empty file and calls Rust’s `File::try_lock`. The test requires two processes with the same account SID in distinct Windows OS sessions, refusal in both directions and orderly release followed by reacquisition. The historical old/new coordinator and installed handover have their own evidence. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Old/new activation](rw02-instance.md)
+
+## What the hosted machines established
+
+At `8a8adaa400abc7303335c624ea68abed197158da`, Windows Server x64 and Windows 11 ARM64 both reached a genuine second session through their own on-demand Task Scheduler S4U logon. The original controller and first Rust holder were in session 2. The scheduled Python process was in session 0 and independently returned the same account digest. On each host, both tokens reported elevation with type Default. Task Scheduler recorded the requested LUA level. The original fixture stopped before the scheduled holder or contender opened the guard. Both runs verified unchanged batch-logon assignments, task deletion and removal of the synthetic directory. The scheduled action returned 1. Every file in each evidence index was checked. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642)
+
+| Native archive | SHA-256 of `cross-session/evidence.sha256` |
+| --- | --- |
+| Windows x64 | `e171450f2f920bf3705e0f8467f77988d2be1ebc02fcdfc10bbb5e61a9d805ea` |
+| Windows ARM64 | `1db2eb47abc199ae645e787ee7b21ef3b0fdad5a1aefaece4a26968447bc1a4f` |
+
+## Two independent Windows trials
+
+The hosted controller builds the pinned native Rust image once. Each trial gets a fresh marked profile, a new guard file and a unique task. Both tasks request the same on-demand S4U logon at LUA level. Each trial records the actual process rights Windows supplied. The first task, its known processes and its profile must be gone before the second trial starts. A failed lock sequence with verified cleanup still permits the independent second trial. [Controller](../../tools/rust-qa/instance/cross-session/observe.py) · [Scheduled action](../../tools/rust-qa/instance/cross-session/scheduler.ps1)
+
+| Result | Qualification |
+| --- | --- |
+| `ambientGuardPassed` in `ambient-case.json` | All five native writers inherit the existing process rights of the bootstrap in their own session. An elevated Default token can qualify here. |
+| `standardUserGuardPassed` in `standard-case.json` | Both participants and every native writer meet the ordinary-user rules below. An elevated Default token fails here. |
+| `lockSequenceObserved` in either case | Both refusals, both handovers and the final release were observed against the original file identity. A case also requires verified cleanup to pass. |
+| `passed` in `result.json` | Both hosted trials passed and the shared build directory was removed. The two separate guard results remain available when one trial fails. Installed handover retains its own acceptance evidence. |
+
+For the ambient trial each bootstrap runs the fixed participant directly. The controller matches the participant to the same live process and checks each writer against its own session’s participant. It compares the account and session, elevation and type, integrity, UIAccess and restrictions, and a digest of the groups, restricting SIDs, capabilities and privilege attributes. A cross-session difference between the logon groups is expected. The reports retain digests and counts for these private inventories. [Authority inspection](../../tools/rust-qa/instance/cross-session/standard.py) · [Windows token information](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class)
+
+For the standard-user trial each primary token must report no elevation, default or limited elevation type, no enabled local administrative/operator aliases, no application capabilities or UIAccess, and integrity at or below Medium. The privilege inventory must fit the ordinary-user set, including disabled privileges. A participant meeting these checks can run the fixed test directly. If a hosted bootstrap has administrative authority, it records its original token facts. It can invoke the system `runas.exe` with the listed Basic User level `0x20000`, a profile-free launch and the exact hashed Python image/script for its role. This requires an already-running Secondary Logon service. A refused launch or insufficient effective token preserves its reason in the raw evidence. The test uses existing account and service settings. [Fixed participant](../../tools/rust-qa/instance/cross-session/worker.py) · [Mandatory integrity](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control) · [Windows Runas](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc771525%28v%3Dws.11%29)
+
+Each Rust process starts suspended and belongs to its owner’s private kill-on-close job. Before the first thread resumes, the controller checks its exact image, creation time, PID, account, native session and authority. It inspects each live holder again after its `WRITER_HELD` response. In order, the first process holds, its peer refuses, the first releases, the peer holds, the original side refuses, the peer releases, and the original side reacquires and releases. Each completion ties the actual response and exit code to the exact process and volume/file ID. The ordered events appear in `observedWriterEvents`. The managed oracle only reads the account identity. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Independent observation](../../tools/rust-qa/instance/cross-session/observe.py)
 
 ## Native reproduction
 
-Run the following in the disposable `rewrite/rust` Windows x64 and ARM64 jobs with the repository's pinned Rust compiler and .NET SDK already installed. The Python fixture uses the existing `build` and `Child` functions. The only .NET invocation after building the source-pinned oracle is its identity operation. All writer processes use the same native Rust executable, which opens a pre-existing guard file and calls `File::try_lock`. [Instance builder](../../tools/rust-qa/instance/run.py) and [Rust file guard](../../tools/rust-qa/instance/main.rs)
+The existing hosted jobs run the following from the matching native architecture with the pinned Rust and .NET toolchains. The local account must already have its effective batch-logon assignment. The same output directory holds both per-case reports, prefixed `ambient-*` receipts and the standard trial’s original receipt names. The controller verifies the original logon rights and removal of the exact registered task. It checks the stamped process identities before deleting each temporary profile.
 
 ```bash
 python3 tools/rust-qa/instance/cross-session/observe.py "$NATIVE_TARGET" \
   --output "artifacts/rust/instance-native/$NATIVE_TARGET/cross-session"
 ```
 
-The controller creates a unique marked directory under `RUNNER_TEMP`, a synthetic profile and one empty guard. It records the volume and file ID. It reads the current token's SID and session, checks the native SDK oracle's account identity, and checks current-account batch logon rights through a local read-only LSA policy handle. The account must already have an effective allow assignment and no applicable deny assignment. The fixture records whether the assignment comes from the account or its current token groups, and checks it again after unregistering the task. [Microsoft batch logon policy](https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/log-on-as-a-batch-job) and [account rights](https://learn.microsoft.com/en-us/windows/win32/secauthz/account-rights-constants)
+A separate test uses two **already logged-on standard sessions of the same account** on a disposable Windows VM. Prepare a new shared local scratch directory accessible to that account in both sessions. Its marker `.ifw-existing-session-test` contains exactly the UTF-8 text `Immich Folder Watch isolated Windows test VM; synthetic data only` followed by LF. The two shells use the same checkout, Python executable and native target. Run the controller first, then give its printed unique directory to the peer within 110 seconds. Both validate their existing console or RDP session through Windows Terminal Services. The controller reads back the second connection state and protocol. This mode uses no scheduled task or alternative launch, and records its origin as `existing-standard-sessions`. Only the fixed guard’s child environment receives its four expected public rewrite identifiers. [Two-session runner](../../tools/rust-qa/instance/cross-session/existing.py)
 
-The local task has one fixed action, a random single-use name, zero triggers, `TASK_LOGON_S4U`, `TASK_RUNLEVEL_LUA`, the current SID and a three-minute execution limit. The launcher gets the Python executable from the live controller and supplies the checked-in worker and the marked directory as its only action arguments. Registration uses create-only semantics. The supervisor reads back the principal, logon type, privilege level, action and trigger count before starting the task. S4U supplies a noninteractive session without a stored password. The worker checks its actual token elevation before starting a Rust writer. [Microsoft Principal.LogonType](https://learn.microsoft.com/en-us/windows/win32/taskschd/principal-logontype), [Principal.RunLevel](https://learn.microsoft.com/en-us/windows/win32/taskschd/principal-runlevel) and [registration semantics](https://learn.microsoft.com/en-us/windows/win32/taskschd/taskfolder-registertaskdefinition)
+```powershell
+python tools/rust-qa/instance/cross-session/existing.py controller x86_64-pc-windows-msvc $MarkedVmScratch
+python tools/rust-qa/instance/cross-session/existing.py peer x86_64-pc-windows-msvc $PrintedFixtureDirectory
+```
 
-## Observations required for a pass
-
-| Order | Controller session | S4U session |
-| --- | --- | --- |
-| 1 | First Rust process reports `WRITER_HELD` | Worker proves the same SID, a different session, a non-elevated token, matching guard ID and executable hash |
-| 2 | Holder remains open while the controller checks the live worker process | A Rust contender reports `WRITER_BUSY` and exits successfully |
-| 3 | Holder reports `WRITER_RELEASED` and exits | Replacement reports `WRITER_HELD` |
-| 4 | Controller reads the live replacement's token, image and session. A Rust contender reports `WRITER_BUSY` and exits | Replacement keeps the lock through the inverse check |
-| 5 | A fresh original-session writer reacquires and releases the guard with the original file identity | Replacement reports `WRITER_RELEASED` and exits |
-
-The process session returned by `ProcessIdToSessionId` must match `TokenSessionId`. The receipt records the SHA-256 of each observed SID. The controller independently inspects the live scheduled worker and native holder. The scheduled worker forwards only the four public hosted rewrite identifiers required by the existing Rust guard. It checks the source-built executable's SHA-256 before use. There is no legacy listener, activation endpoint, media access or credential input in this probe. [Microsoft ProcessIdToSessionId](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-processidtosessionid)
-
-Private state files coordinate bounded waits. On failure the controller signals the worker to stop. The task supervisor stops only its own instance when needed, removes the definition and verifies its absence. A second local Task Scheduler connection independently checks the exact name and can clean up an interrupted matching definition. A pass requires task exit code zero, removal readback, unchanged observed batch rights and deletion of the marked directory. The published result contains build and source hashes, session IDs, process identity evidence and the file ID. The worker and scheduler retain separate receipts. The transient manifest containing the raw SID is removed with the profile.
-
-## Validation boundary
-
-The pinned native Linux compiler `1.100.0 (0ef1bc386)` built the same Rust source. Two processes of the same UID in different real POSIX sessions rejected both contenders and completed orderly handover and reacquisition on one file. Five local regression tests passed, including the live Linux rehearsal, a wrong account, equal session IDs and an elevated worker. PowerShell 7.7 parsed the scheduling script. Native Windows verification depends on separate x64 and ARM64 hosted execution with the documented account privileges. By design, an S4U run exercises a batch session. Console-to-RDP behavior, two independently logged-on interactive desktops, and prevention of a shipping .NET writer restarting during an installed handover have their own prerequisites.
+Seventeen local tests passed, including an actual two-session POSIX rehearsal using the pinned native Rust writer. They cover changed authority, false or misattributed lock responses, cleanup failures and independent reporting. The Windows trials above await native execution of this version. The manual two-desktop route reports `standardUserGuardPassed` for its own result and leaves `ambientGuardPassed` unmeasured. [Regression tests](../../tools/rust-qa/instance/cross-session/test_fixture.py)
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/instance/cross-session -p 'test_*.py'

@@ -5,11 +5,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from batch import eligible
-from fixture import HOSTED, INSTANCE, MARKER, ROOT, guard_id, instance, subject_env, wait, write
+from fixture import HOSTED, INSTANCE, MARKER, ROOT, guard_id, instance, read, subject_env, wait, write
+from standard import AMBIENT, STANDARD, qualifies, required_authority
+import observe
 import worker
 
 RUSTC = ROOT / "artifacts/rust/toolchain/bin/rustc"
@@ -57,18 +61,199 @@ class FixtureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             subject_env(Path.cwd(), {**HOSTED, "GITHUB_REF": "refs/heads/main"})
 
-    def test_equal_sessions_different_account_and_elevation_stop_before_writers(self):
-        with tempfile.TemporaryDirectory() as d:
-            area = Path(d)
-            write(area / "controller.json", {"sid": "synthetic", "controller": {"sessionId": 2}})
-            for sid, session, elevated in (("wrong", 0, False), ("synthetic", 2, False), ("synthetic", 0, True)):
-                with self.subTest(sid=sid, session=session, elevated=elevated), patch("worker.Accounts") as accounts:
-                    accounts.return_value.identify.return_value = (sid, Path("app"), {"sessionId": session, "elevated": elevated})
-                    result = {}
-                    with self.assertRaises(RuntimeError):
-                        worker.run(area, result)
-                    self.assertEqual(result["worker"]["sessionId"], session)
-                    self.assertFalse((area / "worker-ready.json").exists())
+    def test_effective_membership_integrity_privileges_and_capabilities_are_required(self):
+        standard = dict(elevated=False, tokenType=1, elevationType=1, enabledAdministrativeGroups=0,
+                        privilegesOutsideStandard=0, enabledOutsideStandard=0, uiAccess=False,
+                        capabilityCount=0, integrityRid=8192)
+        self.assertTrue(qualifies(standard))
+        self.assertTrue(qualifies({**standard, "elevationType": 3, "integrityRid": 4096}))
+        for key, bad in (("elevated", True), ("tokenType", 2), ("elevationType", 2),
+                         ("enabledAdministrativeGroups", 1), ("privilegesOutsideStandard", 1),
+                         ("integrityRid", 12288), ("capabilityCount", 1), ("uiAccess", True)):
+            with self.subTest(key=key):
+                self.assertFalse(qualifies({**standard, key: bad}))
+        self.assertFalse(qualifies({"elevated": False}))
+
+    def test_same_session_or_wrong_account_stops_before_any_writer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            area = Path(tmp)
+            config = {"hosted": HOSTED, "controller": {"sidSha256": "fixture", "sessionId": 2}, "expires": time.time() + 30}
+            write(area / "controller.json", config)
+            for digest, session in (("stranger", 0), ("fixture", 2)):
+                with patch("worker.Accounts") as accounts:
+                    accounts.return_value.identify.return_value = ("private", Path(sys.executable), {"sessionId": session, "sidSha256": digest})
+                    with self.assertRaisesRegex(RuntimeError, "account"):
+                        worker.own_identity(area, "scheduled")
+            self.assertFalse((area / "scheduled-ready.json").exists())
+
+    def test_failed_standard_launch_preserves_the_original_second_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            area = Path(tmp)
+            identity = {"pid": 42, "sessionId": 0, "elevated": True, "elevationType": 1}
+            with patch("worker.own_identity", return_value=({"mode": "hosted-S4U"}, None, "private", identity)), patch(
+                    "worker.basic_user", side_effect=RuntimeError("Level unavailable")):
+                with self.assertRaisesRegex(RuntimeError, "Level unavailable"):
+                    worker.run(area, {})
+            self.assertEqual(read(area / "scheduled-bootstrap.json"), identity)
+            self.assertFalse((area / "scheduled-ready.json").exists())
+
+    def test_existing_standard_sessions_never_attempt_a_trust_level_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            area = Path(tmp)
+            identity = {"pid": 42, "sessionId": 3, "elevated": True}
+            with patch("worker.own_identity", return_value=({"mode": "existing-standard-sessions"}, None, "private", identity)), patch(
+                    "worker.basic_user") as alternative:
+                with self.assertRaisesRegex(RuntimeError, "already"):
+                    worker.run(area, {})
+                alternative.assert_not_called()
+
+    def test_all_five_writers_are_inspected_before_their_controller_acknowledgement(self):
+        self.exercise_handover(STANDARD)
+
+    def test_elevated_ambient_trial_independently_inspects_five_native_writers(self):
+        self.exercise_handover(AMBIENT)
+
+    def exercise_handover(self, mode, *, finish_override=None, child_override=None):
+        elevated = mode == AMBIENT
+        facts = dict(tokenType=1, elevationType=1 if elevated else 3, elevated=elevated, enabledAdministrativeGroups=int(elevated),
+                     denyOnlyAdministrativeGroups=0, privilegeCount=4 + int(elevated), privilegesOutsideStandard=int(elevated),
+                     enabledOutsideStandard=0, capabilityCount=0, uiAccess=False, hasRestrictions=False,
+                     integrityRid=12288 if elevated else 8192, sidSha256="fixture")
+        phase_names = [phase for phases in worker.PHASES.values() for phase, _ in phases]
+        pids = {name: i + 40 for i, name in enumerate(("original", "scheduled", *phase_names))}
+        identities = {}
+        for name, pid in pids.items():
+            session = 2 if name.startswith("original") else 0
+            identities[name] = {**facts, "pid": pid, "created100ns": pid, "sessionId": session, "tokenSessionId": session,
+                                "authorityInventorySha256": ("a" if session else "b") * 64}
+        if child_override:
+            identities["scheduled-refuse"].update(child_override)
+        guard = {"fileId": "fixture", "volume": "test"}
+        with tempfile.TemporaryDirectory() as tmp:
+            area = Path(tmp)
+            for filename in ("original-ready", "scheduled-ready"):
+                write(area / (filename + ".json"), {"worker": identities[filename.split("-")[0]], "guard": guard})
+            for role in worker.PHASES:
+                write(area / (role + "-bootstrap.json"), identities[role])
+                write(area / (role + "-done.json"), {"passed": True})
+            for name in phase_names:
+                for suffix in ("-created.json", "-held.json"):
+                    write(area / (name + suffix), identities[name])
+                ended = {"pid": pids[name], "created100ns": pids[name], "guard": guard, "exitCode": 0,
+                         "event": "WRITER_BUSY" if name.endswith("-refuse") else "WRITER_RELEASED"}
+                if name == "scheduled-refuse" and finish_override:
+                    ended.update(finish_override)
+                write(area / (name + "-finished.json"), ended)
+            result = {"mode": mode, "controller": identities["original"], "guard": guard,
+                      "build": {"rust_binary_sha256": "fixture"}}
+            def inspect(_, pid, __, image, session, created):
+                name = next(n for n, number in pids.items() if number == pid)
+                self.assertEqual(identities[name]["sessionId"], session)
+                self.assertEqual(identities[name]["created100ns"], created)
+                if name in phase_names and not (area / (name + "-verified.json")).exists():
+                    self.assertTrue((area / (name + "-launch.json")).is_file())
+                    self.assertEqual(image.name, "instance.exe")
+                return identities[name]
+            with patch.object(observe, "verified_process", side_effect=inspect), patch.object(
+                    observe.instance, "sha", return_value="fixture"), patch.object(observe, "guard_id", return_value=guard):
+                observe.native_handover(area, object(), "private", area / "instance.exe", None, result)
+            self.assertEqual(set(result["writersObservedBeforeResume"]), set(phase_names))
+            self.assertEqual(result["originalReacquiredAfterScheduledRelease"], identities["original-last"])
+            self.assertTrue(result["lockSequenceObserved"])
+            self.assertEqual([(row["phase"], row["event"]) for row in result["observedWriterEvents"]], [
+                ("original-hold", "WRITER_HELD"), ("scheduled-refuse", "WRITER_BUSY"), ("original-hold", "WRITER_RELEASED"),
+                ("scheduled-hold", "WRITER_HELD"), ("original-refuse", "WRITER_BUSY"), ("scheduled-hold", "WRITER_RELEASED"),
+                ("original-last", "WRITER_HELD"), ("original-last", "WRITER_RELEASED")])
+
+    def test_ambient_trial_never_requests_an_alternative_process_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            area = Path(tmp)
+            identity = {"pid": 42, "elevated": True, "elevationType": 1, "sessionId": 0}
+            result = {}
+            with patch("worker.own_identity", return_value=({"mode": AMBIENT}, None, "private", identity)), patch(
+                    "worker.basic_user") as alternative, patch("worker.participant", return_value=True) as fixed:
+                worker.run(area, result)
+            alternative.assert_not_called()
+            fixed.assert_called_once_with(area, "scheduled")
+            self.assertEqual(read(area / "scheduled-bootstrap.json"), identity)
+            self.assertEqual(result["mode"], "unchanged-bootstrap-authority")
+
+    def test_ambient_trial_requires_the_local_parents_actual_authority(self):
+        for key, changed in (("authorityInventorySha256", "a" * 64), ("elevated", False), ("integrityRid", 8192),
+                             ("tokenSessionId", 3), ("privilegeCount", 3), ("authorityInventorySha256", "x" * 64)):
+            with self.subTest(key=key, changed=changed), self.assertRaisesRegex(RuntimeError, "suspended native writer"):
+                self.exercise_handover(AMBIENT, child_override={key: changed})
+        with self.assertRaisesRegex(ValueError, "Unknown"):
+            required_authority("ambiguous", {}, {})
+
+    def test_busy_exit_code_guard_pid_and_process_creation_must_match(self):
+        for key, wrong in (("event", "WRITER_HELD"), ("exitCode", 1), ("guard", {"fileId": "other"}),
+                           ("pid", 98765), ("created100ns", 12345)):
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, "lock response"):
+                self.exercise_handover(AMBIENT, finish_override={key: wrong})
+
+    def test_ambient_evidence_cannot_promote_the_standard_user_gate(self):
+        full = {"attempted": True, "passed": True, "lockSequenceObserved": True, "temporaryProfileRemoved": True}
+        ambient = {**full, "mode": AMBIENT, "ambientGuardPassed": True}
+        standard = {**full, "mode": STANDARD, "standardUserGuardPassed": True}
+        for a, s, expected_a, expected_s in (
+                (ambient, standard, True, True), (ambient, {}, True, False), ({}, standard, False, True),
+                (ambient, {**standard, "temporaryProfileRemoved": False}, True, False),
+                ({**ambient, "lockSequenceObserved": False}, standard, False, True),
+                (ambient, {**standard, "passed": False}, True, False),
+                (ambient, {**standard, "attempted": False}, True, False),
+                (ambient, {**standard, "mode": AMBIENT}, True, False)):
+            result = observe.summarize(a, s)
+            self.assertIs(result["ambientGuardPassed"], expected_a)
+            self.assertIs(result["standardUserGuardPassed"], expected_s)
+            self.assertIs(result["passed"], expected_a and expected_s)
+
+    def test_each_trial_confirms_its_exact_task_cleanup_after_scheduler_failure(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"GITHUB_SHA": "fixture"}):
+            base = Path(temp)
+            output = base / "results"
+            output.mkdir()
+            args = SimpleNamespace(target="fixture", output=output)
+            areas = []
+            def scheduled(area, _args, result, _reference):
+                areas.append(area)
+                result["schedulerStarted"] = True
+                if result["mode"] == STANDARD:
+                    result.update(schedulerExit=1, cleanupExit=0)
+                    write(area / "cleanup.json", {"cleanupVerified": True})
+                raise RuntimeError("Fixture registration failed")
+            with patch.object(observe, "scheduled", side_effect=scheduled), patch.object(observe, "participants_exited", return_value=0):
+                ambient = observe.hosted_case(args, base, AMBIENT, object())
+                standard = observe.hosted_case(args, base, STANDARD, object())
+            self.assertNotEqual(*areas)
+            self.assertTrue(areas[0].is_dir())
+            self.assertFalse(areas[1].exists())
+            self.assertFalse(ambient["temporaryProfileRemoved"])
+            self.assertTrue(standard["temporaryProfileRemoved"])
+            self.assertFalse(read(output / "ambient-case.json")["ambientGuardPassed"])
+            self.assertFalse(read(output / "standard-case.json")["standardUserGuardPassed"])
+            self.assertIsNone(ambient["standardUserGuardPassed"])
+            self.assertIsNone(standard["ambientGuardPassed"])
+
+    @unittest.skipUnless(sys.platform == "linux", "local filesystem link controls")
+    def test_guard_identity_refuses_links(self):
+        with tempfile.TemporaryDirectory() as temp:
+            area = Path(temp)
+            original, guard = area / "original", area / "writer.lock"
+            original.touch()
+            guard.symlink_to(original)
+            with self.assertRaisesRegex(RuntimeError, "guard"):
+                guard_id(area)
+            guard.unlink()
+            os.link(original, guard)
+            with self.assertRaisesRegex(RuntimeError, "guard"):
+                guard_id(area)
+
+    def test_raw_account_errors_are_never_written_to_receipts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            file = Path(tmp) / "test.json"
+            write(file, {"error": "S-1-5-21-123-456-789-1000 fixture failed"})
+            self.assertEqual(read(file)["error"], "[account ID] fixture failed")
 
     def test_worker_failure_and_deadline_are_observable(self):
         with tempfile.TemporaryDirectory() as d:
@@ -76,7 +261,7 @@ class FixtureTests(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 wait(area, "missing.json", 0)
             write(area / "worker-done.json", {"passed": False, "reason": "synthetic"})
-            with self.assertRaisesRegex(RuntimeError, "worker finished"):
+            with self.assertRaisesRegex(RuntimeError, "participant failed"):
                 wait(area, "missing.json")
 
     @unittest.skipUnless(sys.platform == "linux" and RUSTC.is_file(), "native Linux Rust rehearsal")

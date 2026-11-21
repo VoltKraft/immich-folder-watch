@@ -15,15 +15,20 @@ if ($taskName -cnotmatch '^IfwQaCross_[a-f0-9]{32}$' -or
     throw 'Expected a new marked profile directly under the disposable runner temp directory.'
 }
 $config = [IO.File]::ReadAllText((Join-Path $areaPath 'controller.json')) | ConvertFrom-Json
+if ($config.mode -cnotin @('hosted-S4U-ambient','hosted-S4U')) { throw 'Expected a fixed hosted guard trial.' }
 $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-if ($currentSid -cne $config.sid) { throw 'Controller account differs from the local registration principal.' }
+$sha = [Security.Cryptography.SHA256]::Create()
+try {
+    $sidDigest = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::ASCII.GetBytes($currentSid))).Replace('-', '').ToLowerInvariant()
+} finally { $sha.Dispose() }
+if ($sidDigest -cne $config.controller.sidSha256) { throw 'Controller account differs from the local registration principal.' }
 # The executable is taken from the live parent, never from a command supplied in the manifest.
 $python = [Diagnostics.Process]::GetProcessById([int]$config.controller.pid).MainModule.FileName
 if ([IO.Path]::GetFileName($python) -notmatch '^python(?:3(?:\.\d+)?)?\.exe$') { throw 'Expected the Python controller.' }
 $worker = (Get-Item -LiteralPath (Join-Path $PSScriptRoot 'worker.py')).FullName
 $fixedArgs = '-I -B "' + $worker + '" "' + $areaPath + '"'
 $source = 'ImmichFolderWatch rewrite fixture ' + $taskName
-$report = [ordered]@{ registered = $false; cleanupVerified = $false; mode = 'on-demand S4U' }
+$report = [ordered]@{ registered = $false; cleanupVerified = $false; mode = 'on-demand S4U'; trial = $config.mode }
 $task = $running = $registeredXml = $null
 $owns = $false
 
@@ -103,9 +108,9 @@ try {
         $report.state = $task.State
     }
 } catch {
-    $report.error = $_.Exception.Message
+    $report.error = $_.Exception.Message -replace '(?i)\bS-\d+-(?:\d+-)*\d+\b', '[account ID]'
     $report.hresult = ('0x{0:X8}' -f $_.Exception.GetBaseException().HResult)
-    throw
+    throw $report.error
 } finally {
     try {
         if ($owns) {
@@ -133,8 +138,8 @@ try {
         }
         if ($null -ne $folder -and $null -eq (Find-ThisTask)) { $report.cleanupVerified = $true }
     } catch {
-        $report.cleanupError = $_.Exception.Message
-        throw
+        $report.cleanupError = $_.Exception.Message -replace '(?i)\bS-\d+-(?:\d+-)*\d+\b', '[account ID]'
+        throw $report.cleanupError
     } finally {
         if ($VerifyCleanup) { Save-Report 'cleanup.json' } else { Save-Report 'scheduler.json' }
     }
