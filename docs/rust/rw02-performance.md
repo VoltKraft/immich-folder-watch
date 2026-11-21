@@ -86,6 +86,14 @@ artifact directory has SHA-256
 The Ubuntu jobs build the shipping .NET reference on each fresh host, save
 its measured budgets, then run the same workload on the Rust subject.
 
+At `8b071ab` both Ubuntu hosts built the shipping reference. Their installed
+.NET packs made the old runtime-directory search ambiguous or unmatched, so
+the timing trials never started. The driver now obtains the reference pack
+from the pinned SDK's own `KnownFrameworkReference` for `net10.0`. Its
+20,000-file Fedora smoke run built the reference frame counter, completed
+the idle and scan trials, and recorded render passes. This short run is
+ineligible for budget selection. [Hosted assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452).
+
 Use a Release build of the Linux desktop application from the source reference. The commands below use this checkout's isolated reference build, SDK, checksum-pinned Rust toolchain, inspected GUI registry and filtered YAML sources. Each run requires a fresh output label. Preserve the original fixed-budget report and verify its SHA-256 against the value above before replaying the pair. Select the full Git revision of the built Rust source. Each staged binary also carries a receipt binding its exact source-file hashes.
 
 ```sh

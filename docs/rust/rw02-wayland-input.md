@@ -170,12 +170,39 @@ previously exercised selection stays available through `--ibus-engine anthy`,
 the default when `--wayland-ime` is given. The probes require native
 RemoteDesktop and DisplayConfig services, virtual monitors, text-input-v3,
 viewporter and fractional-scale-v1. The driver enables the private
-framebuffer-scaling option where Mutter exposes it. Pure Ubuntu GNOME 46
-runs on x64 and ARM64 require separate hosted receipts.
+framebuffer-scaling option where Mutter accepts it.
 [Ubuntu Noble GNOME Shell](https://packages.ubuntu.com/noble/gnome-shell),
 [Ubuntu Noble package archive](https://archive.ubuntu.com/ubuntu/dists/noble/InRelease).
 
 ```sh
 subject=artifacts/rust/gui-build/release/native-gui-assessment
-python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --ibus-engine mozc --monitor-changes
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --wayland-ime --ibus-engine mozc
+python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject" --monitor-changes
 ```
+
+The two commands use independent private sessions so either result survives
+a failure in the other. A combined command still exercises the same native
+window. It writes the monitor observations and IME commit separately and
+reports each failed observation.
+
+## Ubuntu GNOME 46 display configuration
+
+In hosted run `44835826452` at `8b071ab`, both Noble architectures
+retained physical layout mode 2. The secondary 1920 × 1080 connector
+offered only scales 1 and 2, and reported all 1920 × 1080 logical units at
+2×. The independent geometry check stopped the combined run before its Mozc
+test. Ubuntu's `mutter-common 46.2-1ubuntu0.24.04.18` declares the
+`experimental-features` key as a string array. Its schema description
+includes `scale-monitor-framebuffer`, while the GSettings range describes
+only the array type. Upstream GNOME 46 uses an enumerated flags key.
+[Ubuntu Mutter source](https://launchpad.net/ubuntu/+source/mutter/46.2-1ubuntu0.24.04.18),
+[upstream Mutter schema](https://github.com/GNOME/mutter/blob/46.2/data/org.gnome.mutter.gschema.xml.in#L93-L111).
+
+The fixture range-checks the complete requested value, preserves the private
+profile's existing entries and reads the saved value back before starting
+GNOME Shell. `monitor-settings.json` records the exact range, values and
+availability on that installation. The driver then requires Mutter to
+report logical layout mode 1 and the requested connector configuration.
+The independent protocol and committed-buffer checks still cover all four
+transitions. A compositor with built-in fractional scaling can pass those
+checks without an experimental settings key.

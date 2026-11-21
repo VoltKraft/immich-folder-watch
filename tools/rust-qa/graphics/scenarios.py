@@ -152,7 +152,7 @@ def edit_draft(observer, process):
     return field
 
 
-def exercise(stack, case, process, observer, damage, frames, log, media, tray):
+def exercise(stack, case, process, observer, damage, frames, log, media, tray, *, require_queue_completion):
     evidence = {}
     x11 = isinstance(observer, X11Observer)
 
@@ -247,6 +247,16 @@ def exercise(stack, case, process, observer, damage, frames, log, media, tray):
     wait_for(lambda: has(f"GRAPHICS_LOST generation=1 reason={reason}"), 5, "wgpu did not acknowledge the selected device loss")
     if case == "driver-loss" and not has("GRAPHICS_DRIVER_SIGNAL vkQueueSubmit returned VK_ERROR_DEVICE_LOST after VK_SUCCESS"):
         raise RuntimeError("No software-driver fault was observed at vkQueueSubmit")
+    if case == "driver-loss" and require_queue_completion:
+        lines = log.read_text().splitlines()
+        completion = [(index, int(m[1])) for index, line in enumerate(lines)
+                      if (m := re.fullmatch(r"GRAPHICS_DRIVER_QUEUE_IDLE result=0 elapsed_us=(\d+)", line))]
+        signals = [i for i, line in enumerate(lines) if line.startswith("GRAPHICS_DRIVER_SIGNAL ")]
+        losses = [i for i, line in enumerate(lines) if line == "GRAPHICS_LOST generation=1 reason=Unknown"]
+        if len(completion) != 1 or len(signals) != 1 or len(losses) != 1 or not completion[0][0] < signals[0] < losses[0]:
+            raise RuntimeError("Expected the real software queue to finish before the single injected result and loss callback")
+        evidence["controlled_submit"] = dict(queue_submit="VK_SUCCESS", queue_wait_idle="VK_SUCCESS",
+                                             wait_us=completion[0][1], reported="VK_ERROR_DEVICE_LOST")
     if case == "raw-loss":
         # The raw control continues through the original eframe draw after destruction.
         until = time.monotonic() + 2

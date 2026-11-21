@@ -15,6 +15,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+import xml.etree.ElementTree as ET
 
 
 HERE = Path(__file__).resolve().parent
@@ -76,12 +77,18 @@ def namespace(work, app, runtime, desktop_spike=False):
         for name in ("dotnet", "host", "shared"):
             command += ["--ro-bind", str(runtime / name), "/runtime/" + name]
         sdk_version = json.loads((REPO / "global.json").read_text())["sdk"]["version"]
-        compiler = runtime / "sdk" / sdk_version / "Roslyn/bincore"
-        references = [path for path in (runtime / "packs/Microsoft.NETCore.App.Ref").glob("*/ref/net10.0")
-                      if (runtime / "shared/Microsoft.NETCore.App" / path.parents[1].name).is_dir()]
-        if not (compiler / "csc.dll").is_file() or len(references) != 1:
-            raise ValueError("Use the pinned SDK with a matching .NET 10 reference/runtime pack")
-        command += ["--ro-bind", str(compiler), "/compiler", "--ro-bind", str(references[0]), "/reference-assemblies"]
+        sdk = runtime / "sdk" / sdk_version
+        compiler = sdk / "Roslyn/bincore"
+        bundled = ET.parse(sdk / "Microsoft.NETCoreSdk.BundledVersions.props")
+        packs = {item.get("TargetingPackVersion", "") for item in bundled.iter("KnownFrameworkReference")
+                 if item.get("Include") == "Microsoft.NETCore.App" and item.get("TargetFramework") == "net10.0"
+                 and item.get("TargetingPackName") == "Microsoft.NETCore.App.Ref"}
+        if len(packs) != 1 or not re.fullmatch(r"10\.0\.\d+", next(iter(packs))):
+            raise ValueError(f"The pinned .NET {sdk_version} SDK does not declare a unique .NET 10 reference pack")
+        references = runtime / "packs/Microsoft.NETCore.App.Ref" / packs.pop() / "ref/net10.0"
+        if not (compiler / "csc.dll").is_file() or not (references / "System.Runtime.dll").is_file():
+            raise ValueError(f"Missing the compiler or SDK-declared reference assemblies at {references}")
+        command += ["--ro-bind", str(compiler), "/compiler", "--ro-bind", str(references), "/reference-assemblies"]
     environment = {"HOME": "/tmp/home", "DISPLAY": ":93", "DBUS_SESSION_BUS_ADDRESS": "unix:path=/tmp/session-bus",
                    "LANG": "C.UTF-8", "PATH": "/usr/bin:/bin", "LIBGL_ALWAYS_SOFTWARE": "1",
                    "PYTHONDONTWRITEBYTECODE": "1", "DOTNET_ROOT": "/runtime",

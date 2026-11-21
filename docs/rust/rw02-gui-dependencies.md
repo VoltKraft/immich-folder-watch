@@ -182,6 +182,18 @@ drivers and the application's orderly shutdown.
 
 ## Native interfaces and outstanding checks
 
+At `8b071ab`, each native host rebuilt the integrated GUI. The archived
+source and feature reports reproduced the four checked-in digests, covering
+235 packages per Linux target and 135 per Windows target. The ordinary
+Linux desktop window passed three editing cases and eight pixel controls on
+each architecture. The integrated result hashes were
+`6f1bb3eb38a3a6ddaeaf39257bdbc130e149258a280c58286cbacbe790957cff` on x64
+and `7c53c16336c078873e4a57f9cd9f4d8543c11d6d942c954dc41970095138ac6f` on
+ARM64. Each receipt includes the exact binary hash. Windows x64 passed the
+CJK pointer selection, deletion and caret test in the comparative subject.
+Both Windows hosts stopped before completing all mixed-direction cases.
+[Native graph, build and editor evidence](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452).
+
 - Hidden eframe windows can receive `App::logic` callbacks on a repaint wakeup.
   The app must drain bounded events there independently of visible frame input.
   Verify that hidden startup, tray failure and restoration work with the real

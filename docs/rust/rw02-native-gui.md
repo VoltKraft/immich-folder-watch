@@ -272,3 +272,14 @@ redrawn field with the original draft and native focus, and an edit that
 changes the captured pixels. The normal close, reopen and quit sequence
 must also pass after recovery. Native Windows results for this fixture are
 pending. [Observer and process-bound controls](../../tools/rust-qa/observe-windows-gui.py).
+
+In the integrated run, Windows x64 delivered the destruction callback and
+initialized generation two on WARP. Both the original and replacement windows
+were briefly visible to the observer. The observer now waits for the original
+to disappear before sending any further input. The initial Latin render
+control also passed on both Windows hosts. Later pointer cases failed to
+observe a caret. The input fixture now posts each client position immediately
+before its corresponding button message and records whether the physical
+screen point belonged to the foreground test window. Acceptance still requires
+the expected visual caret, selection, deletion and follow-up edit.
+[Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452).

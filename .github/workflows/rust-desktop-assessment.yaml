@@ -82,6 +82,11 @@ jobs:
         shell: bash
         run: python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET"
 
+      - name: Verify the native writer guard across same-account Windows sessions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: bash
+        run: python3 tools/rust-qa/instance/cross-session/observe.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET/cross-session"
+
       - name: Exercise Linux TLS, polling and WebSocket loopback sessions
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
         shell: bash
@@ -153,9 +158,13 @@ jobs:
         id: gnome_ime
         run: sudo apt-get install --yes --no-install-recommends gnome-shell ibus ibus-mozc gir1.2-ibus-1.0
 
-      - name: Observe Mozc composition and monitor changes with GNOME Wayland
+      - name: Observe Mozc composition in the native GNOME Wayland filename field
         if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
-        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --ibus-engine mozc --monitor-changes
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --ibus-engine mozc
+
+      - name: Observe native GNOME Wayland output membership, scale and buffer sizes
+        if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --monitor-changes
 
       - name: Build the offline native Linux service probes
         id: linux_services
@@ -232,6 +241,13 @@ jobs:
           python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
             "artifacts/rust/gui-native/$NATIVE_TARGET/windows-recovery" --device-recovery
 
+      - name: Verify input ownership on the runner and its disposable Windows desktop
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/windows-desktop/run.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-desktop"
+
       - name: Observe rendered font coverage and mixed-direction editing on the native desktop
         if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
         shell: bash
@@ -256,6 +272,17 @@ jobs:
           python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
           python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
 
+      - name: Measure the shipping WPF host and native Rust GUI on the same Windows desktop
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-performance/run.py $env:NATIVE_TARGET --output "artifacts/rust/windows-performance/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -263,6 +290,14 @@ jobs:
       - name: Observe Vulkan loss and redraw on Wayland
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-loss-ci --case driver-loss --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Destroy the owned X11 render device during a frame and verify recovery
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-paint-ci --case during-paint --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Destroy the owned Wayland render device during a frame and verify recovery
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-paint-ci --case during-paint --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
 
       - name: Observe worker and tray behavior when no renderer is available
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
@@ -304,6 +339,9 @@ jobs:
           path: |
             artifacts/rust/storage-native/
             artifacts/rust/instance-native/${{ matrix.target }}/result.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/scheduler.log
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
@@ -329,9 +367,11 @@ jobs:
             artifacts/rust/graphics/*-ci/*.log
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
+            artifacts/rust/windows-performance/native-*/*
             artifacts/rust/gui-build/release/*.inputs.json
             artifacts/rust/font-coverage/*/result.json
             artifacts/rust/font-coverage/*/*/native.log
+            artifacts/rust/font-coverage/*/*/pointer.json
             artifacts/rust/font-coverage/*/*/observed.ppm
             artifacts/rust/font-coverage/subjects/*/subject.json
           if-no-files-found: error

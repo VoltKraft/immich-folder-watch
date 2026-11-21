@@ -73,6 +73,23 @@ class WindowsInput:
     """Send window-targeted messages only to the synthetic child's verified top-level HWND."""
     def __init__(self, observer):
         self.observer = observer
+        self.pointer_positions = {"ownedDesktopPoint": 0, "windowMessagesOnly": 0}
+        from ctypes import wintypes as w
+        user = c.WinDLL("user32", use_last_error=True)
+        self.client_to_screen = user.ClientToScreen
+        self.client_to_screen.argtypes = [w.HWND, c.POINTER(w.POINT)]
+        self.at_point = user.WindowFromPoint
+        self.at_point.argtypes = [w.POINT]
+        self.at_point.restype = w.HWND
+        self.set_position = user.SetCursorPos
+        self.set_position.argtypes = [c.c_int, c.c_int]
+        self.foreground = user.GetForegroundWindow
+        self.foreground.argtypes = []
+        self.foreground.restype = w.HWND
+        self.point = w.POINT
+        self.disposable = (os.getenv("RUNNER_ENVIRONMENT") == "github-hosted"
+                           and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch"
+                           and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust")
 
     def send(self, msg, key, pos):
         hwnd = self.observer.visible()
@@ -80,19 +97,32 @@ class WindowsInput:
             raise RuntimeError("Could not deliver a native input message to the synthetic window")
         time.sleep(.09)
 
-    def mouse(self, msg, down, x, y):
-        self.send(msg, int(down), (y << 16) | x)
+    def mouse(self, x, y, held, button=None):
+        hwnd = self.observer.visible()
+        if not hwnd:
+            raise RuntimeError("The synthetic child has no visible client for the pointer")
+        position = self.point(x, y)
+        moved = (self.disposable and self.foreground() == hwnd and self.client_to_screen(hwnd, c.byref(position))
+                 and self.observer.ancestor(self.at_point(position), 2) == hwnd
+                 and self.set_position(position.x, position.y))
+        self.pointer_positions["ownedDesktopPoint" if moved else "windowMessagesOnly"] += 1
+        packed = (y << 16) | x
+        if not self.observer.post(hwnd, 0x200, int(held), packed):
+            raise RuntimeError("Could not deliver client pointer coordinates to the owned HWND")
+        # Winit uses TrackMouseEvent and egui drops a click after WM_MOUSELEAVE clears its
+        # last pointer position. Put the position and button in the same queue burst.
+        if button is not None and not self.observer.post(hwnd, button, int(button == 0x201), packed):
+            raise RuntimeError("Could not deliver the owned window's pointer button")
+        time.sleep(.09)
 
     def click(self, x, y):
-        self.mouse(0x200, False, x, y)
-        self.mouse(0x201, True, x, y)
-        self.mouse(0x202, False, x, y)
+        self.mouse(x, y, False, 0x201)
+        self.mouse(x, y, True, 0x202)
 
     def drag(self, x0, x1, y):
-        self.mouse(0x200, False, x0, y)
-        self.mouse(0x201, True, x0, y)
-        self.mouse(0x200, True, x1, y)
-        self.mouse(0x202, False, x1, y)
+        self.mouse(x0, y, False, 0x201)
+        self.mouse(x1, y, True)
+        self.mouse(x1, y, True, 0x202)
 
     def key(self, name):
         vk, scan = {"Right": (0x27, 0x4d), "Left": (0x25, 0x4b), "Delete": (0x2e, 0x53)}[name]
@@ -156,7 +186,11 @@ def run(binary, work, observer=None, display="Windows test desktop"):
                 process.stdin.flush()
             else:
                 controls = X11Input(observer)
-            result = check_case(profile, name, controls, process, log, directory)
+            try:
+                result = check_case(profile, name, controls, process, log, directory)
+            finally:
+                if windows:
+                    (directory / "pointer.json").write_text(json.dumps(controls.pointer_positions) + "\n", encoding="utf-8")
             if windows:
                 process.stdin.write(b"Q")
                 process.stdin.close()

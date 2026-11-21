@@ -64,7 +64,7 @@ class Windows:
         while self.peek(ctypes.byref(message), None, 0, 0, 1):
             self.dispatch(ctypes.byref(message))
 
-    def visible(self):
+    def visible(self, retiring=None):
         self.pump()
         matching = []
 
@@ -81,6 +81,10 @@ class Windows:
 
         if not self.enumerate(visit, 0):
             raise ctypes.WinError(ctypes.get_last_error())
+        if retiring in matching and len(matching) == 2:
+            # During DX12 replacement Windows can temporarily expose both generations.
+            # Wait for the old HWND to vanish before observing or sending any input.
+            return None
         if len(matching) > 1:
             raise RuntimeError("Multiple visible assessment windows")
         return next(iter(matching), None)
@@ -119,10 +123,10 @@ def run_case(binary, output, name, background, tray, reopen, speech_cues=None):
                     process.stdin.write(value)
                     process.stdin.flush()
 
-                def wait_for(condition, label):
+                def wait_for(condition, label, retiring=None):
                     start = time.monotonic()
                     while time.monotonic() - start < 35:
-                        hwnd = observer.visible()
+                        hwnd = observer.visible(retiring)
                         if process.poll() is not None:
                             raise RuntimeError(f"{name} exited before {label}, see {log}")
                         if condition(hwnd, log.read_text(encoding="utf-8", errors="replace")):
@@ -188,7 +192,8 @@ def run_case(binary, output, name, background, tray, reopen, speech_cues=None):
                                             and "GRAPHICS_LOST generation=1 reason=Destroyed" in text
                                             and "GRAPHICS_ATTEMPT generation=2 policy=cpu" in text
                                             and any(e["event"] == "show" and e["hwnd"] == window for e in observer.events),
-                                            "new DX12 generation and native HWND after process-local device destruction")
+                                            "new DX12 generation and native HWND after process-local device destruction",
+                                            retiring=previous)
                             check_input(hwnd, "after", ["-RecoveryPhase", "after"])
                             actions.append("edited and captured the restored focused field after recovery")
                         else:

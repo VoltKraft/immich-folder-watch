@@ -60,11 +60,13 @@ def launch(backend, flatpak, shell, chooser_only, hosted_runtime):
     }
     flatpak_paths = []
     if flatpak:
+        from flatpak_fixture import SYS_DIRS
         from runtime_pin import deployment
         runtime, details = deployment(hosted_runtime)
         inputs['platform'] = details
         destination = Path('/tmp/private-flatpak-system') / details['ref'] / details['commit']
-        flatpak_paths = ['--ro-bind', str(runtime), str(destination), '--setenv', 'FLATPAK_SYSTEM_DIR',
+        flatpak_paths = ['--tmpfs', '/sys', *(arg for path in SYS_DIRS for arg in ('--dir', path)),
+            '--ro-bind', str(runtime), str(destination), '--setenv', 'FLATPAK_SYSTEM_DIR',
             '/tmp/private-flatpak-system', '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak']
     (work / 'inputs.json').write_text(json.dumps(inputs, indent=2) + '\n')
     cmd[end:] = ['--uid', '0', '--gid', '0', '--cap-add', 'CAP_SYS_ADMIN', '--cap-add', 'CAP_SETFCAP',
@@ -191,6 +193,7 @@ def inside(backend, flatpak, shell, chooser_only):
             'xserver': server})
         if flatpak:
             import flatpak_fixture
+            record('flatpak_launch_bus', flatpak_fixture.start_launch_bus(stack, bus))
             record('flatpak', flatpak_fixture.prepare(inputs['platform']['commit']))
 
         def app(action):

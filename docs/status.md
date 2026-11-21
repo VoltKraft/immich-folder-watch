@@ -1,5 +1,30 @@
 # Project Status
 
+## Native desktop follow-up and Windows writer ownership (2026-11-21)
+
+The integrated Linux x64 GUI recovered and accepted a real edit on both X11
+and Wayland after an application-owned device was destroyed during painting.
+The separate Vulkan fixture now waits for its submitted queue work to finish
+before returning a controlled device-loss result. A repeat of the Linux .NET
+reference with 20,000 synthetic files reached every measurement phase after
+resolving the exact .NET 10 targeting pack from the SDK. The established
+100,000-file budgets remain the acceptance reference.
+[Graphics observations](rust/rw02-graphics.md) and [resource evidence](rust/rw02-performance.md).
+
+An isolated Ubuntu 24.04 x64 userspace reproduced the installed Flatpak
+launcher's missing system-bus socket. With an isolated empty bus and the five
+empty device directories required by Flatpak 1.14, the installed app passed
+parented folder selection, grant readback, revocation and notification on both
+X11 and Wayland. The next hosted run repeats the checks on both architectures.
+[Ubuntu component hashes and native results](rust/rw02-portal-dialog.md).
+
+Five tests for the cross-session driver passed locally, including file-lock
+exclusion and reacquisition in two real POSIX sessions. Two distinct native
+Windows sessions still need to pass. Six portable-reader parser and cleanup
+tests and the window-targeted pointer sequence passed locally. The native
+desktop jobs exercise those changes on both Windows architectures.
+[Cross-session checks](rust/rw02-cross-session.md) and [Windows screen reader](rust/rw02-windows-reader.md).
+
 ## Native GUI checks at the integrated revision (2026-11-21)
 
 At `8b071ab` the four native GUI builds reproduced their reviewed package

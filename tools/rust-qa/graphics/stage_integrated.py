@@ -55,7 +55,8 @@ def stage(args):
     observer = instrument_submit(work, subject, worker)
     receipt = dict(gui_receipt=sha(subject / "native-gui-assessment.inputs.json"),
                    worker_receipt=sha(subject / "worker.inputs.json"), submit_observer=observer,
-                   submit_source=sha(HERE / "submit_loss.rs"), stage=sha(Path(__file__)))
+                   submit_source=sha(HERE / "submit_loss.rs"), observer_builder=sha(HERE / "build.py"),
+                   stage=sha(Path(__file__)))
     (subject / "integrated.inputs.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(subject)
 

@@ -55,8 +55,10 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 All four native targets confirmed old/new local activation in both directions and exclusion
 between two cooperative Rust writers. The shipping coordinator could still
-start with the new guard held. Installed handover and Windows cross-session
-exclusion remain open. [Native process evidence](rw02-instance.md).
+start with the new guard held. The new same-account Windows test requires two
+actual session IDs, both exclusion directions and reacquisition. Installed
+handover and native Windows cross-session exclusion remain open.
+[Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
 ## Native evidence matrix
 
@@ -65,7 +67,7 @@ exclusion remain open. [Native process evidence](rw02-instance.md).
 | Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 27 Rust tests, distinct NTFS 8.3 denial, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases, independent Startup readbacks, Shell registration and balloon callback passed. [Native keyboard focus, password masking and Unicode clipboard](rw02-native-gui.md#reproduction) passed at `2e7ed89`. Screen-reader evidence remains open. | Pending |
 | Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Same 27 native tests, distinct NTFS alias, five traces and 5,844 comparisons | Four native DX12 lifecycle cases and independent Startup readbacks passed. UI Automation observed German names and password protection. Hosted foreground and tray registration remain open. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real FUSE grants, lock refusal and private upstream fix verified locally. | Four hosted lifecycle cases on each of X11/Wayland. AT-SPI, protected input, language and clipboard passed on both. Fedora X11 measurements met all [11 reference limits](rw02-performance.md#paired-x11-measurements). | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Same four native X11/Wayland lifecycle cases and full AT-SPI input run on both backends at `4961746`. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons | Four X11/Wayland lifecycle cases, protected input and clipboard passed on each backend. At `8b071ab`, all three integrated text-editing cases, eight glyph controls and both host folder choosers passed. | Pending |
 
 All four also passed two live WAL backups, 40 production C# readback assertions,
 15 native loopback transport cases and six old/new activation and file-lock
@@ -103,7 +105,9 @@ The released egui 0.37 text editor deleted the wrong visible Arabic character
 in two mixed-direction cases. A narrowly scoped upstream correction passed
 the same pointer, keyboard and GPU readback tests on Linux x64, including
 numbers inside a right-to-left run. The integrated Linux x64 GUI also passed
-the tests in its ordinary filename field. The other three native hosts remain
+the tests in its ordinary filename field. Ubuntu x64 and ARM64 subsequently
+passed the same checks at `8b071ab`. Windows DX12 rendered the first control
+on both hosts. Complete editing evidence on both Windows targets remains
 open. [Comparative font tests](rw02-font-coverage.md) and
 [integrated source and field observations](rw02-gui-dependencies.md).
 

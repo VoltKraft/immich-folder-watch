@@ -1,7 +1,8 @@
 # Windows screen reader assessment
 
-The native Windows assessment starts portable NVDA 2026.3.1 with its eSpeak
-synthesizer in a fresh configuration. A separate UI Automation client verifies
+The native Windows assessment starts portable NVDA 2026.3.1 with a fresh
+configuration. It requests eSpeak and also accepts the reader's Microsoft
+OneCore fallback when initialization succeeds. A separate UI Automation client verifies
 the application HWND, process, focused field and foreground ownership before
 sending keyboard input. It waits for announcements from the actual reader at
 the German filename field, password field, language button and English filename
@@ -37,3 +38,16 @@ The final command runs only on a disposable native Windows rewrite runner.
 The local parser controls passed with ordered announcements, protected input,
 split log writes and unrelated logging. Actual NVDA observations from native
 Windows x64 and ARM64 remain pending. [Fixture and input checks](../../tools/rust-qa/windows-reader/run.py).
+
+At `8b071ab`, both Windows runners initialized NVDA and selected OneCore
+after the audio device rejected eSpeak. The observer required eSpeak and
+stopped before interacting with the app. It also discovered that the
+portable reader kept DLLs open during cleanup. The profile now declares
+the release's schema version 25 for its numeric typing-echo settings. The
+fixture records the active synthesizer and gives the owned NVDA window
+its normal quit message before bounded cleanup. The ARM64 runner used the
+official x64 reader with a native ARM64 application. Ordered application
+announcements remain a separate acceptance requirement on both hosts.
+[Hosted observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452),
+[release configuration schema](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/config/configSpec.py)
+and [reader shutdown](https://github.com/nvaccess/nvda/blob/08788e99cd9db570966063b549d2cd1f7496493a/source/nvda.pyw).

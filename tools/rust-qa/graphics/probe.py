@@ -21,6 +21,12 @@ HERE = Path(__file__).resolve().parent
 NAMESPACES = ("net", "mnt", "pid", "ipc", "user")
 HELPER_REVISION = "9e189bf06662a2286a1cbadd2efc14ac4a8e22e4"
 GRAPHICS_FREEZE = "27462474116603be88e476ed32a943b4fa1126c7"
+FIRST_INTEGRATION = "8b071ab9089a87a65ae1cc23325fcbba452fe4d2"
+
+
+def archived_digest(revision, name):
+    return hashlib.sha256(subprocess.check_output(
+        ["git", "show", f"{revision}:tools/rust-qa/graphics/{name}"], cwd=HERE)).hexdigest()
 
 
 def freeze_drivers(destination):
@@ -81,8 +87,8 @@ def launch(args):
         integrated = json.loads((subject / "integrated.inputs.json").read_text())
         files = {"gui_receipt": subject / "native-gui-assessment.inputs.json",
                  "worker_receipt": subject / "worker.inputs.json", "submit_observer": subject / "submit-observer/libvulkan.so.1",
-                 "stage": HERE / "stage_integrated.py", "submit_source": HERE / "submit_loss.rs"}
-        if any(integrated[role] != sha(path) for role, path in files.items()):
+                 "stage": HERE / "stage_integrated.py", "submit_source": HERE / "submit_loss.rs", "observer_builder": HERE / "build.py"}
+        if any(integrated.get(role) != sha(path) for role, path in files.items()):
             raise ValueError("The integrated graphics measurement differs from its input receipt")
     elif args.case == "stock":
         workers = json.loads((subject / "worker.inputs.json").read_text())
@@ -98,11 +104,12 @@ def launch(args):
             checks["submit_observer"] = "submit-observer/libvulkan.so.1"
         if any(sha(subject / path) != exp[role] for role, path in checks.items()):
             raise ValueError("Experimental subject differs from its bound sources")
-        builder = sha(HERE / "build.py") if exp.get("base_revision") else hashlib.sha256(subprocess.check_output(
-            ["git", "show", GRAPHICS_FREEZE + ":tools/rust-qa/graphics/build.py"], cwd=HERE)).hexdigest()
-        if exp["builder"] != builder or any(exp[field] != sha(HERE / name) for field, name in
+        builders = ({sha(HERE / "build.py"), archived_digest(FIRST_INTEGRATION, "build.py")}
+                    if exp.get("base_revision") else {archived_digest(GRAPHICS_FREEZE, "build.py")})
+        if (exp["builder"] not in builders or exp["submit_source"] != archived_digest(GRAPHICS_FREEZE, "submit_loss.rs")
+                or any(exp[field] != sha(HERE / name) for field, name in
                (("pins", "inputs.py"), ("patch", "supervisor.patch"),
-                ("graphics", "graphics.rs"), ("submit_source", "submit_loss.rs"))):
+                ("graphics", "graphics.rs")))):
             raise ValueError("Rebuild the experiment from the current observation inputs")
     with tempfile.TemporaryDirectory(prefix="ifw-rw02-graphics-", dir="/tmp") as tmp:
         work = Path(tmp) / "run"
@@ -256,9 +263,11 @@ def inside():
                         raise RuntimeError("An ordinary GUI accepted the diagnostic device-loss action")
         else:
             try:
-                evidence.update(exercise(stack, spec["case"], subject, observer, damage, frames, log, media, tray))
+                evidence.update(exercise(stack, spec["case"], subject, observer, damage, frames, log, media, tray,
+                                         require_queue_completion=spec["integrated"]))
             except (TimeoutError, RuntimeError) as exc:
                 evidence["observation_error"] = str(exc)
+                evidence["subject_exit_at_failure"] = subject.poll()
                 observer.poll()
                 evidence["window_events"] = observer.events
                 if spec["monitor_capture"]:

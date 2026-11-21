@@ -39,18 +39,36 @@ def component(ibus_engine):
     return path, program, record.findtext("name"), record.findtext("version")
 
 
+def prepare_monitor_scaling():
+    settings = Gio.Settings.new("org.gnome.mutter")
+    schema = settings.get_property("settings-schema")
+    key = "experimental-features"
+    feature = "scale-monitor-framebuffer"
+    observation = {"schema": schema.get_id(), "key": key, "available": schema.has_key(key)}
+    if observation["available"]:
+        definition = schema.get_key(key)
+        before = settings.get_strv(key)
+        requested = before if feature in before else [*before, feature]
+        value = GLib.Variant("as", requested)
+        accepted = definition.range_check(value)
+        observation.update(range=definition.get_range().print_(True), previous=before, accepts_value=accepted)
+        if accepted:
+            if not settings.set_value(key, value):
+                raise RuntimeError("The private profile rejected Mutter's framebuffer-scaling setting")
+            Gio.Settings.sync()
+        observation["readback"] = settings.get_strv(key)
+        if accepted and observation["readback"] != requested:
+            raise RuntimeError("The private profile did not retain Mutter's framebuffer-scaling setting")
+    dump("monitor-settings.json", observation)
+
+
 def prepare_shell(stack, ime, monitors, ibus_engine):
     os.environ.update(XDG_CURRENT_DESKTOP="GNOME", XDG_SESSION_TYPE="wayland", GSETTINGS_BACKEND="keyfile")
     shell_version = subprocess.check_output(["gnome-shell", "--version"], text=True, timeout=5).split()[-1]
     Gio.Settings.new("org.gnome.desktop.interface").set_boolean("enable-animations", False)
     Gio.Settings.new("org.gnome.shell").set_string("welcome-dialog-last-shown-version", shell_version)
     if monitors:
-        settings = Gio.Settings.new("org.gnome.mutter")
-        schema = settings.get_property("settings-schema")
-        if schema.has_key("experimental-features"):
-            key = "experimental-features"
-            if "scale-monitor-framebuffer" in str(schema.get_key(key).get_range()):
-                settings.set_strv(key, ["scale-monitor-framebuffer"])
+        prepare_monitor_scaling()
     Gio.Settings.sync()
     if not ime:
         return
@@ -159,8 +177,12 @@ def configure_outputs(observer, second_scale, *, initial=False):
         logical_after = sorted(after[2], key=lambda group: group[0])
         observed = [(g[0], g[1], g[2], g[3], g[4], g[5][0][0]) for g in logical_after]
         expected = [(g[0], g[1], g[2], g[3], g[4], g[5][0][0]) for g in desired]
-        return after if observed == expected else None
-    after = wait_for(applied, 5, "Mutter did not apply the requested logical positions and scales")
+        return after if observed == expected and after[3].get("layout-mode") == 1 else None
+    try:
+        after = wait_for(applied, 5, "Mutter did not apply the requested logical layout, positions and scales")
+    except TimeoutError:
+        dump(f"displays-rejected-{second_scale}.json", display_state(observer))
+        raise
     dump(f"displays-applied-{second_scale}.json", after)
     return [g[5][0][0] for g in desired]
 
@@ -416,20 +438,35 @@ def exercise(stack, observer, *, ime, monitors, ibus_engine):
     prop = ("org.gnome.Shell", "OverviewActive")
     shell_property("Set", GLib.Variant("(ssv)", (*prop, GLib.Variant("b", False))))
     wait_for(lambda: not shell_property("Get", GLib.Variant("(ss)", prop))[0], 4, "Desktop overview remained open")
+    failures = {}
+    connectors = None
     if monitors:
-        connectors = configure_outputs(observer, 2.0, initial=True)
+        try:
+            connectors = configure_outputs(observer, 2.0, initial=True)
+        except Exception as error:
+            failures["monitor_configuration"] = str(error)
     start_accessibility(stack)
     log = WORK / "gnome-input-application.log"
     app = checked_start(stack, ["env", "WAYLAND_DEBUG=client", "/app/native-gui-assessment"], log)
     wait_for(lambda: check_alive(app, log) or observer.poll(), 12, "The assessment app did not map")
     observer.focus_for_input()
-    if monitors:
-        result["monitor_transitions"] = check_monitors(observer, log, connectors, app)
+    if connectors:
+        try:
+            result["monitor_transitions"] = check_monitors(observer, log, connectors, app)
+        except Exception as error:
+            failures["monitor_transitions"] = str(error)
     if ime:
-        result["composition"] = check_ime(observer, log, app, ibus_engine)
+        try:
+            result["composition"] = check_ime(observer, log, app, ibus_engine)
+            dump("composition.json", result["composition"])
+        except Exception as error:
+            failures["composition"] = str(error)
     else:
         dump("native-inputs.json", native_inputs(observer, app))
     action("quit")
     if app.wait(timeout=8) != 0:
         raise RuntimeError("The private GNOME assessment application did not shut down")
+    if failures:
+        dump("gnome-failures.json", failures)
+        raise RuntimeError("; ".join(f"{name}: {detail}" for name, detail in failures.items()))
     return result

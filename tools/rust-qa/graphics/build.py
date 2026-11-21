@@ -19,9 +19,10 @@ ROOT = HERE.parents[2]
 ART = ROOT / "artifacts/rust"
 BASE = ART / "performance/subjects/native-map-confirmed"
 BASE_REVISION = "6c953e32c0b2710bfe06b19805214946653480af"
+GRAPHICS_FREEZE = "27462474116603be88e476ed32a943b4fa1126c7"
 
 
-def instrument_submit(work, subject, receipt):
+def instrument_submit(work, subject, receipt, *, historical=False):
     original = HERE.parent / "performance/present.rs"
     if sha(original) != receipt["sources"]["tools/rust-qa/performance/present.rs"]:
         raise ValueError("Vulkan observation source differs from the reviewed worker receipt")
@@ -33,7 +34,11 @@ def instrument_submit(work, subject, receipt):
         raise ValueError("The approved device dispatch site changed")
     content = content.replace(site, site + '\n    if let Some(proxy) = unsafe { submit_loss::resolve(name, actual) } { return proxy; }')
     (source / "driver.rs").write_text(content + '\nmod submit_loss;\n')
-    shutil.copyfile(HERE / "submit_loss.rs", source / "submit_loss.rs")
+    if historical:
+        fault = subprocess.check_output(["git", "show", GRAPHICS_FREEZE + ":tools/rust-qa/graphics/submit_loss.rs"], cwd=ROOT)
+        (source / "submit_loss.rs").write_bytes(fault)
+    else:
+        shutil.copyfile(HERE / "submit_loss.rs", source / "submit_loss.rs")
     output = subject / "submit-observer"
     output.mkdir()
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--dev", "/dev",
@@ -102,13 +107,13 @@ def build(label, base):
             raise ValueError(f"Changed source-bound helper {name}")
         (subject / name).parent.mkdir(exist_ok=True)
         shutil.copy2(base / name, subject / name)
-    submit = instrument_submit(work, subject, workers)
+    submit = instrument_submit(work, subject, workers, historical=True)
     provenance = dict(base_receipt=sha(receipt), base_revision=BASE_REVISION, base=source["binary_sha256"],
                       patch=sha(HERE / "supervisor.patch"), graphics=sha(HERE / "graphics.rs"),
                       builder=sha(Path(__file__)), pins=sha(HERE / "inputs.py"),
                       baseline_builder=sha(gui / "build.py"), worker=workers["worker_sha256"],
                       observer=workers["observer_sha256"], gui=sha(subject / "native-gui-assessment"),
-                      submit_source=sha(HERE / "submit_loss.rs"), submit_observer=submit)
+                      submit_source=sha(work / "driver-src/submit_loss.rs"), submit_observer=submit)
     (subject / "graphics.inputs.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(subject)
 

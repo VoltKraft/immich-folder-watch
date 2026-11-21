@@ -207,3 +207,51 @@ python3 tools/rust-qa/portal-dialog/native.py wayland --host-chooser-only
 python3 tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
 python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
 ```
+
+## Ubuntu Flatpak launch bus
+
+In hosted run `44835826452` at `8b071ab`, the signed runtime acquisition
+and offline installation of the fixture app completed on Ubuntu x64 and
+ARM64. Each of the four installed-client runs then reported `Could not
+connect: No such file or directory` before the Rust process reported an
+application identity or parent. The x64 launcher SHA-256
+`25a6e33ac9307e5ece4c16eb49e03b5b25bdc4facc7175b1c7638718682bcf5a`
+matches the executable from Ubuntu's signed `flatpak 1.14.6-1ubuntu0.1`
+package. This build links libmalcontent. During app startup Flatpak opens
+a system-bus connection before querying the account service. It propagates
+a missing socket as a launch error. With an available bus it handles the
+absence of that optional service itself.
+[Ubuntu Flatpak package](https://launchpad.net/ubuntu/+source/flatpak/1.14.6-1ubuntu0.1),
+[Flatpak 1.14.6 launch check](https://github.com/flatpak/flatpak/blob/1.14.6/common/flatpak-run.c#L3671-L3709).
+
+The fixture creates a second D-Bus daemon in its existing private network,
+mount and PID namespaces. Only the host-side `flatpak run` commands receive
+its system-bus address. The new daemon has no service activation directories.
+The driver checks the distinct bus ID and activatable names and writes both
+to `steps.flatpak_launch_bus` in `results.json`. The chooser, Documents
+service and permission store use the original private session bus. The
+installed application's metadata still grants only its display sockets.
+
+After opening the bus, version 1.14.6 also requires five read-only source
+directories under `/sys`. The outer fixture supplies `block`, `bus`,
+`class`, `dev` and `devices` on a new private tmpfs and checks that each
+is empty. The installed runtime receives those empty directories.
+[Flatpak base sandbox setup](https://github.com/flatpak/flatpak/blob/1.14.6/common/flatpak-run.c#L3237-L3252).
+
+Native x64 runs used the APT-verified Ubuntu 24.04.5 userspace on a
+Fedora kernel. The launchers, portal frontend, Documents service, GTK
+backend and permission store matched the hosted x64 binary hashes. The
+original fixture's only traced socket connection returned `ENOENT` for
+`/run/dbus/system_bus_socket`. With the private bus and device directories,
+both real installed clients proved native dialog parenting, cancellation,
+selection, document access, notification delivery and withdrawal. After
+permission revocation a fresh client on each backend reported `ENOENT`
+opening its grant-relative root. The public runtime and compiled Rust
+client matched the earlier Fedora controls. A fresh hosted ARM64 run must
+exercise the same paths.
+
+| Native x64 receipt under `artifacts/rust/gui-noble-native/runs/portal-dialog/` | SHA-256 |
+| --- | --- |
+| `x11-flatpak-uekzaksp/cancel-connect.strace` (original driver, socket calls only) | `c3ba77d28a52e9c94c455e936560a81462554ecbd656eb61be9eb6a0ccbf1a7b` |
+| `x11-flatpak-imkfupty/results.json` | `a6aab7952b7474585113e31e90ba2f6d54a87fcedb103299e3e43dff06f5f08f` |
+| `wayland-flatpak-sts9536y/results.json` | `104c6827e17e9044ff87afabdd30aee62dd34c7e59c7ef5d7a249568328d53d8` |

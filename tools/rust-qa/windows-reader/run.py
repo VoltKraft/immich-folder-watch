@@ -1,6 +1,9 @@
 """Run a checksum-pinned, temporary portable NVDA against the owned Windows GUI fixture."""
 
 import argparse
+from contextlib import contextmanager
+import ctypes
+from ctypes import wintypes
 import hashlib
 import http.client
 import json
@@ -82,13 +85,58 @@ def stop(process):
             process.wait(timeout=10)
 
 
+@contextmanager
+def private_profile(report):
+    directory = tempfile.TemporaryDirectory(prefix="ifw-reader-", dir=os.environ["RUNNER_TEMP"])
+    try:
+        yield Path(directory.name)
+    finally:
+        # NVDA's per-process accessibility helpers can outlive its main window briefly.
+        prior_error = sys.exc_info()[0]
+        deadline = time.monotonic() + 20
+        while True:
+            try:
+                directory.cleanup()
+                report["profileRemoved"] = True
+                break
+            except PermissionError as error:
+                if time.monotonic() >= deadline:
+                    report.update(profileRemoved=False, cleanupLockedFile=Path(error.filename or "").name)
+                    if prior_error is None:
+                        raise
+                    break
+                time.sleep(.25)
+
+
+def close_reader(process):
+    if process.poll() is not None:
+        return "already exited"
+    user = ctypes.WinDLL("user32", use_last_error=True)
+    user.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+    user.FindWindowW.restype = wintypes.HWND
+    user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    hwnd = user.FindWindowW("wxWindowClassNR", "NVDA")
+    owner = wintypes.DWORD()
+    if hwnd and user.GetWindowThreadProcessId(hwnd, ctypes.byref(owner)) and owner.value == process.pid:
+        # The pinned release uses this window message for its own quit operation.
+        if user.PostMessageW(hwnd, 0x0012, 0, 0):
+            try:
+                process.wait(timeout=20)
+                return "owned reader window quit"
+            except subprocess.TimeoutExpired:
+                pass
+    stop(process)
+    return "owned child terminated"
+
+
 def assess(installer, binary, output, report):
     if os.name != "nt" or any(os.getenv(key) != value for key, value in {
         "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "GITHUB_REF": "refs/heads/rewrite/rust",
         "GITHUB_REPOSITORY": "VoltKraft/immich-folder-watch"}.items()):
         raise ValueError("A disposable Windows rewrite runner is required")
-    with tempfile.TemporaryDirectory(prefix="ifw-reader-", dir=os.environ["RUNNER_TEMP"]) as temp:
-        area = Path(temp)
+    with private_profile(report) as area:
+        temp = str(area)
         config = area / "config"
         portable = area / "portable"
         cues = area / "cues"
@@ -107,7 +155,7 @@ def assess(installer, binary, output, report):
         check = subprocess.run([*args, "--check-running"], cwd=area, env=env, timeout=25, stdin=subprocess.DEVNULL)
         if check.returncode != 1:
             raise RuntimeError("The disposable desktop did not confirm the absence of an existing NVDA instance")
-        (config / "nvda.ini").write_text("[general]\nshowWelcomeDialogAtStartup = false\nplayStartAndExitSounds = false\n"
+        (config / "nvda.ini").write_text("schemaVersion = 25\n[general]\nshowWelcomeDialogAtStartup = false\nplayStartAndExitSounds = false\n"
             "[update]\nautoCheck = false\nallowUsageStats = false\naskedAllowUsageStats = true\n"
             "[speech]\nsynth = espeak\n[keyboard]\nspeakTypedCharacters = 2\nspeakTypedWords = 0\n"
             "[remote]\nenabled = false\n[addonStore]\nautomaticUpdates = disabled\n", encoding="utf-8")
@@ -121,11 +169,11 @@ def assess(installer, binary, output, report):
             deadline = time.monotonic() + 65
             while time.monotonic() < deadline and reader.poll() is None:
                 log.read()
-                if log.synth == "espeak" and log.initialized:
+                if log.synth in ("espeak", "oneCore") and log.initialized:
                     break
                 time.sleep(.12)
             else:
-                raise RuntimeError("Portable NVDA with eSpeak did not initialize on this desktop")
+                raise RuntimeError("Portable NVDA did not initialize a supported speech synthesizer")
             report["lastStep"] = "observe owned GUI and screen reader speech"
             test = subprocess.Popen([sys.executable, HERE.parent / "observe-windows-gui.py", binary, output / "gui",
                                      "--input-only", "--speech-cues", cues], stdin=subprocess.DEVNULL, cwd=ROOT)
@@ -144,7 +192,7 @@ def assess(installer, binary, output, report):
                           synth=log.synth, readerInitialized=log.initialized, readerDiagnosticModules=log.diagnostics)
             if raw_log.is_file():
                 report["privateLogSha256"] = sha(raw_log)
-            stop(reader)
+            report["readerShutdown"] = close_reader(reader)
 
 
 def main():
