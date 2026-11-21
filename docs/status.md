@@ -1,5 +1,15 @@
 # Project Status
 
+## Native watch registration at 45dc03b (2026-11-21)
+
+Ubuntu x64 and ARM64 each passed eight unit tests and fifteen real watch
+scenarios, including a 16,384-event kernel overflow and renewed coverage
+after a directory was replaced. Both Windows targets passed seven unit tests
+and returned Windows error 5 before the first native subscription was ready.
+The next run records the failing operation and checks independent handles
+to the same synthetic directory. The native Windows watch remains open.
+[Four verified watch archives](rust/rw02-watch-events.md#distribution-inputs-and-integration).
+
 ## Native watch hints, platform logging and Windows desktop follow-up (2026-11-21)
 
 Three Fedora x64 runs of the reviewed watch adapter passed eight unit checks

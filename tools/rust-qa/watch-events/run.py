@@ -60,8 +60,11 @@ def machine(binary, target):
 
 class Subject:
     def __init__(self, binary, work, token, mode, capacity):
-        self.process = subprocess.Popen([binary, mode, str(capacity)], cwd=work, env={**os.environ, "IFW_WATCH_FIXTURE": token},
-                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+        self.diagnostics = tempfile.TemporaryFile()
+        self.process = subprocess.Popen([binary, mode, str(capacity)], cwd=work,
+                                        env={**os.environ, "IFW_WATCH_FIXTURE": token, "IFW_WATCH_DIAGNOSTICS": "1"},
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.diagnostics,
+                                        text=True, encoding="utf-8")
         self.lines = queue.Queue()
 
         def read():
@@ -76,7 +79,10 @@ class Subject:
 
     def line(self):
         value = self.lines.get(timeout=10)
-        require(value is not None, "The watch subject exited before its observation")
+        if value is None:
+            self.diagnostics.seek(0)
+            detail = self.diagnostics.read(2048).decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"The watch subject exited before its observation: {detail}")
         return value
 
     def command(self, text):
@@ -128,6 +134,7 @@ class Subject:
         finally:
             self.reader.join(timeout=5)
             self.process.stdout.close()
+            self.diagnostics.close()
 
 
 @contextmanager
@@ -520,7 +527,8 @@ def execute(args, output, report):
     exe = ".exe" if os.name == "nt" else ""
     cargo, rustc = TOOLCHAIN / ("cargo" + exe), TOOLCHAIN / ("rustc" + exe)
     report["compiler"] = subprocess.check_output([sys.executable, CHECK, args.target, "--rustc", rustc], text=True).strip()
-    sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", HERE / "run.py", *sorted((HERE / "src").glob("*.rs")), PIN, CHECK]
+    sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", HERE / "run.py", HERE / "windows_control.py",
+               *sorted((HERE / "src").glob("*.rs")), PIN, CHECK]
     report["inputs"] = {s.relative_to(ROOT).as_posix(): sha(s) for s in sources}
     report["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     report["sourceChanges"] = subprocess.check_output(["git", "status", "--short", "--", *sources], cwd=ROOT, text=True).splitlines()
@@ -549,6 +557,9 @@ def execute(args, output, report):
         report["binaryMachine"] = machine(binary, args.target)
         rows = report["observations"] = {}
         work = fixture(area, "runtime")
+        if os.name == "nt":
+            from windows_control import registration_controls
+            report["nativeRegistrationControls"] = registration_controls(work / "source")
         with observe(binary, work) as (subject, _):
             if sys.platform == "linux":
                 require(subject.command("DIRFLAGS") == f"DIRFLAGS {os.O_DIRECTORY} {os.O_NOFOLLOW}",

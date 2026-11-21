@@ -17,6 +17,15 @@ const CHANGES: u32 = 1 | 2 | 8 | 0x10 | 0x40;
 const ERROR_OPERATION_ABORTED: i32 = 995;
 const ERROR_NOT_FOUND: i32 = 1168;
 
+pub(super) fn observed<T>(operation: &str, result: io::Result<T>) -> io::Result<T> {
+    if let Err(error) = &result
+        && std::env::var_os("IFW_WATCH_DIAGNOSTICS").as_deref() == Some(std::ffi::OsStr::new("1"))
+    {
+        eprintln!("WATCH_OPERATION {operation} {error}");
+    }
+    result
+}
+
 #[repr(C)]
 struct Overlapped {
     internal: usize,
@@ -60,7 +69,7 @@ fn event() -> io::Result<OwnedHandle> {
     // SAFETY: this creates an unnamed, non-inheritable, manual-reset event.
     let handle = unsafe { CreateEventW(null(), 1, 0, null()) };
     if handle.is_null() {
-        return Err(io::Error::last_os_error());
+        return observed("CreateEventW", Err(io::Error::last_os_error()));
     }
     // SAFETY: CreateEventW returned a new owned handle.
     Ok(unsafe { OwnedHandle::from_raw_handle(handle) })
@@ -100,7 +109,7 @@ pub(super) fn prepare(
         )
     };
     if raw as isize == -1 {
-        return Err(io::Error::last_os_error());
+        return observed("ReOpenFile", Err(io::Error::last_os_error()));
     }
     // SAFETY: ReOpenFile succeeded and returned an independently owned handle.
     let directory = unsafe { OwnedHandle::from_raw_handle(raw) };
@@ -187,7 +196,11 @@ impl Backend {
                 )
             };
             let error = (started == 0).then(io::Error::last_os_error);
-            if windows_status::submitted(error, shared)? == Next::ReplaceAfterInventory {
+            if observed(
+                "ReadDirectoryChangesW",
+                windows_status::submitted(error, shared),
+            )? == Next::ReplaceAfterInventory
+            {
                 // No I/O was submitted. Expose overflow even on the very first arm.
                 if let Some(announce) = ready.take() {
                     let _ = announce.send(());

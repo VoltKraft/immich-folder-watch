@@ -175,6 +175,28 @@ watch package. [Target archives and digests](../../rust/toolchain-inputs.json).
 
 ## Distribution inputs and integration
 
+At `45dc03b` both native Ubuntu jobs passed eight unit tests and fifteen
+filesystem scenarios. Each saw a real kernel overflow at the unchanged
+16,384-event limit, coalesced 16,384 notifications and detected the next
+edit after registration was renewed. The native flags read back from Python
+were 65,536/131,072 on x64 and 16,384/32,768 on ARM64 for directory-only
+and no-follow opens respectively. On both Windows targets, all seven
+portable unit cases passed and the native executable exited with Windows
+error 5 before reporting its first registration. The original logs did not
+identify the failing API. The observer now retains native operation errors
+and compares two handle-bound opens of the same synthetic directory with
+a direct fixture control. No notification or scan is credited for these
+independent handle checks. [Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44950398472)
+· [ReOpenFile](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-reopenfile)
+· [OpenFileById](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-openfilebyid).
+
+| Target | Actions artifact | SHA-256 of verified ZIP |
+| --- | ---: | --- |
+| Ubuntu x64 | 14725487369 | `16f8dad05b0cfce7e895cea0d8459a0c7a3d99c68b766e06d2b6bf0a395e01b4` |
+| Ubuntu ARM64 | 14725526245 | `bcaa572e37c06bfc5d088a4ab638e02cb1451e7329b1c7c6da2f96b9ea9b5cb4` |
+| Windows x64 | 14725745848 | `fbd03d2ab82a41b95efe0c174dc363d5b7cbeb655f77d64e8fdb73f622880aac` |
+| Windows ARM64 | 14725174102 | `aef9b68dcc38c4836977d4ed7dc352605e19580755a9b96bd36b9d16b170beac` |
+
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256
 `b9dd28af9ec3c24651b64336d0e50acd168b50eb80daef390a09bfdcc9eb953b`.

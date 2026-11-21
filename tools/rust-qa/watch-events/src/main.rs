@@ -29,7 +29,12 @@ fn directory(path: &Path) -> io::Result<File> {
             .share_mode(3)
             .custom_flags(0x0200_0000 | 0x20_0000);
     }
-    options.open(path)
+    let file = options.open(path);
+    #[cfg(windows)]
+    if let Err(error) = &file {
+        eprintln!("WATCH_OPERATION open synthetic directory {path:?} {error}");
+    }
+    file
 }
 
 #[cfg(target_os = "linux")]

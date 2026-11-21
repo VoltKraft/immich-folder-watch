@@ -190,7 +190,16 @@ impl Watch {
     /// or loss requiring replacement. A start error requires the caller's regular
     /// inventory fallback. Queue size must be between 1 and 256.
     pub fn start(directory: &File, scope: Scope<'_>, capacity: usize) -> io::Result<Self> {
-        if !(1..=256).contains(&capacity) || !directory.metadata()?.is_dir() {
+        if !(1..=256).contains(&capacity) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "hint capacity must be 1 to 256",
+            ));
+        }
+        let metadata = directory.metadata();
+        #[cfg(windows)]
+        let metadata = native::observed("directory metadata", metadata);
+        if !metadata?.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "a directory and bounded hint capacity are required",
