@@ -7,6 +7,10 @@ name = "desktop-lifecycle"
 version = "0.0.0"
 
 [[package]]
+name = "desktop-platform-log"
+version = "0.0.0"
+
+[[package]]
 name = "ifw-immich"
 version = "0.0.0"
 

@@ -1,5 +1,21 @@
 # Project Status
 
+## Native log adapter and hosted desktop results (2026-11-21)
+
+The new Rust logging crate passed the native Fedora x64 file and journal
+comparison against the shipping .NET provider. Twelve file records survived
+reopening. An isolated systemd journal preserved six distinct messages and
+their priorities. Its writer reported zero effective capabilities. The
+Windows implementation passed Clippy checks against each pinned MSVC target.
+Windows native Event Log readback and Ubuntu native journal readback remain
+open. [Receipts and reproduction](rust/rw02-platform-logs.md).
+
+At `8a8adaa`, both hosted Ubuntu architectures passed native Mozc composition,
+GNOME output scaling and installed Flatpak access and revocation under X11 and
+Wayland. Windows x64 passed the complete DX12 replacement-window edit,
+including restored focus and changed pixels. The same-account cross-session
+test failed on both Windows hosts. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
+
 ## Native desktop follow-up and Windows writer ownership (2026-11-21)
 
 The integrated Linux x64 GUI recovered and accepted a real edit on both X11
