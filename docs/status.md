@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows directory identity at cd1d7d7 (2026-11-21)
+
+Both Windows runners traced the failed subscription to `ReOpenFile`.
+Opening the same volume and 128-bit file ID succeeded on both. The revised
+watch adapter uses this identity and checks the second handle before
+starting asynchronous reads. It passed Clippy for both MSVC targets.
+The same diagnostic revision again passed all fifteen scenarios on each
+Ubuntu target. Windows event delivery and cancellation await a native
+run of the revised adapter. [Native receipts](rust/rw02-watch-events.md#distribution-inputs-and-integration).
+
 ## Native watch registration at 45dc03b (2026-11-21)
 
 Ubuntu x64 and ARM64 each passed eight unit tests and fifteen real watch

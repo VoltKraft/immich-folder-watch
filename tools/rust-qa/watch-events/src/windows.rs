@@ -9,8 +9,10 @@ use std::sync::Arc;
 use std::sync::mpsc::SyncSender;
 
 const FILE_LIST_DIRECTORY: u32 = 1;
-const SHARE_READ_WRITE_DELETE: u32 = 7;
+const FILE_READ_ATTRIBUTES: u32 = 0x80;
+const SHARE_READ_WRITE: u32 = 3;
 const BACKUP_SEMANTICS: u32 = 0x0200_0000;
+const OPEN_REPARSE_POINT: u32 = 0x0020_0000;
 const OVERLAPPED_IO: u32 = 0x4000_0000;
 // File name, directory name, size, last write and creation time.
 const CHANGES: u32 = 1 | 2 | 8 | 0x10 | 0x40;
@@ -34,9 +36,37 @@ struct Overlapped {
     event: RawHandle,
 }
 
+#[repr(C)]
+#[derive(Default, PartialEq, Eq)]
+struct FileIdInfo {
+    volume: u64,
+    file_id: [u8; 16],
+}
+
+// FILE_ID_DESCRIPTOR's union has 8-byte alignment and a 16-byte maximum member.
+#[repr(C, align(8))]
+struct FileIdDescriptor {
+    size: u32,
+    kind: i32,
+    extended_id: [u8; 16],
+}
+
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn ReOpenFile(original: RawHandle, access: u32, share: u32, flags: u32) -> RawHandle;
+    fn GetFileInformationByHandleEx(
+        file: RawHandle,
+        class: i32,
+        information: *mut c_void,
+        size: u32,
+    ) -> i32;
+    fn OpenFileById(
+        volume_hint: RawHandle,
+        id: *const FileIdDescriptor,
+        access: u32,
+        share: u32,
+        security: *const c_void,
+        flags: u32,
+    ) -> RawHandle;
     fn CreateEventW(
         security: *const c_void,
         manual: i32,
@@ -63,6 +93,26 @@ unsafe extern "system" {
         wait: i32,
     ) -> i32;
     fn CancelIoEx(directory: RawHandle, overlapped: *mut Overlapped) -> i32;
+}
+
+fn identity(handle: &impl AsRawHandle) -> io::Result<FileIdInfo> {
+    let mut id = FileIdInfo::default();
+    // SAFETY: the caller owns a live handle and the output covers one FILE_ID_INFO.
+    let ok = unsafe {
+        GetFileInformationByHandleEx(
+            handle.as_raw_handle(),
+            18, // FileIdInfo
+            (&raw mut id).cast(),
+            size_of::<FileIdInfo>() as u32,
+        )
+    };
+    if ok == 0 {
+        return observed(
+            "GetFileInformationByHandleEx",
+            Err(io::Error::last_os_error()),
+        );
+    }
+    Ok(id)
 }
 
 fn event() -> io::Result<OwnedHandle> {
@@ -99,20 +149,35 @@ pub(super) fn prepare(
     scope: Scope<'_>,
     _: &Shared,
 ) -> io::Result<(Stop, Backend)> {
-    // SAFETY: reopen the caller's live directory object for asynchronous notification.
+    let expected = identity(directory)?;
+    let descriptor = FileIdDescriptor {
+        size: size_of::<FileIdDescriptor>() as u32,
+        kind: 2, // ExtendedFileIdType
+        extended_id: expected.file_id,
+    };
+    // SAFETY: the authorized directory stays open across the lookup on its own volume.
+    // Open the entry itself and preserve the original lease's exclusion of delete access.
     let raw = unsafe {
-        ReOpenFile(
+        OpenFileById(
             directory.as_raw_handle(),
-            FILE_LIST_DIRECTORY,
-            SHARE_READ_WRITE_DELETE,
-            BACKUP_SEMANTICS | OVERLAPPED_IO,
+            &descriptor,
+            FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+            SHARE_READ_WRITE,
+            null(),
+            BACKUP_SEMANTICS | OPEN_REPARSE_POINT | OVERLAPPED_IO,
         )
     };
     if raw as isize == -1 {
-        return observed("ReOpenFile", Err(io::Error::last_os_error()));
+        return observed("OpenFileById", Err(io::Error::last_os_error()));
     }
-    // SAFETY: ReOpenFile succeeded and returned an independently owned handle.
+    // SAFETY: OpenFileById succeeded and returned an independently owned handle.
     let directory = unsafe { OwnedHandle::from_raw_handle(raw) };
+    if identity(&directory)? != expected {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "The notification handle identifies a different directory",
+        ));
+    }
     let stop = Arc::new(event()?);
     let tree = matches!(scope, Scope::Tree { .. });
     Ok((
@@ -241,5 +306,10 @@ mod tests {
     fn native_request_has_the_64_bit_windows_abi() {
         assert_eq!(size_of::<Overlapped>(), 32);
         assert_eq!(std::mem::offset_of!(Overlapped, event), 24);
+        assert_eq!(size_of::<FileIdInfo>(), 24);
+        assert_eq!(std::mem::offset_of!(FileIdInfo, file_id), 8);
+        assert_eq!(size_of::<FileIdDescriptor>(), 24);
+        assert_eq!(align_of::<FileIdDescriptor>(), 8);
+        assert_eq!(std::mem::offset_of!(FileIdDescriptor, extended_id), 8);
     }
 }

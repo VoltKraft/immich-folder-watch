@@ -36,8 +36,12 @@ even after an inventory succeeds. [Rust interface](../../tools/rust-qa/watch-eve
   full event stream. [Linux adapter](../../tools/rust-qa/watch-events/src/linux.rs),
   [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html) and
   [descriptor links](https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html).
-- **Windows.** Reopen the same directory object with `FILE_LIST_DIRECTORY`
-  and asynchronous I/O. One 32-KiB DWORD-aligned buffer covers a flat or
+- **Windows.** Read the volume serial and 128-bit file ID from the authorized
+  directory. Open that ID for listing and attribute reads using the original
+  handle as the volume hint. The asynchronous handle opens the entry itself,
+  allows read/write sharing and denies delete sharing. Both handles must
+  identify the same volume and file before notifications can start. Failure
+  leaves the caller's periodic inventory available. One 32-KiB DWORD-aligned buffer covers a flat or
   recursive subscription. A zero-byte completion or `ERROR_NOTIFY_ENUM_DIR`
   returned on either submission or completion records `NativeOverflow` and
   retires the subscription. Even the first submission exposes this state to
@@ -47,7 +51,8 @@ even after an inventory succeeds. [Rust interface](../../tools/rust-qa/watch-eve
   directory handle. A timeout leaves the caller owning the worker.
   Windows reports changes below the subscribed directory. The periodic check
   also covers the root itself. [Windows adapter](../../tools/rust-qa/watch-events/src/windows.rs),
-  [same-object reopen](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-reopenfile),
+  [open by file ID](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-openfilebyid),
+  [handle identity](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info),
   [directory notifications](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
   and [cancellation lifetime](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex).
 
@@ -196,6 +201,20 @@ independent handle checks. [Four native jobs](https://github.com/VoltKraft/immic
 | Ubuntu ARM64 | 14725526245 | `bcaa572e37c06bfc5d088a4ab638e02cb1451e7329b1c7c6da2f96b9ea9b5cb4` |
 | Windows x64 | 14725745848 | `fbd03d2ab82a41b95efe0c174dc363d5b7cbeb655f77d64e8fdb73f622880aac` |
 | Windows ARM64 | 14725174102 | `aef9b68dcc38c4836977d4ed7dc352605e19580755a9b96bd36b9d16b170beac` |
+
+At `cd1d7d7`, Windows Server x64 and Windows 11 ARM64 both identified
+`ReOpenFile` as the source of error 5. The separate `OpenFileById` and
+ordinary fixture opens both returned the identical volume/file identity.
+Neither Windows worker reached its first notification in those runs. Both
+Ubuntu targets again passed all fifteen observations. The four ZIPs matched
+their Actions digests and passed CRC verification. Windows x64 artifact
+14725763446 has SHA-256 `989506eef632cdc1942c16dda5be63d2f5740d8a4687acc312d38ad18963d1fc`
+and Windows ARM64 artifact 14726270855 has SHA-256
+`450d189cd9a808cae34ab27a44c1c71c984888896a816573f7a00ceb0b356292`.
+The corrected registration uses the demonstrated lookup and independently
+compares the new handle. Both MSVC target builds passed Clippy. Native event
+and shutdown observations for this change are pending.
+[Four diagnostic runs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44951905544).
 
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256
