@@ -155,6 +155,8 @@ def measure(exe, output, hosted, known):
     tray = observations.get("tray", {})
     if not tray or "error" in tray:
         failures.append("Windows accessibility observer did not execute successfully")
+    if tray.get("overflow") == "requested" and tray.get("overflowClosed") is not True:
+        failures.append("The Explorer notification flyout did not return to its original closed state")
     acknowledged = native.get("tray.initial.add") is True
     required = ("tray.initial.version4", "tray.modify", "tray.controlled_remove", "tray.synthetic_taskbar_readd.add",
                 "tray.synthetic_taskbar_readd.version4", "tray.remove")
@@ -177,6 +179,8 @@ def measure(exe, output, hosted, known):
         "independentNotificationUiaElement": tray.get("notificationElementFound") is True,
         "trayAccessibleNameObserved": tray.get("trayElementFound") is True,
         "uiaInvokeSent": tray.get("invokeSent") is True,
+        "openedTrayOverflowObserved": tray.get("overflowVisibleAfterRequest") is True,
+        "openedTrayOverflowClosed": tray.get("overflowClosed"),
         "nativeActivationCallbackObserved": native.get("tray.callbacks.shell_open", 0) > 0,
         "nativeTaskbarCreatedMessageObserved": native.get("tray.callbacks.taskbar_created", 0) > 0,
         "controlledShellMessageReregistration": native.get("tray.synthetic_taskbar_readd.add") is True,
@@ -225,6 +229,8 @@ def main():
             raise ValueError("Unreviewed Windows lockfile")
         step("compiler", [sys.executable, QA / "check-toolchain.py", args.target])
         step("recovery", [sys.executable, "-m", "unittest", "test_recovery"])
+        step("tray-cleanup", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                              "-File", HERE / "test_tray_state.ps1"])
         if not args.offline:
             step("fetch", ["cargo", "fetch", "--locked"])
         step("inventory", [sys.executable, QA / "audit-graph.py", HERE / "Cargo.toml", args.target, output / "graph.json",

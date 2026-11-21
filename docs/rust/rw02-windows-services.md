@@ -119,3 +119,15 @@ ABIs with Clippy warnings denied, and passed rustfmt and three isolated shortcut
 recovery tests. Native status comes from the two Windows runs. A shell-less
 runner can supply shortcut, hidden-window and private-desktop observations while
 interactive notification-area evidence remains open. [Acceptance record](acceptance.md).
+
+At `8a8adaa`, Explorer on x64 registered the icon, returned a nonempty icon
+rectangle and reported displaying its notification. UI Automation saw one
+Shell root and could not find the fixture's tooltip. ARM64 Explorer declined
+registration. The follow-up first checks the exact test tooltip through the
+accessible name and help text. After confirmed registration it can open the
+same-session Explorer button for hidden icons, inspect the temporary flyout
+and invoke the exact test icon through its provider. It records the native
+activation callback independently and restores the flyout if the test opened
+it. Four deterministic controls cover cleanup and an Explorer process change.
+The native result for this observer is pending. [Explorer observer](../../tools/rust-qa/windows-services/tray-overflow.ps1)
+and [Microsoft notification area guidance](https://learn.microsoft.com/en-us/windows/win32/shell/notification-area).
