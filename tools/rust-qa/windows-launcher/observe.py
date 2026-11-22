@@ -23,7 +23,7 @@ from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
 from window_readback import paint_control, snapshot
 import retained_subject
-from retained_window import LIFETIME, RetainedWindow, graphics as retained_graphics
+from retained_window import LIFETIME, RetainedWindow, ShowOrderUnavailable, graphics as retained_graphics
 
 TARGETS = {"x86_64-pc-windows-msvc": 0x8664, "aarch64-pc-windows-msvc": 0xaa64}
 SUBJECTS = ("canonical", "retained")
@@ -206,6 +206,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
     autostart = label == "activation"
     private = witness is not None
     args = ["--autostart"] if autostart else []
+    show_ordered = True
     result.update(stage="primary-start", primaryArguments=args, initialTrayAvailable=tray,
                   windowReadbacks={})
     with ExitStack() as stack:
@@ -311,9 +312,16 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 resume_options["before_resume"] = before_resume
             with second_log.open("xb") as second_stream, child(api, desk, name, exe, [], trial, env, second_stream,
                                                                False, private=private, **resume_options) as (second, second_job, _tid):
+                pump_secondary = windows.pump
+                if retained is not None:
+                    result["suspendedSecondary"]["resumeReturnedMs"] = clock()
+                    def pump_secondary():
+                        windows.pump()
+                        if "afterTrigger" not in evidence and f"LAUNCHER_OPEN client={second.pid}\n" in log().splitlines(keepends=True):
+                            retained.sample_after_trigger("secondaryShow", dict(secondaryPid=second.pid))
                 result.update(secondaryArguments=[], secondaryPid=second.pid,
                               secondaryCreation100ns=api.process_identity(int(second._handle)))
-                result["secondaryExit"] = wait_for_exit(second, windows.pump, 12)
+                result["secondaryExit"] = wait_for_exit(second, pump_secondary, 12)
                 result["secondaryJobEmpty"] = api.wait_job_empty(second_job, 3)
                 counts = JobAccounting()
                 recorder.checked(api.query_job(second_job, 1, c.byref(counts), c.sizeof(counts), None))
@@ -328,7 +336,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 start = result["suspendedSecondary"]
                 if (start["pid"], start["creation100ns"]) != (result["secondaryPid"], result["secondaryCreation100ns"]):
                     raise ValueError("The resumed launcher secondary was not the original suspended process")
-                retained.activated_show(start["events"], start["tick"], clock(), "secondaryShow")
+                show_ordered = retained.activated_show(start["events"], start["tick"], clock(), "secondaryShow",
+                                                       released_by=start["resumeReturnedMs"])
             else:
                 wait(lambda: log().count("ADAPTER Dx12 ") >= 2, "The reopened GUI did not acquire its DX12 adapter")
                 result["canonicalRecreation"] = dict(initial=initial, reopened=reopened, differentHwnd=initial != reopened,
@@ -360,6 +369,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             native_tray.qualify_quiet_shell(final_log, result, no_host=True)
         if retained is not None:
             retained_graphics(final_log, evidence, before_quit=False)
+    if not show_ordered:
+        raise ShowOrderUnavailable(evidence["secondaryShow"]["reason"])
 
 
 def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, native_tray=None, subject="canonical"):
@@ -381,14 +392,21 @@ def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, nat
             result["paintControl"]["error"] = str(exc)
         fixture = recorder.load_windows_fixture()
         console = system_console_path(api.kernel)
+        uncertain = None
         for label in (("activation", "restart") if native_tray is None else ("activation",)):
             result[label] = {}
-            cycle(api, desk, name, desktop, anchor, fixture, exe, console, trial, env, out, label, result[label],
-                  native_tray=native_tray, subject=subject)
+            try:
+                cycle(api, desk, name, desktop, anchor, fixture, exe, console, trial, env, out, label, result[label],
+                      native_tray=native_tray, subject=subject)
+            except ShowOrderUnavailable as exc:
+                # cycle reports ambiguous ordering only after normal quit and verified job cleanup.
+                uncertain = exc
         if "restart" in result and result["activation"]["primaryCreation100ns"] == result["restart"]["primaryCreation100ns"]:
             raise ValueError("A fresh elected primary on the original shell-less desktop was required")
         if desk.receiving_input(desktop) is not False or shell("Shell_TrayWnd", None):
             raise ValueError("The private desktop changed during the launcher trial")
+        if uncertain is not None:
+            raise uncertain
     finally:
         try:
             if native_tray is not None:
@@ -564,7 +582,9 @@ def run_cases(visit, result):
                 if CleanupUnconfirmed.in_chain(exc):
                     raise
                 raise CleanupUnconfirmed(f"Cleanup of the {name} launcher trial was not confirmed") from exc
-            if first is None:
+            if isinstance(exc, ShowOrderUnavailable):
+                record["status"] = "unavailable"
+            if first is None or (isinstance(first, ShowOrderUnavailable) and not isinstance(exc, ShowOrderUnavailable)):
                 first = exc
         else:
             record["status"] = "passed"
@@ -659,6 +679,10 @@ if __name__ == "__main__":
         run(options.target, output, results, subject=options.subject)
     except Exception as exc:
         chain = failures(exc)
+        if isinstance(exc, ShowOrderUnavailable):
+            results.update(status="unavailable", error=chain[0]["message"], failures=chain)
+            print(str(exc), file=sys.stderr)
+            sys.exit(2)
         results.update(status="failed", error=chain[0]["message"], failures=chain)
         raise
     else:

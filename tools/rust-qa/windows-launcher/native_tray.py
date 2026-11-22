@@ -649,6 +649,8 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 if records(log(), "TRAY_CALLBACK") or records(log(), "TRAY_OPEN"):
                     raise ValueError("The observed Shell callback did not reach the original GUI queue") from exc
                 raise Unavailable("The exact provider returned without a matching Shell callback") from exc
+            if retained is not None:
+                retained.sample_after_trigger("callbackShow", result["delivery"])
             result["stage"] = "visible-primary"
             hwnd = wait(windows.visible, "The opened primary had no independently visible window")
             wait(lambda: "ADAPTER Dx12 " in log(), "The activated GUI did not initialize its renderer")
@@ -663,7 +665,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                     retained.opened(hwnd, log, wait)
                 else:
                     retained.first(hwnd, log, wait)
-                retained.activated_show(events_before_invoke, result["delivery"]["dispatchMs"], clock(), "callbackShow")
+                show_ordered = retained.activated_show(events_before_invoke, result["delivery"]["dispatchMs"], clock(), "callbackShow")
                 result["keyboardFocus"] = {}
                 retained.focus(result["keyboardFocus"])
                 retained.check_visible(log, "beforeQuit")
@@ -692,6 +694,8 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
             raise ValueError("The original provider activation changed before quit")
         if retained is not None:
             launcher.retained_graphics(log(), evidence, before_quit=False)
+            if not show_ordered:
+                raise launcher.ShowOrderUnavailable(evidence["callbackShow"]["reason"])
 
 
 def assess(target, out, result, *, subject="canonical"):
@@ -727,7 +731,7 @@ def assess(target, out, result, *, subject="canonical"):
             except Exception as exc:
                 shutdown = state.get("nativeShutdown", state.get("activation", {}).get("nativeShutdown", {}))
                 churn_timeout = isinstance(exc, TimeoutError) and shutdown.get("observedHostInstability") is True
-                state.update(status="unavailable" if isinstance(exc, Unavailable) or churn_timeout else "failed",
+                state.update(status="unavailable" if isinstance(exc, (Unavailable, launcher.ShowOrderUnavailable)) or churn_timeout else "failed",
                              failures=launcher.failures(exc))
                 if not state["cleanupConfirmed"] or CleanupUnconfirmed.in_chain(exc):
                     state["status"] = "failed"

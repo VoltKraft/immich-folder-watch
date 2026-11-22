@@ -206,7 +206,7 @@ class LauncherTests(unittest.TestCase):
             fixture = Mock(TITLE=TITLE)
             fixture.Windows.return_value = windows
             with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value={"witnessSeen": private}),
-                  patch.object(observe, "bind", return_value=Mock(side_effect=[14, 23])),
+                  patch.object(observe, "bind", return_value=Mock(side_effect=[14, 16, 23])),
                   patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
                   patch.object(retained_window, "visible_surface"), patch.object(retained_window, "focus_sample",
                                return_value=dict(foreground=True, active=True, focused=True)),

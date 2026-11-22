@@ -7,10 +7,14 @@ import runpy
 import time
 
 from win32 import bind
-from window_readback import visible_surface
+from window_readback import desktop_windows, visible_surface
 
 LIFETIME = Path(__file__).resolve().parents[1] / "windows-warm-window/window_lifetime.py"
 WindowLifetime = runpy.run_path(str(LIFETIME), run_name="ifw_launcher_window_lifetime")["WindowLifetime"]
+
+
+class ShowOrderUnavailable(Exception):
+    """The two Windows uptime samples do not establish the order of activation and SHOW."""
 
 
 class GuiThreadInfo(c.Structure):
@@ -140,15 +144,66 @@ class RetainedWindow:
             raise ValueError("The retained GUI reported another close during activation")
         graphics(text, row)
 
-    def activated_show(self, start, earliest, observed, field):
+    def sample_after_trigger(self, field, trigger):
+        """Query the owned GUI state only after its exact launcher or Shell Open was acknowledged."""
+        row = self.record["afterTrigger"] = dict(field=field, trigger=trigger, pid=self.windows.pid, state="unconfirmed")
+        if self.windows.visible() is not None:
+            row["state"] = "visible"
+            return
+        if self.hwnd is not None:
+            row["root"] = self.identity()
+            if self.windows.is_visible(self.hwnd):
+                row["state"] = "visible"
+                return
+            row["state"] = "retainedRootHidden"
+        else:
+            # Background startup has no known root yet. Verify the complete set of owned top-level windows.
+            try:
+                scan = desktop_windows(self.desk, self.windows, self.windows.desktop, None)
+            except OSError as exc:
+                row["readError"] = str(exc)
+                return
+            row["desktopWindows"] = scan
+            if (scan["desktop"] != self.name or len(scan["windows"]) != scan["ownedCount"]
+                    or any(w["pid"] != self.windows.pid or w["desktop"] != self.name or w["titleAtLimit"]
+                           or w["titleError"] or w["title"] == self.title for w in scan["windows"])):
+                return
+            row["state"] = "noGuiRoot"
+            row["lifetimeCursor"] = len(self.lifetime.events)
+        row["eventCursor"] = len(self.windows.events)
+
+    def activated_show(self, start, earliest, observed, field, *, released_by=None):
+        """Return False when the native observations cannot establish strict causal order."""
         shows = [e for e in self.events(start) if e["event"] == "show"]
         if len(shows) != 1:
             raise ValueError("Expected exactly one native show of the original GUI after activation")
-        # WinEvent supplies a 32-bit uptime tick. Extend it inside the observed 64-bit interval.
-        elapsed = (shows[0]["winEventTimeMs"] - earliest) & 0xffffffff
-        if not 0 <= observed - earliest <= 35_000 or elapsed > observed - earliest:
+        latest = earliest if released_by is None else released_by
+        event = shows[0]
+        tick = event["winEventTimeMs"]
+        row = self.record[field] = dict(earliestMs=earliest, releasedByMs=latest, observedMs=observed,
+                                        showEvent=event, status="outsideInterval")
+        # The event was already received when the observer sampled the upper endpoint.
+        # A 32-bit event tick equal to a GetTickCount64 lower endpoint cannot establish which came first.
+        elapsed = (tick - earliest) & 0xffffffff
+        if not (0 <= tick <= 0xffffffff and 0 <= earliest <= latest <= observed
+                and observed - earliest <= 35_000 and elapsed <= observed - earliest):
             raise ValueError("The retained window show was outside its native activation interval")
-        self.record[field] = dict(earliestMs=earliest, observedMs=observed, showEvent=shows[0])
+        row["showMs"] = earliest + elapsed
+        if row["showMs"] > latest:
+            row.update(status="ordered", basis="distinctTicks")
+            return True
+        probe = self.record.get("afterTrigger", {})
+        own_root = probe.get("state") == "retainedRootHidden" and probe["root"]["hwnd"] == self.hwnd
+        if probe.get("state") == "noGuiRoot":
+            life = [kind for hwnd, kind, _ in self.lifetime.events[probe["lifetimeCursor"]:] if hwnd == self.hwnd]
+            own_root = life == ["create"] and all(w["hwnd"] != self.hwnd for w in probe["desktopWindows"]["windows"])
+        cursor = probe.get("eventCursor")
+        if (own_root and probe["field"] == field and probe["pid"] == self.windows.pid and cursor is not None
+                and cursor >= start and [e for e in self.events(cursor) if e["event"] == "show"] == shows):
+            row.update(status="ordered", basis="observedHiddenAfterTrigger")
+            return True
+        row.update(status="inconclusive", reason="The SHOW and activation could not be ordered within the Windows timer tick")
+        return False
 
     def focus(self, record):
         if self.name != "Default":
