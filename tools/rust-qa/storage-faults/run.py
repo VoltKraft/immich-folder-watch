@@ -53,6 +53,29 @@ def producer_anchor(events: list[dict]) -> str:
     return sealed[0]["sha256"]
 
 
+def capture_crash_files(output: Path, destination: str, *, include_shm: bool) -> dict:
+    """Copy required DB/WAL bytes and optionally the transient WAL index."""
+    raw = output / destination
+    raw.mkdir()
+    names = ["state.db", "state.db-wal"]
+    if include_shm and (output / "state.db-shm").exists():
+        names.append("state.db-shm")
+    captured = {}
+    for name in names:
+        copy = raw / name
+        shutil.copyfile(output / name, copy)
+        captured[name] = {"bytes": copy.stat().st_size, "sha256": sha256(copy)}
+    return captured
+
+
+def compare_crash_files(before: dict, after: dict) -> list[str]:
+    """Require exact byte continuity for every file captured before the kill."""
+    for name, expected in before.items():
+        if after.get(name) != expected:
+            raise RuntimeError(f"hard kill unexpectedly changed quiescent SQLite file bytes: {name}")
+    return sorted(before)
+
+
 def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str, env: dict) -> dict:
     """Kill only the owned child after its explicit native transaction barrier."""
     process = subprocess.Popen([str(executable), "worker", str(seed), str(output), mode, fault],
@@ -95,26 +118,18 @@ def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str,
                 if not confirmed or event["wal_bytes"] <= 32 or event["snapshot_sha256"] != anchor:
                     raise RuntimeError("missing confirmed transaction or actual WAL")
                 snapshot_checks.append(snapshot_check(output, anchor, "before-hard-kill"))
-                # Preserve all three files before any recovery process opens them.
-                raw = output / "before-kill"
-                raw.mkdir()
-                for suffix in ("", "-wal", "-shm"):
-                    source = output / ("state.db" + suffix)
-                    if source.exists():
-                        shutil.copyfile(source, raw / source.name)
+                # Windows WAL-index byte locks prevent ordinary SHM reads while
+                # the worker lives. Preserve DB/WAL now and SHM after termination,
+                # always before recovery opens SQLite (sqlite.org/walformat.html).
+                before = capture_crash_files(output, "before-kill", include_shm=os.name != "nt")
                 process.kill()
                 break
         code = process.wait(timeout=10)
         expected = -signal.SIGKILL if os.name != "nt" else 1
         if code != expected:
             raise RuntimeError(f"unexpected hard-kill exit status {code}")
-        after = output / "after-kill-before-reopen"
-        after.mkdir()
-        for source in sorted((output / "before-kill").iterdir()):
-            actual = output / source.name
-            if not actual.exists() or sha256(actual) != sha256(source):
-                raise RuntimeError("hard kill unexpectedly changed quiescent SQLite file bytes")
-            shutil.copyfile(actual, after / actual.name)
+        after = capture_crash_files(output, "after-kill-before-reopen", include_shm=True)
+        compared = compare_crash_files(before, after)
         reader.join(timeout=5)
         errors.join(timeout=5)
         if producer_anchor(events) != anchor:
@@ -123,8 +138,10 @@ def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str,
         return {"mechanism": "TerminateProcess" if os.name == "nt" else "SIGKILL",
                 "exit_code": code, "events": events, "stderr": "".join(stderr),
                 "snapshot_sha256": anchor, "snapshot_checks": snapshot_checks,
-                "graceful_cleanup_ran": False, "files_unchanged_by_kill": True,
-                "after_kill_files": {p.name: {"bytes": p.stat().st_size, "sha256": sha256(p)} for p in sorted(after.iterdir())}}
+                "graceful_cleanup_ran": False,
+                "pre_kill_shm_policy": "omitted-windows-mandatory-locks" if os.name == "nt" else "capture-if-present",
+                "before_kill_files": before, "after_kill_files": after,
+                "file_comparison": {"files": compared, "all_unchanged": True}}
     finally:
         if process.poll() is None:
             process.kill()
@@ -224,6 +241,7 @@ def main() -> int:
         result["first_party_sources"] = len(hashes)
         command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs")])
         command("windows-image-preparation-tests", [sys.executable, str(HERE / "test_windows_image.py"), "-v"])
+        command("crash-capture-tests", [sys.executable, str(HERE / "test_crash_capture.py"), "-v"])
         common = ["--manifest-path", str(HERE / "Cargo.toml"), "--frozen", "--target", args.target]
         command("clippy", ["cargo", "clippy", *common, "--all-targets", "--", "-D", "warnings"])
         command("build", ["cargo", "build", *common, "--release"])

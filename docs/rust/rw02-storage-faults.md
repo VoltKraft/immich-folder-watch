@@ -67,9 +67,14 @@ The two crash barriers distinguish an uncommitted transaction from a committed
 transaction whose application acknowledgement was not sent. The parent observes
 the explicit test barrier and uses real SIGKILL on Linux or TerminateProcess on
 Windows. The blocked process cannot run a Rust destructor or graceful rollback.
-The pending transaction already has measured WAL spill. Raw DB/WAL/SHM copies
-before and after termination are compared and retained before recovery opens
-the database. They are forensic evidence, not the backup used for restoration.
+The pending transaction already has measured WAL spill. Raw DB/WAL copies before
+and after termination must match and are retained before recovery opens the
+database. Linux additionally compares SHM when present. Windows captures SHM
+after termination only, because its active mandatory locks deny ordinary reads.
+Receipts identify each captured/compared file and explicitly record this Windows
+omission. They are forensic evidence, not the backup used for restoration. The
+[SQLite WAL-index contract](https://sqlite.org/walformat.html#the_wal_index_or_shm_file)
+states that SHM contains no database content and is unnecessary for crash recovery.
 
 The capacity case sets and reads back SQLite's
 [`max_page_count`](https://sqlite.org/pragma.html#pragma_max_page_count), then
@@ -376,6 +381,67 @@ The only required workflow delta is to pass `--windows-vhd` to the existing
 storage-fault runner on the two native Windows lanes. Existing `--tmpfs` Linux
 lanes and artifact inclusion remain appropriate. Source review precedes that
 candidate execution; this task changes no workflow or shared acceptance record.
+
+## Windows crash-capture failure and correction (2026-11-22)
+
+The native Windows x64 job
+[137244473417](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002/job/137244473417)
+at `a66e045` failed in the first sensitive/uncommitted case, before the intended
+TerminateProcess call or any recovery validation. Its stack trace reaches
+`run.py:103`, `shutil.copyfile` and Python's `fsrc_readinto`, then reports
+`PermissionError: [Errno 13] Permission denied`. The retained `before-kill`
+directory contains a complete 45,056-byte DB and 2,142,432-byte WAL but an empty
+SHM destination; the original SHM has 32,768 bytes. All 264 files in this failed
+storage evidence inventory match their recorded hashes. The completed native
+build/seed/C# steps do not establish any passing recovery case. The old command
+did not select `--windows-vhd`, so this failure says nothing about VHD attachment
+or filesystem-full behavior.
+
+This locates the failure in the extra forensic SHM copy, consistent with the
+[Windows WAL locks at SHM offsets 120–127](https://sqlite.org/walformat.html#wal_locks)
+and [mandatory byte-range read exclusion](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex).
+The corrected runner captures mandatory DB/WAL before and after termination and
+SHM after termination, before any SQLite reopen. Linux retains its three-file
+comparison. It replaces the unqualified unchanged-files flag with the exact
+compared file list and hashes, without suppressing required-file copy errors or
+byte differences. This is a fixture portability correction; no SQL, transaction,
+backup API, dependency or application behavior changes.
+
+The new tests inject active SHM read denial, require DB/WAL copy failures and
+missing files to stay fatal, detect same-length changed bytes, and ensure that
+an unobserved SHM cannot be reported as compared. An additional actual Windows
+byte-lock test is prepared for both native Windows lanes. Linux skips that test
+explicitly; neither the portable controls nor the prior Windows failure are
+represented as a successful native Windows rerun.
+
+| Retained Windows x64 diagnostic | SHA-256 |
+| --- | --- |
+| Original artifact ZIP `14759798302` | `cdba4f57b20c8514ffdc3cb6b0ca96922f0a90e03a0c42af4ce4839f8ccce12c` |
+| Original complete job log | `e589df94aac1c58a8bc5140cd20eba7c4b834714c1398cef62cd1a9cb4d3bc06` |
+| Failed storage `result.json` | `d2f075cb032e2fea5496e5be155fb74b49c7023edd815e2ffae132b1459e5413` |
+| Failed storage `evidence-hashes.json` | `1e13d364ddab73921498f1afc4cbecb08de84032606c44819f41027ecd6c9ee6` |
+
+The unchanged originals remain under ignored
+`artifacts/rust/hosted-desktop/45034293002`. Native Windows execution of the
+corrected capture path and guarded filesystem-full experiment remains required.
+
+The fresh native Fedora x64 regression `linux-x64-08 --tmpfs` passed all 47
+expected command outcomes, eight cases, 208 C# assertions and 16 deliberately
+rejected corrupt snapshots. All four actual SIGKILL receipts name DB/WAL/SHM and
+confirm identical bytes across termination. Both actual 8-MiB tmpfs ENOSPC
+cases and same-volume restores passed. The new capture suite passed six tests
+and skipped its one native-Windows-only test; all ten image/preparation tests
+passed. Rustfmt, denied-warning Clippy, native compile-option gates and the real
+C# build/readback passed. All 149 archived source bindings and 466 evidence
+hashes matched disk, and the owned tested sources matched the working tree.
+The earlier 453-file `linux-x64-06` and 464-file `linux-x64-07` inventories remain
+unchanged. No native Windows success is inferred from this Linux regression.
+
+| Corrected local regression | SHA-256 |
+| --- | --- |
+| `linux-x64-08/result.json` | `3fd2493cdff128d53716651dcf704bb1fc55a9ea75985549c902f3b959d884b4` |
+| `linux-x64-08/first-party-source-hashes.json` | `3c4d5dd97af0f92e6a5e7bbc0b41fa04b2d0055c278a5fd35d79c5de3f8b1c41` |
+| `linux-x64-08/evidence-hashes.json` | `17fdb5d61129e7300d569a3a39b8ef244b962b865e05a37c5e666ba49f2b86e0` |
 
 ## Retained diagnostic attempts
 

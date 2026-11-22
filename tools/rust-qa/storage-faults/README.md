@@ -74,6 +74,10 @@ product assets. Native Windows execution is pending until a source-bound CI run.
 Portable image/layout, corruption, capability-gate and simulated cleanup checks:
 `python tools/rust-qa/storage-faults/test_windows_image.py -v`. These checks do not
 execute or substitute for Windows mounting or filesystem exhaustion.
+Crash-capture and unchanged-byte negative controls run with
+`python tools/rust-qa/storage-faults/test_crash_capture.py -v`. Its actual mandatory
+byte-lock check runs only on Windows and is explicitly skipped elsewhere. Both
+test commands are included in the maintained runner.
 
 Output must be a fresh directory strictly below `artifacts/rust/storage-faults`.
 Each failed run is retained; retry with a new name. Only this fresh synthetic tree
@@ -145,8 +149,15 @@ Individual verifier commands require the original digest as their final argument
 `ifw-storage-faults verify <case> <producer-sha256>` and
 `dotnet FaultReadback.dll <case> <producer-sha256>`.
 
-The before/after-kill raw DB/WAL/SHM copies are forensic evidence, not recovery
-backups. Recovery uses only the completed SQLite backup API snapshot. Actual
+Raw DB/WAL copies are mandatory before and after the kill and must match exactly.
+Linux additionally captures and compares SHM when present. Windows captures SHM
+only after termination, before any SQLite reopen: its active mandatory byte locks
+deny ordinary reads. The receipt names every captured and compared file, records
+the Windows omission and never claims a before/after SHM comparison on that host.
+No DB/WAL copy denial, missing file or byte mismatch is ignored. These files are
+forensic evidence, not recovery backups; the transient SHM index contains no
+database content ([SQLite WAL format](https://sqlite.org/walformat.html)).
+Recovery uses only the completed SQLite backup API snapshot. Actual
 failures and all source/recipe/native compiler hashes, dependency archives,
 notices, logs and per-case JSON remain in the output. The large build tree is
 kept locally but excluded from the evidence-hash inventory; its actual executables
