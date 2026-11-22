@@ -1,7 +1,7 @@
 """Check the independent counter and HWND bindings of the diagnostic timeline."""
 import unittest
 
-from dispatch import correlate
+from dispatch import correlate, hidden_failure
 
 
 def sample(single=True):
@@ -68,7 +68,21 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(result["completedPresentsByCallback"], {"modifiers-empty-event": 1, "focus-lost-event": 1})
         self.assertEqual(result["completedWindowAndLoopCallbacks"]["focus-lost-event"], 1)
         inv["presentation"]["traceBoundsQpc"][0] = 16
-        self.assertEqual(correlate(trace, dxgi, inv, False)["hidden"]["verifiedHiddenIntervals"], 5)
+        partial = correlate(trace, dxgi, inv, False)["hidden"]
+        self.assertEqual(partial["verifiedHiddenIntervals"], 5)
+        self.assertIn("5 of 6", hidden_failure("root-repaint", partial))
+
+    def test_delayed_last_show_cannot_exclude_a_hidden_present(self):
+        trace, dxgi, inv = sample(single=False)
+        trace = trace.replace("show 5 542 558 9 0 1 559", "show 5 542 558 9 0 0 559")
+        dxgi += "\nDXGI 42 5 0 0 523 524"
+        inv["presentation"]["successfulPresents"] += 1
+        report = correlate(trace, dxgi, inv, False)
+        self.assertEqual(report["actions"]["reopen"]["nativeVisibilityBeforeAfter"], {"0-to-1": 5, "0-to-0": 1})
+        self.assertEqual(report["hidden"]["verifiedHiddenIntervals"], 6)
+        self.assertEqual(report["hidden"]["presentCallsStarted"], 1)
+        self.assertIn("presented", hidden_failure("root-repaint", report["hidden"]))
+        self.assertIsNone(hidden_failure("original-hidden-paint", report["hidden"]))
 
     def test_preserves_out_of_thread_presents_and_delayed_native_visibility_as_observed(self):
         trace, dxgi, inv = sample()
@@ -79,7 +93,7 @@ class DispatchTests(unittest.TestCase):
         report = correlate("\n".join(lines).replace(" 9 0 1 ", " 9 0 0 "), dxgi.replace("42 5", "42 7"), inv, True)
         self.assertEqual(report["presentsByUiCallback"], {"other-owned-thread": 6})
         self.assertEqual(report["actions"]["reopen"]["nativeVisibilityBeforeAfter"], {"0-to-0": 6})
-        self.assertEqual(report["hidden"]["verifiedHiddenIntervals"], 0)
+        self.assertEqual(report["hidden"]["verifiedHiddenIntervals"], 6)
         timings = report["actions"]["reopen"]["durations"]
         self.assertEqual(timings["uiCallbackWallMs"]["median"], 16)
         self.assertEqual(timings["redrawCallbackWallMs"]["median"], 5)

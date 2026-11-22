@@ -121,7 +121,7 @@ In the separate dispatch trial, both the Win32 observer and the UI thread record
 
 The x64 pipe reader received the request in about 0.05 ms. Median time from that read to the UI handler was 50.80 ms with the root repaint and 69.71 ms with the single wake. The native show calls took a further 35.06 and 33.11 ms at the median. ARM64 delivered the same wakeups in 0.17 and 0.16 ms, then spent 3.06 and 3.03 ms in the show call. These are separate phase medians. The independent archive readback is `windows-dispatch-readback.json`, SHA-256 `547b16a849947cce165b555ea67a1ca91f6978398ac52ecbc91996b35c4a2b4a`. Replaying both original timelines on both architectures reproduced every original dispatch result and all 841 hidden intervals. [Native archives](rw02-native-gui.md#native-follow-up-at-8091469).
 
-The comparison build now tells eframe when the application deliberately hides its root. It checks the actual Win32 visibility before using the existing logic-only path. Native input, accessibility and application logic continue to run. Showing the root requests a fresh frame. Explicit pixel requests and visible descendants still receive UI work. Focus and modifier transitions have distinct trace labels. The original policy is selectable in the same isolated executable. Its native behavior and response budgets require a new run. [eframe change](../../tools/rust-qa/windows-warm-window/eframe-hidden-input.patch) · [Application change](../../tools/rust-qa/windows-warm-window/retained-hidden-input.patch) · [Dispatch readback](../../tools/rust-qa/windows-warm-window/dispatch.py).
+The comparison build now tells eframe when the application deliberately hides its root. It checks the actual Win32 visibility before using the existing logic-only path. Native input, accessibility and application logic continue to run. Showing the root requests a fresh frame. Source review confirms eframe honors already pending pixel requests and visible descendants. The single-window host exercises its root. Focus and modifier transitions have distinct trace labels. The original policy is selectable in the same isolated executable. Its native behavior and response budgets require a new run. [eframe change](../../tools/rust-qa/windows-warm-window/eframe-hidden-input.patch) · [Application change](../../tools/rust-qa/windows-warm-window/retained-hidden-input.patch) · [Dispatch readback](../../tools/rust-qa/windows-warm-window/dispatch.py).
 
 At `fe8d43c` two offline reconstructions produced the same twelve-member
 source ZIP, SHA-256 `3e53af63d808cfde90c44bd6142aeadcde83e04997bef4edb464733f342cd325`.
@@ -135,3 +135,11 @@ root and produced the rlib with SHA-256
 The 13 portable comparison tests passed, including altered input and compiler
 path refusals. [Pins and license origins](../../tools/rust-qa/windows-warm-window/eframe-source.json)
 · [Reconstruction](../../tools/rust-qa/windows-warm-window/eframe_source.py).
+
+Independent review found that a delayed visibility sample after show could
+exclude a previously confirmed hidden interval. A six-reopen regression
+put one successful DXGI call in that interval. The corrected recorder
+counts it, requires coverage of every eligible reopen and reports whether
+the original-paint control reproduced a hidden presentation. Fourteen
+portable tests passed. Replaying all 841 historical intervals reproduced
+the same counts and native timings after the correction.

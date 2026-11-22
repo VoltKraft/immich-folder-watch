@@ -68,7 +68,9 @@ def hidden_presents(spans, reopens, presentations, bounds):
             continue
         hide = changes[index - 1]
         start, end = hide["sampled"], show["start"]
-        if ((hide["before"], hide["after"], show["before"], show["after"]) != (1, 0, 0, 1)
+        # The external HWND observer already confirmed this reopen. A delayed
+        # post-show sample does not change the state preceding the show call.
+        if ((hide["before"], hide["after"], show["before"]) != (1, 0, 0)
                 or not bounds[0] <= start < end <= bounds[1]):
             continue
         verified += 1
@@ -82,6 +84,15 @@ def hidden_presents(spans, reopens, presentations, bounds):
     return dict(eligibleReopens=len(reopens), verifiedHiddenIntervals=verified,
                 presentCallsStarted=hidden_starts, completedPresentsByCallback=dict(completed),
                 completedWindowAndLoopCallbacks=dict(callbacks))
+
+
+def hidden_failure(name, hidden):
+    covered, total = hidden["verifiedHiddenIntervals"], hidden["eligibleReopens"]
+    if covered != total or covered < 5:
+        return f"{name} covered {covered} of {total} eligible hidden intervals"
+    if name != "original-hidden-paint" and hidden["presentCallsStarted"]:
+        return f"{name} presented to a confirmed hidden root window"
+    return None
 
 
 def correlate(text, native_dxgi, inventory, single):
@@ -220,9 +231,11 @@ def run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token,
                                          observed, single)
         recorder.write(out / "result.json", record)
         hidden = observed["dispatch"]["hidden"]
-        if hidden["verifiedHiddenIntervals"] < 5:
-            failures.append(f"{name} has fewer than five verified hidden intervals")
-        if not original and hidden["presentCallsStarted"]:
-            failures.append(f"{name} presented to a confirmed hidden root window")
+        problem = hidden_failure(name, hidden)
+        if problem:
+            failures.append(problem)
+    control = record["cases"]["original-hidden-paint"]["dispatch"]["hidden"]
+    record["originalHiddenPresentObserved"] = control["presentCallsStarted"] > 0
+    recorder.write(out / "result.json", record)
     if failures:
         raise ValueError(". ".join(failures))
