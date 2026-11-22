@@ -135,3 +135,52 @@ Seventeen local tests passed, including an actual two-session POSIX rehearsal us
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/instance/cross-session -p 'test_*.py'
 ```
+
+## Hosted private-console and lock results at 93ecc35
+
+Both native Windows hosts passed the elevated writer handover at
+`93ecc354f9be40ad0c76e33c46bdadb55f2e2fb8`. The standard-user handover remains
+open. On each host the original participant in session 2 and the scheduled
+participant in session 0 had the same account SID. Both reported elevated Default
+primary tokens at High integrity. The controller verified each of five Rust
+writers before its first thread resumed. Their PID, process creation time, token
+and session matched the independent participant receipts. Across eight ordered
+events, each side held the original guard file and refused its peer while it held
+the lock. The original side reacquired and released the same file after its peer
+exited. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235).
+
+All four redirected trust-level queries again exited zero and returned zero bytes.
+This time the original session on each host also recorded 280 UTF-16LE bytes in
+its private console. Both captures listed `0x20000 (Basic User)` and had SHA-256
+`6d1f89626bf104dceb243134d5b5359d115891768722aa3753685ca8e7423ace`.
+The fixed Basic User action then returned 1 in both original sessions. The receipt
+records only the action's exit code, leaving the reason unknown. Each scheduled
+console helper saw the controller's abort marker and exited 1 before the system
+query, with an empty screen and a diagnostic on stderr. Both standard-user trials
+ended before a participant or writer started. The documented test in two already
+logged-on ordinary sessions can exercise the outstanding handover.
+[Prior pipe evidence](#trust-level-query-on-the-hosted-machines) · [Private-console reader at the measured revision](https://github.com/VoltKraft/immich-folder-watch/blob/93ecc354f9be40ad0c76e33c46bdadb55f2e2fb8/tools/rust-qa/instance/cross-session/worker.py).
+
+Both jobs verified seven process exits for the elevated trial and two bootstrap
+exits for the standard-user trial. Both removed the tasks, both synthetic profiles
+and the shared build directory. The account's observed batch-logon assignments
+matched before and after. Secondary Logon returned from Running to its initial
+Stopped state with Manual startup. On x64, the standard trial's first cleanup
+reported `0x8004130B` (no running instance) and left its task registered. The
+separate cleanup pass checked ownership, recovered the registration and verified
+its removal. ARM64 verified removal on the first pass. The x64 log identifies
+the cleanup handler. Its per-instance enumeration, identity check and stop can
+race normal process exit. A focused fix can accept that specific HRESULT after a
+fresh enumeration confirms the owned instance is gone, then keep the existing
+checks for all process exits, task deletion and absence. [Scheduler cleanup at the measured revision](https://github.com/VoltKraft/immich-folder-watch/blob/93ecc354f9be40ad0c76e33c46bdadb55f2e2fb8/tools/rust-qa/instance/cross-session/scheduler.ps1#L114-L146).
+
+Each downloaded archive matched its Actions digest. The independent readback
+verified all 37 indexed files per host, the native and observer inputs against
+20 source hashes per target, and all four private-console returns against their
+byte counts and digests. The combined `writer-raw-readback.json` beside the job ZIPs
+has SHA-256 `b249389c3c275697ba7ecca565c05c59acd362b6baf66d8bd1d511225035994d`.
+
+| Target | Writer ZIP SHA-256 | Evidence index SHA-256 |
+| --- | --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14778841782) | `dbdc6535df3775f20d3bba300a3ce8f90a85bf18b3bcfecd4ee7679e8cac19c2` | `72df5c7d667641e0138e4aab0b858f176003c9ff0e70948dca189a14d1854baf` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14778658716) | `5d414bc903795abd7508802e0a912decc1d579e872e0c1e849d641665709a5ab` | `71311eb3abae34999bf62be7d976585e258e673f7e69b3a953fe6b58ee16cfe4` |
