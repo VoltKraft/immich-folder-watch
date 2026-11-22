@@ -445,6 +445,12 @@ unchanged. No native Windows success is inferred from this Linux regression.
 
 ## Retained diagnostic attempts
 
+A Fedora x64 rerun exercised both casing modes for each portable fault
+before the platform-specific volume cases. All eight cases, 208 C# assertions
+and eight final snapshot checks passed. All 466 evidence hashes matched.
+`linux-x64-09/result.json` has SHA-256
+`e6810b0bcb8283cd33448c5c06cce6ccd2ad8b1ac5a11d419cc928420adaf075`.
+
 `linux-x64-01` through `linux-x64-03` passed their earlier six-case semantic checks.
 A subsequent hash audit identified writes by the real C# initializer to the
 retained backup. The isolated `csharp-snapshot-diagnosis` reproduced changes at

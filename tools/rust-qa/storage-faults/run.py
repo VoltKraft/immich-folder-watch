@@ -279,9 +279,10 @@ def main() -> int:
         result["csharp_assembly_sha256"] = sha256(assembly)
         cases = output / "cases"
         cases.mkdir()
-        for mode in ("sensitive", "insensitive"):
-            for fault in ("uncommitted", "commit-before-ack", "sqlite-full", *(["enospc"] if args.tmpfs else []),
-                          *(["windows-full"] if args.windows_vhd else [])):
+        # Complete both casing modes before a platform-specific volume can report a missing capability.
+        for fault in ("uncommitted", "commit-before-ack", "sqlite-full", *(["enospc"] if args.tmpfs else []),
+                      *(["windows-full"] if args.windows_vhd else [])):
+            for mode in ("sensitive", "insensitive"):
                 name = mode + "-" + fault
                 case = cases / name
                 if fault == "windows-full":

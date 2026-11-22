@@ -16,6 +16,9 @@ python3 tools/rust-qa/storage-faults/run.py x86_64-unknown-linux-gnu \
   --dotnet artifacts/flatpak-local-2.11.2/sdk/dotnet --tmpfs
 ```
 
+The six portable cases run first, in both casing modes. The native volume
+cases follow, so their availability cannot suppress the portable observations.
+
 The target must be native. The interface also supports
 `aarch64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` and
 `aarch64-pc-windows-msvc`; those lanes require their own execution evidence.
