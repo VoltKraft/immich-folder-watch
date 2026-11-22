@@ -37,6 +37,23 @@ fn directory(path: &Path) -> io::Result<File> {
     file
 }
 
+#[cfg(windows)]
+fn notification_directory(
+    authorized: &File,
+    path: &Path,
+) -> io::Result<native_watch_hints::NotificationDirectory> {
+    use std::os::windows::fs::OpenOptionsExt;
+    // Only this synthetic fixture performs a name-based acquisition. Both
+    // objects are obtained inside its initial private grant, before any external
+    // mutations. The application must acquire this object in its safe-fs grant.
+    let notification = File::options()
+        .access_mode(1 | 0x80 | 0x10_0000)
+        .share_mode(3)
+        .custom_flags(0x0200_0000 | 0x20_0000 | 0x4000_0000)
+        .open(path)?;
+    native_watch_hints::NotificationDirectory::bind(authorized, notification)
+}
+
 #[cfg(target_os = "linux")]
 fn fixture_descendants(root: &File) -> io::Result<Vec<File>> {
     use std::os::fd::AsRawFd;
@@ -232,7 +249,14 @@ fn main() -> io::Result<()> {
         }
         _ => return Err(io::Error::other("unknown fixture mode")),
     };
+    #[cfg(target_os = "linux")]
     let mut watch = Watch::start(&root, scope, capacity)?;
+    #[cfg(windows)]
+    let mut watch = Watch::start(
+        notification_directory(&root, Path::new("source"))?,
+        scope,
+        capacity,
+    )?;
     #[cfg(windows)]
     let mut registration_inputs = Some((root, nested));
     #[cfg(target_os = "linux")]

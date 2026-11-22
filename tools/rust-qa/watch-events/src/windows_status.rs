@@ -1,10 +1,22 @@
-//! ReadDirectoryChangesW submission and completion decisions.
+//! Windows identity eligibility and ReadDirectoryChangesW status decisions.
 
 use super::{Reason, Shared};
 use std::io;
 
 const ERROR_IO_PENDING: i32 = 997;
 pub(super) const ERROR_NOTIFY_ENUM_DIR: i32 = 1022;
+
+pub(super) fn require_file_id(file_id: &[u8; 16]) -> io::Result<()> {
+    // MS-FSCC FileIdInformation can succeed with zero when 128-bit IDs are
+    // unsupported. Such a value cannot bind two independently opened objects.
+    if *file_id == [0; 16] {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "the filesystem did not provide a 128-bit file identity",
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Next {
@@ -41,6 +53,23 @@ pub(super) fn completed(result: io::Result<u32>, shared: &Shared) -> io::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_file_identity_is_declined() {
+        assert_eq!(
+            require_file_id(&[0; 16]).unwrap_err().kind(),
+            io::ErrorKind::Unsupported
+        );
+    }
+
+    #[test]
+    fn every_byte_of_a_nonzero_128_bit_identity_is_significant() {
+        for byte in 0..16 {
+            let mut file_id = [0; 16];
+            file_id[byte] = 1;
+            require_file_id(&file_id).unwrap();
+        }
+    }
 
     #[test]
     fn immediate_enumeration_error_retires_the_registration_without_a_retry() {

@@ -17,6 +17,8 @@ mod native;
 mod native;
 #[cfg(any(windows, test))]
 mod windows_status;
+#[cfg(windows)]
+pub use native::NotificationDirectory;
 #[cfg(not(all(
     any(target_os = "linux", windows),
     any(target_arch = "x86_64", target_arch = "aarch64")
@@ -189,16 +191,24 @@ impl Watch {
     /// Start the native provider and inspect the initial snapshot for coverage
     /// or loss requiring replacement. A start error requires the caller's regular
     /// inventory fallback. Queue size must be between 1 and 256.
-    pub fn start(directory: &File, scope: Scope<'_>, capacity: usize) -> io::Result<Self> {
+    /// On Windows, consumes a separately acquired and bound asynchronous
+    /// notification object. The worker never reopens an authorized path or ID.
+    pub fn start(
+        #[cfg(target_os = "linux")] directory: &File,
+        #[cfg(windows)] directory: NotificationDirectory,
+        scope: Scope<'_>,
+        capacity: usize,
+    ) -> io::Result<Self> {
         if !(1..=256).contains(&capacity) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "hint capacity must be 1 to 256",
             ));
         }
+        #[cfg(target_os = "linux")]
         let metadata = directory.metadata();
         #[cfg(windows)]
-        let metadata = native::observed("directory metadata", metadata);
+        let metadata = native::observed("directory metadata", directory.file().metadata());
         if !metadata?.is_dir() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

@@ -36,12 +36,17 @@ even after an inventory succeeds. [Rust interface](../../tools/rust-qa/watch-eve
   full event stream. [Linux adapter](../../tools/rust-qa/watch-events/src/linux.rs),
   [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html) and
   [descriptor links](https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html).
-- **Windows.** Read the volume serial and 128-bit file ID from the authorized
-  directory. Open that ID for listing and attribute reads using the original
-  handle as the volume hint. The asynchronous handle opens the entry itself,
-  allows read/write sharing and denies delete sharing. Both handles must
-  identify the same volume and file before notifications can start. Failure
-  leaves the caller's periodic inventory available. One 32-KiB DWORD-aligned buffer covers a flat or
+- **Windows.** The caller acquires a dedicated asynchronous directory file
+  object inside its authorized grant, opening the entry itself with read/write
+  sharing and no delete sharing. `NotificationDirectory::bind` verifies its
+  volume/file identity against the retained authorized directory and rejects
+  absent 128-bit IDs, reparse entries, synchronous objects and missing
+  listing/attribute access.
+  `Watch::start` consumes this object; it never reopens a name or file ID.
+  Identity comparison binds the notification source, not authorization for
+  destructive work. Concurrent/replacement subscriptions need distinct file
+  objects, not duplicated handles to an active subscription. Failure leaves
+  the caller's periodic inventory available. One 32-KiB DWORD-aligned buffer covers a flat or
   recursive subscription. A zero-byte completion or `ERROR_NOTIFY_ENUM_DIR`
   returned on either submission or completion records `NativeOverflow` and
   retires the subscription. Even the first submission exposes this state to
@@ -51,7 +56,7 @@ even after an inventory succeeds. [Rust interface](../../tools/rust-qa/watch-eve
   directory handle. A timeout leaves the caller owning the worker.
   Windows reports changes below the subscribed directory. The periodic check
   also covers the root itself. [Windows adapter](../../tools/rust-qa/watch-events/src/windows.rs),
-  [open by file ID](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-openfilebyid),
+  [asynchronous acquisition](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew),
   [handle identity](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info),
   [directory notifications](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
   and [cancellation lifetime](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex).
@@ -247,6 +252,60 @@ query after joining. Native Windows results for the additional lease scenario
 are pending.
 [Fixture control](../../tools/rust-qa/watch-events/src/main.rs) and [external observer](../../tools/rust-qa/watch-events/run.py).
 
+### Dedicated asynchronous object candidate (2026-11-22)
+
+The error-87 result demonstrates that matching file IDs alone did not establish
+a usable notification object. It does not identify every filesystem-internal
+cause. The next candidate removes the failing reopen from the adapter entirely:
+the initial grant supplies the dedicated asynchronous object, and ownership
+moves into the worker. Its original no-delete lease remains until that worker
+has completed or cancelled and drained its I/O. No pathname recovery or retry
+loop was added. The separate caller-input release scenario remains unchanged.
+
+Both the Rust adapter and Python controls reject an all-zero 128-bit file ID
+immediately after an otherwise successful identity query, before any binding
+or by-ID lookup. MS-FSCC specifies this value when the filesystem does not
+support 128-bit file IDs; equal absent IDs cannot establish object identity.
+Deterministic Rust and Python controls reject the absent value and accept a
+nonzero value at each of its sixteen byte positions. The Rust controls also
+run on Linux. [FileIdInformation contract](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/e4185a8a-ed8d-4f98-ab55-ca34dc8916e6).
+
+Before arming, synchronous `NtQueryInformationFile` requests read
+`FileAccessInformation` and `FileModeInformation`. They verify listing/attribute
+rights and absence of either synchronous-I/O flag, so mistakenly passing an
+ordinary synchronous directory cannot block the worker inside the first arm.
+An additional native unit case accepts a correctly bound async acquisition and
+rejects a synchronous object, missing listing access and a different directory.
+Microsoft documents file-information queries as synchronous even on asynchronous
+file objects.
+[Query classes](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntqueryinformationfile)
+and [query lifetime](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ioisoperationsynchronous).
+
+The optional Win32 controls now compare real notification requests on fresh
+direct, by-ID, `ReOpenFile`, and empty-name handle-relative `NtOpenFile` objects.
+Each method records requested access/sharing/flags, actual identity,
+access/mode/reparse attributes, submission, returned notification names and a
+separate idle-request cancellation. A positive cancellation requires an idle
+pending request, successful `CancelIoEx` and completion with error 995. The
+report records NT `CreateOptions` (`0x204001`) separately from Win32 open flags
+(`0x42200000`). The historical by-ID adapter and control at `d403fee` requested
+access `0x81`; the current acquisitions request `0x100081`, including
+`SYNCHRONIZE`. These are different access requests, so later success alone
+cannot isolate the cause of the historical error 87. Each method runs in a
+bounded child process;
+pending buffers are drained before release, or that isolated process is killed
+after 20 seconds. These controls are diagnostic evidence and do not substitute
+for the Rust worker's independent scenarios. The handle-relative NT route is
+an experiment, not a selected fallback. Native Windows results remain pending.
+
+Both MSVC targets passed Clippy with warnings denied for this candidate. The
+native Fedora x64 guard passed ten library tests, three Python control tests
+and fifteen scenarios, including the actual inotify overflow. Its source-bound
+receipt is
+`artifacts/rust/watch-events/x86_64-unknown-linux-gnu/direct-object-guard-03/result.json`,
+SHA-256 `d5193fbf49c4e8f5abbd6e411710915ae310cb328a2b08745312897f6818cb76`.
+These are compilation/Linux results, not Windows notification acceptance.
+
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256
 `b9dd28af9ec3c24651b64336d0e50acd168b50eb80daef390a09bfdcc9eb953b`.
@@ -254,15 +313,19 @@ The Fedora executable loaded the system dynamic loader, glibc 2.44 and GCC's
 unwind library. Each receipt identifies the actual mapped files by digest.
 The Fedora glibc `LICENSES`, libgcc `COPYING.RUNTIME` and pinned Rust
 `COPYRIGHT-library.html` were inspected. These host components stay in their
-OS packages. The Windows adapter imports the system Kernel32 API. The native
-Windows fixture inventories the DLLs loaded by its own executable. The
+OS packages. The Windows adapter imports the system Kernel32 and Ntdll APIs.
+The native Windows fixture inventories the DLLs loaded by its own executable. The
 assessment adds only its own Rust source to the reviewed runtime inputs.
 [Manifest](../../tools/rust-qa/watch-events/Cargo.toml),
 [Rust licensing at the pinned revision](https://github.com/rust-lang/rust/blob/0ef1bc386059596dada8fb65b50425aab2ea637a/COPYRIGHT)
 and [GNU C Library](https://sourceware.org/glibc/).
 
 The assessment supplies authorized directory handles from a synthetic profile.
-Connecting that operation to the application's safe-fs leases, applying the
+The Windows fixture performs both name-based opens only during the initial
+private grant, then binds the async object before the observer starts mutations.
+Production must acquire that object within its safe-fs grant or retained-parent
+relative open; the fixture pathname is not an application fallback. Connecting
+that operation to the application's safe-fs leases, applying the
 shipping debounce and five-second schedule, and reconciling the resulting
 state belong to the foundation and engine stages. The later package inventory
 must still cover its actual binary inputs. [Stage dependencies](../rust-rewrite-plan.md#staged-implementation-proposal).

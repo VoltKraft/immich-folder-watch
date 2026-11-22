@@ -570,6 +570,7 @@ def execute(args, output, report):
     cargo, rustc = TOOLCHAIN / ("cargo" + exe), TOOLCHAIN / ("rustc" + exe)
     report["compiler"] = subprocess.check_output([sys.executable, CHECK, args.target, "--rustc", rustc], text=True).strip()
     sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", HERE / "run.py", HERE / "windows_control.py",
+               HERE / "test_windows_control.py",
                *sorted((HERE / "src").glob("*.rs")), PIN, CHECK]
     report["inputs"] = {s.relative_to(ROOT).as_posix(): sha(s) for s in sources}
     report["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -578,6 +579,9 @@ def execute(args, output, report):
     original = subprocess.check_output(["git", "show", REFERENCE + ":" + worker], cwd=ROOT)
     report["shippingWorker"] = {"revision": REFERENCE, "sha256": hashlib.sha256(original).hexdigest()}
     report["toolBinaries"] = {p.name: sha(p) for p in (cargo, rustc)}
+    report["controlTests"] = subprocess.check_output(
+        [sys.executable, "-m", "unittest", "-v", "test_windows_control.py"], cwd=HERE,
+        text=True, stderr=subprocess.STDOUT, timeout=30).strip()
     with tempfile.TemporaryDirectory(prefix="native-", dir=output) as scratch:
         area = Path(scratch)
         target_dir = area / "build"

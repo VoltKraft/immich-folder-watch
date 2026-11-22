@@ -3,6 +3,7 @@ use super::{Scope, Shared};
 use std::ffi::c_void;
 use std::fs::File;
 use std::io;
+use std::os::windows::fs::MetadataExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
@@ -10,10 +11,8 @@ use std::sync::mpsc::SyncSender;
 
 const FILE_LIST_DIRECTORY: u32 = 1;
 const FILE_READ_ATTRIBUTES: u32 = 0x80;
-const SHARE_READ_WRITE: u32 = 3;
-const BACKUP_SEMANTICS: u32 = 0x0200_0000;
-const OPEN_REPARSE_POINT: u32 = 0x0020_0000;
-const OVERLAPPED_IO: u32 = 0x4000_0000;
+const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+const SYNCHRONOUS_IO: u32 = 0x10 | 0x20;
 // File name, directory name, size, last write and creation time.
 const CHANGES: u32 = 1 | 2 | 8 | 0x10 | 0x40;
 const ERROR_OPERATION_ABORTED: i32 = 995;
@@ -43,12 +42,11 @@ struct FileIdInfo {
     file_id: [u8; 16],
 }
 
-// FILE_ID_DESCRIPTOR's union has 8-byte alignment and a 16-byte maximum member.
-#[repr(C, align(8))]
-struct FileIdDescriptor {
-    size: u32,
-    kind: i32,
-    extended_id: [u8; 16],
+#[repr(C)]
+#[derive(Default)]
+struct IoStatusBlock {
+    status: usize,
+    information: usize,
 }
 
 #[link(name = "kernel32")]
@@ -59,14 +57,6 @@ unsafe extern "system" {
         information: *mut c_void,
         size: u32,
     ) -> i32;
-    fn OpenFileById(
-        volume_hint: RawHandle,
-        id: *const FileIdDescriptor,
-        access: u32,
-        share: u32,
-        security: *const c_void,
-        flags: u32,
-    ) -> RawHandle;
     fn CreateEventW(
         security: *const c_void,
         manual: i32,
@@ -95,6 +85,93 @@ unsafe extern "system" {
     fn CancelIoEx(directory: RawHandle, overlapped: *mut Overlapped) -> i32;
 }
 
+#[link(name = "ntdll")]
+unsafe extern "system" {
+    fn NtQueryInformationFile(
+        file: RawHandle,
+        status: *mut IoStatusBlock,
+        information: *mut c_void,
+        length: u32,
+        class: i32,
+    ) -> i32;
+    fn RtlNtStatusToDosError(status: i32) -> u32;
+}
+
+fn information_u32(file: &File, class: i32) -> io::Result<u32> {
+    let mut status = IoStatusBlock::default();
+    let mut value = 0u32;
+    // SAFETY: access/mode queries are synchronous APIs even on asynchronous
+    // file objects. Both writable buffers cover their declared native layouts.
+    let result = unsafe {
+        NtQueryInformationFile(
+            file.as_raw_handle(),
+            &raw mut status,
+            (&raw mut value).cast(),
+            size_of_val(&value) as u32,
+            class,
+        )
+    };
+    if result < 0 {
+        // SAFETY: this converts the returned NTSTATUS without dereferencing memory.
+        return Err(io::Error::from_raw_os_error(
+            unsafe { RtlNtStatusToDosError(result) } as i32,
+        ));
+    }
+    if status.information != size_of_val(&value) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "incomplete notification handle information",
+        ));
+    }
+    Ok(value)
+}
+
+/// A dedicated asynchronous file object acquired inside the caller's authorized
+/// directory grant. Acquisition must deny delete sharing and open the entry
+/// without following reparse points. The file must have no other outstanding I/O.
+///
+/// Binding verifies the expected directory; it does not authorize a pathname or
+/// confer permission for file mutations. Acquire distinct file objects for
+/// simultaneous or replacement subscriptions, never `try_clone` an active watch.
+pub struct NotificationDirectory(File);
+
+impl NotificationDirectory {
+    pub fn bind(authorized: &File, notification: File) -> io::Result<Self> {
+        let attributes = notification.metadata()?;
+        if !attributes.is_dir()
+            || attributes.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+            || identity(authorized)? != identity(&notification)?
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "notification acquisition differs from the authorized directory",
+            ));
+        }
+        let access = observed(
+            "notification FileAccessInformation",
+            information_u32(&notification, 8),
+        )?;
+        let mode = observed(
+            "notification FileModeInformation",
+            information_u32(&notification, 16),
+        )?;
+        if access & (FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES)
+            != FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES
+            || mode & SYNCHRONOUS_IO != 0
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "notification acquisition requires an asynchronous listing handle",
+            ));
+        }
+        Ok(Self(notification))
+    }
+
+    pub(super) fn file(&self) -> &File {
+        &self.0
+    }
+}
+
 fn identity(handle: &impl AsRawHandle) -> io::Result<FileIdInfo> {
     let mut id = FileIdInfo::default();
     // SAFETY: the caller owns a live handle and the output covers one FILE_ID_INFO.
@@ -112,6 +189,10 @@ fn identity(handle: &impl AsRawHandle) -> io::Result<FileIdInfo> {
             Err(io::Error::last_os_error()),
         );
     }
+    observed(
+        "FileIdInfo identity support",
+        windows_status::require_file_id(&id.file_id),
+    )?;
     Ok(id)
 }
 
@@ -145,39 +226,14 @@ pub(super) struct Backend {
 }
 
 pub(super) fn prepare(
-    directory: &File,
+    directory: NotificationDirectory,
     scope: Scope<'_>,
     _: &Shared,
 ) -> io::Result<(Stop, Backend)> {
-    let expected = identity(directory)?;
-    let descriptor = FileIdDescriptor {
-        size: size_of::<FileIdDescriptor>() as u32,
-        kind: 2, // ExtendedFileIdType
-        extended_id: expected.file_id,
-    };
-    // SAFETY: the authorized directory stays open across the lookup on its own volume.
-    // Open the entry itself and preserve the original lease's exclusion of delete access.
-    let raw = unsafe {
-        OpenFileById(
-            directory.as_raw_handle(),
-            &descriptor,
-            FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
-            SHARE_READ_WRITE,
-            null(),
-            BACKUP_SEMANTICS | OPEN_REPARSE_POINT | OVERLAPPED_IO,
-        )
-    };
-    if raw as isize == -1 {
-        return observed("OpenFileById", Err(io::Error::last_os_error()));
-    }
-    // SAFETY: OpenFileById succeeded and returned an independently owned handle.
-    let directory = unsafe { OwnedHandle::from_raw_handle(raw) };
-    if identity(&directory)? != expected {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "The notification handle identifies a different directory",
-        ));
-    }
+    // Move the acquired object, including its original open mode and sharing
+    // lease. An ID lookup can identify the same directory while producing a
+    // file object that the filesystem refuses for directory notifications.
+    let directory: OwnedHandle = directory.0.into();
     let stop = Arc::new(event()?);
     let tree = matches!(scope, Scope::Tree { .. });
     Ok((
@@ -301,6 +357,8 @@ impl Backend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn native_request_has_the_64_bit_windows_abi() {
@@ -308,8 +366,47 @@ mod tests {
         assert_eq!(std::mem::offset_of!(Overlapped, event), 24);
         assert_eq!(size_of::<FileIdInfo>(), 24);
         assert_eq!(std::mem::offset_of!(FileIdInfo, file_id), 8);
-        assert_eq!(size_of::<FileIdDescriptor>(), 24);
-        assert_eq!(align_of::<FileIdDescriptor>(), 8);
-        assert_eq!(std::mem::offset_of!(FileIdDescriptor, extended_id), 8);
+        assert_eq!(size_of::<IoStatusBlock>(), 16);
+        assert_eq!(std::mem::offset_of!(IoStatusBlock, information), 8);
+    }
+
+    #[test]
+    fn binding_accepts_only_the_matching_asynchronous_directory() {
+        let name = format!(
+            "ifw-watch-bind-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let path = std::env::temp_dir().join(name);
+        std::fs::create_dir(&path).unwrap();
+        std::fs::create_dir(path.join("other")).unwrap();
+        let open = |path: &std::path::Path, asynchronous| {
+            File::options()
+                .access_mode(FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | 0x10_0000)
+                .share_mode(3)
+                .custom_flags(0x0200_0000 | 0x20_0000 | if asynchronous { 0x4000_0000 } else { 0 })
+                .open(path)
+                .unwrap()
+        };
+        {
+            let authorized = open(&path, false);
+            assert!(NotificationDirectory::bind(&authorized, open(&path, false)).is_err());
+            assert!(
+                NotificationDirectory::bind(&authorized, open(&path.join("other"), true)).is_err()
+            );
+            let without_listing = File::options()
+                .access_mode(FILE_READ_ATTRIBUTES | 0x10_0000)
+                .share_mode(3)
+                .custom_flags(0x0200_0000 | 0x20_0000 | 0x4000_0000)
+                .open(&path)
+                .unwrap();
+            assert!(NotificationDirectory::bind(&authorized, without_listing).is_err());
+            let notification = NotificationDirectory::bind(&authorized, open(&path, true)).unwrap();
+            drop(notification);
+        }
+        std::fs::remove_dir_all(path).unwrap();
     }
 }
