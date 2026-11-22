@@ -31,6 +31,8 @@ def subjects(target):
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if (record["revision"] != revision or record["target"] != target or record["baselineReceipt"] != sha(canonical)
             or sha(cold) != record["baseline"] or sha(warm) != record["binary"]
+            or record["eframeSource"]["archive"] != "eframe-source.zip"
+            or sha(output / "eframe-source.zip") != record["eframeSource"]["archiveSha256"]
             or any(sha(HERE / name) != digest for name, digest in record["variantInputs"].items())):
         raise ValueError("Unexpected warm-window native build inputs")
     api = recorder.Win32()

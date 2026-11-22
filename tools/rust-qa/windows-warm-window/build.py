@@ -20,6 +20,7 @@ ORIGINALS = {
 }
 sys.path.insert(0, str(QA))
 from gui import source_profile
+import eframe_source
 
 
 def sha(path):
@@ -44,16 +45,19 @@ def stage(project):
     env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(project.parent)}
     for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         env.pop(key, None)
-    for name in ("candidate.patch", "presentation.patch", "dispatch.patch"):
-        command = ["git", "apply", "--whitespace=error", str(HERE / name)]
-        subprocess.run([*command, "--check"], cwd=gui, env=env, check=True)
-        subprocess.run(command, cwd=gui, env=env, check=True)
+    patches = [(HERE / name).read_bytes() for name in ("candidate.patch", "presentation.patch", "dispatch.patch")]
+    pins = json.loads(eframe_source.PINS.read_bytes())
+    patches.append(eframe_source.checked_bytes(eframe_source.APPLICATION_PATCH, pins["applicationPatchSha256"]))
+    for patch in patches:
+        subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--whitespace=error", "-"],
+                       input=patch, cwd=gui, env=env, check=True)
     for name in ("loop_wake.rs", "windows_present.rs", "ui_trace.rs"):
         shutil.copyfile(HERE / name, gui / "src" / name)
     # Extend the canonical read-only Win32 queries with the comparison's existing timing queries.
     shutil.copyfile(HERE / "win32_clock.rs", gui / "src/win32_clock.rs")
     with (gui / "src/lib.rs").open("a", encoding="utf-8", newline="\n") as library:
         library.write("\nmod win32_clock;\npub use win32_clock::{counter, frequency, thread_id};\n")
+    eframe_source.prepare(gui)
     return gui
 
 
@@ -67,7 +71,7 @@ def feature_rows(manifest, target, env):
             continue
         package, features = line.removesuffix(" (*)").split("|")
         name, version, *_ = package.split()
-        rows.add((name, version, tuple(sorted(filter(None, features.split(","))))))
+        rows.add((name, version.removeprefix("v"), tuple(sorted(filter(None, features.split(","))))))
     return sorted(rows)
 
 
@@ -93,22 +97,28 @@ def main(target):
     manifest = str(gui / "Cargo.toml")
     lock, graph = source_profile.verify_native_graph(target, env)
     selected = feature_rows(gui / "Cargo.toml", target, env)
-    if (lock != ordinary["lockSha256"] or graph != ordinary["graphSha256"] or sha(gui / "Cargo.lock") != lock
-            or sha(gui / "Cargo.toml") != sha(GUI / "Cargo.toml") or selected != feature_rows(GUI / "Cargo.toml", target, env)
+    if (lock != ordinary["lockSha256"] or graph != ordinary["graphSha256"] or selected != feature_rows(GUI / "Cargo.toml", target, env)
             or any(source_profile.tree_info(gui / "artifacts/text" / name) != info for name, info in approved["trees"].items())):
-        raise ValueError("Unexpected canonical native dependency graph")
+        raise ValueError("Unexpected package, feature or text engine change in the retained Windows graph")
     subprocess.run(["cargo", "fmt", "--manifest-path", manifest, "--", "--check"], env=env, check=True)
     subprocess.run(["cargo", "clippy", "--manifest-path", manifest, "--frozen", "--all-targets", "--", "-D", "warnings"],
                    cwd=gui, env=env, check=True)
-    subprocess.run(["cargo", "build", "--manifest-path", manifest, "--frozen", "--release"], cwd=gui, env=env, check=True)
+    compiled = subprocess.check_output(["cargo", "build", "--manifest-path", manifest, "--frozen", "--release",
+                                        "--message-format=json-render-diagnostics"], cwd=gui, env=env)
+    features, = [flags for name, version, flags in selected if (name, version) == ("eframe", "0.37.0")]
+    eframe_unit = eframe_source.compiled_eframe([json.loads(line) for line in compiled.splitlines()],
+                                               gui, output / "build", features)
+    sources = eframe_source.source_bundle(gui, output / "eframe-source.zip")
     exe = output / "build/release/native-gui-assessment.exe"
     record = dict(target=target, revision=revision, baselineReceipt=sha(ordinary_path), baseline=sha(canonical), binary=sha(exe),
-                  graph=graph, lock=lock, selectedFeatureRows=len(selected), canonicalInputs=ORIGINALS,
+                  canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
+                  selectedFeatureRows=len(selected), canonicalInputs=ORIGINALS, eframeSource=sources, eframeUnit=eframe_unit,
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
                   variantInputs={name: sha(HERE / name) for name in
-                                 ("candidate.patch", "presentation.patch", "dispatch.patch", "loop_wake.rs",
+                                 ("candidate.patch", "presentation.patch", "dispatch.patch", "retained-hidden-input.patch",
+                                  "eframe-hidden-input.patch", "eframe-source.json", "eframe_source.py", "loop_wake.rs",
                                   "windows_present.rs", "ui_trace.rs", "win32_clock.rs", "build.py")})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")

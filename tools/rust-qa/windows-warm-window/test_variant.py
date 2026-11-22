@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from zipfile import ZipFile
 
 import inputs
 import measure
@@ -68,13 +69,100 @@ class WarmTests(unittest.TestCase):
             self.skipTest("requires the reconstructed canonical GUI inputs")
         with tempfile.TemporaryDirectory() as temp:
             gui = builder.stage(Path(temp) / "stage")
-            for name in ("Cargo.lock", "Cargo.toml", "src/windows_worker.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
+            builder.eframe_source.verify_lock(gui, json.loads(builder.eframe_source.PINS.read_bytes()))
+            for name in ("src/windows_worker.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
                 self.assertEqual(builder.sha(builder.GUI / name), builder.sha(gui / name))
             self.assertEqual(builder.sha(gui / "src/loop_wake.rs"), builder.sha(builder.HERE / "loop_wake.rs"))
             self.assertEqual(builder.sha(gui / "src/windows_present.rs"), builder.sha(builder.HERE / "windows_present.rs"))
             for name, digest in builder.ORIGINALS.items():
                 self.assertEqual(builder.sha(builder.GUI / "src" / name), digest)
                 self.assertNotEqual(builder.sha(gui / "src" / name), digest)
+
+    def test_retained_source_archive_replays_identically_and_preserves_original_notices(self):
+        if not (builder.GUI / "artifacts/text/egui").is_dir():
+            self.skipTest("requires the reconstructed canonical GUI inputs")
+        source = builder.eframe_source
+        pins = json.loads(source.PINS.read_bytes())
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archives = []
+            for name in ("first", "second"):
+                gui = builder.stage(root / name / "project")
+                archive = root / name / "eframe-source.zip"
+                receipt = source.source_bundle(gui, archive)
+                self.assertEqual(receipt, {"pins": pins, "archive": archive.name, "archiveSha256": builder.sha(archive)})
+                archives.append(archive)
+            self.assertEqual(archives[0].read_bytes(), archives[1].read_bytes())
+            expected = {"pins.json": source.PINS, source.PATCH.name: source.PATCH,
+                        source.APPLICATION_PATCH.name: source.APPLICATION_PATCH}
+            for family, folder in (("canonical", builder.GUI), ("retained", gui)):
+                for filename in ("Cargo.lock", "Cargo.toml"):
+                    expected[family + "/" + filename] = folder / filename
+            for filename, evidence in pins["notices"].items():
+                expected["notices/" + filename] = builder.ROOT / evidence["path"]
+            package = pins["crate"] + ".crate"
+            with ZipFile(archives[0]) as bundle:
+                self.assertEqual(bundle.namelist(), sorted([package, *expected]))
+                self.assertEqual(hashlib.sha256(bundle.read(package)).hexdigest(), pins["archiveSha256"])
+                for member, original in expected.items():
+                    self.assertEqual(bundle.read(member), original.read_bytes(), member)
+            changed_notice = root / "changed-notice"
+            changed_notice.write_text("Changed license text", encoding="utf-8")
+            pins["notices"]["eframe/LICENSE-MIT"]["path"] = str(changed_notice)
+            changed_pins = root / "pins.json"
+            changed_pins.write_text(json.dumps(pins), encoding="utf-8")
+            with patch.object(source, "PINS", changed_pins), self.assertRaisesRegex(ValueError, "Changed source input"):
+                source.source_bundle(gui, root / "wrong.zip")
+            (gui / source.PACKAGE / "src/lib.rs").write_bytes(b"")
+            with self.assertRaisesRegex(ValueError, "changed during compilation"):
+                source.source_bundle(gui, root / "wrong.zip")
+            self.assertFalse((root / "wrong.zip").exists())
+            lock = gui / "Cargo.lock"
+            lock.write_bytes(lock.read_bytes().replace(b'version = 4\n', b'version = 3\n', 1))
+            pins["retainedLockSha256"] = builder.sha(lock)
+            with self.assertRaisesRegex(ValueError, "registry identity"):
+                source.verify_lock(gui, pins)
+
+    def test_reconstruction_rejects_changed_archive_patch_or_unreviewed_source_digest(self):
+        source = builder.eframe_source
+        pins = json.loads(source.PINS.read_bytes())
+        try:
+            archive = source.original_archive(pins)
+        except FileNotFoundError:
+            self.skipTest("requires the original native GUI crate cache")
+        patch = source.PATCH.read_bytes()
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / "eframe"
+            for inputs in ((archive + b"changed", patch), (archive, patch + b"changed")):
+                with self.assertRaisesRegex(ValueError, "archive or retained source patch"):
+                    source.reconstruct(dest, pins, *inputs)
+                self.assertFalse(dest.exists())
+            pins["modified"].pop("src/epi.rs")
+            with self.assertRaisesRegex(ValueError, "Unexpected modified eframe compiler sources"):
+                source.reconstruct(dest, pins, archive, patch)
+
+    def test_compiler_receipt_requires_the_staged_eframe_sources_features_and_outputs(self):
+        source = builder.eframe_source
+        with tempfile.TemporaryDirectory() as temp:
+            gui = Path(temp) / "gui"
+            build = Path(temp) / "build"
+            build.mkdir()
+            rlib = build / "libeframe.rlib"
+            rlib.write_bytes(b"compiler test fixture")
+            features = ["accesskit", "clipboard", "wgpu_no_default_features"]
+            unit = {"reason": "compiler-artifact", "manifest_path": str(gui / source.PACKAGE / "Cargo.toml"),
+                    "target": {"name": "eframe", "src_path": str(gui / source.PACKAGE / "src/lib.rs")},
+                    "features": features, "filenames": [str(rlib)]}
+            finished = {"reason": "build-finished", "success": True}
+            result = source.compiled_eframe([unit, finished], gui, build, features)
+            self.assertEqual(result["outputs"], {"libeframe.rlib": builder.sha(rlib)})
+            for messages in ([finished], [unit, unit, finished], [unit, dict(finished, success=False)],
+                             [dict(unit, manifest_path=str(gui / "Cargo.toml")), finished],
+                             [dict(unit, target=dict(unit["target"], src_path=str(gui / "registry/src/lib.rs"))), finished],
+                             [dict(unit, features=[*features, "persistence"]), finished],
+                             [dict(unit, filenames=[str(gui / "elsewhere.rlib")]), finished]):
+                with self.assertRaises(ValueError):
+                    source.compiled_eframe(messages, gui, build, features)
 
     def test_resident_pages_are_counted_once_with_image_ownership(self):
         api = Mock()
