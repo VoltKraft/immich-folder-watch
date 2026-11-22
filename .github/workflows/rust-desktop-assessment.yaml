@@ -69,6 +69,18 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --stored-keys --output "artifacts/rust/storage-native/$NATIVE_TARGET"
 
+      - name: Retain failed storage diagnostics before the desktop trials
+        if: ${{ !cancelled() && steps.storage.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-storage-diagnostics-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-native/${{ matrix.target }}/result.json
+            artifacts/rust/storage-native/${{ matrix.target }}/*.log
+            artifacts/rust/storage-native/${{ matrix.target }}/evidence-hashes.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Round-trip legacy YAML with the filtered offline source bundle
         id: yaml
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -217,6 +229,26 @@ jobs:
         with:
           name: rust-launcher-${{ matrix.target }}-${{ github.sha }}
           path: artifacts/rust/windows-launcher/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Observe the primary GUI registering and reopening through its Windows tray icon
+        id: windows_gui_tray
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the primary GUI tray and cleanup observations
+        if: ${{ !cancelled() && (steps.windows_gui_tray.outcome == 'success' || steps.windows_gui_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-gui-tray-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-gui-tray/${{ matrix.target }}/
           if-no-files-found: error
           retention-days: 14
 
@@ -626,6 +658,7 @@ jobs:
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
             artifacts/rust/windows-launcher/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray/${{ matrix.target }}/
             artifacts/rust/windows-reader/native-*/result.json
             artifacts/rust/windows-reader/native-*/gui/*.json
             artifacts/rust/windows-imports/runs/*/result.json

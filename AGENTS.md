@@ -194,6 +194,8 @@ to reconcile project decisions, defaults, and recorded state.
   Use the dedicated native service fixtures with disposable profiles.
   The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
   owned desktop, a visible synthetic icon and a matching native Shell callback.
+  Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+  when changing the shared receiver or launcher.
   Keep the integrated Linux and Windows inventory subjects bound to the
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls

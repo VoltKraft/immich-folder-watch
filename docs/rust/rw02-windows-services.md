@@ -272,3 +272,36 @@ The private trial result hashes are
 `4853a03925bcf221d850fa971a43197644b1484ba6939729f129aacc9c71a6a0`
 (x64) and `686cd35dcbc7b31881668db6a6e70cb3cabad7559f2e770cc154eec25789da94`
 (ARM64). [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
+
+## Primary GUI and Shell callback
+
+The elected GUI owns a hidden top-level Shell receiver throughout the
+inventory worker's lifetime. It obtains the initial tray state from
+`Shell_NotifyIconW` and passes it to the desktop lifecycle. The receiver
+reports a new Shell and retries registration. A Shell activation enters the
+primary's bounded command channel and wakes the window. The receiver stops
+before worker drain and release of the primary election. The standalone
+service assessment uses the same native receiver and icon implementation.
+[GUI adapter](../../tools/rust-qa/gui/src/windows_tray.rs)
+· [Shared receiver](../../tools/rust-qa/gui/src/windows_tray_shell.rs).
+
+On the private desktop with no Shell, the observer starts the worker and
+checks the fallback window and its ordinary secondary launch. On the
+runner's original desktop it starts the primary with `--autostart`. For
+an acknowledged icon, it checks the receiver's PID, the rectangle from the
+Shell, two successive marker colors at the same screen position and the
+Explorer provider's exact per-run tooltip. It invokes the identified item
+through UI Automation. A passing result requires the matching native
+callback after the provider's invocation start, an admitted GUI command,
+a primary window intersecting an actual monitor, at least one UI pass and
+confirmed process and icon cleanup. A missing icon or provider is recorded
+as unavailable. Each architecture has its own result archive.
+[Hosted observer](../../tools/rust-qa/windows-launcher/native_tray.py)
+· [Explorer provider](../../tools/rust-qa/windows-launcher/tray_provider.ps1).
+
+The receiver retries a refused real host after 3, 6, 12 and 24 seconds,
+then at most once every 30 seconds. A new host starts a fresh retry schedule.
+Success or host loss cancels the pending attempt. A marked test message
+does not start a retry. The five portable state tests cover delayed
+registration, host replacement, host absence and a full or disconnected
+GUI queue. [Retry and delivery tests](../../tools/rust-qa/gui/tests/windows_tray.rs).

@@ -80,7 +80,10 @@ comparison. The native command also checks that its complete C# casing map
 matches a separately reproduced Unicode table before qualifying the Rust
 comparison. [Legacy checks and source pins](rust/rw02-legacy.md#independently-reproduced-casing-profiles).
 
-A second process runs the compiled oracle with managed invariant casing.
+A second process runs the same compiled oracle with managed invariant casing.
+Both invocations select the installed Microsoft.NETCore.App 10.0.12 runtime
+with roll-forward disabled. The development machine needs that patch
+alongside SDK 10.0.401. The receipt verifies the loaded assembly and CoreLib.
 `managed-scalar-reference/manifest.json` records CoreLib
 and the scalar payloads. `managed-legacy.json` records the independently
 derived table used by Rust and the complete comparison. On a local repeat
@@ -140,6 +143,14 @@ control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
+
+The Windows assessment runs the ordinary launcher first, followed by
+`python -B tools/rust-qa/windows-launcher/native_tray.py <native-target>`
+on the disposable x64 and ARM64 runners. The latter starts the elected GUI
+and its inventory worker, reads the Shell registration and observes the window
+and worker across activation and quit. It writes its result and raw logs to
+`artifacts/rust/windows-gui-tray/<native-target>/`.
+[Primary GUI and Shell callback](rust/rw02-windows-services.md#primary-gui-and-shell-callback).
 
 The native feasibility workflow runs the Windows storage recovery trial after
 the watch tests. Its `rust-recovery-<target>-<commit>` artifact contains the
