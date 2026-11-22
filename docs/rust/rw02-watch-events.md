@@ -249,7 +249,7 @@ still alive. Both MSVC targets passed Clippy with warnings denied. Fedora
 x64 passed all eight unit tests and fifteen Linux scenarios in
 `independent-lease-guard-01`, and a separate live fixture answered a state
 query after joining. Native Windows results for the additional lease scenario
-were pending in those runs; the later x64 result below exercises it.
+were pending in those runs; the later Windows results below exercise it.
 [Fixture control](../../tools/rust-qa/watch-events/src/main.rs) and [external observer](../../tools/rust-qa/watch-events/run.py).
 
 ### Dedicated asynchronous object candidate (2026-11-22)
@@ -297,7 +297,7 @@ pending buffers are drained before release, or that isolated process is killed
 after 20 seconds. These controls are diagnostic evidence and do not substitute
 for the Rust worker's independent scenarios. The handle-relative NT route is
 an experiment, not a selected fallback. Complete native Windows acceptance
-remains pending; the partial x64 observations follow below.
+remains pending; the partial native Windows observations follow below.
 
 Both MSVC targets passed Clippy with warnings denied for this candidate. The
 native Fedora x64 guard passed ten library tests, three Python control tests
@@ -320,6 +320,14 @@ notification and completed an explicit idle cancellation. By-ID acquisition
 still failed at the first notification submission with error 87 despite the
 same `0x100081` requested/queried access and asynchronous mode; `ReOpenFile`
 still returned error 5.
+
+Windows 11 ARM64 repeated all seven positive observations at the same commit,
+including error 32 while the notification lease was held and successful rename
+after join. Its direct and empty-name NT delivery/cancellation controls passed,
+while `ReOpenFile` returned 5 and the by-ID notification submission returned 87.
+It then failed at the identical flat-scope assertion, also without retaining
+the native notification names. Neither Windows run establishes the cause of
+that scope assertion or a complete watcher pass.
 
 The run failed at the flat-scope assertion before recording that scenario's
 native names. That assertion equated any generation increase with a nested
@@ -358,6 +366,13 @@ its `result.json` has SHA-256
 CRC and inner digest verification passed. All watch source digests match the
 commit exactly. The toolchain JSON and verification script match its content
 with the Windows checkout's CRLF representation.
+
+The ARM64 archive from the same run, artifact `14759221577`, has verified
+SHA-256 `c44bbaab454c39929c2d4b4999a0e0716f348a2715f8df665bba51e6d0f287c8`;
+its `result.json` has SHA-256
+`ab31229b148ca56402b40d328df8c9525c24d5b940c90358c0f1c8248b7a090b`.
+CRC, inner digest and committed input checks passed with the same two CRLF
+representations noted above.
 
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256
