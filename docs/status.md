@@ -114,8 +114,13 @@ review and native tests on all four hosts passed. Linux ran 19 filesystem
 checks per host. Windows ran 16 per host on local storage and again over
 encrypted SMB. Both NTFS hosts observed a distinct short alias. The ARM64
 SMB share also provided one. Both Windows storage VHDs returned FAT legacy
-file identifiers across one rename. A direct Rust safe-fs trial on FAT is
-still open. [FAT observation](rust/rw02-filesystem.md#fat-handle-observation-on-two-native-windows-hosts).
+file identifiers across one rename. An independent review of `16781c2`
+closed five findings in the opt-in adapter fixture. A Fedora repeat passed
+eight recovery cases and all 208 C# assertions, with 476 evidence hashes
+verified. The Windows feasibility workflow now selects the direct Rust
+adapter trial after the eight recovery cases. Native FAT results are pending.
+[Original FAT observation](rust/rw02-filesystem.md#fat-handle-observation-on-two-native-windows-hosts)
+· [Reviewed fixture](rust/rw02-storage-faults.md).
 
 The appearance-enabled desktop at `a66e045` passed all eleven fixed
 Fedora X11 budgets over three 100,000-file runs. Median startup was

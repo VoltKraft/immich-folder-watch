@@ -195,6 +195,9 @@ to reconcile project decisions, defaults, and recorded state.
   a private desktop and installs only into its disposable test repository.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
+  The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only
+  after the eight recovery cases on the owned Windows test volume. Preserve
+  the separate provider outcome, volume readback and cleanup evidence.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

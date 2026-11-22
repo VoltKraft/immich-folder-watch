@@ -137,7 +137,13 @@ measured presentation modes and remaining checks.
 The native feasibility workflow runs the Windows storage recovery trial after
 the watch tests. Its `rust-recovery-<target>-<commit>` artifact contains the
 complete evidence inventory for both path comparison modes, including VHD
-cleanup. The desktop assessment retains early Windows writer and tray results
+cleanup. After the eight recovery cases the same job selects the reviewed
+`--windows-provider` trial. It reads and renames a new 45-byte file on the
+second private FAT volume. Check the recovery status, the separate
+`windows-provider.json` and the final VHD readback. The command fails if
+either selected check fails or the host cannot supply the provider.
+[Windows recovery and provider fixture](rust/rw02-storage-faults.md).
+The desktop assessment retains early Windows writer and tray results
 before the scan. Its final artifact includes the desktop logs and Linux
 storage recovery evidence. Each archive name includes the target and commit.
 The Windows desktop job first records the WPF budget and the regular Mailbox
