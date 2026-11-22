@@ -1,7 +1,10 @@
 """Exercise the ordinary secondary invocation and the evidence required to attribute its window."""
+from contextlib import contextmanager
 import ctypes as c
+import json
 from pathlib import Path, PureWindowsPath
 import subprocess
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
@@ -88,6 +91,113 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(launch.call_args.args, ([image],))
         self.assertNotIn("stdin", launch.call_args.kwargs)
         api.assign_suspended.assert_called_once_with(api.new_job.return_value, launch.return_value, image)
+
+    def test_normal_secondary_uses_the_existing_desktop_without_an_inherited_desktop_or_command_pipe(self):
+        api, desk, image = Mock(), Mock(), Path("native-gui-assessment.exe")
+        with (patch.object(subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True),
+              patch.object(subprocess, "Popen") as launch):
+            launch.return_value.stdin = None
+            with observe.child(api, desk, "Default", image, [], Path("case"), {}, None, False, private=False):
+                pass
+        desk.open_named.assert_not_called()
+        self.assertEqual(launch.call_args.args, ([image],))
+        self.assertNotIn("startupinfo", launch.call_args.kwargs)
+        self.assertNotIn("stdin", launch.call_args.kwargs)
+
+    def test_native_tray_evidence_and_missing_receipt_have_distinct_foreground_startup_inputs(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "shell.json"
+            for value in (False, True):
+                path.write_text(json.dumps(dict(head="head", target="target", workflowRun="run", hosted=True,
+                                                probeCompleted=True, observations={"shellIconAcceptedAndRemoved": value})))
+                result = {}
+                self.assertIs(observe.foreground_tray_input(path, "target", "head", "run", result), value)
+                self.assertEqual(result["source"], "native Shell receipt")
+                self.assertEqual(result["sha256"], observe.recorder.sha(path))
+            for candidate in (path, path.with_name("missing.json")):
+                result = {}
+                self.assertFalse(observe.foreground_tray_input(candidate, "target", "other", "run", result))
+                self.assertEqual(result["source"], "synthetic unavailable tray")
+                self.assertNotIn("sha256", result)
+
+    def test_foreground_cycle_requires_close_second_process_worker_identity_and_quit(self):
+        api, desk, windows = Mock(), Mock(), Mock()
+        primary, second = Mock(pid=12, _handle=2), Mock(pid=15, _handle=5)
+        primary.poll.return_value = None
+        second.poll.return_value = 0
+        windows.events = []
+        desk.name.return_value = "Default"
+        desk.foreground.return_value = 22
+        api.process_identity.side_effect = lambda handle: handle * 10
+        api.wait_job_empty.return_value = True
+        current = None
+        launches = []
+        result = {}
+        with TemporaryDirectory() as directory:
+            out = Path(directory)
+            primary_log = out / "foreground-primary.log"
+
+            def emit(text):
+                with primary_log.open("ab") as stream:
+                    stream.write(text.encode())
+
+            def write(data):
+                nonlocal current
+                if data == b"T":
+                    current = 21
+                    emit("LAUNCHER_PRIMARY pid=12\nREADY Visible Available\nADAPTER Dx12 Cpu\n")
+                elif data == b"Q":
+                    primary.poll.return_value = 0
+                    emit("DRAINED passes=5\n")
+                else:
+                    self.fail("Only the initial tray result and Quit belong on the primary command pipe")
+
+            def close_window(hwnd):
+                nonlocal current
+                self.assertEqual(hwnd, current)
+                current = None
+                emit("WINDOW_RELEASED generation=1\n")
+
+            def owner(_hwnd, pid):
+                pid._obj.value = 12
+                return 8
+
+            @contextmanager
+            def launch(_api, _desk, name, exe, args, _trial, _env, stream, first, *, private):
+                nonlocal current
+                launches.append((name, exe, args, first, private))
+                if first:
+                    yield primary, 1, 8
+                    return
+                self.assertIsNone(current)
+                stream.write(b"LAUNCHER_SECONDARY server=12\n")
+                emit("LAUNCHER_OPEN client=15\nADAPTER Dx12 Cpu\n")
+                current = 22
+                yield second, 3, None
+
+            def accounting(_job, _kind, value, _size, _returned):
+                value._obj.total = 1
+                return True
+
+            primary.stdin.write.side_effect = write
+            windows.visible.side_effect = lambda **_kwargs: current
+            windows.close_window.side_effect = close_window
+            windows.owner.side_effect = owner
+            api.query_job.side_effect = accounting
+            fixture = Mock()
+            fixture.Windows.return_value = windows
+            with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value={"witnessSeen": None}),
+                  patch.object(observe.recorder, "idle_complete", return_value=True),
+                  patch.object(observe.recorder, "owned_worker", return_value=13),
+                  patch.object(observe, "primary_job_members", side_effect=[[13, 1300], [13, 1300]])):
+                observe.cycle(api, desk, "Default", 9, None, fixture, GUI, CONSOLE, out, {}, out,
+                              "foreground", result, tray=True)
+        self.assertEqual(launches, [("Default", GUI, [], True, False), ("Default", GUI, [], False, False)])
+        self.assertEqual(result["stage"], "drained")
+        self.assertTrue(result["primaryJobEmpty"])
+        self.assertEqual((result["initialWindow"], result["reopenedWindow"], result["workerAfter"]), (21, 22, [13, 1300]))
+        self.assertEqual(list(result["windowReadbacks"]), ["startup-intent", "first-dx12-adapter", "first-visible-window",
+                                                          "hidden-before-launch", "reopen"])
 
     def test_receipt_requires_the_original_primary_and_its_worker(self):
         secondary = ["LAUNCHER_SECONDARY server=12"]

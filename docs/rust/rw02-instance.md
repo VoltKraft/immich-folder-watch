@@ -131,7 +131,63 @@ the same test profile. The logs and receipt are under
 All 54 earlier Rust idle measurements across three runs recorded
 `conhost.exe` in the GUI's process tree. In all six canonical trials at
 `7517e3b` the console host was a direct child of the inventory worker.
-These observations motivated the per-member identity check. Both ordinary
-launcher steps at `8091469` failed. Native qualification remains open.
-[Earlier native measurements](rw02-windows-window.md#repeat-measurements-before-the-dispatch-trace) ·
-[Launcher run at 8091469](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500).
+These observations motivated the per-member identity check.
+[Earlier native measurements](rw02-windows-window.md#repeat-measurements-before-the-dispatch-trace).
+
+### Native first-window timeout at `8091469`
+
+Both Windows jobs timed out waiting for the first visible primary on their private
+desktop. Each primary reported `READY Visible Unavailable`, initialized its first
+graphics generation on the Microsoft Basic Render Driver and completed eight
+empty inventory passes. Neither job reached the second launch. The x64 action
+trace records the timeout followed by Win32 error 170 from `CloseDesktop`.
+Its JSON retained only the cleanup error. The ARM64 JSON retained the timeout.
+[Windows x64 action](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500/job/137346335384) ·
+[Windows ARM64 action](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500/job/137346335340).
+
+| Target | Primary / worker PID | SHA-256 of activation-primary.log | SHA-256 of result.json |
+| --- | --- | --- | --- |
+| Windows x64 | 3604 / 8472 | `1f77103b4794d6e6ab64a0e735e58b110dd12435415fa1a25d6d308ded5b6603` | `b51b58091e30af7ce7c8c7df0ecf384cb7264674db8ebe04ed1ea14108b514c8` |
+| Windows ARM64 | 8700 / 9312 | `dfe7da6799ed735c212ea22fa710a9643448b59b4ce3d4610b39f50744ccac0b` | `484833f58c6ad9ae8b2ce8859adbb88e0bf58fe1b6060c16dc709f89b5a94939` |
+
+The GUI emits its adapter marker during application creation. The pinned
+eframe 0.37.0 backend creates a hidden root and shows it after the first frame.
+The archived logs leave that first paint, the HWND's actual desktop and its
+visibility unresolved. Both native receipts identify the CRLF checkout of the
+historical launcher observer by SHA-256
+`65b501a930d46c6b9dd9511ed3a65cdcc772f139c5bcac68a2bbdd5b3176415e`.
+[GUI app creation](../../tools/rust-qa/gui/src/main.rs) ·
+[eframe window creation](https://github.com/emilk/egui/blob/3c6eb8261c3293ad9c7ea1ed58487e038860ebef/crates/eframe/src/native/wgpu_integration.rs#L1177) ·
+[eframe first show](https://github.com/emilk/egui/blob/3c6eb8261c3293ad9c7ea1ed58487e038860ebef/crates/eframe/src/native/epi_integration.rs#L448).
+
+### Independent desktop observations
+
+The private desktop's creator now restores its own original thread desktop
+after releasing its hooks and windows. The supervisor joins that thread before
+closing the private desktop handle. The receipt retains observation and cleanup
+failures in order. A private observer-owned window records whether a hidden
+and a shown window receive the same internal paint request used by winit.
+The control also reads back its own visibility after show and hide. At GUI
+startup, adapter initialization, first visibility, close and reopen, the observer
+enumerates the primary's top-level HWNDs. It records up to 32 entries with
+their Unicode captions, classes, PIDs, thread desktops, visibility and minimized state, together
+with the primary's creation time. If the initial thread chose another desktop,
+the observer also enumerates that desktop for windows owned by the primary.
+[Window readback](../../tools/rust-qa/windows-launcher/window_readback.py) ·
+[Desktop handle lifetime](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-closedesktop) ·
+[Thread desktop assignment](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop).
+
+After verified cleanup, a second isolated profile exercises an ordinary
+foreground-first launch on the runner's existing unlocked Default desktop.
+Both invocations use the canonical GUI executable without arguments. The
+first launch must show its own titled window, close it, accept the second
+process's request, show its window again and retain the same inventory worker
+through Quit. The profile uses the preceding native Shell result as its initial
+tray input when available. If that result is unavailable, the receipt identifies
+the synthetic unavailable-tray input. Foreground startup requests a visible
+window with either value. The foreground result is recorded separately even
+when private fallback fails after verified cleanup. An unconfirmed cleanup
+prevents the next launch. Both Windows architectures still require a fresh
+native run of the private fallback, restart and foreground trials.
+[Launcher controls](../../tools/rust-qa/windows-launcher/test_launcher.py) ·
+[Desktop and cleanup controls](../../tools/rust-qa/windows-launcher/test_desktops.py).
