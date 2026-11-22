@@ -171,7 +171,9 @@ to reconcile project decisions, defaults, and recorded state.
   the [development guide](docs/development.md#rust-feasibility-workspace)
   lists the other native feasibility entry points.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
-  toolchain. Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
+  toolchain. Assign every workspace member a role in the
+  [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).
+  Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.

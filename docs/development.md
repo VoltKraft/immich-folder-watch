@@ -78,6 +78,13 @@ The same run compares Rust path, timestamp and casing observations to a native
 .NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
 comparison. See the [legacy checks](rust/rw02-legacy.md).
 
+The native command also writes `workspace-boundaries.json` for the selected
+target. It checks the resolved Cargo dependencies of each workspace member
+against its role. A new member needs an explicit role. The generic crates
+must stay independent of Immich, and presentation dependencies belong in
+the presentation layer. [Dependency direction](rust-desktop-standard.md#rds-01-dependency-direction)
+· [Cargo graph check](../tools/rust-qa/workspace-boundaries/check.py).
+
 The [native watch test](rust/rw02-watch-events.md) exercises the retained
 directory handles, bounded change hints and periodic inventory fallback.
 Each native feasibility job uploads the target's result and digest.

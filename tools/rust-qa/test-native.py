@@ -47,6 +47,10 @@ def main():
     }
     commands = {
         "compiler": [sys.executable, str(QA / "check-toolchain.py"), args.target],
+        "workspace-boundaries": [
+            sys.executable, "-B", str(QA / "workspace-boundaries/check.py"), args.target,
+            "--output", str(evidence / "workspace-boundaries.json"),
+        ],
         "format": ["cargo", "fmt", "--all", "--check"],
         "clippy": ["cargo", "clippy", "--frozen", "--workspace", "--all-targets", "--", "-D", "warnings"],
         "tests": ["cargo", "test", "--frozen", "--workspace", "--", "--show-output"],
