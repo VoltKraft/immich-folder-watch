@@ -68,8 +68,14 @@ probe="$run/build/bin/StoreIdentities/release/StoreIdentities.dll"
   dotnet "$probe" capture "$run/older"
 "${study[@]}" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet "$probe" capture "$run/managed"
 "${study[@]}" dotnet "$probe" capture "$run/current"
+writers=("$run/older" "$run/managed" "$run/current")
+"${study[@]}" "LD_LIBRARY_PATH=$IFW_TEST_ICU74" DOTNET_SYSTEM_GLOBALIZATION_APPLOCALICU=74.2 \
+  dotnet "$probe" read "${writers[@]}" "$run/reader-older"
+"${study[@]}" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet "$probe" read "${writers[@]}" "$run/reader-managed"
+"${study[@]}" dotnet "$probe" read "${writers[@]}" "$run/reader-current"
 python3 -B "$tool/invariant_profile.py" compare "$run/upstream" \
-  --writers "$run/older" "$run/managed" "$run/current" > "$run/comparison.json"
+  --writers "${writers[@]}" --readers "$run/reader-older" "$run/reader-managed" "$run/reader-current" \
+  > "$run/comparison.json"
 ```
 
 The legacy store writes both spellings for each of six name pairs and looks
@@ -81,9 +87,30 @@ when a pair shares a key. Exact transfer history persists in all six
 databases. The comparison opens finalized databases through immutable
 SQLite URIs, checks all four tables against the raw C# observations, and
 verifies the original file hashes again. The per-reader source counts in
-this comparison come from direct SQL predicates using the three independently
-derived keys. The ordinary cross-profile C# readback has its own qualification
+the writer section come from direct SQL predicates using the three independently
+derived keys.
+
+Each actual reader opens six private copies of the three writers' original
+databases. Each copy receives two ordinary store API queries for its source
+listing. The first uses the original source spelling. The second supplies
+the stored source key as a diagnostic spelling. Each query also looks up all
+12 relative paths. The independent Python comparison repeats these lookups
+with the reader's externally reconstructed scalar table against the immutable
+original. It compares ordered entries, raw source and file spelling, exact
+asset IDs, missing entries, account transfer time and the final copies' four
+logical tables. The 18 combinations cover 36 source listings, 432 path
+lookups and 18 transfer times. The reader's own `result.json` contains the
+full API observations and before/after SHA-256 for each copy. Every reader
+also emits its complete casing TSV, target, CoreLib build and assembly
+digests. The ordinary two-profile readback has its own qualification
 contract. [C# readback](../legacy-keys/README.md).
+
+For the insensitive fixture's original mixed source spelling, only a reader
+with the writer's profile finds the source. When supplied the stored ICU 17
+source key, all three readers list its eight raw entries. The ICU 15,
+managed 16 and ICU 17 readers resolve respectively 9, 10 and 12 of the
+12 relative spellings on that database. Every sensitive combination returns
+all 12 distinct names.
 
 ## Attribution
 

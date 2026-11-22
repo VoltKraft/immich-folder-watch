@@ -1,7 +1,9 @@
+import sqlite3
 import unittest
 
 from invariant_profile import DIFFERENTIAL, check_source, decode, differences, encode, sha, three_profiles
-from store import expected_entries
+from readers import sql_observation
+from store import ACCOUNT, expected_entries
 
 
 class ManagedInvariantTests(unittest.TestCase):
@@ -49,6 +51,26 @@ class ManagedInvariantTests(unittest.TestCase):
         for name in ("UnicodeData.txt", "gen-CategoryCasingInfo.cs", "CharUnicodeInfoData.cs"):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "published source"):
                 check_source(name, b"wrong source")
+
+    def test_source_and_relative_lookups_preserve_raw_writer_spelling(self):
+        db = sqlite3.connect(":memory:")
+        db.row_factory = sqlite3.Row
+        self.addCleanup(db.close)
+        db.execute("CREATE TABLE sync_entries(account_scope, source_path, source_key, relative_path, relative_path_key, asset_id)")
+        display, stored = "/Archive-ſ-ƛ", "/ARCHIVE-S-Ƛ"
+        db.execute("INSERT INTO sync_entries VALUES (?,?,?,?,?,?)",
+                   (ACCOUNT, display, stored, "long-s-ſ.jpg", "LONG-S-S.JPG", "long-s-lower"))
+        db.execute("INSERT INTO sync_entries VALUES (?,?,?,?,?,?)",
+                   (ACCOUNT, display, stored, "stroke-ƛ.jpg", "STROKE-Ƛ.JPG", "stroke-lower"))
+        for index, mapping in enumerate(self.maps):
+            raw = sql_observation(db, display, mapping)
+            self.assertEqual(len(raw["entries"]), 2 if index == 2 else 0)
+            visible = sql_observation(db, stored, mapping)
+            self.assertEqual([entry["relativePath"] for entry in visible["entries"]], ["long-s-ſ.jpg", "stroke-ƛ.jpg"])
+            self.assertEqual(visible["lookups"]["long-s-S.jpg"],
+                             {"sourcePath": display, "relativePath": "long-s-ſ.jpg", "assetId": "long-s-lower"})
+            self.assertEqual(visible["lookups"]["long-s-ſ.jpg"] is None, index == 1)
+            self.assertEqual(visible["lookups"]["stroke-ƛ.jpg"] is None, index == 0)
 
 
 if __name__ == "__main__":

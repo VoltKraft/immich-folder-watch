@@ -166,14 +166,21 @@ def main():
     comparison = commands.add_parser("compare", help="Verify complete, pre-staged inputs offline")
     comparison.add_argument("directory", type=Path)
     comparison.add_argument("--writers", nargs=3, type=Path, metavar=("ICU15", "MANAGED16", "ICU17"))
+    comparison.add_argument("--readers", nargs=3, type=Path, metavar=("ICU15", "MANAGED16", "ICU17"))
     args = parser.parse_args()
     if args.command == "fetch":
         fetch(args.directory)
         return
+    if args.readers and not args.writers:
+        parser.error("--readers requires the original --writers captures")
     result = inspect(args.directory)
     if args.writers:
         from store import verify_writers
-        result["storeObservations"] = verify_writers(args.writers, three_profiles())
+        tables = three_profiles()
+        result["storeObservations"] = verify_writers(args.writers, tables)
+        if args.readers:
+            from readers import verify_readers
+            result["actualReaderComparisons"] = verify_readers(args.readers, args.writers, tables, result["storeObservations"])
     print(json.dumps(result, indent=2))
 
 

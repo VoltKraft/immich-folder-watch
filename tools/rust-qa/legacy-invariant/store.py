@@ -3,6 +3,7 @@
 import json
 import sqlite3
 import stat
+from contextlib import contextmanager
 
 from invariant_profile import ROOT, VMR, decode, require, sha
 
@@ -22,16 +23,24 @@ ORDER = {
 }
 
 
-def private_input(directory):
+def artifact_directory(directory):
     base = ROOT / "artifacts/rust"
     require(directory.is_absolute() and directory.resolve() == directory and directory.is_relative_to(base),
             "Supply an absolute synthetic capture below artifacts/rust without links")
+
+
+def require_regular(file):
+    info = file.lstat()
+    require(stat.S_ISREG(info.st_mode) and not getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,
+            "Synthetic capture members must be regular files")
+
+
+def private_input(directory):
+    artifact_directory(directory)
     files = list(directory.iterdir())
     require({file.name for file in files} == FILES, "Unexpected synthetic capture members")
     for file in files:
-        info = file.lstat()
-        require(stat.S_ISREG(info.st_mode) and not getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,
-                "Synthetic capture members must be regular files")
+        require_regular(file)
     return {file.name: sha(file.read_bytes()) for file in files}
 
 
@@ -47,21 +56,31 @@ def expected_entries(mapping, sensitive):
     return rows, {path: rows[fold(path)][1] for path in paths}, aliases
 
 
-def inspect_db(path, case, mode, source, profile, maps):
-    sensitive = mode == "sensitive"
-    keys = {name: source if sensitive else source.translate(mapping) for name, mapping in maps.items()}
+@contextmanager
+def immutable_db(path):
     database = sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)
     try:
         database.row_factory = sqlite3.Row
         database.execute("PRAGMA query_only=ON")
         for pragma, expected in (("journal_mode", "delete"), ("integrity_check", "ok"), ("user_version", 1)):
             require(database.execute("PRAGMA " + pragma).fetchone()[0] == expected, "Invalid standalone schema-v1 database")
-        tables = {table: [dict(row) for row in database.execute(f"SELECT * FROM {table} ORDER BY {order}")]
-                  for table, order in ORDER.items()}
-        by_reader = {name: database.execute("SELECT count(*) FROM sync_entries WHERE account_scope=? AND source_key=?",
-                                            (ACCOUNT, key)).fetchone()[0] for name, key in keys.items()}
+        yield database
     finally:
         database.close()
+
+
+def all_tables(database):
+    return {table: [dict(row) for row in database.execute(f"SELECT * FROM {table} ORDER BY {order}")]
+            for table, order in ORDER.items()}
+
+
+def inspect_db(path, case, mode, source, profile, maps):
+    sensitive = mode == "sensitive"
+    keys = {name: source if sensitive else source.translate(mapping) for name, mapping in maps.items()}
+    with immutable_db(path) as database:
+        tables = all_tables(database)
+        by_reader = {name: database.execute("SELECT count(*) FROM sync_entries WHERE account_scope=? AND source_key=?",
+                                            (ACCOUNT, key)).fetchone()[0] for name, key in keys.items()}
     require(tables == case["tables"], "Immutable SQLite rows differ from the C# store's captured rows")
     entries = tables["sync_entries"]
     expected, lookups, aliases = expected_entries(maps[profile], sensitive)

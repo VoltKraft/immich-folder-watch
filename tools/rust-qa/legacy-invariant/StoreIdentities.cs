@@ -27,9 +27,14 @@ internal static partial class CasingCases
 
     private static async Task<int> Main(string[] args)
     {
+        if (args is ["read", var older, var managed, var current, var output])
+        {
+            await ReadIdentitiesAsync([older, managed, current], output);
+            return 0;
+        }
         if (args is not ["capture", var destination])
         {
-            Console.Error.WriteLine("Usage: StoreIdentities capture <fresh-absolute-directory-under-artifacts/rust>");
+            Console.Error.WriteLine("Usage: StoreIdentities capture <new-output> or read <icu15-writer> <managed-writer> <icu17-writer> <new-output>");
             return 2;
         }
         var (os, arch) = NativeTarget();
