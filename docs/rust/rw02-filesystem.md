@@ -39,16 +39,29 @@ An absent index or an unavailable identity on other filesystems fails the operat
 The ABI declarations are limited to the supported 64-bit targets, with compile-time
 layout checks. Linux uses its native dev/inode pair while the handle is live.
 These identifiers cannot be persisted as stand-alone deletion authority.
+FAT can change a file index during a rename. When validating a file against
+its name, the adapter checks the originally acquired identity against both
+the current handle information and the entry opened relative to its pinned
+parent. A disagreement cancels the match. Timestamp repair obtains its
+single-link check from that same held-handle observation.
+[Windows file index lifetime](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information).
 Windows also checks the normalized name of a public handle for a reserved
 component, including when the caller supplies an 8.3 alias. Linux requires the
 legacy `statx` result mask plus ctime. Protected directories also require reported
 owner and mode. Unsupported identity or protection aborts that operation.
 
 The portable Windows identity-policy tests exercised missing extended IDs,
-nonzero high bits, allowed FAT-family names and absent legacy indices.
-All four unit tests and fourteen Linux handle tests passed on Fedora x64.
-Both MSVC targets passed Clippy with warnings denied. A native Windows
-run is still needed for the updated handle adapter.
+nonzero high bits, allowed FAT-family names and absent legacy indices. Both
+Windows architectures passed these checks and their NTFS and encrypted SMB
+handle tests at `a66e045`. The follow-up also exercised disagreement between
+the held, named and acquired identities. Five unit tests and fourteen Linux
+handle tests passed on Fedora x64 and both MSVC targets passed Clippy.
+An independent review checked the missing-entry and native-error paths,
+the live link-count check and the final handle-bound write. It repeated
+all nineteen Fedora checks. Comparing the two observations does not reserve
+the filename between operations.
+Native execution of the follow-up and a real FAT volume observation are pending.
+[Four-target run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293004).
 
 `Download::publish` flushes the payload, checks the destination and prepares
 the native request. The atomic no-replace operation handles a competing arrival

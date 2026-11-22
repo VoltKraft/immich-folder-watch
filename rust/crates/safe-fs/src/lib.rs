@@ -99,6 +99,13 @@ impl ObjectInfo {
         }
         Ok(())
     }
+
+    fn agrees_with_entry(&self, acquired: FileIdentity, entry: &Self) -> bool {
+        self.kind == EntryKind::File
+            && entry.kind == EntryKind::File
+            && self.identity == acquired
+            && entry.identity == acquired
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -244,6 +251,7 @@ impl VerifiedFile {
         self.file.metadata()
     }
 
+    /// Identity observed at acquisition. Use `is_current_entry` to revalidate it.
     pub fn identity(&self) -> FileIdentity {
         self.identity
     }
@@ -251,9 +259,19 @@ impl VerifiedFile {
     /// Missing or replaced entries cease to match. A lookup error such as a
     /// reparse point, denial or unsupported identity stays an error.
     pub fn is_current_entry(&self) -> io::Result<bool> {
+        Ok(self.current_info()?.is_some())
+    }
+
+    fn current_info(&self) -> io::Result<Option<ObjectInfo>> {
         match native::entry_info(&self.parent.0.file, &self.name) {
-            Ok(info) => Ok(info.kind == EntryKind::File && info.identity == self.identity),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
+            Ok(entry) => {
+                // Some filesystems can change the index of a live file after a rename.
+                let held = native::info(&self.file)?;
+                Ok(held
+                    .agrees_with_entry(self.identity, &entry)
+                    .then_some(held))
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -284,7 +302,7 @@ impl TimeRepairFile {
     /// and journals its intent. Linux supports updating mtime. Windows also
     /// updates creation time. Reject an observed alias or changed entry.
     pub fn set_times(&self, created: SystemTime, modified: SystemTime) -> io::Result<()> {
-        if !self.0.is_current_entry()? || native::info(&self.0.file)?.links != 1 {
+        if !self.0.current_info()?.is_some_and(|held| held.links == 1) {
             return Err(denied(
                 "timestamp repair requires the same single-link file",
             ));
@@ -295,5 +313,31 @@ impl TimeRepairFile {
         #[cfg(target_os = "linux")]
         let _ = created;
         self.0.file.set_times(times)
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+
+    #[test]
+    fn current_entry_requires_agreement_with_the_live_handle_and_the_acquisition() {
+        let acquired = FileIdentity {
+            volume: 41,
+            file: 5,
+        };
+        let changed = FileIdentity {
+            volume: 41,
+            file: 9,
+        };
+        let info = |identity| ObjectInfo {
+            kind: EntryKind::File,
+            identity,
+            links: 1,
+        };
+        assert!(info(acquired).agrees_with_entry(acquired, &info(acquired)));
+        assert!(!info(changed).agrees_with_entry(acquired, &info(acquired)));
+        assert!(!info(acquired).agrees_with_entry(acquired, &info(changed)));
+        assert!(!info(changed).agrees_with_entry(acquired, &info(changed)));
     }
 }
