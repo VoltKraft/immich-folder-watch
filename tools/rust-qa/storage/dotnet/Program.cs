@@ -14,9 +14,14 @@ internal static class Program
 {
     private static async Task Main(string[] args)
     {
+        if (args is ["--casing-fixtures", var destination])
+        {
+            await CasingCases.WriteAsync(destination);
+            return;
+        }
         if (args.Length != 1)
         {
-            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output>");
+            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output> or --casing-fixtures <new-output>");
         }
         var output = Path.GetFullPath(args[0]);
         var scope = Path.GetFullPath("artifacts/rust") + Path.DirectorySeparatorChar;
