@@ -19,8 +19,8 @@
   },
   "canonicalLockSha256": "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25",
   "retainedLockSha256": "e061bcf25558fe72f388a615d64691a4fae7e594d712fa6c1191cfc51494ef0e",
-  "canonicalManifestSha256": "ac04be2c8cd44c1a1c49ce357b6f2f314da2fd4932fca0415e2487ca10aa6249",
-  "retainedManifestSha256": "2eab91121bbaabecacf53ee235d4e195a4ee14cb503b9259e6669e63314ff7aa",
+  "canonicalManifestSha256": "aa1d480aebc839c4c5a742be3a547af19273739bcd6634c36afd556a353139ed",
+  "retainedManifestSha256": "79cb690c71d6dcd5a9593dd6a03a490af83a9b9d38096a232ae6b9b48d8141f6",
   "license": "MIT OR Apache-2.0",
   "selectedLicense": "MIT",
   "adaptedSource": {

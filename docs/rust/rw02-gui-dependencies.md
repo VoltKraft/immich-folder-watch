@@ -198,6 +198,19 @@ their 235 packages and their existing feature sets. The combined development
 profile already selects these Shell APIs. [GUI manifest](../../tools/rust-qa/gui/Cargo.toml)
 · [Standalone service review](rw02-windows-services.md#dependency-review-and-local-evidence).
 
+The GUI also declares the existing `Win32_System_Threading` feature
+directly to observe the registered Shell process through a synchronization
+handle. AccessKit already selects it on both Windows targets. Reproducing
+all four complete reports yielded the same four digests. The original
+generated Threading module has SHA-256
+`a4caf28ab454d5c886b02cb1caacec628f2d0ef55df507fca545145be2900893`.
+The retained-window comparison reconstructed its eframe source archive
+with SHA-256 `ce55769b1e721136161c6bf19fdd46665ccb6b00cca5f0b3290c23f1f8a06b7f`.
+Its three tray source files and icon matched the canonical GUI byte-for-byte.
+The retained and canonical normal/build features matched on all four targets.
+Fifteen comparison tests passed, as did formatting and cross-Clippy for both
+retained Windows targets.
+
 The original crate SHA-256 is
 `527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580`.
 The generated Shell module is 3,585,884 bytes with SHA-256
