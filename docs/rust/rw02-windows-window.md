@@ -146,3 +146,74 @@ two external requests. The recorder binds the start of each interval to the
 actual preceding external close and declines a trace with an intervening
 visibility change. Fifteen portable tests passed. Replaying all 841
 historical intervals reproduced the same counts and native timings.
+
+## Native retained-window results at 0a2b5ca
+
+The retained Mailbox build met all eleven WPF-derived limits on both Windows hosts at
+`0a2b5ca19bcd7cb7be7a5f77415e05b8237ca47a`. Each four-core runner measured its
+own WPF reference before timing the Rust processes. Windows Server 2025 x64 and
+Windows 11 ARM64 both used the DX12 Microsoft Basic Render Driver. The table gives
+the median of three trials per subject with UI dispatch tracing disabled. For close and reopen, each
+trial contributed its own p95. The limits were recomputed from the original WPF
+records before rounding the displayed values. [x64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/job/137378911450) · [ARM64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/job/137378911693).
+
+| Metric | x64 WPF | x64 limit | x64 retained | ARM64 WPF | ARM64 limit | ARM64 retained |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Startup (ms) | 814.989 | 977.987 | 202.899 | 769.519 | 923.424 | 206.415 |
+| Visible CPU (% of one core) | 4.007 | 5.008 | 0 | 3.080 | 4.081 | 0 |
+| Hidden CPU (% of one core) | 3.905 | 4.905 | 0 | 3.795 | 4.796 | 0 |
+| Visible working set (MiB) | 130.020 | 143.022 | 60.281 | 133.492 | 146.842 | 69.676 |
+| Hidden working set (MiB) | 128.113 | 140.925 | 59.008 | 129.004 | 141.905 | 68.203 |
+| Idle close p95 (ms) | 6.411 | 16.411 | 4.319 | 3.077 | 13.077 | 2.802 |
+| Idle reopen p95 (ms) | 7.439 | 17.440 | 7.670 | 3.462 | 13.463 | 3.455 |
+| Scan close p95 (ms) | 19.355 | 29.356 | 19.144 | 4.214 | 14.215 | 4.084 |
+| Scan reopen p95 (ms) | 12.096 | 22.096 | 11.343 | 5.175 | 15.175 | 4.261 |
+| Visible presentations/s | 0.066 | 0.133 | 0 | 0.066 | 0.133 | 0 |
+| Hidden presentations/s | 0 | 0.067 | 0 | 0 | 0.067 | 0 |
+
+The canonical teardown executable met six limits on each host. The retained FIFO
+control met ten on each, exceeding the scan-close limit at 37.438 ms on x64 and
+19.185 ms on ARM64. All twelve retained-window behavior cases passed on each host,
+including restoring a focused draft after hide and after device replacement.
+The archived pixel captures matched the focus and editing records.
+
+The three instrumented Mailbox inventories used the same executable on each host.
+The external HWND observations and UI-thread samples confirmed both ends of every
+eligible hidden interval within the ETW recording.
+The table counts successful DXGI calls that started after the native hide and
+before the next show. The last column measures when the external observer saw the
+window again.
+
+| Host and policy | Verified / eligible intervals | Hidden presents | Pipe read to UI dequeue, median (ms) | Reopen p95 (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| x64 root repaint | 303 / 303 | 0 | 0.150 | 11.652 |
+| x64 single wake | 292 / 292 | 0 | 0.141 | 11.459 |
+| x64 original hidden painting | 204 / 204 | 423 | 20.706 | 56.242 |
+| ARM64 root repaint | 216 / 216 | 0 | 0.142 | 4.740 |
+| ARM64 single wake | 216 / 216 | 0 | 0.135 | 4.701 |
+| ARM64 original hidden painting | 211 / 211 | 0 | 0.147 | 4.640 |
+
+The x64 original policy presented once in each empty-modifier callback and once
+in each focus-loss callback. Fifteen intervals included a third presentation in
+another window callback. Both corrected policies still delivered both native
+input callbacks in every interval. Median callback wall time for empty modifiers
+and focus loss fell from 26.866 and 11.993 ms under the original policy to
+0.042 and 0.010 ms with the regular root wake. The successful DXGI call itself
+took 0.176 ms at p95 in the original first pass. Separating frame production
+from the invisible-window sleep would require timings inside eframe. On ARM64,
+all three policies recorded zero hidden presentations. The ordinary root wake
+provides the measured Windows configuration for the next integrated build.
+
+The independent replay checked 30 file-I/O traces, each covering two passes
+over 100,000 distinct files, and all 18 retained DXGI timing traces. Every
+decoder completed without reporting a lost event or buffer. Both job archives
+contain the same 12-member `eframe-source.zip`, SHA-256
+`3e53af63d808cfde90c44bd6142aeadcde83e04997bef4edb464733f342cd325`. Reapplying
+the patch reproduced the 36-file compiler tree recorded by both native builds.
+The two independent JSON readbacks are stored beside the original archives
+under `artifacts/rust/hosted-desktop-storage/45077818235/`.
+
+| Target | Actions archive SHA-256 | Independent retained readback SHA-256 |
+| --- | --- | --- |
+| [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778955008) | `589f02834ed6fe5227a087a92db8a575c5daa5208ae72753e307788183ae7074` | `e65c12aa50d665def1c0634cb8deec4fdd665b52b76cf6f112eb3997756f0f9c` |
+| [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778472175) | `9a7b632c69fb4979982f72b758a6356cc5475e8ccf2b766d27e849b0145e8661` | `372dd4c7a66e1d1ac3fa04df818f2c1c0db386b2ea228ec3ed1956079c914e20` |
