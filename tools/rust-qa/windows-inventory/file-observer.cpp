@@ -282,8 +282,9 @@ int wmain(int argc, wchar_t** argv) {
     p.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
     p.Wnode.ClientContext = 1;
     p.BufferSize = 256;
-    p.MinimumBuffers = 32;
-    p.MaximumBuffers = 192;
+    // Reserve space before the sustained 100,000-file workload starts on either subject.
+    p.MinimumBuffers = 128;
+    p.MaximumBuffers = 512;
     p.MaximumFileSize = 3072;
     p.LogFileMode = EVENT_TRACE_FILE_MODE_SEQUENTIAL;
     std::copy(name.begin(), name.end(), q.logger);
@@ -299,7 +300,12 @@ int wmain(int argc, wchar_t** argv) {
     }
     ULONG stopped = ControlTraceW(session, nullptr, &p, EVENT_TRACE_CONTROL_STOP);
     if (status || stopped || p.EventsLost || p.LogBuffersLost) {
-        std::printf("TRACE_ERROR %lu %lu %lu %lu\n", status, stopped, p.EventsLost, p.LogBuffersLost); return 4;
+        std::printf("TRACE_ERROR %lu %lu %lu %lu\n", status, stopped, p.EventsLost, p.LogBuffersLost);
+        if (stopped == ERROR_SUCCESS) {
+            std::printf("BUFFER_STATS sizeKiB=%lu minimum=%lu maximum=%lu allocated=%lu written=%lu\n",
+                        p.BufferSize, p.MinimumBuffers, p.MaximumBuffers, p.NumberOfBuffers, p.BuffersWritten);
+        }
+        return 4;
     }
     EVENT_TRACE_LOGFILEW input{};
     input.LogFileName = argv[3];

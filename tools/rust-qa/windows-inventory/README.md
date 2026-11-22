@@ -12,6 +12,8 @@ The Windows SDK's installed manifest supplies the layout of create, cleanup/clos
 
 Each of three trials requires the original live inventory PID and independent HWND show/hide events. At least five requests per direction must start and finish within the first pass, with bracketing file activity within half a second. The ledger retains the first and last QPCs of each group of at most 32 distinct successes. Idle CPU and working set include the whole subject tree. The driver fixes the same-host WPF budget before running Rust. [Scan recorder](scan.py) · [Predeclared comparison](../windows-performance/metrics.py)
 
+In the third canonical ARM64 trial at `8091469`, ETW reported 310,757 lost events. The two scan metrics remained unmeasured. The recorder now requests 128 initial buffers and up to 512 of 256 KiB each for both subjects. A loss still invalidates the file trace. When Windows successfully closes a session that lost events, its log also includes the effective buffer settings and buffers written. [Windows ETW buffer settings](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/ns-evntrace-event_trace_properties) · [Native results](../../../docs/rust/rw02-native-gui.md#native-follow-up-at-8091469).
+
 Run from the matching MSVC developer shell after the native GUI and YAML assessment have produced their target receipts. Use a fresh output directory for each CI job. The command also measures the shipping WPF reference at the recorder's immutable revision.
 
 ```powershell
