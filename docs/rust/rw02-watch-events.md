@@ -297,7 +297,7 @@ pending buffers are drained before release, or that isolated process is killed
 after 20 seconds. These controls are diagnostic evidence and do not substitute
 for the Rust worker's independent scenarios. The handle-relative NT route is
 an experiment, not a selected fallback. Complete native Windows acceptance
-remains pending; the partial native Windows observations follow below.
+was still pending at that stage; the subsequent observations follow below.
 
 Both MSVC targets passed Clippy with warnings denied for this candidate. The
 native Fedora x64 guard passed ten library tests, three Python control tests
@@ -362,7 +362,8 @@ controls and fifteen native Fedora x64 scenarios. Both MSVC targets passed
 Clippy with warnings denied.
 `artifacts/rust/watch-events/x86_64-unknown-linux-gnu/flat-notification-guard-01/result.json`
 has SHA-256 `afefd9df972c060093932eab57b75c0813f36ce7ec7adbc96f4bcc809a2b0563`.
-Its native Windows raw-record observations remain pending.
+Its native Windows raw-record observations were pending at that revision;
+the four-target results below provide the subsequent observations.
 
 The archived x64 ZIP from [run 45034293004](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293004)
 has verified SHA-256
@@ -379,6 +380,69 @@ its `result.json` has SHA-256
 `ab31229b148ca56402b40d328df8c9525c24d5b940c90358c0f1c8248b7a090b`.
 CRC, inner digest and committed input checks passed with the same two CRLF
 representations noted above.
+
+### Four-target watch observations at 3b4854d
+
+[Run 45039099706](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099706)
+passed all four native jobs at clean revision
+`3b4854d867f614a956042dfe987ecc7c008e53ec`. Every target passed ten Rust
+unit tests and six Python control tests without skips. Ubuntu x64 and ARM64
+each passed fifteen native scenarios; Windows Server x64 and Windows 11 ARM64
+each passed thirteen. These are executions on the reported native compiler
+hosts and executable machines, not cross-build results.
+
+Both Windows flat subscriptions returned the following three raw completed
+buffers. An independent decode of their length fields and UTF-16 names matched
+the parsed receipt and accounted for every generation after the initial one.
+
+| Generation | Phase | Native action | Relative name | Completed bytes |
+| ---: | --- | --- | --- | ---: |
+| 2 | Nested-file write | 3: modified | `nested` | 24 |
+| 3 | Direct-child creation | 1: added | `flat.jpg` | 28 |
+| 4 | Direct-child creation | 3: modified | `flat.jpg` | 28 |
+
+Thus this run directly observed the immediate parent-directory modification;
+it did not report `nested/item.jpg` from the flat subscription. Both receipts
+set `parentMetadataObservedDuringNestedPhase=true`. Their complete flat
+inventories were empty after the nested write and contained only `flat.jpg`
+after the direct write. The Linux subscriptions stayed at generation 1 for
+the nested write and advanced for the direct child. This resolves the previous
+scope assertion with native records while preserving conservative rescans.
+The earlier runs remain failed records because they did not retain those names.
+
+Both Windows targets also passed the independent notification-handle lease,
+pending-I/O shutdown, ordinary mutations, inventory cancellation, application
+queue pressure, renewed coverage, missing-child scan and sharing trials.
+The sharing trial observed Windows error 32 for conflicting delete, rename and
+read access; the failing Python inventory retained its baseline with errno 13,
+then recovered after release. The separate direct and empty-name NT controls
+each delivered their synthetic file and cancelled an idle request successfully
+with completion 995. `ReOpenFile` still returned 5 and by-ID notification
+submission still returned 87; neither is the selected adapter route.
+The two Linux runs each observed the actual 16,384-event inotify overflow,
+registration refusal, root movement and post-arm directory replacement.
+
+Each local ZIP below was independently matched to the live GitHub artifact
+digest and size, then checked for CRC integrity. The four inner `evidence.sha256`
+files matched `result.json`. All twelve input digests in each watch receipt
+match the commit: the two Windows receipts use CRLF for `rust/toolchain-inputs.json`
+and `tools/rust-qa/check-toolchain.py`; all other inputs match byte for byte.
+The four receipts report no modified source paths. Archives are retained under
+`artifacts/rust/hosted-watch-events/45039099706/`.
+
+| Host | Native scenarios | Artifact ID | ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| Linux x64 | 15 | 14761190564 | `8fbe0dba24de0ee1ab208572fc6d6b33d80c31632c99b34aac901cc924e327c2` |
+| Linux ARM64 | 15 | 14760309747 | `039e40647adf162fdda5c6140c1a1d0f0f7d25b5d08a6eb0d29ad9569d8ff514` |
+| Windows x64 | 13 | 14760802069 | `ae44296d88e24b6feb9f26cbca4de27041c417a196e525ce72f6d2558ac4fcce` |
+| Windows ARM64 | 13 | 14760184752 | `bad868b9491343f4f683e298b00a38d894fd5eca557e2b5ba77cbc47d20544fb` |
+
+This covers the selected isolated watch scenarios. Actual Windows kernel-buffer
+overflow remains unobserved; its status handling has deterministic coverage.
+The filesystem SMB tests are separate from these local watch runs and do
+not establish notification delivery over SMB or portal/FUSE. Safe-fs grant
+integration, scheduling and engine reconciliation remain later-stage work.
+[Filesystem evidence](rw02-filesystem.md#retained-identity-follow-up-at-3b4854d).
 
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256

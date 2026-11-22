@@ -60,8 +60,10 @@ An independent review checked the missing-entry and native-error paths,
 the live link-count check and the final handle-bound write. It repeated
 all nineteen Fedora checks. Comparing the two observations does not reserve
 the filename between operations.
-Native execution of the follow-up and a real FAT volume observation are pending.
-[Four-target run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293004).
+The retained-identity follow-up has since run on all four native targets and
+on both Windows SMB fixtures, as recorded [below](#retained-identity-follow-up-at-3b4854d).
+A real FAT volume observation remains separate.
+[Earlier four-target run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293004).
 
 `Download::publish` flushes the payload, checks the destination and prepares
 the native request. The atomic no-replace operation handles a competing arrival
@@ -183,6 +185,73 @@ no-replace publication, cancellation and revocation. Its distro daemon
 returned `ENOSYS` for the shared media read lock. A private build containing
 the upstream fix enforced the lock on the underlying file while retaining
 the grant boundary. [Rust and shipping .NET observations](rw02-linux-services.md).
+
+### Retained-identity follow-up at 3b4854d
+
+[Run 45039099706](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099706)
+completed all four native jobs at clean revision
+`3b4854d867f614a956042dfe987ecc7c008e53ec`, using pinned Rust 1.100.0
+(`0ef1bc386`). The safe-fs suites passed without ignored or filtered cases:
+five unit tests plus fourteen Linux handle tests on each Ubuntu architecture,
+and five unit tests plus eleven Windows handle tests both locally and through
+each encrypted loopback SMB share. The complete workspace test totals were
+36 per Linux target and 33 per Windows target; SMB repeated only safe-fs.
+Formatting, warnings-denied Clippy and release-probe builds also passed.
+
+The three-way identity policy test explicitly rejects disagreement between the
+acquired identity, the current held-handle observation and the named entry,
+including when the two current observations agree with each other but differ
+from acquisition. This is a deterministic policy test. Separately, the native
+leaf-rename/replacement test kept reading the original bytes from its retained
+handle, rejected timestamp repair through the stale name, and preserved both
+the moved file and the same-length/same-time replacement. Native hard-link
+refusal, directory-lease behavior, bounded scans, no-replace publication and
+private-stage cleanup also passed on their applicable targets. The two staging
+unit cases perform real filesystem operations with controlled races or a
+simulated lost acknowledgement; they do not simulate a real network outage.
+[Retained-handle tests](../../rust/crates/safe-fs/tests/handles.rs) and
+[identity policy](../../rust/crates/safe-fs/src/lib.rs).
+
+Both Windows SMB receipts recorded negotiated dialect 3.1.1, encryption,
+local-backing-to-UNC marker agreement, thirteen opened synthetic UNC roots,
+and removal of both the temporary share and its scratch directory. Those
+thirteen roots correspond to eleven integration cases and two staging unit
+cases; the other three unit cases test identity policy without a filesystem.
+The native test harness constructs each UNC under an owned
+`\\localhost\IfwRustQa<random-id>$` share; no production share was used.
+
+The local Windows/NTFS fixture reported both `distinct_short_name=true` and
+`short_name_denial_verified=true` on both architectures. The SMB ARM64 log
+also reported both true. The SMB x64 log explicitly reported both false:
+its successful suite does not establish a distinct-8.3 alias denial over SMB.
+The local required-alias gate remains satisfied independently of that gap.
+Linux results exercise the POSIX backend on the runner's temporary filesystem;
+these receipts do not record a measured Linux filesystem type or a fresh
+Windows volume-type query. Native FAT/FAT32/exFAT volume behavior, including
+index changes during rename, remains outside these archives. The portable
+FAT identity-policy controls cannot substitute for that separate observation.
+
+All four ZIPs were independently matched against GitHub's live artifact digest
+and size and passed CRC checks. Their receipts identify the same commit,
+workflow run and native target, report `modifiedSources=[]`, and bind the
+workspace lockfile to SHA-256
+`d1d0fd1a6b27d1e21a620b27d38ac918bd0b409098e75d4b931881ab9ef6b7c8`.
+Every recorded step exited 0 and its named log is present. Unlike the separate
+watch receipts, these archives provide clean-checkout/commit and lockfile
+provenance rather than an individual source-file digest inventory. Archives
+are retained under `artifacts/rust/hosted-feasibility/45039099706/`.
+
+| Host | Local safe-fs / workspace tests | SMB safe-fs tests | Artifact ID | ZIP SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Linux x64 | 19 / 36 | Not applicable | 14761285282 | `daf9bd181457b402f3cbb76cc737249afcfc28eecad5f622c35ca8c080ffea72` |
+| Linux ARM64 | 19 / 36 | Not applicable | 14760822896 | `13f6581722030d73e2e01187c73d856fbd06ec5d9e1f912b88cc897ee916c4cf` |
+| Windows x64 | 16 / 33 | 16 | 14761230718 | `0f55f014340f36cc3a628bf86ab866057a2937cddbb17d66479967c60e0d5c03` |
+| Windows ARM64 | 16 / 33 | 16 | 14760647683 | `d009e0a708feb42865e5e786d8b5608f71dde8d42ca7ffb976c481c59e19a52e` |
+
+These results cover the isolated filesystem API and its stated fault controls.
+They do not establish native SMB/FUSE disconnection recovery, integrated engine
+deletion authority or installed rollback. Those remain distinct integration
+and recovery gates.
 
 ## Independent review of the feasibility boundary
 
