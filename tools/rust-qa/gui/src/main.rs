@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug)]
 enum Command {
+    #[cfg(target_os = "windows")]
+    ReadFilenameIme(u8),
     Open,
     Close,
     Quit,
@@ -69,6 +71,8 @@ enum ControlId {
 }
 
 struct Model {
+    #[cfg(target_os = "windows")]
+    ime_sample: Option<u8>,
     lifecycle: DesktopLifecycle,
     commands: Receiver<Command>,
     filename: String,
@@ -83,6 +87,11 @@ struct Model {
 impl Model {
     fn command(&mut self, command: Command) -> Option<HostCommand> {
         match command {
+            #[cfg(target_os = "windows")]
+            Command::ReadFilenameIme(sample) => {
+                self.ime_sample = Some(sample);
+                None
+            }
             Command::Open => self.lifecycle.activate(),
             Command::Close => self.lifecycle.close_window(),
             Command::Quit => self.lifecycle.request_quit(),
@@ -231,7 +240,7 @@ impl eframe::App for Window {
         }
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let mut model = self.model.borrow_mut();
         model.passes += 1;
         ui.ctx()
@@ -247,6 +256,15 @@ impl eframe::App for Window {
             let filename = ui
                 .text_edit_singleline(&mut model.filename)
                 .labelled_by(label.id);
+            #[cfg(target_os = "windows")]
+            if let Some(sample) = model.ime_sample.take() {
+                native_gui_assessment::report_filename_mode(
+                    _frame,
+                    sample,
+                    de && filename.has_focus() && ui.input(|input| input.focused),
+                    ui.output(|output| output.ime.is_some()),
+                );
+            }
             let label = ui.label(if de { "Kennwort" } else { "Password" });
             let password = ui
                 .add(egui::TextEdit::singleline(&mut model.password).password(true))
@@ -397,6 +415,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         lifecycle.tray()
     );
     let model = Rc::new(RefCell::new(Model {
+        #[cfg(target_os = "windows")]
+        ime_sample: None,
         lifecycle,
         commands,
         filename: "Grüße – Sommer.jpg".to_owned(),
@@ -444,6 +464,7 @@ fn windows_fixture_input(
     use std::io::Read;
     let mut input = std::io::stdin();
     let mut next = [0];
+    let observe_ime = std::env::var("IFW_QA_FILENAME_IME").as_deref() == Ok("1");
     input.read_exact(&mut next)?;
     let available = match next[0] {
         b'T' => true,
@@ -461,6 +482,9 @@ fn windows_fixture_input(
                     } else {
                         continue;
                     }
+                }
+                Ok(()) if observe_ime && matches!(next[0], b'1'..=b'7') => {
+                    Command::ReadFilenameIme(next[0] - b'0')
                 }
                 _ => Command::Quit,
             };

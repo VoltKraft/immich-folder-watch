@@ -2,17 +2,50 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 import struct
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from run import KEYBOARD_CATEGORY, QA, ROOT, accepted, checked_build, digest, eligibility, run
+from run import FIELD_SOURCES, KEYBOARD_CATEGORY, ROOT, accepted, checked_build, digest, eligibility, launch_ps, run
 
 
 class ImeTests(unittest.TestCase):
+    def test_compose_inherits_only_a_short_lived_duplicate_and_stops_on_timeout(self):
+        reader, writer = os.pipe()
+        self.addCleanup(os.close, reader)
+        control = self.enterContext(os.fdopen(writer, "wb"))
+        # Use the real duplicate descriptor lifetime with a modeled Windows handle table.
+        self.enterContext(patch.dict(sys.modules, {"msvcrt": SimpleNamespace(get_osfhandle=lambda fd: fd + 1000)}))
+        inheritance = self.enterContext(patch.object(os, "set_handle_inheritable", create=True))
+        self.enterContext(patch.object(subprocess, "CREATE_NO_WINDOW", 0, create=True))
+        self.enterContext(patch.object(subprocess, "STARTUPINFO", SimpleNamespace, create=True))
+        process = MagicMock()
+        process.wait.side_effect = subprocess.TimeoutExpired("compose", 115)
+        process.poll.return_value = None
+
+        def start(command, **options):
+            handle, = options["startupinfo"].lpAttributeList["handle_list"]
+            self.assertEqual(command[-2:], ["-SamplePipe", str(handle)])
+            self.assertTrue(options["close_fds"])
+            self.assertNotEqual(handle - 1000, writer)
+            os.fstat(handle - 1000)
+            inheritance.assert_called_once_with(handle, True)
+            return process
+
+        with tempfile.TemporaryDirectory() as area, patch.object(subprocess, "Popen", side_effect=start):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                launch_ps("test-only", "compose", Path(area), {}, sample_pipe=control)
+        with self.assertRaises(OSError):
+            os.fstat(inheritance.call_args.args[0] - 1000)
+        os.fstat(writer)
+        process.kill.assert_called_once_with()
+
     def test_observed_composition_remains_failed_when_removing_its_profile_raises(self):
         with tempfile.TemporaryDirectory() as area:
             output = Path(area)
@@ -71,6 +104,8 @@ class ImeTests(unittest.TestCase):
             self.assertFalse(accepted({n: v for n, v in positive.items() if n != k}, 23), k)
         self.assertFalse(accepted({**positive, "restoredLayout": 0x411}, 23))
         self.assertFalse(accepted({**positive, "committedCodePoint": "U+0061"}, 23))
+        diagnostic = {"beforeA": {"state": "observed", "open": True, "conversionFlags": 1}}
+        self.assertFalse(accepted({**positive, "preeditBeforeEnter": False, "attempts": [diagnostic]}, 23))
 
     def test_gui_receipt_binds_executable_native_machine_and_field_source(self):
         with tempfile.TemporaryDirectory() as d:
@@ -78,19 +113,24 @@ class ImeTests(unittest.TestCase):
             pe = bytearray(150)
             pe[:2], pe[60:64], pe[100:106] = b"MZ", struct.pack("<I", 100), b"PE\0\0\x64\xaa"
             binary.write_bytes(pe)
-            field = QA / "gui/src/main.rs"
             info = {"source": "revision", "binarySha256": digest(binary), "target": "aarch64-pc-windows-msvc",
-                    "compilerSources": {field.relative_to(ROOT).as_posix(): digest(field)}}
+                    "compilerSources": {p.relative_to(ROOT).as_posix(): digest(p) for p in FIELD_SOURCES}}
             record.write_text(json.dumps(info))
             self.assertEqual(checked_build(binary, record, info["target"], 0xaa64, "revision")["source"], "revision")
             for machine, source in ((0x8664, "revision"), (0xaa64, "changed")):
                 with self.assertRaises(ValueError):
                     checked_build(binary, record, info["target"], machine, source)
-            bad = copy.deepcopy(info)
-            bad["compilerSources"][field.relative_to(ROOT).as_posix()] = "changed"
-            record.write_text(json.dumps(bad))
-            with self.assertRaises(ValueError):
-                checked_build(binary, record, info["target"], 0xaa64, None)
+            for source in FIELD_SOURCES:
+                for missing in (False, True):
+                    bad = copy.deepcopy(info)
+                    key = source.relative_to(ROOT).as_posix()
+                    if missing:
+                        del bad["compilerSources"][key]
+                    else:
+                        bad["compilerSources"][key] = "changed"
+                    record.write_text(json.dumps(bad))
+                    with self.assertRaises(ValueError):
+                        checked_build(binary, record, info["target"], 0xaa64, None)
 
 
 if __name__ == "__main__":

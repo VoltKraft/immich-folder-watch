@@ -22,6 +22,7 @@ from worker import shared_windows
 from windows_observer import private_profile, select_powershell
 
 KEYBOARD_CATEGORY = "34745c63-b2f0-4784-8b67-5e12c8701a31"
+FIELD_SOURCES = (QA / "gui/src/main.rs", QA / "gui/src/lib.rs")
 
 
 def digest(path):
@@ -53,10 +54,9 @@ def checked_build(binary, path, target, machine, expected_source):
         offset, = struct.unpack("<I", stream.read(4))
         stream.seek(offset)
         signature, image_machine = struct.unpack("<4sH", stream.read(6))
-    field_source = QA / "gui/src/main.rs"
-    source_key = field_source.relative_to(ROOT).as_posix()
     if (signature != b"PE\0\0" or image_machine != machine or receipt["target"] != target
-            or receipt["binarySha256"] != digest(binary) or receipt["compilerSources"][source_key] != digest(field_source)
+            or receipt["binarySha256"] != digest(binary)
+            or any(receipt["compilerSources"].get(p.relative_to(ROOT).as_posix()) != digest(p) for p in FIELD_SOURCES)
             or (expected_source and receipt["source"] != expected_source)):
         raise ValueError("The GUI build receipt, native target or observed Rust field source differs")
     return {"target": target, "sha256": digest(path), "source": receipt["source"]}
@@ -85,13 +85,29 @@ def accepted(data, pid):
             and data.get("restoredLayout") == data.get("originalLayout") and bool(data.get("restoredLayout")))
 
 
-def launch_ps(host, mode, output, env, extra=()):
+def launch_ps(host, mode, output, env, extra=(), sample_pipe=None):
     cmd = [host, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
            "-File", HERE / "observe.ps1", "-Mode", mode, "-OutputFile", output / (mode + ".json"), *map(str, extra)]
     with (output / (mode + ".log")).open("wb") as log:
-        return subprocess.run(cmd, cwd=output, env=env, stdin=subprocess.DEVNULL, stdout=log,
-                              stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW,
-                              timeout=115, check=False).returncode
+        options = dict(cwd=output, env=env, stdin=subprocess.DEVNULL, stdout=log,
+                       stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
+        if sample_pipe is None:
+            return subprocess.run(cmd, **options, timeout=115, check=False).returncode
+        # Extend the existing fixture control pipe only to the trusted composition observer.
+        # The temporary inheritable duplicate closes in this process immediately after launch.
+        import msvcrt
+        with os.fdopen(os.dup(sample_pipe.fileno()), "wb", buffering=0) as duplicate:
+            handle = msvcrt.get_osfhandle(duplicate.fileno())
+            os.set_handle_inheritable(handle, True)
+            startup = subprocess.STARTUPINFO()
+            startup.lpAttributeList = {"handle_list": [handle]}
+            process = subprocess.Popen([*cmd, "-SamplePipe", str(handle)], **options, close_fds=True, startupinfo=startup)
+        with process:
+            try:
+                return process.wait(timeout=115)
+            finally:
+                if process.poll() is None:
+                    process.kill()
 
 
 def subject(args, api, env, host, result):
@@ -102,7 +118,7 @@ def subject(args, api, env, host, result):
         raise RuntimeError("The disposable worker is outside an active unlocked native input desktop")
     log = args.output / "subject.log"
     with log.open("wb") as stream, subprocess.Popen(
-            [args.binary], cwd=args.output, env=env, stdin=subprocess.PIPE, stdout=stream,
+            [args.binary], cwd=args.output, env={**env, "IFW_QA_FILENAME_IME": "1"}, stdin=subprocess.PIPE, stdout=stream,
             stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW) as child:
         observer = None
         try:
@@ -126,7 +142,7 @@ def subject(args, api, env, host, result):
                     or info["subject"]["session"] != context["session"]):
                 raise RuntimeError("The subject and observer do not share the active desktop and OS session")
             exit_code = launch_ps(host, "compose", args.output, env,
-                                  ["-SubjectId", child.pid, "-WindowHandle", hwnd, "-SubjectLog", log])
+                                  ["-SubjectId", child.pid, "-WindowHandle", hwnd, "-SubjectLog", log], child.stdin)
             result["observerExit"] = exit_code
             result["afterInput"] = api.context()
             if exit_code or not accepted(read(args.output / "compose.json"), child.pid):
@@ -207,9 +223,9 @@ def main():
         parser.error("Use the development-only native GUI assessment binary")
     args.output.mkdir(parents=True, exist_ok=False)
     source = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "hosted.ps1", HERE / "language-list.ps1",
-              HERE / "test_language_list.ps1", HERE / "Ime.cs",
+              HERE / "test_language_list.ps1", HERE / "Ime.cs", HERE / "mode-sample.ps1", HERE / "test_mode_sample.ps1",
               QA / "windows-desktop/worker.py", QA / "windows-desktop/win32.py", QA / "windows_observer.py",
-              QA / "observe-windows-gui.py", QA / "observe-windows-input.ps1", QA / "gui/src/main.rs"]
+              QA / "observe-windows-gui.py", QA / "observe-windows-input.ps1", *FIELD_SOURCES]
     result = {"status": "failed", "source": os.getenv("GITHUB_SHA"), "run": os.getenv("GITHUB_RUN_ID"),
               "host": platform.platform(), "machine": platform.machine(), "binarySha256": digest(args.binary),
               "inputs": {p.relative_to(ROOT).as_posix(): digest(p) for p in source}}

@@ -3,12 +3,14 @@ param(
     [Parameter(Mandatory=$true)][string]$OutputFile,
     [int]$SubjectId,
     [long]$WindowHandle,
-    [string]$SubjectLog
+    [string]$SubjectLog,
+    [long]$SamplePipe
 )
 $ErrorActionPreference = 'Stop'
 if ($env:IFW_QA_ISOLATED -cne '1') { throw 'Use the disposable native GUI launcher.' }
 Add-Type -Path (Join-Path $PSScriptRoot 'Ime.cs')
 . (Join-Path $PSScriptRoot 'language-list.ps1')
+. (Join-Path $PSScriptRoot 'mode-sample.ps1')
 $result = [ordered]@{ status='failed'; mode=$Mode }
 
 function Save-Evidence {
@@ -114,6 +116,7 @@ function Set-OwnedLayout([IntPtr]$Layout) {
 
 $original = $null
 $changed = $false
+$sampleWriter = $null
 try {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
     # Compile the existing constrained ownership/click bridge without running its separate keyboard scenario.
@@ -128,6 +131,16 @@ try {
     Add-Type -TypeDefinition $source[0].Value
     $handle = [IntPtr]::new($WindowHandle)
     $threadId = [IfwQaIme.Native]::OwnedThread($handle, $SubjectId)
+    if ($SamplePipe -ne 0) {
+        $pipe = $null
+        try {
+            $pipe = [Microsoft.Win32.SafeHandles.SafeFileHandle]::new([IntPtr]::new($SamplePipe), $true)
+            $sampleWriter = [IO.FileStream]::new($pipe, [IO.FileAccess]::Write, 1, $false)
+        } catch {
+            $result.samplePipeError = $_.Exception.GetBaseException().Message
+            if ($null -ne $pipe) { $pipe.Dispose() }
+        }
+    }
     $result.subjectId = $SubjectId
     $result.threadId = $threadId
     $field = Wait-For { Get-OwnedFilename } 'normal German filename'
@@ -168,11 +181,14 @@ try {
     Send-Key 'end'
     $result.attempts = @()
     $composing = $false
+    $sample = 1
     foreach ($gesture in @('ime-on', 'alt-backquote')) {
         $attempt = [ordered]@{ modeGesture=$gesture }
         $result.attempts += $attempt
+        $attempt.beforeModeGesture = Get-IfwModeSample $sample
         Send-Key $gesture
         Start-Sleep -Milliseconds 200
+        $attempt.beforeA = Get-IfwModeSample ($sample + 1)
         $offset = (Get-Item -LiteralPath $SubjectLog).Length
         Send-Key 'a'
         $until = [DateTime]::UtcNow.AddSeconds(5)
@@ -182,11 +198,15 @@ try {
             Start-Sleep -Milliseconds 80
         } while ([DateTime]::UtcNow -lt $until)
         $attempt.preeditBeforeEnter = $composing
-        if ($trace -match '(?m)^IME commit chars=[1-9][0-9]*\r?$') { throw 'The IME committed before the observed Enter gesture.' }
+        $attempt.afterA = Get-IfwModeSample ($sample + 2)
+        if ((Get-Trace $offset) -match '(?m)^IME commit chars=[1-9][0-9]*\r?$') { throw 'The IME committed before the observed Enter gesture.' }
         if ($composing) { break }
         if ((Get-Text) -cne ($initial + 'a')) { throw 'A plain lower-case a was not the only added character.' }
+        $attempt.literalAConfirmed = $true
         Send-Key 'backspace'
         [void](Wait-For { (Get-Text) -ceq $initial } 'clean retry of the synthetic filename')
+        $attempt.originalFilenameRestored = $true
+        $sample += 3
     }
     if (-not $composing) { throw 'No nonempty native preedit arrived after an ordinary A key.' }
     $offset = (Get-Item -LiteralPath $SubjectLog).Length
@@ -197,6 +217,7 @@ try {
     $result.commitAfterEnter = $true
     $result.committedCodePoint = 'U+3042'
     $result.normalFilenameConfirmed = $true
+    $result.afterCommit = Get-IfwModeSample 7
     $result.status = 'passed'
 } catch {
     $result.error = $_.Exception.GetBaseException().Message
@@ -212,5 +233,10 @@ try {
         $result.status='failed'
         $result.restoreError=$_.Exception.GetBaseException().Message
         throw
-    } finally { Save-Evidence }
+    } finally {
+        if ($null -ne $sampleWriter) {
+            try { $sampleWriter.Dispose() } catch { $result.samplePipeCloseError = $_.Exception.GetBaseException().Message }
+        }
+        Save-Evidence
+    }
 }

@@ -71,6 +71,23 @@ both retained. [Windows x64 job](https://github.com/VoltKraft/immich-folder-watc
 | Japanese GUI result | `fe654f222d33ed91fd84438d4fae90081aeb158b3bcb6c0b144d0a3f5ac26b95` | `0857d9a38beeab3badc6a9e763c8f56dc6403159a62b08135c7ead0ddfbd17a8` |
 | Language servicing | `fa327c36031356b549d1834fc78fed04a2df44742faa91fd73c83cfb293ea7f8` | `954a73028da7580a1fc2d2c908e376cda0d9c6107412aee7c8586d5481575ee2` |
 
+On 2026-11-22 the two x64 receipts showed identical inventories (SHA-256
+`f35d7a2d071c5ac3e074388918c2a63ce723fab9ccbd49d3b7aeabcd52e44dbc`),
+13 matching observer inputs and 14 matching GUI compiler inputs. Both
+selected Japanese HKL `0x04110411`. The input method's open and conversion
+states during typing remain unknown for both runs. The IME fixture now
+requests a sample before each mode gesture, before A, after its observed
+outcome and after a successful commit. The GUI's own UI thread checks
+that the German filename and its foreground HWND have focus, then reports
+the editor's IME request, thread HKL, IMM open flag and conversion bits.
+A missing context and unavailable conversion bits have separate results.
+Zero is a reported alphanumeric mode. These readbacks add no keystrokes.
+Native repeats on Windows x64 and ARM64 are pending.
+[IMM thread ownership](https://learn.microsoft.com/en-us/windows/win32/intl/developing-ime-aware-multiple-thread-applications)
+· [IMM open state](https://learn.microsoft.com/en-us/windows/win32/api/imm/nf-imm-immgetopenstatus)
+· [conversion status](https://learn.microsoft.com/en-us/windows/win32/api/imm/nf-imm-immgetconversionstatus)
+· [conversion flags](https://learn.microsoft.com/en-us/windows/win32/intl/ime-conversion-mode-values).
+
 The revised IME and ordinary text observers start child processes in their
 retained evidence directory. Profile, cache and temporary data use the
 fresh private profile. A Windows file lock can delay cleanup for up to 20
@@ -114,7 +131,7 @@ tags, retains the input-method identifiers, and still requires actual
 preedit, commit and field readback for acceptance.
 [Native servicing run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
 
-Three portable regression tests check input-service eligibility, the independent preedit/commit/final-text conditions and the executable/source receipt. PowerShell 7.7 parsed the script and compiled both the TSF/Win32 observer and the existing shared ownership bridge. The 64-bit TSF profile structure measured 88 bytes. The local Linux workstation supplies these static checks. An actual Windows trace and UIA value are required for native acceptance.
+Five portable regression tests cover input-service eligibility, preedit, commit, field readback, source binding, the observation pipe and cleanup. PowerShell 7.7 checked the response parser with absent contexts, unsupported flags, and partial, repeated and wrong-thread responses. Rust 1.100 passed rustfmt and Clippy for the ordinary and retained GUI builds on both MSVC targets from Linux. The earlier PowerShell check compiled the TSF/Win32 observer and the shared ownership bridge and measured the 64-bit TSF profile structure at 88 bytes. Native acceptance requires the Windows trace and UIA value.
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/windows-ime -p 'test_*.py'

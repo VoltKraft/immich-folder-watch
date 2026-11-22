@@ -14,7 +14,7 @@ GUI = QA / "gui"
 AREA = ROOT / "artifacts/rust/windows-warm-window"
 TARGETS = ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")
 ORIGINALS = {
-    "main.rs": "5c8f2421c723ffa06edb11dc02a6399cd32fe4b2df391b4db3d3db801b6cbe58",
+    "main.rs": "962dd73f2123997f9e44d7efd27cb2dd70fc602ee18b2caa8aa243fd1ea8a1b1",
     "native_window.rs": "68f5025187929bea6121de9b5aca6d821a80cf0156406837fa9188c71399641f",
     "graphics.rs": "d13c3087261770a73f3e904d677b71ace1deba6efce47f68061f3a40184d828e",
 }
@@ -50,8 +50,10 @@ def stage(project):
         subprocess.run(command, cwd=gui, env=env, check=True)
     for name in ("loop_wake.rs", "windows_present.rs", "ui_trace.rs"):
         shutil.copyfile(HERE / name, gui / "src" / name)
-    # The implicit library target isolates three read-only system queries from the unsafe-free GUI.
-    shutil.copyfile(HERE / "win32_clock.rs", gui / "src/lib.rs")
+    # Extend the canonical read-only Win32 queries with the comparison's existing timing queries.
+    shutil.copyfile(HERE / "win32_clock.rs", gui / "src/win32_clock.rs")
+    with (gui / "src/lib.rs").open("a", encoding="utf-8", newline="\n") as library:
+        library.write("\nmod win32_clock;\npub use win32_clock::{counter, frequency, thread_id};\n")
     return gui
 
 
