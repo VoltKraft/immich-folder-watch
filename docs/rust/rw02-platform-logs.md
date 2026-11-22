@@ -51,7 +51,10 @@ The Ubuntu archive's daemon hash was
 The successful local receipt `noble-native-cgroup-01/result.json` had SHA-256
 `12e26e018ff2969a60ca78a5bf43159ebc198257754e5e60ff17de7f50fbc35b`.
 Use `--journal-system-root` to select an extracted distribution of the native
-architecture. The hosted Ubuntu checks still need a repeat with this change.
+architecture. At `45dc03b` and `d403fee` both hosted Ubuntu architectures
+passed with the read-only cgroup mapping. Each private journal returned the
+six original records with priorities 7, 7, 6, 4, 3 and 2 from a writer
+with zero effective capabilities. [Four-target repeat](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
 [Hosted jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350)
 and [systemd 255 journal initialization](https://github.com/systemd/systemd/blob/v255/src/journal/journald-server.c#L2455-L2457).
 

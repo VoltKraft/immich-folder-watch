@@ -1,5 +1,58 @@
 # Project Status
 
+## Native rewrite assessments and independent storage review (2026-11-22)
+
+RW-01 is accepted. RW-02 remains the active package of
+[M-RUST-IMPLEMENTATION-20261114](project.md#m-rust-implementation-20261114).
+All eight archives from `45dc03b` and `d403fee` matched the published
+digests. Both Ubuntu targets passed all eleven X11 resource limits, actual
+Orca speech and three password masks under X11 and Wayland, and six native
+journal readbacks. Both Windows targets passed NVDA speech and clipboard at
+`45dc03b`. ARM64 repeated that pass. In the x64 repeat the UI Automation
+range read after Delete failed. The ordinary Windows editor passed all
+three mixed-text cases on x64 and one on ARM64. Cross-session exclusion,
+native Japanese composition, mixed-DPI/RDP and interactive Windows tray
+activation remain open. [Archived results](rust/rw02-native-gui.md#native-follow-up-at-d403fee).
+
+The retained Windows candidate reduced visible working set to about 60 MiB
+on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
+Native 100,000-file timings still exceeded the WPF close/reopen limits.
+Both Windows watch handles opened by ID, but the first asynchronous
+notification call returned error 87 before any event arrived.
+[Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
+
+Revision `26ed5dd` compares two non-tearing DX12 presentation modes and
+records their actual timing during scans. Revision `27ade4b` records
+guarded keyboard submission and refreshes both Windows text interfaces
+after Delete. Revision `e575bb3` accepts the observed token flag and
+Japanese language representations in the respective native fixtures.
+The [strict display checks](rust/rw02-windows-display.md) at `6a88744`
+require a real mixed-DPI or RDP session when that qualification is selected.
+The [filesystem adapter](rust/rw02-filesystem.md) at `f538828` declines
+missing file identifiers. All eighteen Linux filesystem checks and Clippy
+for Linux x64 and both Windows targets passed.
+
+At `966b861` the Linux x64 storage fixture passed four real process kills,
+two SQLite page limits and two 8 MiB tmpfs exhaustion cases. An independent
+reviewer replayed all eight recoveries and 208 C# assertions, rejected 16
+altered snapshots in both languages and verified all 453 evidence hashes.
+The two previous review findings are closed for this experiment. The
+production migration, installed rollback and three other native executions
+remain open. [Storage sources and evidence](rust/rw02-storage-faults.md).
+
+The combined dependency assessment at `f22015a` built the native
+Linux x64 executable offline and relinked a changed Wayland binding. A real
+Plasma panel at `26b7aac` reopened the hidden application twice. At `6f55f36`
+the visible panel followed system light, dark and high-contrast settings
+and recovered after a portal service restart. The updated assessment
+exercises these fixtures on their applicable targets. Next verify the
+native runs for Windows notification delivery, GUI readback, presentation
+during real scans, Japanese input and cross-session ownership. The Windows
+console topology and supported Linux portal lock deployment each still need
+an appropriate runtime environment. [Combined build](rust/rw02-combined-profile.md),
+[Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and
+[acceptance matrix](rust/acceptance.md).
+
 ## Windows directory identity at cd1d7d7 (2026-11-21)
 
 Both Windows runners traced the failed subscription to `ReOpenFile`.

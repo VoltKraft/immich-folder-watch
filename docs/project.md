@@ -58,6 +58,10 @@ remains a behavioral oracle throughout; the candidate cannot require its runtime
 egui/eframe is the preferred candidate, subject to the [RW-02 feasibility decision](rust/rw02-stack-decision.md). Normal
 implementation decisions are delegated; fundamental changes require documented
 failed requirements and an evidence-based alternative, without relaxing criteria.
+The [combined dependency profile](rust/rw02-combined-profile.md) records the
+selected feasibility inputs, exact target features and offline reconstruction.
+The [native evidence matrix](rust/acceptance.md#native-evidence-matrix)
+tracks their observed coverage across all four targets.
 
 The following acceptance criteria are fixed for this run. Their evidence is
 conjunctive: a missing required platform/test/artifact remains open.

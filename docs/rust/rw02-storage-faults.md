@@ -9,6 +9,18 @@ isolation and exact scenario steps.
 
 ## Engine and workload
 
+On 2026-11-22 an independent reviewer replayed all eight Linux x64
+recoveries at `966b861317559e85c7f50eede87d65d215868560`. The reviewer
+verified 453 evidence hashes, 138 source bindings, 208 C# assertions and
+16 expected Rust/C# hash-mismatch rejections. The producer hash survived
+all phase and final checks on each original snapshot. The review closed
+the two earlier findings about the initial backup hash and documented
+timeouts. Independent report SHA-256
+`02534d16f4abc9c24e31199af88eafc5c35165d7f47877b5d4e88a058823ee60`,
+source run manifest `a0c5035758144586b3e743d4db04769c9dcdd9be2bcfead88e72560827b45492`.
+This covers the Linux x64 feasibility experiment. The product migration and
+installed recovery require separate review.
+
 The existing development assessment compiles unchanged as the seed executable.
 It imports the actual C#-generated native SQL/JSON corpus and exercises all four
 tables, both path-casing modes, Unicode paths, identities, tombstones, repair

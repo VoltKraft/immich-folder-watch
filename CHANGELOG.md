@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a pinned Rust feasibility workspace for window lifecycle, legacy value codecs, handle-bound filesystem operations and realtime framing. Add native differential tests and an isolated 100,000-file desktop benchmark.
 - Add isolated Rust desktop, SQLite and TLS/WebSocket assessments with audited inputs, native window observations and C# readback of Rust-written WAL backups.
 - Add native Linux and Windows file-watch probes with overflow recovery. Exercise real screen readers, platform logs, document-portal file locking, and Windows display and resource behavior in the rewrite assessment.
+- Add an offline combined Rust dependency build, native SQLite crash and full-disk recovery checks, and Linux desktop assessments for system colors and activation through the visible Plasma tray icon.
 
 ## [3.0.4] - 2026-11-13
 

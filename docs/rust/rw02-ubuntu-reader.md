@@ -1,6 +1,6 @@
 # RW-02 Ubuntu screen reader
 
-The ordinary Rust filename and password controls produced real Orca speech on X11 and Mutter Wayland in the isolated Ubuntu 24.04.5 x64 userspace. Both runs used Ubuntu's native Mesa, AT-SPI, Speech Dispatcher and eSpeak NG on the local Fedora kernel. The dedicated display, session bus and ALSA file sink were inside the test namespaces. The initial local confirmation covers x64. Ubuntu ARM64 has reviewed package inputs for a separate native execution. [Canonical GUI assessment](rw02-native-gui.md)
+The ordinary Rust filename and password controls produced real Orca speech on X11 and Mutter Wayland in the isolated Ubuntu 24.04.5 x64 userspace. Both runs used Ubuntu's native Mesa, AT-SPI, Speech Dispatcher and eSpeak NG on the local Fedora kernel. The dedicated display, session bus and ALSA file sink were inside the test namespaces. Separate native Ubuntu x64 and ARM64 runs reproduced the observations below. [Canonical GUI assessment](rw02-native-gui.md)
 
 ## Native observation
 
@@ -16,6 +16,26 @@ Ubuntu Orca 46.1 reported `English push button.` on the original X11 run. Its fi
 | Fedora Wayland | `gui-run/wayland-wc2pnfs9` | 624,430 | 3 |
 
 Directories are relative to `artifacts/rust/`. Each reported interval includes both speech samples and gaps, and each passed its non-silence check. All four runs passed the ordinary lifecycle, keyboard, language-switch, masked AT-SPI and clipboard checks. Ubuntu used GUI SHA-256 `a77706470f8dca72751b1cf0ecc3a52520788f21ee96d5a8b0f851799b7c5efe`. Fedora used `80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`. Neither run supplied a Mesa presentation override. The 49 retained local receipts cover both originals, four successes, the private recordings and their source metadata. [Local checksum manifest](../../tools/rust-qa/ubuntu-reader/local-x64.sha256)
+
+## Hosted Ubuntu x64 and ARM64
+
+On both revisions each backend produced the four German/English control
+announcements in order, three individual password masks and non-silent audio.
+For each row the X11 and Wayland manifests bound nine original inputs each,
+including Orca's log, the raw recording and the Rust application's log.
+Their hashes were checked again against the uploaded files.
+
+| Revision | Native Ubuntu | Measured X11 audio bytes | Measured Wayland audio bytes | SHA-256 of ubuntu-reader.json |
+| --- | --- | ---: | ---: | --- |
+| 45dc03b | x64 | 467742 | 752520 | `15dede214ddcf2483c4564499e095a7a4cd1272aa4ed41ab07065af7599f0b99` |
+| 45dc03b | ARM64 | 569572 | 687440 | `25c355fafa0724aac457d4eb610cf8c6a850e8bcabeff5b669f62a05c39c38c7` |
+| d403fee | x64 | 507308 | 687440 | `1720b98f1cff3a55a36549dccb503b201eaa9f299cd38581c09edc4d2e009020` |
+| d403fee | ARM64 | 565116 | 687440 | `0390224bb4f46b913cda7327af2a1146431a1e9e6869fe51bb34288180a0d225` |
+
+The byte counts describe each measured interval. The verifier also examined
+the protected-input and speech initialization records and the actual signal.
+[First run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44950398558)
+and [repeat](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
 
 ## Ubuntu test packages
 

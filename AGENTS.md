@@ -175,6 +175,10 @@ to reconcile project decisions, defaults, and recorded state.
   when changing the candidate desktop profile.
   Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md)
+  and the original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
+  The [Linux appearance](docs/rust/rw02-appearance.md) and
+  [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
   Use the dedicated native service fixtures with disposable profiles. The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.

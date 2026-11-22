@@ -142,6 +142,54 @@ passed at this revision. [Native feasibility](https://github.com/VoltKraft/immic
 · [Compatibility oracle](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423415)
 · [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945427967).
 
+## Native follow-up at d403fee
+
+Two consecutive runs exercised the same retained-window and reader revisions.
+Each archive matched the SHA-256 published by Actions and passed its ZIP
+integrity check. The second run used `d403feefce23cad5357bf3fb0b49af03f012333e`.
+[First run at 45dc03b](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44950398558)
+and [repeat at d403fee](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
+
+| Target | Repeat archive ID | Entries | SHA-256 |
+| --- | ---: | ---: | --- |
+| Linux x64 | 14728361571 | 716 | `15150629dd51f2fdc0d5b9792f4f46a6ff0a49ac7c989e00cb7aaf0c12d383e6` |
+| Linux ARM64 | 14728287422 | 716 | `eba8a926a0d9e7c161f58c288e2e10854f3b1106a34efad1306cb5c832c15f44` |
+| Windows x64 | 14728933001 | 646 | `6e4391e0eebe43292f538115201178642a8395fba1aaece3900733fa20387c17` |
+| Windows ARM64 | 14729417789 | 658 | `454cf16b2d6a637d0fcce5b20c9bb082bd3e7fcc68c052e2f951bd46be9455ca` |
+
+On each Ubuntu target the paired X11 comparison again passed all eleven
+budgets, including three scans of 100,000 actual files. Orca produced four
+ordered control announcements and three password masks on both X11 and
+Wayland. Each system journal retained six correctly prioritized records.
+Both jobs stopped the separate Noble portal rebuild when Meson's private
+Python module could not be imported. A corrected local x64 rebuild repeated
+the grant comparisons. [Orca](rw02-ubuntu-reader.md#hosted-ubuntu-x64-and-arm64),
+[journal](rw02-platform-logs.md) and [Noble portal](rw02-portal-noble.md).
+
+Both Windows targets met the retained GUI's memory and idle budgets. The real
+scan exposed slower close/reopen responses against WPF. The first run completed
+the native NVDA clipboard gesture on both targets. ARM64 repeated that pass.
+On x64 the second run produced all seven speech cues and submitted Delete
+to the owned window. Its selection-range read raised an error before the
+clipboard round trip finished. The separate ordinary-field suite passed all
+three editing cases on x64. On ARM64 it painted the eight glyphs and selected
+the intended character in both Arabic cases, then failed before recording
+the resulting filename. The standalone font stress passed on both architectures
+in the repeat. [Retained window](rw02-windows-window.md),
+[NVDA](rw02-windows-reader.md) and [ordinary editor](rw02-windows-text.md).
+
+Both Windows hosts exposed a single 1024 × 768 console monitor at 96 DPI.
+The x64 original-desktop frame was observable. WWAHost covered the ARM64
+original-desktop field. Neither archive observed an interactive tray activation
+or an independent notification UIA element. On x64 Shell accepted the icon and
+reported the balloon shown. ARM64 exercised the visible fallback. Both
+Japanese typing trials restored the original language list after Windows
+reported the installed Japanese language tag as `ja`. Composition and
+mixed-DPI/RDP rendering remain open. Both cross-session trials stopped
+before starting a writer while reading a one-byte token flag.
+[Shell](rw02-windows-services.md), [display](rw02-windows-display.md),
+[Japanese input](rw02-windows-ime.md) and [writer fixture](rw02-cross-session.md).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

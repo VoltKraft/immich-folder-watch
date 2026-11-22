@@ -106,6 +106,7 @@ the matching toolchains on `PATH`. Use fresh output directories for each run.
 
 ```bash
 python3 tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --output artifacts/rust/storage-native/test
+python3 tools/rust-qa/storage-faults/run.py x86_64-unknown-linux-gnu --cargo-home artifacts/rust/storage-cargo-home --output artifacts/rust/storage-faults/test --tmpfs
 python3 tools/rust-qa/yaml/run.py x86_64-unknown-linux-gnu --output artifacts/rust/yaml-assessment/runs/test
 python3 tools/rust-qa/instance/run.py x86_64-unknown-linux-gnu --output artifacts/rust/instance-native/test
 python3 tools/rust-qa/realtime/run.py x86_64-unknown-linux-gnu --output artifacts/rust/realtime-native/test
@@ -123,6 +124,16 @@ control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
+
+The [crash and storage exhaustion fixture](rust/rw02-storage-faults.md)
+uses separate copies for both language verifiers and preserves each
+original backup. On Linux its private mount requires the documented
+namespace launcher. The [combined profile](rust/rw02-combined-profile.md)
+builds from verified local archives and exercises an offline Linux relink.
+The [appearance observer](rust/rw02-appearance.md) reads actual pixels after
+portal changes and the [Plasma fixture](rust/rw02-plasma.md) activates the
+visible branded panel icon. Use the individual guides for their native
+prerequisites and fresh output directories.
 
 The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
 Shell and separate compositor/client traces. Fedora uses IBus Anthy by
