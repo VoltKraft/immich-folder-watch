@@ -8,6 +8,7 @@ import ctypes as c
 import json
 from pathlib import Path
 import subprocess
+import struct
 import sys
 from contextlib import ExitStack
 
@@ -25,6 +26,64 @@ def require_file_id(identifier):
 def idle_cancel_passed(result):
     return (result.get("sameDirectory") is True and result.get("idleWaitResult") == 258
             and result.get("cancelError") == 0 and result.get("completionError") == 995)
+
+
+def decode_notifications(data):
+    """Decode a bounded completed FILE_NOTIFY_INFORMATION buffer for evidence."""
+    if not 0 < len(data) <= 32768:
+        raise ValueError("Invalid native notification buffer size")
+    position, names = 0, []
+    while True:
+        if position + 12 > len(data):
+            raise ValueError("Incomplete native notification header")
+        next_offset, action, name_bytes = struct.unpack_from("<III", data, position)
+        end = position + 12 + name_bytes
+        if not name_bytes or name_bytes % 2 or end > len(data) or action not in range(1, 6):
+            raise ValueError("Invalid native notification name or action")
+        name = data[position + 12:end].decode("utf-16-le")
+        names.append({"action": action, "name": name})
+        if not next_offset:
+            if len(data) - end > 3:
+                raise ValueError("Unaccounted native notification bytes")
+            return names
+        if (next_offset < 12 + name_bytes or next_offset % 4
+                or position + next_offset >= len(data)):
+            raise ValueError("Invalid native notification offset")
+        position += next_offset
+
+
+def flat_notification_evidence(trace, before, nested, direct):
+    """Qualify actual flat-watch records; generation changes alone prove no name."""
+    batches, previous = [], 0
+    if not 1 <= before <= nested < direct:
+        raise ValueError("Flat notification observation generations differ")
+    for line in trace.splitlines():
+        fields = line.split()
+        if len(fields) != 4 or fields[0] != "WATCH_NOTIFY":
+            raise ValueError("Incomplete or truncated flat notification diagnostics")
+        generation, count = map(int, fields[1:3])
+        if not previous < generation <= direct or not 0 < count <= 32768 or len(fields[3]) != count * 2:
+            raise ValueError("Flat notification count or generation differs")
+        data = bytes.fromhex(fields[3])
+        notifications = decode_notifications(data)
+        for row in notifications:
+            allowed = row == {"action": 3, "name": "nested"}
+            if generation > nested:
+                allowed |= row["name"] == "flat.jpg" and row["action"] in (1, 3)
+            if not allowed:
+                raise ValueError("Out-of-scope or unexpected flat notification: " + repr(row))
+        batches.append({"generation": generation, "bytes": count, "hex": fields[3],
+                        "notifications": notifications})
+        previous = generation
+    active = [row for row in batches if row["generation"] > before]
+    if len(active) != direct - before or any(
+            row["generation"] != before + index for index, row in enumerate(active, 1)):
+        raise ValueError("A flat notification generation lacks its native record")
+    direct_rows = [event for row in active if row["generation"] > nested for event in row["notifications"]]
+    if {"action": 1, "name": "flat.jpg"} not in direct_rows:
+        raise ValueError("The flat watch did not report its direct child creation")
+    return {"batches": batches, "parentMetadataObserved": nested > before,
+            "directChildObserved": True}
 
 
 def registration_controls(root):
@@ -119,25 +178,6 @@ def trial(root, method):
         return {"status": hex(result & 0xffffffff), "bytes": status.information,
                 "value": value.value if result == 0 and status.information == 4 else None}
 
-    def decode(buffer, count):
-        import struct
-        data, position, names = bytes(buffer)[:count], 0, []
-        while position < len(data):
-            if position + 12 > len(data):
-                raise RuntimeError("Incomplete native notification header")
-            next_offset, action, name_bytes = struct.unpack_from("<III", data, position)
-            if name_bytes % 2 or position + 12 + name_bytes > len(data):
-                raise RuntimeError("Incomplete native notification name")
-            name = data[position + 12:position + 12 + name_bytes].decode("utf-16-le")
-            names.append({"action": action, "name": name})
-            if not next_offset:
-                break
-            if (next_offset < 12 + name_bytes or next_offset % 4
-                    or position + next_offset >= len(data)):
-                raise RuntimeError("Invalid native notification offset")
-            position += next_offset
-        return names
-
     with ExitStack() as outer:
         original_handle = create(str(root), access, share, None, 3, flags, None)
         if original_handle == invalid:
@@ -219,7 +259,7 @@ def trial(root, method):
                     result["completionError"] = 0 if ok else c.get_last_error()
                     result["bytes"] = count.value
                     if ok and not cancel_only:
-                        result["notifications"] = decode(buffer, count.value)
+                        result["notifications"] = decode_notifications(bytes(buffer)[:count.value])
                         result["createdNameObserved"] = any(row["name"] == name for row in result["notifications"])
                     result["passed"] = (idle_cancel_passed(result) if cancel_only else
                         result["sameDirectory"] and bool(ok) and result.get("createdNameObserved", False))

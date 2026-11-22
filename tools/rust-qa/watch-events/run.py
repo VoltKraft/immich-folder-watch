@@ -125,6 +125,13 @@ class Subject:
             require(self.process.wait(timeout=5) == 0, "Watch teardown failed")
         return int(micros)
 
+    def completed_diagnostics(self):
+        require(self.process.poll() is not None, "Read native diagnostics only after the subject exits")
+        self.diagnostics.seek(0)
+        data = self.diagnostics.read(2_200_001)
+        require(len(data) <= 2_200_000, "Native diagnostics exceeded their bounded evidence size")
+        return data.decode("utf-8")
+
     def close(self):
         try:
             self.process.stdin.close()
@@ -244,15 +251,13 @@ def cancelled_periodic_scan(binary, area, rows):
 
 
 def mutation_cases(binary, area, rows):
-    for name in ("create", "modify", "rename", "delete", "nested-create", "direct-scope"):
+    for name in ("create", "modify", "rename", "delete", "nested-create"):
         work = fixture(area, name)
         source = work / "source"
         sample = source / "original.jpg"
         if name in ("modify", "rename", "delete"):
             sample.write_text("first", encoding="utf-8")
-        if name == "direct-scope":
-            (source / "nested/item.jpg").write_text("original", encoding="utf-8")
-        with observe(binary, work, "direct" if name == "direct-scope" else "tree") as (subject, ready):
+        with observe(binary, work) as (subject, ready):
             if name == "create":
                 sample.write_text("first", encoding="utf-8")
             elif name == "modify":
@@ -266,15 +271,48 @@ def mutation_cases(binary, area, rows):
             expected = {
                 "create": {"original.jpg": "first"}, "modify": {"original.jpg": "second-content"},
                 "rename": {"renamed.jpg": "first"}, "delete": {},
-                "nested-create": {"nested/item.jpg": "nested"}, "direct-scope": {},
+                "nested-create": {"nested/item.jpg": "nested"},
             }[name]
-            if name == "direct-scope":
-                state = subject.snapshot(f"WAIT {ready['generation']} 350")
-                require(state["generation"] == ready["generation"], "A flat subscription reported a nested file")
-            else:
-                state = subject.changed(ready)
-            complete(subject, source, expected, recursive=name != "direct-scope")
+            state = subject.changed(ready)
+            complete(subject, source, expected)
             rows[name] = {"state": state, "inventory": expected, "stopMicros": subject.stop()}
+    direct_scope(binary, area, rows)
+
+
+def direct_scope(binary, area, rows):
+    work = fixture(area, "direct-scope")
+    source = work / "source"
+    (source / "nested/item.jpg").write_text("original", encoding="utf-8")
+    with observe(binary, work, "direct") as (subject, _):
+        subject.settle()
+        complete(subject, source, {}, recursive=False)
+        before = subject.snapshot("STATE")
+        require(before["reasons"] == 0 and before["generation"] == before["acknowledged"],
+                "The flat subscription did not start with a clean inventory")
+        (source / "nested/item.jpg").write_text("nested", encoding="utf-8")
+        subject.snapshot(f"WAIT {before['generation']} 350")
+        subject.settle()
+        nested = subject.snapshot("STATE")
+        require(not nested["requiresRegistration"] and nested["reasons"] in (0, 2),
+                "The flat subscription lost coverage during the nested mutation")
+        complete(subject, source, {}, recursive=False)
+        (source / "flat.jpg").write_text("direct", encoding="utf-8")
+        subject.changed(nested)
+        subject.settle()
+        direct = subject.snapshot("STATE")
+        require(not direct["requiresRegistration"] and direct["reasons"] == 2,
+                "The flat subscription lost its direct-child change")
+        complete(subject, source, {"flat.jpg": "direct"}, recursive=False)
+        row = rows["direct-scope"] = {"before": before, "nestedMutation": nested, "directChild": direct,
+                                       "nestedMutationInventory": {}, "inventory": {"flat.jpg": "direct"},
+                                       "stopMicros": subject.stop()}
+        if os.name == "nt":
+            from windows_control import flat_notification_evidence
+            row["rawNotificationTrace"] = subject.completed_diagnostics()
+            row["nativeNotifications"] = flat_notification_evidence(
+                row["rawNotificationTrace"], before["generation"], nested["generation"], direct["generation"])
+        else:
+            require(nested["generation"] == before["generation"], "A flat inotify subscription changed for a nested file")
 
 
 def queue_and_inventory(binary, area, rows):

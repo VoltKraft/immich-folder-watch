@@ -1,6 +1,7 @@
 use super::windows_status::{self, ERROR_NOTIFY_ENUM_DIR, Next};
 use super::{Scope, Shared};
 use std::ffi::c_void;
+use std::fmt::Write as _;
 use std::fs::File;
 use std::io;
 use std::os::windows::fs::MetadataExt;
@@ -206,6 +207,33 @@ fn event() -> io::Result<OwnedHandle> {
     Ok(unsafe { OwnedHandle::from_raw_handle(handle) })
 }
 
+fn trace_notification(buffer: &[u32], count: u32, generation: u64, traced: &mut usize) {
+    // Fixture-only diagnostics: preserve the actual completed bytes without
+    // filtering wakeups. At most 32 native buffers are emitted per flat watch.
+    if *traced == 32 {
+        eprintln!("WATCH_NOTIFY_TRUNCATED");
+        *traced += 1;
+        return;
+    }
+    if *traced > 32 {
+        return;
+    }
+    *traced += 1;
+    if count as usize > size_of_val(buffer) {
+        eprintln!("WATCH_NOTIFY_INVALID_COUNT {count}");
+        return;
+    }
+    let mut line = format!("WATCH_NOTIFY {generation} {count} ");
+    for byte in buffer
+        .iter()
+        .flat_map(|word| word.to_ne_bytes())
+        .take(count as usize)
+    {
+        let _ = write!(line, "{byte:02x}");
+    }
+    eprintln!("{line}");
+}
+
 pub(super) struct Stop(Arc<OwnedHandle>);
 
 impl Stop {
@@ -287,6 +315,10 @@ impl Backend {
 
     pub(super) fn run(self, shared: &Shared, ready: SyncSender<()>) -> io::Result<()> {
         let mut ready = Some(ready);
+        let trace = !self.tree
+            && std::env::var_os("IFW_WATCH_DIAGNOSTICS").as_deref()
+                == Some(std::ffi::OsStr::new("1"));
+        let mut traced = 0;
         // DWORD alignment and a 32-KiB buffer also satisfy the documented remote limit.
         let mut buffer = [0u32; 8192];
         let handles = [self.stop.as_raw_handle(), self.completed.as_raw_handle()];
@@ -338,9 +370,14 @@ impl Backend {
             match signaled {
                 0 => return self.cancel_and_drain(pending),
                 1 => {
-                    if windows_status::completed(self.completion(pending), shared)?
-                        == Next::ReplaceAfterInventory
-                    {
+                    let completed = self.completion(pending);
+                    let count = completed.as_ref().ok().copied();
+                    let next = windows_status::completed(completed, shared)?;
+                    if trace && let Some(count) = count {
+                        let generation = shared.state.lock().unwrap().snapshot.generation;
+                        trace_notification(&buffer, count, generation, &mut traced);
+                    }
+                    if next == Next::ReplaceAfterInventory {
                         return Ok(());
                     }
                 }

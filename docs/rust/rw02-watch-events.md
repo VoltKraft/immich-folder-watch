@@ -249,7 +249,7 @@ still alive. Both MSVC targets passed Clippy with warnings denied. Fedora
 x64 passed all eight unit tests and fifteen Linux scenarios in
 `independent-lease-guard-01`, and a separate live fixture answered a state
 query after joining. Native Windows results for the additional lease scenario
-are pending.
+were pending in those runs; the later x64 result below exercises it.
 [Fixture control](../../tools/rust-qa/watch-events/src/main.rs) and [external observer](../../tools/rust-qa/watch-events/run.py).
 
 ### Dedicated asynchronous object candidate (2026-11-22)
@@ -296,7 +296,8 @@ bounded child process;
 pending buffers are drained before release, or that isolated process is killed
 after 20 seconds. These controls are diagnostic evidence and do not substitute
 for the Rust worker's independent scenarios. The handle-relative NT route is
-an experiment, not a selected fallback. Native Windows results remain pending.
+an experiment, not a selected fallback. Complete native Windows acceptance
+remains pending; the partial x64 observations follow below.
 
 Both MSVC targets passed Clippy with warnings denied for this candidate. The
 native Fedora x64 guard passed ten library tests, three Python control tests
@@ -305,6 +306,58 @@ receipt is
 `artifacts/rust/watch-events/x86_64-unknown-linux-gnu/direct-object-guard-03/result.json`,
 SHA-256 `d5193fbf49c4e8f5abbd6e411710915ae310cb328a2b08745312897f6818cb76`.
 These are compilation/Linux results, not Windows notification acceptance.
+
+### Native direct-object result and flat scope diagnosis (2026-11-22)
+
+At `a66e0456a85a62844e2de2fd155aaeac3577f87c`, the Windows Server x64
+fixture passed ten library tests, three Python controls, pending-I/O shutdown,
+the independent notification-handle lease and the create, modify, rename,
+delete and nested-create scenarios. The lease trial denied `DELETE` with error
+32 after the caller handles closed, observed the nested write, then restored
+`DELETE` access and renamed the directory while the joined subject remained
+alive. The standalone direct and empty-name NT acquisitions each delivered a
+notification and completed an explicit idle cancellation. By-ID acquisition
+still failed at the first notification submission with error 87 despite the
+same `0x100081` requested/queried access and asynchronous mode; `ReOpenFile`
+still returned error 5.
+
+The run failed at the flat-scope assertion before recording that scenario's
+native names. That assertion equated any generation increase with a nested
+file notification. Microsoft defines notification names relative to the watched
+handle and action 3 as a modification that may concern metadata. A flat watch
+can therefore observe an immediate entry such as the `nested` directory;
+this is distinct from observing `nested/item.jpg`. The archived result cannot
+distinguish those cases, so a parent-directory metadata event remains a
+hypothesis and this run remains failed.
+[Directory scope](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
+and [notification records](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-file_notify_information).
+
+The follow-up retains raw completed bytes from the actual Rust flat watch only
+when fixture diagnostics are enabled, capped at 32 buffers of at most 32 KiB.
+It does not filter wakeups or change rescan, overflow or cancellation decisions.
+The observer requires every new generation to have its bounded native record.
+For the nested-write phase only action 3 for the immediate `nested` entry is
+accepted; a nested filename, unknown action/name, missing record or truncated
+trace fails. A separate direct-child creation must produce an actual added
+record for `flat.jpg`. Complete nonrecursive inventories must exclude the
+nested file both before and after this direct write. The Linux quiet-nested
+assertion remains in place. Failed record qualification preserves the raw
+trace and states in the receipt.
+
+The follow-up passed ten library tests, six Python controls and fifteen native
+Fedora x64 scenarios. Both MSVC targets passed Clippy with warnings denied.
+`artifacts/rust/watch-events/x86_64-unknown-linux-gnu/flat-notification-guard-01/result.json`
+has SHA-256 `afefd9df972c060093932eab57b75c0813f36ce7ec7adbc96f4bcc809a2b0563`.
+Its native Windows raw-record observations remain pending.
+
+The archived x64 ZIP from [run 45034293004](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293004)
+has verified SHA-256
+`e775d3f2a090f36123de610a76a24fc8ea6ecd632c5a3285db55c9384603f97d`;
+its `result.json` has SHA-256
+`684bb1d66a737ace2e6c092021487bc4810fb0c59a01be67a998a3f3a792e025`.
+CRC and inner digest verification passed. All watch source digests match the
+commit exactly. The toolchain JSON and verification script match its content
+with the Windows checkout's CRLF representation.
 
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256
