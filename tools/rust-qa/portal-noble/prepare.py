@@ -3,6 +3,7 @@ import concurrent.futures
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -87,6 +88,37 @@ def merge(base, added, view, prefix=Path()):
             dest.symlink_to(os.readlink(lower))
         else:
             dest.symlink_to("/noble-usr/" + (prefix / name).as_posix())
+
+
+def observe_split_python(osroot, prepared, output):
+    """Exercise the hosted package split using the byte-identical lower Python in a fresh local merged view."""
+    lower, upper = osroot / "usr", prepared / "extra/usr"
+    view = prepared / "usr/bin"
+    name = os.readlink(lower / "bin/python3")
+    if not re.fullmatch(r"python3\.\d+", name):
+        raise ValueError("Expected a versioned Python executable in the Noble runtime")
+    relative = "bin/" + name
+    target = view / name
+    module = "lib/python3/dist-packages/mesonbuild/mesonmain.py"
+    if (view.is_symlink() or os.readlink(view / "python3") != name or os.readlink(target) != "/extra-usr/" + relative
+            or not (upper / module).is_file() or (lower / module).exists()
+            or sha(lower / relative) != sha(upper / relative)):
+        raise ValueError("The local fixture requires identical Python executables and upper-layer-only Meson")
+    # Only this generated link inside the fresh private compiler view changes. Both distributions stay read-only.
+    target.unlink()
+    target.symlink_to("/noble-usr/" + relative)
+    cmd = guest(osroot, prepared / "usr", extra=["--ro-bind", str(upper), "/extra-usr", "--"])
+    inspect = ("import importlib.util, json, os, sys; "
+               "print(json.dumps(dict(prefix=sys.prefix, executable=os.readlink('/proc/self/exe'), "
+               "searchPath=sys.path, mesonFound=importlib.util.find_spec('mesonbuild') is not None)))")
+    before = json.loads(subprocess.check_output(cmd + ["/usr/bin/python3", "-c", inspect], text=True, timeout=15))
+    result = subprocess.run(cmd + ["/usr/bin/meson", "--version"], capture_output=True, text=True, timeout=15)
+    before.update(mesonExit=result.returncode, mesonError=result.stderr, interpreterSha256=sha(lower / relative))
+    (output / "split-python-control.log").write_text(json.dumps(before, indent=2) + "\n")
+    if (before["prefix"] != "/noble-usr" or before["executable"] != "/noble-usr/" + relative or before["mesonFound"]
+            or result.returncode != 1 or "ModuleNotFoundError: No module named 'mesonbuild'" not in result.stderr):
+        raise ValueError("The original namespace did not reproduce the hosted missing Meson module")
+    return before
 
 
 def prepare(osroot, aptroot, output, arch, download):

@@ -11,7 +11,7 @@ import time
 
 from build import pair
 from inputs import ART, BASE, HERE, ROOT, VERSION, sha, source_inputs
-from prepare import guest, prepare
+from prepare import guest, observe_split_python, prepare
 
 sys.path.insert(0, str(HERE.parent / "linux-services"))
 from dotnet_build import reference_sdk
@@ -61,8 +61,10 @@ def run_probe(osroot, out, portal, reader, expected, binary_source):
                 observation=sha(out / "observation.json"), inputs=sha(out / "input.json"))
 
 
-def main(hosted, download):
+def main(hosted, download, split_python=False):
     if hosted:
+        if split_python:
+            raise ValueError("The layer-split control uses the local immutable Noble fixture")
         if os.getenv("GITHUB_ACTIONS") != "true" or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted":
             raise ValueError("Hosted mode requires a disposable native GitHub runner")
         osroot = aptroot = Path("/")
@@ -95,6 +97,8 @@ def main(hosted, download):
         facts["control"] = authentic
         build = out / "build"
         build.mkdir()
+        if split_python:
+            facts["splitPythonControl"] = observe_split_python(osroot, dev, build)
         facts["build"] = pair(osroot, dev, cache, build)
         for name, expect in (("packaged", "enosys"), ("unmodified", "enosys"), ("backport", "supported")):
             executable = (osroot / "usr/libexec/xdg-document-portal" if name == "packaged" else
@@ -117,5 +121,7 @@ if __name__ == "__main__":
     group.add_argument("--hosted", action="store_true")
     group.add_argument("--local-noble", action="store_true")
     parser.add_argument("--download", action="store_true", help="Fetch checked public Ubuntu inputs into the private cache")
+    parser.add_argument("--local-split-python", action="store_true",
+                        help="Reproduce the hosted lower Python and upper Meson split in the private local view")
     args = parser.parse_args()
-    raise SystemExit(main(args.hosted, args.download))
+    raise SystemExit(main(args.hosted, args.download, args.local_split_python))

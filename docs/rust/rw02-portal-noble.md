@@ -25,6 +25,19 @@ The offline run `amd64-kgndqoro` took 31.3 seconds on 2026-11-21. Its worktree w
 | Unmodified `d9c1db7cc7e00b592802a8a26ee273f062db5128845fcea51cf621acf41ce736` | `56d7c438` | 28 | `d3451b56ba68b0e3857ded0363fdabe884e020846022f5601292c90ff58efbe7` |
 | Backport `17980d7a8269396cf9a711f01e05ea2d62eddc0cb9459a0380a639eb74512852` | `e42a75c2` | 42 | `503cfb9ccd034937eff0ea27de7fe328de83e7949f18c3b78a12784b92b272f3` |
 
+## Meson on the Ubuntu runners
+
+Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).
+
+The local x64 control selected the same distribution Python executable from the read-only Noble runtime and kept Meson in the development layer. Python followed the interpreter symlink and chose `/noble-usr` as its prefix. The package was visible under the merged `/usr`, but Python searched only the runtime layer. Executing the real Meson launcher reproduced the hosted traceback byte for byte. The build now supplies `PYTHONHOME=/usr`, gives the distribution package directory priority, and disables the user site. Before configuration it starts the real launcher, checks its version against the imported package, and records the resolved interpreter, launcher, module paths and file hashes. [Python module search path initialization](https://docs.python.org/3.12/library/sys_path_init.html) · [Meson check](../../tools/rust-qa/portal-noble/meson_python.py).
+
+Two offline runs under the local Noble x64 userspace on November 21, 2026 confirmed the correction. Both compiled the same pair of daemon binaries as the earlier control. Each performed 28 lock checks with the packaged service, 28 with the source control and 42 with the private backport, then revoked all three grants. The next hosted x64 and ARM64 runs must independently complete these steps.
+
+| Private compiler layout | Run under `artifacts/rust/portal-noble/runs/` | Result SHA-256 |
+| --- | --- | --- |
+| Runtime Python and development-layer Meson | `amd64-vlxw1ad1` | `549b17d44ea12e91c8280f9f08365e0088189c19b3d57be314eb1b84f218157f` |
+| Python and Meson in the same development layer | `amd64-cx1dy5mt` | `15901a02c80ce65585d59d24142a3c786b91420bd4d987a6b659958246766d82` |
+
 ## Source, package and license binding
 
 The public source comes from Ubuntu's signed `noble-updates/main/source/Sources.xz`. The recipe verifies Ubuntu Archive Automatic Signing Key (2018) fingerprint `F6ECB3762474EDA9D21B7022871920D1991BC93C`, the index digest, the exact package version and all four source objects. It independently checks the binary package SHA-256 and verifies the installed daemon, permission store and copyright file against that package. Both running service executables are then hashed through their private `/proc/<pid>/exe` descriptors. Each native run records its input and output hashes. [Archive validation](../../tools/rust-qa/portal-noble/verify.py) · [Source archive pins](../../tools/rust-qa/portal-noble/inputs.py).
@@ -43,5 +56,7 @@ python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
 ```
 
 For the maintained local private Noble x64 userspace, run `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --download`. Once the signed source metadata, source archives and required development packages are in the private cache, omitting `--download` runs the comparison offline. The portable command `python3 -B tools/rust-qa/portal-noble/test_control.py` checks that a capability refusal cannot count as contention or success and that unsigned changes to the package index or dependency selection fail.
+
+Use `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --local-split-python` to exercise the hosted package layout offline with the local Noble userspace. The fixture verifies the two interpreter binaries are byte-identical and selects the runtime copy through a link in the newly created private compiler view. It retains the original Meson error in `build/split-python-control.log`. Every build collects the corrected interpreter and Meson inputs in `build/meson-python.log` and the final result.
 
 Every run creates a new `artifacts/rust/portal-noble/runs/<arch>-<id>/`. Preserve `result.json`, each of `packaged/`, `unmodified/` and `backport/` with its JSON/log files, `development/apt-packages.json`, `development/build-packages.json`, `development/package-notices.json` and `build/*.log`. Generated build trees, package archives and executables stay private. [Native launcher](../../tools/rust-qa/portal-noble/run.py).

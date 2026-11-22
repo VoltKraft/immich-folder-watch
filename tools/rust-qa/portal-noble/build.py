@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 
@@ -28,6 +29,16 @@ def inventory(src):
             for p in sorted(src.rglob("*")) if p.is_file() or p.is_symlink()}
 
 
+def meson_inputs(observation, osroot, prepared):
+    layers = {"/noble-usr": osroot / "usr", "/extra-usr": prepared / "extra/usr"}
+    for item in observation["files"].values():
+        path = Path(item["resolved"])
+        layer = "/" + path.parts[1]
+        if layer not in layers or sha(layers[layer] / path.relative_to(layer)) != item["sha256"]:
+            raise ValueError("The observed Meson input differs from its read-only Ubuntu layer")
+    return observation
+
+
 def pair(osroot, prepared, cache, out):
     src = out / "source"
     cmd = guest(osroot, prepared / "usr", extra=[
@@ -35,11 +46,16 @@ def pair(osroot, prepared, cache, out):
         "--ro-bind", str(cache), "/inputs", "--ro-bind", str(HERE), "/recipe",
         "--ro-bind", str(ROOT / "rust/crates/safe-fs/src"), "/safe-fs",
         "--ro-bind", str(ART / "toolchain"), "/toolchain", "--bind", str(out), "/work",
+        # Python follows the interpreter symlink into a backing layer unless the joined distribution prefix is explicit.
+        "--setenv", "PYTHONHOME", "/usr", "--setenv", "PYTHONNOUSERSITE", "1",
+        "--setenv", "PYTHONPATH", "/usr/lib/python3/dist-packages",
         "--setenv", "CFLAGS", "-D_GNU_SOURCE=1 -include sys/file.h",
         "--setenv", "SOURCE_DATE_EPOCH", "1790112000", "--chdir", "/work", "--"])
     def run(name, *args):
         with (out / (name + ".log")).open("wb") as log:
             subprocess.run(cmd + list(args), stdout=log, stderr=subprocess.STDOUT, check=True, timeout=170)
+    run("meson-python", "/usr/bin/python3", "/recipe/meson_python.py")
+    meson = meson_inputs(json.loads((out / "meson-python.log").read_text()), osroot, prepared)
     run("unpack", "dpkg-source", "--no-check", "-x", "/inputs/" + SOURCE + "_" + VERSION + ".dsc", "/work/source")
     (src / "subprojects/libglnx").symlink_to("../libglnx")
     baseline = inventory(src)
@@ -78,7 +94,7 @@ def pair(osroot, prepared, cache, out):
     names = re.findall(r"(?:=> )?(/[^\s]+) \(0x[0-9a-f]+\)", linked)
     sums = subprocess.check_output(runtime + ["sha256sum", *names], text=True)
     libraries = {name: digest for digest, name in (line.split() for line in sums.splitlines())}
-    return dict(originalSource=baseline[C_FILE], patchedSource=AFTER, upstreamHunk=sha(HERE / "flock.patch"),
+    return dict(originalSource=baseline[C_FILE], patchedSource=AFTER, upstreamHunk=sha(HERE / "flock.patch"), mesonPython=meson,
                 sourceLicenses=LICENSES, fuseBuildInputs=FUSE, runtimeLibraries=libraries,
                 distroSource=ORIGINALS, patchSeries=(src / "debian/patches/series").read_text().splitlines(),
                 rustSafeFs={p.name: sha(p) for p in sorted((ROOT / "rust/crates/safe-fs/src").glob("*.rs"))},
