@@ -81,6 +81,9 @@ Crash-capture and unchanged-byte negative controls run with
 `python tools/rust-qa/storage-faults/test_crash_capture.py -v`. Its actual mandatory
 byte-lock check runs only on Windows and is explicitly skipped elsewhere. Both
 test commands are included in the maintained runner.
+Source-export controls run with
+`python tools/rust-qa/storage-faults/test_source_snapshot.py -v`; the maintained
+runner also executes them, including a transfer that excludes hidden paths.
 
 Output must be a fresh directory strictly below `artifacts/rust/storage-faults`.
 Each failed run is retained; retry with a new name. Only this fresh synthetic tree
@@ -166,3 +169,19 @@ notices, logs and per-case JSON remain in the output. The large build tree is
 kept locally but excluded from the evidence-hash inventory; its actual executables
 and generated source are separately hashed or archived. Do not upload build
 caches as evidence. No remote side effect is undone by restoring a database.
+
+The explicitly selected source inventory is exported byte-for-byte. Its existing
+`first-party-source-hashes.json` retains original repository-relative logical
+paths. `first-party-source-paths.json` maps every logical path to its stored path
+relative to the run output. Ordinary sources keep their existing
+`first-party-sources/<logical-path>` location. A logical path with any dot-prefixed
+component instead uses `first-party-hidden-sources/<key>.source`, where `key` is
+the lowercase SHA-256 of the UTF-8 logical path. The lookup table preserves that
+exact original path; it is not a renamed source or altered notice. The export
+checks each copied digest and refuses existing destinations. Both indices and
+all stored bytes are covered by `evidence-hashes.json` and have visible paths.
+This changes no upload setting and adds no uninventoried source or hidden file.
+For older exports without the new lookup table, the stored location is the
+previous `first-party-sources/<logical-path>` convention. Missing bytes in an
+older hosted artifact must still be reported separately; a Git reconstruction
+does not retroactively make them present in that artifact.

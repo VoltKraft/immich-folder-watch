@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -32,6 +33,39 @@ def isolated(value: Path) -> Path:
     if not path.is_relative_to(ARTIFACTS.resolve()) or path == ARTIFACTS.resolve():
         raise ValueError("output must be a new directory below artifacts/rust/storage-faults")
     return path
+
+
+def export_source_snapshot(repository: Path, output: Path, sources: list[Path]) -> dict:
+    """Export only inventoried sources with visible paths and exact logical names.
+
+    Artifact uploads omit dotfiles by default. Hidden logical paths therefore
+    have a visible storage name derived from their UTF-8 logical path, with an
+    explicit lookup table. Ordinary source paths and the logical hash index keep
+    their existing format. Source bytes and notices are never transformed.
+    """
+    inventory = {source.relative_to(repository).as_posix(): source for source in sources}
+    hashes, locations = {}, {}
+    for logical in sorted(inventory):
+        relative = Path(logical)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("source must be inside the explicit repository inventory")
+        if any(part.startswith(".") for part in relative.parts):
+            key = hashlib.sha256(logical.encode("utf-8")).hexdigest()
+            archived = Path("first-party-hidden-sources") / (key + ".source")
+        else:
+            archived = Path("first-party-sources") / relative
+        destination = output / archived
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        expected = sha256(inventory[logical])
+        with inventory[logical].open("rb") as original, destination.open("xb") as copy:
+            shutil.copyfileobj(original, copy)
+        if sha256(destination) != expected:
+            raise ValueError(f"exported source bytes differ: {logical}")
+        hashes[logical] = expected
+        locations[logical] = archived.as_posix()
+    write_json(output / "first-party-source-hashes.json", hashes)
+    write_json(output / "first-party-source-paths.json", locations)
+    return hashes
 
 
 def snapshot_check(output: Path, expected: str, phase: str) -> dict:
@@ -230,18 +264,13 @@ def main() -> int:
             sources += [p for p in directory.rglob("*") if p.is_file() and not {"obj", "target", "__pycache__"}.intersection(p.relative_to(directory).parts)
                         and ("bin" not in p.relative_to(directory).parts or p.relative_to(directory).parts[:2] == ("src", "bin")) and p.suffix != ".pyc"]
         sources += [ROOT / name for name in ("LICENSE", "global.json", "Directory.Build.props", "Directory.Build.targets", "NuGet.Config", "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
-        hashes = {}
-        for source in sorted(set(sources)):
-            relative = source.relative_to(ROOT)
-            destination = output / "first-party-sources" / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, destination)
-            hashes[relative.as_posix()] = sha256(source)
-        write_json(output / "first-party-source-hashes.json", hashes)
+        hashes = export_source_snapshot(ROOT, output, sources)
         result["first_party_sources"] = len(hashes)
+        result["source_snapshot_paths"] = "first-party-source-paths.json"
         command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs")])
         command("windows-image-preparation-tests", [sys.executable, str(HERE / "test_windows_image.py"), "-v"])
         command("crash-capture-tests", [sys.executable, str(HERE / "test_crash_capture.py"), "-v"])
+        command("source-snapshot-tests", [sys.executable, str(HERE / "test_source_snapshot.py"), "-v"])
         common = ["--manifest-path", str(HERE / "Cargo.toml"), "--frozen", "--target", args.target]
         command("clippy", ["cargo", "clippy", *common, "--all-targets", "--", "-D", "warnings"])
         command("build", ["cargo", "build", *common, "--release"])

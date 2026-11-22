@@ -443,6 +443,112 @@ unchanged. No native Windows success is inferred from this Linux regression.
 | `linux-x64-08/first-party-source-hashes.json` | `3c4d5dd97af0f92e6a5e7bbc0b41fa04b2d0055c278a5fd35d79c5de3f8b1c41` |
 | `linux-x64-08/evidence-hashes.json` | `17fdb5d61129e7300d569a3a39b8ef244b962b865e05a37c5e666ba49f2b86e0` |
 
+## Ubuntu ARM64 retest and source export (2026-11-22)
+
+The native Ubuntu ARM64 artifact from
+[run 45039099730](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
+at `3b4854d867f614a956042dfe987ecc7c008e53ec` repeats all eight cases and all 47
+expected command outcomes. The archived C# reader reports native process and OS
+`Arm64`, .NET 10.0.15 and SQLite 3.53.4; the Rust verifier reports `aarch64`/Linux
+and SQLite 3.54.1. Each case's separate `fault.json`, `verification.json` and
+`csharp-readback.json` matches the corresponding aggregate result. All eight
+retained original snapshots match their producer hashes, all 48 supervisor
+phase/final checks agree, and both actual language entry points reject the eight
+byte-100 corruptions with their required errors/exits. The corrupt directories
+contain only the changed input, and the valid original files remain unchanged.
+
+Four actual SIGKILL exits are `-9`. Every archived pre/post DB/WAL/SHM byte and
+hash agrees with its named receipt. Both logical page-limit cases report SQLite
+13 at 27 × 4,096 = 110,592 bytes and need transaction-drop rollback. Both private
+8-MiB tmpfs cases report actual OS errno 28, SQLite 13, zero free/available bytes,
+automatic rollback and successful same-volume restoration. These distinct
+failure mechanisms retain their existing interpretation.
+
+The actual C# source performs eight semantic assertions per opened database:
+source entries, repair JSON, successful-sync time, exact owned album ID, other
+account's album ID, other account's entry count, the 64-bit file size and tombstone
+expiry. The per-file counts in this retest are:
+
+| Actual C# subject | Cases | Assertions per file/case | Total |
+| --- | --- | --- | --- |
+| Recovered `state.db` | All eight | 8 | 64 |
+| Authenticated `csharp-snapshot.db` copy of retained `snapshot.db` | All eight | 8 | 64 |
+| Backup-API `restored.db` | All eight | 8 | 64 |
+| `same-volume-restored.db` | The two actual tmpfs ENOSPC cases | 8 | 16 |
+
+Thus each casing mode contributes 24 assertions for each of uncommitted,
+commit-before-ack and SQLite page-limit recovery, plus 32 for actual tmpfs
+ENOSPC: **208 assertions**. Every Rust recovery additionally reports `ok`
+integrity, full recovered/restored snapshot equality, a successful restored
+write/rollback and detection of the semantically unequal SQL control. These are
+source-bound observations from the ARM64 run, not an ARM64 execution on Fedora.
+
+The downloaded ZIP matches GitHub's advertised SHA-256. Direct inspection
+verified **465 of 466** indexed storage evidence files and **148 of 149** source
+copies. The sole absent file is
+`first-party-sources/tools/rust-qa/storage-faults/windows-image/.gitattributes`.
+The pinned uploader defaults to excluding hidden files
+([exact action README](https://github.com/actions/upload-artifact/blob/cf430e030ddbb5b0abf93d22962f4752f3646cd9/README.md#inputs)).
+Its original Git blob at that exact commit is
+`c051534be59047d5e35418324c101f55e321d467`: 78 bytes with SHA-256
+`32452b24635fef482005490b54a1101d4c75b53dea74e33f2a13abd06d3c6364`.
+Those reconstructed bytes match both archived hash indices. All 149 source
+hashes also match their exact Git-commit blobs. This is **465 direct files plus
+one separately reconstructed source**, not a claim that the original ZIP contains
+all 466 files. The original archive and manifests were not changed.
+
+The review and reconstructed bytes are retained separately in ignored
+`artifacts/rust/storage-faults/hosted-arm64-45039099730-review/`; the archive stays
+at `artifacts/rust/hosted-desktop-storage/45039099730/linux-arm64.zip`.
+
+| ARM64 artifact/review identity | SHA-256 |
+| --- | --- |
+| Original ZIP | `e70016232c6a366280d2181de23d67fa400eac7255b9683a4b89e414bbc3b000` |
+| Archived `result.json` | `6d12c52da24e0ed726cfc8695c4eaca5eb34b44c43b87752773b2d4bf9d5a6ad` |
+| Archived `evidence-hashes.json` | `596bf89760924bfb5fc7fcb3ad2c0410ab807dd9731e7019a5944a7baa463689` |
+| Separate `review.json` | `c23354ef8cd7083951ed330f99805dd4e1ab988d253ca42022ecb3edec113eff` |
+
+The corrected export retains the existing logical source-hash index and ordinary
+source paths. Only explicitly inventoried paths containing a dot-prefixed
+component receive a visible `first-party-hidden-sources/<key>.source` location,
+where the key is the SHA-256 of the UTF-8 logical path. The visible
+`first-party-source-paths.json` maps every original logical path to its exact
+stored location. Source and notice bytes remain unchanged, and copy digests are
+checked before indices are emitted. Both indices and all visible copies enter
+the ordinary evidence inventory. Existing artifacts without the new lookup keep
+their original `first-party-sources/<logical-path>` convention. There is no
+automatic reconstruction of missing archived bytes, global hidden-file upload,
+workflow change or broader source discovery.
+
+Six portable tests cover a hidden-file-excluding transfer and complete lookup,
+exact retained notice/line-ending/Unicode bytes, deterministic ordering and
+duplicate inputs, omission of uninventoried files, rejection of corrupt copies,
+refusal to replace an existing export and rejection of out-of-inventory paths.
+The maintained runner includes these tests; its recovery, fault, permission and
+VHD contracts are unchanged.
+
+The fresh native Fedora x64 `linux-x64-10 --tmpfs` run passed all 48 expected
+command outcomes, eight recoveries, 208 C# assertions and 16 corrupt-copy
+rejections. All six source-export controls passed. All 150 sources resolve via
+the new lookup and match their hashes; all 469 indexed evidence files match.
+A separate local transfer excluded every dot-prefixed path, packaged the
+result into a ZIP and read every indexed byte back. No indexed file was excluded,
+and all 469 evidence hashes and 150 logical source hashes still matched,
+including the exact original `.gitattributes` and retained notices. This is a
+local simulation of the relevant upload filter, not a completed hosted upload.
+The transfer receipt and visible ZIP remain in ignored
+`artifacts/rust/storage-faults/linux-x64-10-upload-check/`. The earlier
+`linux-x64-06`, `linux-x64-08` and `linux-x64-09` evidence inventories remain
+unchanged at 453, 466 and 466 files respectively.
+
+| Corrected export / native regression | SHA-256 |
+| --- | --- |
+| `linux-x64-10/result.json` | `e0da5ae44cb00ade4d2e700ba206ab2e35dc832920bd43e38d1c979e7f6b16e6` |
+| `linux-x64-10/first-party-source-hashes.json` | `5b28a4652424e569716f7ecb70c7eb176bb9ac8821a86aafe19587523e966c25` |
+| `linux-x64-10/first-party-source-paths.json` | `e190f9eddde33e1f72eea9134e97ba76f71f370be0837584538f86769070d13e` |
+| `linux-x64-10/evidence-hashes.json` | `f11b3fb82b29d285b8c60db0bbc14c0ac02d0bb433903643c3058c84b12647a2` |
+| Local transfer `review.json` | `752b8509cc97c08a8f283f8aefe8066e3931663432751e23be80a7a145a2d54e` |
+
 ## Retained diagnostic attempts
 
 A Fedora x64 rerun exercised both casing modes for each portable fault
@@ -469,10 +575,12 @@ starting; the single allowed retry with explicit sandbox arguments succeeded.
 
 ## Limits and next gate
 
-Native Windows x64/ARM64 and Linux ARM64 executions remain required; the runner
-interface is prepared but local Linux x64 results do not stand in for those
-hosts. Matrix integration belongs to the primary agent after review of this
-first proof. No shared workflow or application file changed in this assignment.
+The Linux ARM64 fault cases above now have native execution evidence. Native
+Windows filesystem-full qualification and hosted confirmation that the corrected
+source export arrives complete remain required. Local Linux x64 results do not
+stand in for another native host. Matrix integration and the Windows result
+record belong to the primary agent. No shared workflow or application file
+changed in this assignment.
 
 Physical disk/filesystem ENOSPC beyond the tested tmpfs, power loss,
 storage-controller behavior, interrupted
