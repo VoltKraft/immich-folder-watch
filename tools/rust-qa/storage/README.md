@@ -37,6 +37,41 @@ derived controls in their own directory. The completed report is
 cross-library reads with the same C# runtime.
 [Stored SQLite identity results](../../../docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 
+### Read the frozen three-profile Fedora study
+
+The separate developer diagnostic accepts the original three C# writer
+receipts from `86ae038`. Their same-process casing exports cover ICU
+Unicode 15.1, .NET 10.0.12 managed invariant casing and ICU Unicode 17.
+The independent C# readers at `3c58fc1` exercised each writer in both path
+modes. The diagnostic binds the writer's build, tables and snapshot to
+those receipts. It uses the same immutable SQLite and historical lookup
+implementation as the ordinary two-profile inspector.
+
+Build the example with the [pinned native toolchain](../../../docs/development.md#rust-feasibility-workspace)
+and the reviewed storage build flags, then pass the two retained evidence
+directories and a fresh output directory below `artifacts/rust`.
+
+```bash
+export CARGO_HOME="$PWD/artifacts/rust/storage-assessment/cargo-home"
+export CARGO_TARGET_DIR="$PWD/artifacts/rust/three-profile-inspector-build"
+export LIBSQLITE3_SYS_USE_PKG_CONFIG=0
+export LIBSQLITE3_FLAGS="-USQLITE_ENABLE_LOAD_EXTENSION -DSQLITE_OMIT_LOAD_EXTENSION"
+cargo build --manifest-path tools/rust-qa/storage/Cargo.toml --frozen --release \
+  --target x86_64-unknown-linux-gnu --example inspect_stored_keys
+python3 -B tools/rust-qa/storage/study_stored_keys.py \
+  --probe "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/examples/inspect_stored_keys" \
+  --writers artifacts/rust/managed-invariant-verified-86ae038 \
+  --readers artifacts/rust/managed-readback-verified-3c58fc1 \
+  --output artifacts/rust/stored-keys-three-profile
+```
+
+The observer explicitly selects `--three-profile-study`, rechecks the
+original writer files and compares each returned key with the physical
+SQLite rows using independent Unicode projections. A returned key preserves
+the stored spelling. Absence, ambiguity and possible aliases are read-only
+observations. Creating or rewriting identities requires a separate
+application policy. [Study sources and Unicode License v3 notice](../legacy-invariant/README.md).
+
 Each output contains `result.json`, `evidence-hashes.json`, step logs, first-party
 source copies, untouched `.crate` archives, supplied notices, feature graphs and
 the original/backup synthetic databases with Rust and C# reports. Large build

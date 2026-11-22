@@ -14,39 +14,62 @@ use std::path::Path;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 type Key = [String; 2];
-const PROFILES: [(&str, &str, u64); 2] = [
-    (
-        "15.1.0",
-        "02c4363688e37251e1169559be56231d6e9c398ba046ea3773cdf037df72cd2f",
-        1449,
-    ),
-    (
-        "17.0.0",
-        "195bd89b3934dcf9c93b72b4232c53d9787dacb8ebbf2270df7a6a73e53f473e",
-        1504,
-    ),
-];
+struct Profile {
+    name: &'static str,
+    table: &'static str,
+    sha256: &'static str,
+    changed: u64,
+    // Original StoreIdentities writer result, independently rechecked by all three C# readers.
+    study_receipt: &'static str,
+}
+
+const ICU15: Profile = Profile {
+    name: "15.1.0",
+    table: "tools/rust-qa/legacy/casing/unicode-15.1.0.tsv",
+    sha256: "02c4363688e37251e1169559be56231d6e9c398ba046ea3773cdf037df72cd2f",
+    changed: 1449,
+    study_receipt: "ef4b3573995b1f6cd13bc519895e73b156acc4093e3c401f8742e8c9e2fc5ce0",
+};
+const ICU17: Profile = Profile {
+    name: "17.0.0",
+    table: "tools/rust-qa/legacy/casing/unicode-17.0.0.tsv",
+    sha256: "195bd89b3934dcf9c93b72b4232c53d9787dacb8ebbf2270df7a6a73e53f473e",
+    changed: 1504,
+    study_receipt: "4ef03394e3c4466ba129110d6d9fcee4d2b2f7ca2795bd5f59fbbabe0b271105",
+};
+const MANAGED16: Profile = Profile {
+    name: "managed-invariant-10.0.12",
+    table: "tools/rust-qa/legacy-invariant/managed-invariant-10.0.12.tsv",
+    sha256: "51e3c6f44c782e8e99c355b504f32900da56c9e4a500da83a15a2f807b95b6e4",
+    changed: 1475,
+    study_receipt: "0fb938ec806cfca482a6c8bab23becba769b0680b2570c3fcf11e0f3dd08a881",
+};
+const QUALIFIED: &[Profile] = &[ICU15, ICU17];
+const STUDY: &[Profile] = &[ICU15, MANAGED16, ICU17];
+const STUDY_FORMAT: &str = "ifw-managed-invariant-store-differential-v1";
 
 struct Forms {
     maps: Vec<ReferenceCaseMap>,
 }
 
 impl Forms {
-    fn load(mode: &str) -> Result<Self> {
+    fn load(mode: &str, profiles: &[Profile], study: bool) -> Result<Self> {
+        if !matches!(mode, "sensitive" | "insensitive") {
+            return Err("an explicit path comparison mode is required".into());
+        }
         let mut maps = Vec::new();
-        if mode == "insensitive" {
-            for (version, expected, _) in PROFILES {
-                let file = format!("tools/rust-qa/legacy/casing/unicode-{version}.tsv");
-                let data = fs::read(file)?;
-                if digest(&data) != expected {
+        if mode == "insensitive" || study {
+            for profile in profiles {
+                let data = fs::read(profile.table)?;
+                if digest(&data) != profile.sha256 {
                     return Err("unqualified casing input".into());
                 }
-                maps.push(ReferenceCaseMap::from_reference_tsv(std::str::from_utf8(
-                    &data,
-                )?)?);
+                if mode == "insensitive" {
+                    maps.push(ReferenceCaseMap::from_reference_tsv(std::str::from_utf8(
+                        &data,
+                    )?)?);
+                }
             }
-        } else if mode != "sensitive" {
-            return Err("an explicit path comparison mode is required".into());
         }
         Ok(Self { maps })
     }
@@ -203,55 +226,74 @@ fn verify_backup(filename: &str, expected: &str) -> Result<()> {
     Ok(())
 }
 
-fn writer_profile(dir: &Path, marker: &Value) -> Result<&'static str> {
+fn writer_profile<'a>(dir: &Path, marker: &Value, profiles: &'a [Profile]) -> Result<&'a Profile> {
     let path = dir.join("invariant-uppercase.tsv");
     if !fs::symlink_metadata(&path)?.file_type().is_file() {
         return Err("expected the writer's regular casing table".into());
     }
     let checksum = digest(&limited(fs::File::open(path)?, 200_000)?);
-    let (version, _, changed) = PROFILES
+    let writer = profiles
         .iter()
-        .find(|(_, known, _)| *known == checksum)
+        .find(|candidate| candidate.sha256 == checksum)
         .ok_or("unqualified full casing table from the SQLite writer")?;
     let profile = &marker["casingProfile"];
     if profile["tableSha256"] != checksum
         || profile["scannedScalars"] != 1_112_064u64
-        || profile["changedScalars"] != *changed
+        || profile["changedScalars"] != writer.changed
         || profile["contextBatchChecked"] != true
     {
         return Err("incomplete same-process writer casing evidence".into());
     }
-    Ok(version)
+    Ok(writer)
 }
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
-    if args.len() != 3 {
-        return Err(
-            "usage: inspect_stored_keys <synthetic-backup-directory> <mode> <snapshot-sha256>"
-                .into(),
-        );
-    }
-    let mode = args[1].to_str().ok_or("invalid comparison mode")?;
-    let expected = args[2].to_str().ok_or("invalid digest")?;
+    let (directory, mode, expected, study) = match args.as_slice() {
+        [directory, mode, expected] => (directory, mode, expected, false),
+        [flag, directory, mode, expected] if flag == "--three-profile-study" => (directory, mode, expected, true),
+        _ => return Err("usage: inspect_stored_keys [--three-profile-study] <synthetic-backup-directory> <mode> <snapshot-sha256>".into()),
+    };
+    let mode = mode.to_str().ok_or("invalid comparison mode")?;
+    let expected = expected.to_str().ok_or("invalid digest")?;
     let root = fs::canonicalize("artifacts/rust")?;
-    let dir = fs::canonicalize(Path::new(&args[0]))?;
+    let dir = fs::canonicalize(Path::new(directory))?;
     if !dir.starts_with(&root) || dir == root {
         return Err("expected a private fixture below artifacts/rust".into());
     }
-    let marker: Value = serde_json::from_slice(&limited(
-        fs::File::open(dir.join("manifest.json"))?,
-        1024 * 1024,
-    )?)?;
-    if !matches!(
-        marker["format"].as_str(),
-        Some("ifw-qualified-path-key-fixture-v1" | "ifw-derived-path-key-control-v1")
-    ) || marker["cases"][mode]["sha256"] != expected
-    {
+    let marker_path = dir.join(if study {
+        "result.json"
+    } else {
+        "manifest.json"
+    });
+    if !fs::symlink_metadata(&marker_path)?.file_type().is_file() {
+        return Err("expected a regular fixture manifest".into());
+    }
+    let bytes = limited(fs::File::open(marker_path)?, 1024 * 1024)?;
+    let marker: Value = serde_json::from_slice(&bytes)?;
+    let recognized = if study {
+        marker["format"] == STUDY_FORMAT
+    } else {
+        matches!(
+            marker["format"].as_str(),
+            Some("ifw-qualified-path-key-fixture-v1" | "ifw-derived-path-key-control-v1")
+        )
+    };
+    if !recognized || marker["cases"][mode]["sha256"] != expected {
         return Err("synthetic fixture manifest or recorded snapshot digest differs".into());
     }
-    let writer_profile = writer_profile(&dir, &marker)?;
-    let forms = Forms::load(mode)?;
+    let profiles = if study { STUDY } else { QUALIFIED };
+    let writer = writer_profile(&dir, &marker, profiles)?;
+    if study {
+        // This selection is bound to the three original Fedora x64 writer builds and snapshots.
+        if digest(&bytes) != writer.study_receipt {
+            return Err("unrecognized frozen study writer receipt".into());
+        }
+        if marker["os"] != std::env::consts::OS || !cfg!(target_arch = "x86_64") {
+            return Err("the frozen study requires the writer's native Linux x64 target".into());
+        }
+    }
+    let forms = Forms::load(mode, profiles, study)?;
     std::env::set_current_dir(dir)?;
     let filename = format!("{mode}.db");
     verify_backup(&filename, expected)?;
@@ -280,12 +322,15 @@ fn main() -> Result<()> {
     })?;
     drop(db);
     verify_backup(&filename, expected)?;
-    let output = json!({
+    let mut output = json!({
         "format": "ifw-stored-path-key-observations-v1", "inputFormat": marker["format"], "mode": mode, "snapshotSha256": expected,
-        "writerProfile": writer_profile,
+        "writerProfile": writer.name,
         "os": std::env::consts::OS, "arch": std::env::consts::ARCH, "lookup": observations,
         "opaqueOwnershipRows": ownership, "transferHistoryRows": history,
     });
+    if study {
+        output["writerReceiptSha256"] = json!(writer.study_receipt);
+    }
     serde_json::to_writer(std::io::stdout().lock(), &output)?;
     Ok(())
 }
