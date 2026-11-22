@@ -187,6 +187,28 @@ The [Linux x64 receipt](../../tools/rust-qa/gui/evidence/text-profile-linux-x64.
 binds the native results, both build records, the source graph, observation
 drivers and the application's orderly shutdown.
 
+## Windows notification-area bindings
+
+The ordinary GUI and the retained-window comparison now use the same
+first-party receiver as the standalone Windows Shell assessment. The GUI
+selects the already locked Microsoft `windows` 0.62.2 crate directly on
+Windows. The only additional feature in either Windows GUI graph is
+`Win32_UI_Shell`. Both retain 135 packages. The two Linux graphs retain
+their 235 packages and their existing feature sets. The combined development
+profile already selects these Shell APIs. [GUI manifest](../../tools/rust-qa/gui/Cargo.toml)
+· [Standalone service review](rw02-windows-services.md#dependency-review-and-local-evidence).
+
+The original crate SHA-256 is
+`527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580`.
+The generated Shell module is 3,585,884 bytes with SHA-256
+`2f8f0191baf83d942c67090e12e34746c1dda8426f072f7f2ec498fe8ce25eb0`.
+It declares the system Shell functions used for registration, modification,
+rectangle lookup and removal. The GUI preserves Microsoft's original
+MIT and Apache-2.0 license texts and selects the MIT option. All four
+target reports were reproduced from the original archives and checked
+against their unpacked sources. [Published source](https://static.crates.io/crates/windows/windows-0.62.2.crate)
+· [Target digests](../../rust/audit/gui-profile.json).
+
 ## Native interfaces and outstanding checks
 
 At `8b071ab`, each native host rebuilt the integrated GUI. The archived

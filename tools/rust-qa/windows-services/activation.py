@@ -57,7 +57,8 @@ def controls(target, exe, directory, report):
                                                      "privateDesktopHostAbsence", "privateDesktopFallbackWindowVisible"))):
         raise ValueError("Expected the source-bound native service and shell-less controls on the same runner")
     sources = [*HERE.glob("*.py"), *HERE.glob("*.ps1"), *(HERE / "src").glob("*.rs"), HERE / "Cargo.toml",
-               HERE / "Cargo.lock", HERE / "inputs.json", QA / "gui/src/tray-icon.argb"]
+               HERE / "Cargo.lock", HERE / "inputs.json", QA / "gui/src/tray-icon.argb",
+               QA / "gui/src/windows_tray_shell.rs"]
     for source in sources:
         if sha(source) != base["sourceFiles"][source.relative_to(ROOT).as_posix()]:
             raise ValueError("The source used to build or observe the original service changed")

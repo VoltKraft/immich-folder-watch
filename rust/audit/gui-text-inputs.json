@@ -10,7 +10,7 @@
   "nativeFeatureReports": {
     "aarch64-pc-windows-msvc": {
       "packages": 135,
-      "nativeFeatureSetsSha256": "498bbd192f051ca274ccc2f2d09433662a9a8f65dd4bea246aa7a0fb12469b3d"
+      "nativeFeatureSetsSha256": "d4257db8af496165dd32d43172d7d39142a5108fbccbab9a3105f8cf855d313b"
     },
     "aarch64-unknown-linux-gnu": {
       "packages": 235,
@@ -18,7 +18,7 @@
     },
     "x86_64-pc-windows-msvc": {
       "packages": 135,
-      "nativeFeatureSetsSha256": "8f66fa7116a313d323d7c29495140d51e8e5f0d7e26880f27f6c485175208ae3"
+      "nativeFeatureSetsSha256": "b32b53dc0616ce7d73e664dcdc5eb19f6ade2f1c6c6d8a96a4ef5e7b9e49a3e1"
     },
     "x86_64-unknown-linux-gnu": {
       "packages": 235,

@@ -70,7 +70,8 @@ class WarmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             gui = builder.stage(Path(temp) / "stage")
             builder.eframe_source.verify_lock(gui, json.loads(builder.eframe_source.PINS.read_bytes()))
-            for name in ("src/windows_worker.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
+            for name in ("src/windows_worker.rs", "src/windows_tray.rs", "src/windows_tray_state.rs",
+                         "src/windows_tray_shell.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
                 self.assertEqual(builder.sha(builder.GUI / name), builder.sha(gui / name))
             self.assertEqual(builder.sha(gui / "src/loop_wake.rs"), builder.sha(builder.HERE / "loop_wake.rs"))
             self.assertEqual(builder.sha(gui / "src/windows_present.rs"), builder.sha(builder.HERE / "windows_present.rs"))

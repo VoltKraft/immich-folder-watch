@@ -22,7 +22,7 @@
                  .send(command)
 @@ -415,6 +421,10 @@
      #[cfg(target_os = "windows")]
-     let (native, available) = windows_fixture_input(control.clone())?;
+     let (mut native, available) = windows_fixture_input(control.clone(), launcher.is_some())?;
      #[cfg(target_os = "windows")]
 +    if control.loop_wake.single() {
 +        println!("WINDOW_WAKE mode=single");

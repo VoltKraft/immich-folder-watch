@@ -1654,6 +1654,7 @@ dependencies = [
  "eframe",
  "futures-lite",
  "wgpu",
+ "windows",
  "winit",
  "zbus",
 ]

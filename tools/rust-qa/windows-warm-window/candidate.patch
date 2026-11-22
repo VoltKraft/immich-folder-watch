@@ -139,9 +139,9 @@
          graphics_attention: Arc::default(),
          #[cfg(target_os = "linux")]
 @@ -497,10 +527,21 @@
-         _ => return Err("Expected an initial tray result".into()),
-     };
-     let handle = std::thread::spawn(move || {
+             }
+             return;
+         }
 +        let report_memory = matches!(
 +            std::env::var("IFW_QA_WINDOWS_RESIDENCY").as_deref(),
 +            Ok("1" | "performance-control")

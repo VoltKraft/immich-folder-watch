@@ -17,10 +17,10 @@
       "compiled": "80ffc51f9cff75de744b3e8d5a8a8b3a35485def9d7bc462790466f83d71f492"
     }
   },
-  "canonicalLockSha256": "19aa12ab5d107dbc4b6a7257b3f0e41aa36771da335feccb079d6bba0b4da173",
-  "retainedLockSha256": "f17a6ea7ba7c29144ac14a3b81ea80a71e629377b8ac864388a95dfa0e28e75e",
-  "canonicalManifestSha256": "fda1beb1205ffdc5e03295c075dcad1c1ef2ee7a7c38024d36b96ba0a1aca930",
-  "retainedManifestSha256": "74f9e4fd0bbd97957773e256472e1aba80646ea2a322dec776e1b2ada2d3df96",
+  "canonicalLockSha256": "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25",
+  "retainedLockSha256": "e061bcf25558fe72f388a615d64691a4fae7e594d712fa6c1191cfc51494ef0e",
+  "canonicalManifestSha256": "ac04be2c8cd44c1a1c49ce357b6f2f314da2fd4932fca0415e2487ca10aa6249",
+  "retainedManifestSha256": "2eab91121bbaabecacf53ee235d4e195a4ee14cb503b9259e6669e63314ff7aa",
   "license": "MIT OR Apache-2.0",
   "selectedLicense": "MIT",
   "adaptedSource": {

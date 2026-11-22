@@ -217,7 +217,7 @@ def main():
               "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     files = list(HERE.glob("*")) + list((HERE / "src").glob("*.rs")) + [QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "windows_observer.py", ROOT / "rust/toolchain-inputs.json"]
-    files.append(QA / "gui/src/tray-icon.argb")
+    files.extend(QA / "gui/src" / name for name in ("tray-icon.argb", "windows_tray_shell.rs"))
     result["sourceFiles"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(files) if p.is_file()}
 
     def step(name, cmd):
