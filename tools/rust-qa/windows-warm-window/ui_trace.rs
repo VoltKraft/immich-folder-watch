@@ -68,7 +68,12 @@ pub(super) fn event(event: &WindowEvent) -> Option<Span> {
             guard.0.after = i64::from(size.height);
             Some(guard)
         }
-        WindowEvent::Focused(_) => span("focus-event"),
+        WindowEvent::Focused(true) => span("focus-gained-event"),
+        WindowEvent::Focused(false) => span("focus-lost-event"),
+        WindowEvent::ModifiersChanged(modifiers) if modifiers.state().is_empty() => {
+            span("modifiers-empty-event")
+        }
+        WindowEvent::ModifiersChanged(_) => span("modifiers-changed-event"),
         WindowEvent::Occluded(_) => span("occlusion-event"),
         _ => span("window-event"),
     }

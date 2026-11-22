@@ -466,7 +466,7 @@ jobs:
           python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-control
           exit $LASTEXITCODE
 
-      - name: Trace the two retained-window activation paths during the Windows scan
+      - name: Trace retained-window activation and hidden presentations during the Windows scan
         if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
         env:
@@ -665,6 +665,7 @@ jobs:
             artifacts/rust/windows-performance/native-*/*
             artifacts/rust/windows-warm-window/*/build.json
             artifacts/rust/windows-warm-window/*/observed/
+            artifacts/rust/windows-warm-window/*/eframe-source.zip
             artifacts/rust/windows-warm-window/*/measured/
             artifacts/rust/windows-warm-window/*/measured-fifo/*.json
             artifacts/rust/windows-warm-window/*/measured-fifo/*.log

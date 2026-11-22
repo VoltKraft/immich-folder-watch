@@ -21,7 +21,7 @@ import dispatch
 
 def measured_generation(log, mode, *, dispatch_trace=False):
     rows = log.read_text(encoding="utf-8", errors="replace").splitlines()
-    if not dispatch_trace and any(row.startswith(("DISPATCH", "WINDOW_WAKE ")) for row in rows):
+    if not dispatch_trace and any(row.startswith(("DISPATCH", "WINDOW_WAKE ", "WINDOW_HIDDEN_PAINT ")) for row in rows):
         raise ValueError("The ordinary measurement used a diagnostic dispatch path")
     if ([r for r in rows if r.startswith("GRAPHICS_MEMORY ")] != ["GRAPHICS_MEMORY generation=1 hint=MemoryUsage"]
             or [r for r in rows if r.startswith("GRAPHICS_READY ")] != ["GRAPHICS_READY generation=1"]
@@ -88,7 +88,8 @@ def main(target, fifo_control=False, dispatch_trace=False):
                   observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py", "scan_present.py")})
     try:
         if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
-                                         "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE")):
+                                         "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE",
+                                         "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL")):
             raise ValueError("Select the requested diagnosis using the recorder option")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
@@ -192,6 +193,6 @@ if __name__ == "__main__":
     parser.add_argument("target", choices=TARGETS)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--fifo-control", action="store_true", help="measure the previous DXGI interval on this same executable")
-    mode.add_argument("--dispatch", action="store_true", help="trace two private Mailbox wake paths on the same native workload")
+    mode.add_argument("--dispatch", action="store_true", help="trace Mailbox activation and compare hidden-root paint policies")
     args = parser.parse_args()
     raise SystemExit(main(args.target, args.fifo_control, args.dispatch))

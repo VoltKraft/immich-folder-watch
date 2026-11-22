@@ -1,4 +1,4 @@
-"""Compare two private activation wakes and locate the native UI thread inside the observed HWND timeline."""
+"""Measure activation dispatch and presentations between verified hide and show transitions."""
 from bisect import bisect_left, bisect_right
 from collections import Counter
 from contextlib import ExitStack
@@ -13,6 +13,7 @@ from metrics import METRICS
 from scan_present import start as trace_presentation
 
 CALLBACKS = {"close-event", "redraw-event", "resize-event", "focus-event", "occlusion-event",
+             "focus-gained-event", "focus-lost-event", "modifiers-empty-event", "modifiers-changed-event",
              "window-event", "user-event", "new-events", "about-to-wait"}
 OPERATIONS = {"pipe-open", "open-dequeued", "show", "hide", "focus", "request-redraw", "private-wake"}
 
@@ -50,6 +51,39 @@ def parse(text, pid, frequency, single):
     return sorted(spans, key=lambda s: s["start"])
 
 
+def hidden_presents(spans, reopens, presentations, bounds):
+    changes = [s for s in spans if s["label"] in ("hide", "show")]
+    transitions = [s["start"] for s in changes]
+    presentations = sorted(presentations)
+    present_starts = [p[0] for p in presentations]
+    inputs = [s for s in spans if s["label"] in CALLBACKS]
+    input_starts = [s["start"] for s in inputs]
+    verified = 0
+    hidden_starts = 0
+    completed = Counter()
+    callbacks = Counter()
+    for show in reopens:
+        index = bisect_left(transitions, show["start"])
+        if index == 0 or changes[index - 1]["label"] != "hide":
+            continue
+        hide = changes[index - 1]
+        start, end = hide["sampled"], show["start"]
+        if ((hide["before"], hide["after"], show["before"], show["after"]) != (1, 0, 0, 1)
+                or not bounds[0] <= start < end <= bounds[1]):
+            continue
+        verified += 1
+        for _, finish, label in presentations[bisect_left(present_starts, start):bisect_left(present_starts, end)]:
+            hidden_starts += 1
+            if finish <= end:
+                completed[label] += 1
+        for event in inputs[bisect_left(input_starts, start):bisect_left(input_starts, end)]:
+            if event["end"] <= end:
+                callbacks[event["label"]] += 1
+    return dict(eligibleReopens=len(reopens), verifiedHiddenIntervals=verified,
+                presentCallsStarted=hidden_starts, completedPresentsByCallback=dict(completed),
+                completedWindowAndLoopCallbacks=dict(callbacks))
+
+
 def correlate(text, native_dxgi, inventory, single):
     presentation = inventory["presentation"]
     frequency, pid = presentation["qpcFrequency"], presentation["guiPid"]
@@ -77,6 +111,7 @@ def correlate(text, native_dxgi, inventory, single):
     starts = [s["start"] for s in callbacks]
     latest_end = list(accumulate((s["end"] for s in callbacks), max))
     commands_by_callback = Counter()
+    reopens = []
     def callback_at(start, end):
         enclosing = callbacks[bisect_left(latest_end, end):bisect_right(starts, start)]
         return next((s["label"] for s in reversed(enclosing) if end <= s["end"]), "outside-recorded-callback")
@@ -95,6 +130,7 @@ def correlate(text, native_dxgi, inventory, single):
                    redrawCallbackWallMs=occupied_ticks((s for s in active if s["label"] == "redraw-event"), a, b) * factor,
                    resizeCallbackWallMs=occupied_ticks((s for s in active if s["label"] == "resize-event"), a, b) * factor)
         if opening:
+            reopens.append(native)
             dequeued = one("open-dequeued", delivery["start"], native["start"])
             commands_by_callback[callback_at(dequeued["start"], dequeued["end"])] += 1
             row.update(pipeWakeCallMs=(delivery["end"] - delivery["start"]) * factor,
@@ -111,16 +147,21 @@ def correlate(text, native_dxgi, inventory, single):
     by_callback = Counter()
     threads = Counter()
     first, last = presentation["firstPassBoundsQpc"]
+    all_presents = []
     for line in native_dxgi.splitlines():
         if not line.startswith("DXGI "):
             continue
         process, thread, interval, flags, start, end = map(int, line.split()[1:])
+        if process != pid or thread <= 0 or end < start or flags & 1:
+            raise ValueError("The DXGI call does not belong to this process and clock")
+        label = callback_at(start, end) if thread == ui else "other-owned-thread"
+        all_presents.append((start, end, label))
         if not first <= start <= end <= last:
             continue
         if (process, interval, flags & 0x201) != (pid, 0, 0) or thread <= 0:
             raise ValueError("The native presentation does not belong to the owned Mailbox process")
         threads[thread] += 1
-        by_callback[callback_at(start, end) if thread == ui else "other-owned-thread"] += 1
+        by_callback[label] += 1
     if sum(by_callback.values()) != presentation["successfulPresents"]:
         raise ValueError("The number of successful, attributable scan presents differs")
     actions = {}
@@ -133,7 +174,8 @@ def correlate(text, native_dxgi, inventory, single):
             responseBeforeNativeVisibilitySample=sum(row["externalMinusVisibilitySampleMs"] < 0 for row in rows))
     return dict(guiPid=pid, hwnd=hwnd, uiThread=ui, pipeThread=pipe.pop(), frequency=frequency, singleWake=single,
                 privateWakeCallbacks=len(groups["private-wake"]), activationsByUiCallback=dict(commands_by_callback),
-                presentationThreads=dict(threads), presentsByUiCallback=dict(by_callback), actions=actions)
+                presentationThreads=dict(threads), presentsByUiCallback=dict(by_callback), actions=actions,
+                hidden=hidden_presents(spans, reopens, all_presents, presentation["traceBoundsQpc"]))
 
 
 def run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, primary, check_device):
@@ -147,11 +189,14 @@ def run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token,
     record["primaryResultSha256"] = sha(primary)
     record["dispatchObserverSha256"] = sha(HERE / "dispatch.py")
     record["cases"] = {}
-    for index, name in enumerate(("root-repaint", "single-wake"), 1):
+    failures = []
+    for index, name in enumerate(("root-repaint", "single-wake", "original-hidden-paint"), 1):
         trial = f"rust-{index}-scan"
-        single = index == 2
+        single = name == "single-wake"
+        original = name == "original-hidden-paint"
         with ExitStack() as env:
-            for key, value in (("IFW_QA_WINDOWS_DISPATCH", "1"), ("IFW_QA_WINDOWS_SINGLE_WAKE", str(int(single)))):
+            for key, value in (("IFW_QA_WINDOWS_DISPATCH", "1"), ("IFW_QA_WINDOWS_SINGLE_WAKE", str(int(single))),
+                               ("IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL", str(int(original)))):
                 os.environ[key] = value
                 env.callback(os.environ.pop, key)
             observed = recorder.measure_scan(api, fixture, "rust", gui, files, area / trial, endpoint, user_sid,
@@ -168,6 +213,16 @@ def run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token,
         wakes = [s for s in log_text.splitlines() if s.startswith("WINDOW_WAKE ")]
         if wakes != (["WINDOW_WAKE mode=single"] if single else []):
             raise ValueError("The owned process started a different wake policy")
+        controls = [s for s in log_text.splitlines() if s.startswith("WINDOW_HIDDEN_PAINT ")]
+        if controls != (["WINDOW_HIDDEN_PAINT mode=original"] if original else []):
+            raise ValueError("The owned process started a different hidden-root paint policy")
         observed["dispatch"] = correlate(log_text, dxgi.read_text(encoding="ascii"),
                                          observed, single)
         recorder.write(out / "result.json", record)
+        hidden = observed["dispatch"]["hidden"]
+        if hidden["verifiedHiddenIntervals"] < 5:
+            failures.append(f"{name} has fewer than five verified hidden intervals")
+        if not original and hidden["presentCallsStarted"]:
+            failures.append(f"{name} presented to a confirmed hidden root window")
+    if failures:
+        raise ValueError(". ".join(failures))

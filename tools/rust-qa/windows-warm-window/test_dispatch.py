@@ -26,7 +26,8 @@ def sample(single=True):
         presents.append(f"DXGI 42 5 0 0 {t + 69} {t + 72}")
     trace = "\n".join([f"DISPATCH_BEGIN 42 1000 {int(single)} {len(spans)} 0", *spans, "DISPATCH_END"])
     inventory = dict(guiPid=42, eligibleResponses=requests, allRequests=requests,
-                     presentation=dict(guiPid=42, qpcFrequency=1000, firstPassBoundsQpc=[5, 600], successfulPresents=6))
+                     presentation=dict(guiPid=42, qpcFrequency=1000, traceBoundsQpc=[0, 625],
+                                       firstPassBoundsQpc=[5, 600], successfulPresents=6))
     return trace, "\n".join(presents), inventory
 
 
@@ -46,6 +47,28 @@ class DispatchTests(unittest.TestCase):
             self.assertEqual(timings["externalMinusVisibilitySampleMs"]["median"], -7)
             self.assertEqual(actions["responseBeforeNativeVisibilitySample"], 6)
             self.assertEqual(actions["nativeVisibilityBeforeAfter"], {"0-to-1": 6})
+            self.assertEqual(report["hidden"]["verifiedHiddenIntervals"], 6)
+            self.assertEqual(report["hidden"]["presentCallsStarted"], 0)
+
+    def test_hidden_interval_starts_after_native_hide_and_ends_before_show(self):
+        trace, dxgi, inv = sample(single=False)
+        lines = trace.splitlines()
+        extra_events = ["DISPATCH modifiers-empty-event 5 16 18 0 -1 -1 0",
+                        "DISPATCH focus-lost-event 5 19 27 0 -1 -1 0"]
+        lines[0] = f"DISPATCH_BEGIN 42 1000 0 {len(lines) - 2 + len(extra_events)} 0"
+        lines[-1:-1] = extra_events
+        # First hidden interval is [15, 42). One call crosses its end and one began before its start.
+        calls = ["DXGI 42 5 0 0 14 16", "DXGI 42 5 0 0 16 17", "DXGI 42 5 0 0 19 23",
+                 "DXGI 42 5 0 0 41 43", "DXGI 42 5 0 0 42 44"]
+        inv["presentation"]["successfulPresents"] += len(calls)
+        trace = "\n".join(lines)
+        dxgi = "\n".join([dxgi, *calls])
+        result = correlate(trace, dxgi, inv, False)["hidden"]
+        self.assertEqual(result["presentCallsStarted"], 3)
+        self.assertEqual(result["completedPresentsByCallback"], {"modifiers-empty-event": 1, "focus-lost-event": 1})
+        self.assertEqual(result["completedWindowAndLoopCallbacks"]["focus-lost-event"], 1)
+        inv["presentation"]["traceBoundsQpc"][0] = 16
+        self.assertEqual(correlate(trace, dxgi, inv, False)["hidden"]["verifiedHiddenIntervals"], 5)
 
     def test_preserves_out_of_thread_presents_and_delayed_native_visibility_as_observed(self):
         trace, dxgi, inv = sample()
@@ -56,6 +79,7 @@ class DispatchTests(unittest.TestCase):
         report = correlate("\n".join(lines).replace(" 9 0 1 ", " 9 0 0 "), dxgi.replace("42 5", "42 7"), inv, True)
         self.assertEqual(report["presentsByUiCallback"], {"other-owned-thread": 6})
         self.assertEqual(report["actions"]["reopen"]["nativeVisibilityBeforeAfter"], {"0-to-0": 6})
+        self.assertEqual(report["hidden"]["verifiedHiddenIntervals"], 0)
         timings = report["actions"]["reopen"]["durations"]
         self.assertEqual(timings["uiCallbackWallMs"]["median"], 16)
         self.assertEqual(timings["redrawCallbackWallMs"]["median"], 5)
