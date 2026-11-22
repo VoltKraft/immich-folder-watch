@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "ifw-winit-import"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "AGPL-3.0-only"
+publish = false
+
+[[bin]]
+name = "ifw-winit-import"
+path = "winit.rs"
+
+[dependencies]
+winit = { version = "=0.30.13", default-features = false, features = ["x11", "wayland", "rwh_06"] }

@@ -1,12 +1,13 @@
-"""Check named ARM64 import objects and the linked PE import directory."""
+"""Check named 64-bit import objects and the linked PE import directory."""
 
 import struct
 from collections import defaultdict
 
 ARM64 = 0xAA64
+AMD64 = 0x8664
 
 
-def import_headers(path):
+def import_headers(path, machine=ARM64):
     data = path.read_bytes()
     if not data.startswith(b"!<arch>\n"):
         raise ValueError("Invalid COFF archive")
@@ -23,13 +24,13 @@ def import_headers(path):
         if header[:16].rstrip() in (b"/", b"//"):
             continue
         if blob[:4] != b"\0\0\xff\xff":
-            if struct.unpack_from("<H", blob)[0] != ARM64:
-                raise ValueError("Non-ARM64 descriptor object")
+            if struct.unpack_from("<H", blob)[0] != machine:
+                raise ValueError("Wrong COFF descriptor machine")
             coff += 1
             continue
-        _, _, version, machine, _, length, hint, flags = struct.unpack_from("<HHHHIIHH", blob)
-        if (version, machine, length, flags) != (0, ARM64, len(blob) - 20, 4):
-            raise ValueError("Unexpected ARM64 import version, size, lookup-by-name or function type")
+        _, _, version, arch, _, length, hint, flags = struct.unpack_from("<HHHHIIHH", blob)
+        if (version, arch, length, flags) != (0, machine, len(blob) - 20, 4):
+            raise ValueError("Unexpected import version, machine, size, lookup-by-name or function type")
         symbol, library, tail = blob[20:].decode("ascii").split("\0")
         if tail or symbol in symbols[library]:
             raise ValueError(f"Duplicate or malformed import in {library}")
@@ -39,14 +40,14 @@ def import_headers(path):
     return dict(symbols), coff
 
 
-def pe_imports(path):
+def pe_imports(path, machine=ARM64):
     image = path.read_bytes()
     pe, = struct.unpack_from("<I", image, 0x3C)
-    machine, count = struct.unpack_from("<HH", image, pe + 4)
+    arch, count = struct.unpack_from("<HH", image, pe + 4)
     opt_size, = struct.unpack_from("<H", image, pe + 20)
     opt = pe + 24
-    if (image[pe:pe+4], machine, struct.unpack_from("<H", image, opt)[0]) != (b"PE\0\0", ARM64, 0x20B):
-        raise ValueError("Expected an ARM64 PE32+ image")
+    if (image[pe:pe+4], arch, struct.unpack_from("<H", image, opt)[0]) != (b"PE\0\0", machine, 0x20B):
+        raise ValueError(f"Expected a PE32+ image with machine {machine:#x}")
     sections = [struct.unpack_from("<IIII", image, opt + opt_size + i * 40 + 8)
                 for i in range(count)]
 

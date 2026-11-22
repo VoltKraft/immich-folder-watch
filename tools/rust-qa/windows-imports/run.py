@@ -1,4 +1,4 @@
-"""Reconstruct the Windows ARM64 import surface from pinned Microsoft metadata."""
+"""Reconstruct a Windows import archive from pinned Microsoft WinMD and exercise its bindings."""
 
 import argparse
 import json
@@ -12,13 +12,20 @@ from collections import defaultdict
 from pathlib import Path
 
 from formats import import_headers, pe_imports
-from inputs import BASE, BASELINES, HERE, LIBRARY, ROOT, SOURCE_TAR, crates, sha, source_bundle, target_std, upstream
+from inputs import (BASE, BASELINES, HERE, LIBRARY, ROOT, SOURCE_TAR, WINDOWS_ARM64, WINDOWS_X64,
+                    crates, sha, source_bundle, target_std, upstream)
 from relink import variant
+from winit_relink import winit_consumer
 
-TARGET = "aarch64-pc-windows-msvc"
+TARGETS = {t.triple: t for t in (WINDOWS_ARM64, WINDOWS_X64)}
 RUST_REVISION = "0ef1bc386059596dada8fb65b50425aab2ea637a"
 EXE = ".exe" if os.name == "nt" else ""
-REQUIRED_IMPORT = {"kernel32.dll": ["IsProcessorFeaturePresent"]}
+PROBES = {
+    WINDOWS_ARM64: ("probe.rs", ("ifw_feature", "ifw_ring_feature"),
+                    {"kernel32.dll": ["IsProcessorFeaturePresent"]}),
+    WINDOWS_X64: ("probe_x64.rs", ("ifw_current_thread_id", "ifw_system_metric"),
+                  {"kernel32.dll": ["GetCurrentThreadId"], "user32.dll": ["GetSystemMetrics"]}),
+}
 
 
 def run(command, directory, *, env=None, timeout=180):
@@ -91,7 +98,7 @@ def read_metadata(compiler, source, work):
     return dict(tables), args
 
 
-def llvm_library(linker, tables, directory):
+def llvm_library(linker, tables, directory, target):
     directory.mkdir()
     libraries = []
     for dll, imports in tables.items():
@@ -102,26 +109,26 @@ def llvm_library(linker, tables, directory):
         (directory / definition).write_bytes(
             (f"LIBRARY {dll}\nEXPORTS\n" + "\n".join(entries) + "\n").encode("ascii"))
         filename = dll + ".lib"
-        run([*linker, "/lib", "/machine:arm64", f"/def:{definition}", f"/out:{filename}"], directory)
+        run([*linker, "/lib", f"/machine:{target.vs_arch}", f"/def:{definition}", f"/out:{filename}"], directory)
         libraries.append(filename)
     run([*linker, "/lib", f"/out:{LIBRARY}", *libraries], directory)
     return directory / LIBRARY
 
 
-def compiler_environment(work):
-    """Choose the installed Microsoft ARM64 compiler and librarian for the upstream tool."""
+def compiler_environment(work, target):
+    """Choose the installed Microsoft compiler and librarian for the requested target."""
     finder = Path(os.environ["ProgramFiles(x86)"]) / "Microsoft Visual Studio/Installer/vswhere.exe"
     path = Path(run([finder, "-utf8", "-latest", "-products", "*", "-property", "installationPath"],
                     work).decode("utf-8-sig").strip())
     setup = path / "Common7/Tools/VsDevCmd.bat"
     if not setup.is_absolute() or not setup.is_file():
-        raise ValueError("Visual Studio ARM64 C++ tools were not found")
+        raise ValueError("Visual Studio C++ tools were not found")
 
     def selected(values, host):
         env = {k.upper(): v for k, v in values.items()}
         programs = [shutil.which(name, path=env["PATH"]) for name in ("cl.exe", "lib.exe")]
         if all(x and Path(x).resolve().is_relative_to(path.resolve()) and
-               Path(x).parent.name.lower() == "arm64" for x in programs):
+               Path(x).parent.name.lower() == target.vs_arch for x in programs):
             return env, {"compiler": sha(Path(programs[0])), "librarian": sha(Path(programs[1])),
                          "version": env.get("VCTOOLSVERSION"), "hostArch": host,
                          "binDirectory": Path(programs[0]).parent.relative_to(path).as_posix()}
@@ -135,10 +142,11 @@ def compiler_environment(work):
     # paths such as Program Files are quoted only by the batch language itself.
     if any(character in str(setup) for character in '"%\r\n'):
         raise ValueError("Unsupported Visual Studio setup path")
-    activate = work / "ifw-arm64-tools.cmd"
+    activate = work / "ifw-msvc-tools.cmd"
     attempts = []
-    for host in ("arm64", "amd64"):
-        activate.write_bytes((f'@call "{setup}" -no_logo -arch=arm64 -host_arch={host} >nul\r\n'
+    hosts = ("arm64", "amd64") if target == WINDOWS_ARM64 else ("amd64",)
+    for host in hosts:
+        activate.write_bytes((f'@call "{setup}" -no_logo -arch={target.vs_arch} -host_arch={host} >nul\r\n'
                               '@if errorlevel 1 exit /b 1\r\n@set\r\n').encode('mbcs'))
         process = subprocess.run([os.environ["COMSPEC"], "/d", "/u", "/c", activate.name], cwd=work,
                                  stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
@@ -150,51 +158,55 @@ def compiler_environment(work):
         found = selected({**os.environ, **values}, host)
         if found:
             return found
-    raise ValueError("Could not locate the ARM64 compiler and librarian after setup: " + ", ".join(attempts))
+    raise ValueError(f"Could not locate the {target.vs_arch} compiler and librarian after setup: " + ", ".join(attempts))
 
 
-def original_generator(compiler, source, args, work, env):
+def original_generator(compiler, source, args, work, env, target):
     version = tomllib.loads((source / "crates/tools/msvc/Cargo.toml").read_text("utf-8"))["package"]["version"]
-    env = {**env, "PLATFORM": "arm64", "CARGO_PKG_VERSION": version}
+    env = {**env, "PLATFORM": target.vs_arch, "CARGO_PKG_VERSION": version}
     program = work / "microsoft-import-generator.exe"
     run([compiler, *args, source / "crates/tools/msvc/src/main.rs", "-o", program], work, env=env)
     folder = work / "msvc"
-    dest = folder / "crates/targets/aarch64_msvc/lib"
+    dest = folder / "crates/targets" / target.crate.removeprefix("windows_") / "lib"
     dest.mkdir(parents=True)
     run([program], folder, env=env, timeout=1200)
     return dest / LIBRARY
 
 
-def compile_binding(compiler, cargo, work, sysroot):
-    args = [compiler, "--target", TARGET, "--edition=2021", "--crate-type=lib", "-O"]
+def compile_binding(compiler, cargo, work, sysroot, target):
+    args = [compiler, "--target", target.triple, "--edition=2021", "--crate-type=lib", "-O"]
     if sysroot:
         args.extend(["--sysroot", sysroot])
     targets = work / "libwindows_targets.rmeta"
     bindings = work / "libwindows_sys.rmeta"
     run([*args, "--emit=metadata", "--crate-name", "windows_targets",
          cargo / "windows-targets/src/lib.rs", "-o", targets], work)
-    features = [value for feature in ("Win32", "Win32_Foundation", "Win32_System", "Win32_System_Threading")
-                for value in ("--cfg", f'feature="{feature}"')]
+    names = ["Win32", "Win32_Foundation", "Win32_System", "Win32_System_Threading"]
+    if target == WINDOWS_X64:
+        names += ["Win32_UI", "Win32_UI_WindowsAndMessaging"]
+    features = [value for name in names for value in ("--cfg", f'feature="{name}"')]
     run([*args, "--emit=metadata", "--crate-name", "windows_sys", *features,
          "--extern", f"windows_targets={targets}", cargo / "windows-sys/src/lib.rs", "-o", bindings], work)
     obj = work / "binding.obj"
     run([*args, "--emit=obj", "-L", work, "--extern", f"windows_sys={bindings}",
-         HERE / "probe.rs", "-o", obj], work)
+         HERE / PROBES[target][0], "-o", obj], work)
     return obj
 
 
-def link_probe(linker, obj, lib, directory):
+def link_probe(linker, obj, lib, directory, target):
     directory.mkdir()
     out = directory / "kernel-probe.dll"
-    run([*linker, "/dll", "/noentry", "/nodefaultlib", "/machine:arm64", "/timestamp:0",
-         "/export:ifw_feature", "/export:ifw_ring_feature", "/out:kernel-probe.dll", obj, lib], directory)
-    imports = pe_imports(out)
-    if imports != REQUIRED_IMPORT:
+    _, exports, required = PROBES[target]
+    run([*linker, "/dll", "/noentry", "/nodefaultlib", f"/machine:{target.vs_arch}", "/timestamp:0",
+         *("/export:" + symbol for symbol in exports), "/out:kernel-probe.dll", obj, lib], directory)
+    imports = pe_imports(out, target.machine)
+    if imports != required:
         raise ValueError(f"Probe linked unexpected imports {imports}")
     return out
 
 
 def assess(options, result):
+    target = TARGETS[options.target]
     work = Path(tempfile.mkdtemp(prefix="build-", dir=BASE))
     source = work / "source"
     cargo = work / "crates"
@@ -204,84 +216,96 @@ def assess(options, result):
     result["upstream"]["sourceTarSha256"] = sha(bundle)
     if sha(bundle) != SOURCE_TAR:
         raise ValueError("Generated source tar differs from the reviewed identity")
-    records, original = crates(cargo, options.acquire)
+    records, original = crates(cargo, options.acquire, target)
     result["crateInputs"] = records
     compiler, linker, host = rust_tools(work)
     result["compiler"] = {"host": host, "commit": RUST_REVISION,
                           "linker": run([*linker, "--version"], work).decode().strip()}
-    if options.native and (host != TARGET or os.name != "nt"):
-        raise ValueError("Native ARM64 Windows Rust is required for --native")
+    if options.native and (host != target.triple or os.name != "nt"):
+        raise ValueError(f"Native {target.triple} Rust is required for --native")
     tables, rust_args = read_metadata(compiler, source, work)
     result["metadata"] = {"dlls": len(tables), "signatures": sum(map(len, tables.values())),
                           "cdecl": sum(c == "cdecl" for dll in tables.values() for c in dll.values()),
                           "signatureSha256": sha(work / "signatures.tsv")}
-    libs = {"published": original, "llvm": llvm_library(linker, tables, work / "llvm")}
-    repeat = llvm_library(linker, tables, work / "repeat")
+    libs = {"published": original, "llvm": llvm_library(linker, tables, work / "llvm", target)}
+    repeat = llvm_library(linker, tables, work / "repeat", target)
     if repeat.read_bytes() != libs["llvm"].read_bytes():
         raise ValueError("Repeated LLVM rebuilds differ")
     result["llvmRepeatSha256"] = sha(repeat)
-    original_imports, _ = import_headers(original)
+    original_imports, _ = import_headers(original, target.machine)
     sysroot = None
-    if host != TARGET:
-        sysroot, result["crossTargetStd"] = target_std(TARGET, work, options.target_std, options.acquire)
-    obj = compile_binding(compiler, cargo, work, sysroot)
+    if host != target.triple:
+        sysroot, result["crossTargetStd"] = target_std(target.triple, work, options.target_std, options.acquire)
+    obj = compile_binding(compiler, cargo, work, sysroot, target)
     result["bindingObjectSha256"] = sha(obj)
     library_results = result["libraries"] = {}
 
     def verify(name, library):
-        imports, coff = import_headers(library)
+        imports, coff = import_headers(library, target.machine)
         if coff != 3 * len(tables):
-            raise ValueError(f"{name} differs from the three ARM64 descriptor objects per module")
+            raise ValueError(f"{name} differs from the three {target.vs_arch} descriptor objects per module")
         if {k: set(v) for k, v in imports.items()} != {k: set(v) for k, v in tables.items()}:
             raise ValueError(f"{name} differs from the WinMD named function surface")
         differences = sum(hint != original_imports[dll][symbol] for dll, symbols in imports.items()
                           for symbol, hint in symbols.items())
         if differences:
             raise ValueError(f"{name} differs from the published lookup hints")
-        probe = link_probe(linker, obj, library, work / ("pe-" + name))
+        probe = link_probe(linker, obj, library, work / ("pe-" + name), target)
         library_results[name] = {
             "sha256": sha(library), "exactPublishedBytes": library.read_bytes() == original.read_bytes(),
             "descriptorObjects": coff, "hintDifferences": differences, "peSha256": sha(probe),
-            "peImports": pe_imports(probe),
+            "peImports": pe_imports(probe, target.machine),
         }
         if options.native:
             library_results[name]["execution"] = json.loads(run([observer, probe], work))
     env = os.environ.copy()
     if options.native:
-        env, result["microsoftTools"] = compiler_environment(work)
+        env, result["microsoftTools"] = compiler_environment(work, target)
         observer = work / "native-observer.exe"
         run([compiler, "--edition=2021", "-O", HERE / "native.rs", "-o", observer], work, env=env)
     for name, library in libs.items():
         verify(name, library)
     if options.transport:
         result["transport"] = {}
-        variant(work, cargo / "windows_aarch64_msvc", libs["llvm"], compiler, TARGET, run, env,
+        variant(work, cargo / target.crate, libs["llvm"], compiler, target.triple, run, env,
                 options.native, result["transport"])
     if options.native:
-        verify("msvc", original_generator(compiler, source, rust_args, work, env))
+        verify("msvc", original_generator(compiler, source, rust_args, work, env, target))
+        if target == WINDOWS_X64 and not library_results["msvc"]["exactPublishedBytes"]:
+            raise ValueError("Microsoft's original generator did not reproduce the pinned archive bytes")
     if len({lib["peSha256"] for lib in library_results.values()}) != 1:
-        raise ValueError("The linked ARM64 probe differs between import libraries")
+        raise ValueError(f"The linked {target.vs_arch} probe differs between import libraries")
+    if target == WINDOWS_X64:
+        result["winit"] = {}
+        winit_consumer(work, cargo / target.crate, libs["llvm"], compiler, target, run, env,
+                       sysroot, options.native, result["winit"])
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", choices=TARGETS, default=WINDOWS_ARM64.triple)
     parser.add_argument("--acquire", action="store_true", help="fetch missing pinned public source inputs")
-    parser.add_argument("--native", action="store_true", help="also rebuild with MSVC and execute native ARM64 probes")
-    parser.add_argument("--target-std", type=Path, help="official Rust 1.100.0 ARM64 MSVC std tar.xz")
+    parser.add_argument("--native", action="store_true", help="also rebuild with MSVC and execute native probes")
+    parser.add_argument("--target-std", type=Path, help="official Rust 1.100.0 target std tar.xz")
     parser.add_argument("--source-tar", type=Path, help="read the verified filtered source tar offline")
     parser.add_argument("--transport", action="store_true",
                         help="resolve the isolated transport override and run the full relink on native Windows")
     options = parser.parse_args()
+    if options.transport and options.target != WINDOWS_ARM64.triple:
+        parser.error("--transport requires the ARM64 target; only that transport selects this import archive")
     runs = BASE / "runs"
     runs.mkdir(parents=True, exist_ok=True)
-    directory = Path(tempfile.mkdtemp(prefix="arm64-", dir=runs))
+    directory = Path(tempfile.mkdtemp(prefix=TARGETS[options.target].vs_arch + "-", dir=runs))
     first_party = {p.name: sha(p) for p in HERE.iterdir() if p.is_file()}
-    result = {"nativeExecutionRequested": options.native, "sourceFiles": first_party,
+    result = {"target": options.target, "nativeExecutionRequested": options.native, "sourceFiles": first_party,
+              "combinedLockSha256": sha(HERE.parent / "combined-profile/Cargo.lock"),
               "transportInventorySha256": sha(HERE.parent / "realtime/inputs.json"),
               "toolchainInputsSha256": sha(ROOT / "rust/toolchain-inputs.json"),
               "workflowRun": os.environ.get("GITHUB_RUN_ID"), "workflowCommit": os.environ.get("GITHUB_SHA")}
     try:
         assess(options, result)
+        if {p.name: sha(p) for p in HERE.iterdir() if p.is_file()} != first_party:
+            raise ValueError("The assessment sources changed during verification")
         result["passed"] = True
     except Exception as exc:
         result.update(passed=False, error=str(exc))

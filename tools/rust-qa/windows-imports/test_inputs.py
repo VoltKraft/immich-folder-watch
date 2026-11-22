@@ -5,19 +5,45 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from formats import ARM64, import_headers
+from formats import AMD64, ARM64, import_headers
 from inputs import upstream
-from relink import compare_lock
+from relink import check_link_response, compare_lock
 
 
-def import_archive(flags):
+def import_archive(flags, machine=ARM64):
     strings = b"IsProcessorFeaturePresent\0kernel32.dll\0"
-    obj = struct.pack("<HHHHIIHH", 0, 0xffff, 0, ARM64, 0, len(strings), 792, flags) + strings
+    obj = struct.pack("<HHHHIIHH", 0, 0xffff, 0, machine, 0, len(strings), 792, flags) + strings
     header = f"{'kernel32.dll/':<16}{0:<12}{0:<6}{0:<6}{'644':<8}{len(obj):<10}`\n".encode("ascii")
     return b"!<arch>\n" + header + obj + (b"\n" if len(obj) % 2 else b"")
 
 
 class InputBoundaries(unittest.TestCase):
+    def test_x64_rejects_arm64_despite_identical_export_names(self):
+        with tempfile.TemporaryDirectory() as folder:
+            lib = Path(folder) / "test.lib"
+            lib.write_bytes(import_archive(4, AMD64))
+            self.assertIn("kernel32.dll", import_headers(lib, AMD64)[0])
+            with self.assertRaisesRegex(ValueError, "machine"):
+                import_headers(lib, ARM64)
+            lib.write_bytes(import_archive(4, ARM64))
+            with self.assertRaisesRegex(ValueError, "machine"):
+                import_headers(lib, AMD64)
+
+    def test_link_response_rejects_a_published_sibling_with_the_same_filename(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            original = root / "published/windows.0.52.0.lib"
+            rebuilt = root / "rebuilt/windows.0.52.0.lib"
+            for path in (original, rebuilt):
+                path.parent.mkdir()
+                path.touch()
+            response = root / "link.rsp"
+            response.write_text(f'"{original}"\r\n', encoding="utf-16")
+            with self.assertRaisesRegex(ValueError, "isolated import library"):
+                check_link_response(response, rebuilt)
+            response.write_text(f'"{rebuilt}"\r\n', encoding="utf-16")
+            check_link_response(response, rebuilt)
+
     def test_forged_import_kind_fails_even_with_the_expected_name(self):
         with tempfile.TemporaryDirectory() as folder:
             lib = Path(folder) / "test.lib"

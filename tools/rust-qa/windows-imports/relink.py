@@ -14,7 +14,7 @@ REALTIME = HERE.parent / "realtime"
 NAME = "windows_aarch64_msvc"
 
 
-def registry_cache(dst, lock):
+def registry_cache(dst, lock, suite="transport"):
     caches = [BASE.parent / "realtime-cargo", BASE.parent / "realtime-assessment/cargo-home",
               BASE.parent / "assessment-cache"]
     for home in caches:
@@ -29,22 +29,33 @@ def registry_cache(dst, lock):
             isolated.mkdir(parents=True)
             for file, checksum in expected:
                 if sha(file) != checksum:
-                    raise ValueError(f"Locked transport source changed: {file.name}")
+                    raise ValueError(f"Locked {suite} source changed: {file.name}")
                 shutil.copyfile(file, isolated / file.name)
             return len(expected)
-    raise ValueError("The transport (--locked) assessment must first populate its job-local registry cache")
+    raise ValueError(f"The {suite} (--locked) assessment must first populate its job-local registry cache")
 
 
-def compare_lock(before, after):
+def compare_lock(before, after, name=NAME, suite="transport"):
     for pkg in before["package"]:
-        if pkg["name"] == NAME and pkg["version"] == "0.52.6":
+        if pkg["name"] == name and pkg["version"] == "0.52.6":
             del pkg["source"]
             del pkg["checksum"]
             break
     else:
         raise ValueError("Missing original Microsoft registry package")
     if before != after:
-        raise ValueError("Replacing the single import package changed the remaining transport lock")
+        raise ValueError(f"Replacing the single import package changed the remaining {suite} lock")
+
+
+def check_link_response(response, library):
+    """Require the exact isolated path in the full-path MSVC link response."""
+    raw = response.read_bytes()
+    encoding = "utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else (
+        "utf-16-le" if b"\0" in raw[:16] else "utf-8-sig")
+    matches = [line.strip(' "\t') for line in raw.decode(encoding).splitlines()
+               if line.strip(' "\t').lower().endswith(LIBRARY)]
+    if len(matches) != 1 or not Path(matches[0]).samefile(library):
+        raise ValueError("The final link response did not resolve the isolated import library")
 
 
 def variant(work, source, rebuilt, compiler, target, run, env, native, result):
@@ -94,13 +105,7 @@ def variant(work, source, rebuilt, compiler, target, run, env, native, result):
     run([cargo, "rustc", "--release", "--frozen", "--", "-C", f"link-arg=/LINKREPROFULLPATHRSP:{response}",
          "-C", f"link-arg=/MAP:{link_map}"],
         project, env=env, timeout=1500)
-    raw = response.read_bytes()
-    encoding = "utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else (
-        "utf-16-le" if b"\0" in raw[:16] else "utf-8-sig")
-    text = raw.decode(encoding)
-    matches = [line.strip(' "\t') for line in text.splitlines() if line.strip(' "\t').lower().endswith(LIBRARY)]
-    if len(matches) != 1 or not Path(matches[0]).samefile(override / "lib" / LIBRARY):
-        raise ValueError("The final transport response file did not resolve the rebuilt library")
+    check_link_response(response, override / "lib" / LIBRARY)
     result["linkerConfirmedIsolatedLibrary"] = True
     result["featureMapProviders"] = sorted({line.split()[-1] for line in
            link_map.read_text(encoding="utf-8-sig", errors="replace").splitlines()

@@ -1,4 +1,4 @@
-# Windows ARM64 import library reconstruction
+# Windows x64 and ARM64 import library reconstruction
 
 The realtime assessment uses `ring 0.17.14` to query the ARMv8 crypto
 instruction flag through `kernel32!IsProcessorFeaturePresent`. Its Windows
@@ -6,6 +6,15 @@ ARM64 graph selects `windows-sys 0.52.0`, `windows-targets 0.52.6` and
 `windows_aarch64_msvc 0.52.6`. The Windows x64 transport uses ring's
 separately reviewed x64 CPU detection and assembly. [Transport inputs](rw02-realtime-transport.md#dependency-and-native-input-review)
 and [Microsoft's API documentation](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent).
+
+On x64 the combined GUI profile reaches `windows_x86_64_msvc 0.52.6` through
+`winit 0.30.13 → windows-sys 0.52.0 → windows-targets 0.52.6`. Winit calls
+`GetCurrentThreadId` on entry to its Windows event loop and during CRT
+initialization to remember the primary thread. It calls `CreateWindowExW`
+for the event loop's internal message target. The 111-package hosted x64
+transport graph contains ring, windows-sys 0.61.2 and windows-link 0.2.1.
+[Combined graph](rw02-combined-profile.md) · [Winit event-loop source](https://github.com/rust-windowing/winit/blob/e9809ef54b18499bb4f2cac945719ecc2a61061b/src/platform_impl/windows/event_loop.rs)
+· [Native transport graph receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002).
 
 ## Microsoft sources and notices
 
@@ -30,7 +39,7 @@ recipe and all three independently checked registry archives. [Input selection](
 [Microsoft's reader entry point](https://github.com/microsoft/windows-rs/blob/db06b51c2ebb743efb544d40e3064efa49f28d38/crates/tools/lib/src/lib.rs)
 and [MSVC generator](https://github.com/microsoft/windows-rs/blob/db06b51c2ebb743efb544d40e3064efa49f28d38/crates/tools/msvc/src/main.rs).
 
-## Reconstructed interface and local link
+## ARM64 reconstructed interface and local link
 
 On Linux x64, all 20,551 WinMD declarations matched Microsoft's 371 C
 baselines byte for byte, including the argument counts for 19,200 stdcall
@@ -67,6 +76,60 @@ Both used 45 files from the checksum-pinned ARM64 standard-library component.
 The three negative controls rejected a changed import type, an unreviewed source
 tar and an unrelated lockfile change.
 
+## Windows x64 reconstruction
+
+The original x64 crate SHA-256 is
+`589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec`.
+Its target directory, both license notices and published import archive match
+Microsoft revision `db06b51c2ebb743efb544d40e3064efa49f28d38`. Microsoft's
+generator uses the same WinMD function list and 371 C baselines for both
+64-bit targets. The x64 comparison checked every AMD64 descriptor and short
+COFF member, including the machine, undecorated function name, DLL, lookup
+hint and code-import type. The source distinguishes 19,200 stdcall and 1,351
+cdecl declarations. On x64 the compiler uses the Windows x64 calling
+convention for these ordinary functions. The probe calls the original Rust
+`extern "system"` bindings with zero arguments and with an integer argument.
+[Microsoft x64 ABI](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170)
+· [Target source](https://github.com/microsoft/windows-rs/tree/db06b51c2ebb743efb544d40e3064efa49f28d38/crates/targets/x86_64_msvc)
+· [Binding probe](../../tools/rust-qa/windows-imports/probe_x64.rs).
+
+| Fedora x64 cross-link with pinned Rust 1.100.0 and LLVM 23.1.5 | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Published AMD64 archive | 5,210,890 | `24d8cbc445955b0d48041948a3c71ce2cddb948c089b25ec7106fadd9f3efde0` |
+| Source-built AMD64 archive, both independent builds | 5,068,350 | `cc85942812c02a5ad0195125c77c50f9cee24b2c6bf3351881cd203351151bf6` |
+| AMD64 probe PE with either archive | 2,048 | `2eabd604806c3d3e57210b7f126f86826e46cbd7536ec74716f74c612455558f` |
+
+Both archives contain all 20,551 functions and 1,113 descriptor objects.
+The linked PE imports only `kernel32.dll!GetCurrentThreadId` and
+`user32.dll!GetSystemMetrics`. The separate event-loop executable uses the
+complete Apache-2.0 winit 0.30.13 source from the combined lock. The fixture
+verified all 372 original GUI registry archives and reproduced the combined
+x64 feature lists for winit and the three binding packages. The private
+Cargo override replaces the target library with the LLVM rebuild. The
+remaining lock entries stay equal. Cross-compiling winit in both builds
+produced 14 calls to `GetCurrentThreadId` and two to `CreateWindowExW` in
+each target's optimized LLVM IR. [Winit fixture](../../tools/rust-qa/windows-imports/winit.rs)
+· [Cargo and MSVC relink checks](../../tools/rust-qa/windows-imports/winit_relink.py).
+
+The 2026-11-22 offline upstream-source run is recorded in
+`artifacts/rust/windows-imports/runs/x64-xexvnzss/result.json`, SHA-256
+`83ba1b82d46a0f2c314cd588c585d56dca310a18893a3775fd17c68f92aff6be`.
+The ARM64 replay from the filtered tar retained its previous LLVM archive and
+probe PE hashes, and verified all 152 registry archives of the transport.
+Its receipt is `arm64-bdtc56rs/result.json`, SHA-256
+`6aba0e9b820396059c34ac79079773f30687b8cc24a183b2a885a023724ada89`.
+The five input tests passed, including rejection of the other COFF machine
+and a link response resolving the same filename in the wrong directory.
+
+Native x64 execution and byte-for-byte regeneration with Microsoft's
+librarian remain open. The native command builds the published and rebuilt
+winit consumers independently. It requires a full-path linker response, a
+map entry for an executed binding, matching PE imports, successful creation
+of the event loop on the primary thread and winit's expected rejection on
+a worker thread. A separate native observer checks all three linked DLLs
+against the system APIs on two live threads and reads four virtual desktop
+metrics. Each observer confirms native AMD64 using `IsWow64Process2`.
+
 ## Repeat the checks
 
 Use the pinned toolchain under `artifacts/rust/toolchain`. The first command
@@ -81,6 +144,16 @@ copies, build products and original downloads stay under ignored
 python3 tools/rust-qa/windows-imports/run.py --acquire
 python3 tools/rust-qa/windows-imports/run.py --source-tar /path/to/corresponding-source.tar --transport
 python3 -m unittest discover -s tools/rust-qa/windows-imports -p test_inputs.py
+```
+
+For x64, prepare the GUI's private registry cache first. The first command
+below uses the cached source tar and official cross-target standard library
+on Linux. Run the second command on the native Windows x64 candidate host
+after the GUI assessment has fetched its locked sources.
+
+```sh
+python3 -B tools/rust-qa/windows-imports/run.py --target x86_64-pc-windows-msvc --source-tar /path/to/corresponding-source.tar
+python -B tools/rust-qa/windows-imports/run.py --target x86_64-pc-windows-msvc --acquire --native
 ```
 
 On native Windows ARM64, run `python tools/rust-qa/windows-imports/run.py --acquire --native --transport`

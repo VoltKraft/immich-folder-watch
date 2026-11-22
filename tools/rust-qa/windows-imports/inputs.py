@@ -1,4 +1,4 @@
-"""Verify and isolate the upstream sources used by the ARM64 import assessment."""
+"""Verify and isolate the upstream sources used by the Windows import assessment."""
 
 import hashlib
 import io
@@ -7,8 +7,12 @@ import re
 import shutil
 import tarfile
 import tempfile
+import tomllib
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+
+from formats import AMD64, ARM64
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -18,14 +22,23 @@ TARBALL = f"https://codeload.github.com/microsoft/windows-rs/tar.gz/{REVISION}"
 SOURCE_DIGEST = "e5ad2f84779a3f1ca490d9658093fb677c24bd6208e26765096d719f83799087"
 SOURCE_TAR = "cfb0c1357c9b3bc7cb0b746ffce50d23a25b78aeeeaccb1c4e6ad1fa280d979b"
 LIBRARY = "windows.0.52.0.lib"
-LIBRARY_DIGEST = "ca85dd7757f338ba00d0bc19229f176ee426a707425ee4fcf205ec491a95bd5a"
 METADATA = Path("crates/libs/bindgen/default")
 BASELINES = Path("crates/targets/baseline")
-PACKAGES = {
-    "windows_aarch64_msvc": "0.52.6",
-    "windows-sys": "0.52.0",
-    "windows-targets": "0.52.6",
-}
+
+
+@dataclass(frozen=True)
+class Target:
+    triple: str
+    vs_arch: str
+    machine: int
+    crate: str
+    library_sha256: str
+
+
+WINDOWS_ARM64 = Target("aarch64-pc-windows-msvc", "arm64", ARM64, "windows_aarch64_msvc",
+                       "ca85dd7757f338ba00d0bc19229f176ee426a707425ee4fcf205ec491a95bd5a")
+WINDOWS_X64 = Target("x86_64-pc-windows-msvc", "x64", AMD64, "windows_x86_64_msvc",
+                     "24d8cbc445955b0d48041948a3c71ce2cddb948c089b25ec7106fadd9f3efde0")
 PINNED = {
     "license-mit", "license-apache-2.0", "crates/libs/metadata/Cargo.toml",
     "crates/tools/msvc/Cargo.toml", "crates/tools/msvc/src/main.rs",
@@ -137,11 +150,18 @@ def source_bundle(root, output):
             tar.addfile(entry, io.BytesIO(data))
 
 
-def crates(root, acquire):
+def crates(root, acquire, target):
     profile = json.loads((HERE.parent / "realtime/inputs.json").read_bytes())
+    combined = tomllib.loads((HERE.parent / "combined-profile/Cargo.lock").read_text("utf-8"))
     records = {}
-    for name, version in PACKAGES.items():
-        pin, = (p for p in profile["packages"] if p["name"] == name and p["version"] == version)
+    for name, version in ((target.crate, "0.52.6"), ("windows-sys", "0.52.0"), ("windows-targets", "0.52.6")):
+        row, = (p for p in combined["package"] if (p["name"], p["version"]) == (name, version))
+        # The target packages carry the same original Microsoft license files.
+        license_package = WINDOWS_ARM64.crate if name == WINDOWS_X64.crate else name
+        review, = (p for p in profile["packages"] if (p["name"], p["version"]) == (license_package, version))
+        if row["source"] != "registry+https://github.com/rust-lang/crates.io-index" or (
+                name == license_package and row["checksum"] != review["archiveSha256"]):
+            raise ValueError(f"Unexpected registry input for {name}")
         slug = f"{name}-{version}"
         filename = f"{slug}.crate"
         path = BASE / "input" / filename
@@ -152,16 +172,17 @@ def crates(root, acquire):
                 break
         if not path.exists() and acquire:
             download(path, f"https://static.crates.io/crates/{name}/{filename}")
-        if sha(path) != pin["archiveSha256"]:
-            raise ValueError(f"Original archive differs from the transport pin: {slug}")
-        records[name] = {"version": version, "archiveSha256": pin["archiveSha256"]}
+        if sha(path) != row["checksum"]:
+            raise ValueError(f"Original archive differs from the combined lock: {slug}")
+        records[name] = {"version": version, "archiveSha256": row["checksum"],
+                         "notices": review["notices"], "selectedLicense": review["selected"]}
         with tarfile.open(path) as tar:
             for item in tar:
                 prefix = f"{slug}/"
                 if not item.name.startswith(prefix):
                     raise ValueError(f"Unexpected archive root in {slug}")
                 part = item.name[len(prefix):]
-                if (name != "windows_aarch64_msvc" and part not in pin["notices"] and
+                if (name != target.crate and part not in review["notices"] and
                         part != "lib/" + LIBRARY and not part.startswith("src/")):
                     continue
                 pieces = PurePosixPath(part)
@@ -172,10 +193,17 @@ def crates(root, acquire):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 with dest.open("xb") as out:
                     out.write(tar.extractfile(item).read())
-        for notice, digest in pin["notices"].items():
+        for notice, digest in review["notices"].items():
             if sha(root / name / notice) != digest:
                 raise ValueError(f"Notice mismatch for {slug}: {notice}")
-    original = root / "windows_aarch64_msvc/lib" / LIBRARY
-    if sha(original) != LIBRARY_DIGEST:
-        raise ValueError("Original ARM64 import library mismatch")
+    package = root / target.crate
+    vcs = json.loads((package / ".cargo_vcs_info.json").read_bytes())
+    if vcs != {"git": {"sha1": REVISION}, "path_in_vcs": "crates/targets/" + target.crate.removeprefix("windows_")}:
+        raise ValueError(f"Wrong Microsoft source revision for {target.crate}")
+    manifest = tomllib.loads((package / "Cargo.toml").read_text("utf-8"))["package"]
+    if manifest["license"] != "MIT OR Apache-2.0" or manifest["name"] != target.crate or manifest["version"] != "0.52.6":
+        raise ValueError(f"Wrong target crate declaration for {target.triple}")
+    original = package / "lib" / LIBRARY
+    if sha(original) != target.library_sha256:
+        raise ValueError(f"Original {target.vs_arch} import library mismatch")
     return records, original
