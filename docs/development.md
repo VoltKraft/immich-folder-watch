@@ -125,6 +125,13 @@ PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
 
+Windows uploads an early writer archive after the cross-session trials and
+an early set of storage recovery and tray receipts before the scan.
+The final assessment archive contains the detailed logs and full evidence
+inventories. Each archive name includes the native target and commit.
+The x64 and ARM64 import-library jobs rebuild the selected native library
+and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).
+
 The [crash and storage exhaustion fixture](rust/rw02-storage-faults.md)
 uses separate copies for both language verifiers and preserves each
 original backup. On Linux its private mount requires the documented

@@ -165,6 +165,8 @@ to reconcile project decisions, defaults, and recorded state.
   cross-build. Independently review filesystem, migration and final integration.
   The [RW-02 stack decision](docs/rust/rw02-stack-decision.md) records the
   qualified components, native resource limits and remaining desktop checks.
+  Follow the [Windows import-library reconstruction](docs/rust/rw02-windows-imports.md)
+  for the native x64 winit and ARM64 transport consumers.
   Native log adapters use the [isolated host tests](docs/rust/rw02-platform-logs.md);
   the [development guide](docs/development.md#rust-feasibility-workspace)
   lists the other native feasibility entry points.

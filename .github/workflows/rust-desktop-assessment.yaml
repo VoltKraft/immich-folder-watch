@@ -149,6 +149,7 @@ jobs:
         run: python3 tools/rust-qa/platform-logs/observe.py "$NATIVE_TARGET" --output "artifacts/rust/platform-logs/native-$NATIVE_TARGET"
 
       - name: Recover native WAL transactions after process termination and bounded storage failure
+        id: storage_faults
         if: ${{ !cancelled() && steps.storage.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
         shell: bash
         env:
@@ -181,9 +182,27 @@ jobs:
             --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
 
       - name: Activate the application's tray icon from its own disposable Windows desktop
+        id: windows_tray
         if: ${{ !cancelled() && steps.windows_services.outcome == 'success' }}
         shell: bash
         run: python3 -B tools/rust-qa/windows-services/activation.py "$NATIVE_TARGET"
+
+      - name: Retain Windows recovery and tray results before the scan measurements
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.storage_faults.outcome == 'success' || steps.storage_faults.outcome == 'failure' || steps.windows_tray.outcome == 'success' || steps.windows_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-recovery-tray-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-faults/${{ matrix.target }}/result.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/evidence-hashes.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/fault.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/verification.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/csharp-readback.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/process-kill.json
+            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/windows-vhd.json
+            artifacts/rust/windows-services/native-${{ matrix.target }}/activation/*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify the GUI graph and build with the pinned native compiler
         id: gui
@@ -192,6 +211,14 @@ jobs:
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Rebuild the x64 import library and run its native winit consumer
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.gui.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-imports/run.py --target x86_64-pc-windows-msvc --acquire --native
+          exit $LASTEXITCODE
 
       - name: Observe native X11 lifecycle and AT-SPI
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
