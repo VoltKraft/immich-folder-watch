@@ -45,6 +45,7 @@ tools/rust-qa/windows-warm-window/candidate.patch text eol=lf whitespace=-blank-
 tools/rust-qa/windows-display/** text eol=lf
 tools/rust-qa/watch-events/** text eol=lf
 tools/rust-qa/performance/worker/** text eol=lf
+tools/rust-qa/performance/worker-inputs.json text eol=lf
 tools/rust-qa/platform-logs/** text eol=lf
 tools/rust-qa/yaml/** text eol=lf
 tools/rust-qa/linux-services/** text eol=lf

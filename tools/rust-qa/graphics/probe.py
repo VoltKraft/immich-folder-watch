@@ -127,11 +127,12 @@ def launch(args):
     if gui_receipt["binary_sha256"] != sha(subject / "native-gui-assessment"):
         raise ValueError("GUI binary differs from the bound source receipt")
     if args.integrated:
-        from stage_integrated import verify
+        from stage_integrated import WORKER_PROFILE, verify
         verify(subject)
         integrated = json.loads((subject / "integrated.inputs.json").read_text())
         files = {"gui_receipt": subject / "native-gui-assessment.inputs.json",
-                 "worker_receipt": subject / "worker.inputs.json", "submit_observer": subject / "submit-observer/libvulkan.so.1",
+                 "worker_receipt": subject / "worker.inputs.json", "worker_profile": WORKER_PROFILE,
+                 "submit_observer": subject / "submit-observer/libvulkan.so.1",
                  "stage": HERE / "stage_integrated.py", "submit_source": HERE / "submit_loss.rs", "observer_builder": HERE / "build.py"}
         if any(integrated.get(role) != sha(path) for role, path in files.items()):
             raise ValueError("The integrated graphics measurement differs from its input receipt")

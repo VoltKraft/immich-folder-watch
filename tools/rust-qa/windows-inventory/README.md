@@ -17,3 +17,8 @@ Run from the matching MSVC developer shell after the native GUI and YAML assessm
 ```powershell
 python tools/rust-qa/windows-performance/run.py $env:NATIVE_TARGET --output "artifacts/rust/windows-performance/native-$env:NATIVE_TARGET"
 ```
+
+The native filesystem source must match the
+[shared worker input list](../performance/worker-inputs.json). Windows
+checks every current source file and records the list's digest with the build.
+The frozen inventory and its Cargo manifest and lock are checked independently.

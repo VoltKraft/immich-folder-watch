@@ -8,12 +8,13 @@ import shutil
 import sys
 
 from build import instrument_submit
-from inputs import WORKER_SOURCES, sha, source_digest
+from inputs import sha
 
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 ART = ROOT / "artifacts/rust"
+WORKER_PROFILE = HERE.parent / "performance/worker-inputs.json"
 
 
 def verify(subject):
@@ -21,14 +22,17 @@ def verify(subject):
     import source_profile
     gui = json.loads((subject / "native-gui-assessment.inputs.json").read_text())
     worker = json.loads((subject / "worker.inputs.json").read_text())
-    required = {"tools/rust-qa/gui/src/" + name for name in ("main.rs", "graphics.rs", "fonts.rs", "native_window.rs", "linux.rs", "tray-icon.argb")}
+    required = {"tools/rust-qa/gui/src/" + name for name in
+                ("main.rs", "graphics.rs", "fonts.rs", "native_window.rs", "linux.rs", "tray-icon.argb",
+                 "linux_appearance.rs", "appearance_style.rs")}
+    reviewed_worker = json.loads(WORKER_PROFILE.read_text(encoding="utf-8"))
     if (not required.issubset(gui["sources"]) or gui["binary_sha256"] != sha(subject / "native-gui-assessment")
-            or worker["gui_sha256"] != gui["binary_sha256"] or source_digest(worker) != WORKER_SOURCES
+            or worker["gui_sha256"] != gui["binary_sha256"] or worker["sources"] != reviewed_worker
             or gui.get("sourceProfileSha256") != sha(source_profile.REVIEW)):
-        raise ValueError("The integrated GUI, source profile and frozen worker receipt are required")
-    for name, digest in gui["sources"].items():
+        raise ValueError("The integrated GUI and reviewed native worker receipts are required")
+    for name, digest in (*gui["sources"].items(), *reviewed_worker.items()):
         if sha(ROOT / name) != digest:
-            raise ValueError(f"The build differs from the working native GUI source {name}")
+            raise ValueError(f"The staged subject differs from the working source {name}")
     for name, digest in (("ifw-performance-worker", worker["worker_sha256"]),
                          ("observer/libvulkan.so.1", worker["observer_sha256"])):
         if sha(subject / name) != digest:
@@ -53,7 +57,7 @@ def stage(args):
         dest.parent.mkdir(exist_ok=True)
         shutil.copy2(base / name, dest)
     observer = instrument_submit(work, subject, worker)
-    receipt = dict(gui_receipt=sha(subject / "native-gui-assessment.inputs.json"),
+    receipt = dict(gui_receipt=sha(subject / "native-gui-assessment.inputs.json"), worker_profile=sha(WORKER_PROFILE),
                    worker_receipt=sha(subject / "worker.inputs.json"), submit_observer=observer,
                    submit_source=sha(HERE / "submit_loss.rs"), observer_builder=sha(HERE / "build.py"),
                    stage=sha(Path(__file__)))

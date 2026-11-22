@@ -82,6 +82,18 @@ python3 tools/rust-qa/gui/native.py --backend wayland --binary "$subject/native-
 
 ### Local integrated observations
 
+The current integrated Linux and Windows performance subjects use one
+[reviewed inventory source list](../../tools/rust-qa/performance/worker-inputs.json).
+It includes the handle-bound filesystem at `88fd180`. The historical
+graphics control still verifies its original worker source digest. A fresh
+offline Fedora x64 build matched all thirteen current source hashes and
+rejected the older worker at `a66e045`. Under X11 the real Mesa driver-loss
+case restored the draft and editor focus, presented four frames after the
+next key and processed another file on the same worker. The process exited
+successfully after 48 presentations. The native report
+`graphics/x11-recovery-current-88fd180/results.json` under `artifacts/rust/`
+has SHA-256 `3efbeb0bb9bc915f825c69ff39811bca5f71f39250d8a788465a9e5ff0954aa8`.
+
 The 11 recorded first-party GUI source hashes of release binary `80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002` match both `417a897` and `8b071ab`. Its text source profile was `68d5585d27f45449e3382a96afc6e17bc37f625cae1ef153fb81c9ffde399f48`. X11 and Wayland independently observed actual logical-device destruction during a GUI pass, renderer replacement, the restored focused filename and a new native key. An absent software ICD exhausted two automatic attempts on each desktop. The worker processed a new file while the tray advertised the failure. Additional X11 controls covered real Intel-to-CPU recovery, a second loss, explicit reactivation, diagnostic rejection on ordinary startup, and propagation of an unrelated panic. The historical overlay replay reproduced the original executable byte for byte. [Local artifact checksums](../../tools/rust-qa/graphics/evidence/integrated-linux-x64.sha256)
 
 Three runs scanning 100,000 synthetic files each passed all eleven pre-established same-host .NET resource thresholds. Startup was 177.910 ms. The full subject tree used 127.355 MiB median RSS both visible and hidden. Idle samples recorded zero CPU ticks, XDamage events and successful Vulkan presents in both states. During the scan, the 95th percentiles for opening and closing were 1.50 and 10.66 ms. The measured GUI, development worker and ordinary resource driver have separate input receipts. [Reference, workload and thresholds](rw02-performance.md)

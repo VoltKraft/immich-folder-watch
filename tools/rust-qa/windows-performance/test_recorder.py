@@ -202,6 +202,22 @@ class RecorderTests(unittest.TestCase):
             self.assertEqual(subject.sha(worker / "Cargo.toml"), subject.MANIFEST_HASH)
             self.assertIn("inventory_release()?;", new)
 
+    def test_inventory_staging_requires_the_exact_reviewed_filesystem(self):
+        reviewed = json.loads(subject.WORKER_PROFILE.read_text(encoding="utf-8"))
+        entry = "rust/crates/safe-fs/src/lib.rs"
+        wrong_hash = {**reviewed, entry: "0" * 64}
+        missing = {name: digest for name, digest in reviewed.items() if name != entry}
+        extra = {**reviewed, "rust/crates/safe-fs/src/extra.rs": "0" * 64}
+        with tempfile.TemporaryDirectory() as temp:
+            profile = Path(temp) / "worker-inputs.json"
+            project = Path(temp) / "project"
+            for label, changed in (("changed", wrong_hash), ("missing", missing), ("extra", extra)):
+                with self.subTest(label=label), patch.object(subject, "WORKER_PROFILE", profile):
+                    profile.write_text(json.dumps(changed), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "reviewed worker profile"):
+                        subject.stage_workspace(project)
+                    self.assertFalse(project.exists())
+
     def test_process_totals_follow_the_supervisor_and_its_verified_descendants(self):
         class Snapshot:
             def __init__(self):

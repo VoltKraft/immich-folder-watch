@@ -16,7 +16,7 @@ ORIGINAL = QA / "performance/worker"
 SOURCE_HASH = "edee4a245a8aee38963ce1ee54ce05ad78d5a12f3b4b34deeb73eba2cdbf1a68"
 LOCK_HASH = "6d1876027b3c8d55ce479471e51a5c4d0f356e00597c393abeb7b16a1a270905"
 MANIFEST_HASH = "dbc101945286359d703e79fdb3bedab24429964ecffb0991985cd2e3a059bfa6"
-SAFE_FS_HASH = "ef03c25c0477abe32314bd3be3ffc8d031e61bbe7034ac68e250a52929caeb6c"
+WORKER_PROFILE = QA / "performance/worker-inputs.json"
 
 
 def sha(path):
@@ -37,11 +37,10 @@ def stage_workspace(project):
         raise ValueError("Windows inventory requires the approved worker source, manifest and lock")
     crate = ROOT / "rust/crates/safe-fs"
     approved = [ROOT / "rust/Cargo.toml", crate / "Cargo.toml", *sorted((crate / "src").glob("*.rs"))]
-    tree = hashlib.sha256()
-    for path in sorted(approved):
-        tree.update(path.relative_to(ROOT).as_posix().encode("utf-8") + b"\0" + bytes.fromhex(sha(path)))
-    if tree.hexdigest() != SAFE_FS_HASH:
-        raise ValueError("The handle-bound native filesystem source differs from the comparison baseline")
+    review = json.loads(WORKER_PROFILE.read_text(encoding="utf-8"))
+    reviewed_fs = {name: digest for name, digest in review.items() if name.startswith("rust/")}
+    if {path.relative_to(ROOT).as_posix(): sha(path) for path in approved} != reviewed_fs:
+        raise ValueError("The handle-bound native filesystem source differs from the reviewed worker profile")
     worker = project / "tools/rust-qa/performance/worker"
     (worker / "src").mkdir(parents=True)
     for name in ("Cargo.lock", "Cargo.toml"):
@@ -137,7 +136,7 @@ def build_subject(area, output, gui, target, pe_machine):
     if any(pe_machine(p) != machine for p in (rust, executable, trace) if p is not None):
         raise ValueError("The staged native inventory subject or observer has an unexpected architecture")
     files = [*sorted(HERE.glob("*.rs")), *sorted(HERE.glob("*.py")), HERE / "file-observer.cpp",
-             HERE.parent / "windows-performance/etw-owned.h", review_path,
+             HERE.parent / "windows-performance/etw-owned.h", review_path, WORKER_PROFILE,
              ORIGINAL / "src/main.rs", ORIGINAL / "Cargo.toml", ORIGINAL / "Cargo.lock", ROOT / "rust/Cargo.toml",
              ROOT / "rust/crates/safe-fs/Cargo.toml", *sorted((ROOT / "rust/crates/safe-fs/src").glob("*.rs"))]
     facts = dict(gui=sha(rust), worker=sha(executable), fileObserver=sha(trace) if trace else None, compiledEntry=sha(worker / "src/main.rs"),
