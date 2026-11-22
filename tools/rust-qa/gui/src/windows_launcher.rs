@@ -1,4 +1,4 @@
-use super::win32_instance as local;
+use super::{launcher_delivery, win32_instance as local};
 use std::ffi::c_void;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::TrySendError;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -43,15 +44,12 @@ pub struct Listener {
 }
 
 impl Listener {
-    pub fn stop(mut self) -> io::Result<()> {
-        self.finish()
-    }
-
-    fn finish(&mut self) -> io::Result<()> {
+    pub fn stop(&mut self) -> io::Result<()> {
         let Some(worker) = self.worker.take() else {
             return Ok(());
         };
         self.stopping.store(true, Ordering::Release);
+        worker.thread().unpark();
         let deadline = Instant::now() + TIMEOUT;
         while !worker.is_finished() {
             // Connect to our own waiting listener and close without sending a command.
@@ -73,7 +71,7 @@ impl Listener {
 
 impl Drop for Listener {
     fn drop(&mut self) {
-        if let Err(error) = self.finish() {
+        if let Err(error) = self.stop() {
             eprintln!("Local launcher cleanup failed: {error}");
         }
     }
@@ -150,7 +148,11 @@ fn received(mut pipe: &File, stopping: &AtomicBool) -> io::Result<bool> {
     Ok(false)
 }
 
-fn listen(pipe: File, stopping: &AtomicBool, open: impl Fn() -> bool) -> io::Result<()> {
+fn listen<T>(
+    pipe: File,
+    stopping: &AtomicBool,
+    open: impl Fn() -> Result<(), TrySendError<T>>,
+) -> io::Result<()> {
     while !stopping.load(Ordering::Acquire) {
         match local::accept(&pipe) {
             Ok(()) => {
@@ -158,12 +160,8 @@ fn listen(pipe: File, stopping: &AtomicBool, open: impl Fn() -> bool) -> io::Res
                     break;
                 }
                 let client = local::peer_pid(&pipe, false)?;
-                if received(&pipe, stopping)? {
-                    if open() {
-                        println!("LAUNCHER_OPEN client={client}");
-                    } else {
-                        eprintln!("Local window activation queue unavailable");
-                    }
+                if received(&pipe, stopping)? && launcher_delivery::enqueue(stopping, &open)? {
+                    println!("LAUNCHER_OPEN client={client}");
                 }
             }
             Err(error) if error.raw_os_error() == Some(232) => (),
@@ -180,7 +178,9 @@ fn listen(pipe: File, stopping: &AtomicBool, open: impl Fn() -> bool) -> io::Res
     Ok(())
 }
 
-pub fn start_launcher(open: impl Fn() -> bool + Send + 'static) -> io::Result<Launch> {
+pub fn start_launcher<T>(
+    open: impl Fn() -> Result<(), TrySendError<T>> + Send + 'static,
+) -> io::Result<Launch> {
     if std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").is_none() {
         return Ok(Launch::Disabled);
     }

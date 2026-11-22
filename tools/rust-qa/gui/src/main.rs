@@ -52,14 +52,18 @@ struct Wake {
 impl Control {
     fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
         self.sender.try_send(command)?;
+        self.wake();
+        Ok(())
+    }
+
+    fn wake(&self) {
         if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
             if let Some(window) = &wake.x11 {
                 window.request_redraw();
-                return Ok(());
+                return;
             }
             wake.context.request_repaint();
         }
-        Ok(())
     }
 }
 
@@ -406,9 +410,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok()
     };
     #[cfg(target_os = "windows")]
-    let launcher = {
+    let mut launcher = {
         let handle = control.clone();
-        match native_gui_assessment::start_launcher(move || handle.send(Command::Open).is_ok())? {
+        match native_gui_assessment::start_launcher(move || {
+            handle.sender.try_send(Command::Open)?;
+            handle.wake();
+            Ok(())
+        })? {
             native_gui_assessment::Launch::Secondary => return Ok(()),
             native_gui_assessment::Launch::Primary(listener) => Some(listener),
             native_gui_assessment::Launch::Disabled => None,
@@ -448,11 +456,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         #[cfg(target_os = "linux")]
         &native,
     );
+    // Stop admitting window commands when the UI exits. Retain the election through worker drain.
+    #[cfg(target_os = "windows")]
+    let launcher_stopped = launcher.as_mut().map_or(Ok(()), |listener| listener.stop());
     assessment.finish()?;
     #[cfg(target_os = "windows")]
-    if let Some(listener) = launcher {
-        listener.stop()?;
-    }
+    launcher_stopped?;
     #[cfg(target_os = "linux")]
     {
         if let Some(observer) = appearance.as_mut() {

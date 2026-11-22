@@ -9,7 +9,7 @@
  mod native_window;
  
  use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
-@@ -30,12 +32,16 @@
+@@ -32,12 +34,16 @@
      Close,
      Quit,
      DestroyGraphics,
@@ -26,7 +26,7 @@
      #[cfg(target_os = "linux")]
      graphics_attention: Arc<std::sync::atomic::AtomicBool>,
      #[cfg(target_os = "linux")]
-@@ -43,21 +49,34 @@
+@@ -45,20 +51,36 @@
  }
  
  struct Wake {
@@ -39,13 +39,7 @@
  impl Control {
      fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
 -        self.sender.try_send(command)?;
--        if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
--            if let Some(window) = &wake.x11 {
--                window.request_redraw();
--                return Ok(());
--            }
--            wake.context.request_repaint();
--        }
+-        self.wake();
 -        Ok(())
 +        #[cfg(target_os = "windows")]
 +        {
@@ -53,25 +47,28 @@
 +            self.sender
 +                .send(command)
 +                .map_err(|err| TrySendError::Disconnected(err.0))?;
-+            self.loop_wake.notify();
++            self.wake();
 +            Ok(())
 +        }
 +        #[cfg(target_os = "linux")]
 +        {
 +            self.sender.try_send(command)?;
-+            if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
-+                if let Some(window) = &wake.retained {
-+                    window.request_redraw();
-+                    return Ok(());
-+                }
-+                wake.context.request_repaint();
-+            }
++            self.wake();
 +            Ok(())
 +        }
      }
- }
  
-@@ -88,6 +107,11 @@
+     fn wake(&self) {
++        #[cfg(target_os = "windows")]
++        self.loop_wake.notify();
++        #[cfg(target_os = "linux")]
+         if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
+-            if let Some(window) = &wake.x11 {
++            if let Some(window) = &wake.retained {
+                 window.request_redraw();
+                 return;
+             }
+@@ -101,6 +123,11 @@
              Command::Quit => self.lifecycle.request_quit(),
              Command::DestroyGraphics => {
                  self.graphics.request_test_fault();
@@ -83,7 +80,7 @@
                  None
              }
          }
-@@ -137,7 +161,7 @@
+@@ -150,7 +177,7 @@
          }
          fonts::add_fallbacks(&mut fonts);
          creation.egui_ctx.set_fonts(fonts);
@@ -92,7 +89,7 @@
          if let Some(render) = &creation.wgpu_render_state {
              let info = render.adapter.get_info();
              println!(
-@@ -145,15 +169,14 @@
+@@ -158,15 +185,14 @@
                  info.backend, info.device_type, info.name
              );
          }
@@ -114,7 +111,7 @@
          });
          if !can_hide {
              creation.egui_ctx.request_repaint();
-@@ -192,6 +215,8 @@
+@@ -205,6 +231,8 @@
                  self.applied_appearance = Some(state);
              }
          }
@@ -123,7 +120,7 @@
          self.model.borrow_mut().graphics.apply_surface_choice(frame);
          // Count native composition stages without disclosing entered text.
          ctx.input(|i| {
-@@ -208,7 +233,7 @@
+@@ -221,7 +249,7 @@
              }
          });
          if self.can_hide {
@@ -132,7 +129,7 @@
          }
          let mut model = self.model.borrow_mut();
          if ctx.input(|i| i.viewport().close_requested())
-@@ -360,6 +385,8 @@
+@@ -386,6 +414,8 @@
      let control = Control {
          sender,
          window: Arc::new(Mutex::new(None)),
@@ -141,7 +138,7 @@
          #[cfg(target_os = "linux")]
          graphics_attention: Arc::default(),
          #[cfg(target_os = "linux")]
-@@ -451,10 +478,21 @@
+@@ -497,10 +527,21 @@
          _ => return Err("Expected an initial tray result".into()),
      };
      let handle = std::thread::spawn(move || {

@@ -87,6 +87,21 @@ PID against the primary's pinned profile record before sending. The primary
 queues the request through its ordinary window supervisor. [Local Windows IPC](../../tools/rust-qa/gui/src/win32_instance.rs) ·
 [GUI launcher adapter](../../tools/rust-qa/gui/src/windows_launcher.rs).
 
+If all eight UI command slots are occupied, the listener keeps the pending
+activation and retries when capacity becomes available. Earlier queued
+commands keep their order. When the UI exits, it stops the listener before
+draining the worker and keeps the primary mutex through that drain. Shutdown
+wakes a listener waiting for a queue slot. The secondary records a completed pipe write.
+The primary emits `LAUNCHER_OPEN` only after it queues the command and wakes
+the supervisor. The observer verifies the resulting HWND separately. The
+portable Rust tests exercise queue saturation, shutdown and a closed receiver.
+[Queue delivery](../../tools/rust-qa/gui/src/launcher_delivery.rs) ·
+[Bounded-channel tests](../../tools/rust-qa/gui/tests/launcher_delivery.rs).
+
+```sh
+cargo test --frozen --manifest-path tools/rust-qa/gui/Cargo.toml --test launcher_delivery
+```
+
 After the canonical GUI build and filtered YAML worker bundle are available in
 the native Windows toolchain environment, run the observer separately on x64
 and ARM64.

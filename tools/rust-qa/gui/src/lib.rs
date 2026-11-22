@@ -1,6 +1,7 @@
 //! Windows adapters used by the isolated native desktop fixture.
 #![cfg(windows)]
 
+mod launcher_delivery;
 mod win32_instance;
 mod windows_launcher;
 pub use windows_launcher::{Launch, start_launcher};
