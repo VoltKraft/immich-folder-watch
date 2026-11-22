@@ -66,3 +66,45 @@ passed. [Hosted native assessments](https://github.com/VoltKraft/immich-folder-w
 The legacy writer ignored the new lock on every target. Cross-session ownership
 for the same Windows SID and prevention of legacy restarts during installed
 handover remain open.
+
+## Ordinary second launch of the Windows GUI
+
+The shipping desktop shortcut starts the executable without arguments. A second
+launch sends `SHOW_GUI` to the primary and exits. The WPF dispatcher shows and
+activates the existing window. The Startup shortcut uses `--autostart` to
+request a hidden first start. The coordinator tests above verified the pipe
+exchange. The earlier Rust GUI observations reopened a window through the test
+process's standard input. [Desktop shortcut](../../packaging/windows/Installer.wxs) ·
+[Windows startup](../../src/ImmichFolderWatch.App/Program.cs) ·
+[WPF dispatcher](../../src/ImmichFolderWatch.App/App.xaml.cs).
+
+The canonical Rust feasibility GUI now uses the same local mutex election and
+`SHOW_GUI` byte protocol when the observer explicitly enables its marked
+synthetic profile. The mutex and pipe names include the test account SID and
+a fresh profile identifier. The first process restricts the pipe to that
+account and local clients. The second process checks the pipe server's kernel
+PID against the primary's pinned profile record before sending. The primary
+queues the request through its ordinary window supervisor. [Local Windows IPC](../../tools/rust-qa/gui/src/win32_instance.rs) ·
+[GUI launcher adapter](../../tools/rust-qa/gui/src/windows_launcher.rs).
+
+After the canonical GUI build and filtered YAML worker bundle are available in
+the native Windows toolchain environment, run the observer separately on x64
+and ARM64.
+
+```powershell
+python tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET
+```
+
+The observer creates a non-input desktop, verifies the absence of the Shell
+notification area, and launches the primary with `--autostart`. It checks the
+visible fallback, closes its HWND and verifies that it disappears. A second
+copy of the same executable then runs without arguments. Its job must contain
+exactly one process over its entire lifetime and drain with exit code zero.
+The observer independently checks the reopened window's owning process and
+desktop, and the original inventory worker's PID and creation time. It records
+whether the reopened window obtained the foreground. Quit must drain the
+primary and worker, and a fresh launch must become primary in the same test
+profile. The logs and receipt are under
+`artifacts/rust/windows-launcher/<target>/`. Both native launcher observations
+are pending. [Native observer](../../tools/rust-qa/windows-launcher/observe.py) ·
+[Launcher evidence controls](../../tools/rust-qa/windows-launcher/test_launcher.py).

@@ -101,6 +101,8 @@ def build(args, build_dir, env):
                    cwd=build_dir, env=env, check=True, timeout=180)
     dll = output / "InstanceOracle.dll"
     tracked = sorted(set(sources) | {HERE / name for name in ("legacy-inputs.json", "main.rs", "unix.rs", "windows.rs", "run.py")})
+    if os.name == "nt":
+        tracked.append(HERE.parent / "gui/src/win32_instance.rs")
     receipt = {"native_target": args.target, "dotnet_sdk": sdk, "legacy_reference": pins["reference"],
                "oracle_sha256": sha(dll), "rust_binary_sha256": sha(exe),
                "source_sha256": {path.relative_to(ROOT).as_posix(): sha(path) for path in tracked}

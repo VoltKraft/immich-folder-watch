@@ -371,6 +371,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let background = match std::env::args().nth(1).as_deref() {
         Some("--background") => true,
+        #[cfg(windows)]
+        Some("--autostart") if std::env::var("IFW_QA_WINDOWS_LAUNCHER").as_deref() == Ok("1") => {
+            true
+        }
         None => false,
         _ => return Err("Expected no argument or --background".into()),
     };
@@ -400,6 +404,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .map_err(|error| eprintln!("Desktop appearance unavailable: {error}"))
         .ok()
+    };
+    #[cfg(target_os = "windows")]
+    let launcher = {
+        let handle = control.clone();
+        match native_gui_assessment::start_launcher(move || handle.send(Command::Open).is_ok())? {
+            native_gui_assessment::Launch::Secondary => return Ok(()),
+            native_gui_assessment::Launch::Primary(listener) => Some(listener),
+            native_gui_assessment::Launch::Disabled => None,
+        }
     };
     #[cfg(target_os = "windows")]
     let mut assessment = benchmark::Benchmark::start()?;
@@ -436,6 +449,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         &native,
     );
     assessment.finish()?;
+    #[cfg(target_os = "windows")]
+    if let Some(listener) = launcher {
+        listener.stop()?;
+    }
     #[cfg(target_os = "linux")]
     {
         if let Some(observer) = appearance.as_mut() {

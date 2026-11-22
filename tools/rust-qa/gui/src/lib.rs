@@ -1,5 +1,9 @@
-//! Passive Windows input-method observations for the isolated native filename fixture.
+//! Windows adapters used by the isolated native desktop fixture.
 #![cfg(windows)]
+
+mod win32_instance;
+mod windows_launcher;
+pub use windows_launcher::{Launch, start_launcher};
 
 use std::ffi::c_void;
 use std::ptr::null_mut;
