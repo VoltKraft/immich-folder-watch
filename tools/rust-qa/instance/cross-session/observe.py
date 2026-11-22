@@ -52,7 +52,8 @@ def prepare(area, args, result, mode, reference=None):
     result["guard"] = guard_id(profile)
     write(area / "controller.json", {"controller": baseline, "mode": mode, "hosted": HOSTED, "guard": result["guard"],
                                      "binarySha256": build["rust_binary_sha256"], "pythonSha256": instance.sha(Path(sys.executable)),
-                                     "workerSha256": instance.sha(HERE / "worker.py"), "expires": time.time() + 300})
+                                     "workerSha256": instance.sha(HERE / "worker.py"),
+                                     "consoleLevelsSha256": instance.sha(HERE / "console_levels.py"), "expires": time.time() + 300})
     return env, accounts, sid, exe
 
 

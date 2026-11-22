@@ -85,6 +85,37 @@ must confirm the actual standard-user lock sequence.
 [Start-Service](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-service)
 and [Stop-Service](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-service).
 
+## Trust-level query on the hosted machines
+
+At `0a2b5ca` the original and scheduled sessions on each Windows
+architecture reached the running Secondary Logon service. All four
+`runas /showtrustlevels` calls returned zero with a zero-byte output pipe.
+The standard-user participants never started. Both ambient guard sequences
+passed. Each host restored Secondary Logon to its original stopped state
+and manual start type. The x64 and ARM64 writer ZIPs have SHA-256
+`05d3ec9ccc0aeb9d3b794122aed3b71123e200bd9a1a87f60fea525fab6b3cc6` and
+`6e35af637ae38cadbb5a22e1717fa89120493437eb0e9564ea606bee9776ef40`.
+The independent two-host readback has SHA-256
+`5067eb43c001a4aa85e383bb42c98ebd0b681ce55d70fbae0dc60e708f9fb728`.
+[Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).
+
+The hosted fixture now repeats just that successful empty query on a new
+hidden console. Windows documents separate behavior for console handles
+and redirected pipes. The query helper requires a blank screen and verifies
+it is the sole attached process before and after the fixed system utility
+runs. Its bounded screen read returns the utility's actual status and
+UTF-16 text. The receipt preserves the original pipe observation and the
+private screen's exact UTF-16LE bytes in `screenUtf16LeBase64` for replay.
+Only an explicit listed Basic User level can
+start the existing standard-user trial. Its two participants and every
+writer still have their actual authority checked. Twenty-four portable
+tests passed, including the two-process Unix rehearsal and five private
+console controls. Seven simulated service lifecycle cases passed in
+PowerShell 7.7.0. Native execution of the private console query is pending.
+[Private query](../../tools/rust-qa/instance/cross-session/console_levels.py)
+· [Windows console handles](https://learn.microsoft.com/en-us/windows/console/console-handles)
+· [Windows console screen-buffer read](https://learn.microsoft.com/en-us/windows/console/readconsoleoutputcharacter).
+
 The existing hosted jobs run the following from the matching native architecture with the pinned Rust and .NET toolchains. The local account must already have its effective batch-logon assignment. The same output directory holds both per-case reports, prefixed `ambient-*` receipts and the standard trial’s original receipt names. The controller verifies the original logon rights and removal of the exact registered task. It checks the stamped process identities before deleting each temporary profile.
 
 ```bash

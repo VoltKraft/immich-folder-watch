@@ -1,5 +1,6 @@
 """Fixed original-session or S4U participant for the synthetic native writer."""
 
+import base64
 import ctypes as c
 from ctypes import wintypes as w
 import hashlib
@@ -11,6 +12,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import console_levels
 from fixture import Accounts, HERE, HOSTED, bind, checked, guard_id, instance, read, release, subject_env, validate_area, wait, write
 from standard import AMBIENT, EXISTING, STANDARD, fixed_writer, qualifies, required_authority
 
@@ -26,6 +28,35 @@ def level_inventory(returncode, output):
     return {"levelQueryExit": returncode, "levelQueryBytes": len(output),
             "levelQuerySha256": hashlib.sha256(output).hexdigest(), "levelCodes": [hex(code) for code in codes],
             "levelListed": returncode == 0 and 0x20000 in codes}
+
+
+def observe_levels(report, redirected, console_probe):
+    """Keep both native observations. Retry only a successful, empty pipe."""
+    report.update(level_inventory(redirected.returncode, redirected.stdout))
+    if report["levelListed"]:
+        report["levelSource"] = "redirected-query"
+        return True
+    if redirected.returncode or redirected.stdout:
+        return False
+    console = console_probe()
+    if len(console.stdout) > console_levels.MAX_CELLS * 2 or len(console.stdout) % 2:
+        raise ValueError("Invalid private console evidence size")
+    second = level_inventory(console.returncode, console.stdout)
+    second["screenUtf16LeBase64"] = base64.b64encode(console.stdout).decode("ascii")
+    second["diagnostic"] = console.stderr.decode("utf-8", errors="replace")[:1024]
+    report["privateConsoleQuery"] = second
+    if second["levelListed"]:
+        report["levelSource"] = "private-console-query"
+    return second["levelListed"]
+
+
+def console_probe(area, role):
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = subprocess.SW_HIDE
+    return subprocess.run([sys.executable, "-I", "-B", str(HERE / "worker.py"), "--console-levels", role, str(area)],
+                          cwd=area, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup, close_fds=True, timeout=20)
 
 
 def own_identity(area, role):
@@ -77,16 +108,19 @@ def participant(area, role):
     return result["passed"]
 
 
-def basic_user(area, role, config):
-    # Use only Windows' installed utility and the fixed, hashed Python/script pair.
+def system_runas():
     kernel = c.WinDLL("kernel32", use_last_error=True)
     system_directory = bind(kernel, "GetSystemDirectoryW", w.UINT, w.LPWSTR, w.UINT)
     folder = c.create_unicode_buffer(32768)
     n = checked(system_directory(folder, len(folder)), "GetSystemDirectoryW")
     if n >= len(folder):
         raise RuntimeError("Invalid system directory length")
-    base = Path(folder.value)
-    runas = base / "runas.exe"
+    return Path(folder.value) / "runas.exe"
+
+
+def basic_user(area, role, config):
+    # Use only Windows' installed utility and the fixed, hashed Python/script pair.
+    runas = system_runas()
     report = {"launcherSha256": instance.sha(runas), "level": "0x20000", "launched": False}
     try:
         # No service is started or reconfigured. A dormant Secondary Logon prerequisite is reported.
@@ -111,8 +145,7 @@ def basic_user(area, role, config):
         options = dict(cwd=area, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        creationflags=0x08000000, timeout=15)
         levels = subprocess.run([runas, "/showtrustlevels"], **options)
-        report.update(level_inventory(levels.returncode, levels.stdout))
-        if not report["levelListed"]:
+        if not observe_levels(report, levels, lambda: console_probe(area, role)):
             raise RuntimeError("The Windows trust-level query did not confirm the Basic User prerequisite")
         command = subprocess.list2cmdline([sys.executable, "-I", "-B", str(HERE / "worker.py"), "--participant", role, str(area)])
         if instance.sha(Path(sys.executable)) != config["pythonSha256"] or instance.sha(HERE / "worker.py") != config["workerSha256"]:
@@ -151,12 +184,25 @@ def main():
         raise SystemExit("A marked native Windows session is required")
     argv = sys.argv[1:]
     actor = len(argv) == 3 and argv[0] == "--participant" and argv[1] in PHASES
+    console = len(argv) == 3 and argv[0] == "--console-levels" and argv[1] in PHASES
     original = len(argv) == 2 and argv[0] == "--original"
-    if not (actor or original or len(argv) == 1):
+    if not (actor or console or original or len(argv) == 1):
         raise SystemExit("Expected a fixed synthetic writer role")
     area = Path(argv[-1]).resolve(strict=True)
     validate_area(area)
-    role = argv[1] if actor else "original" if original else "scheduled"
+    role = argv[1] if actor or console else "original" if original else "scheduled"
+    if console:
+        try:
+            config, _, _, _ = own_identity(area, role)
+            if (config["mode"] != STANDARD or sys.stdout.isatty()
+                    or instance.sha(HERE / "console_levels.py") != config["consoleLevelsSha256"]):
+                raise RuntimeError("The private query requires the identified hosted standard-user trial")
+            status, raw = console_levels.query(system_runas(), area)
+            sys.stdout.buffer.write(raw)
+            return status
+        except Exception as exc:
+            print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
     result = {"passed": False}
     if actor:
         try:
