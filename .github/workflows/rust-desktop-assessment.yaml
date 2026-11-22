@@ -200,6 +200,16 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
 
+      - name: Reopen the hidden Windows GUI through an ordinary second launch
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
       - name: Rebuild the x64 import library and run its native winit consumer
         if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.gui.outcome == 'success' }}
         shell: pwsh
@@ -561,6 +571,7 @@ jobs:
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-launcher/${{ matrix.target }}/
             artifacts/rust/windows-reader/native-*/result.json
             artifacts/rust/windows-reader/native-*/gui/*.json
             artifacts/rust/windows-imports/runs/*/result.json

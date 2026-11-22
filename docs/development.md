@@ -146,6 +146,11 @@ either selected check fails or the host cannot supply the provider.
 The desktop assessment retains early Windows writer and tray results
 before the scan. Its final artifact includes the desktop logs and Linux
 storage recovery evidence. Each archive name includes the target and commit.
+After the GUI build and YAML reconstruction, the Windows job launches the
+same GUI executable a second time without arguments on a private desktop
+with no notification area. The launcher result and both processes' logs
+are under `windows-launcher/<target>/` in the desktop archive.
+[Windows launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
 The Windows desktop job first records the WPF budget and the regular Mailbox
 and FIFO trials. Its subsequent `--dispatch` trace measures the two retained
 window activation paths using the same native host and budget. The result and

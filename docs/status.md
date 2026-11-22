@@ -48,6 +48,12 @@ it on the GUI thread, showing the HWND and the native visibility readback.
 Its second diagnostic path avoids asking eframe for a duplicate repaint.
 The workflow retains both traces separately from the eleven original limits.
 The comparison still needs a native run.
+The Windows jobs also select the ordinary second launch introduced at
+`58a838b`. On a desktop without a notification area it checks activation
+of the same primary process and worker, followed by Quit and restart.
+Cross-target Clippy passed for both Windows architectures, along with eleven
+portable checks. Native launcher results are pending.
+[Launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
 At `3b4854d` both Windows architectures passed all thirteen notification
 scenarios. Their nonrecursive watch reported the direct child directory's
 metadata and the direct file's creation and change. Both Ubuntu targets
