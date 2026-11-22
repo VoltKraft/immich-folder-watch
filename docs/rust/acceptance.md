@@ -55,18 +55,20 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 All four native targets confirmed old/new local activation in both directions and exclusion
 between two cooperative Rust writers. The shipping coordinator could still
-start with the new guard held. Windows x64 observed both lock refusal directions and reacquisition in
-sessions 2 and 0 with the same existing account. The standard-user trial
-stopped before acquiring the guard. Installed handover and standard-user
-cross-session exclusion remain open.
+start with the new guard held. Both Windows targets observed both lock refusal
+directions and reacquisition in sessions 2 and 0 of the same elevated account.
+At `3b4854d` the fixture temporarily started and restored Secondary Logon on
+both hosts. The standard-user probe stopped during trust-level enumeration,
+before any ordinary-user process acquired the guard. Installed handover and
+standard-user cross-session exclusion remain open.
 [Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
-The [watch adapter](rw02-watch-events.md) passed fifteen filesystem scenarios
-on both Ubuntu architectures. At `a66e045` both Windows architectures
-delivered real changes, retained the directory lease after its caller closed
-and released it on shutdown. Seven scenarios passed on each. The flat-watch
-assertion failed before the observer retained the native relative names.
-The next run captures those names to qualify nonrecursive scope. The Windows
+At `3b4854d` the [watch adapter](rw02-watch-events.md) passed fifteen
+filesystem scenarios on each Ubuntu architecture and thirteen on each
+Windows architecture. The Windows nonrecursive watch reported a modification
+of the direct child directory, then an addition and a modification of the
+direct child file. Its inventory excluded the file below the child directory.
+The Windows
 [retained-window variant](rw02-windows-window.md) held the same DX12 device
 across an ordinary close and passed the native idle and memory limits on
 both architectures. Close/reopen latency during a real scan remains open.
@@ -75,21 +77,22 @@ both architectures. Close/reopen latency during a real scan remains open.
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Native filesystem and NTFS alias tests, 13 encrypted SMB cases, seven watch scenarios, five policy traces and 5,844 scalar comparisons | Four DX12 lifecycle cases, Startup readback, Shell registration and balloon callback. The replacement DX12 window restored the draft and accepted input. Ordinary mixed-text editing passed all three cases. At `a66e045` NVDA repeated speech and ordinary Delete/paste successfully. The Japanese IME committed あ in the normal editor. The host exposed a single console display target. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | Native filesystem and NTFS alias tests, 13 encrypted SMB cases, seven watch scenarios, five traces and 5,844 scalar comparisons | Four DX12 lifecycle cases and independent Startup readback. NVDA speech, masks and clipboard passed on two revisions. The original console remained covered. On the isolated desktop both Arabic selections matched, with the deletion readbacks still open. | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 30 hosted Rust tests, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | Same 30 native tests, five traces and 5,844 comparisons. Fifteen native watch scenarios, six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five policy traces and 5,844 scalar comparisons. The local NTFS alias gate passed. | Four DX12 lifecycle cases, Startup readback, Shell registration and balloon callback. The replacement DX12 window restored the draft and accepted input. All three ordinary mixed-text edits, NVDA speech and ordinary Delete/paste passed. The Japanese IME committed あ in the normal editor. The separate font repeat stopped at field focus. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five traces and 5,844 scalar comparisons. The NTFS and SMB alias gates passed. | Four DX12 lifecycle cases and independent Startup readback. All three ordinary mixed-text edits, four standalone font cases, NVDA speech, masks and clipboard passed on the private input desktop. The Japanese IME committed あ and restored the input layout. The private profile cleanup failed. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
 The [earlier four archives](rw02-native-gui.md#native-follow-up-at-d403fee) and
 [follow-up archives](rw02-native-gui.md#native-follow-up-at-a66e045) bind each
 hosted result to its revision. The [Plasma panel](rw02-plasma.md),
 [system appearance](rw02-appearance.md), [native storage faults](rw02-storage-faults.md)
-and [combined offline Linux build](rw02-combined-profile.md) have separate
+and [four combined offline builds](rw02-combined-profile.md) have separate
 source and runtime evidence. Both Ubuntu hosts completed the private Noble
-backport, eight WAL recovery cases and offline combined relinks. Windows x64
-ran its combined native smoke. Remaining Windows combined evidence, Windows
-flat-watch qualification, interactive Shell activation, ARM64 IME, mixed-DPI/RDP
-and standard-user cross-session writer exclusion remain open.
+backport, eight WAL recovery cases and offline combined relinks. Both Windows
+targets passed the combined build, Clippy and native smoke. Each hosted
+console offered one 96-DPI output. Interactive Shell activation, clean ARM64
+IME completion, mixed-DPI/RDP, Windows scan-time limits and standard-user
+cross-session writer exclusion retain their native gates.
 
 The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.
 

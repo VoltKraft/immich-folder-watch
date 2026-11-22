@@ -4,28 +4,42 @@
 
 RW-01 is accepted. RW-02 remains the active package of
 [M-RUST-IMPLEMENTATION-20261114](project.md#m-rust-implementation-20261114).
-All eight archives from `45dc03b` and `d403fee` matched the published
-digests. Both Ubuntu targets passed all eleven X11 resource limits, actual
-Orca speech and three password masks under X11 and Wayland, and six native
-journal readbacks. Both Windows targets passed NVDA speech and clipboard at
-`45dc03b`. ARM64 repeated that pass. In the x64 repeat the UI Automation
-range read after Delete failed. The ordinary Windows editor passed all
-three mixed-text cases on x64 and one on ARM64. At `a66e045`, x64 passed the repeated NVDA edit and
-real Japanese preedit, commit and UI Automation readback of あ. Its existing
-account excluded the other writer in sessions 2 and 0 and reacquired the
-guard. The standard-user trial stopped before either participant entered.
-Mixed-DPI/RDP and interactive Windows tray activation remain open. [Archived results](rust/rw02-native-gui.md#native-follow-up-at-d403fee).
+At `a66e045` all four combined native profiles rebuilt offline. All four
+desktop archives matched GitHub's digests, and all 74 indexed combined
+outputs matched their manifests. Both Windows normal editors passed all
+three mixed-filename edits, including selection and deletion. NVDA read
+the expected speech and password masks on each native desktop. The separate
+font probe passed all four ARM64 cases and stopped at field focus on x64.
+Both Japanese IMEs composed あ and restored the input layout. The ARM64
+driver reported a sharing violation while removing its profile after
+observing the edit. Revision `21b6938` makes cleanup part of the result and
+preserves the successful composition separately. Each hosted Windows console
+offered a single 96-DPI display. Both Ubuntu architectures have passed all
+eleven X11 resource limits, Orca speech and masks under X11 and Wayland and
+six journal readbacks. [Four native archives](rust/rw02-native-gui.md#native-follow-up-at-a66e045)
+· [IME receipts](rust/rw02-windows-ime.md).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
 Native 100,000-file timings still exceeded the WPF close/reopen limits.
-At `a66e045`, both Windows architectures delivered seven notification
-scenarios including real writes and lease release after shutdown. Their
-flat-watch check failed before recording the relative name. Revisions
-`b7c6577` and `ac0d25c` retain bounded native action/name batches. Both
-Ubuntu targets passed all fifteen watch scenarios. The four-target
-compatibility reference, PR CI and CodeQL passed at the same head.
+At `3b4854d` both Windows architectures passed all thirteen notification
+scenarios. Their nonrecursive watch reported the direct child directory's
+metadata and the direct file's creation and change. Both Ubuntu targets
+passed all fifteen scenarios. On each Windows host the candidate guard
+again excluded the other writer across two sessions of the same elevated
+account. The fixture started and restored Secondary Logon. Its standard-user
+probe stopped during the trust-level query before either writer ran.
+Installed old/new handover and ordinary-user exclusion remain open.
+[Four-platform run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099706),
 [Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
+
+The .NET reference, PR CI, CodeQL and dependency submission completed
+successfully at the same commit. The Windows storage fault steps on both
+architectures and the x64 interactive tray step reported failure while the
+desktop jobs were still running. Their final receipts are needed to identify
+which observations completed.
+[Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
+· [Desktop and storage](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730).
 
 Revision `26ed5dd` compares two non-tearing DX12 presentation modes and
 records their actual timing during scans. Revision `27ade4b` records
@@ -39,7 +53,10 @@ missing file identifiers. All eighteen Linux filesystem checks and Clippy
 for Linux x64 and both Windows targets passed. Both Windows targets then
 passed the native NTFS and encrypted SMB tests at `a66e045`. Revision
 `88fd180` also checks the current identity of the held file. An independent
-review and nineteen Fedora tests passed. Native FAT observation remains open.
+review and native tests on all four hosts passed. Linux ran 19 filesystem
+checks per host. Windows ran 16 per host on local storage and again over
+encrypted SMB. Both NTFS hosts observed a distinct short alias. The ARM64
+SMB share also provided one. Native FAT observation remains open.
 
 The appearance-enabled desktop at `a66e045` passed all eleven fixed
 Fedora X11 budgets over three 100,000-file runs. Median startup was
@@ -62,17 +79,17 @@ Plasma panel at `26b7aac` reopened the hidden application twice. At `6f55f36`
 the visible panel followed system light, dark and high-contrast settings
 and recovered after a portal service restart. Both Ubuntu hosts repeated the combined offline relink, the native
 Noble portal comparison and light/dark changes at `a66e045`. Ubuntu x64
-repeated two actual Plasma panel clicks. The Windows x64 combined smoke
-passed. Its timing trial stopped before the scan, after rejecting the
-updated filesystem against an older digest. The revised worker input
-checks, Windows capacity trial, tray observation and standard-user lock
-trial need native results. The Windows
-console topology and supported Linux portal lock deployment each still need
-an appropriate runtime environment. [Combined build](rust/rw02-combined-profile.md),
+repeated two actual Plasma panel clicks. Both Windows combined smoke tests
+passed. The earlier scan trials rejected a stale filesystem input digest.
+Windows capacity, tray and scan-time results are being collected at
+`3b4854d`. Mixed-DPI and RDP require an appropriate Windows session.
+Released distro portals on the tested Linux hosts still refuse the required
+cooperative file lock. [Combined build](rust/rw02-combined-profile.md),
 [Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and
 [acceptance matrix](rust/acceptance.md).
 
-The next native assessment uses `c5606ec` for the scan workload,
+The [current native desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
+uses `c5606ec` for the scan workload,
 `c19a88e` for tray input ownership, `048cc27` for the disposable writer
 service and `0ed4dc4` for the locked Windows WAL-index capture. The tray
 review closed all three findings. The separate VHD review closed its
@@ -80,6 +97,12 @@ parameter-layout finding at `2a49051`. At `daf7d85` Fedora repeated all
 eight storage cases, including six portable cases before the volume
 trials. The 14 workflow security checks passed. Cargo version-update
 configuration is prepared on the rewrite branch at `54fac8b`.
+
+At `7aa8091` two offline reconstructions of the Windows x64 import library
+matched all 20,551 import records. The actual winit source and resolved
+features were verified in both builds. Native x64 execution, the MSVC
+librarian comparison and the native link map are pending. The ARM64
+transport reconstruction repeated successfully offline. [Import evidence](rust/rw02-windows-imports.md).
 
 ## Windows directory identity at cd1d7d7 (2026-11-21)
 

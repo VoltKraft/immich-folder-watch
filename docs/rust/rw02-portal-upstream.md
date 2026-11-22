@@ -191,3 +191,18 @@ refusal. A private rebuild with the upstream function passed 42 ordinary
 shared/exclusive lock operations through a genuine Documents grant. Three
 builds produced byte-identical unmodified and patched executables. The
 native run used Noble x64 userspace on a Fedora kernel. [Noble package, source and lock receipts](rw02-portal-noble.md).
+
+On 2026-11-22 the latest upstream release was still 1.22.1. Ubuntu had
+added Noble `1.18.4-1ubuntu2.24.04.4` and Resolute
+`1.21.1+ds-1ubuntu3.2` to Proposed. The complete distribution patches
+address Snap camera access and an AddFiles deadlock respectively. They
+do not implement file locking. The newer source archives were inspected
+without installing them. The released Documents interface accepts file
+descriptors on export and returns a document ID or a mountpoint.
+It offers no call to obtain the authorized backing descriptor on import.
+The existing private backport demonstrates native feasibility on both
+Ubuntu architectures. Qualifying a generally available host component
+remains necessary for a functioning Linux release candidate.
+[Ubuntu publication records](https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedSources&source_name=xdg-desktop-portal&exact_match=true&status=Published)
+· [Upstream release history](https://github.com/flatpak/xdg-desktop-portal/releases)
+· [Documents interface](https://github.com/flatpak/xdg-desktop-portal/blob/3152e604cf0eb2e195e298944cc8c728ee8009a7/data/org.freedesktop.portal.Documents.xml).
