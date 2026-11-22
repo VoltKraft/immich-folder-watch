@@ -53,6 +53,15 @@ fn run() -> Result<()> {
     if mode == "--hosted-private-tray" && hosted() && known == "private" {
         return tray::activation::assess(area, id);
     }
+    if mode == "--hosted-notification"
+        && hosted()
+        && known == "private"
+        && std::env::var("IFW_QA_LATE_NOTIFICATION").as_deref() == Ok("1")
+        && std::env::var("GITHUB_REF").as_deref() == Ok("refs/heads/rewrite/rust")
+        && std::env::var("GITHUB_REPOSITORY").as_deref() == Ok("VoltKraft/immich-folder-watch")
+    {
+        return tray::notification_only(area, id);
+    }
     if mode != "--isolated-session" && !(mode == "--github-hosted" && hosted()) {
         return Err(invalid());
     }

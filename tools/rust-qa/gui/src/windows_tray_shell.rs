@@ -107,10 +107,10 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
             }
             WM_LBUTTONUP if id == ICON => e.pointer_up = e.pointer_up.saturating_add(1),
             WM_CONTEXTMENU | WM_RBUTTONUP => e.shell_context = e.shell_context.saturating_add(1),
-            NIN_BALLOONSHOW => e.shown = e.shown.saturating_add(1),
-            NIN_BALLOONHIDE => e.hidden = e.hidden.saturating_add(1),
-            NIN_BALLOONTIMEOUT => e.timed_out = e.timed_out.saturating_add(1),
-            NIN_BALLOONUSERCLICK => e.clicked = e.clicked.saturating_add(1),
+            NIN_BALLOONSHOW if id == ICON => e.shown = e.shown.saturating_add(1),
+            NIN_BALLOONHIDE if id == ICON => e.hidden = e.hidden.saturating_add(1),
+            NIN_BALLOONTIMEOUT if id == ICON => e.timed_out = e.timed_out.saturating_add(1),
+            NIN_BALLOONUSERCLICK if id == ICON => e.clicked = e.clicked.saturating_add(1),
             _ => {}
         }
     } else {
@@ -351,4 +351,36 @@ pub(crate) fn color(id: &str) -> Result<[u8; 3]> {
         164 + ((n >> 8) & 63) as u8,
         48 + (n & 63) as u8,
     ])
+}
+
+#[cfg(test)]
+mod notification_tests {
+    use super::*;
+
+    #[test]
+    fn balloon_callbacks_belong_to_the_registered_v4_icon() {
+        let counts = || {
+            let e = EVENTS.get();
+            [e.shown, e.hidden, e.timed_out, e.clicked]
+        };
+        for (id, expected) in [(ICON + 1, [0; 4]), (ICON, [1; 4])] {
+            for event in [
+                NIN_BALLOONSHOW,
+                NIN_BALLOONHIDE,
+                NIN_BALLOONTIMEOUT,
+                NIN_BALLOONUSERCLICK,
+            ] {
+                // The callback branch only decodes these scalar test parameters.
+                unsafe {
+                    window_proc(
+                        HWND::default(),
+                        CALLBACK,
+                        WPARAM::default(),
+                        LPARAM(((id << 16) | event) as isize),
+                    )
+                };
+            }
+            assert_eq!(counts(), expected);
+        }
+    }
 }

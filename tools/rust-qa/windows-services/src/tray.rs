@@ -105,6 +105,100 @@ fn report_events(e: Events) {
     }
 }
 
+fn notification_state(prefix: &str) {
+    match unsafe { SHQueryUserNotificationState() } {
+        Ok(s) => println!("{prefix}.notification_state={}", s.0),
+        Err(e) => println!("{prefix}.notification_state_hresult={}", e.code().0),
+    }
+}
+
+fn request_notification(icon: &Icon<'_>, id: &str, body: &str) -> bool {
+    let mut notice = icon.base();
+    notice.uFlags = NIF_INFO | NIF_REALTIME;
+    notice.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME | NIIF_NOSOUND;
+    copy_text(&mut notice.szInfoTitle, &format!("IFW notice {id}"));
+    copy_text(&mut notice.szInfo, body);
+    icon.call("notification_request", NIM_MODIFY, &notice)
+}
+
+fn signal_observer(area: &Path, name: &str, id: &str) -> Result<()> {
+    let pending = area.join(format!("{name}.pending"));
+    std::fs::write(&pending, id)?;
+    std::fs::rename(pending, area.join(name))?;
+    Ok(())
+}
+
+/// Issue one silent notification on the original disposable desktop after the observer is armed.
+pub(super) fn notification_only(area: &Path, id: &str) -> Result<()> {
+    let mut receiver = Receiver::new()?;
+    host("notice");
+    println!(
+        "notice.pid={}\nnotice.owner_hwnd={}\nnotice.icon_id={ICON}",
+        std::process::id(),
+        receiver.hwnd.0 as usize
+    );
+    let mut icon = Icon {
+        owner: &receiver,
+        prefix: "notice",
+        title: format!("IFW tray {id}"),
+        cleanup: false,
+    };
+    let image = unsafe { LoadIconW(None, IDI_APPLICATION)? };
+    let (added, v4) = icon.register("initial", image);
+    let trial = (|| {
+        signal_observer(area, "notice.ready", id)?;
+        let start = Instant::now();
+        while !area.join("notice.go").is_file() {
+            if area.join("notice.finish").is_file() || start.elapsed() >= Duration::from_secs(25) {
+                return Err(invalid());
+            }
+            pump(30);
+        }
+        pump(0);
+        let before = EVENTS.get();
+        notification_state("notice");
+        let requested = added
+            && v4
+            && request_notification(&icon, id, &format!("Synthetic IFW notification {id}"));
+        println!("notice.requested={requested}");
+        signal_observer(area, "notice.sent", id)?;
+        let issued = Instant::now();
+        loop {
+            pump(40);
+            if area.join("notice.finish").is_file()
+                && (!requested
+                    || EVENTS.get().shown > before.shown
+                    || issued.elapsed() >= Duration::from_secs(8))
+            {
+                break;
+            }
+            if issued.elapsed() >= Duration::from_secs(25) {
+                return Err(invalid());
+            }
+        }
+        let after = EVENTS.get();
+        println!(
+            "notice.balloon_show={}\nnotice.balloon_hide={}\nnotice.balloon_timeout={}\nnotice.balloon_click={}\nnotice.taskbar_created={}",
+            after.shown.saturating_sub(before.shown),
+            after.hidden.saturating_sub(before.hidden),
+            after.timed_out.saturating_sub(before.timed_out),
+            after.clicked.saturating_sub(before.clicked),
+            after.taskbar.saturating_sub(before.taskbar)
+        );
+        Ok(())
+    })();
+    let removed = added && icon.remove("remove");
+    drop(icon);
+    let close = receiver.close();
+    println!("notice.receiver_closed={}", close.is_ok());
+    trial?;
+    close?;
+    if added && !removed {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
 pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
     let receiver = Receiver::new()?;
     host("tray");
@@ -140,19 +234,8 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
         }
         Err(e) => println!("tray.icon_rect_hresult={}", e.code().0),
     }
-    match unsafe { SHQueryUserNotificationState() } {
-        Ok(s) => println!("tray.notification_state={}", s.0),
-        Err(e) => println!("tray.notification_state_hresult={}", e.code().0),
-    }
-    let mut notice = icon.base();
-    notice.uFlags = NIF_INFO | NIF_REALTIME;
-    notice.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME | NIIF_NOSOUND;
-    copy_text(&mut notice.szInfoTitle, &format!("IFW notice {id}"));
-    copy_text(
-        &mut notice.szInfo,
-        "Synthetic Windows notification assessment",
-    );
-    icon.call("notification_request", NIM_MODIFY, &notice);
+    notification_state("tray");
+    request_notification(&icon, id, "Synthetic Windows notification assessment");
     std::fs::write(
         area.join("tray.ready"),
         if first { "registered" } else { "unavailable" },

@@ -214,6 +214,7 @@ def main():
     env.update(CARGO_HOME=str(args.cargo_home.resolve()), CARGO_TARGET_DIR=str(build))
     result = {"target": args.target, "hosted": hosted, "locked": sha(HERE / "Cargo.lock"),
               "steps": {}, "workflowRun": os.getenv("GITHUB_RUN_ID"),
+              "workflowAttempt": os.getenv("GITHUB_RUN_ATTEMPT"), "runner": os.getenv("RUNNER_NAME"),
               "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     files = list(HERE.glob("*")) + list((HERE / "src").glob("*.rs")) + [QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "windows_observer.py", ROOT / "rust/toolchain-inputs.json"]
@@ -233,7 +234,7 @@ def main():
         if sha(QA / "gui/src/tray-icon.argb") != inputs["trayArgbSha256"]:
             raise ValueError("The embedded first-party tray image differs from the reviewed input")
         step("compiler", [sys.executable, QA / "check-toolchain.py", args.target])
-        step("recovery", [sys.executable, "-m", "unittest", "test_recovery", "test_activation"])
+        step("recovery", [sys.executable, "-m", "unittest", "test_recovery", "test_activation", "test_notification"])
         step("tray-cleanup", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                               "-File", HERE / "test_tray_state.ps1"])
         if not args.offline:
@@ -247,9 +248,14 @@ def main():
         result["canonicalGraphSha256"] = fingerprint
         step("format", ["cargo", "fmt", "--all", "--check"])
         step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
+        step("balloon-id", ["cargo", "test", "--frozen", "balloon_callbacks_belong_to_the_registered_v4_icon"])
         step("build", ["cargo", "build", "--frozen", "--release"])
         exe = build / "release/ifw-windows-services-probe.exe"
         result["probeSha256"] = sha(exe)
+        tick = ctypes.WinDLL("kernel32").GetTickCount64
+        tick.restype = ctypes.c_uint64
+        tick.argtypes = []
+        result["measureUptimeMs"] = tick()
         result["observations"] = measure(exe, output, hosted, args.hosted_startup)
         if result["observations"]["failedChecks"]:
             raise ValueError("Native checks failed, see result.json, native.txt and observer.json")
