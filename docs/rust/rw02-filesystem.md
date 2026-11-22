@@ -30,9 +30,12 @@ reconciliation rules. Timestamp repair callers must verify content and persist
 their journal intent before applying the change. A hard link created after the
 final link-count observation is outside the guarantee of that observation.
 
-Windows uses the complete `FileIdInfo` volume/128-bit file identifier. For
-FAT, FAT32 and exFAT a verified filesystem type permits the documented legacy
-file index. An unavailable identity on other filesystems fails the operation.
+Windows uses the complete `FileIdInfo` volume/128-bit file identifier.
+A provider can successfully return an all-zero file ID when it cannot supply
+that information. The adapter then checks the filesystem on the same live
+handle. FAT, FAT32 and exFAT can supply a nonzero legacy file index.
+An absent index or an unavailable identity on other filesystems fails the operation.
+[Microsoft FileIdInformation](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/e4185a8a-ed8d-4f98-ab55-ca34dc8916e6).
 The ABI declarations are limited to the supported 64-bit targets, with compile-time
 layout checks. Linux uses its native dev/inode pair while the handle is live.
 These identifiers cannot be persisted as stand-alone deletion authority.
@@ -40,6 +43,12 @@ Windows also checks the normalized name of a public handle for a reserved
 component, including when the caller supplies an 8.3 alias. Linux requires the
 legacy `statx` result mask plus ctime. Protected directories also require reported
 owner and mode. Unsupported identity or protection aborts that operation.
+
+The portable Windows identity-policy tests exercised missing extended IDs,
+nonzero high bits, allowed FAT-family names and absent legacy indices.
+All four unit tests and fourteen Linux handle tests passed on Fedora x64.
+Both MSVC targets passed Clippy with warnings denied. A native Windows
+run is still needed for the updated handle adapter.
 
 `Download::publish` flushes the payload, checks the destination and prepares
 the native request. The atomic no-replace operation handles a competing arrival

@@ -31,6 +31,8 @@ mod native;
 #[cfg(test)]
 #[path = "../tests/support/mod.rs"]
 mod test_support;
+#[cfg(any(windows, test))]
+mod windows_identity;
 
 const INTERNAL_PREFIX: &[u8] = b".ifw-internal-";
 

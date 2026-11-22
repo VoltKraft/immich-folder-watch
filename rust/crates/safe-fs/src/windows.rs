@@ -1,4 +1,5 @@
 use super::staging::transaction_name;
+use super::windows_identity;
 use super::{Directory, EntryKind, FileIdentity, ObjectInfo, denied, internal_name};
 use std::ffi::{OsStr, OsString, c_void};
 use std::fs::{File, OpenOptions};
@@ -311,11 +312,9 @@ fn identity(file: &File, basic: &HandleInformation) -> io::Result<FileIdentity> 
             size_of::<FileIdInfo>() as u32,
         )
     } != 0
+        && let Some(id) = windows_identity::reported(id.volume, u128::from_le_bytes(id.identifier))
     {
-        return Ok(FileIdentity {
-            volume: id.volume,
-            file: u128::from_le_bytes(id.identifier),
-        });
+        return Ok(id);
     }
     let mut fs_name = [0u16; 32];
     // SAFETY: unused outputs may be null. fs_name has the supplied UTF-16 capacity.
@@ -339,19 +338,8 @@ fn identity(file: &File, basic: &HandleInformation) -> io::Result<FileIdentity> 
         .position(|&c| c == 0)
         .ok_or_else(|| io::Error::other("invalid filesystem name"))?;
     let fs = String::from_utf16_lossy(&fs_name[..length]);
-    if !["FAT", "FAT32", "exFAT"]
-        .iter()
-        .any(|name| name.eq_ignore_ascii_case(&fs))
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "filesystem lacks a supported stable file identifier",
-        ));
-    }
-    Ok(FileIdentity {
-        volume: basic.serial.into(),
-        file: (u128::from(basic.index_high) << 32) | u128::from(basic.index_low),
-    })
+    let index = (u64::from(basic.index_high) << 32) | u64::from(basic.index_low);
+    windows_identity::legacy(&fs, basic.serial, index)
 }
 
 pub(super) fn info(file: &File) -> io::Result<ObjectInfo> {
