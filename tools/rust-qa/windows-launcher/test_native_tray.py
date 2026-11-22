@@ -37,6 +37,7 @@ def callback(queued="22", dispatched=23, code=0x401):
 class TrayProofTests(unittest.TestCase):
     def test_native_source_ignores_incomplete_records_and_rejects_a_mismatched_incarnation(self):
         probe = tray.NativeTray(Mock(), Mock(), "Default", TOKEN)
+        probe.witness = Mock(confirmed=True)
         proc = Mock(pid=18)
         probe.desk.name.return_value = "Default"
         probe.desk.window.return_value = dict(tid=2, pid=18, **{"class": "IFW RW02 synthetic tray receiver"})
@@ -104,12 +105,16 @@ class TrayProofTests(unittest.TestCase):
                 state = {}
                 log = head + registration(added) + closed(added)
                 probe.check_drain(proc, 1, log, state)
-                probe.qualify_quiet_shell(log, state, no_host=not added)
+                if added:
+                    self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+                    with self.assertRaises(tray.Unavailable):
+                        probe.qualify_quiet_shell(log, state, no_host=False)
+                else:
+                    probe.qualify_quiet_shell(log, state, no_host=True)
                 self.assertEqual(state["nativeShutdown"]["uiPasses"], 2)
             without_frame = log.replace("DRAINED passes=2", "DRAINED passes=0")
             probe.check_drain(proc, 1, without_frame, state)
-            with self.assertRaisesRegex(ValueError, "no UI pass"):
-                probe.qualify_quiet_shell(without_frame, state, no_host=False)
+            self.assertEqual(state["nativeShutdown"]["uiPasses"], 0)
             for invalid in (log.replace("removed=1", "removed=0"), log.replace("pid=18 hwnd=43 id=23 registered", "pid=33 hwnd=43 id=23 registered"),
                             log.replace("DRAINED passes=2", "INVENTORY"), log.replace("gui_tray.shutdown=true", "gui_tray.shutdown=false")):
                 with self.assertRaises(tray.CleanupUnconfirmed):
@@ -168,17 +173,23 @@ class ResidentTests(unittest.TestCase):
                     report_icon("initial", RGB)
                 elif data in (b"M", b"P"):
                     if data == b"M":
-                        append("gui_tray.change=true\n")
+                        if refusal != "missing-modify":
+                            append("gui_tray.change=true\n")
+                        if refusal == "duplicate-modify":
+                            append("gui_tray.change=true\n")
+                        if refusal == "superseded":
+                            append("TRAY_HOST pid=18 previous=81 current=82 previous_hwnd=51 current_hwnd=53\n")
                     report_icon("changed" if data == b"M" else "sample", COMPLEMENT)
                 elif data == b"Q":
-                    append(closed(refusal != "shell"))
+                    ending = closed(refusal != "shell")
+                    append(ending.replace("passes=2", "passes=0") if refusal == "no-frame" else ending)
                     proc.poll.return_value = 0
                 else:
                     self.fail("Unexpected synthetic launcher control")
             proc.stdin.write.side_effect = send
             def receive(stage):
                 if stage == "first":
-                    return {"surface": SURFACE}
+                    return {"surface": SURFACE | {"shellPid": 87} if refusal == "foreign-provider" else SURFACE}
                 if stage == "ready" and refusal == "provider":
                     raise tray.Unavailable("No exact accessible icon")
                 if stage in ("ready", "attempt"):
@@ -198,8 +209,8 @@ class ResidentTests(unittest.TestCase):
             def provider(*_):
                 yield helper, receive
 
-            witness = Mock(markers=0)
-            witness.live.return_value = True
+            witness = Mock(markers=0, confirmed=refusal != "unbound", original=(81, 51))
+            witness.live.side_effect = lambda stage: stage != refusal
             with (patch.object(tray, "ShellWitness", return_value=witness),
                   patch.object(tray, "bind", return_value=lambda: 28), patch.object(tray, "ordinary_console", return_value=True),
                   patch.object(tray.launcher, "child", child), patch.object(tray.launcher, "snapshot", return_value={}),
@@ -212,6 +223,10 @@ class ResidentTests(unittest.TestCase):
                 operation = lambda: tray.resident(api, desk, out / "gui.exe", out, {"IFW_QA_INVENTORY_TOKEN": TOKEN}, out, state)
                 if refusal == "early":
                     with self.assertRaisesRegex(ValueError, "outside the provider observation"):
+                        operation()
+                elif refusal in ("missing-modify", "duplicate-modify", "no-frame"):
+                    expected = "no UI pass" if refusal == "no-frame" else "one acknowledged"
+                    with self.assertRaisesRegex(ValueError, expected):
                         operation()
                 elif refusal:
                     with self.assertRaises(tray.Unavailable):
@@ -242,6 +257,24 @@ class ResidentTests(unittest.TestCase):
         self.assertEqual(commands[-1], b"Q")
         self.assertNotIn("delivery", state)
         self.assertLess(state["provider"]["attemptTick"], state["provider"]["startTick"])
+
+    def test_lost_or_foreign_shell_cannot_authorize_invoke_and_delete_does_not_imply_stability(self):
+        for refusal in ("unbound", "foreign-provider", "beforeMarker", "afterMarker", "beforeInvoke",
+                        "missing-modify", "duplicate-modify", "superseded"):
+            with self.subTest(refusal=refusal):
+                _, requests, state = self.exercise(refusal)
+                self.assertNotIn(b"invoke\n", requests)
+                self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+                self.assertFalse(state["nativeShutdown"]["stableRegistration"])
+        for refusal in ("providerAttempt", "afterInvoke", "afterQuit"):
+            with self.subTest(refusal=refusal):
+                _, requests, state = self.exercise(refusal)
+                self.assertIn(b"invoke\n", requests)
+                self.assertFalse(state["nativeShutdown"]["activationHostChecks"][refusal])
+                self.assertTrue(state["nativeShutdown"]["observedHostInstability"])
+                self.assertFalse(state["nativeShutdown"]["stableRegistration"])
+                self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+        self.exercise("no-frame")
 
 
 if __name__ == "__main__":

@@ -87,6 +87,8 @@ class NativeLifetimeTests(unittest.TestCase):
                         WITHDRAW + attempt("recreate", True, True) + closed(False),
                         WITHDRAW + attempt("retry", False, False) + closed(True),
                         attempt("retry", False, False) + closed(False),
+                        attempt("retry", False, False) + closed(True),
+                        attempt("recreate", True, False) + closed(False),
                         WITHDRAW + attempt("retry", True, True).replace("id=23", "id=27") + closed(True),
                         closed(True) + WITHDRAW]:
             with self.subTest(invalid=invalid), self.assertRaises(tray.CleanupUnconfirmed):
@@ -136,7 +138,8 @@ class NativeLifetimeTests(unittest.TestCase):
     def test_returning_after_ack_without_the_original_process_does_not_establish_a_witness(self):
         self.probe.watch_original(self.stack, self.report)
         self.gone()  # The matching initial stdout cannot retrospectively bracket the registration.
-        self.probe.registration(self.proc, lambda: registration(True), lambda fn, _: fn(), self.report, no_host=False)
+        with self.assertRaises(tray.Unavailable):
+            self.probe.registration(self.proc, lambda: registration(True), lambda fn, _: fn(), self.report, no_host=False)
         self.assertFalse(self.report["shellWitness"]["initialBindingConfirmed"])
         with self.assertRaises(tray.CleanupUnconfirmed):
             self.drain(RETIRED)

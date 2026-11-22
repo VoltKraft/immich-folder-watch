@@ -136,6 +136,8 @@ def replay_shutdown(log, key, token, report):
             raise CleanupUnconfirmed("Missing the fresh add or withdrawal after the old Shell declined v4")
         awaiting_add = False
         if action in ("initial.add", "retry.add", "recreate.add"):
+            if outstanding and not can_withdraw:
+                raise CleanupUnconfirmed("An outstanding icon must receive a real existing-version refusal before a fresh add")
             phase = action.split(".")[0]
             if (phase == "initial") != (registrations == 0):
                 raise CleanupUnconfirmed("The first Shell request must be the only initial registration")
@@ -305,10 +307,27 @@ class NativeTray:
     def __init__(self, api, desk, name, token):
         self.api, self.desk, self.name, self.token = api, desk, name, token
         self.witness = None
+        self.activation_checks = {}
 
     def watch_original(self, stack, result):
         result["shellWitness"] = {}
         self.witness = ShellWitness(self.api, self.desk, self.name, stack, result["shellWitness"])
+
+    def original_at(self, stage, surface=None):
+        witness = self.witness
+        try:
+            live = witness is not None and witness.live(stage)
+        except OSError as exc:
+            witness.report[stage] = {"error": str(exc)}
+            live = False
+        agrees = bool(live and witness.confirmed and (surface is None or
+                      (surface["shellPid"], surface["bar"]) == witness.original))
+        self.activation_checks[stage] = agrees
+        return agrees
+
+    def require_original(self, stage, surface=None):
+        if not self.original_at(stage, surface):
+            raise Unavailable(f"The retained original Shell could not be confirmed at {stage}")
 
     def registration(self, proc, log, wait, result, *, no_host):
         entries = wait(lambda: records(log(), "TRAY_REGISTER"), "No initial native registration outcome")
@@ -345,6 +364,10 @@ class NativeTray:
             raise Unavailable("The Shell accepted registration on the private desktop without a taskbar")
         if not no_host and (added, v4) != ("1", "1"):
             raise Unavailable("The input desktop did not accept the integrated icon's first v4 registration")
+        if not no_host:
+            self.activation_checks["initialAck"] = bool(self.witness and self.witness.confirmed)
+            if not self.activation_checks["initialAck"]:
+                raise Unavailable("The first v4 acknowledgement did not match the independently pinned original Shell")
         return key
 
     def visible_window(self, proc, hwnd, result, stage):
@@ -411,15 +434,24 @@ class NativeTray:
             report["shellAfterExit"] = shell_rect(int(key[1]))
             if report["shellAfterExit"]["hresult"] >= 0:
                 raise CleanupUnconfirmed("The Shell did not confirm absence of the original icon after quit")
-        report["stableRegistration"] = (len(rows) == 1 and not retirement and not report["withdrawals"]
-                                        and len(report["bindings"]) <= 1 and "gui_tray.existing." not in log
-                                        and "TRAY_TASKBAR " not in log and "TRAY_HOST " not in log)
         report["cleanupMethod"] = report["reportedCleanupMethod"]
+        quiet = len(rows) == 1 and not retirement and not report["withdrawals"] and not shell_changed(log)
+        stable = quiet
+        if self.name == "Default" and initial[-2:] == ("1", "1"):
+            self.original_at("afterQuit")
+            steps = ("initialAck", "beforeMarker", "afterMarker", "beforeInvoke", "providerAttempt", "afterInvoke", "afterQuit")
+            report["activationHostChecks"] = dict(self.activation_checks)
+            changes = [ok for event, ok in report["shellOperations"] if event == "change"]
+            stable = bool(quiet and all(self.activation_checks.get(step) is True for step in steps)
+                          and self.witness and self.witness.markers == 1 and changes == [True])
+        report["observedHostInstability"] = not quiet or False in self.activation_checks.values()
+        report["stableRegistration"] = stable
 
     @staticmethod
     def qualify_quiet_shell(log, result, *, no_host):
-        if not result["nativeShutdown"]["stableRegistration"]:
-            raise Unavailable("The taskbar changed or the subject repeated registration during the trial")
+        if (not result["nativeShutdown"]["stableRegistration"]
+                or (not no_host and result["nativeShutdown"].get("activationHostChecks", {}).get("initialAck") is not True)):
+            raise Unavailable("The original Shell registration could not be confirmed through the trial")
         if result["nativeShutdown"]["shellAfterExit"] is None:
             raise Unavailable("The receiver HWND was reused before post-quit readback")
         if not no_host and not result["nativeShutdown"]["uiPasses"]:
@@ -431,6 +463,11 @@ class NativeTray:
 def command(process, data):
     process.stdin.write(data)
     process.stdin.flush()
+
+
+def shell_changed(log):
+    return (any(tag in log for tag in ("TRAY_TASKBAR ", "TRAY_HOST ", "gui_tray.existing.", "gui_tray.retry.", "gui_tray.recreate."))
+            or len(records(log, "TRAY_BIND")) > 1 or len(records(log, "TRAY_REGISTER")) > 1)
 
 
 def provider_event(path, stage):
@@ -552,6 +589,7 @@ def resident(api, desk, gui, trial, env, out, result):
         def hidden():
             text = log()
             if (windows.visible() is not None or records(text, "TRAY_CALLBACK") or records(text, "TRAY_OPEN")
+                    or shell_changed(text)
                     or any(value in text for value in ("ADAPTER Dx12 ", "WINDOW_RELEASED ", "LAUNCHER_OPEN "))
                     or not ordinary_console(desk.context(), "Default")):
                 raise Unavailable("The original GUI, accessibility or desktop state changed before provider activation")
@@ -583,11 +621,13 @@ def resident(api, desk, gui, trial, env, out, result):
                 first = result["first"] = confirm_surface(initial, key, creation, first_rect, colors[0])
                 hidden()
                 result["stage"] = "second-marker"
-                before_change = native.witness.live("beforeMarker")
+                native.require_original("beforeMarker", first)
                 command(proc, b"M")
                 changed = wait(lambda: icon(log(), "changed", key, colors[1]), "Missing GUI marker modification")
-                after_change = native.witness.live("afterMarker")
-                native.witness.markers += int(before_change and after_change)
+                native.require_original("afterMarker")
+                if [line for line in log().splitlines() if line.startswith("gui_tray.change=")] != ["gui_tray.change=true"]:
+                    raise ValueError("The GUI marker was not backed by exactly one acknowledged Shell modification")
+                native.witness.markers += 1
                 command(proc, b"P")
                 current = wait(lambda: icon(log(), "sample", key, colors[1]), "Missing fresh GUI rectangle")
                 if first_rect != changed or changed != current:
@@ -598,12 +638,15 @@ def resident(api, desk, gui, trial, env, out, result):
                 result["providerIdentity"] = confirm_provider(ready, result["second"], native.token)
                 hidden()
                 result["stage"] = "provider-invoke"
+                native.require_original("beforeInvoke", result["second"])
                 command(helper, b"invoke\n")
                 attempted = wait(lambda: get("attempt"), "The exact accessibility provider was unavailable")
-                confirm_surface(attempted, key, creation, current, colors[1], first)
+                target = confirm_surface(attempted, key, creation, current, colors[1], first)
+                native.require_original("providerAttempt", target)
                 if confirm_provider(attempted, result["second"], native.token) != result["providerIdentity"]:
                     raise ValueError("The accessibility provider changed before invocation")
                 invoked = wait(lambda: get("invoked"), "The accessibility provider did not return")
+                native.require_original("afterInvoke", target)
                 state.update(attemptTick=attempted["tick"], startTick=invoked["startTick"], returnedTick=invoked["returnedTick"])
                 if not 0 <= state["attemptTick"] <= state["startTick"] <= state["returnedTick"]:
                     raise ValueError("The provider's monotonic interval was invalid")
@@ -672,7 +715,7 @@ def assess(target, out, result):
                         resident(api, desk, gui, trial, env, out, state)
             except Exception as exc:
                 shutdown = state.get("nativeShutdown", state.get("activation", {}).get("nativeShutdown", {}))
-                churn_timeout = isinstance(exc, TimeoutError) and shutdown.get("stableRegistration") is False
+                churn_timeout = isinstance(exc, TimeoutError) and shutdown.get("observedHostInstability") is True
                 state.update(status="unavailable" if isinstance(exc, Unavailable) or churn_timeout else "failed",
                              failures=launcher.failures(exc))
                 if not state["cleanupConfirmed"] or CleanupUnconfirmed.in_chain(exc):
