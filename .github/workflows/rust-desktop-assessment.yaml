@@ -201,6 +201,7 @@ jobs:
           python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
 
       - name: Reopen the hidden Windows GUI through an ordinary second launch
+        id: windows_launcher
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
         env:
@@ -209,6 +210,15 @@ jobs:
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
           python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET
           exit $LASTEXITCODE
+
+      - name: Retain the launcher result before the resource measurements
+        if: ${{ !cancelled() && (steps.windows_launcher.outcome == 'success' || steps.windows_launcher.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-launcher-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-launcher/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Rebuild the x64 import library and run its native winit consumer
         if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.gui.outcome == 'success' }}
