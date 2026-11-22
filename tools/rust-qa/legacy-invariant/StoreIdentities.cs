@@ -29,8 +29,16 @@ internal static partial class CasingCases
     {
         if (args is ["read-sizes", var copies, var result])
         {
-            await ReadUpdatedSizesAsync(copies, result);
-            return 0;
+            try
+            {
+                await ReadUpdatedSizesAsync(copies, result);
+                return 0;
+            }
+            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine(error.Message);
+                return 2;
+            }
         }
         if (args is ["read", var older, var managed, var current, var output])
         {

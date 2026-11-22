@@ -115,7 +115,9 @@ all 12 distinct names.
 The `read-sizes` command exercises `GetAsync` and `GetSourceEntriesAsync`
 on private copies before and after the [Rust file-size experiment](../storage/README.md#update-the-size-of-a-historical-entry-on-a-new-copy).
 It records the active complete casing table, CoreLib and shipping Core
-assembly digests with the observed paths, asset IDs and sizes.
+assembly digests with the observed paths, asset IDs and sizes. The reader
+checks the finalized input pair's membership, file type, SQLite header and
+digests before opening its copies and again before publishing observations.
 
 ## Attribution
 

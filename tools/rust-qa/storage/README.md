@@ -115,9 +115,20 @@ python3 -B tools/rust-qa/storage/study_file_sizes.py \
   --older-icu "$IFW_TEST_ICU74" --output artifacts/rust/stored-key-mutations/file-sizes
 ```
 
-The six updates cover both path modes for each writer. Eight refusal cases
+The six updates cover both path modes for each writer. Nine refusal cases
 cover ambiguous and possible aliases, unexplained stored keys, both absence
-outcomes, a stale size, a different account and an unknown same-process
-table. The frozen donors contain entries and transfer history. Their repair
+outcomes, stale expectations of both 20 and 37 bytes, a different account
+and an unknown same-process table. Each successful update repeats the
+operation against the actual target size of 37 and verifies its digest.
+With umask zero the direct Rust process creates a 0700 case directory and
+0600 database files. SQLite opens only the freshly created copy for writing.
+
+The C# and Python readers require a finalized pair of single-link regular
+files with rollback-journal headers. Both check the two names and contents
+around copying or reading. On a separate copy, a committed WAL makes
+38 bytes visible while the main file alone still shows 37. Both readers
+must reject it as input. Other controls cover an isolated WAL-mode main
+file, an extra directory entry, a symbolic link, a hard link and a FIFO.
+The frozen donors contain entries and transfer history. Their repair
 and ownership tables are empty. New identities, populated repair or album
 changes and external synchronization need separate evidence.

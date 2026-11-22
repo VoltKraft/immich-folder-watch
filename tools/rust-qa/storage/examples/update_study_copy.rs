@@ -4,22 +4,31 @@
 use ifw_sqlite_assessment::{Fixture, PathLookup, Result, digest, field, limited, verify_backup};
 use rusqlite::{Connection, OpenFlags, TransactionBehavior, params};
 use serde_json::{Value, json};
-use std::fs::{self, File};
+use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::Path;
 
 const NEW_SIZE: i64 = 37;
 const ACCOUNT: &str = "ifw-managed-invariant-study";
 
 fn new_file(path: &Path, bytes: &[u8]) -> Result<()> {
-    let mut file = File::create_new(path)?;
+    let mut options = OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    let mut file = options.open(path)?;
     file.write_all(bytes)?;
     file.sync_all()?;
     Ok(())
 }
 
 fn open_copy(copy: &Path) -> Result<Connection> {
-    let db = Connection::open_with_flags(copy, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+    let db = Connection::open_with_flags(
+        copy,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
     db.execute_batch("PRAGMA trusted_schema=OFF;")?;
     if db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))? != 1
         || db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))? != "delete"
@@ -44,7 +53,16 @@ fn update(db: &mut Connection, fixture: &Fixture, query: &Value) -> Result<(Valu
     if !tables.contains("sync_entries") || tables.contains("sync_timestamp_repairs") {
         return Ok((json!({"status": "pending-repair"}), 0));
     }
-    if old == NEW_SIZE {
+    let stored: i64 = tx.query_row(
+        "SELECT file_size FROM sync_entries
+         WHERE account_scope=?1 AND source_key=?2 AND relative_path_key=?3",
+        params![account, key[0], key[1]],
+        |row| row.get(0),
+    )?;
+    if stored != old {
+        return Ok((json!({"status": "stale-size"}), 0));
+    }
+    if stored == NEW_SIZE {
         return Ok((json!({"status": "unchanged-size"}), 0));
     }
     let rows = tx.execute(
@@ -52,9 +70,6 @@ fn update(db: &mut Connection, fixture: &Fixture, query: &Value) -> Result<(Valu
          WHERE account_scope=?2 AND source_key=?3 AND relative_path_key=?4 AND file_size=?5",
         params![NEW_SIZE, account, key[0], key[1], old],
     )?;
-    if rows == 0 {
-        return Ok((json!({"status": "stale-size"}), 0));
-    }
     if rows != 1 {
         return Err("expected one existing physical record".into());
     }
@@ -92,7 +107,10 @@ fn main() -> Result<()> {
     if digest(&bytes) != expected {
         return Err("donor changed before copying".into());
     }
-    fs::create_dir(destination)?;
+    let mut builder = DirBuilder::new();
+    #[cfg(unix)]
+    builder.mode(0o700);
+    builder.create(destination)?;
     let copy = destination.join("after.db");
     new_file(&copy, &bytes)?;
     if control {
@@ -115,6 +133,17 @@ fn main() -> Result<()> {
     verify_backup(&copy, &before_sha)?;
     let (decision, rows) = update(&mut open_copy(&copy)?, &fixture, &query)?;
     let after_sha = digest(&limited(File::open(&copy)?, 16 * 1024 * 1024)?);
+    let mut repeat = Value::Null;
+    if rows == 1 {
+        let mut at_target = query.clone();
+        at_target["expectedFileSize"] = NEW_SIZE.into();
+        let (observed, changed) = update(&mut open_copy(&copy)?, &fixture, &at_target)?;
+        if observed["status"] != "unchanged-size" || changed != 0 {
+            return Err("an exact retry at the stored target size changed the copy".into());
+        }
+        repeat =
+            json!({"expectedFileSize": NEW_SIZE, "decision": observed, "rowsChanged": changed});
+    }
     verify_backup(&copy, &after_sha)?;
     verify_backup(&before, &before_sha)?;
     verify_backup(&source, expected)?;
@@ -124,7 +153,7 @@ fn main() -> Result<()> {
     let receipt = json!({"format":"ifw-study-file-size-update-v1", "writerProfile":fixture.writer, "request":query,
         "writerReceiptSha256":fixture.study_receipt, "donorSha256":expected, "mode":mode,
         "preparedUnexplainedControl":control, "beforeSha256":before_sha, "afterSha256":after_sha,
-        "decision":decision, "rowsChanged":rows, "replacementFileSize":NEW_SIZE});
+        "decision":decision, "rowsChanged":rows, "replacementFileSize":NEW_SIZE, "repeatAtTarget":repeat});
     serde_json::to_writer(std::io::stdout().lock(), &receipt)?;
     Ok(())
 }

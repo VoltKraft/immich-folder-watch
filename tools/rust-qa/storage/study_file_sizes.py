@@ -1,11 +1,15 @@
 """Update a single synthetic file size on historical copies and read it through the shipping C# store."""
 
 import argparse
+from contextlib import closing
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
+import stat
 import subprocess
 
 from evidence import sha256, write_json
@@ -18,15 +22,51 @@ NAMES = {"icu15": "long-s-S.jpg", "managed16": "stroke-Ƛ.jpg", "icu17": "beria
 PK = ("account_scope", "source_key", "relative_path_key")
 
 
+def finalized_hash(path):
+    artifact_directory(path.parent)
+    def companions_absent():
+        for suffix in ("-journal", "-wal", "-shm"):
+            require(not os.path.lexists(str(path) + suffix), "Expected a finalized SQLite database without companions")
+    companions_absent()
+    info = path.lstat()
+    require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, "Expected a single-link regular study file")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        opened = os.fstat(fd)
+        require(os.path.samestat(info, opened) and opened.st_nlink == 1, "Study input changed before the read")
+        header = stream.read(20)
+        require(header[:16] == b"SQLite format 3\0" and header[18:20] == b"\x01\x01",
+                "Expected a finalized rollback-journal database header")
+        stream.seek(0)
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        require(os.path.samestat(opened, path.lstat()) and os.fstat(fd).st_nlink == 1, "A study input was replaced")
+    companions_absent()
+    return digest
+
+
+def finalized_pair(directory):
+    artifact_directory(directory)
+    names = {"before.db", "after.db"}
+    def members():
+        require({p.name for p in directory.iterdir()} == names, "Expected exactly the finalized before.db and after.db pair")
+    members()
+    hashes = {name: finalized_hash(directory / name) for name in sorted(names)}
+    members()
+    return hashes
+
+
 def database_state(path):
+    initial = finalized_hash(path)
     with immutable_db(path) as db:
         schema = [tuple(r) for r in db.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name")]
-        return schema, all_tables(db)
+        state = all_tables(db)
+    require(finalized_hash(path) == initial, "Input changed during immutable SQL readback")
+    return schema, state
 
 
 def rust_run(probe, directory, destination, mode, query, flag=()):
     args = [probe, *flag, directory, mode, sha256(directory / (mode + ".db")), destination]
-    return subprocess.run(args, cwd=ROOT, input=json.dumps(query), capture_output=True, encoding="utf-8", timeout=30)
+    return subprocess.run(args, cwd=ROOT, input=json.dumps(query), capture_output=True, encoding="utf-8", timeout=30, umask=0)
 
 
 def inspect_copy(directory, mode, output, query, probe, decision, key=None, unexplained=False):
@@ -35,7 +75,11 @@ def inspect_copy(directory, mode, output, query, probe, decision, key=None, unex
     result = rust_run(probe, directory, output, mode, query, ["--unexplained-control"] if unexplained else [])
     require(result.returncode == 0, "Rust copy update failed: " + result.stderr)
     receipt = json.loads(result.stdout)
+    inputs = finalized_pair(output)
     before, after = (output / (phase + ".db") for phase in ("before", "after"))
+    permissions = {name: oct(stat.S_IMODE(path.stat().st_mode)) for name, path in (("directory", output), ("before.db", before), ("after.db", after))}
+    require(permissions == {"directory": "0o700", "before.db": "0o600", "after.db": "0o600"},
+            "The direct Rust entry point requires private outputs even with umask zero")
     require(receipt["format"] == "ifw-study-file-size-update-v1" and receipt["mode"] == mode and receipt["request"] == query
             and receipt["donorSha256"] == sha256(donor) and receipt["writerReceiptSha256"] == sha256(directory / "result.json")
             and receipt["afterSha256"] == sha256(after) and receipt["beforeSha256"] == sha256(before)
@@ -54,14 +98,18 @@ def inspect_copy(directory, mode, output, query, probe, decision, key=None, unex
         require(sha256(before) == sha256(donor) and before_tables == original_tables, "Working input differs from donor")
     expected = copy.deepcopy(before_tables)
     if key is None:
-        require(receipt["rowsChanged"] == 0 and sha256(before) == sha256(after), "Refusal wrote to the copy")
+        require(receipt["rowsChanged"] == 0 and receipt["repeatAtTarget"] is None and sha256(before) == sha256(after), "Refusal wrote to the copy")
     else:
         require(receipt["rowsChanged"] == 1 and receipt["decision"]["storedKey"] == list(key[1:])
                 and receipt["decision"]["tables"] == ["sync_entries"], "Rust used a different physical identity")
         row, = [r for r in expected["sync_entries"] if tuple(r[k] for k in PK) == key]
         require(row["file_size"] == 19, "Unexpected initial file size")
         row["file_size"] = 37
+        require(receipt["repeatAtTarget"] == {"expectedFileSize": 37, "decision": {"status": "unchanged-size"}, "rowsChanged": 0},
+                "The genuine retry at the stored target must preserve the updated database")
     require(expected == after_tables, "Unexpected change to a row, field, identity, journal, binding or history")
+    require(inputs == finalized_pair(output), "A finalized pair changed during the observation")
+    receipt["observedPermissionsAtUmaskZero"] = permissions
     return receipt
 
 
@@ -82,11 +130,13 @@ def check_reader(report, directories, cases, mappings, reader):
             fold = {} if mode == "sensitive" else mappings[reader]
             relative = NAMES[writer]
             observed = {}
+            case_directory = cases / writer / mode
+            inputs = finalized_pair(case_directory)
             for phase in ("before", "after"):
                 key = f"{writer}/{mode}/{phase}"
                 item = report["observations"][key]
-                dbpath = cases / key.rsplit("/", 1)[0] / (phase + ".db")
-                require(item["inputSha256"] == sha256(dbpath) and item["history"] == SEED, "Wrong C# input or history")
+                dbpath = case_directory / (phase + ".db")
+                require(item["inputSha256"] == inputs[dbpath.name] and item["history"] == SEED, "Wrong C# input or history")
                 display = stored["sourcePath"]
                 with immutable_db(dbpath) as db:
                     source, = db.execute("SELECT DISTINCT source_key FROM sync_entries WHERE account_scope=?", (ACCOUNT,)).fetchall()
@@ -100,9 +150,80 @@ def check_reader(report, directories, cases, mappings, reader):
                 else:
                     require(value is None and not item["display"]["list"], "Unexpected cross-profile source match")
                 observed[phase] = {v: item[v]["get"] for v in ("display", "storedKey")}
+            require(inputs == finalized_pair(case_directory), "A finalized case changed during the independent SQL read")
             comparisons[f"{writer}/{mode}"] = observed
     require(len(report["observations"]) == 12, "Expected every before/after input exactly once")
     return comparisons
+
+
+def reader_input_controls(dotnet, assembly, env, output, directories, maps, reader, valid_report):
+    controls = output / "reader-input-controls"
+    cases = controls / "cases"
+    shutil.copytree(output / "cases", cases)
+    pair = cases / "icu15/sensitive"
+    main = pair / "after.db"
+    results = {}
+
+    def reject(label, python_message, csharp_message):
+        try:
+            check_reader(valid_report, directories, cases, maps, reader)
+        except ValueError as error:
+            require(python_message in str(error), "Unexpected independent SQL refusal: " + str(error))
+        else:
+            raise ValueError("The independent SQL reader accepted " + label)
+        destination = controls / ("read-" + label)
+        process = subprocess.run([dotnet, assembly, "read-sizes", cases, destination],
+                                 cwd=ROOT, env=env, text=True, capture_output=True, timeout=30)
+        require(process.returncode == 2 and not process.stdout and csharp_message in process.stderr
+                and not destination.exists(), "The C# reader did not refuse " + label + ": " + process.stderr)
+        results[label] = {"python": python_message, "csharp": process.stderr.strip(), "exitCode": process.returncode}
+
+    # A committed WAL update is visible from a new connection while the main file still contains 37.
+    args = (ACCOUNT, NAMES["icu15"])
+    where = " WHERE account_scope=? AND relative_path=?"
+    select = "SELECT file_size FROM sync_entries" + where
+    with closing(sqlite3.connect(main)) as writer:
+        require(writer.execute("PRAGMA journal_mode=WAL").fetchone() == ("wal",), "Expected a live WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        require(writer.execute("UPDATE sync_entries SET file_size=38" + where + " AND file_size=37", args).rowcount == 1,
+                "Expected one committed WAL change on the disposable copy")
+        writer.commit()
+        with closing(sqlite3.connect(main.as_uri() + "?mode=ro", uri=True)) as active:
+            live_size = active.execute(select, args).fetchone()[0]
+        with closing(sqlite3.connect(main.as_uri() + "?mode=ro&immutable=1", uri=True)) as isolated:
+            main_size = isolated.execute(select, args).fetchone()[0]
+        require((main_size, live_size) == (37, 38), "The WAL control needs distinct committed and main-file states")
+        companions = [main.with_name(main.name + suffix) for suffix in ("-wal", "-shm")]
+        require(all(p.stat().st_size > 0 for p in companions), "Missing live SQLite companions")
+        snapshot = controls / "active-wal"
+        snapshot.mkdir(mode=0o700)
+        for file in [main, *companions]:
+            shutil.copyfile(file, snapshot / file.name)
+        reject("live-wal", "exactly the finalized", "finalized pair")
+        require(all(sha256(p) == sha256(snapshot / p.name) for p in [main, *companions]), "A reader altered the active WAL fixture")
+        results["live-wal"].update(mainFileSize=main_size, committedSize=live_size,
+                                   files={p.name: sha256(snapshot / p.name) for p in [main, *companions]})
+
+    require({p.name for p in pair.iterdir()} == {"before.db", "after.db"}, "SQLite did not close its disposable WAL")
+    shutil.copyfile(snapshot / "after.db", main)
+    reject("wal-header-alone", "rollback-journal database header", "rollback-journal database header")
+    # Keep the tested members separate from the six Rust outputs and the original donors.
+    shutil.copyfile(output / "cases/icu15/sensitive/after.db", main)
+    extra = pair / "unexpected"
+    extra.touch()
+    reject("unexpected-member", "exactly the finalized", "finalized pair")
+    extra.unlink()
+    main.unlink()
+    main.symlink_to("before.db")
+    reject("symbolic-link", "single-link regular", "finalized pair")
+    main.unlink()
+    main.hardlink_to(pair / "before.db")
+    reject("hard-link", "single-link regular", "single-link regular")
+    main.unlink()
+    os.mkfifo(main, 0o600)
+    reject("named-pipe", "single-link regular", "regular")
+    main.unlink()
+    return results
 
 
 def read_csharp(readers, dotnet, reader_dll, older_icu, output, directories, maps, tables):
@@ -149,7 +270,9 @@ def read_csharp(readers, dotnet, reader_dll, older_icu, output, directories, map
         receipts[profile] = {"resultSha256": sha256(path), "coreAssemblySha256": data["coreAssemblySha256"],
                              "corelibSha256": data["corelibSha256"], "observerSha256": digest,
                              "cases": check_reader(data, directories, output / "cases", maps, profile)}
-    return receipts
+        if profile == "icu15":
+            controls = reader_input_controls(dotnet, assembly, env, output, directories, maps, profile, data)
+    return receipts, controls
 
 
 def run(probe, writers, readers, dotnet, reader_dll, older_icu, output):
@@ -184,6 +307,7 @@ def run(probe, writers, readers, dotnet, reader_dll, older_icu, output):
         ("absent", source, "unwritten.jpg", 19, "absent-profile-dependent"),
         ("absent-concordant", "/IfwSynthetic/other", "new.jpg", 19, "absent-concordant"),
         ("stale", source, "long-s-S.jpg", 20, "stale-size"),
+        ("requested-target-is-stale", source, "long-s-S.jpg", 37, "stale-size"),
         ("wrong-account", source, "long-s-S.jpg", 19, "absent-profile-dependent"),
     ):
         query = {"account": ACCOUNT.upper() if name == "wrong-account" else ACCOUNT, "source": spelling,
@@ -204,15 +328,18 @@ def run(probe, writers, readers, dotnet, reader_dll, older_icu, output):
     require(refused.returncode and not refused.stdout and "unqualified full casing table" in refused.stderr
             and before == private_input(other) and not (parent / "unknown-attempt").exists(), "Unknown writer reached an update")
     negative["unknown-writer"] = {"error": refused.stderr.strip(), "filesBeforeAndAfter": before}
-    csharp = read_csharp(readers, dotnet, reader_dll, older_icu, output, directories, maps, tables)
+    csharp, pair_controls = read_csharp(readers, dotnet, reader_dll, older_icu, output, directories, maps, tables)
     for label, receipt in good.items():
+        observed = finalized_pair(output / "cases" / label)
         for phase in ("before", "after"):
-            require(sha256(output / "cases" / label / (phase + ".db")) == receipt[phase + "Sha256"], "A Rust output changed")
+            require(observed[phase + ".db"] == receipt[phase + "Sha256"], "A Rust output changed")
     require(donors == {p: private_input(d) for p,d in directories.items()}, "An original writer changed")
     write_json(output / "result.json", {"format":"ifw-existing-file-size-study-v1", "writerCommit":WRITER_COMMIT,
                "readerCommit":READER_COMMIT, "writerEvidenceSha256":evidence, "writerFilesBeforeAndAfter":donors,
-               "probeSha256":sha256(probe), "observerSha256":sha256(Path(__file__)), "updates":good, "controls":negative, "csharp":csharp})
-    print("Verified six one-field updates, eight refusal controls and 36 shipping C# before/after reads")
+               "probeSha256":sha256(probe), "observerSha256":sha256(Path(__file__)), "updates":good, "controls":negative,
+               "readerInputControls":pair_controls, "csharp":csharp})
+    print(f"Verified {len(good)} one-field updates and retries, {len(negative)} mutation refusals, "
+          f"{len(pair_controls)} paired-reader refusals and 36 shipping C# before/after reads")
 
 
 if __name__ == "__main__":
