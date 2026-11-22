@@ -305,6 +305,28 @@ each of the ICU and managed inputs, including the full Unicode range and
 managed comparison. This scalar check does not authorize writes to original
 SQLite identities.
 
+### Read-only lookup across three historical writers
+
+The separate Fedora x64 study at `733194b` reads the finalized backups and
+writer receipts from `86ae038`. It checks the eighteen C# reader combinations
+from `3c58fc1` before comparing Rust observations with the stored SQL rows.
+Each backup receives the same 53 queries, covering original names, alternate
+spellings, distinct accounts, ambiguity, possible aliases and confirmed
+absence. Across three writers and both comparison modes all 318 observations
+agreed with the SQL projection. Fourteen controls passed, and the twelve
+original files retained their SHA-256 values. The ordinary two-profile
+inspector also passed its 60 queries and twenty controls. It refused the
+managed writer in both path modes before returning a query result.
+
+The three-profile study applies only to the three source-bound Fedora writers.
+It opens existing records for inspection. Choosing how to write new or
+ambiguous identities during an installed migration remains open.
+The result and verification manifest are in
+`artifacts/rust/stored-keys-three-profile-verified/`, with SHA-256
+`9ee4efa144f87a6e6b45f2c5e41dbf580c3d1beb883017dad2d48da9bb3268e1`
+and `6e7f5c54901bfc009b92e8e522d2433821c7f741b7e174e6c3e973dc5f1b36f7`.
+[Reproduction and corpus inputs](../../tools/rust-qa/storage/README.md).
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

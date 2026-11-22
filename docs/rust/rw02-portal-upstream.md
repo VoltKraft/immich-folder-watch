@@ -206,3 +206,24 @@ remains necessary for a functioning Linux release candidate.
 [Ubuntu publication records](https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedSources&source_name=xdg-desktop-portal&exact_match=true&status=Published)
 · [Upstream release history](https://github.com/flatpak/xdg-desktop-portal/releases)
 · [Documents interface](https://github.com/flatpak/xdg-desktop-portal/blob/3152e604cf0eb2e195e298944cc8c728ee8009a7/data/org.freedesktop.portal.Documents.xml).
+
+### Additional distribution sources checked on 2026-11-22
+
+Upstream `main` at `3152e604` contains the forwarding operation. The 1.22
+maintenance branch at `2fb63f87` still returns `ENOSYS`. Its FUSE source
+SHA-256 is `8a4f4ae33ea81def6424f46dec3612ba5e325bb021a6037621608a0277484c15`.
+[Maintenance source](https://github.com/flatpak/xdg-desktop-portal/blob/2fb63f8720a61891b0c1ca67ca675b0bce80271d/document-portal/document-portal-fuse.c)
+· [Upstream lock change](https://github.com/flatpak/xdg-desktop-portal/commit/caa5ae9e21e44c70c0cf3e7fa78de557acd3ea57).
+
+| Channel | Published sources examined | Evidence |
+| --- | --- | --- |
+| Fedora | Fedora 45 ships `1.22.1-2.fc45`. Updates and Updates-Testing had no replacement. Fedora 44 Updates supplied `1.22.1-1.fc44`, its Testing repository had `1.21.1-1.fc44`, and Fedora 43 supplied `1.20.4-1.fc43`. All four source RPM signatures verified and each contained the released handler. | [Fedora packages](https://packages.fedoraproject.org/pkgs/xdg-desktop-portal/xdg-desktop-portal/) · [Fedora 45 Updates-Testing](https://dl.fedoraproject.org/pub/fedora/linux/updates/testing/45/Everything/source/tree/Packages/x/) |
+| Ubuntu | Jammy `1.14.4-1ubuntu2~22.04.2`, both Noble and Resolute releases and Proposed updates above, and Stonking `1.21.1+ds-1ubuntu6` retained the stub. The `.dsc` digests matched the inspected archives and their active package patches left this handler unchanged. | [Launchpad source publications](https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedSources&source_name=xdg-desktop-portal&exact_match=true&status=Published) |
+| Debian | Trixie/stable `1.20.3+ds-1` and Forky/testing and Sid/unstable `1.22.1+ds-1` retained the stub. The archive listed no separate current Experimental package. | [Debian archive](https://api.ftp-master.debian.org/madison?package=xdg-desktop-portal) |
+| Arch Linux | Extra `1.22.1-2` had the original stub in its official debug source. The published binary package had SHA-256 `7df21ee565cd6f5b42dc374b77cd8a19ab31fb4bc5f76481f06713b5bd40d889`. | [Arch package](https://archlinux.org/packages/extra/x86_64/xdg-desktop-portal/) · [Corresponding debug package](https://geo.mirror.pkgbuild.com/extra-debug/os/x86_64/xdg-desktop-portal-debug-1.22.1-2-x86_64.pkg.tar.zst) |
+| openSUSE Tumbleweed | The released `1.22.1-2.1.x86_64` RPM had SHA-256 `82fadbf91779435f2252754e0b36f16581c019f99d35d4aba3b7821385a612c4`. Factory revision `dc80b05532a4309cbe28b25403818a8a` used the release archive and a documentation/build patch. | [Published RPM](https://download.opensuse.org/tumbleweed/repo/oss/x86_64/xdg-desktop-portal-1.22.1-2.1.x86_64.rpm) · [Package source](https://api.opensuse.org/public/source/openSUSE:Factory/xdg-desktop-portal?rev=dc80b05532a4309cbe28b25403818a8a) |
+
+This source comparison identified no newly released provider for a positive
+native trial. The existing ordinary grant test can evaluate the first
+distribution package containing the fix with an acquisition, a conflicting
+cooperative writer and reacquisition after release.

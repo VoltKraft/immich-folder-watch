@@ -15,6 +15,19 @@ and Japanese input checks, plus Wayland Japanese input and four transitions
 between two outputs. [Four native desktop archives](rust/rw02-native-gui.md#native-follow-up-at-7517e3b)
 · [IME receipts](rust/rw02-windows-ime.md) · [Font observations](rust/rw02-font-coverage.md).
 
+At `8091469` both Ubuntu desktop jobs again passed. Recomputing their three
+100,000-file trials reproduced all eleven same-host performance checks per
+architecture. Ubuntu x64 and ARM64 reopened in 0.89 and 0.90 ms at scan p95
+and each passed all sixteen loopback transport cases. [Ubuntu native receipts](rust/rw02-native-gui.md#native-follow-up-at-8091469)
+· [TLS identity observations](rust/rw02-realtime-transport.md#tls-endpoint-identity).
+Both Windows private Shells refused two registration attempts on the same
+taskbar. The x64 original Shell accepted the icon and reported its balloon.
+Neither host delivered a tray activation. The guard excluded writers in two
+elevated sessions on both hosts. The ordinary-user fixture again stopped
+before either writer ran. Source inspection across Fedora, Ubuntu, Debian,
+Arch and openSUSE found the released Documents-portal read lock unavailable
+in the examined packages. [Portal package sources](rust/rw02-portal-upstream.md#additional-distribution-sources-checked-on-2026-11-22).
+
 The two official Unicode data inputs reproduce the distinct .NET invariant
 uppercase tables observed on Fedora and on all four hosted targets. The
 Fedora Rust probe passed 5,844 requests with each independently generated
@@ -43,8 +56,14 @@ The tagged .NET source and Unicode 16.0 independently reproduce the third
 profile. With the same twelve input filenames the legacy C# store retained
 eleven, ten or eight distinct insensitive entries under the three profiles.
 The native Fedora scalar probe passed 5,844 comparisons each using the ICU
-and managed tables. The additional hosted comparison is selected in the
-normal feasibility entry point. [Managed casing evidence](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+and managed tables at clean revision `da448ed`. All twelve native steps
+passed. The comparison matched both oracle assemblies and CoreLib files.
+The additional hosted comparison is selected in the normal feasibility
+entry point. [Managed casing evidence](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+At `733194b` all 318 Rust lookups on the three original writer profiles
+matched the independent SQL projection. Fourteen controls passed. The separate
+two-profile qualifier still refused the managed writer.
+[Stored-key observations](rust/rw02-legacy.md#read-only-lookup-across-three-historical-writers).
 
 Commit `66d9fd6` produced four SPDX inventories from the verified native
 builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
@@ -65,6 +84,9 @@ for the development builds. Across the four corrected ZIPs, 2,356 complete
 original files and 9,714 byte-range references matched their sources. All
 four corrected SPDX documents passed the schema. The native workflow now
 selects notice generation using its uploaded compiler receipt as input.
+The native Fedora build at `9f68c58` produced the corrected inventory,
+402 build units, 1,799 notice ZIP members and an SPDX document with 446
+packages. Its relinked executable reported the edited Wayland interface.
 Offline replay reconstructed that receipt twice from each of the four
 `7517e3b` archives. All 1,798 indexed files in the resulting Linux x64
 notice ZIP matched the independently reviewed ZIP. The manifest identified

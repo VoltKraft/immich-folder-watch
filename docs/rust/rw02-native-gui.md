@@ -346,6 +346,47 @@ outputs. The X11 and Wayland results have SHA-256
 The build's sixteen source hashes, twelve driver hashes and nineteen Wayland
 evidence hashes matched their retained files.
 
+## Native follow-up at 8091469
+
+Both Ubuntu jobs passed at `80914693b6db24a5a76f4a5035c6ec880605ddc3`.
+Independent readback matched the native archive digests, the two reference
+builds and the measurement sources. On each host the .NET baseline and Rust
+candidate ran three scans of 100,000 synthetic files. Recomputing the values
+from the captured samples reproduced all eleven limits and results.
+[Native desktop run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500).
+
+| Ubuntu target | Startup, Rust / limit | Visible / hidden RSS | Scan reopen p95, Rust / limit | Scan close p95, Rust / limit | Native archive SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| x64 | 197.84 / 1,394.232 ms | 124.848 / 124.598 MiB | 0.89 / 15.95 ms | 0.41 / 15.60 ms | `d6e2ec401f7cce722b257474f827c6497248bf7acc13fba23c35e4cee6e8a949` |
+| ARM64 | 212.74 / 1,495.908 ms | 119.738 / 119.738 MiB | 0.90 / 16.18 ms | 0.37 / 15.531 ms | `bba64617926f39e363b4de32bfdaedcf6f7b419ad4ae5a3185ebbf64018cdd0a` |
+
+Both Rust subjects recorded zero idle CPU, XDamage events and render
+passes during the sampled visible and hidden intervals. All Rust input
+observations began and ended during directory reads. One ARM64 .NET
+reopen finished 0.24 ms after its final read and before scan completion.
+The ordinary p95 includes that observation. On both X11 and Wayland Orca
+announced four labels and three password masks. Both hosts also recorded
+Mozc composition, four font cases and scale changes across virtual outputs.
+Ubuntu x64 recorded two actual Plasma panel activations. The source-bound
+metric, GUI and storage readback is retained in
+`artifacts/rust/hosted-desktop-storage/45067343500/linux-native-readback.json`,
+SHA-256 `9d997d5d230d05b7c880994f7f0f72471926fe8ee1d085e15e3c8a9f10428f34`.
+
+Both Windows private Shells kept the same visible taskbar through two icon
+registration attempts, 3,023 ms apart on x64 and 3,146 ms on ARM64. Each
+returned `0x80004005`, an empty icon rectangle and zero pointer callbacks.
+Each fixture removed its own temporary directory and returned to the original
+input desktop. The original x64 Shell accepted and removed the icon and
+reported a balloon-show callback. The original ARM64 Shell declined the icon.
+The separate writer archives contain successful elevated same-account exclusion
+on each host. Both native standard-user trials stopped before the first
+writer operation because the Basic User prerequisite was unavailable.
+
+| Windows target | Tray archive SHA-256 | Cross-session archive SHA-256 |
+| --- | --- | --- |
+| x64 | `7a3d8ce093ffda820e15a363d92b1d68bb3c6419d4ba7a5274e435572b5a8351` | `721634ecb5ff5e78cf49b1d8b119a843b30256ffd4cf1f56f3e961a997bc578a` |
+| ARM64 | `01a79ad54ff14fc70da83acbb4ab12d7f66331d0dc899326ab241f0979aa2ad8` | `a791d2382f98a27c5632b37ec730fee711f42c9d200841fff0e6561e1337c9d3` |
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

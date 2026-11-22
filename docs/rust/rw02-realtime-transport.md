@@ -66,8 +66,16 @@ wrong-address cases used the same CA digest. All seven build and test steps
 passed, including the source check for 109 registry packages and 192 notices.
 The observed wire report has SHA-256
 `e2c9b69c82811e9b9f667f6a2468a49d7bd12efab35b742eb7c6aed122c21f77`.
-The other three native targets still need to run the added case. Earlier
-four-host results cover fifteen cases. [Wire fixture](../../tools/rust-qa/realtime/verify.py)
+At `8091469` the Ubuntu x64 and ARM64 archived results each contain sixteen
+cases and 191 peer-observed HTTP requests. The matching certificate allowed
+one WebSocket probe and upgrade and thirteen inventory reads. Both refusal
+cases reached the peer's TLS listener and sent zero HTTP requests. The
+redirect destination received no request or credential. The original
+`sessions.json` SHA-256 values are `7c2e4b46f378eddbb4fb08eaf12cc9f62fe4363d4d633e040f179c34a0e4d17d`
+and `0557e8fd8bdae9969dfadc70305d5d63b622f62fc5269e4da76b00c7751a1b05`.
+Both Windows workflow steps also passed. Their complete desktop archives
+are needed to inspect the individual observations. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500)
+· [Wire fixture](../../tools/rust-qa/realtime/verify.py)
 · [Client transport policy](../../tools/rust-qa/realtime/src/transport.rs).
 
 ## Dependency and native input review

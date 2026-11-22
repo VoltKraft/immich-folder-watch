@@ -144,6 +144,21 @@ ZIP continues to carry the native run and the target's SPDX document.
 [Native workflow and reproduction](../development.md#rust-feasibility-workspace)
 · [Pinned artifact action](https://github.com/actions/upload-artifact/blob/cf430e030ddbb5b0abf93d22962f4752f3646cd9/action.yml).
 
+The complete offline Fedora x64 build at `9f68c58` reproduced the corrected
+source inventory directly from the 472 original archives and the reconstructed
+compiler trees. The compiler reported 337 packages and 402 build units.
+Independent readback matched all 74 source digests to Git and all 21 indexed
+outputs to the `result.json` receipt. A native relink changed the observed
+Wayland interface version from 1 to 2. Its original and modified ELF SHA-256
+values were `abe93158503b3ee9350566871e51ce95300f87f25c3d6c29747896ee2f9b0054`
+and `44fdb71dc6c2ca314f28f691d8ca7a05edce607197221655402c40d3c9069d4f`.
+The resulting local notice ZIP had 1,799 members and SHA-256
+`ed387fb918b153ef3d9fd066adfbd0c4a1ff6080f38d837c9fb4511b01d2d913`.
+The SPDX document contained 446 packages and 1,063 relationships and passed
+the official 2.3.1 schema. The local files are retained under
+`artifacts/rust/combined-profile/runs/notice-rights-native-03/` and
+`artifacts/rust/native-notice-input-trials/9f68c58/`.
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native
