@@ -42,3 +42,21 @@ On 2026-11-22 all four complete a66e045 desktop ZIPs passed checksum validation.
 | aarch64-pc-windows-msvc | 249 | 280 | 28 | 256 | 613 | `7602dd020bc501f1e40f0cdd7a878c31609737624e23e7edb2947377456ac959` |
 
 The product packaging gate separately requires the exact built and installed product, its corresponding sources, bundled notices, relink materials and a package-level SBOM. [Rust acceptance record](acceptance.md)
+
+## Inventories generated on all four native runners
+
+At `7517e3b6be84645bc0d40603750b003dd5792104` each runner generated its
+own SPDX document and included it with the compiler evidence. After download,
+the published digest of each complete ZIP and every member CRC passed.
+Local generation from each native receipt reproduced the uploaded document
+byte-for-byte. All four passed the pinned SPDX 2.3.1 schema, compiler-unit,
+notice, font and target checks, including the altered-inventory controls.
+Each document is the `combined-profile/sboms/<target>.spdx.json` member of
+its native archive. [Actions archives](rw02-native-gui.md#native-follow-up-at-7517e3b).
+
+| Native target | Compiled Cargo packages | SPDX packages | Relationships | Uploaded and reproduced SPDX SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Linux x64 | 337 | 444 | 1,061 | `1209cfbc5715bf233f9631f1b714efd9d7d5bc64eafeffb5deecd882e531c357` |
+| Linux ARM64 | 336 | 443 | 1,061 | `1e6bda9e7e22d7ed344d06fd432f88797f7f9275c9b0f6a2085a734d2f62930c` |
+| Windows x64 | 250 | 257 | 614 | `cf9c45d0692f00db34ad87ba55ffc8277d81334162414dd819c6c7df657a8519` |
+| Windows ARM64 | 249 | 256 | 613 | `4e04407310d8a5ed0764214e65b695d323e7a6827620d451696741e0dc4cd3e8` |

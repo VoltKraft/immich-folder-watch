@@ -4,26 +4,16 @@
 
 RW-01 is accepted. RW-02 remains the active package of
 [M-RUST-IMPLEMENTATION-20261114](project.md#m-rust-implementation-20261114).
-At `a66e045` all four combined native profiles rebuilt offline. All four
-desktop archives matched GitHub's digests, and all 74 indexed combined
-outputs matched their manifests. Both Windows normal editors passed all
-three mixed-filename edits, including selection and deletion. NVDA read
-the expected speech and password masks on each native desktop. The separate
-font probe passed all four ARM64 cases and stopped at field focus on x64.
-Both Japanese IMEs composed あ and restored the input layout. The ARM64
-driver reported a sharing violation while removing its profile after
-observing the edit. Revision `21b6938` makes cleanup part of the result and
-preserves the successful composition separately. Each hosted Windows console
-offered a single 96-DPI display. At `3b4854d` ARM64 again committed あ and
-restored its language settings without an exception. The x64 repeat
-produced a literal `a` on both attempts. Both Windows targets passed the
-ordinary filename and NVDA checks. Each Ubuntu desktop job completed
-successfully. Their three full scan trials passed all eleven X11
-limits, and both hosts exercised native graphics recovery, Orca speech and
-masks under X11 and Wayland, and the native journal.
-[Four desktop archives](rust/rw02-native-gui.md#native-follow-up-at-3b4854d)
-· [Four earlier archives](rust/rw02-native-gui.md#native-follow-up-at-a66e045)
-· [IME receipts](rust/rw02-windows-ime.md).
+Both Ubuntu desktop jobs passed at `7517e3b`. Both Windows targets passed
+all three ordinary filename edits, all four standalone font cases and seven
+ordered NVDA speech cues. At both `8b64330` and `7517e3b` the Japanese IME
+showed preedit, committed あ, restored the language settings and removed the
+temporary profile on each architecture. The hosted Windows desktops each
+reported one 96-DPI console monitor. The Linux GUI built from the later
+`f4d5b3a` sources also passed private Fedora X11 lifecycle, clipboard, Orca
+and Japanese input checks, plus Wayland Japanese input and four transitions
+between two outputs. [Four native desktop archives](rust/rw02-native-gui.md#native-follow-up-at-7517e3b)
+· [IME receipts](rust/rw02-windows-ime.md) · [Font observations](rust/rw02-font-coverage.md).
 
 Commit `66d9fd6` produced four SPDX inventories from the verified native
 builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
@@ -31,17 +21,20 @@ byte-for-byte. The independent review checked source licenses, font assets
 and all 74 indexed build outputs. The documents cover 337 and 336 compiled
 Cargo packages on Linux x64 and ARM64, and 250 and 249 on Windows x64 and
 ARM64. The packaged product inventory remains open under RI-AC09.
-The assessment workflow now runs generation and replay after a successful
-combined build. Local replay of all four native archives at `3b4854d` also
-passed the official schema and all native inventory controls.
+At `7517e3b` the assessment workflow generated all four inventories on the
+native hosts. Local replay from the authenticated archives reproduced each
+uploaded document byte-for-byte and passed the official schema and native
+inventory controls.
 [Four build inventories and digests](rust/rw02-combined-sbom.md).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
-At `3b4854d` ARM64 met all eleven WPF-derived limits with Mailbox.
-The x64 window met eight. Reopening during the scan took 124.14 ms at p95
-against 21.92 ms. Both private Explorer instances declined the initial tray
-registration and both tasks returned to their original input desktop.
+ARM64 met all eleven WPF-derived limits with Mailbox in three native runs.
+The x64 window met eight, nine and seven. At `7517e3b`, reopening during
+the scan took 122.81 ms at p95 against 19.555 ms. On ARM64 both private
+tray registration attempts failed, 3.06 seconds apart. On x64 the private
+taskbar disappeared before the receiver ran. Both tasks returned to their
+original input desktop.
 Revision `d716245` records the time between the activation request, handling
 it on the GUI thread, showing the HWND and the native visibility readback.
 Its second diagnostic path avoids asking eframe for a duplicate repaint.
@@ -174,11 +167,12 @@ eight storage cases, including six portable cases before the volume
 trials. The 14 workflow security checks passed. Cargo version-update
 configuration is prepared on the rewrite branch at `54fac8b`.
 
-At `7aa8091` two offline reconstructions of the Windows x64 import library
-matched all 20,551 import records. The actual winit source and resolved
-features were verified in both builds. Native x64 execution, the MSVC
-librarian comparison and the native link map are pending. The ARM64
-transport reconstruction repeated successfully offline. [Import evidence](rust/rw02-windows-imports.md).
+At `8b64330` and `7517e3b` native Windows x64 rebuilt the published import
+library byte-for-byte with MSVC. The independently reconstructed LLVM
+library and the published library both ran the actual winit event loop with
+the same 105 imports from eleven DLLs. All four linker responses and four
+symbol maps matched their receipts. Both maps per run attributed the two
+executed bindings to the selected library. [Native import evidence](rust/rw02-windows-imports.md#native-windows-x64-reconstruction).
 
 ## Windows directory identity at cd1d7d7 (2026-11-21)
 

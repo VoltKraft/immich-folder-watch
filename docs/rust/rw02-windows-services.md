@@ -258,3 +258,17 @@ tests passed. Native activation, Explorer restart, visible notification
 presentation and opening the product GUI still need direct observation.
 [Shell registration](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyiconw)
 · [Taskbar creation notification](https://learn.microsoft.com/en-us/windows/win32/shell/taskbar).
+
+At `7517e3b` the x64 trial saw the private Explorer's taskbar and then lost
+that window before it could launch the receiver. On ARM64, the same visible
+taskbar remained available for 3,060 ms. Both registration attempts failed,
+the rectangle was empty, and the receiver counted zero `TaskbarCreated`
+notifications and zero activations. Both fixtures restored the original
+desktop and removed their temporary directories. On the original x64
+desktop the Shell accepted and removed the icon and reported that the
+balloon was shown. The ARM64 Shell declined registration. A real user
+activation and independent notification-area observation are still needed.
+The private trial result hashes are
+`4853a03925bcf221d850fa971a43197644b1484ba6939729f129aacc9c71a6a0`
+(x64) and `686cd35dcbc7b31881668db6a6e70cb3cabad7559f2e770cc154eec25789da94`
+(ARM64). [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).

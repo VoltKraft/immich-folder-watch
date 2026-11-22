@@ -121,14 +121,31 @@ Its receipt is `arm64-bdtc56rs/result.json`, SHA-256
 The five input tests passed, including rejection of the other COFF machine
 and a link response resolving the same filename in the wrong directory.
 
-Native x64 execution and byte-for-byte regeneration with Microsoft's
-librarian remain open. The native command builds the published and rebuilt
-winit consumers independently. It requires a full-path linker response, a
-map entry for an executed binding, matching PE imports, successful creation
-of the event loop on the primary thread and winit's expected rejection on
-a worker thread. A separate native observer checks all three linked DLLs
-against the system APIs on two live threads and reads four virtual desktop
-metrics. Each observer confirms native AMD64 using `IsWow64Process2`.
+### Native Windows x64 reconstruction
+
+Two Windows x64 runs rebuilt the published library byte-for-byte with
+Microsoft's 14.52.37025 librarian. The two LLVM builds within each run also
+matched each other. All three variants supplied 20,551 imports from 371 DLLs,
+1,113 descriptor objects and identical import hints. The 2,048-byte test PE
+had the same hash in all three cases. Each native AMD64 observer checked
+four desktop metrics and two distinct live thread IDs against the system.
+[First x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45041728291/job/137280567306)
+· [Repeat x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092/job/137301906489).
+
+Both runs authenticated the 372 GUI registry archives and built the actual
+winit consumer twice using the four reviewed package feature lists. Each PE
+created the event loop on its main thread and reported the expected rejection
+on its worker thread. Each pair had the same 105 imports from eleven DLLs.
+The published build's linker response selected the registry library. The
+second selected the isolated LLVM reconstruction. In all four symbol maps,
+the chosen library supplied both `GetCurrentThreadId` and `CreateWindowExW`.
+The four linker responses, four maps and all thirteen fixture source files
+matched their recorded hashes in both authenticated archives.
+
+| Native source | Retained x64 result | Result JSON SHA-256 |
+| --- | --- | --- |
+| `8b64330` | `windows-imports/runs/x64-w4zv7d6l/result.json` | `402361441b4a8612300bbb54f5f8d85b5842640168f7235adc273a0e47811931` |
+| `7517e3b` | `windows-imports/runs/x64-yk0urck8/result.json` | `d6b2f16c46620c8c3016b8427a68996436f65ea7adc65e9aa1ad75a58cbe4449` |
 
 ## Repeat the checks
 
