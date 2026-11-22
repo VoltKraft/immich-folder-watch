@@ -201,3 +201,48 @@ interactive cases. The eight-replay receipt has SHA-256
 The historical Windows x64 job remains failed. Windows ARM64 stopped before
 capturing this field. [Archived native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44945423350)
 · [Pixel observer](../../tools/rust-qa/font-coverage/text_observations.py).
+
+## Windows x64 input timeout at a66e045
+
+On Windows x64 the two glyph cases completed on the DX12 Microsoft Basic Render
+Driver. The fallback case selected and deleted 界 as expected. The next case
+painted `L-بتث-R.jpg` with THEH leftmost in the Arabic run. Its 640 × 400
+readback, SHA-256 `8e660ada8289d902c00bec3b7ceccf071b45c2285893d5855ecffd82c7dd0367`,
+is byte-identical to the same field in Windows x64 runs 44945423350 and
+44953046306, where the click and edit completed. [Run 45034293002](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002)
+and [comparison run 44953046306](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
+
+The x64 job timed out after 20 seconds waiting for the first mixed-text
+caret at client pixel (70, 52). The Rust process was still running. It had
+emitted only the initial field state with both caret indices at −1. The
+Windows observer counted two pointer placements on the foreground fixture
+window and posted the mouse messages to that HWND. Its counters cannot
+establish which events reached egui. The digits case was never started.
+The ordinary GUI separately passed both mixed-text sequences, reporting
+caret indices [4, 3, 4] and [3, 4, 3] and deleting THEH and TEH respectively.
+Both native Linux runners completed all four standalone cases in this run.
+The x64 ZIP SHA-256 is `cdba4f57b20c8514ffdc3cb6b0ca96922f0a90e03a0c42af4ce4839f8ccce12c`.
+[Windows field observer](../../tools/rust-qa/windows-text/observe.ps1)
+and [Microsoft PostMessageW delivery contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew).
+
+The standalone fixture now records client coordinates, foreground and hit
+ownership, cursor readback and the return of each posted pointer command.
+The Rust field records egui's incoming pointer and window focus events per
+rendering pass, the field bounds hit, viewport focus, field focus and click
+response. A missing observation is written to `result.json` with its case,
+input phase, most recent field state and received events. After a live
+subject drains, the observer continues with the next independent case. The
+overall command returns failure if any phase was missing or if any of the
+four cases is absent. Selection, arrow indices, deletion and digit-field
+pixel comparisons keep their original acceptance limits. A new native
+Windows run is needed to distinguish lost pointer delivery from field focus
+or hit processing. [Rust input observation](../../tools/rust-qa/font-coverage/font_probe.rs)
+and [timeout and completeness controls](../../tools/rust-qa/font-coverage/test_observations.py).
+
+The instrumented Linux x64 release passed its offline Clippy/build and all
+four cases on private X11. The mixed field received down and up at (70, 52)
+in passes 7 and 10. Its result SHA-256 is
+`6d093712c5807d4edf9fd9b5d47d0b8bbd190472fa608446af81453b85649d60`.
+Seven portable controls passed. Replaying the reported acceptance values
+accepted the completed Linux x64/ARM64 and earlier Windows x64 runs and
+rejected the incomplete Windows x64 run.

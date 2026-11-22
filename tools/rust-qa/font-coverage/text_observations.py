@@ -114,14 +114,39 @@ def arabic_pixels(frame, bounds, initial):
     return measured
 
 
-def wait_value(function, process, log, seconds=20):
+class MissingObservation(RuntimeError):
+    def __init__(self, phase, process_exit, messages, start):
+        states = fields(messages)
+        events = []
+        for line in messages.splitlines():
+            if not line.startswith("FONT_INPUT "):
+                continue
+            parts = line.split()
+            if len(parts) != 9:
+                continue  # A concurrently appended last line may still be incomplete.
+            _, pass_nr, kind, x, y, inside, viewport, field, click = parts
+            positioned = kind in ("move", "down", "up")
+            events.append({"pass": int(pass_nr), "kind": kind, "clientPixel": [int(x), int(y)] if positioned else None,
+                           "inField": inside == "true" if positioned else None, "viewportFocused": viewport == "true",
+                           "fieldFocused": field == "true", "fieldClicked": click == "true"})
+        self.detail = {"phase": phase, "childExitAtFailure": process_exit, "fieldsBeforeAction": start,
+                       "fieldCount": len(states), "eguiInputCount": len(events),
+                       "lastEguiInputs": events[-24:]}
+        if states:
+            self.detail["lastField"] = {key: states[-1][key] for key in ("primary", "secondary", "caretX", "text")}
+        super().__init__(f"Missing {phase}. Child exit {process_exit}, field states {len(states)}, "
+                         f"egui input events {len(events)}")
+
+
+def wait_value(function, process, log, phase, start=0, seconds=20):
     deadline = time.monotonic() + seconds
     while True:
         messages = log.read_text(encoding="utf-8", errors="replace")
         if value := function(messages):
             return value
-        if process.poll() is not None or time.monotonic() >= deadline:
-            raise RuntimeError(f"Expected native observation did not arrive. Child: {process.poll()}\n{messages[-3200:]}")
+        code = process.poll()
+        if code is not None or time.monotonic() >= deadline:
+            raise MissingObservation(phase, code, messages, start)
         time.sleep(.025)
 
 
@@ -132,7 +157,7 @@ def selection(field):
 
 def check_case(profile, name, controls, process, log, directory):
     text, visual_to_logical = CASES[name]
-    messages = wait_value(lambda m: m if "FONT_FRAME " in m else None, process, log)
+    messages = wait_value(lambda m: m if "FONT_FRAME " in m else None, process, log, "rendered frame")
     initial = fields(messages)[-1]
     if initial["text"] != text:
         raise ValueError("Synthetic model started with the wrong text")
@@ -160,10 +185,10 @@ def check_case(profile, name, controls, process, log, directory):
     if profile == "latin":
         return result
 
-    def read_after(start, predicate):
+    def read_after(start, predicate, phase):
         def read(messages):
             return next((f for f in reversed(fields(messages)[start:]) if predicate(f)), None)
-        return wait_value(read, process, log)
+        return wait_value(read, process, log, phase, start)
 
     def count():
         return len(fields(log.read_text(encoding="utf-8", errors="replace")))
@@ -172,10 +197,10 @@ def check_case(profile, name, controls, process, log, directory):
     if name == "glyphs":
         first = visible[0]
         controls.click(round(first["x"] + first["width"] * .1), y)
-        read_after(0, lambda f: (f["primary"], f["secondary"]) == (0, 0))
+        read_after(0, lambda f: (f["primary"], f["secondary"]) == (0, 0), "initial CJK caret click")
         start = count()
         controls.key("Right")
-        caret = read_after(start, lambda f: f["primary"] == f["secondary"])
+        caret = read_after(start, lambda f: f["primary"] == f["secondary"], "right-arrow caret")
         result["caretAfterRightFromStart"] = caret["primary"]
         time.sleep(.7)  # A separate drag, outside the platform's double-click interval.
         target = next(g for g in visible if g["character"] == "界")
@@ -189,13 +214,13 @@ def check_case(profile, name, controls, process, log, directory):
         start = count()
         fraction = .87 if name == "mixed" else .13
         controls.click(round(piece["x"] + piece["width"] * fraction), y)
-        clicked = read_after(start, lambda f: f["primary"] >= 0)
+        clicked = read_after(start, lambda f: f["primary"] >= 0, "initial bidi caret click")
         start = count()
         controls.key("Right")
-        right = read_after(start, lambda f: f["primary"] >= 0)
+        right = read_after(start, lambda f: f["primary"] >= 0, "right-arrow caret")
         start = count()
         controls.key("Left")
-        left = read_after(start, lambda f: f["primary"] >= 0)
+        left = read_after(start, lambda f: f["primary"] >= 0, "left-arrow caret")
         expected_carets = [4, 3, 4] if name == "mixed" else [3, 4, 3]
         indices = [f["primary"] for f in (clicked, right, left)]
         positions = [f["caretX"] for f in (clicked, right, left)]
@@ -207,10 +232,10 @@ def check_case(profile, name, controls, process, log, directory):
     start = count()
     controls.drag(round(target["x"] + target["width"] * .12),
                   round(target["x"] + target["width"] * .88), y)
-    selected = read_after(start, lambda f: f["primary"] != f["secondary"])
+    selected = read_after(start, lambda f: f["primary"] != f["secondary"], "drag selection")
     start = count()
     controls.key("Delete")
-    after = read_after(start, lambda f: f["text"] != text)
+    after = read_after(start, lambda f: f["text"] != text, "filename after Delete")
     expected_after = text[:expected_index] + text[expected_index + 1:]
     result.update(expectedSelected=text[expected_index], selected=selection(selected),
                   selectedRange=[selected["primary"], selected["secondary"]],

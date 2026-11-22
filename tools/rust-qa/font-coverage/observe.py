@@ -13,9 +13,10 @@ import sys
 import tempfile
 import time
 
-from text_observations import CASES, check_case
+from text_observations import CASES, MissingObservation, check_case
 
 HERE = Path(__file__).resolve().parent
+TRIALS = (("latin", "glyphs"), ("fallback", "glyphs"), ("fallback", "mixed"), ("fallback", "numbers"))
 
 
 class X11Input:
@@ -74,6 +75,7 @@ class WindowsInput:
     def __init__(self, observer):
         self.observer = observer
         self.pointer_positions = {"ownedDesktopPoint": 0, "windowMessagesOnly": 0}
+        self.pointer_events = []
         from ctypes import wintypes as w
         user = c.WinDLL("user32", use_last_error=True)
         self.client_to_screen = user.ClientToScreen
@@ -83,6 +85,8 @@ class WindowsInput:
         self.at_point.restype = w.HWND
         self.set_position = user.SetCursorPos
         self.set_position.argtypes = [c.c_int, c.c_int]
+        self.cursor = user.GetCursorPos
+        self.cursor.argtypes = [c.POINTER(w.POINT)]
         self.foreground = user.GetForegroundWindow
         self.foreground.argtypes = []
         self.foreground.restype = w.HWND
@@ -102,17 +106,32 @@ class WindowsInput:
         if not hwnd:
             raise RuntimeError("The synthetic child has no visible client for the pointer")
         position = self.point(x, y)
-        moved = (self.disposable and self.foreground() == hwnd and self.client_to_screen(hwnd, c.byref(position))
-                 and self.observer.ancestor(self.at_point(position), 2) == hwnd
-                 and self.set_position(position.x, position.y))
+        event = {"hwnd": hex(hwnd), "clientPixel": [x, y], "moveHeld": held, "button": button,
+                 "movePosted": False, "buttonPosted": False}
+        self.pointer_events.append(event)
+        moved = False
+        if self.disposable:
+            event["foregroundOwned"] = self.foreground() == hwnd
+            if event["foregroundOwned"] and self.client_to_screen(hwnd, c.byref(position)):
+                event["screenPixel"] = [position.x, position.y]
+                event["pointOwned"] = self.observer.ancestor(self.at_point(position), 2) == hwnd
+                if event["pointOwned"]:
+                    moved = bool(self.set_position(position.x, position.y))
+                    actual = self.point()
+                    if moved and self.cursor(c.byref(actual)):
+                        event["cursorMatched"] = (position.x, position.y) == (actual.x, actual.y)
+                        event["cursorOnSubject"] = self.observer.ancestor(self.at_point(actual), 2) == hwnd
         self.pointer_positions["ownedDesktopPoint" if moved else "windowMessagesOnly"] += 1
         packed = (y << 16) | x
-        if not self.observer.post(hwnd, 0x200, int(held), packed):
+        event["movePosted"] = bool(self.observer.post(hwnd, 0x200, int(held), packed))
+        if not event["movePosted"]:
             raise RuntimeError("Could not deliver client pointer coordinates to the owned HWND")
         # Winit uses TrackMouseEvent and egui drops a click after WM_MOUSELEAVE clears its
         # last pointer position. Put the position and button in the same queue burst.
-        if button is not None and not self.observer.post(hwnd, button, int(button == 0x201), packed):
-            raise RuntimeError("Could not deliver the owned window's pointer button")
+        if button is not None:
+            event["buttonPosted"] = bool(self.observer.post(hwnd, button, int(button == 0x201), packed))
+            if not event["buttonPosted"]:
+                raise RuntimeError("Could not deliver the owned window's pointer button")
         time.sleep(.09)
 
     def click(self, x, y):
@@ -136,6 +155,12 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def save_report(work, report):
+    pending = work / "result.json.pending"
+    pending.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    pending.replace(work / "result.json")
+
+
 def run(binary, work, observer=None, display="Windows test desktop"):
     windows = os.name == "nt"
     subject = json.loads((binary.parent / "subject.json").read_text(encoding="utf-8"))
@@ -143,7 +168,7 @@ def run(binary, work, observer=None, display="Windows test desktop"):
         raise ValueError("Executable differs from its source-bound build")
     report = {"target": subject["target"], "binarySha256": subject["binarySha256"],
               "subjectSha256": digest(binary.parent / "subject.json"), "observerSha256": digest(Path(__file__)),
-              "assessmentSha256": digest(HERE / "text_observations.py"), "display": display, "runs": []}
+              "assessmentSha256": digest(HERE / "text_observations.py"), "display": display, "runs": [], "failures": []}
     if windows:
         sys.path.insert(0, str(HERE.parent))
         spec = importlib.util.spec_from_file_location("font_fixture_windows", HERE.parent / "observe-windows-gui.py")
@@ -159,7 +184,7 @@ def run(binary, work, observer=None, display="Windows test desktop"):
                                            input=text + "\n", encoding="utf-8").splitlines()
             if list(map(int, lines[1].split())) != expected:
                 raise ValueError("Independent Unicode bidi reference changed")
-    for profile, name in (("latin", "glyphs"), ("fallback", "glyphs"), ("fallback", "mixed"), ("fallback", "numbers")):
+    for profile, name in TRIALS:
         directory = work / (profile + "-" + name)
         directory.mkdir()
         log = directory / "native.log"
@@ -186,11 +211,19 @@ def run(binary, work, observer=None, display="Windows test desktop"):
                 process.stdin.flush()
             else:
                 controls = X11Input(observer)
+            failure = None
             try:
                 result = check_case(profile, name, controls, process, log, directory)
+            except MissingObservation as error:
+                failure = {"profile": profile, "name": name, "drained": False, **error.detail}
+                report["failures"].append(failure)
+                save_report(work, report)
+                if process.poll() is not None:
+                    raise
             finally:
                 if windows:
-                    (directory / "pointer.json").write_text(json.dumps(controls.pointer_positions) + "\n", encoding="utf-8")
+                    pointer = {**controls.pointer_positions, "events": controls.pointer_events}
+                    (directory / "pointer.json").write_text(json.dumps(pointer) + "\n", encoding="utf-8")
             if windows:
                 process.stdin.write(b"Q")
                 process.stdin.close()
@@ -199,10 +232,19 @@ def run(binary, work, observer=None, display="Windows test desktop"):
             if process.wait(timeout=15) != 0 or "DRAINED" not in log.read_text(encoding="utf-8", errors="replace"):
                 raise RuntimeError("Native supervisor did not drain")
         output = log.read_text(encoding="utf-8", errors="replace")
+        if failure is not None:
+            failure.update(drained=True, nativeLogSha256=digest(log))
+            if (directory / "observed.ppm").is_file():
+                failure["frameSha256"] = digest(directory / "observed.ppm")
+            if windows:
+                failure["pointerSha256"] = digest(directory / "pointer.json")
+            save_report(work, report)
+            print(profile, name, "failed at", failure["phase"], flush=True)
+            continue
         adapter = next(line.removeprefix("ADAPTER ") for line in output.splitlines() if line.startswith("ADAPTER "))
         result.update(frameSha256=digest(directory / "observed.ppm"), nativeLogSha256=digest(log), adapter=adapter)
         report["runs"].append(result)
-        (work / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        save_report(work, report)
         print(profile, name, result["renderedCoverageMatches"], ascii(result["observedVisual"]),
               ascii(result.get("selected")), flush=True)
     return report
@@ -259,13 +301,23 @@ def main():
         subprocess.run(cmd, check=True)
     result = json.loads((work / "result.json").read_text(encoding="utf-8"))
     print(work / "result.json")
+    verify_result(result, args.require_bidi)
+
+
+def verify_result(result, require_bidi):
+    if result.get("failures"):
+        missing = ", ".join(f"{row['profile']}/{row['name']} at {row['phase']}" for row in result["failures"])
+        raise SystemExit("Missing native observations: " + missing)
+    if [(row["profile"], row["name"]) for row in result["runs"]] != list(TRIALS):
+        raise SystemExit("The four source-bound native font trials did not all complete")
     if not all(row["renderedCoverageMatches"] for row in result["runs"]):
         raise SystemExit("Unexpected font raster or fallback control")
     glyphs = result["runs"][1]
     if not glyphs["editMatches"] or glyphs["caretAfterRightFromStart"] != 1:
         raise SystemExit("Native CJK caret and selection criteria failed")
-    if args.require_bidi and not all(row["visualOrderMatches"] and row["editMatches"]
-                                     and row["keyboardMatches"] and row.get("fieldPixelOrderMatchesOracle", True) for row in result["runs"][2:]):
+    if require_bidi and not all(row["visualOrderMatches"] and row["editMatches"] and row["keyboardMatches"]
+                                and (row["name"] != "numbers" or row.get("fieldPixelOrderMatchesOracle") is True)
+                                for row in result["runs"][2:]):
         raise SystemExit("Native bidirectional acceptance criteria failed")
 
 

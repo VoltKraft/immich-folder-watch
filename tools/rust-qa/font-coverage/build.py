@@ -105,7 +105,7 @@ def build(args):
         record = {"target": args.target, "compiler": version.strip(), "guiRevision": PINS["guiRevision"],
                   "graphSha256": sha(graph), "baseSources": PINS["sources"], "supportSources": PINS["supportSources"], "inputManifest": sha(HERE / "inputs.json"),
                   "builder": sha(HERE / "build.py"), "auditor": sha(HERE / "inputs.py"),
-                  "probe": sha(HERE / "font_probe.rs"), "mainWithProbe": sha(main),
+                  "probe": sha(gui / "src/font_probe.rs"), "mainWithProbe": sha(main),
                   "assets": assets, "binary": binary.name, "binarySha256": sha(binary)}
         if candidate is not None:
             record["bidiCandidate"] = candidate

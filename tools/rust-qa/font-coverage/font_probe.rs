@@ -51,6 +51,40 @@ pub(super) fn filename_edit(ui: &mut egui::Ui, text: &mut String, label: egui::I
         .show(ui);
     output.response.response.clone().labelled_by(label);
     let scale = ui.ctx().pixels_per_point();
+    let field_focused = ui.memory(|memory| memory.has_focus(output.response.id));
+    let clicked = output.response.clicked();
+    let field = output.response.rect;
+    let pass = ui.ctx().cumulative_pass_nr();
+    // Observe what reached egui after the window system processed the fixture's
+    // pointer commands. Do not request focus or change the field's interaction.
+    ui.input(|input| {
+        for event in &input.raw.events {
+            let (kind, pos) = match event {
+                egui::Event::PointerMoved(pos) => ("move", Some(pos)),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    ..
+                } => (if *pressed { "down" } else { "up" }, Some(pos)),
+                egui::Event::PointerGone => ("gone", None),
+                egui::Event::WindowFocused(true) => ("focus-in", None),
+                egui::Event::WindowFocused(false) => ("focus-out", None),
+                _ => continue,
+            };
+            let (x, y, inside) = pos.map_or((-1, -1, false), |p| {
+                (
+                    (p.x * scale).round() as i32,
+                    (p.y * scale).round() as i32,
+                    field.contains(*p),
+                )
+            });
+            println!(
+                "FONT_INPUT {pass} {kind} {x} {y} {inside} {} {field_focused} {clicked}",
+                input.focused
+            );
+        }
+    });
     let cursor = output.cursor_range.map(|r| {
         let caret = output.galley.pos_from_cursor(r.primary);
         let x = (output.galley_pos.x + caret.center().x) * scale;
