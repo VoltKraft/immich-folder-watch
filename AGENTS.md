@@ -198,6 +198,9 @@ to reconcile project decisions, defaults, and recorded state.
   The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only
   after the eight recovery cases on the owned Windows test volume. Preserve
   the separate provider outcome, volume readback and cleanup evidence.
+  The [stored-key assessment](docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles)
+  uses the complete casing table emitted by each C# writer and preserves
+  original SQLite keys across both qualified profiles.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

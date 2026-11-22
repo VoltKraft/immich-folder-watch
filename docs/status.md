@@ -23,9 +23,13 @@ four native jobs at `8091469` each qualified the 15.1.0 table. The shipping
 C# store on Fedora produced two distinct insensitive keys with ICU 74.2 and
 one with ICU 78. Changing either reader's library hid the existing entries
 and repairs while leaving both accounts' transfer history readable. The
-Rust read-only probe passed 48 lookups on the original C# backups and
-twelve controls on copies across the two environments. The production
-new-key policy and installed migration remain open.
+Rust read-only probe passed 56 lookups on the original C# backups and
+eighteen controls on copies across the two environments, including
+native source normalization and the complete same-process writer table.
+The same .NET version in globalization-invariant mode produced identical
+fixture databases to ICU 78 but a different 1,475-row casing table. Both
+reference readers refused the unfamiliar writer. The production new-key
+policy and installed migration remain open.
 [Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
 · [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 

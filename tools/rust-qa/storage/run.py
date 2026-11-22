@@ -38,7 +38,8 @@ def isolated_path(value: Path) -> Path:
 def archive_first_party(output: Path, fixtures: Path, casing_inputs: list[Path]) -> dict:
     paths = [ROOT / name for name in
              ("global.json", "NuGet.Config", "Directory.Build.props", "rust/Cargo.toml",
-              "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
+              "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py",
+              "tools/rust-qa/legacy/InvariantUppercaseProfile.cs")]
     paths.extend(casing_inputs)
     for directory in (HERE, ROOT / "rust/crates/ifw-legacy", ROOT / "src/ImmichFolderWatch.Core", fixtures):
         paths += [path for path in directory.rglob("*") if path.is_file()
@@ -108,6 +109,7 @@ def main() -> int:
             "git", "status", "--porcelain", "--", str(HERE), "rust/crates/ifw-legacy", "rust/Cargo.toml",
             "src/ImmichFolderWatch.Core", "Directory.Build.props", "global.json", "NuGet.Config",
             "rust/tests/fixtures/legacy", "tools/rust-qa/check-toolchain.py",
+            "tools/rust-qa/legacy/InvariantUppercaseProfile.cs",
             *map(str, casing_inputs)], cwd=ROOT, text=True).splitlines(),
         "workflowRun": os.getenv("GITHUB_RUN_ID"), "operatingSystem": platform.platform(),
         "offline": args.offline, "removedBuildOverrideNames": sorted(removed),

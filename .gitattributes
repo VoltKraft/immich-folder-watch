@@ -24,6 +24,8 @@ rust/**/*.toml text eol=lf
 rust/Cargo.lock text eol=lf
 tools/rust-qa/*.sh text eol=lf
 tools/rust-qa/legacy/licenses/* -text
+tools/rust-qa/legacy/InvariantUppercaseProfile.cs text eol=lf
+tools/rust-qa/legacy/casing_profiles.py text eol=lf
 tools/rust-qa/storage/** text eol=lf
 tools/rust-qa/storage-faults/** text eol=lf
 tools/rust-qa/appearance/** text eol=lf

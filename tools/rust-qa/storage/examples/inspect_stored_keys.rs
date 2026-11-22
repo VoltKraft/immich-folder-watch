@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 use ifw_legacy::casing::ReferenceCaseMap;
+use ifw_legacy::paths::{normalize_absolute_source, normalize_relative_text};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -13,14 +14,16 @@ use std::path::Path;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 type Key = [String; 2];
-const PROFILES: [(&str, &str); 2] = [
+const PROFILES: [(&str, &str, u64); 2] = [
     (
         "15.1.0",
         "02c4363688e37251e1169559be56231d6e9c398ba046ea3773cdf037df72cd2f",
+        1449,
     ),
     (
         "17.0.0",
         "195bd89b3934dcf9c93b72b4232c53d9787dacb8ebbf2270df7a6a73e53f473e",
+        1504,
     ),
 ];
 
@@ -32,7 +35,7 @@ impl Forms {
     fn load(mode: &str) -> Result<Self> {
         let mut maps = Vec::new();
         if mode == "insensitive" {
-            for (version, expected) in PROFILES {
+            for (version, expected, _) in PROFILES {
                 let file = format!("tools/rust-qa/legacy/casing/unicode-{version}.tsv");
                 let data = fs::read(file)?;
                 if digest(&data) != expected {
@@ -48,14 +51,20 @@ impl Forms {
         Ok(Self { maps })
     }
 
-    fn spellings(&self, source: &str, relative: &str) -> Vec<Key> {
+    fn spellings(&self, source: &str, relative: &str) -> Result<Vec<Key>> {
+        let native = normalize_absolute_source(Path::new(source))?;
+        let source = native
+            .to_str()
+            .ok_or("source cannot be represented losslessly")?;
+        let relative = normalize_relative_text(relative)?;
         if self.maps.is_empty() {
-            return vec![[source.to_owned(), relative.to_owned()]];
+            return Ok(vec![[source.to_owned(), relative]]);
         }
-        self.maps
+        Ok(self
+            .maps
             .iter()
-            .map(|map| [map.uppercase(source), map.uppercase(relative)])
-            .collect()
+            .map(|map| [map.uppercase(source), map.uppercase(&relative)])
+            .collect())
     }
 }
 
@@ -96,7 +105,7 @@ fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {
         accounts.entry(row.get(0)?).or_default().push(Record {
             table: "sync_entries",
             stored: [row.get(1)?, row.get(2)?],
-            spellings: forms.spellings(row.get_ref(3)?.as_str()?, row.get_ref(4)?.as_str()?),
+            spellings: forms.spellings(row.get_ref(3)?.as_str()?, row.get_ref(4)?.as_str()?)?,
         });
     }
     let mut repairs = db.prepare(
@@ -116,7 +125,7 @@ fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {
             spellings: forms.spellings(
                 field(original, "SourcePath")?,
                 field(original, "RelativePath")?,
-            ),
+            )?,
         });
     }
     Ok(accounts)
@@ -124,7 +133,7 @@ fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {
 
 fn lookup(forms: &Forms, accounts: &Accounts, request: &Value) -> Result<Value> {
     let account = field(request, "account")?;
-    let query = forms.spellings(field(request, "source")?, field(request, "relative")?);
+    let query = forms.spellings(field(request, "source")?, field(request, "relative")?)?;
     let records = accounts.get(account).map_or(&[][..], Vec::as_slice);
     // A partial understanding of an account cannot establish a missing identity.
     if records.iter().any(|record| !record.explained()) {
@@ -194,6 +203,27 @@ fn verify_backup(filename: &str, expected: &str) -> Result<()> {
     Ok(())
 }
 
+fn writer_profile(dir: &Path, marker: &Value) -> Result<&'static str> {
+    let path = dir.join("invariant-uppercase.tsv");
+    if !fs::symlink_metadata(&path)?.file_type().is_file() {
+        return Err("expected the writer's regular casing table".into());
+    }
+    let checksum = digest(&limited(fs::File::open(path)?, 200_000)?);
+    let (version, _, changed) = PROFILES
+        .iter()
+        .find(|(_, known, _)| *known == checksum)
+        .ok_or("unqualified full casing table from the SQLite writer")?;
+    let profile = &marker["casingProfile"];
+    if profile["tableSha256"] != checksum
+        || profile["scannedScalars"] != 1_112_064u64
+        || profile["changedScalars"] != *changed
+        || profile["contextBatchChecked"] != true
+    {
+        return Err("incomplete same-process writer casing evidence".into());
+    }
+    Ok(version)
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() != 3 {
@@ -220,6 +250,7 @@ fn main() -> Result<()> {
     {
         return Err("synthetic fixture manifest or recorded snapshot digest differs".into());
     }
+    let writer_profile = writer_profile(&dir, &marker)?;
     let forms = Forms::load(mode)?;
     std::env::set_current_dir(dir)?;
     let filename = format!("{mode}.db");
@@ -251,6 +282,7 @@ fn main() -> Result<()> {
     verify_backup(&filename, expected)?;
     let output = json!({
         "format": "ifw-stored-path-key-observations-v1", "inputFormat": marker["format"], "mode": mode, "snapshotSha256": expected,
+        "writerProfile": writer_profile,
         "os": std::env::consts::OS, "arch": std::env::consts::ARCH, "lookup": observations,
         "opaqueOwnershipRows": ownership, "transferHistoryRows": history,
     });

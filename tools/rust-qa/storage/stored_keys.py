@@ -78,6 +78,11 @@ def queries(m, mode, tables):
         existing("original upper name", primary, upper, upper if sensitive else lower)
     existing("same spelling in the other account", other, lower, lower)
     existing("standalone repair", primary, journal, journal, repair_only=True)
+    separator = "\\" if m["os"] == "windows" else "/"
+    existing("journal through trailing source separator", primary, journal, journal,
+             repair_only=True, root=source + separator)
+    existing("journal through equivalent absolute source", primary, journal, journal,
+             repair_only=True, root=source + separator + "." + separator)
     existing("preserved tombstone", primary, tombstone, tombstone)
     if sensitive:
         case("changed journal source spelling", primary, source.replace(LOWER, UPPER), journal, "absent-concordant")
@@ -99,7 +104,7 @@ def queries(m, mode, tables):
 
 def run_probe(probe, directory, mode, snapshot, requests):
     return subprocess.run([str(probe), str(directory), mode, snapshot], cwd=ROOT,
-                          input=json.dumps(requests), text=True, capture_output=True,
+                          input=json.dumps(requests), encoding="utf-8", errors="strict", capture_output=True,
                           check=False, timeout=30)
 
 
@@ -120,13 +125,14 @@ def control_copy(output, fixture, name):
     directory = output / name
     directory.mkdir()
     shutil.copyfile(fixture / "insensitive.db", directory / "insensitive.db")
+    shutil.copyfile(fixture / "invariant-uppercase.tsv", directory / "invariant-uppercase.tsv")
     return directory
 
 
-def mark_control(directory, original):
+def mark_control(directory, original, profile):
     digest = sha256(directory / "insensitive.db")
     write_json(directory / "manifest.json", {"format": "ifw-derived-path-key-control-v1",
-               "baseSha256": original, "cases": {"insensitive": {"sha256": digest}}})
+               "baseSha256": original, "casingProfile": profile, "cases": {"insensitive": {"sha256": digest}}})
     return digest
 
 
@@ -147,7 +153,7 @@ def negative_controls(probe, fixture, output, m):
                              (row["source_key"].replace(UPPER, LOWER), row["relative_path_key"].replace(LOWER, UPPER),
                               primary, row["source_key"], row["relative_path_key"])).rowcount
         require(changed == 1, "Synthetic tombstone control was not created")
-    digest = mark_control(directory, base["sha256"])
+    digest = mark_control(directory, base["sha256"], m["casingProfile"])
     cases = [("different profiles on one row", one[0], {"status": "unqualified-history"})]
     cases += [v for v in queries(m, "insensitive", tables) if v[0] == "same spelling in the other account"]
     results["mixedComponents"] = check_answers(probe, directory, "insensitive", digest, cases, tables)
@@ -168,11 +174,20 @@ def negative_controls(probe, fixture, output, m):
             """, (row["source_key"].replace(old, new), m["repairRelativePath"],
                   row["relative_path_key"].replace(old, new), primary)).rowcount
         require(changed == 1, "Synthetic entry/journal collision was not created")
-    digest = mark_control(directory, base["sha256"])
+    digest = mark_control(directory, base["sha256"], m["casingProfile"])
     cases = [("distinct entry and journal keys", one[0], {"status": "ambiguous", "distinctStoredKeys": 2})]
     results["collidingJournal"] = check_answers(probe, directory, "insensitive", digest, cases, tables)
 
-    for name in ("foreign-repair-account", "future-schema", "companion", "wrong-digest"):
+    rejection = {
+        "foreign-repair-account": "repair identity contradicts its stored account",
+        "future-schema": "expected a completed schema-v1 reference backup",
+        "companion": "a standalone backup without SQLite companions is required",
+        "wrong-digest": "synthetic fixture manifest or recorded snapshot digest differs",
+        "changed-snapshot": "synthetic snapshot digest or file type differs",
+        "unrecognized-writer-map": "unqualified full casing table from the SQLite writer",
+        "incomplete-writer-map-evidence": "incomplete same-process writer casing evidence",
+    }
+    for name, expected_error in rejection.items():
         directory = control_copy(output, fixture, name)
         dbpath = directory / "insensitive.db"
         if name == "foreign-repair-account":
@@ -186,11 +201,27 @@ def negative_controls(probe, fixture, output, m):
                 db.execute("PRAGMA user_version=999")
         elif name == "companion":
             (directory / "insensitive.db-wal").write_bytes(b"synthetic companion sentinel")
-        digest = mark_control(directory, base["sha256"])
+        profile = m["casingProfile"].copy()
+        if name == "unrecognized-writer-map":
+            table = directory / "invariant-uppercase.tsv"
+            # This leaves the writer's observed U+019B mapping and mapping count intact.
+            raw = table.read_bytes()
+            require(raw.count(b"000061\t000041\n") == 1, "Expected the original small-a mapping")
+            table.write_bytes(raw.replace(b"000061\t000041\n", b"000061\t000042\n"))
+            profile["tableSha256"] = sha256(table)
+        elif name == "incomplete-writer-map-evidence":
+            profile["contextBatchChecked"] = False
+        digest = mark_control(directory, base["sha256"], profile)
+        if name == "changed-snapshot":
+            with dbpath.open("r+b") as stream:
+                original = stream.read(1)
+                stream.seek(0)
+                stream.write(bytes([original[0] ^ 1]))
         expected = "0" * 64 if name == "wrong-digest" else digest
         before = {p.name: sha256(p) for p in directory.iterdir()}
         run = run_probe(probe, directory, "insensitive", expected, one)
-        require(run.returncode != 0 and not run.stdout, "Invalid control returned lookup data")
+        require(run.returncode != 0 and not run.stdout and expected_error in run.stderr,
+                "Control did not reach its expected refusal: " + name)
         require(before == {p.name: sha256(p) for p in directory.iterdir()}, "Rejected snapshot changed")
         results[name] = {"exitCode": run.returncode, "filesUnchanged": len(before), "error": run.stderr.strip()}
     return results
@@ -205,14 +236,22 @@ def exercise(probe, fixture, output):
     require(m["format"] == "ifw-qualified-path-key-fixture-v1" and m["baseline"] == BASELINE and
             m["nativeUpperOfDiscriminator"] in (LOWER, UPPER), "Unqualified C# discriminator or fixture")
     original = {p.name: sha256(p) for p in fixture.iterdir()}
-    require(set(original) == {"manifest.json", "sensitive.db", "insensitive.db"}, "Expected standalone C# backups")
+    require(set(original) == {"manifest.json", "invariant-uppercase.tsv", "sensitive.db", "insensitive.db"},
+            "Expected standalone C# backups and the original same-process casing table")
+    profile = casing_profiles.match_reference((fixture / "invariant-uppercase.tsv").read_bytes())
+    evidence = m["casingProfile"]
+    require(profile and evidence["tableSha256"] == profile.table_sha256 and evidence["scannedScalars"] == 1_112_064 and
+            evidence["contextBatchChecked"] is True and evidence["changedScalars"] == profile.changed_scalars and
+            m["nativeUpperOfDiscriminator"] == {"15.1.0": LOWER, "17.0.0": UPPER}[profile.version],
+            "The SQLite writer did not produce a complete independently qualified casing table")
     modes = {}
     for mode in ("sensitive", "insensitive"):
         ref = m["cases"][mode]
         readback(fixture / (mode + ".db"), ref)
         modes[mode] = check_answers(probe, fixture, mode, ref["sha256"], queries(m, mode, ref["tables"]), ref["tables"])
         receipt = modes[mode]["receipt"]
-        require(receipt["inputFormat"] == m["format"] and receipt["os"] == m["os"] and
+        require(receipt["inputFormat"] == m["format"] and receipt["writerProfile"] == profile.version and
+                receipt["os"] == m["os"] and
                 receipt["arch"] == {"x64": "x86_64", "arm64": "aarch64"}[m["arch"]],
                 "C# and Rust executed on different native targets")
     controls = negative_controls(probe, fixture, output, m)

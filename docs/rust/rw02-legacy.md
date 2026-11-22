@@ -227,13 +227,35 @@ profile and includes standalone journals. Ownership IDs and transfer
 history stay outside path matching. [Read-only Rust probe](../../tools/rust-qa/storage/examples/inspect_stored_keys.rs)
 · [Independent SQL readback and controls](../../tools/rust-qa/storage/stored_keys.py).
 
-The native Fedora Rust probe passed 24 lookups against each C# generation
-and six controls per generation, including a conflict between an entry and
-a repair journal. Rejected snapshots retained their original bytes. The
-probe only accepts finalized synthetic backups with an expected SHA-256
-and no SQLite sidecars. It uses an immutable read-only connection and
-returns observations. Production migration still needs a write policy,
-complete inventory of historical rows and rollback after actual activity.
+An independent review of the initial 24 lookups per C# generation found
+that appending a separator to a source path yielded a false absence. The
+probe now applies the tested native legacy normalization before casing
+both paths. The same C# process that creates the SQLite snapshot emits
+its complete casing table. The reader checks its digest against both
+qualified originals, counts the recorded scalars and requires the context
+comparison. The Python observer decodes Rust output explicitly as UTF-8.
+
+The corrected native Fedora probe passed 28 lookups against each C#
+generation and nine controls per generation. These include a conflict
+between an entry and a repair journal, an altered snapshot with its
+original expected digest, and an unfamiliar full casing table that
+still maps ƛ exactly as the original. Each control checked the actual
+refusal and the final file hashes. The probe reads finalized synthetic
+backups through an immutable read-only connection. Any SQLite sidecar
+causes refusal. It examines the historical rows under both qualified
+profiles. Production migration still needs a writing policy, complete
+inventory of historical state and rollback after actual activity.
+[Reproducing the eight C# reader combinations](../../tools/rust-qa/legacy-keys/README.md).
+
+At `f538495` the Fedora x64 writer and reader also ran with .NET 10.0.12
+globalization-invariant mode. The same fixture produced byte-identical
+databases to the ICU 78 writer in both path modes, including the same ƛ
+mapping. The complete scalar table had 1,475 changed values and SHA-256
+`51e3c6f44c782e8e99c355b504f32900da56c9e4a500da83a15a2f807b95b6e4`.
+The two-profile C# reader and Rust inspector each refused that writer before
+returning any database observations. All three Fedora captures and the
+separate scalar-oracle comparison are recorded in
+`artifacts/rust/casing-profile-verified-f538495/evidence.json`.
 
 ## Evidence and remaining work
 
