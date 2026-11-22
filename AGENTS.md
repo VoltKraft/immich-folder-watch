@@ -203,7 +203,9 @@ to reconcile project decisions, defaults, and recorded state.
   source pins, exclusive private package mapping, exact compiler/provenance checks
   and offline reconstruction. Framework updates require source-level license review.
 - Dependabot configuration in [`.github/dependabot.yml`](.github/dependabot.yml)
-  covers NuGet and GitHub Actions. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
+  covers NuGet and GitHub Actions. The rewrite also defines weekly Cargo
+  version checks for its [product workspace](rust/Cargo.toml), targeting
+  `rewrite/rust`. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
   for license review, coordinated packaging pins and validation before merging updates.
 - Use four-space C# indentation, file-scoped namespaces, PascalCase types/public
   members, camelCase locals/parameters, and `Async` suffixes. Preserve enabled

@@ -343,6 +343,17 @@ for version updates; other packages and Actions remain individually reviewable.
 Major-version proposals are allowed and require compatibility review. PR titles
 and commits use `chore(deps)`.
 
+The rewrite configuration adds the same weekly schedule for Cargo in
+`/rust`, targeting `rewrite/rust` for version updates. The five current
+workspace members have no external Cargo dependencies. Source-frozen
+development oracles under `tools/rust-qa` have their own reviewed input
+pins. For each product dependency update, check the exact sources,
+licenses, features, native inputs and offline lockfile before merging.
+GitHub reads the configuration from the default branch, so this rewrite-only
+addition has no hosted schedule until a separately selected integration.
+The target-branch option applies to version updates. [GitHub configuration
+reference](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#target-branch).
+
 The configuration takes effect when present on GitHub's default branch. Check
 **Insights > Dependency graph > Dependabot** for the first hosted runs and their
 logs. Alerts and automatic security updates are separate repository settings;
