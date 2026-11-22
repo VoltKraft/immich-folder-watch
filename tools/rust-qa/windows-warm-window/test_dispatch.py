@@ -84,6 +84,23 @@ class DispatchTests(unittest.TestCase):
         self.assertIn("presented", hidden_failure("root-repaint", report["hidden"]))
         self.assertIsNone(hidden_failure("original-hidden-paint", report["hidden"]))
 
+    def test_unrequested_visibility_change_cannot_replace_the_observed_close(self):
+        trace, dxgi, inv = sample(single=False)
+        # A real close hid the HWND at 15. An additional show/hide must not
+        # shorten the interval to start at the later unrequested hide at 28.
+        lines = trace.splitlines()
+        lines[0] = f"DISPATCH_BEGIN 42 1000 0 {len(lines)} 0"
+        lines[-1:-1] = ["DISPATCH show 5 23 24 9 0 1 25", "DISPATCH hide 5 26 27 9 1 0 28"]
+        dxgi += "\nDXGI 42 5 0 0 20 21"
+        inv["presentation"]["successfulPresents"] += 1
+        hidden = correlate("\n".join(lines), dxgi, inv, False)["hidden"]
+        self.assertIn("5 of 6", hidden_failure("root-repaint", hidden))
+        # Scan eligibility belongs to the reopen. A close just outside the
+        # file-work interval is still available in the full external timeline.
+        inv["eligibleResponses"] = inv["eligibleResponses"][1:]
+        report = correlate("\n".join(lines), dxgi, inv, False)
+        self.assertIn("5 of 6", hidden_failure("root-repaint", report["hidden"]))
+
     def test_preserves_out_of_thread_presents_and_delayed_native_visibility_as_observed(self):
         trace, dxgi, inv = sample()
         lines = trace.splitlines()

@@ -140,6 +140,9 @@ Independent review found that a delayed visibility sample after show could
 exclude a previously confirmed hidden interval. A six-reopen regression
 put one successful DXGI call in that interval. The corrected recorder
 counts it, requires coverage of every eligible reopen and reports whether
-the original-paint control reproduced a hidden presentation. Fourteen
-portable tests passed. Replaying all 841 historical intervals reproduced
-the same counts and native timings after the correction.
+the original-paint control reproduced a hidden presentation. A second
+regression inserted an unsolicited show and hide on the same HWND between
+two external requests. The recorder binds the start of each interval to the
+actual preceding external close and declines a trace with an intervening
+visibility change. Fifteen portable tests passed. Replaying all 841
+historical intervals reproduced the same counts and native timings.

@@ -3,7 +3,7 @@ from bisect import bisect_left, bisect_right
 from collections import Counter
 from contextlib import ExitStack
 from functools import partial
-from itertools import accumulate
+from itertools import accumulate, pairwise
 import json
 import os
 from statistics import median
@@ -62,11 +62,10 @@ def hidden_presents(spans, reopens, presentations, bounds):
     hidden_starts = 0
     completed = Counter()
     callbacks = Counter()
-    for show in reopens:
+    for hide, show in reopens:
         index = bisect_left(transitions, show["start"])
-        if index == 0 or changes[index - 1]["label"] != "hide":
+        if index == 0 or changes[index - 1] is not hide:
             continue
-        hide = changes[index - 1]
         start, end = hide["sampled"], show["start"]
         # The external HWND observer already confirmed this reopen. A delayed
         # post-show sample does not change the state preceding the show call.
@@ -123,6 +122,12 @@ def correlate(text, native_dxgi, inventory, single):
     latest_end = list(accumulate((s["end"] for s in callbacks), max))
     commands_by_callback = Counter()
     reopens = []
+    preceding_closes = {
+        (opening["issuedQpc"], opening["responseQpc"]): closing
+        for closing, opening in pairwise(inventory["allRequests"])
+        if closing["action"] == "close" and opening["action"] == "reopen"
+        and closing["responseQpc"] <= opening["issuedQpc"]
+    }
     def callback_at(start, end):
         enclosing = callbacks[bisect_left(latest_end, end):bisect_right(starts, start)]
         return next((s["label"] for s in reversed(enclosing) if end <= s["end"]), "outside-recorded-callback")
@@ -141,7 +146,10 @@ def correlate(text, native_dxgi, inventory, single):
                    redrawCallbackWallMs=occupied_ticks((s for s in active if s["label"] == "redraw-event"), a, b) * factor,
                    resizeCallbackWallMs=occupied_ticks((s for s in active if s["label"] == "resize-event"), a, b) * factor)
         if opening:
-            reopens.append(native)
+            closing = preceding_closes.get((a, b))
+            if closing is None:
+                raise ValueError("The eligible reopen has no preceding externally observed close")
+            reopens.append((one("hide", closing["issuedQpc"], closing["responseQpc"]), native))
             dequeued = one("open-dequeued", delivery["start"], native["start"])
             commands_by_callback[callback_at(dequeued["start"], dequeued["end"])] += 1
             row.update(pipeWakeCallMs=(delivery["end"] - delivery["start"]) * factor,
