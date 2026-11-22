@@ -446,6 +446,16 @@ jobs:
           python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-control
           exit $LASTEXITCODE
 
+      - name: Trace the two retained-window activation paths during the Windows scan
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dispatch
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -593,6 +603,8 @@ jobs:
             artifacts/rust/windows-warm-window/*/measured/
             artifacts/rust/windows-warm-window/*/measured-fifo/*.json
             artifacts/rust/windows-warm-window/*/measured-fifo/*.log
+            artifacts/rust/windows-warm-window/*/dispatch/*.json
+            artifacts/rust/windows-warm-window/*/dispatch/*.log
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json

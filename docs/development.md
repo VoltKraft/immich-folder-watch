@@ -138,6 +138,11 @@ complete evidence inventory for both path comparison modes, including VHD
 cleanup. The desktop assessment retains early Windows writer and tray results
 before the scan. Its final artifact includes the desktop logs and Linux
 storage recovery evidence. Each archive name includes the target and commit.
+The Windows desktop job first records the WPF budget and the regular Mailbox
+and FIFO trials. Its subsequent `--dispatch` trace measures the two retained
+window activation paths using the same native host and budget. The result and
+per-trial logs appear under `windows-warm-window/<target>/dispatch/`.
+See the [window measurements](rust/rw02-windows-window.md).
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).
 

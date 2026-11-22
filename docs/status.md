@@ -42,6 +42,11 @@ At `3b4854d` ARM64 met all eleven WPF-derived limits with Mailbox.
 The x64 window met eight. Reopening during the scan took 124.14 ms at p95
 against 21.92 ms. Both private Explorer instances declined the initial tray
 registration and both tasks returned to their original input desktop.
+Revision `d716245` records the time between the activation request, handling
+it on the GUI thread, showing the HWND and the native visibility readback.
+Its second diagnostic path avoids asking eframe for a duplicate repaint.
+The workflow retains both traces separately from the eleven original limits.
+The comparison still needs a native run.
 At `3b4854d` both Windows architectures passed all thirteen notification
 scenarios. Their nonrecursive watch reported the direct child directory's
 metadata and the direct file's creation and change. Both Ubuntu targets
