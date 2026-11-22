@@ -6,5 +6,6 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../../../../src/ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
+        <Compile Include="../../legacy/InvariantUppercaseProfile.cs" Link="InvariantUppercaseProfile.cs" />
     </ItemGroup>
 </Project>

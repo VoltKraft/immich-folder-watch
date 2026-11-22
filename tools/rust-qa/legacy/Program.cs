@@ -32,33 +32,8 @@ internal static class Program
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(output, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
-        var map = new StringBuilder("IFW-INVARIANT-UPPERCASE-V1\n");
-        var changed = 0;
-        var scalarCount = 0;
-        var batchInput = new StringBuilder();
-        var batchExpected = new StringBuilder();
-        for (var scalar = 0; scalar <= 0x10ffff; scalar++)
-        {
-            if (scalar is >= 0xd800 and <= 0xdfff) continue;
-            var input = char.ConvertFromUtf32(scalar);
-            var upper = input.ToUpperInvariant();
-            var runes = upper.EnumerateRunes().ToArray();
-            if (runes.Length != 1 || input.Length != upper.Length)
-                throw new InvalidDataException("Invariant casing unexpectedly expanded a scalar.");
-            if (input != upper)
-            {
-                map.Append(scalar.ToString("X6", CultureInfo.InvariantCulture)).Append('\t')
-                    .Append(runes[0].Value.ToString("X6", CultureInfo.InvariantCulture)).Append('\n');
-                changed++;
-            }
-            batchInput.Append(input);
-            batchExpected.Append(upper);
-            scalarCount++;
-            if (scalarCount % 4096 == 0)
-                VerifyContextBatch(batchInput, batchExpected);
-        }
-        VerifyContextBatch(batchInput, batchExpected);
-        Write(output, "invariant-uppercase.tsv", map.ToString());
+        var casing = InvariantUppercaseProfile.Capture();
+        casing.Write(output);
 
         var ticks = new SortedSet<long> { 0, 1, 9_999_999, 10_000_000, DateTime.MaxValue.Ticks,
             DateTime.UnixEpoch.Ticks - 1, DateTime.UnixEpoch.Ticks, DateTime.UnixEpoch.Ticks + 1 };
@@ -105,26 +80,19 @@ internal static class Program
             OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
             OS = OperatingSystem.IsWindows() ? "windows" : "linux",
             InvariantSortVersion = CultureInfo.InvariantCulture.CompareInfo.Version.FullVersion,
-            ScannedScalars = scalarCount, ChangedScalars = changed,
+            ScannedScalars = casing.ScannedScalars, ChangedScalars = casing.ChangedScalars,
             ContextBatchEquivalenceChecked = true,
             TimestampVectors = timestamps.Length,
             Payloads = payloads.ToDictionary(name => name, name =>
                 Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, name))))),
             Scope = "Observed .NET output only; no shipping table or cross-platform equivalence certification.",
-            GeneratorSources = new[] { "tools/rust-qa/legacy/Program.cs", "tools/rust-qa/legacy/LegacyScalarOracle.csproj" }
+            GeneratorSources = new[] { "tools/rust-qa/legacy/Program.cs", "tools/rust-qa/legacy/InvariantUppercaseProfile.cs",
+                    "tools/rust-qa/legacy/LegacyScalarOracle.csproj" }
                 .ToDictionary(name => name, name => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(name)))),
         });
-        Console.WriteLine($"Scalar reference exported: {scalarCount} Unicode scalars, {changed} changed mappings, " +
+        Console.WriteLine($"Scalar reference exported: {casing.ScannedScalars} Unicode scalars, {casing.ChangedScalars} changed mappings, " +
             $"{timestamps.Length} timestamps; .NET {Environment.Version}, process {RuntimeInformation.ProcessArchitecture}, OS {RuntimeInformation.OSArchitecture}.");
         return 0;
-    }
-
-    private static void VerifyContextBatch(StringBuilder input, StringBuilder expected)
-    {
-        if (input.ToString().ToUpperInvariant() != expected.ToString())
-            throw new InvalidDataException("Invariant casing depends on scalar context in this runtime.");
-        input.Clear();
-        expected.Clear();
     }
 
     private static void CollectTimestampTicks(JsonElement element, SortedSet<long> ticks)

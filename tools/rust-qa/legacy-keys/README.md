@@ -8,8 +8,11 @@ paths below this checkout's `artifacts/rust`.
 
 Generate a fixture with each writer environment on the same native OS and
 architecture. One must uppercase U+019B to itself and the other to U+A7DC.
-Keep each writer's [complete scalar export](../../../docs/rust/rw02-legacy.md#independently-reproduced-casing-profiles)
-with its observed profile. The following example uses Linux x64. It assumes
+Each writer captures its full invariant uppercase table in the same .NET
+process that produces the databases. The manifest gives its SHA-256, counts
+and context-batch result. The reader captures its own full table and verifies
+both writer files against the [independently derived profiles](../../../docs/rust/rw02-legacy.md#independently-reproduced-casing-profiles).
+The following example uses Linux x64. It assumes
 the original three ICU 74.2 shared libraries and their versioned links are
 available in the private directory named by `IFW_TEST_ICU74`, the default
 .NET environment uses the newer casing table and the project's existing
@@ -43,5 +46,14 @@ the pinned shipping source and the complete logical contents of all four
 tables. `result.json` records the actual reader casing, entries, repairs,
 tombstone, exact album IDs, transfer times and the before/after hashes.
 Verify that the two reports show different reader mappings and four passing
-observations each. The readback rechecks both original directories before
-publishing its report. Reuse requires a new output directory.
+observations each, with `writerTablesVerified` equal to `true`. The readback
+rechecks both original directories before publishing its report. Reuse
+requires a new output directory. An unfamiliar reader retains its captured
+TSV and a failing report with `readerTableVerified` equal to `false`. It
+performs zero database lookups.
+
+For a historical writer that predates in-process table capture, append
+`--archived-writer-hashes <019b-manifest-sha256> <a7dc-manifest-sha256>`
+to the readback command. Take the two manifest digests from the trusted
+original receipt. The diagnostic result identifies each missing writer table
+and records `writerTablesVerified` as `false`. Its reader table is present.

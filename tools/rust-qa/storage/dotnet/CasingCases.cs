@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using ImmichFolderWatch.Core.Models;
 using ImmichFolderWatch.Core.Services;
+using ImmichFolderWatch.LegacyScalarOracle;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -30,6 +31,8 @@ internal static partial class CasingCases
         var sources = VerifyShippingSources();
         await WithFreshDirectoryAsync(destination, async staging =>
         {
+            var casing = InvariantUppercaseProfile.Capture();
+            casing.Write(staging);
             var cases = new Dictionary<string, object>();
             foreach (var mode in new[] { "sensitive", "insensitive" })
                 cases.Add(mode, await SnapshotAsync(staging, mode));
@@ -38,6 +41,7 @@ internal static partial class CasingCases
                 format = "ifw-qualified-path-key-fixture-v1", baseline = Baseline, sources,
                 seed = Seed, os, arch, target = RuntimeInformation.RuntimeIdentifier,
                 runtime = Environment.Version.ToString(), nativeUpperOfDiscriminator = "ƛ".ToUpperInvariant(),
+                casingProfile = casing.Manifest,
                 coreAssemblySha256 = HashFile(typeof(SqliteSyncStateStore).Assembly.Location),
                 fixtureAssemblySha256 = HashFile(typeof(CasingCases).Assembly.Location),
                 sourcePath = SourcePath, account = Account, otherAccount = OtherAccount,
