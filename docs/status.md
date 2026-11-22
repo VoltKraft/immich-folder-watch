@@ -15,6 +15,14 @@ and Japanese input checks, plus Wayland Japanese input and four transitions
 between two outputs. [Four native desktop archives](rust/rw02-native-gui.md#native-follow-up-at-7517e3b)
 · [IME receipts](rust/rw02-windows-ime.md) · [Font observations](rust/rw02-font-coverage.md).
 
+The two official Unicode data inputs reproduce the distinct .NET invariant
+uppercase tables observed on Fedora and on all four hosted targets. The
+Fedora Rust probe passed 5,844 requests with each independently generated
+table, and the strict comparison rejected a third synthetic mapping. The
+native workflow now requires an independently qualified profile. Existing
+database key preservation and the choice for future writes remain open.
+[Casing inputs and results](rust/rw02-legacy.md#independently-reproduced-casing-profiles).
+
 Commit `66d9fd6` produced four SPDX inventories from the verified native
 builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
 byte-for-byte. The independent review checked source licenses, font assets

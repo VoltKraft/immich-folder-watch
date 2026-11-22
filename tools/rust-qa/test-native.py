@@ -68,6 +68,7 @@ def main():
         "legacy-reference": [
             sys.executable, str(QA / "legacy/verify.py"), "--probe", str(cargo_target / "release" / ("legacy-probe" + suffix)),
             "--scalar-reference", str(evidence / "scalar-reference"),
+            "--require-known-casing",
             "--fixtures", str(WORKSPACE / "tests/fixtures/legacy"), "--output", str(evidence / "legacy.json"),
         ],
     }

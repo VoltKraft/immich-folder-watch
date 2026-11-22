@@ -16,6 +16,8 @@ import sqlite3
 import subprocess
 import tempfile
 
+import casing_profiles
+
 
 def utf16_hex(value: str) -> str:
     return value.encode("utf-16-be", errors="surrogatepass").hex().upper()
@@ -45,6 +47,8 @@ def main() -> None:
     parser.add_argument("--scalar-reference", type=Path, required=True)
     parser.add_argument("--fixtures", type=Path, default=Path("rust/tests/fixtures/legacy"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--require-known-casing", action="store_true",
+                        help="Require the native C# map to match an independently derived Unicode profile")
     parser.add_argument("--unicode-data", type=Path,
                         help="Optional separately downloaded/pinned official UnicodeData.txt; no network is used here")
     args = parser.parse_args()
@@ -59,6 +63,8 @@ def main() -> None:
     if legacy_manifest["Platform"] != native or not legacy_manifest["SyntheticOnly"]:
         raise AssertionError("legacy reference platform or isolation mismatch")
     map_path = args.scalar_reference / "invariant-uppercase.tsv"
+    profile = casing_profiles.match_reference(map_path.read_bytes())
+    rust_map = profile.table if profile else map_path
     map_lines = map_path.read_text(encoding="utf-8").splitlines()
     if map_lines[0] != "IFW-INVARIANT-UPPERCASE-V1":
         raise AssertionError("unknown casing map")
@@ -180,7 +186,7 @@ def main() -> None:
                     "source\t" + text_hex("relative/path"), "relative\t" + text_hex("/rooted.jpg")]:
         case("negative control", command, "err")
 
-    result = subprocess.run([str(args.probe.resolve()), str(map_path.resolve())],
+    result = subprocess.run([str(args.probe.resolve()), str(rust_map.resolve())],
                             input="\n".join(requests) + "\n", encoding="utf-8", capture_output=True, timeout=120)
     if result.returncode:
         raise AssertionError(f"Rust probe failed ({result.returncode}): {result.stderr[:400]}")
@@ -208,11 +214,7 @@ def main() -> None:
     unicode_comparison = None
     if args.unicode_data:
         unicode_raw = args.unicode_data.read_bytes()
-        unicode_map = {}
-        for line in unicode_raw.decode("utf-8").splitlines():
-            columns = line.split(";")
-            if columns[12]:
-                unicode_map[int(columns[0], 16)] = int(columns[12], 16)
+        unicode_map = casing_profiles.simple_uppercase(unicode_raw)
         differences = [{"Scalar": f"{scalar:06X}", "DotNet": f"{mapping.get(scalar, scalar):06X}",
                         "UnicodeData": f"{unicode_map.get(scalar, scalar):06X}"}
                        for scalar in sorted(mapping.keys() | unicode_map.keys())
@@ -224,6 +226,14 @@ def main() -> None:
         "runtime_reference": manifest["Runtime"], "passed_requests": len(requests), "categories": categories,
         "exhaustive_scalars": manifest["ScannedScalars"], "changed_scalar_mappings": len(mapping),
         "casing_map_sha256": manifest["Payloads"]["invariant-uppercase.tsv"],
+        "independent_casing_profile": {
+            "qualified": profile is not None,
+            "unicode_version": profile.version if profile else None,
+            "unicode_data_sha256": profile.source_sha256 if profile else None,
+            "rust_input": "unicode-derived" if profile else "native-oracle",
+            "profile_driver_sha256": hashlib.sha256(Path(casing_profiles.__file__).read_bytes()).hexdigest(),
+            "unicode_notice_sha256": casing_profiles.LICENSE_SHA256,
+        },
         "probe_sha256": hashlib.sha256(args.probe.read_bytes()).hexdigest(),
         "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "scalar_manifest_sha256": hashlib.sha256((args.scalar_reference / "manifest.json").read_bytes()).hexdigest(),
@@ -237,6 +247,8 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if args.require_known_casing and profile is None:
+        raise SystemExit("Native scalar comparisons passed with the oracle input. The casing profile needs qualification.")
     print(f"Rust/C# scalar probe passed: {len(requests)} requests, {manifest['ScannedScalars']} Unicode scalars; {native}-{expected_arch}.")
 
 

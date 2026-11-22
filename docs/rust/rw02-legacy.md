@@ -27,10 +27,10 @@ inputs in a development-only workspace. C# oracles are development tooling only.
   configuration base before using this API.
 - `ReferenceCaseMap` applies a supplied simple Unicode map and preserves unpaired
   UTF-16 surrogates. Its constructor checks ordering, uniqueness, unchanged
-  UTF-16 lengths and idempotence; it cannot certify the semantic completeness of
-  an arbitrary supplied map. No map is embedded, automatically downloaded, or
-  accepted as a product configuration setting. The development probe supplies
-  only the separately generated C# reference.
+  UTF-16 lengths and idempotence. The development driver selects an independently
+  derived fixture when it matches the complete native C# observation. The
+  runtime crate takes an explicit map. Product selection for existing and new
+  database keys is still open.
 
 The standard library documents that
 [`std::path::absolute`](https://doc.rust-lang.org/std/path/fn.absolute.html) performs
@@ -129,6 +129,51 @@ never recompute old keys automatically from a newer Unicode table.
 
 `verify.py --unicode-data <downloaded-UnicodeData-17.0.0.txt>` optionally records
 the exact comparison without performing network access itself.
+
+### Independently reproduced casing profiles
+
+The two assessed UnicodeData releases reproduce every recorded native mapping
+after applying .NET's dotless-i rule. The generator uses the Simple_Uppercase_Mapping
+field from each pinned original. It emits the fixture format independently of
+the C# exporter. Each source has 15 semicolon-delimited fields per record.
+Five offline controls cover profile identification, the 55 differences,
+source and table mismatches, the uppercase column and the retained Unicode
+license. [Unicode 15.1 release inventory](https://www.unicode.org/versions/components-15.1.0.html)
+· [Unicode 17.0 version record](https://www.unicode.org/Public/17.0.0/ucd/ReadMe.txt)
+· [.NET invariant implementation](https://raw.githubusercontent.com/dotnet/runtime/v10.0.0/src/native/libs/System.Globalization.Native/pal_casing.c)
+· [Generator and source pins](../../tools/rust-qa/legacy/casing_profiles.py).
+
+| Unicode input | Original UnicodeData SHA-256 | Changed scalars | Native reference with identical complete map |
+| --- | --- | ---: | --- |
+| 15.1.0 | `2fc713e6a31a87c4850a37fe2caffa4218180fadb5de86b43a143ddb4581fb86` | 1,449 | Windows and Ubuntu x64/ARM64 at `7517e3b` |
+| 17.0.0 | `2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c` | 1,504 | Fedora x64 with .NET 10.0.12 |
+
+The version labels identify data that reproduce the observed behavior.
+Selecting by the digest of all 1,112,064 scalar observations also detects
+hosts with a different profile. The native feasibility command requires a
+known profile. For an unfamiliar one the driver first preserves the original
+oracle comparison and then reports that independent qualification is missing.
+The two development tables accompany the original Unicode License V3.
+[15.1 data](https://www.unicode.org/Public/15.1.0/ucd/UnicodeData.txt)
+· [17.0 data](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt)
+· [Unicode terms for data](https://www.unicode.org/copyright.html)
+· [Retained license](../../tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt).
+
+The same Fedora Rust binary passed 5,844 requests with each independently
+derived table. The 15.1 expected values came from the archived Ubuntu x64
+C# reference and the 17.0 expected values came from Fedora. The resulting
+SHA-256 values were `61c9fc28e894f6cfc176c21de278d3ceca41b497ea5f3058581748e360a1423b`
+and `c2a5577060fadd609994205913e791e3f3864fde33d7afb2793198fa3ac53be9`
+respectively. A synthetic change to the U+019B mapping completed the scalar
+comparison and returned a failing eligibility result. Choosing a writing
+policy for a legacy database still requires preserving its stored keys and
+handling mixed or ambiguous rows. [Four original hosted references](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460118).
+
+```sh
+python3 -B tools/rust-qa/legacy/casing_profiles.py 15.1.0 /path/to/15.1.0/UnicodeData.txt
+python3 -B tools/rust-qa/legacy/casing_profiles.py 17.0.0 /path/to/17.0.0/UnicodeData.txt
+python3 -B -m unittest discover -s tools/rust-qa/legacy -p test_casing_profiles.py
+```
 
 ## Evidence and remaining work
 

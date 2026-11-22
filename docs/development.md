@@ -76,7 +76,9 @@ traces exercise the Rust policy. Native window, tray and assistive-technology
 observations have separate entries in the [acceptance record](rust/acceptance.md).
 The same run compares Rust path, timestamp and casing observations to a native
 .NET 10.0.401 development oracle. Make both SDKs available on `PATH` for this
-comparison. See the [legacy checks](rust/rw02-legacy.md).
+comparison. The native command also checks that its complete C# casing map
+matches a separately reproduced Unicode table before qualifying the Rust
+comparison. [Legacy checks and source pins](rust/rw02-legacy.md#independently-reproduced-casing-profiles).
 
 The native command also writes `workspace-boundaries.json` for the selected
 target. It checks the resolved Cargo dependencies of each workspace member
