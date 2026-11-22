@@ -387,6 +387,30 @@ writer operation because the Basic User prerequisite was unavailable.
 | x64 | `7a3d8ce093ffda820e15a363d92b1d68bb3c6419d4ba7a5274e435572b5a8351` | `721634ecb5ff5e78cf49b1d8b119a843b30256ffd4cf1f56f3e961a997bc578a` |
 | ARM64 | `01a79ad54ff14fc70da83acbb4ab12d7f66331d0dc899326ab241f0979aa2ad8` | `a791d2382f98a27c5632b37ec730fee711f42c9d200841fff0e6561e1337c9d3` |
 
+Both complete Windows desktop jobs failed. Their retained Mailbox
+comparison met eight limits on x64 and all eleven on ARM64. The separate
+canonical ARM64 recorder lost 310,757 ETW records in its third file trace.
+Its two aggregate scan metrics are unmeasured. The WPF and retained trials
+had usable native file traces on both architectures.
+[Paired measurements and hidden-window readback](rw02-windows-window.md#presentations-while-the-root-hwnd-was-hidden).
+
+| Target | Complete archive, bytes / members | Archive SHA-256 |
+| --- | ---: | --- |
+| Windows x64 | 11,703,424 / 765 | `e006b1b16a722d987ccd93b6af16acbdbc39cefbd6b72f6a4f352a705aeb64ab` |
+| Windows ARM64 | 11,458,223 / 774 | `006ea53bb6c5450e94fa0c47c41792d286ee8431d4cc5f8d53875f1cebe76958` |
+
+The ordinary launcher fixture timed out waiting for its first visible window
+on the private desktop on both hosts. The primary reported a ready DX12 CPU
+renderer and worker activity. Neither trial reached the second launch. On
+x64 a later Win32 170 during desktop cleanup obscured the timeout in the
+JSON result. The job log preserves both errors. The separate Japanese IME
+trial observed composition and removed its temporary profile on both targets
+for a third time. Each host had one 96-DPI console output. The display
+observer saw the x64 source frame. On ARM64 the owned field did not acquire
+focus. Mixed DPI and RDP remain open. Both hosts passed the sixteen
+loopback transport cases. [Launcher fixture](rw02-instance.md#ordinary-second-launch-of-the-windows-gui)
+· [Display observations](rw02-windows-display.md) · [Native TLS readback](rw02-realtime-transport.md#tls-endpoint-identity).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

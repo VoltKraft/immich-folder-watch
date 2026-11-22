@@ -73,8 +73,16 @@ cases reached the peer's TLS listener and sent zero HTTP requests. The
 redirect destination received no request or credential. The original
 `sessions.json` SHA-256 values are `7c2e4b46f378eddbb4fb08eaf12cc9f62fe4363d4d633e040f179c34a0e4d17d`
 and `0557e8fd8bdae9969dfadc70305d5d63b622f62fc5269e4da76b00c7751a1b05`.
-Both Windows workflow steps also passed. Their complete desktop archives
-are needed to inspect the individual observations. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500)
+The full Windows archives show the same sixteen cases and 191 HTTP requests
+on each architecture. The matching leaf completed all 17 requests, including
+13 inventory reads and one successful upgrade. Both rejected leaves reached
+TLS and sent zero HTTP requests. Neither redirect destination received a
+request or credential. Independent readback verified all nineteen source
+digests, ten output digests and the resolved graph on each host. The Windows
+x64 and ARM64 `sessions.json` digests are
+`8dae434a716f5677c080cba9323226d25d968d8fc3f74f36cfc9e8d12ccfc76a` and
+`029c825cf9b46fef8e92f017e427098048db4dbc7a676d15d19c927178810ad9`.
+[Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500)
 · [Wire fixture](../../tools/rust-qa/realtime/verify.py)
 · [Client transport policy](../../tools/rust-qa/realtime/src/transport.rs).
 

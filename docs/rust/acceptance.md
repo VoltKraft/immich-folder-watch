@@ -44,7 +44,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
-| RI-AC03 | Open | [Read-only path identity lookup on three authentic C# writer profiles](rw02-legacy.md#read-only-lookup-across-three-historical-writers), WAL/crash and native full-volume results. Production write policy, complete migration and rollback after sync activity are pending. |
+| RI-AC03 | Open | [Lookup and exact-row updates on copies of three authentic C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. Production write policy, complete migration and rollback after sync activity are pending. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
 | RI-AC05 | Open | Native lifecycle, old/new/cross-session ownership and durable task/DB shutdown tests |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
@@ -87,21 +87,23 @@ The Windows
 [retained-window variant](rw02-windows-window.md) held the same DX12 device
 across an ordinary close and passed the native idle and memory limits on
 both architectures in earlier trials. Its Mailbox variant met all eleven
-WPF-derived limits on ARM64 three times. Windows x64 met eight, nine and
-seven. At `7517e3b` the x64 scan reopen took 122.81 ms at p95 against
-a 19.555 ms limit.
+WPF-derived limits on ARM64 four times. Windows x64 met eight, nine, seven
+and eight. At `8091469` the x64 scan reopen took 119.95 ms at p95
+against 21.987 ms. The dispatch trace located two successful presentations
+inside each of 439 independently confirmed hidden-window intervals on x64.
+The new retained eframe policy requires native qualification.
 
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. At `7517e3b` all three ordinary editor and all four standalone font cases passed, including NVDA, masking and clipboard. The IME twice committed あ with full cleanup. Retained Mailbox met seven of eleven limits in the latest run. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary edits, four standalone font cases, NVDA speech, masks and clipboard passed. The Japanese IME twice committed あ with full cleanup. Retained Mailbox met all eleven limits three times. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. All three ordinary editor and four standalone font cases passed, including NVDA, masking and clipboard. At `8091469` the Japanese IME passed with cleanup a third time. Retained Mailbox met eight of eleven limits. The ordinary launcher timed out waiting for the primary window. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary edits, four standalone font cases, NVDA speech, masking and clipboard passed. The Japanese IME passed with cleanup three times. Retained Mailbox met all eleven limits four times. The ordinary launcher timed out waiting for the primary window. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
-The [four archives at `7517e3b`](rw02-native-gui.md#native-follow-up-at-7517e3b)
-and [earlier four archives](rw02-native-gui.md#native-follow-up-at-3b4854d)
+The [four archives at `8091469`](rw02-native-gui.md#native-follow-up-at-8091469)
+and [previous four archives](rw02-native-gui.md#native-follow-up-at-7517e3b)
 bind each hosted result to its revision. The [Plasma panel](rw02-plasma.md),
 [system appearance](rw02-appearance.md), [native storage faults](rw02-storage-faults.md)
 and [four combined offline builds](rw02-combined-profile.md) have separate

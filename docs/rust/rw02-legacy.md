@@ -339,6 +339,32 @@ The independent SQL report SHA-256 is
 `cdfd454878ee5cb88722e0265f792bb3b9dd323fd902ff6c36570019a8727915`
 under `artifacts/rust/review-stored-733194b-o1xwcpjx/`.
 
+### Updating a known row on finalized copies
+
+At `b7190ea` the Rust study opened six new copies from the three Fedora C#
+writers in both path comparison modes. A transaction updated one known
+physical entry's file size from 19 to 37 in each copy. The independent SQL
+review reproduced all six before/after pairs byte-for-byte. Names, account
+and source keys, asset IDs, history, schema and every other stored value
+matched the original. Both shipping Core read APIs returned the expected
+results in all 36 reader/profile combinations. The twelve donor files
+retained their original content and modification times.
+
+The independent review also found three defects in the development fixture.
+An expected value equal to the requested size could misreport a stale row
+as unchanged. Direct invocation created Unix scratch files using the caller's
+umask. A C# readback on an active WAL reported size 37 from the main file
+while a separate SQLite connection observed the committed size 38. The six
+positive captures used finalized databases. The findings concern verification
+of changes to copies. Installed migration, ambiguity handling and rollback
+after synthetic synchronization still need application-level evidence.
+The original result SHA-256 is
+`a492cf09a3a2b07c458b004218dd2ef8e109a0021f9535b5265cd29237632ee9`.
+The independent row and control readbacks have SHA-256
+`f720959ac9272027be9bc6bcc59203f3a86dfe78ea0d5897c97f743e36334e8a` and
+`c20e3558e7945dc66dcf97e5938ffa4051884fce722c8f0eeb6622d40410e7c9`.
+[Study entry points](../../tools/rust-qa/storage/README.md).
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

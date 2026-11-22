@@ -153,16 +153,19 @@ either selected check fails or the host cannot supply the provider.
 The desktop assessment retains early Windows writer and tray results
 before the scan. Its final artifact includes the desktop logs and Linux
 storage recovery evidence. Each archive name includes the target and commit.
-After the GUI build and YAML reconstruction, the Windows job launches the
-same GUI executable a second time without arguments on a private desktop
-with no notification area. The launcher result and both processes' logs
+After the GUI build and YAML reconstruction, the Windows job exercises
+ordinary launches on its private desktop without a notification area and on
+the disposable input desktop with a separate synthetic profile. Both paths
+launch the same GUI executable a second time without arguments. The results and process logs
 are available in `rust-launcher-<target>-<commit>` as soon as that step
 finishes, and under `windows-launcher/<target>/` in the final desktop archive.
 [Windows launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
 The Windows desktop job first records the WPF budget and the regular Mailbox
-and FIFO trials. Its subsequent `--dispatch` trace measures the two retained
-window activation paths using the same native host and budget. The result and
-per-trial logs appear under `windows-warm-window/<target>/dispatch/`.
+and FIFO trials. Its subsequent `--dispatch` trace compares both retained
+window wake paths and the original hidden-paint policy with the same executable,
+host and budget. Results and per-trial logs appear under
+`windows-warm-window/<target>/dispatch/`. Preserve the adjacent
+`eframe-source.zip` with the native build receipt for offline reproduction.
 See the [window measurements](rust/rw02-windows-window.md).
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).

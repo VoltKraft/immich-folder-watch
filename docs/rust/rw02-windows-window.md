@@ -87,9 +87,9 @@ python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-co
 python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dispatch
 ```
 
-Preserve `build.json`, `observed/**`, `measured/**` and `measured-fifo/**` under `artifacts/rust/windows-warm-window/<target>/`. The first timed command enforces all eleven WPF-derived maximums. The second records the earlier FIFO policy and binds both complete three-trial comparisons to the same revision, binary, host run, budget and workload. An over-budget control remains visible in its result. Build receipts include the canonical executable digest, reviewed graph, staged first-party source digests, font digests and native candidate executable digest. [Build](../../tools/rust-qa/windows-warm-window/build.py) · [Timed comparison](../../tools/rust-qa/windows-warm-window/measure.py).
+Preserve `build.json`, `eframe-source.zip`, `observed/**`, `measured/**` and `measured-fifo/**` under `artifacts/rust/windows-warm-window/<target>/`. The first timed command enforces all eleven WPF-derived maximums. The second records the earlier FIFO policy and binds both complete three-trial comparisons to the same revision, binary, host run, budget and workload. An over-budget control remains visible in its result. Build receipts identify the canonical and retained executables, their sources, the reviewed features and the fonts. The source archive supplies the inputs for rebuilding the retained eframe derivative. [Build](../../tools/rust-qa/windows-warm-window/build.py) · [Timed comparison](../../tools/rust-qa/windows-warm-window/measure.py).
 
-Keep `dispatch/*.json` and `dispatch/*.log` from the third command. It uses the same source revision, executable, WPF budget, first-party worker and 100,000-file workload for two instrumented inventories. Each wake policy receives one trial. Qualification of a changed default requires the three-trial budget comparison and native behavior checks.
+Keep `dispatch/*.json` and `dispatch/*.log` from the third command. The same retained executable exercises the root repaint wake, a single wake and the original hidden-window painting policy in three instrumented inventories. Each uses the first-party worker, 100,000 files and the same native references. The recorder counts successful DXGI calls starting between a confirmed hide and the next show of that HWND. Qualification also requires the ordinary three-trial budget comparison and native behavior checks.
 
 Nine portable tests covered staged source, resident pages, the shared WPF budget and timing correlations, including overlapping callbacks, asynchronous observations and presents from a different thread of the same process. Rust 1.100.0 passed rustfmt and Clippy for both MSVC targets, including test targets. On each Windows target the staged diagnostic and original manifests resolved to the same 135 package/version/feature entries. The pinned external egui source emitted its existing `std::f32::EPSILON` deprecation. [Variant and budget checks](../../tools/rust-qa/windows-warm-window/test_variant.py) · [Dispatch timeline tests](../../tools/rust-qa/windows-warm-window/test_dispatch.py).
 
@@ -106,4 +106,32 @@ Runs `45041728291` and `45047460092` used the same GUI, worker and warm-window s
 
 Replaying 48 PID-bound file traces verified two passes over 100,000 distinct files in every trial. All 40 retained-window observation cases passed. The x64 Mailbox candidate exceeded idle close and scan reopen in all three runs. Idle reopen and scan close varied between runs. ARM64 Mailbox met all eleven limits three times. In the two repeats, all 1,205 ARM64 scan reopens finished within their respective limits.
 
-The active-scan request clocks place 607 of 607 and 396 of 397 x64 Mailbox reopens above their respective limits. Replaying the 24 retained-mode DXGI traces showed that exactly two successful presentations fell entirely between request and external HWND observation in 950 of those 1,004 reopens. The largest total overlap with successful DXGI calls during an over-budget reopen was 0.5522 ms. The two revisions predate `d716245`. Its paired native dispatch trace is still needed to locate the delay between the private pipe wake, UI callback, HWND visibility change and independent observation.
+The active-scan request clocks place 607 of 607 and 396 of 397 x64 Mailbox reopens above their respective limits. Replaying the 24 retained-mode DXGI traces showed that exactly two successful presentations fell entirely between request and external HWND observation in 950 of those 1,004 reopens. The largest total overlap with successful DXGI calls during an over-budget reopen was 0.5522 ms. The two revisions predate the dispatch trace introduced at `d716245`.
+
+## Presentations while the root HWND was hidden
+
+At `8091469` both architectures completed all ten retained-window behavior checks and all three Mailbox and FIFO trials. Each timed trial observed two passes over 100,000 distinct files. The table gives the median of the three trial p95s in milliseconds, followed by the WPF-derived limit for that job. [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500).
+
+| Target | Mailbox limits met | Idle close | Idle reopen | Scan close | Scan reopen |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Windows x64 | 8 / 11 | **43.83** / 14.509 | **17.59** / 14.661 | 22.55 / 31.325 | **119.95** / 21.987 |
+| Windows ARM64 | 11 / 11 | 3.16 / 13.470 | 4.84 / 15.036 | 9.11 / 14.490 | 4.91 / 15.522 |
+
+In the separate dispatch trial, both the Win32 observer and the UI thread recorded the same HWND and process on a common performance-counter clock. All 238 x64 root-repaint and 201 single-wake reopens had exactly two successful DXGI calls after the native hide completed and before the next show began. Each pair ran on the UI thread during one generic window callback and one focus callback. Neither trial recorded a resize during reopening. On ARM64, all 207 and 195 corresponding intervals contained zero successful presentations. The old trace grouped modifier changes with other window events.
+
+The x64 pipe reader received the request in about 0.05 ms. Median time from that read to the UI handler was 50.80 ms with the root repaint and 69.71 ms with the single wake. The native show calls took a further 35.06 and 33.11 ms at the median. ARM64 delivered the same wakeups in 0.17 and 0.16 ms, then spent 3.06 and 3.03 ms in the show call. These are separate phase medians. The independent archive readback is `windows-dispatch-readback.json`, SHA-256 `547b16a849947cce165b555ea67a1ca91f6978398ac52ecbc91996b35c4a2b4a`. Replaying both original timelines on both architectures reproduced every original dispatch result and all 841 hidden intervals. [Native archives](rw02-native-gui.md#native-follow-up-at-8091469).
+
+The comparison build now tells eframe when the application deliberately hides its root. It checks the actual Win32 visibility before using the existing logic-only path. Native input, accessibility and application logic continue to run. Showing the root requests a fresh frame. Explicit pixel requests and visible descendants still receive UI work. Focus and modifier transitions have distinct trace labels. The original policy is selectable in the same isolated executable. Its native behavior and response budgets require a new run. [eframe change](../../tools/rust-qa/windows-warm-window/eframe-hidden-input.patch) · [Application change](../../tools/rust-qa/windows-warm-window/retained-hidden-input.patch) · [Dispatch readback](../../tools/rust-qa/windows-warm-window/dispatch.py).
+
+At `fe8d43c` two offline reconstructions produced the same twelve-member
+source ZIP, SHA-256 `3e53af63d808cfde90c44bd6142aeadcde83e04997bef4edb464733f342cd325`.
+It contains the published eframe crate, four original license texts, both patches
+and the two Cargo manifests and lockfiles. The Cargo-generated lock changes
+only eframe's source and checksum entries. The Windows profiles each retain
+their original 135 package/version/feature entries. Both MSVC targets passed
+cross-Clippy. A native Fedora release build confirmed the private eframe crate
+root and produced the rlib with SHA-256
+`3bc298723fbb0d0038cd7dd3c9ac88858ce0bee923b35ed868b8199e58b49190`.
+The 13 portable comparison tests passed, including altered input and compiler
+path refusals. [Pins and license origins](../../tools/rust-qa/windows-warm-window/eframe-source.json)
+· [Reconstruction](../../tools/rust-qa/windows-warm-window/eframe_source.py).

@@ -96,25 +96,32 @@ the new receipt archive by its own SHA-256.
 [Four build inventories and digests](rust/rw02-combined-sbom.md)
 · [Development notice reconstruction](rust/rw02-combined-notices.md).
 
-The retained Windows candidate reduced visible working set to about 60 MiB
-on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
-ARM64 met all eleven WPF-derived limits with Mailbox in three native runs.
-The x64 window met eight, nine and seven. At `7517e3b`, reopening during
-the scan took 122.81 ms at p95 against 19.555 ms. On ARM64 both private
-tray registration attempts failed, 3.06 seconds apart. On x64 the private
-taskbar disappeared before the receiver ran. Both tasks returned to their
-original input desktop.
-Revision `d716245` records the time between the activation request, handling
-it on the GUI thread, showing the HWND and the native visibility readback.
-Its second diagnostic path avoids asking eframe for a duplicate repaint.
-The workflow retains both traces separately from the eleven original limits.
-The comparison still needs a native run.
-The Windows jobs also select the ordinary second launch introduced at
-`58a838b`. On a desktop without a notification area it checks activation
-of the same primary process and worker, followed by Quit and restart.
-Cross-target Clippy passed for both Windows architectures, along with eleven
-portable checks. Native launcher results are pending.
-[Launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
+At `8091469` retained Mailbox met all eleven WPF limits on ARM64 for a
+fourth native run. Windows x64 met eight. Reopening during a scan took
+119.95 ms at p95 against 21.987 ms. In two dispatch traces x64 drew twice
+inside each of 439 confirmed hidden intervals. ARM64 drew zero times in
+all 402 intervals. The application and eframe change at `88fb4ba` keeps
+processing input while the root HWND is hidden and requests a frame on show.
+The two platform archives reproduce every original dispatch result. The
+new behavior and the same-host response budgets still need a native run.
+[Measured response and source change](rust/rw02-windows-window.md#presentations-while-the-root-hwnd-was-hidden).
+
+The launcher trial timed out before its first visible window on both
+Windows targets. The x64 cleanup error obscured the original timeout in
+the JSON report. The new fixture records the initial window and cleanup
+separately and also exercises an ordinary first launch on the disposable
+input desktop. Native ordinary activation remains open. Both Windows hosts
+passed the Japanese IME with profile cleanup a third time and passed all
+sixteen realtime transport cases. Each still had one 96-DPI console output.
+[Complete native archives](rust/rw02-native-gui.md#native-follow-up-at-8091469)
+· [Launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
+
+The Rust study at `b7190ea` updated one known physical row on each of six
+finalized copies from three genuine legacy writers. Independent review
+reproduced all twelve before/after files and confirmed all 36 shipping C#
+readbacks. It found a stale-value reporting error, permissive direct scratch
+file modes, and a C# readback that ignored a live WAL. These are open against
+that fixture revision. [Known-row update and independent findings](rust/rw02-legacy.md#updating-a-known-row-on-finalized-copies).
 At `3b4854d` both Windows architectures passed all thirteen notification
 scenarios. Their nonrecursive watch reported the direct child directory's
 metadata and the direct file's creation and change. Both Ubuntu targets
