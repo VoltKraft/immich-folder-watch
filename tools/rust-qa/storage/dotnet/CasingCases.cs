@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ImmichFolderWatch.StorageAssessment;
 
-internal static class CasingCases
+internal static partial class CasingCases
 {
     private const string Baseline = "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc";
     private const string Account = "ifw-casing-primary";
@@ -26,38 +26,13 @@ internal static class CasingCases
 
     public static async Task WriteAsync(string destination)
     {
-        var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
-        var os = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "unsupported";
-        var expectedArch = Environment.GetEnvironmentVariable("IFW_ORACLE_EXPECT_ARCH");
-        if (os == "unsupported" || arch is not ("x64" or "arm64") ||
-            RuntimeInformation.OSArchitecture != RuntimeInformation.ProcessArchitecture ||
-            (expectedArch is not null && arch != expectedArch))
-            throw new InvalidOperationException("A matching native Windows or Linux x64/arm64 runtime is required.");
-
+        var (os, arch) = NativeTarget();
         var sources = VerifyShippingSources();
-        var root = Path.GetFullPath("artifacts/rust") + Path.DirectorySeparatorChar;
-        var output = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destination));
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (!Path.IsPathFullyQualified(destination) || !output.StartsWith(root, comparison) ||
-            Path.Exists(output))
-            throw new IOException("Supply a fresh absolute output directory below the repository's artifacts/rust.");
-        var parent = Directory.GetParent(output)!;
-        for (var directory = parent; directory is not null &&
-             !string.Equals(directory.FullName, Environment.CurrentDirectory, comparison); directory = directory.Parent)
-            if (directory.Exists && directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
-                throw new IOException("The synthetic output directory cannot traverse a link.");
-        parent.Create();
-
-        // Publish both closed snapshots and their manifest together, even when two
-        // independent fixture invocations request the same output name.
-        var temporary = Path.Combine(parent.FullName, ".ifw-casing-" + Guid.NewGuid().ToString("N"));
-        var staging = OperatingSystem.IsWindows() ? Directory.CreateDirectory(temporary) :
-            Directory.CreateDirectory(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        try
+        await WithFreshDirectoryAsync(destination, async staging =>
         {
             var cases = new Dictionary<string, object>();
             foreach (var mode in new[] { "sensitive", "insensitive" })
-                cases.Add(mode, await SnapshotAsync(staging.FullName, mode));
+                cases.Add(mode, await SnapshotAsync(staging, mode));
             var manifest = new
             {
                 format = "ifw-qualified-path-key-fixture-v1", baseline = Baseline, sources,
@@ -70,8 +45,54 @@ internal static class CasingCases
                 repairRelativePath = RepairRelativePath, tombstoneRelativePath = TombstoneRelativePath,
                 albumDirectory = AlbumDirectory, albumId = AlbumId, otherAlbumId = OtherAlbumId, cases
             };
-            await File.WriteAllTextAsync(Path.Combine(staging.FullName, "manifest.json"),
+            await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"),
                 JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+        });
+    }
+
+    private static (string Os, string Arch) NativeTarget()
+    {
+        var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        var os = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "unsupported";
+        var expectedArch = Environment.GetEnvironmentVariable("IFW_ORACLE_EXPECT_ARCH");
+        if (os == "unsupported" || arch is not ("x64" or "arm64") ||
+            RuntimeInformation.OSArchitecture != RuntimeInformation.ProcessArchitecture ||
+            (expectedArch is not null && arch != expectedArch))
+            throw new InvalidOperationException("A matching native Windows or Linux x64/arm64 runtime is required.");
+
+        return (os, arch);
+    }
+
+    private static string ArtifactDirectory(string destination)
+    {
+        var root = Path.GetFullPath("artifacts/rust") + Path.DirectorySeparatorChar;
+        var output = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destination));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!Path.IsPathFullyQualified(destination) || !output.StartsWith(root, comparison))
+            throw new IOException("Supply an absolute directory below the repository's artifacts/rust.");
+        for (var directory = new DirectoryInfo(output); directory is not null &&
+             !string.Equals(directory.FullName, Environment.CurrentDirectory, comparison); directory = directory.Parent)
+            if (directory.LinkTarget is not null || (directory.Exists && directory.Attributes.HasFlag(FileAttributes.ReparsePoint)))
+                throw new IOException("The synthetic fixture directory cannot traverse a link.");
+        return output;
+    }
+
+    private static async Task WithFreshDirectoryAsync(string destination, Func<string, Task> write)
+    {
+        var output = ArtifactDirectory(destination);
+        if (Path.Exists(output))
+            throw new IOException("Supply a fresh absolute output directory below the repository's artifacts/rust.");
+        var parent = Directory.GetParent(output)!;
+        parent.Create();
+
+        // Publish both closed snapshots and their manifest together, even when two
+        // independent fixture invocations request the same output name.
+        var temporary = Path.Combine(parent.FullName, ".ifw-casing-" + Guid.NewGuid().ToString("N"));
+        var staging = OperatingSystem.IsWindows() ? Directory.CreateDirectory(temporary) :
+            Directory.CreateDirectory(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        try
+        {
+            await write(staging.FullName);
             Directory.Move(staging.FullName, output);
         }
         finally

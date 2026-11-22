@@ -19,9 +19,14 @@ internal static class Program
             await CasingCases.WriteAsync(destination);
             return;
         }
+        if (args is ["--casing-readback", var first, var second, var readback])
+        {
+            Environment.ExitCode = await CasingCases.CompareAsync(first, second, readback) ? 0 : 1;
+            return;
+        }
         if (args.Length != 1)
         {
-            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output> or --casing-fixtures <new-output>");
+            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output>, --casing-fixtures <new-output>, or --casing-readback <019b-fixture> <a7dc-fixture> <new-output>");
         }
         var output = Path.GetFullPath(args[0]);
         var scope = Path.GetFullPath("artifacts/rust") + Path.DirectorySeparatorChar;
