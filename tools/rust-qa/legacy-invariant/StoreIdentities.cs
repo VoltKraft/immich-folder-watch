@@ -27,6 +27,11 @@ internal static partial class CasingCases
 
     private static async Task<int> Main(string[] args)
     {
+        if (args is ["read-sizes", var copies, var result])
+        {
+            await ReadUpdatedSizesAsync(copies, result);
+            return 0;
+        }
         if (args is ["read", var older, var managed, var current, var output])
         {
             await ReadIdentitiesAsync([older, managed, current], output);
@@ -34,7 +39,7 @@ internal static partial class CasingCases
         }
         if (args is not ["capture", var destination])
         {
-            Console.Error.WriteLine("Usage: StoreIdentities capture <new-output> or read <icu15-writer> <managed-writer> <icu17-writer> <new-output>");
+            Console.Error.WriteLine("Usage: StoreIdentities capture <new-output>, read <icu15-writer> <managed-writer> <icu17-writer> <new-output>, or read-sizes <six-copy-cases> <new-output>");
             return 2;
         }
         var (os, arch) = NativeTarget();

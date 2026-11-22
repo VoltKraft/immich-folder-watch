@@ -37,6 +37,23 @@ derived controls in their own directory. The completed report is
 cross-library reads with the same C# runtime.
 [Stored SQLite identity results](../../../docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 
+Each output contains `result.json`, `evidence-hashes.json`, step logs, first-party
+source copies, untouched `.crate` archives, supplied notices, feature graphs and
+the original/backup synthetic databases with Rust and C# reports. Large build
+products remain in a separate `artifacts/rust/storage-build/<run-id>` directory.
+The runner archives failing output too; a directory's existence is not a pass.
+
+`inputs.json` is generated review evidence, not an automatic approval mechanism.
+`record-inputs.py --reviewed-source-inventory <reviewed-inventory.json>` regenerates
+it only from a separately audited inventory and matching offline Cargo sources.
+Changing dependencies, features, native flags, assets or notices requires a new
+source review before regenerating it. Do not hand-edit Cargo.lock or inputs.json.
+
+See [the storage audit](../../../docs/rust/rw02-storage-inputs.md) for license
+disposition, measured behavior, original source evidence and outstanding cases.
+YAML, production migration, existing future-schema WAL, full-disk/process-crash
+recovery and cross-environment identity policy are outside this bounded proof.
+
 ### Read the frozen three-profile Fedora study
 
 The separate developer diagnostic accepts the original three C# writer
@@ -72,19 +89,35 @@ the stored spelling. Absence, ambiguity and possible aliases are read-only
 observations. Creating or rewriting identities requires a separate
 application policy. [Study sources and Unicode License v3 notice](../legacy-invariant/README.md).
 
-Each output contains `result.json`, `evidence-hashes.json`, step logs, first-party
-source copies, untouched `.crate` archives, supplied notices, feature graphs and
-the original/backup synthetic databases with Rust and C# reports. Large build
-products remain in a separate `artifacts/rust/storage-build/<run-id>` directory.
-The runner archives failing output too; a directory's existence is not a pass.
+### Update the size of a historical entry on a new copy
 
-`inputs.json` is generated review evidence, not an automatic approval mechanism.
-`record-inputs.py --reviewed-source-inventory <reviewed-inventory.json>` regenerates
-it only from a separately audited inventory and matching offline Cargo sources.
-Changing dependencies, features, native flags, assets or notices requires a new
-source review before regenerating it. Do not hand-edit Cargo.lock or inputs.json.
+The separate `update_study_copy` example copies an authenticated donor into a
+fresh directory below `artifacts/rust/stored-key-mutations`. It resolves the
+displayed paths with the shared historical lookup inside an immediate SQLite
+transaction. An agreed, existing entry with the expected size of 19 bytes can
+be changed to 37 bytes. The update binds the original physical account,
+source and relative keys. The observer compares the complete before/after
+schema and all four tables. It retains both databases and the request.
 
-See [the storage audit](../../../docs/rust/rw02-storage-inputs.md) for license
-disposition, measured behavior, original source evidence and outstanding cases.
-YAML, production migration, existing future-schema WAL, full-disk/process-crash
-recovery and cross-environment identity policy are outside this bounded proof.
+Use the same Cargo setup as above and build both examples with `--examples`.
+Build the extended C# observation command in its private offline environment
+using the [StoreIdentities build procedure](../legacy-invariant/README.md#reproduction-on-linux-x64).
+Pass that assembly, the pinned .NET host and the qualified ICU 74.2
+directory. The observer stages the original shipping Core DLL from the
+frozen reader build and runs the two shipping store APIs on separate copies.
+
+```bash
+python3 -B tools/rust-qa/storage/study_file_sizes.py \
+  --probe "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/examples/update_study_copy" \
+  --writers artifacts/rust/managed-invariant-verified-86ae038 \
+  --readers artifacts/rust/managed-readback-verified-3c58fc1 \
+  --dotnet "$(command -v dotnet)" --reader-dll "$run/build/bin/StoreIdentities/release/StoreIdentities.dll" \
+  --older-icu "$IFW_TEST_ICU74" --output artifacts/rust/stored-key-mutations/file-sizes
+```
+
+The six updates cover both path modes for each writer. Eight refusal cases
+cover ambiguous and possible aliases, unexplained stored keys, both absence
+outcomes, a stale size, a different account and an unknown same-process
+table. The frozen donors contain entries and transfer history. Their repair
+and ownership tables are empty. New identities, populated repair or album
+changes and external synchronization need separate evidence.

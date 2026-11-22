@@ -112,6 +112,11 @@ managed 16 and ICU 17 readers resolve respectively 9, 10 and 12 of the
 12 relative spellings on that database. Every sensitive combination returns
 all 12 distinct names.
 
+The `read-sizes` command exercises `GetAsync` and `GetSourceEntriesAsync`
+on private copies before and after the [Rust file-size experiment](../storage/README.md#update-the-size-of-a-historical-entry-on-a-new-copy).
+It records the active complete casing table, CoreLib and shipping Core
+assembly digests with the observed paths, asset IDs and sizes.
+
 ## Attribution
 
 The development TSV derives from the Unicode Character Database 16.0.0,
