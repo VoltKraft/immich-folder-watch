@@ -242,6 +242,38 @@ before its first process kill. All four overall desktop jobs recorded failure.
 [Storage](rw02-storage-faults.md), [graphics inputs](rw02-graphics.md#local-integrated-observations)
 and [workflow run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002).
 
+## Native follow-up at 3b4854d
+
+[Run 45039099730](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
+tested `3b4854d867f614a956042dfe987ecc7c008e53ec`. Both Ubuntu jobs passed.
+Each complete ZIP matched the size and SHA-256 published by Actions and
+passed ZIP integrity checks.
+
+| Native target | Actions artifact | Bytes | Verified ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| Ubuntu x64 | 14762715938 | 19,506,512 | `a495111a590cc54b72753cf57fba93f17e24802acddf873dea88170c12d92114` |
+| Ubuntu ARM64 | 14761634190 | 19,567,805 | `e70016232c6a366280d2181de23d67fa400eac7255b9683a4b89e414bbc3b000` |
+
+On each host the Rust and .NET references used the same X11 server,
+workload and recorder. All eleven limits passed over three independent
+100,000-file trials. The native runs exercised Mesa device loss during
+X11 and Wayland rendering as well as startup without a driver.
+
+| Native target | Startup (ms) | Visible memory (MiB) | Scan close p95 (ms) | Scan reopen p95 (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Ubuntu x64 | 252.05 | 124.371 | 0.39 | 0.93 |
+| Ubuntu ARM64 | 204.15 | 119.957 | 0.33 | 0.89 |
+
+Both hosts repeated eight storage fault recoveries with 208 C# assertions,
+16 corruption rejections and eight final snapshot checks. In each ZIP 465
+of 466 indexed storage files matched directly. Actions omitted one tracked
+`.gitattributes` file from its source snapshot. Its exact 78 bytes were
+recovered and verified independently from the Git revision. Both combined
+native builds and modified Wayland relinks also passed.
+[Linux x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319428)
+· [Linux ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319481)
+· [Storage fixture](rw02-storage-faults.md).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

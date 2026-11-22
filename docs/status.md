@@ -14,10 +14,24 @@ Both Japanese IMEs composed あ and restored the input layout. The ARM64
 driver reported a sharing violation while removing its profile after
 observing the edit. Revision `21b6938` makes cleanup part of the result and
 preserves the successful composition separately. Each hosted Windows console
-offered a single 96-DPI display. Both Ubuntu architectures have passed all
-eleven X11 resource limits, Orca speech and masks under X11 and Wayland and
-six journal readbacks. [Four native archives](rust/rw02-native-gui.md#native-follow-up-at-a66e045)
+offered a single 96-DPI display. At `3b4854d` each Ubuntu desktop job
+completed successfully. Their three full scan trials passed all eleven X11
+limits, and both hosts exercised native graphics recovery, Orca speech and
+masks under X11 and Wayland, and the native journal.
+[Linux desktop results](rust/rw02-native-gui.md#native-follow-up-at-3b4854d)
+· [Four earlier archives](rust/rw02-native-gui.md#native-follow-up-at-a66e045)
 · [IME receipts](rust/rw02-windows-ime.md).
+
+Commit `66d9fd6` produced four SPDX inventories from the verified native
+builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
+byte-for-byte. The independent review checked source licenses, font assets
+and all 74 indexed build outputs. The documents cover 337 and 336 compiled
+Cargo packages on Linux x64 and ARM64, and 250 and 249 on Windows x64 and
+ARM64. The packaged product inventory remains open under RI-AC09.
+The assessment workflow now runs generation and replay after a successful
+combined build. Local replay of the two Ubuntu archives at `3b4854d` also
+passed the official schema and all native inventory controls.
+[Four build inventories and digests](rust/rw02-combined-sbom.md).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
@@ -34,12 +48,19 @@ Installed old/new handover and ordinary-user exclusion remain open.
 [Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
 
 The .NET reference, PR CI, CodeQL and dependency submission completed
-successfully at the same commit. The Windows storage fault steps on both
-architectures and the x64 interactive tray step reported failure while the
+successfully at the same commit. The Windows storage fault and interactive
+tray steps on both architectures reported failure while the
 desktop jobs were still running. Their final receipts are needed to identify
 which observations completed.
 [Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
 · [Desktop and storage](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730).
+
+The standard native Linux x64 entry point at clean revision `c47d9b1`
+passed all ten steps, including 36 Rust tests and 5,844 comparisons to the
+C# oracle. The new offline Cargo graph check verified the roles of all five
+workspace crates. Eight regression cases cover actual Cargo resolution,
+development-only features and target-specific renamed or build dependencies.
+[Architecture check](../tools/rust-qa/workspace-boundaries/check.py).
 
 Revision `26ed5dd` compares two non-tearing DX12 presentation modes and
 records their actual timing during scans. Revision `27ade4b` records
@@ -73,6 +94,13 @@ in the native run at `a66e045`. All 453 files in each evidence inventory
 matched the archive. Windows recovery, the production migration and installed
 rollback remain open. [Storage sources and evidence](rust/rw02-storage-faults.md).
 
+At `3b4854d` both Ubuntu jobs repeated all eight recoveries. Each archive
+contained 465 of 466 indexed evidence files. The omitted 78-byte Git
+attributes file matched the original commit when verified separately. At
+`93d424a` the source snapshot preserves its logical path and bytes under a
+visible artifact name. Fedora passed all eight recoveries again, and all
+469 evidence files and 150 sources survived the local ZIP round trip.
+
 The combined dependency assessment at `f22015a` built the native
 Linux x64 executable offline and relinked a changed Wayland binding. A real
 Plasma panel at `26b7aac` reopened the hidden application twice. At `6f55f36`
@@ -87,6 +115,15 @@ Released distro portals on the tested Linux hosts still refuse the required
 cooperative file lock. [Combined build](rust/rw02-combined-profile.md),
 [Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and
 [acceptance matrix](rust/acceptance.md).
+
+At `1efe254` the private Noble x64 trial distinguished a host without
+file-lock support from an ordinary busy file on the same retained grant.
+The packaged and pristine services reported `UnsupportedFileLock` on three
+attempts each. With the existing backport, the reader acquired the file,
+reported `FileBusy` while an independent writer held its lease, and acquired
+the same file again after release. An independent reviewer verified the
+reader and descriptor identities, the source hashes and all three native
+service receipts. [Native portal evidence](rust/rw02-portal-noble.md).
 
 The [current native desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
 uses `c5606ec` for the scan workload,

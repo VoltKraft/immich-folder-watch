@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native desktop](rw02-native-gui.md#native-follow-up-at-d403fee) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native desktop](rw02-native-gui.md#native-follow-up-at-3b4854d) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -50,7 +50,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
 | RI-AC07 | Open | Independent consumer on four targets and dependency/profile isolation verification |
 | RI-AC08 | Open | Exact-revision Actions packages, offline and actual installer/migration evidence |
-| RI-AC09 | Open | Audited resolved graph/assets, notices, SBOM and reconstructible source inputs |
+| RI-AC09 | Open | [Four reproducible development-build SPDX inventories](rw02-combined-sbom.md) verified against the native Cargo logs. Candidate packages still need their exact installed inventory, notices and reconstructible source inputs. |
 | RI-AC10 | Open | Independent final review with no unresolved acceptance blocker and truthful complete handoff |
 
 All four native targets confirmed old/new local activation in both directions and exclusion

@@ -144,6 +144,9 @@ uses separate copies for both language verifiers and preserves each
 original backup. On Linux its private mount requires the documented
 namespace launcher. The [combined profile](rust/rw02-combined-profile.md)
 builds from verified local archives and exercises an offline Linux relink.
+Each successful native build also generates a target-specific SPDX inventory.
+The [SBOM commands](rust/rw02-combined-sbom.md) reproduce it from the native
+run directory or an archived run with its published SHA-256.
 The [appearance observer](rust/rw02-appearance.md) reads actual pixels after
 portal changes and the [Plasma fixture](rust/rw02-plasma.md) activates the
 visible branded panel icon. Use the individual guides for their native

@@ -509,12 +509,14 @@ jobs:
         run: ./tools/rust-qa/windows-ime/hosted.ps1
 
       - name: Build the combined Linux dependency profile and relink a modified Wayland binding
+        id: combined_linux
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
         run: |
           python3 -B tools/rust-qa/combined-profile/run.py --native "$NATIVE_TARGET" --fetch --relink \
             --output "artifacts/rust/combined-profile/runs/$NATIVE_TARGET"
 
       - name: Build and exercise the combined Windows dependency profile
+        id: combined_windows
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' && steps.windows_transport.outcome == 'success' }}
         shell: pwsh
         env:
@@ -523,6 +525,17 @@ jobs:
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
           python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --fetch --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
+
+      - name: Record the reviewed components of the native development build
+        if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
+        shell: bash
+        run: |
+          python3 -B tools/rust-qa/combined-profile/sbom.py "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --output "artifacts/rust/combined-profile/sboms/$NATIVE_TARGET.spdx.json"
+          python3 -B tools/rust-qa/combined-profile/test_sbom.py --target "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --document "artifacts/rust/combined-profile/sboms/$NATIVE_TARGET.spdx.json"
 
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
@@ -541,6 +554,7 @@ jobs:
             artifacts/rust/appearance/runs/*/*.log
             artifacts/rust/plasma/runs/**
             artifacts/rust/combined-profile/runs/**
+            artifacts/rust/combined-profile/sboms/*.spdx.json
             artifacts/rust/instance-native/${{ matrix.target }}/result.json
             artifacts/rust/instance-native/${{ matrix.target }}/hosted-secondary-logon.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
