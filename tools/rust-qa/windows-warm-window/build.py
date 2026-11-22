@@ -110,6 +110,24 @@ def compiler_graph(messages, gui, selected):
     return {"units": len(units), "featureSets": len(observed), "packages": len({(n, v) for n, v, _ in observed})}
 
 
+def application_artifact(messages, gui, executable):
+    """Identify the local binary Cargo linked and bind its bytes to the tested executable."""
+    manifest = (gui / "Cargo.toml").resolve()
+    units = [item for item in messages if item["reason"] == "compiler-artifact"
+             and item["target"]["kind"] == ["bin"] and Path(item["manifest_path"]).resolve() == manifest]
+    if len(units) != 1:
+        raise ValueError("The retained compiler must report exactly one local GUI binary")
+    unit, = units
+    target = unit["target"]
+    output = executable.resolve()
+    if (target["name"] != "native-gui-assessment" or target["crate_types"] != ["bin"]
+            or Path(target["src_path"]).resolve() != (gui / "src/main.rs").resolve()
+            or not unit["executable"] or Path(unit["executable"]).resolve() != output
+            or sum(Path(name).resolve() == output for name in unit["filenames"]) != 1):
+        raise ValueError("The retained GUI compiler output does not match the selected executable")
+    return {"target": target["name"], "crateRoot": "src/main.rs", "output": executable.name, "sha256": sha(output)}
+
+
 def main(target):
     if os.name != "nt" or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted" or os.getenv("GITHUB_ACTIONS") != "true":
         raise ValueError("Build this native comparison on a disposable Windows rewrite runner")
@@ -144,12 +162,14 @@ def main(target):
     messages = [json.loads(line) for line in compiled.splitlines()]
     eframe_unit = eframe_source.compiled_eframe(messages, gui, output / "build", features)
     compiler = compiler_graph(messages, gui, selected)
+    exe = output / "build/release/native-gui-assessment.exe"
+    compiler["application"] = application_artifact(messages, gui, exe)
     log = output / "compiler.jsonl"
     log.write_bytes(compiled)
     compiler.update(file=log.name, sha256=sha(log))
     sources = eframe_source.source_bundle(gui, output / "eframe-source.zip")
-    exe = output / "build/release/native-gui-assessment.exe"
-    record = dict(target=target, revision=revision, baselineReceipt=sha(ordinary_path), baseline=sha(canonical), binary=sha(exe),
+    record = dict(target=target, revision=revision, baselineReceipt=sha(ordinary_path), baseline=sha(canonical),
+                  binary=compiler["application"]["sha256"],
                   canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
                   selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=ORIGINALS,
                   eframeSource=sources, eframeUnit=eframe_unit,

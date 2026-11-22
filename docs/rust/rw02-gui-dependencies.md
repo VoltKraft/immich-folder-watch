@@ -228,6 +228,16 @@ The linked ELF SHA-256 was
 `21b9bf68e78096b690e823e1176a7c1e0638416e6689299e069e2dc1b66c944c`.
 The Windows builds capture their own compiler output on each architecture.
 
+Independent review found that the GUI library and binary share package and
+feature values. The verifier now requires a single Cargo binary target built
+from the local `src/main.rs`. Its declared executable and output file must
+identify the image passed to the observers. A replay of the full native
+Fedora compiler stream at `8bb3248` bound the linked image with SHA-256
+`865907276e5f9dcf15aa8f86269dca777ed7631cde2d4044d125b975a7f97d60`.
+Removing just the binary message left the library and all package features
+present and correctly failed the new check. Both canonical and retained GUI
+sources also passed Clippy with the two Windows target libraries.
+
 The original crate SHA-256 is
 `527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580`.
 The generated Shell module is 3,585,884 bytes with SHA-256

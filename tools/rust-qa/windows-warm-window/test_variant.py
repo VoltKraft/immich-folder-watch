@@ -21,6 +21,25 @@ spec.loader.exec_module(builder)
 
 
 class WarmTests(unittest.TestCase):
+    def test_compiler_reports_the_actual_local_binary_and_entry_point(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gui, exe = Path(tmp) / "gui", Path(tmp) / "native-gui-assessment.exe"
+            exe.write_bytes(b"test executable")
+            target = {"kind": ["bin"], "crate_types": ["bin"], "name": "native-gui-assessment",
+                      "src_path": str(gui / "src/main.rs")}
+            unit = {"reason": "compiler-artifact", "manifest_path": str(gui / "Cargo.toml"),
+                    "target": target, "executable": str(exe), "filenames": [str(exe)]}
+            library = {**unit, "target": {**target, "kind": ["lib"]}, "executable": None, "filenames": []}
+            expected = {"target": target["name"], "crateRoot": "src/main.rs", "output": exe.name, "sha256": builder.sha(exe)}
+            self.assertEqual(builder.application_artifact([library, unit], gui, exe), expected)
+            for units in ([library], [unit, unit], [{**unit, "filenames": []}], [{**unit, "filenames": [str(exe)] * 2}],
+                          [{**unit, "executable": None}], [{**unit, "executable": str(gui / exe.name)}],
+                          [{**unit, "manifest_path": str(exe.parent / "Cargo.toml")}],
+                          [{**unit, "target": {**target, "src_path": str(gui / "src/lib.rs")}}],
+                          [{**unit, "target": {**target, "name": "other-binary"}}]):
+                with self.subTest(units=units), self.assertRaises(ValueError):
+                    builder.application_artifact(units, gui, exe)
+
     def test_all_compiled_features_and_source_identities_must_match_the_retained_graph(self):
         registry = "registry+https://github.com/rust-lang/crates.io-index"
         with tempfile.TemporaryDirectory() as temp:

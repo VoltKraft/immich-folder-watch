@@ -38,7 +38,9 @@ class NativePairTests(unittest.TestCase):
             compiler.write_bytes(b"compiled")
             build = dict(target=target, revision="revision", baselineReceipt=sha(canonical), binary=sha(warm), baseline=sha(cold),
                          eframeSource={"archive": archive.name, "archiveSha256": sha(archive)}, variantInputs={},
-                         compilerEvidence={"file": compiler.name, "sha256": sha(compiler)})
+                         compilerEvidence={"file": compiler.name, "sha256": sha(compiler),
+                                           "application": {"target": "native-gui-assessment", "crateRoot": "src/main.rs",
+                                                           "output": warm.name, "sha256": sha(warm)}})
             receipt.write_text(json.dumps(build))
             with (patch.dict(subjects.__globals__, ROOT=root), patch.object(observe.recorder, "hosted", return_value=True),
                   patch.object(subprocess, "check_output", return_value="revision"), patch.object(observe.recorder, "Win32") as api):
@@ -52,6 +54,10 @@ class NativePairTests(unittest.TestCase):
                     path.write_bytes(saved)
                 write_pe(warm, 0x8664, b"same-checkout")
                 receipt.write_text(json.dumps(build | {"binary": sha(warm)}))
+                with self.assertRaisesRegex(ValueError, "build inputs"):
+                    subjects(target)
+                build["binary"] = build["compilerEvidence"]["application"]["sha256"] = sha(warm)
+                receipt.write_text(json.dumps(build))
                 with self.assertRaisesRegex(ValueError, "same architecture"):
                     subjects(target)
 
