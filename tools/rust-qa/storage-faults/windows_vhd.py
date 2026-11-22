@@ -176,7 +176,7 @@ class Api:
         return result
 
 
-def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: Path) -> dict:
+def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: Path, *, after_recovery=None) -> dict:
     directory = output.with_name(output.name + "-volume")
     directory.mkdir(exist_ok=False)
     receipt_path = directory / "windows-vhd.json"
@@ -396,6 +396,12 @@ def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: 
         check_snapshot("after-same-volume-restore")
         report["snapshot_sha256"] = anchor
         report["status"] = "passed"
+        if after_recovery is not None:
+            save()
+            report["provider_followup"] = after_recovery(report, api, volume, directory, validate_volume)
+            # The optional observer cannot waive the existing storage checks.
+            validate_volume()
+            check_snapshot("after-optional-provider")
     except Exception as error:
         report["status"] = "unavailable" if isinstance(error, Unavailable) else "failed"
         report["error"] = str(error)

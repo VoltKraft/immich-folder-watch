@@ -26,6 +26,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(STORAGE))
 from evidence import external_lock, sha256, target_graph, verify_fixture, verify_sources, write_json
 import windows_vhd
+import windows_provider
 
 
 def evidence_inventory(output: Path) -> dict:
@@ -198,11 +199,14 @@ def main() -> int:
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--tmpfs", action="store_true", help="Also run actual ENOSPC in private Linux 8-MiB tmpfs namespaces")
     parser.add_argument("--windows-vhd", action="store_true", help="Also exhaust an owned 16-MiB FAT16 VHD on disposable hosted Windows only")
+    parser.add_argument("--windows-provider", action="store_true", help="After all VHD recovery checks, observe ordinary safe-fs access through one private NTFS directory mount")
     args = parser.parse_args()
     if args.tmpfs and sys.platform != "linux":
         parser.error("--tmpfs is a native Linux experiment")
     if args.windows_vhd and os.name != "nt":
         parser.error("--windows-vhd requires a disposable native Windows candidate runner")
+    if args.windows_provider and not args.windows_vhd:
+        parser.error("--windows-provider requires the existing --windows-vhd recovery")
     output = isolated(args.output)
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     build = output / "build"
@@ -271,10 +275,28 @@ def main() -> int:
             sources += [p for p in directory.rglob("*") if p.is_file() and not {"obj", "target", "__pycache__"}.intersection(p.relative_to(directory).parts)
                         and ("bin" not in p.relative_to(directory).parts or p.relative_to(directory).parts[:2] == ("src", "bin")) and p.suffix != ".pyc"]
         sources += [ROOT / name for name in ("LICENSE", "global.json", "Directory.Build.props", "Directory.Build.targets", "NuGet.Config", "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
+        if args.windows_provider:
+            sources += windows_provider.source_files(ROOT)
         hashes = export_source_snapshot(ROOT, output, sources)
         result["first_party_sources"] = len(hashes)
         result["source_snapshot_paths"] = "first-party-source-paths.json"
-        command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs")])
+        command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs"), str(HERE / "fat_provider.rs")])
+        if args.windows_provider:
+            command("provider-controls", [sys.executable, str(HERE / "test_windows_provider.py"), "-v"])
+            provider_build = build / "provider"
+            provider_build.mkdir(parents=True)
+            library = provider_build / "libsafe_fs.rlib"
+            provider_binary = provider_build / "ifw-fat-provider.exe"
+            command("provider-library-build", ["rustc", "--edition=2024", "--target", args.target, "-Dwarnings",
+                "--crate-name", "safe_fs", "--crate-type=rlib", str(ROOT / "rust/crates/safe-fs/src/lib.rs"), "-o", str(library)])
+            command("provider-build", ["rustc", "--edition=2024", "--target", args.target, "-Dwarnings",
+                str(HERE / "fat_provider.rs"), "--extern", "safe_fs=" + str(library), "-o", str(provider_binary)])
+            windows_provider.require_native_pe(provider_binary, args.target)
+            for path in [*windows_provider.source_files(ROOT), HERE / "fat_provider.rs"]:
+                if sha256(path) != hashes[path.relative_to(ROOT).as_posix()]:
+                    raise ValueError("safe-fs source changed during provider compilation")
+            result["provider_binary_sha256"] = sha256(provider_binary)
+            result["provider_library_sha256"] = sha256(library)
         command("windows-image-preparation-tests", [sys.executable, str(HERE / "test_windows_image.py"), "-v"])
         command("crash-capture-tests", [sys.executable, str(HERE / "test_crash_capture.py"), "-v"])
         command("source-snapshot-tests", [sys.executable, str(HERE / "test_source_snapshot.py"), "-v"])
@@ -315,14 +337,95 @@ def main() -> int:
         result["csharp_assembly_sha256"] = sha256(assembly)
         cases = output / "cases"
         cases.mkdir()
+        def verify_case(name: str, case: Path, fault: str, events: list[dict]) -> None:
+            anchor = producer_anchor(events)
+            fault_evidence = json.loads((case / "fault.json").read_text())
+            if (fault_evidence["snapshot_sha256"] != anchor
+                    or any(event["snapshot_sha256"] != anchor for event in events if "snapshot_sha256" in event)):
+                raise ValueError("raw fault marker changed original snapshot digest")
+            checks = [snapshot_check(case, anchor, "before-rust")]
+            command(name + "-verify", [str(binary), "verify", str(case), anchor])
+            checks.append(snapshot_check(case, anchor, "after-rust"))
+            checks.append(snapshot_check(case, anchor, "before-csharp"))
+            command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
+            checks.append(snapshot_check(case, anchor, "after-csharp"))
+            readback = json.loads((case / "csharp-readback.json").read_text())
+            if readback["Assertions"] != (32 if fault in ("enospc", "windows-full") else 24):
+                raise ValueError("C# readback assertion count differs")
+            verification = json.loads((case / "verification.json").read_text())
+            if (not readback["RetainedSnapshotUnchanged"]
+                    or any(verification[key] != anchor for key in ("snapshot_sha256", "snapshot_before_sha256", "snapshot_after_sha256", "snapshot_copy_sha256"))
+                    or any(readback[key] != anchor for key in ("SnapshotSha256", "SnapshotBeforeSha256", "SnapshotAfterSha256", "SnapshotCopySha256"))):
+                raise ValueError("retained pre-fault snapshot changed")
+            # Exercise both actual preflight paths with an independently
+            # corrupted copy, without giving either reader a new baseline.
+            tampered = case / "tampered-snapshot"
+            tampered.mkdir()
+            shutil.copyfile(case / "snapshot.db", tampered / "snapshot.db")
+            snapshot_check(tampered, anchor, "negative-copy-before-change")
+            with (tampered / "snapshot.db").open("r+b") as stream:
+                stream.seek(100)
+                original_byte = stream.read(1)[0]
+                stream.seek(100)
+                stream.write(bytes([original_byte ^ 1]))
+            changed_sha256 = sha256(tampered / "snapshot.db")
+            if changed_sha256 == anchor:
+                raise ValueError("negative control did not change actual snapshot bytes")
+            for language, arguments, code in (
+                    ("rust", [str(binary), "verify", str(tampered), anchor], 1),
+                    ("csharp", [dotnet, str(assembly), str(tampered), anchor], 42)):
+                rejected = command(name + "-tampered-" + language, arguments, code)
+                if b"SNAPSHOT_SHA256_MISMATCH" not in rejected:
+                    raise ValueError("tampered snapshot failed for an unrelated reason")
+                if ({path.name for path in tampered.iterdir()} != {"snapshot.db"}
+                        or sha256(tampered / "snapshot.db") != changed_sha256):
+                    raise ValueError("rejected snapshot was opened or produced derived files")
+            checks.append(snapshot_check(case, anchor, "after-negative-controls"))
+            result["cases"].append({"name": name, "fault": fault_evidence,
+                "producer_snapshot_sha256": anchor, "snapshot_checks": checks,
+                "verification": verification, "csharp": readback,
+                "byte_corruption_control": {"offset": 100, "original_byte": original_byte,
+                    "changed_byte": original_byte ^ 1, "original_sha256": anchor, "changed_sha256": changed_sha256,
+                    "rust_exit_code": 1, "csharp_exit_code": 42, "no_derived_files": True,
+                    "rejected_before_sqlite_open": True}})
+            write_json(output / "result.json", result)
+
         # Complete both casing modes before a platform-specific volume can report a missing capability.
         for fault in ("uncommitted", "commit-before-ack", "sqlite-full", *(["enospc"] if args.tmpfs else []),
                       *(["windows-full"] if args.windows_vhd else [])):
             for mode in ("sensitive", "insensitive"):
                 name = mode + "-" + fault
                 case = cases / name
+                verified_before_provider = []
                 if fault == "windows-full":
-                    private = windows_vhd.run(binary, seed, case, mode, env, ROOT)
+                    after_recovery = None
+                    if args.windows_provider and mode == "insensitive":
+                        def after_recovery(private, api, volume, directory, validate_volume):
+                            # No provider setup or FAT writes until every existing
+                            # recovery and cross-language control has completed.
+                            verify_case(name, case, fault, private["events"])
+                            for completed in result["cases"]:
+                                completed["snapshot_checks"].append(snapshot_check(
+                                    cases / completed["name"], completed["producer_snapshot_sha256"],
+                                    "before-provider-after-all-cases"))
+                            recovery = output / "recovery-before-provider.json"
+                            windows_provider.durable_json(recovery, {
+                                "format": "ifw-before-provider-recovery-v1", "status": "passed",
+                                "completed_cases": len(result["cases"]),
+                                "csharp_assertions": sum(item["csharp"]["Assertions"] for item in result["cases"]),
+                                "original_snapshot_checks": len(result["cases"]),
+                                "vhd_detach_and_final_readback_pending": True,
+                                "target": args.target, "cases": result["cases"],
+                                "source_index_sha256": sha256(output / "first-party-source-hashes.json")})
+                            verified_before_provider.append(True)
+                            if sha256(provider_binary) != result["provider_binary_sha256"]:
+                                raise ValueError("provider executable changed after compilation")
+                            observed = windows_provider.run(provider_binary, env, api, volume, directory,
+                                                            validate_volume, recovery)
+                            result["provider_followup"] = observed
+                            windows_provider.durable_json(output / "windows-provider.json", observed)
+                            return {"status": observed["status"], "receipt": "windows-provider.json"}
+                    private = windows_vhd.run(binary, seed, case, mode, env, ROOT, after_recovery=after_recovery)
                     result["steps"][name + "-volume"] = {"call": "windows_vhd.run", "exit_code": 0,
                         "expected_exit_code": 0, "receipt": str((case / "windows-vhd.json").relative_to(output))}
                     events = private["events"]
@@ -348,57 +451,8 @@ def main() -> int:
                     killed = kill_case(binary, seed, case, mode, fault, env)
                     write_json(case / "process-kill.json", killed)
                     events = killed["events"]
-                anchor = producer_anchor(events)
-                fault_evidence = json.loads((case / "fault.json").read_text())
-                if (fault_evidence["snapshot_sha256"] != anchor
-                        or any(event["snapshot_sha256"] != anchor for event in events if "snapshot_sha256" in event)):
-                    raise ValueError("raw fault marker changed original snapshot digest")
-                checks = [snapshot_check(case, anchor, "before-rust")]
-                command(name + "-verify", [str(binary), "verify", str(case), anchor])
-                checks.append(snapshot_check(case, anchor, "after-rust"))
-                checks.append(snapshot_check(case, anchor, "before-csharp"))
-                command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
-                checks.append(snapshot_check(case, anchor, "after-csharp"))
-                readback = json.loads((case / "csharp-readback.json").read_text())
-                if readback["Assertions"] != (32 if fault in ("enospc", "windows-full") else 24):
-                    raise ValueError("C# readback assertion count differs")
-                verification = json.loads((case / "verification.json").read_text())
-                if (not readback["RetainedSnapshotUnchanged"]
-                        or any(verification[key] != anchor for key in ("snapshot_sha256", "snapshot_before_sha256", "snapshot_after_sha256", "snapshot_copy_sha256"))
-                        or any(readback[key] != anchor for key in ("SnapshotSha256", "SnapshotBeforeSha256", "SnapshotAfterSha256", "SnapshotCopySha256"))):
-                    raise ValueError("retained pre-fault snapshot changed")
-                # Exercise both actual preflight paths with an independently
-                # corrupted copy, without giving either reader a new baseline.
-                tampered = case / "tampered-snapshot"
-                tampered.mkdir()
-                shutil.copyfile(case / "snapshot.db", tampered / "snapshot.db")
-                snapshot_check(tampered, anchor, "negative-copy-before-change")
-                with (tampered / "snapshot.db").open("r+b") as stream:
-                    stream.seek(100)
-                    original_byte = stream.read(1)[0]
-                    stream.seek(100)
-                    stream.write(bytes([original_byte ^ 1]))
-                changed_sha256 = sha256(tampered / "snapshot.db")
-                if changed_sha256 == anchor:
-                    raise ValueError("negative control did not change actual snapshot bytes")
-                for language, arguments, code in (
-                        ("rust", [str(binary), "verify", str(tampered), anchor], 1),
-                        ("csharp", [dotnet, str(assembly), str(tampered), anchor], 42)):
-                    rejected = command(name + "-tampered-" + language, arguments, code)
-                    if b"SNAPSHOT_SHA256_MISMATCH" not in rejected:
-                        raise ValueError("tampered snapshot failed for an unrelated reason")
-                    if ({path.name for path in tampered.iterdir()} != {"snapshot.db"}
-                            or sha256(tampered / "snapshot.db") != changed_sha256):
-                        raise ValueError("rejected snapshot was opened or produced derived files")
-                checks.append(snapshot_check(case, anchor, "after-negative-controls"))
-                result["cases"].append({"name": name, "fault": fault_evidence,
-                    "producer_snapshot_sha256": anchor, "snapshot_checks": checks,
-                    "verification": verification, "csharp": readback,
-                    "byte_corruption_control": {"offset": 100, "original_byte": original_byte,
-                        "changed_byte": original_byte ^ 1, "original_sha256": anchor, "changed_sha256": changed_sha256,
-                        "rust_exit_code": 1, "csharp_exit_code": 42, "no_derived_files": True,
-                        "rejected_before_sqlite_open": True}})
-                write_json(output / "result.json", result)
+                if not verified_before_provider:
+                    verify_case(name, case, fault, events)
         # Compare actual originals after every reader/negative trial has finished,
         # using the early producer anchors retained in memory, never a late hash.
         for case_result in result["cases"]:
@@ -412,9 +466,13 @@ def main() -> int:
         result["error"] = str(error)
         traceback.print_exc()
     finally:
+        if args.windows_provider:
+            result["selected_checks_status"] = (result.get("provider_followup", {}).get("status", "not-run")
+                                                 if result["status"] == "passed" else result["status"])
         write_json(output / "result.json", result)
         write_json(output / "evidence-hashes.json", evidence_inventory(output))
-    return 0 if result["status"] == "passed" else (2 if result["status"] == "unavailable" else 1)
+    status = result.get("selected_checks_status", result["status"])
+    return 0 if status == "passed" else (2 if status == "unavailable" else 1)
 
 
 if __name__ == "__main__":

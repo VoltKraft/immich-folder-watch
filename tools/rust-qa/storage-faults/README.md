@@ -76,7 +76,60 @@ Every exit path closes owned handles, attempts explicit detach and retains a
 cleanup receipt. Success additionally requires the volume to disappear, fixed
 MBR/footer and size to remain unchanged, and a hash of the detached VHD. The
 initialized and final images are synthetic evidence, not recovery backups or
-product assets. Native Windows execution is pending until a source-bound CI run.
+product assets. Source-bound native results are recorded in the linked evidence
+document; the optional provider follow-up below needs its own native result.
+
+After independent review and a passing native recovery qualification, the
+**separate opt-in** `--windows-provider` can observe the unchanged workspace
+`safe-fs` API on the same final, insensitive VHD. It never creates another VHD.
+The default command above remains without a directory mount.
+
+```powershell
+python tools/rust-qa/storage-faults/run.py x86_64-pc-windows-msvc `
+  --output artifacts/rust/storage-faults/windows-x64-provider-new `
+  --windows-vhd --windows-provider --dotnet dotnet
+```
+
+Use the ARM64 target and a new output for its separate native result. This option
+requires the existing hosted Windows gates, an already available mount right,
+and a private NTFS output directory with a live, nonzero extended identity. No
+privilege, service, drive letter, global alias or disk-layout change is attempted.
+Missing capability is reported as `unavailable`; there is no fallback.
+
+The last VHD stays attached while all eight existing Rust/C# recovery cases,
+208 C# assertions, corrupt-copy controls and original-snapshot comparisons finish.
+The supervisor writes and fsyncs `recovery-before-provider.json` before creating
+the empty NTFS mount directory or any provider file. Final VHD detach/readback is
+explicitly still pending at this checkpoint. Only this new directory is associated
+with the already authenticated volume GUID. The probe root is an ordinary FAT
+subdirectory beneath it: the adapter's deliberate rejection of a GUID namespace
+or a reparse point as the final watch root remains unchanged.
+
+A direct native Rust child opens and reads one fixed 45-byte synthetic file,
+performs an ordinary fixture rename, reads the held lease and reopens the new
+name through `safe-fs`. Its old-name match must be false and its new-name match
+true. File-identity equality across the rename is recorded, not assumed. No
+timestamp write, replacement, attack simulation, production rename API or cached
+identity cleanup is exercised. The child has a 15-second deadline and a
+10-second termination wait; the supervisor waits before deleting owned names.
+
+The supervisor removes only the names it created, undoes only its authenticated
+mount mapping, checks the empty NTFS stub's identity before removal and requires
+no remaining volume mount path. All pre-existing volume file hashes and measured
+capacity must match after cleanup. Failure still reaches the existing VHD detach,
+detached-image readback and final snapshot checks. An unconfirmed child exit
+prevents name removal and is retained as an explicit cleanup failure.
+
+`windows-provider.json` and `result.json.provider_followup` record this outcome
+separately from `result.json.status`, which retains the storage result. With the
+option selected, `selected_checks_status` also controls exit status: 0 only when
+both passed, 2 for an unavailable provider, otherwise 1. The unchanged `safe-fs`
+sources, workspace/crate manifests and probe source are exported with hashes;
+the pinned native compiler builds an isolated rlib and executable, records their
+hashes and checks the executable's PE machine. No Cargo dependency or lockfile
+changes. Portable controls run with
+`python tools/rust-qa/storage-faults/test_windows_provider.py -v`; test doubles
+and the local Linux compile do not establish a Windows FAT provider pass.
 
 Portable image/layout, corruption, capability-gate and simulated cleanup checks:
 `python tools/rust-qa/storage-faults/test_windows_image.py -v`. These checks do not

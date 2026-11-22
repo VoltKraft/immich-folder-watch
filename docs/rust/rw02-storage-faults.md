@@ -744,3 +744,104 @@ installed migration/ownership handover, and application-side retry/replay remain
 unproven. This is not acceptance of full-disk recovery under every mechanism or
 completion of RI-AC03. The production migration/recovery implementation and its
 independent review remain behind the existing stage gates.
+
+## Opt-in ordinary FAT provider follow-up (2026-11-22)
+
+The optional `--windows-provider` follow-up uses the unchanged workspace
+`safe-fs` public API after the existing eight-case Windows recovery experiment.
+It is development-only, requires `--windows-vhd`, and is disabled by default.
+No workflow enables it in this change. Independent review and a source-bound
+native run remain required; the ordinary Win32 identity observations in the
+earlier VHD receipts are not adapter qualification.
+
+The last, insensitive VHD remains attached while its ordinary Rust/C# checks
+finish. All eight cases, 208 C# assertions, sixteen corrupted-copy rejections
+and a new comparison of all eight actual original snapshots must succeed first.
+`recovery-before-provider.json` records those results and is closed after flush
+and fsync before any provider mount directory or file is created. It explicitly
+states that final VHD detach and detached-image readback are still pending.
+The supervisor later repeats the existing deferred snapshot checks regardless
+of a returned provider outcome. The default recovery path retains its original
+no-mount behavior and test ordering.
+
+The adapter intentionally accepts drive/UNC watch roots, not a volume GUID
+namespace or a reparse point as the final root. To observe the actual FAT
+provider without changing that contract, the supervisor creates one new empty
+NTFS directory inside its owned VHD output directory. It retains and compares
+the held and named NTFS identities, associates only the already validated VHD
+GUID with that new directory, and reads the association back. Microsoft defines
+this [mounted-folder operation](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setvolumemountpointw)
+for an empty directory; its target can be a non-NTFS volume
+([mounted folders](https://learn.microsoft.com/en-us/windows/win32/fileio/volume-mount-points)).
+Missing existing capability, NTFS backing or usable identity is an explicit
+unavailable result, subject to successful cleanup of anything already created.
+There is no privilege adjustment, service change, drive letter, global alias,
+new VHD, format, disk-number selection or alternate-path fallback.
+
+The direct Rust child receives only an ordinary new FAT subdirectory beneath
+that verified mount. It uses `Directory::open_root`, `open_file`, `Read`, `Seek`,
+`metadata`, `identity` and `is_current_entry` against one fixed 45-byte synthetic
+file. After one ordinary `std::fs::rename` by the fixture, the held lease must
+still read those bytes, the old name must cease to match, and a new-name lease
+must read the same bytes and match its current entry. Acquisition and reopened
+identities are recorded without requiring equality across rename. The probe
+does not implement a production rename operation, timestamp repair, a replacement
+case or an attack simulation. The child exits after releasing all leases.
+
+The supervisor enforces a 15-second child timeout and a 10-second kill/wait
+bound. It then removes only the owned file names and subdirectory, undoes only
+the verified mount, removes its authenticated empty NTFS stub and checks that
+the volume has no remaining mount path. Existing volume-file hashes, root entry
+names and measured capacity must match their pre-probe values. Cached FAT IDs
+never authorize removal. An unconfirmed child exit prevents name removal and
+is recorded as a cleanup failure. Every outcome still reaches the original
+VHD cleanup/readback path. An unexpected mapping is retained as a failure rather
+than being removed by the fixture.
+
+Provider evidence is separate in `windows-provider.json` and
+`result.json.provider_followup`; `result.json.status` retains the storage
+outcome. Only when this option is selected does `selected_checks_status`
+combine their statuses for the command exit code. It returns 0 only if both
+passed, 2 for unavailable capability, otherwise 1. The source inventory includes
+the unchanged safe-fs sources and workspace/crate manifests. The pinned native
+compiler builds the isolated rlib/probe, records both hashes, and verifies the
+probe's PE machine. No dependency or Cargo lockfile changes are involved.
+
+Supported invocation after review, on the existing disposable hosted runner:
+
+```powershell
+python tools/rust-qa/storage-faults/run.py x86_64-pc-windows-msvc `
+  --output artifacts/rust/storage-faults/windows-x64-provider-new `
+  --windows-vhd --windows-provider --dotnet dotnet
+```
+
+Use `aarch64-pc-windows-msvc` and a new output for native ARM64. Do not use
+the provider executable as a standalone command on an arbitrary volume.
+Portable controls: `python tools/rust-qa/storage-faults/test_windows_provider.py -v`.
+
+Locally, all ten provider controls passed, including incomplete-recovery denial
+before setup, actual direct-child timeout/termination, missing capability,
+cleanup after failed/unavailable child outcomes, exact source-copy bindings,
+both PE machine controls and refusal to remove another mount mapping. These
+are explicitly portable controls with test doubles for native mount calls.
+The unchanged library and probe compile on Fedora with pinned Rust 1.100.0;
+Rustfmt and warnings-denied Clippy pass. The actual Linux executable refuses
+its unsupported host before creating a directory. The final source check in
+`provider-source-check-03` retains sixteen source bindings and six executed
+steps. The earlier `-02` stopped before compilation because its toolchain check
+used a missing `rustc` on PATH; that diagnostic remains, and `-03` supplies the
+explicit compiler path. No Windows provider execution is claimed.
+
+The independent default-path regression `linux-x64-12 --tmpfs` passed all 48
+expected command outcomes, eight cases and 208 C# assertions. All 153 exported
+source bindings and 478 evidence hashes matched, including the six newly indexed
+compiler/generated-source copies. It validates the common verification refactor
+and unchanged no-mount recovery path; the separately bound provider source check
+covers the final provider-specific cleanup refinements.
+
+| Local provider preparation evidence | SHA-256 |
+| --- | --- |
+| `linux-x64-12/result.json` | `83d90683df418fc15d83d715f3e33541e551f28d11dc3fe743d97a7bec974428` |
+| `linux-x64-12/evidence-hashes.json` | `2ae8c725590dfeb6f00121fb36faaae678ca74cc8038bcca5c2f8c64499e8c7b` |
+| `provider-source-check-03/result.json` | `6f167dbb2cbaf6f1dc33b0964ca9145644bbdbdba4b05e808a155071c1ddee63` |
+| `provider-source-check-03/evidence-hashes.json` | `7fa93a7555d647126065dacd06e2666940f17a2248ab869ce9a6f111850029e1` |
