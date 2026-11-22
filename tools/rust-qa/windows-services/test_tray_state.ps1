@@ -34,4 +34,14 @@ $rejected = $false
 try { Restore-IfwTrayOverflow $state @{} { param($bar, $pidValue) return $false } }
 catch { $rejected = $true }
 if (-not $rejected -or $script:calls -ne 1 -or -not $script:visible) { throw 'A lost private desktop changed the flyout' }
-Write-Output 'Five tray cleanup controls passed'
+$script:checks = 0
+$rejected = $false
+try {
+    Restore-IfwTrayOverflow $state @{} {
+        param($bar, $pidValue)
+        $script:checks++
+        return $script:checks -eq 1
+    }
+} catch { $rejected = $true }
+if (-not $rejected -or $script:calls -ne 2) { throw 'A changed desktop certified a flyout closure' }
+Write-Output 'Six tray cleanup controls passed'

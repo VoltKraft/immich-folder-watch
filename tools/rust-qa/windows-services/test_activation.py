@@ -1,13 +1,17 @@
 """Portable controls for visible icon identity and genuine input/callback attribution."""
 
 from contextlib import nullcontext
+import ctypes as c
+from ctypes import wintypes as w
+import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from activation_native import ICON, Native, Unavailable, callback_ok, center, expected_colors, matches, same_spot
-from activation_worker import challenge, snapshot
+from activation_native import ICON, Native, Unavailable, callback_tick, center, expected_colors, matches, same_spot
+from activation_worker import challenge, gesture, overflow, snapshot
 
 
 class Activation(unittest.TestCase):
@@ -79,24 +83,153 @@ class Activation(unittest.TestCase):
         safe = Native.__new__(Native)
         safe.name = self.api.name
         safe.send = Mock()
+        safe.require_desktop = Mock()
         with self.assertRaises(Unavailable):
             safe.input_pair(lambda: dict(self.spot, rgb=self.before), dict(self.spot, rgb=self.after), {}, "first")
         safe.send.assert_not_called()
 
-    def test_callback_requires_our_v4_id_activation_and_native_dispatch_in_input_interval(self):
-        event = [1, 0x203, ICON, 32, 2, 1005]
-        self.assertTrue(callback_ok(event, 1000, 1010))
-        for index, bad in ((0, 0), (1, 0x202), (1, 0x401), (2, 90), (5, 999), (5, 1011)):
+    def test_callback_requires_our_v4_id_exact_queue_entry_and_native_dispatch_in_input_interval(self):
+        event = [1, 0x400, ICON, 1004, 1, 1005, 1004]
+        self.assertEqual(callback_tick(event, 1000, 1010), 1004)
+        for index, bad in ((0, 0), (1, 0x202), (1, 0x401), (2, 90), (3, -1), (3, 999),
+                           (3, 1000), (3, 1006), (5, 999), (5, 1011)):
             altered = event.copy()
             altered[index] = bad
-            self.assertFalse(callback_ok(altered, 1000, 1010))
-        self.assertFalse(callback_ok([], 1000, 1010))
+            self.assertIsNone(callback_tick(altered, 1000, 1010))
+        self.assertIsNone(callback_tick([], 1000, 1010))
+        event[1] = 0x203
+        self.assertIsNone(callback_tick(event, 1000, 1010))
+        self.assertIsNone(callback_tick(event, 1000, 1010, 1004))
+        self.assertIsNone(callback_tick(event, 1000, 1010, 1005))
+        self.assertEqual(callback_tick(event, 1000, 1010, 1003), 1004)
+
+    def test_queued_time_extends_across_both_clock_wraps_and_rejects_old_messages_dispatched_late(self):
+        mask64 = (1 << 64) - 1
+        for boundary in (1 << 31, 1 << 32, 2 << 32, 1 << 64):
+            start, dispatch, read = boundary - 4, (boundary + 3) & mask64, (boundary + 9) & mask64
+            event = [1, 0x400, ICON, (boundary + 1) & 0xffffffff, 0, dispatch, 0]
+            self.assertEqual(callback_tick(event, start, read), (boundary + 1) & mask64)
+            event[3] = (boundary - 5) & 0xffffffff
+            self.assertIsNone(callback_tick(event, start, read))
+            event[3] = (boundary + 5) & 0xffffffff
+            self.assertIsNone(callback_tick(event, start, read))
+
+    def pointer(self, sends, *, moved=False, released=False):
+        api = Native.__new__(Native)
+        api.name = self.api.name
+        api.send = Mock(side_effect=sends)
+        api.require_desktop, api.tick = Mock(), Mock(return_value=100)
+        def position(out):
+            point = c.cast(out, c.POINTER(w.POINT)).contents
+            point.x, point.y = self.spot["center"]
+            if moved and api.send.call_count:
+                point.x += 40
+            return 1
+        api.cursor = position
+        api.key = lambda key: 0x8000 if key == 1 and api.send.call_count and not released else 0
+        return api
+
+    def test_partial_down_never_releases_after_the_cursor_color_owner_or_desktop_changes(self):
+        good = dict(self.spot, rgb=self.after)
+        for change in ("cursor", "color", "shell", "job", "desktop", "button"):
+            with self.subTest(change=change):
+                api = self.pointer([1], moved=change == "cursor", released=change == "button")
+                after = dict(good)
+                if change == "color":
+                    after["rgb"] = self.before
+                if change == "shell":
+                    after["root"] = 99
+                if change == "job":
+                    after = Unavailable("Visible owner failed job check")
+                if change == "desktop":
+                    api.require_desktop.side_effect = [None, None, Unavailable("Lost the input desktop")]
+                receipt = {}
+                with self.assertRaisesRegex(RuntimeError, "release on the owned icon"):
+                    api.input_pair(Mock(side_effect=[good, after]), good, receipt, "first")
+                self.assertTrue(receipt["incompleteInput"])
+                self.assertIn("firstReleaseError", receipt)
+                self.assertEqual(api.send.call_count, 1)
+
+    def test_partial_down_remains_a_failed_trial_after_a_fully_guarded_release(self):
+        good = dict(self.spot, rgb=self.after)
+        api, receipt = self.pointer([1, 1]), {}
+        recheck = Mock(return_value=good)
+        with self.assertRaisesRegex(RuntimeError, "complete gesture"):
+            api.input_pair(recheck, good, receipt, "first")
+        self.assertEqual(recheck.call_count, 2)
+        self.assertEqual([call.args[0] for call in api.send.call_args_list], [2, 1])
+        self.assertEqual(receipt["firstCleanupUp"], 1)
+        self.assertTrue(receipt["incompleteInput"])
+
+    def test_incomplete_input_never_drags_the_pointer_or_becomes_unavailable_in_cleanup(self):
+        good = dict(self.spot, rgb=self.after)
+        api, receipt = self.pointer([1], moved=True), {}
+        api.move = Mock(return_value=1)
+        with self.assertRaisesRegex(RuntimeError, "release on the owned icon"):
+            gesture(api, lambda: good, good, self.proc, self.area, receipt)
+        api.move.assert_called_once_with(*self.spot["center"])
+        self.assertTrue(receipt["cursorRestoreWithheldAfterIncompleteInput"])
 
     def test_qualification_reaches_gesture_with_matching_native_and_external_evidence(self):
         for label in ("first", "second", "armed"):
             self.stage(label)
         self.drive([dict(self.spot, rgb=self.before), dict(self.spot, rgb=self.after)])
         self.assertTrue(self.clicked)
+
+
+class OverflowCompletion(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.area = Path(temp.name)
+        self.host = self.area / "pwsh.exe"
+        self.host.touch()
+        self.provider = {"overflow": "requested", "providerReady": True, "completed": True,
+                         "releaseAcknowledged": True, "overflowClosed": True, "restoreOutcome": "verified closed"}
+
+    def observe(self, data, *, ready=True, exit_code=0, timeout=False, diagnostic=b"", startup_timeout=False):
+        record, api, proc = {}, Mock(), Mock()
+        self.record, self.entered = record, False
+        proc.returncode = exit_code
+        proc.poll.return_value = None if startup_timeout else exit_code
+        if ready:
+            (self.area / "overflow.ready").write_bytes(b"ready")
+        api.launch_child.return_value = nullcontext(proc)
+        reply = (data, diagnostic)
+        proc.communicate.side_effect = [subprocess.TimeoutExpired("owned helper", 6), reply] if timeout else [reply]
+        with patch("activation_worker.shutil.which", return_value=str(self.host)), \
+                patch.object(subprocess, "CREATE_NO_WINDOW", 0, create=True), \
+                patch("activation_worker.time.monotonic", side_effect=[0, 0, 37]), patch("activation_worker.time.sleep"):
+            with overflow(str(self.host), self.area, api, 40, 100, record):
+                self.entered = True
+        return record
+
+    def test_only_verified_restore_or_a_proven_untouched_flyout_can_pass(self):
+        self.assertTrue(self.observe(json.dumps(self.provider).encode())["provider"]["overflowClosed"])
+        untouched = {"overflow": "already visible", "providerReady": True, "completed": True, "restoreOutcome": "untouched"}
+        self.assertTrue(self.observe(json.dumps(untouched).encode())["ready"])
+
+    def test_absent_ready_or_start_timeout_cannot_enter_the_observation(self):
+        for late in (False, True):
+            with self.subTest(late=late), self.assertRaises(RuntimeError):
+                self.observe(json.dumps(self.provider).encode(), ready=False, startup_timeout=late)
+            self.assertFalse(self.entered)
+            self.assertEqual(self.record["startTimedOut"], late)
+
+    def test_provider_failures_and_cleanup_timeouts_reject_even_a_successful_gesture(self):
+        for values, options in (({"completed": False}, {}), ({"operationError": "provider"}, {}), ({"operationError": ""}, {}),
+                                ({"restoreError": "lost owner"}, {}), ({"releaseAcknowledged": False}, {}),
+                                ({"overflowClosed": False}, {}), ({"restoreOutcome": "untouched"}, {}),
+                                ({"overflow": "unknown"}, {}), ({}, {"exit_code": 1}),
+                                ({}, {"timeout": True}), ({}, {"diagnostic": b"restore failed"})):
+            with self.subTest(values=values, options=options), self.assertRaises(RuntimeError):
+                self.observe(json.dumps({**self.provider, **values}).encode(), **options)
+            self.assertTrue(self.entered)
+
+    def test_missing_or_malformed_provider_json_rejects_completion(self):
+        for output in (b"", b"invalid", b"[]", b"{}"):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                self.observe(output)
 
 
 if __name__ == "__main__":

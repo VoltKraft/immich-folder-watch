@@ -19,6 +19,8 @@ OWNER_CLASS = "IFW RW02 synthetic tray receiver"
 BAR = "Shell_TrayWnd"
 OVERFLOW = ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
 ICON = 23
+DWORD_MASK = (1 << 32) - 1
+UPTIME_MASK = (1 << 64) - 1
 
 
 class Unavailable(Exception):
@@ -58,10 +60,29 @@ def same_spot(a, b):
     return all(a[key] == b[key] for key in ("rect", "center", "hit", "root", "shellPid", "ownerHwnd", "iconId"))
 
 
-def callback_ok(event, first_tick, last_tick):
-    return (len(event) == 6 and event[0] >= 1 and event[1] in (0x400, 0x203) and event[2] == ICON
-            and 0 <= event[3] <= 0xffffffff and 0 <= last_tick - first_tick < 10_000
-            and first_tick <= event[5] <= last_tick)
+def elapsed_ticks(after, before):
+    return (after - before) & UPTIME_MASK
+
+
+def callback_tick(event, first_tick, last_tick, second_tick=None):
+    """Return the queue timestamp in the observer's uptime epoch when ordering is provable."""
+    if (len(event) != 7 or event[0] < 1 or event[1] not in (0x400, 0x203) or event[2] != ICON
+            or not 0 <= event[3] <= DWORD_MASK or not 0 <= event[6] <= DWORD_MASK
+            or not all(0 <= value <= UPTIME_MASK for value in (event[5], first_tick, last_tick))):
+        return None
+    queued = (event[3] - first_tick) & DWORD_MASK
+    dispatched = elapsed_ticks(event[5], first_tick)
+    observed = elapsed_ticks(last_tick, first_tick)
+    # A pre-input message and an immediate callback can share a coarse clock tick.
+    # Only a strictly later queue tick has an unambiguous lower bound. A real
+    # dequeued MSG may be dispatched in the same tick as its queue timestamp.
+    if not 0 < queued <= dispatched <= observed < 10_000:
+        return None
+    if event[1] == 0x203:
+        if (second_tick is None or not 0 <= second_tick <= UPTIME_MASK or
+                elapsed_ticks(second_tick, first_tick) >= queued):
+            return None
+    return (first_tick + queued) & UPTIME_MASK
 
 
 class Native:
@@ -266,29 +287,44 @@ class Native:
         return {"rect": bounds, "center": xy, "hit": hex(hit), "root": hex(root), "rootClass": root_info["class"],
                 "shellPid": pid, "ownerHwnd": hex(hwnd), "iconId": ICON, "rgb": [color >> n & 255 for n in (0, 8, 16)]}
 
-    def input_pair(self, recheck, expected, receipt, label, deadline=None):
+    def check_pointer_target(self, recheck, expected, *, release=False):
+        self.require_desktop()
         live = recheck()
         if not same_spot(live, expected) or not matches(live["rgb"], expected_colors(self.name[6:])[1]):
             raise Unavailable("The second color or independently identified hit target changed before input")
+        pressed = {vk for vk in (1, 2, 4, 16, 17, 18, 91, 92) if self.key(vk) & 0x8000}
+        if pressed != ({1} if release else set()):
+            raise Unavailable("The keyboard/mouse state changed before the owned gesture")
+        self.require_desktop()
         position = w.POINT()
         check(self.cursor(c.byref(position)), "GetPhysicalCursorPos")
-        if ([position.x, position.y] != expected["center"] or
-                any(self.key(vk) & 0x8000 for vk in (1, 2, 4, 16, 17, 18, 91, 92))):
-            raise Unavailable("The cursor or keyboard/mouse state changed before the owned gesture")
+        if [position.x, position.y] != expected["center"]:
+            raise Unavailable("The physical cursor moved away from the verified fixture icon")
+
+    def input_pair(self, recheck, expected, receipt, label, double_interval=None):
+        self.check_pointer_target(recheck, expected)
         pair = (Input * 2)()
         pair[0].mouse.flags, pair[1].mouse.flags = 2, 4  # LEFTDOWN and LEFTUP queued together.
-        self.require_desktop()
         now = self.tick()
-        if deadline is not None and now >= deadline:
+        if double_interval is not None and elapsed_ticks(now, receipt["firstStartTick"]) >= double_interval:
             receipt[label + "OutsideDoubleClickTime"] = True
             return
         receipt[label + "StartTick"] = now
         count = self.send(2, pair, c.sizeof(Input))
+        receipt[label + "ReturnedTick"] = self.tick()
         receipt[label + "Sent"] = count
+        if count == 2:
+            return
+        receipt["incompleteInput"] = True
         if count == 1:
-            self.require_desktop()
-            if not same_spot(recheck(), expected):
-                raise RuntimeError("The owned gesture was incomplete and its target changed")
-            receipt[label + "CleanupUp"] = self.send(1, c.byref(pair[1]), c.sizeof(Input))
-        if count != 2:
-            raise RuntimeError("SendInput did not queue both events on the verified fixture center")
+            try:
+                # The queued DOWN can move focus or the cursor. The current physical position,
+                # live pixel, handles, job and desktop must all still qualify for one UP.
+                self.check_pointer_target(recheck, expected, release=True)
+                receipt[label + "CleanupUp"] = self.send(1, c.byref(pair[1]), c.sizeof(Input))
+                if receipt[label + "CleanupUp"] != 1:
+                    raise RuntimeError("Windows did not queue the corrective LEFTUP")
+            except Exception as error:
+                receipt[label + "ReleaseError"] = str(error)
+                raise RuntimeError("Incomplete SendInput. A release on the owned icon could not be verified") from error
+        raise RuntimeError("SendInput did not queue the complete gesture")

@@ -14,9 +14,9 @@ import time
 import traceback
 
 from activation import HERE, hosted, module, paths, sha, write
-from activation_native import ICON, Native, Unavailable, callback_ok, check, expected_colors, matches, same_spot
+from activation_native import ICON, Native, Unavailable, callback_tick, check, elapsed_ticks, expected_colors, matches, same_spot
 
-RECORDS = {"synthetic.fixture", "change", "arm", "finish", "overflow.ready", "release-menu"}
+RECORDS = {"synthetic.fixture", "change", "arm", "finish", "overflow.pending", "overflow.ready", "release-menu"}
 RECORDS.update(name + suffix for name in ("first", "second", "armed", "callback") for suffix in ("", ".pending"))
 
 
@@ -109,9 +109,19 @@ def overflow(host, area, api, bar, pid, record):
                           cwd=area, creationflags=subprocess.CREATE_NO_WINDOW) as proc:
         try:
             until = time.monotonic() + 36
-            while not (area / "overflow.ready").is_file() and proc.poll() is None and time.monotonic() < until:
+            ready = area / "overflow.ready"
+            record["ready"], record["startTimedOut"] = False, False
+            while time.monotonic() < until:
+                if ready.is_file():
+                    record["ready"] = ready.read_bytes() == b"ready"
+                    break
+                if proc.poll() is not None:
+                    break
                 time.sleep(.08)
-            record["ready"] = (area / "overflow.ready").is_file()
+            else:
+                record["startTimedOut"] = True
+            if not record["ready"]:
+                raise RuntimeError("The private overflow helper did not confirm readiness")
             yield
         finally:
             (area / "release-menu").touch()
@@ -129,6 +139,19 @@ def overflow(host, area, api, bar, pid, record):
                     record["invalidProviderOutput"] = True
             if err.strip():
                 record["diagnostic"] = err.decode("utf-8", errors="replace")[-600:]
+            provider = record.get("provider")
+            if (proc.returncode != 0 or record.get("timedOut") or record.get("startTimedOut") or not record.get("ready")
+                    or err.strip() or not isinstance(provider, dict) or provider.get("completed") is not True
+                    or provider.get("providerReady") is not True or "operationError" in provider or "restoreError" in provider):
+                raise RuntimeError("The private overflow helper failed, timed out or returned an incomplete result")
+            action = provider.get("overflow")
+            if action == "requested":
+                if (provider.get("releaseAcknowledged") is not True or provider.get("overflowClosed") is not True
+                        or provider.get("restoreOutcome") != "verified closed"):
+                    raise RuntimeError("The helper did not confirm restoration of the fixture's opened flyout")
+            elif (action not in ("unchanged", "already visible") or provider.get("restoreOutcome") != "untouched"
+                    or "overflowClosed" in provider or "releaseAcknowledged" in provider):
+                raise RuntimeError("The overflow helper could not establish the original flyout state")
 
 
 def gesture(api, sample, target, proc, area, record):
@@ -146,28 +169,35 @@ def gesture(api, sample, target, proc, area, record):
             time.sleep(.005)
         if not (area / "callback").is_file():
             # The shipping Shell handler also accepts a double click. Re-prove ownership before each pair.
-            deadline = record["firstStartTick"] + api.double_time()
-            if api.tick() < deadline:
+            double_interval = api.double_time()
+            if elapsed_ticks(api.tick(), record["firstStartTick"]) < double_interval:
                 try:
-                    api.input_pair(sample, target, record, "second", deadline)
+                    api.input_pair(sample, target, record, "second", double_interval)
                 except Unavailable as error:
                     # A single-click activation may have closed its overflow while dispatch was in flight.
                     record["secondWithheld"] = str(error)
         event = received(area, "callback", 3.5, proc)
         record["callbackReadTick"] = api.tick()
-        record["callback"] = dict(zip(("count", "code", "iconId", "messageTick32", "buttonUps", "dispatchTick64"), event))
-        if not callback_ok(event, record["firstStartTick"], record["callbackReadTick"]):
-            raise Unavailable("The receiver lacked a qualifying activation for this icon in the input interval")
+        record["callback"] = dict(zip(("count", "code", "iconId", "messageTick32", "buttonUps",
+                                       "dispatchTick64", "threadLastMessageTick32"), event))
+        message_tick = callback_tick(event, record["firstReturnedTick"], record["callbackReadTick"], record.get("secondReturnedTick"))
+        record["callback"]["qualifiedMessageTick64"] = message_tick
+        if message_tick is None:
+            raise Unavailable("The callback lacked a matching queued activation with a provable timestamp after input")
     finally:
-        api.require_desktop()
-        now = w.POINT()
-        check(api.cursor(c.byref(now)), "GetPhysicalCursorPos(before cleanup)")
-        if [now.x, now.y] == target["center"]:
-            check(api.move(saved.x, saved.y), "SetPhysicalCursorPos(restore fixture cursor)")
-            record["cursorRestored"] = True
+        if record.get("incompleteInput"):
+            # Further pointer movement could drag a queued button-down. Preserve its hard failure.
+            record["cursorRestoreWithheldAfterIncompleteInput"] = True
         else:
-            record["cursorMovedIndependently"] = True
-            raise Unavailable("The fixture cursor moved independently before cleanup")
+            api.require_desktop()
+            now = w.POINT()
+            check(api.cursor(c.byref(now)), "GetPhysicalCursorPos(before cleanup)")
+            if [now.x, now.y] == target["center"]:
+                check(api.move(saved.x, saved.y), "SetPhysicalCursorPos(restore fixture cursor)")
+                record["cursorRestored"] = True
+            else:
+                record["cursorMovedIndependently"] = True
+                raise Unavailable("The fixture cursor moved independently before cleanup")
 
 
 def challenge(api, area, host, proc, shell, job, report):

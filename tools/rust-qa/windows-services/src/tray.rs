@@ -30,6 +30,7 @@ struct Events {
     pointer_open: u32,
     last_pointer_code: u32,
     last_pointer_tick: u32,
+    last_queued_tick: Option<u32>,
     last_dispatch_tick: u64,
     last_pointer_id: u32,
     pointer_up: u32,
@@ -43,6 +44,7 @@ struct Events {
 thread_local! {
     static REGISTERED: Cell<u32> = const { Cell::new(0) };
     static EVENTS: Cell<Events> = Cell::new(Events::default());
+    static DISPATCHING: Cell<Option<MSG>> = const { Cell::new(None) };
 }
 
 unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
@@ -69,6 +71,16 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
                     e.last_pointer_id = id;
                     e.last_pointer_code = code;
                     e.last_pointer_tick = unsafe { GetMessageTime() } as u32;
+                    // A nonqueued sent callback has no MSG.time of its own. GetMessageTime alone
+                    // can then describe the thread's previous, unrelated queue entry.
+                    e.last_queued_tick = DISPATCHING.get().and_then(|entry| {
+                        (entry.hwnd == hwnd
+                            && entry.message == msg
+                            && entry.wParam == wp
+                            && entry.lParam == lp
+                            && unsafe { InSendMessageEx(None) } == ISMEX_NOSEND)
+                            .then_some(entry.time)
+                    });
                     e.last_dispatch_tick = activation::uptime_millis();
                 }
             }
@@ -300,7 +312,9 @@ fn pump(millis: u32) {
                 break;
             }
             let _ = TranslateMessage(&msg);
+            let previous = DISPATCHING.replace((msg.message == CALLBACK).then_some(msg));
             DispatchMessageW(&msg);
+            DISPATCHING.set(previous);
         }
     }
 }

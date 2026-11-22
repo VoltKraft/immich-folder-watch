@@ -185,13 +185,14 @@ pub(crate) fn assess(area: &Path, id: &str) -> Result<()> {
                         area,
                         "callback",
                         format!(
-                            "{} {} {} {} {} {}",
+                            "{} {} {} {} {} {} {}",
                             e.pointer_open,
                             e.last_pointer_code,
                             e.last_pointer_id,
-                            e.last_pointer_tick,
+                            e.last_queued_tick.map_or(-1, i64::from),
                             e.pointer_up,
-                            e.last_dispatch_tick
+                            e.last_dispatch_tick,
+                            e.last_pointer_tick
                         ),
                     )?;
                     break;

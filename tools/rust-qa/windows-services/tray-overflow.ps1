@@ -79,6 +79,9 @@ function Restore-IfwTrayOverflow($State, $Record, [scriptblock]$BeforeChange = $
     }
     $until = [DateTime]::UtcNow.AddSeconds(3)
     do {
+        if ($null -ne $BeforeChange -and -not (& $BeforeChange $State.bar $State.explorer)) {
+            throw 'The private Explorer changed before its flyout closure could be verified'
+        }
         if ((Get-IfwOverflowWindow $State.explorer) -eq [IntPtr]::Zero) {
             $Record.overflowClosed = $true
             return

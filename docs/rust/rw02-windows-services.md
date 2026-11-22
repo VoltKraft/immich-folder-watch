@@ -197,22 +197,38 @@ control or cleanup. [Launcher](../../tools/rust-qa/windows-services/activation.p
    rechecks the color, geometry, cursor position and HWND owners. It queues
    one left-button down/up pair, with an optional second independently guarded
    pair inside the system double-click interval. Rust must receive
-   `NIN_SELECT` or `WM_LBUTTONDBLCLK` with the correct version-4 icon ID and
-   a dispatch time inside the input interval. It records Windows' message
-   time, callback code, icon ID and system uptime. The receiver has a zero
+   `NIN_SELECT` or `WM_LBUTTONDBLCLK` with the correct version-4 icon ID. Rust
+   binds `MSG.time` to the exact HWND, code and parameters being dispatched
+   from its message queue. A synchronous sent callback can carry the thread's
+   previous `GetMessageTime` value and is recorded as a callback without a
+   qualifying queue time. The observer extends the message's 32-bit timestamp
+   within the bounded 64-bit uptime interval. The queue tick must follow the
+   completed first `SendInput`, and for double clicks it must follow the
+   completed second call. It can equal the dispatch tick. An equal lower tick
+   is ambiguous at Windows' clock resolution. Messages already queued before
+   the gesture fail even when the procedure runs later. The receiver has a zero
    activation baseline and its private mode sends no test messages to the
    callback HWND. [Version-4 notifications](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-notifyicondataw),
    [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
+   [message queue timestamp](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-msg),
+   [GetMessageTime semantics](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessagetime)
    and [shared system clock](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64).
 4. Cleanup removes the fixture icon, closes the owned Explorer job after
    readback of zero active processes, removes the marked temporary directory
-   by identity and restores the original input desktop. The negative controls
-   include a stale callback, a different HWND at the same coordinates, a
-   rectangle containing the wrong pixel, and a private desktop lost before
-   flyout cleanup. [Private observer](../../tools/rust-qa/windows-services/activation_worker.py)
+   by identity and restores the original input desktop. A used overflow helper
+   must acknowledge readiness, exit successfully and return a complete result.
+   If it opened the flyout, it must receive the release marker and confirm closure
+   while the private Explorer still owns the input desktop. A timeout, provider
+   error or failed restore makes the trial fail even after a qualifying callback.
+   A partially queued input pair also fails. For an isolated left-button down,
+   a single corrective release requires a fresh check of the live desktop,
+   visible process-tree ownership, callback and taskbar HWNDs, hit target, color,
+   actual cursor coordinates and pressed left button. Uncertain ownership
+   withholds the release. Further cursor movement is suppressed after a partial
+   pair. [Private observer](../../tools/rust-qa/windows-services/activation_worker.py)
    and [input qualification](../../tools/rust-qa/windows-services/test_activation.py).
 
-The Linux host ran the 13 Python controls, the five PowerShell tray cleanup
+The Linux host ran the 21 Python controls, the six PowerShell tray cleanup
 controls, the PowerShell parser and the embedded observer's C# compiler. Rustfmt
 and warnings-denied offline Clippy passed for both pinned MSVC targets. A fresh
 audit verified the unpacked dependencies against their archives and reproduced

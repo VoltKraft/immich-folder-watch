@@ -47,18 +47,45 @@ $guard = {
         [IfwSyntheticShellObserver]::FindWindow('Shell_TrayWnd', $null) -eq $Candidate -and
         [IfwSyntheticShellObserver]::Matches($script:privateDesktop, $Candidate, $Owner)
 }
-$record = @{ overflow = 'unchanged' }
+$record = @{ overflow = 'unchanged'; providerReady = $false; completed = $false }
 $state = $null
 try {
     if (-not (& $guard ([IntPtr]$Bar) $ShellPid)) { throw 'Private Explorer identity or input desktop changed' }
     $state = Open-IfwTrayOverflow $record $guard
+    if (-not (& $guard ([IntPtr]$Bar) $ShellPid)) { throw 'The private Explorer changed during the provider call' }
     $record.providerReady = $true
-    [IO.File]::WriteAllText((Join-Path $Area 'overflow.ready'), 'ready')
-    $until = [DateTime]::UtcNow.AddSeconds(35)
-    while ($null -ne $state -and -not [IO.File]::Exists((Join-Path $Area 'release-menu')) -and [DateTime]::UtcNow -lt $until) {
-        Start-Sleep -Milliseconds 80
+    $pending = Join-Path $Area 'overflow.pending'
+    [IO.File]::WriteAllText($pending, 'ready')
+    [IO.File]::Move($pending, (Join-Path $Area 'overflow.ready'))
+    if ($null -ne $state) {
+        $elapsed = [Diagnostics.Stopwatch]::StartNew()
+        $release = Join-Path $Area 'release-menu'
+        while (-not [IO.File]::Exists($release) -and $elapsed.Elapsed.TotalSeconds -lt 35) {
+            Start-Sleep -Milliseconds 80
+        }
+        if (-not [IO.File]::Exists($release) -or $elapsed.Elapsed.TotalSeconds -ge 35) {
+            throw 'Timed out waiting for the observer to release the opened flyout'
+        }
+        $record.releaseAcknowledged = $true
     }
+} catch {
+    $record.operationError = $_.Exception.Message
 } finally {
-    try { Restore-IfwTrayOverflow $state $record $guard }
-    finally { $record | ConvertTo-Json -Compress }
+    try {
+        if ($record.overflow -eq 'requested') {
+            if ($null -eq $state) { throw 'The provider attempted to open the flyout without returning its state' }
+            Restore-IfwTrayOverflow $state $record $guard
+            if ($record.overflowClosed -ne $true) { throw 'The opened private flyout was not observed closed' }
+            $record.restoreOutcome = 'verified closed'
+        } elseif ($null -eq $state) {
+            $record.restoreOutcome = 'untouched'
+        } else {
+            throw 'Unrecognized flyout ownership state'
+        }
+    } catch {
+        $record.restoreError = $_.Exception.Message
+    }
 }
+$record.completed = $record.providerReady -and -not $record.ContainsKey('operationError') -and -not $record.ContainsKey('restoreError')
+$record | ConvertTo-Json -Compress
+if (-not $record.completed) { exit 1 }
