@@ -45,19 +45,9 @@ fn read_map(path: &Path) -> Result<ReferenceCaseMap, Box<dyn std::error::Error>>
     if bytes.len() > 200_000 {
         return Err("reference map exceeds limit".into());
     }
-    let text = std::str::from_utf8(&bytes)?;
-    let mut lines = text.lines();
-    if lines.next() != Some("IFW-INVARIANT-UPPERCASE-V1") {
-        return Err("unknown reference-map format".into());
-    }
-    let mut pairs = Vec::new();
-    for line in lines {
-        let (from, to) = line.split_once('\t').ok_or("invalid map row")?;
-        let from = char::from_u32(u32::from_str_radix(from, 16)?).ok_or("invalid map scalar")?;
-        let to = char::from_u32(u32::from_str_radix(to, 16)?).ok_or("invalid map scalar")?;
-        pairs.push((from, to));
-    }
-    Ok(ReferenceCaseMap::from_reference_pairs(pairs)?)
+    Ok(ReferenceCaseMap::from_reference_tsv(std::str::from_utf8(
+        &bytes,
+    )?)?)
 }
 
 fn handle(line: &str, map: &ReferenceCaseMap) -> Result<String, ()> {

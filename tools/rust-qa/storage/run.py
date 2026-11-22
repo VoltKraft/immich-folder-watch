@@ -35,10 +35,11 @@ def isolated_path(value: Path) -> Path:
     return path
 
 
-def archive_first_party(output: Path, fixtures: Path) -> dict:
+def archive_first_party(output: Path, fixtures: Path, casing_inputs: list[Path]) -> dict:
     paths = [ROOT / name for name in
              ("global.json", "NuGet.Config", "Directory.Build.props", "rust/Cargo.toml",
               "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
+    paths.extend(casing_inputs)
     for directory in (HERE, ROOT / "rust/crates/ifw-legacy", ROOT / "src/ImmichFolderWatch.Core", fixtures):
         paths += [path for path in directory.rglob("*") if path.is_file()
                   and not {"obj", "target", "__pycache__"}.intersection(path.relative_to(directory).parts)
@@ -64,6 +65,8 @@ def main() -> int:
     parser.add_argument("--cargo-home", type=Path, default=ARTIFACTS / "storage-cargo-home")
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--stored-keys", action="store_true",
+                        help="Inspect existing path identities in two additional synthetic C# backups")
     args = parser.parse_args()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
@@ -76,6 +79,11 @@ def main() -> int:
     fixtures = ROOT / "rust/tests/fixtures/legacy" / native_os
     dotnet = str(Path(args.dotnet).resolve()) if Path(args.dotnet).is_file() else args.dotnet
     inputs = json.loads((HERE / "inputs.json").read_text(encoding="utf-8"))
+    casing_inputs = []
+    if args.stored_keys:
+        casing_inputs = [HERE.parent / "legacy" / path for path in
+                         ("casing/unicode-15.1.0.tsv", "casing/unicode-17.0.0.tsv",
+                          "casing_profiles.py", "licenses/Unicode-LICENSE.txt")]
     env = os.environ.copy()
     # Build flag overrides must not silently change the reviewed native input.
     removed = []
@@ -99,7 +107,8 @@ def main() -> int:
         "modifiedSources": subprocess.check_output([
             "git", "status", "--porcelain", "--", str(HERE), "rust/crates/ifw-legacy", "rust/Cargo.toml",
             "src/ImmichFolderWatch.Core", "Directory.Build.props", "global.json", "NuGet.Config",
-            "rust/tests/fixtures/legacy", "tools/rust-qa/check-toolchain.py"], cwd=ROOT, text=True).splitlines(),
+            "rust/tests/fixtures/legacy", "tools/rust-qa/check-toolchain.py",
+            *map(str, casing_inputs)], cwd=ROOT, text=True).splitlines(),
         "workflowRun": os.getenv("GITHUB_RUN_ID"), "operatingSystem": platform.platform(),
         "offline": args.offline, "removedBuildOverrideNames": sorted(removed),
         "nativeBuild": {"LIBSQLITE3_FLAGS": inputs["sqlite"]["flags"], "LIBSQLITE3_SYS_USE_PKG_CONFIG": "0"},
@@ -137,7 +146,7 @@ def main() -> int:
         result["lockSha256"] = sha256(HERE / "Cargo.lock")
         verify_fixture(fixtures, native_os)
         result["fixtureManifestSha256"] = sha256(fixtures / "manifest.json")
-        result["firstPartySourceCount"] = len(archive_first_party(output, fixtures))
+        result["firstPartySourceCount"] = len(archive_first_party(output, fixtures, casing_inputs))
         cargo = ["cargo", "metadata", "--manifest-path", str(MANIFEST), "--locked", "--format-version", "1"]
         if args.offline:
             cargo.append("--offline")
@@ -207,6 +216,21 @@ def main() -> int:
             raise ValueError("native Rust/C# result identity or assertion count mismatch")
         result["rust"] = rust_result
         result["csharp"] = csharp_result
+        if args.stored_keys:
+            corpus = output / "casing-fixtures"
+            observation = output / "stored-keys"
+            command("stored-key-build", ["cargo", "build", "--manifest-path", str(MANIFEST), "--frozen",
+                                         "--release", "--target", args.target, "--example", "inspect_stored_keys"])
+            example = executable.parent / "examples" / ("inspect_stored_keys" + executable.suffix)
+            command("stored-key-reference", [dotnet, str(assembly), "--casing-fixtures", str(corpus)])
+            command("stored-key-readback", [sys.executable, "-B", str(HERE / "stored_keys.py"), "--probe",
+                                            str(example), "--fixture", str(corpus), "--output", str(observation)])
+            manifest = json.loads((corpus / "manifest.json").read_bytes())
+            if manifest["fixtureAssemblySha256"] != result["csharpAssemblySha256"]:
+                raise ValueError("Stored key corpus came from a different C# build")
+            result["storedKeys"] = {"inputs": sha256(corpus / "manifest.json"),
+                                    "observations": sha256(observation / "result.json"),
+                                    "rustExecutable": sha256(example)}
         result["status"] = "passed"
         print(f"Storage assessment passed; evidence: {output}", flush=True)
     except Exception as error:

@@ -175,6 +175,66 @@ python3 -B tools/rust-qa/legacy/casing_profiles.py 17.0.0 /path/to/17.0.0/Unicod
 python3 -B -m unittest discover -s tools/rust-qa/legacy -p test_casing_profiles.py
 ```
 
+At `8091469` all four native hosts passed the strict comparison with the
+independently generated 15.1.0 table. Each archived C# table matches the
+pinned bytes and all 1,112,064 scalar observations. The native Rust probes
+passed 5,844 requests each. The archived comparison records identify the
+UnicodeData digest, Unicode license digest and actual profile driver. The
+Windows driver bytes include the checkout's CRLF endings.
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343481).
+
+### Stored SQLite identities across two casing profiles
+
+A Fedora x64 experiment ran the same shipping C# store and .NET 10.0.12
+assembly with ICU 74.2 and ICU 78. The two full scalar exports reproduce
+the qualified 15.1.0 and 17.0.0 tables respectively. A source path and
+relative filenames included ƛ (U+019B), whose uppercase is Ƛ (U+A7DC)
+in the newer table. The store wrote both filenames, one tombstone, a
+pending repair linked to an entry, a separate pending repair, album IDs
+and the transfer timestamps of two accounts. It created a separate
+standalone backup for each comparison mode. [C# fixture](../../tools/rust-qa/storage/dotnet/CasingCases.cs).
+
+| C# writer | Path mode | Primary media and tombstone rows | Standalone backup SHA-256 |
+| --- | --- | ---: | --- |
+| ICU 74.2 or ICU 78 | Sensitive | 3 | `9c5fc8805d55e7ba8425007c8fadbdbb3be29fca478c2e372135c797ddcc7d65` |
+| ICU 74.2 | Insensitive | 3 | `55eb8fa0d955aeeebfd6c726a31adfaf9a16dc9abc558d0400c823cb27e7383b` |
+| ICU 78 | Insensitive | 2 | `6d54b1c758dec5449af7b726864a199f1465b6d022cc9ea264470de1300f353c` |
+
+Each backup is 45,056 bytes. All four were reproduced byte-for-byte and
+checked with a separate read-only SQLite reader. Both C# writers also
+stored one media row for the other account. Under ICU 74.2 the two
+case-insensitive media keys were distinct. Under ICU 78 the second ordinary
+upsert updated the first physical row.
+
+Eight reads through the production C# store covered both writers, readers
+and path modes on private copies. In each direction of a library change,
+the case-insensitive reader found zero entries at the original source
+spelling. It also missed the repairs, tombstone and album bindings. Both
+transfer timestamps remained readable. The case-sensitive readers found
+the three primary entries and both repair journals with either library.
+The source-bound fixture manifest and eight-way readback are retained in
+`artifacts/rust/casing-oracle-verified-e59a691/`.
+
+The separate Rust inspection reads previously stored source and relative
+keys together with the original spellings in entries and repair JSON.
+It keeps the account scope exact. A unique historical identity returns
+the original stored keys when every compatible writer interpretation
+agrees. Distinct existing keys that could address the same name produce
+an ambiguity. A spelling that would only match after changing profiles
+returns a possible alias. An unexplained persisted key blocks an absence
+claim for that account. The lookup checks both components with the same
+profile and includes standalone journals. Ownership IDs and transfer
+history stay outside path matching. [Read-only Rust probe](../../tools/rust-qa/storage/examples/inspect_stored_keys.rs)
+· [Independent SQL readback and controls](../../tools/rust-qa/storage/stored_keys.py).
+
+The native Fedora Rust probe passed 24 lookups against each C# generation
+and six controls per generation, including a conflict between an entry and
+a repair journal. Rejected snapshots retained their original bytes. The
+probe only accepts finalized synthetic backups with an expected SHA-256
+and no SQLite sidecars. It uses an immutable read-only connection and
+returns observations. Production migration still needs a write policy,
+complete inventory of historical rows and rollback after actual activity.
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

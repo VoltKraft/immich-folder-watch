@@ -161,7 +161,10 @@ and exercise its respective winit or transport consumer. [Import-library reconst
 
 The [crash and storage exhaustion fixture](rust/rw02-storage-faults.md)
 uses separate copies for both language verifiers and preserves each
-original backup. On Linux its private mount requires the documented
+original backup. The SQLite assessment accepts `--stored-keys` to exercise
+read-only lookups of entries, tombstones and repair journals in two additional
+synthetic C# backups. [Cross-profile storage results](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+On Linux the fault fixture's private mount requires the documented
 namespace launcher. The [combined profile](rust/rw02-combined-profile.md)
 builds from verified local archives and exercises an offline Linux relink.
 Each successful native build also generates a target-specific SPDX inventory.

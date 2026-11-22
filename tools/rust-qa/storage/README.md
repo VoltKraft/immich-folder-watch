@@ -29,6 +29,14 @@ fails the runtime gate. Native compiler commands are retained in build logs.
 All build-flag overrides removed from the subprocess environment are recorded by
 name, without dumping the parent environment.
 
+Select `--stored-keys` to write two more synthetic C# backups and exercise
+read-only identity lookup with the two independently qualified casing tables.
+The driver checks all four logical tables against C# output and keeps
+derived controls in their own directory. The completed report is
+`stored-keys/result.json`. The two-generation Fedora experiment also covers
+cross-library reads with the same C# runtime.
+[Stored SQLite identity results](../../../docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+
 Each output contains `result.json`, `evidence-hashes.json`, step logs, first-party
 source copies, untouched `.crate` archives, supplied notices, feature graphs and
 the original/backup synthetic databases with Rust and C# reports. Large build
