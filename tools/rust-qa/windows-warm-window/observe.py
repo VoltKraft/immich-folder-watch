@@ -14,26 +14,7 @@ import uuid
 from inputs import HERE, QA, ROOT, TARGETS, recorder, sha, subjects
 from native import owned_directory, pin_path
 from residency import sample
-
-
-class WindowLifetime:
-    def __init__(self, pid):
-        from native import bind, checked
-        user = c.WinDLL("user32", use_last_error=True)
-        callback_type = c.WINFUNCTYPE(None, w.HANDLE, w.DWORD, w.HWND, w.LONG, w.LONG, w.DWORD, w.DWORD)
-        hook = bind(user, "SetWinEventHook", w.HANDLE, w.DWORD, w.DWORD, w.HMODULE, callback_type,
-                    w.DWORD, w.DWORD, w.DWORD)
-        self.unhook = bind(user, "UnhookWinEvent", w.BOOL, w.HANDLE)
-        self.events = []
-        @callback_type
-        def callback(_hook, event, hwnd, object_id, child, _thread, tick):
-            if hwnd and object_id == 0 and child == 0:
-                self.events.append((int(hwnd), "create" if event == 0x8000 else "destroy", tick))
-        self.callback = callback
-        self.hook = checked(hook(0x8000, 0x8001, None, callback, pid, 0, 0))
-
-    def close(self):
-        recorder.checked(self.unhook(self.hook))
+from window_lifetime import WindowLifetime
 
 
 def drive(api, fixture, binary, output, name, *, single_wake=False):
@@ -250,7 +231,7 @@ def main(target):
     out = output / "observed"
     out.mkdir()
     record["controls"] = {}
-    files = [HERE / s for s in ("observe.py", "inputs.py", "residency.py")]
+    files = [HERE / s for s in ("observe.py", "inputs.py", "residency.py", "window_lifetime.py")]
     files.extend(QA / s for s in ("observe-windows-gui.py", "observe-windows-input.ps1", "windows_observer.py",
                                   "windows-performance/native.py", "windows-performance/run.py"))
     record["observerInputs"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in files}

@@ -11,6 +11,7 @@ import sys
 
 import observe as launcher
 from observe import CleanupUnconfirmed, bind, check, ordinary_console, recorder
+from window_readback import monitor_work_area, visible_surface
 
 PROVIDER = launcher.HERE / "tray_provider.ps1"
 RECORDS = {
@@ -30,23 +31,6 @@ class Unavailable(Exception):
 
 class IconIdentifier(c.Structure):
     _fields_ = [("size", w.DWORD), ("owner", w.HWND), ("id", w.UINT), ("guid", c.c_uint32 * 4)]
-
-
-class MonitorInfo(c.Structure):
-    _fields_ = [("size", w.DWORD), ("monitor", w.RECT), ("work", w.RECT), ("flags", w.DWORD)]
-
-
-def monitor_work_area(hwnd):
-    user = c.WinDLL("user32", use_last_error=True)
-    from_window = bind(user, "MonitorFromWindow", w.HANDLE, w.HWND, w.DWORD)
-    info = bind(user, "GetMonitorInfoW", w.BOOL, w.HANDLE, c.POINTER(MonitorInfo))
-    handle = from_window(hwnd, 0)  # MONITOR_DEFAULTTONULL
-    if not handle:
-        return None
-    monitor = MonitorInfo(size=c.sizeof(MonitorInfo))
-    check(info(handle, c.byref(monitor)), "GetMonitorInfoW(visible primary)")
-    r = monitor.work
-    return [r.left, r.top, r.right, r.bottom]
 
 
 def shell_rect(hwnd):
@@ -371,28 +355,8 @@ class NativeTray:
         return key
 
     def visible_window(self, proc, hwnd, result, stage):
-        window = self.desk.window(hwnd)
-        cloaked = w.DWORD()
-        if not window or window["pid"] != proc.pid or self.desk.name(self.desk.thread_desktop(window["tid"])) != self.name:
-            raise ValueError("The visible GUI window did not belong to the original primary on its desktop")
-        hr = self.desk.attribute(hwnd, 14, c.byref(cloaked), c.sizeof(cloaked))
-        window.update(minimized=bool(self.desk.iconic(hwnd)), cloakHresult=hr,
-                      cloaked=cloaked.value if hr == 0 else None)
-        result[stage] = window
-        if self.name == "Default" and window["cloaked"] != 0:
-            raise Unavailable("DWM did not confirm an uncloaked GUI window on the input desktop")
-        rect = window["rect"]
-        if (not self.desk.visible(hwnd) or window["minimized"]
-                or not isinstance(rect, list) or rect[0] >= rect[2] or rect[1] >= rect[3]):
-            raise ValueError("The native launcher window did not have a visible, non-minimized surface")
-        if self.name == "Default":
-            work = window["monitorWorkArea"] = monitor_work_area(hwnd)
-            if work is None:
-                raise ValueError("The activated GUI window did not intersect a real monitor")
-            overlap = window["visibleWorkArea"] = [max(rect[0], work[0]), max(rect[1], work[1]),
-                                                   min(rect[2], work[2]), min(rect[3], work[3])]
-            if overlap[0] >= overlap[2] or overlap[1] >= overlap[3]:
-                raise ValueError("The activated GUI window did not intersect the monitor work area")
+        visible_surface(self.desk, self.name, proc.pid, hwnd, result, stage, monitor_area=monitor_work_area,
+                        unavailable=Unavailable)
 
     def check_drain(self, proc, job, log, result):
         """Retain normal app exit, job accounting and exact icon removal even on observation failure."""
@@ -559,7 +523,9 @@ def confirm_provider(event, surface, token):
     return provider
 
 
-def resident(api, desk, gui, trial, env, out, result):
+def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", reopen=False):
+    if reopen and subject != "retained":
+        raise ValueError("The Shell reopen case requires the retained-window executable")
     desktop = check(desk.thread_desktop(desk.thread()), "GetThreadDesktop(input observer)")
     result["contextBefore"] = desk.context()
     if not ordinary_console(result["contextBefore"], "Default"):
@@ -567,14 +533,21 @@ def resident(api, desk, gui, trial, env, out, result):
     native = NativeTray(api, desk, "Default", env["IFW_QA_INVENTORY_TOKEN"])
     clock = bind(api.kernel, "GetTickCount64", c.c_uint64)
     primary_log = out / "resident-primary.log"
+    args = [] if reopen else ["--autostart"]
     with ExitStack() as stack:
         stream = stack.enter_context(primary_log.open("xb"))
-        proc, job, tid = stack.enter_context(launcher.child(api, desk, "Default", gui, ["--autostart"], trial, env,
+        proc, job, tid = stack.enter_context(launcher.child(api, desk, "Default", gui, args, trial, env,
                                                             stream, True, private=False))
         creation = api.process_identity(int(proc._handle))
-        result.update(primaryPid=proc.pid, primaryCreation100ns=creation, primaryArguments=["--autostart"])
-        windows = recorder.load_windows_fixture().Windows(proc.pid, desktop)
+        result.update(primaryPid=proc.pid, primaryCreation100ns=creation, primaryArguments=args)
+        fixture = recorder.load_windows_fixture()
+        windows = fixture.Windows(proc.pid, desktop)
         stack.callback(launcher.release, windows.close, "Could not release the resident GUI window hook")
+        retained = None
+        if subject == "retained":
+            evidence = result["retainedWindow"] = {}
+            retained = launcher.RetainedWindow(desk, windows, fixture.TITLE, "Default", evidence)
+            stack.callback(launcher.release, retained.close, "Could not remove the Shell activation lifetime hook")
 
         def log():
             return primary_log.read_text(encoding="utf-8", errors="replace")
@@ -588,18 +561,26 @@ def resident(api, desk, gui, trial, env, out, result):
 
         def hidden():
             text = log()
-            if (windows.visible() is not None or records(text, "TRAY_CALLBACK") or records(text, "TRAY_OPEN")
-                    or shell_changed(text)
-                    or any(value in text for value in ("ADAPTER Dx12 ", "WINDOW_RELEASED ", "LAUNCHER_OPEN "))
-                    or not ordinary_console(desk.context(), "Default")):
+            if shell_changed(text) or not ordinary_console(desk.context(), "Default"):
                 raise Unavailable("The original GUI, accessibility or desktop state changed before provider activation")
+            if (windows.visible() is not None or records(text, "TRAY_CALLBACK") or records(text, "TRAY_OPEN")
+                    or any(value in text for value in ("WINDOW_RELEASED ", "LAUNCHER_OPEN "))):
+                error = ValueError if retained is not None else Unavailable
+                raise error("Unexpected GUI activation or release before the selected Shell provider was invoked")
+            if reopen:
+                if not retained.hidden(text):
+                    raise ValueError("The previously closed GUI did not remain hidden until the real Shell activation")
+            elif "ADAPTER Dx12 " in text or "GRAPHICS_ATTEMPT " in text:
+                raise ValueError("The background GUI allocated a renderer before the real Shell activation")
 
         result["stage"] = "registration"
         try:
             native.watch_original(stack, result)
             command(proc, b"B")
             key = native.registration(proc, log, wait, result, no_host=False)
-            wait(lambda: "READY BackgroundStartup Available" in log().splitlines(), "The supervisor did not remain resident")
+            expected = "READY Visible Available" if reopen else "READY BackgroundStartup Available"
+            wait(lambda: expected in log().splitlines(), "The supervisor did not select its expected window intent")
+            result["startupIntent"] = expected
             wait(lambda: recorder.idle_complete(log()), "The original worker did not finish its initial inventories")
             worker = recorder.owned_worker(api, proc, primary_log, recorder.await_value)
             handle = recorder.checked(api.open(0x100000 | 0x1000, False, worker))
@@ -610,6 +591,13 @@ def resident(api, desk, gui, trial, env, out, result):
                 detail = result[stage + "Job"] = {}
                 return launcher.primary_job_members(api, desk, job, proc.pid, worker, gui, console, detail)
             result["workerBefore"] = worker_identity("before")
+            if reopen:
+                result["stage"] = "close-before-provider"
+                first_window = wait(windows.visible, "The ordinary retained primary did not show its first window")
+                wait(lambda: "ADAPTER Dx12 " in log(), "The original window did not initialize DX12")
+                retained.first(first_window, log, wait)
+                retained.close_window()
+                wait(lambda: retained.hidden(log()), "The retained window did not hide before the provider challenge")
             hidden()
             result["residentWindows"] = launcher.snapshot(desk, windows, desktop, None, tid, creation)
             colors = marker_colors(native.token)
@@ -639,6 +627,9 @@ def resident(api, desk, gui, trial, env, out, result):
                 hidden()
                 result["stage"] = "provider-invoke"
                 native.require_original("beforeInvoke", result["second"])
+                if retained is not None:
+                    windows.pump()
+                    events_before_invoke = len(windows.events)
                 command(helper, b"invoke\n")
                 attempted = wait(lambda: get("attempt"), "The exact accessibility provider was unavailable")
                 target = confirm_surface(attempted, key, creation, current, colors[1], first)
@@ -667,6 +658,15 @@ def resident(api, desk, gui, trial, env, out, result):
             result["workerAfter"] = worker_identity("after")
             if result["workerAfter"] != result["workerBefore"] or api.process_identity(int(proc._handle)) != creation:
                 raise ValueError("The activated primary or its original inventory worker changed")
+            if retained is not None:
+                if reopen:
+                    retained.opened(hwnd, log, wait)
+                else:
+                    retained.first(hwnd, log, wait)
+                retained.activated_show(events_before_invoke, result["delivery"]["dispatchMs"], clock(), "callbackShow")
+                result["keyboardFocus"] = {}
+                retained.focus(result["keyboardFocus"])
+                retained.check_visible(log, "beforeQuit")
         finally:
             try:
                 result["quitRequested"] = False
@@ -690,15 +690,22 @@ def resident(api, desk, gui, trial, env, out, result):
         if (delivery(log(), key, state["startTick"], result["delivery"]["observedMs"]) != result["delivery"]
                 or "LAUNCHER_OPEN " in log()):
             raise ValueError("The original provider activation changed before quit")
+        if retained is not None:
+            launcher.retained_graphics(log(), evidence, before_quit=False)
 
 
-def assess(target, out, result):
+def assess(target, out, result, *, subject="canonical"):
     files = (Path(__file__).resolve(), PROVIDER, launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
-    with launcher.native_subject(target, out, result, files) as (api, desk, built_gui, inventory, _revision):
-        for case in ("shellLess", "inputDesktop"):
+    cases = ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
+    with launcher.native_subject(target, out, result, files, subject=subject) as (api, desk, built_gui, inventory, _revision):
+        for index, case in enumerate(cases):
             state = result[case] = dict(cleanupConfirmed=False)
             try:
+                case_out = out
+                if case == "inputDesktopReopen":
+                    case_out = out / case
+                    case_out.mkdir()
                 with launcher.staged_profile(state, api, built_gui, inventory) as (gui, trial, env):
                     env["IFW_QA_WINDOWS_TRAY"] = "1"
                     if case == "shellLess":
@@ -709,10 +716,14 @@ def assess(target, out, result):
                         def visit(handle):
                             with ExitStack() as stack:
                                 native.watch_original(stack, state)
-                                launcher.desktop_cases(api, desk, name, handle, gui, trial, env, out, state, native_tray=native)
+                                launcher.desktop_cases(api, desk, name, handle, gui, trial, env, case_out, state,
+                                                       native_tray=native, subject=subject)
                         launcher.private_desktop(desk, select, name, visit, state["desktopCleanup"])
                     else:
-                        resident(api, desk, gui, trial, env, out, state)
+                        resident(api, desk, gui, trial, env, case_out, state, subject=subject,
+                                 reopen=case == "inputDesktopReopen")
+                if not state["cleanupConfirmed"]:
+                    raise CleanupUnconfirmed(f"Cleanup of {case} was not confirmed")
             except Exception as exc:
                 shutdown = state.get("nativeShutdown", state.get("activation", {}).get("nativeShutdown", {}))
                 churn_timeout = isinstance(exc, TimeoutError) and shutdown.get("observedHostInstability") is True
@@ -720,28 +731,32 @@ def assess(target, out, result):
                              failures=launcher.failures(exc))
                 if not state["cleanupConfirmed"] or CleanupUnconfirmed.in_chain(exc):
                     state["status"] = "failed"
-                    if case == "shellLess":
-                        result["inputDesktop"] = dict(status="not-run", reason="Private cleanup was not confirmed")
+                    for later in cases[index + 1:]:
+                        result[later] = dict(status="not-run", reason=f"Cleanup of {case} was not confirmed")
                     raise
             else:
                 state["status"] = "passed"
-    statuses = {result[case]["status"] for case in ("shellLess", "inputDesktop")}
+    statuses = {result[case]["status"] for case in cases}
     return "failed" if "failed" in statuses else "unavailable" if "unavailable" in statuses else "passed"
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=launcher.TARGETS)
-    target = parser.parse_args().target
-    out = launcher.ROOT / "artifacts/rust/windows-gui-tray" / target
+    parser.add_argument("--subject", choices=launcher.SUBJECTS, default="canonical")
+    options = parser.parse_args()
+    target = options.target
+    directory = "windows-gui-tray-retained" if options.subject == "retained" else "windows-gui-tray"
+    out = launcher.ROOT / "artifacts/rust" / directory / target
     out.mkdir(parents=True, exist_ok=False)
-    result = {"target": target, "status": "failed"}
+    result = {"target": target, "subject": options.subject, "status": "failed"}
     try:
-        result["status"] = assess(target, out, result)
+        result["status"] = assess(target, out, result, subject=options.subject)
     except Exception as exc:
         result["failures"] = launcher.failures(exc)
     finally:
-        result["evidenceFiles"] = {path.name: recorder.sha(path) for path in sorted(out.iterdir()) if path.is_file()}
+        result["evidenceFiles"] = {path.relative_to(out).as_posix(): recorder.sha(path)
+                                   for path in sorted(out.rglob("*")) if path.is_file()}
         recorder.write(out / "result.json", result)
     print(result["status"])
     return {"passed": 0, "unavailable": 2, "failed": 1}[result["status"]]

@@ -8,6 +8,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 import observe
+import retained_window
+from test_retained_window import FIRST_RENDER, OwnedRoot, TITLE
 
 
 GUI = PureWindowsPath(r"C:\fixture\subject\native-gui-assessment.exe")
@@ -94,9 +96,16 @@ class LauncherTests(unittest.TestCase):
         desk.name.side_effect = lambda handle: "WinSta0" if handle is desk.station.return_value else "IfwQa_test"
         desk.receiving_input.return_value = False
         image = Path("native-gui-assessment.exe")
+        witnessed = []
         with patch.object(observe, "start_named") as launch:
-            with observe.child(api, desk, "IfwQa_test", image, [], Path("case"), {}, None, False):
+            def before_resume(secondary):
+                api.assign_suspended.assert_called_once_with(api.new_job.return_value, secondary, image)
+                secondary.resume.assert_not_called()
+                witnessed.append(secondary.pid)
+            with observe.child(api, desk, "IfwQa_test", image, [], Path("case"), {}, None, False,
+                               before_resume=before_resume):
                 pass
+        self.assertEqual(witnessed, [launch.return_value.pid])
         desk.open_named.assert_called_once_with("IfwQa_test", 0, False, 1)
         launch.assert_called_once_with(image, [], cwd=Path("case"), env={}, stream=None, desktop="IfwQa_test", primary=False)
         api.assign_suspended.assert_called_once_with(api.new_job.return_value, launch.return_value, image)
@@ -131,58 +140,61 @@ class LauncherTests(unittest.TestCase):
                 self.assertNotIn("sha256", result)
 
     def test_foreground_cycle_requires_close_second_process_worker_identity_and_quit(self):
-        api, desk, windows = Mock(), Mock(), Mock()
+        self.exercise_cycle()
+
+    def exercise_cycle(self, subject="canonical", *, private=False):
+        api, desk = Mock(), Mock()
+        windows = OwnedRoot(12)
         primary, second = Mock(pid=12, _handle=2), Mock(pid=15, _handle=5)
         primary.poll.return_value = None
         second.poll.return_value = 0
-        windows.events = []
-        desk.name.return_value = "Default"
-        desk.foreground.return_value = 22
+        name = "IfwQa_Launcher_private" if private else "Default"
+        label = "activation" if private else "foreground"
+        desk.name.return_value = name
+        desk.foreground.side_effect = lambda: windows.hwnd
         api.process_identity.side_effect = lambda handle: handle * 10
         api.wait_job_empty.return_value = True
-        current = None
         launches = []
         result = {}
         with TemporaryDirectory() as directory:
             out = Path(directory)
-            primary_log = out / "foreground-primary.log"
+            primary_log = out / (label + "-primary.log")
 
             def emit(text):
                 with primary_log.open("ab") as stream:
                     stream.write(text.encode())
 
             def write(data):
-                nonlocal current
-                if data == b"T":
-                    current = 21
-                    emit("LAUNCHER_PRIMARY pid=12\nREADY Visible Available\nADAPTER Dx12 Cpu\n")
+                if data in (b"T", b"N"):
+                    windows.hwnd = 21
+                    windows.show(3, create=True)
+                    emit("LAUNCHER_PRIMARY pid=12\nREADY Visible " + ("Unavailable" if private else "Available") + "\n")
+                    emit(FIRST_RENDER if subject == "retained" else "GRAPHICS_READY generation=1\nADAPTER Dx12 Cpu\n")
                 elif data == b"Q":
                     primary.poll.return_value = 0
+                    if subject == "retained":
+                        emit("WINDOW_RELEASED passes=5\n")
                     emit("DRAINED passes=5\n")
                 else:
                     self.fail("Only the initial tray result and Quit belong on the primary command pipe")
 
-            def close_window(hwnd):
-                nonlocal current
-                self.assertEqual(hwnd, current)
-                current = None
-                emit("WINDOW_RELEASED generation=1\n")
-
-            def owner(_hwnd, pid):
-                pid._obj.value = 12
-                return 8
+            windows.on_close = lambda: emit("WINDOW_HIDDEN\n" if subject == "retained" else "WINDOW_RELEASED passes=1\n")
 
             @contextmanager
-            def launch(_api, _desk, name, exe, args, _trial, _env, stream, first, *, private):
-                nonlocal current
+            def launch(_api, _desk, name, exe, args, _trial, _env, stream, first, *, private, before_resume=None):
                 launches.append((name, exe, args, first, private))
                 if first:
                     yield primary, 1, 8
                     return
-                self.assertIsNone(current)
+                self.assertIsNone(windows.visible())
+                if before_resume:
+                    before_resume(second)
                 stream.write(b"LAUNCHER_SECONDARY server=12\n")
-                emit("LAUNCHER_OPEN client=15\nADAPTER Dx12 Cpu\n")
-                current = 22
+                emit("LAUNCHER_OPEN client=15\n")
+                if subject == "canonical":
+                    windows.hwnd = 22
+                    emit("GRAPHICS_READY generation=2\nADAPTER Dx12 Cpu\n")
+                windows.show(20, create=subject == "canonical")
                 yield second, 3, None
 
             def accounting(_job, _kind, value, _size, _returned):
@@ -190,24 +202,36 @@ class LauncherTests(unittest.TestCase):
                 return True
 
             primary.stdin.write.side_effect = write
-            windows.visible.side_effect = lambda **_kwargs: current
-            windows.close_window.side_effect = close_window
-            windows.owner.side_effect = owner
             api.query_job.side_effect = accounting
-            fixture = Mock()
+            fixture = Mock(TITLE=TITLE)
             fixture.Windows.return_value = windows
-            with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value={"witnessSeen": None}),
+            with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value={"witnessSeen": private}),
+                  patch.object(observe, "bind", return_value=Mock(side_effect=[14, 23])),
+                  patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
+                  patch.object(retained_window, "visible_surface"), patch.object(retained_window, "focus_sample",
+                               return_value=dict(foreground=True, active=True, focused=True)),
                   patch.object(observe.recorder, "idle_complete", return_value=True),
                   patch.object(observe.recorder, "owned_worker", return_value=13),
                   patch.object(observe, "primary_job_members", side_effect=[[13, 1300], [13, 1300]])):
-                observe.cycle(api, desk, "Default", 9, None, fixture, GUI, CONSOLE, out, {}, out,
-                              "foreground", result, tray=True)
-        self.assertEqual(launches, [("Default", GUI, [], True, False), ("Default", GUI, [], False, False)])
+                observe.cycle(api, desk, name, 9, 2 if private else None, fixture, GUI, CONSOLE, out, {}, out,
+                              label, result, tray=not private, subject=subject)
+        self.assertEqual(launches, [(name, GUI, ["--autostart"] if private else [], True, private),
+                                    (name, GUI, [], False, private)])
         self.assertEqual(result["stage"], "drained")
         self.assertTrue(result["primaryJobEmpty"])
-        self.assertEqual((result["initialWindow"], result["reopenedWindow"], result["workerAfter"]), (21, 22, [13, 1300]))
+        self.assertEqual((result["initialWindow"], result["reopenedWindow"], result["workerAfter"]),
+                         (21, 21 if subject == "retained" else 22, [13, 1300]))
         self.assertEqual(list(result["windowReadbacks"]), ["startup-intent", "first-dx12-adapter", "first-visible-window",
                                                           "hidden-before-launch", "reopen"])
+        return result
+
+    def test_retained_no_argument_secondary_and_shellless_fallback_reopen_original_native_root_and_worker(self):
+        for private in (False, True):
+            with self.subTest(private=private):
+                result = self.exercise_cycle("retained", private=private)
+                self.assertEqual(result["retainedWindow"]["lifetimeBeforeQuit"], [[21, "create", 3]])
+                self.assertEqual(result["secondaryTotalProcesses"], 1)
+                self.assertEqual(result["keyboardFocus"]["applicable"], not private)
 
     def test_receipt_requires_the_original_primary_and_its_worker(self):
         secondary = ["LAUNCHER_SECONDARY server=12"]

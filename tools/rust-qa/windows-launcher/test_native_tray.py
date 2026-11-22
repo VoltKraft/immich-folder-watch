@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 import native_tray as tray
+import retained_window
+from test_retained_window import FIRST_RENDER, OwnedRoot, TITLE
 
 TOKEN = "1234567890abcdef" * 2
 KEY = "18", "43", "23"
@@ -144,16 +146,15 @@ class TrayProofTests(unittest.TestCase):
 
 
 class ResidentTests(unittest.TestCase):
-    def exercise(self, refusal):
-        api, desk, windows = Mock(), Mock(), Mock()
+    def exercise(self, refusal, *, subject="canonical", reopen=False):
+        api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
-        windows.visible.return_value = None
         proc.poll.return_value = None
         api.process_identity.return_value = 101
         api.wait_job_empty.return_value = True
         desk.owner.return_value = 0
         desk.name.return_value = "Default"
-        desk.foreground.return_value = 99
+        desk.foreground.side_effect = lambda: windows.hwnd
         desk.window.side_effect = lambda hwnd: dict(pid=18, tid=2, rect=RECT, **{"class": "IFW RW02 synthetic tray receiver"})
         desk.iconic.return_value = False
         desk.attribute.return_value = 0
@@ -166,10 +167,15 @@ class ResidentTests(unittest.TestCase):
                     stream.write(msg)
             def report_icon(phase, color):
                 append(f"TRAY_ICON phase={phase} pid=18 hwnd=43 id=23 rgb={color} rect=-4,10,28,42 ok=1\n")
+            windows.on_close = lambda: append("WINDOW_HIDDEN\n")
             def send(data):
                 commands.append(data)
                 if data == b"B":
-                    append("LAUNCHER_PRIMARY pid=18\n" + registration(refusal != "shell") + "READY BackgroundStartup Available\n")
+                    startup = "Visible" if reopen else "BackgroundStartup"
+                    append("LAUNCHER_PRIMARY pid=18\n" + registration(refusal != "shell") + f"READY {startup} Available\n")
+                    if reopen:
+                        append(FIRST_RENDER)
+                        windows.show(3, create=True)
                     report_icon("initial", RGB)
                 elif data in (b"M", b"P"):
                     if data == b"M":
@@ -181,6 +187,8 @@ class ResidentTests(unittest.TestCase):
                             append("TRAY_HOST pid=18 previous=81 current=82 previous_hwnd=51 current_hwnd=53\n")
                     report_icon("changed" if data == b"M" else "sample", COMPLEMENT)
                 elif data == b"Q":
+                    if subject == "retained" and windows.visible():
+                        append("WINDOW_RELEASED passes=2\n")
                     ending = closed(refusal != "shell")
                     append(ending.replace("passes=2", "passes=0") if refusal == "no-frame" else ending)
                     proc.poll.return_value = 0
@@ -195,8 +203,14 @@ class ResidentTests(unittest.TestCase):
                 if stage in ("ready", "attempt"):
                     return dict(surface=dict(SURFACE, rgb=COMPLEMENT), provider=ELEMENT, tick=19)
                 if stage == "invoked":
-                    append((callback("20", 20) if refusal == "early" else callback()) + "ADAPTER Dx12 Cpu\n")
-                    windows.visible.return_value = 99
+                    append(callback("20", 20) if refusal == "early" else callback())
+                    if not reopen:
+                        append(FIRST_RENDER if subject == "retained" else "ADAPTER Dx12 Cpu\n")
+                    if refusal == "second-generation":
+                        append("GRAPHICS_READY generation=2\n")
+                    if refusal == "different-window":
+                        windows.hwnd = 100
+                    windows.show(16 if refusal == "premature-show" else 24, create=not reopen)
                     return {"startTick": 21, "returnedTick": 25}
                 self.fail("Unexpected provider stage")
             helper.stdin.write.side_effect = requests.append
@@ -212,20 +226,31 @@ class ResidentTests(unittest.TestCase):
             witness = Mock(markers=0, confirmed=refusal != "unbound", original=(81, 51))
             witness.live.side_effect = lambda stage: stage != refusal
             with (patch.object(tray, "ShellWitness", return_value=witness),
+                  patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
+                  patch.object(retained_window, "visible_surface", side_effect=lambda *a: tray.visible_surface(
+                      *a, monitor_area=lambda _: [-20, 0, 100, 100])),
+                  patch.object(retained_window, "focus_sample", return_value=dict(foreground=True, active=True, focused=True)),
                   patch.object(tray, "bind", return_value=lambda: 28), patch.object(tray, "ordinary_console", return_value=True),
                   patch.object(tray.launcher, "child", child), patch.object(tray.launcher, "snapshot", return_value={}),
                   patch.object(tray.launcher, "system_console_path"), patch.object(tray.recorder, "load_windows_fixture") as fixture,
                   patch.object(tray.recorder, "idle_complete", return_value=True), patch.object(tray.recorder, "owned_worker", return_value=28),
-                  patch.object(tray.launcher, "primary_job_members", return_value=[28, 201]), patch.object(tray, "provider", provider),
+                  patch.object(tray.launcher, "primary_job_members",
+                               side_effect=[[28, 201], [28, 302] if refusal == "different-worker" else [28, 201]]),
+                  patch.object(tray, "provider", provider),
                   patch.object(tray, "monitor_work_area", return_value=[-20, 0, 100, 100]),
                   patch.object(tray, "shell_rect", return_value=dict(hresult=-1, rect=None))):
                 fixture.return_value.Windows.return_value = windows
-                operation = lambda: tray.resident(api, desk, out / "gui.exe", out, {"IFW_QA_INVENTORY_TOKEN": TOKEN}, out, state)
+                fixture.return_value.TITLE = TITLE
+                operation = lambda: tray.resident(api, desk, out / "gui.exe", out, {"IFW_QA_INVENTORY_TOKEN": TOKEN},
+                                                  out, state, subject=subject, reopen=reopen)
                 if refusal == "early":
                     with self.assertRaisesRegex(ValueError, "outside the provider observation"):
                         operation()
-                elif refusal in ("missing-modify", "duplicate-modify", "no-frame"):
-                    expected = "no UI pass" if refusal == "no-frame" else "one acknowledged"
+                elif refusal in ("missing-modify", "duplicate-modify", "no-frame", "second-generation",
+                                 "different-window", "premature-show", "different-worker"):
+                    expected = {"no-frame": "no UI pass", "second-generation": "first ordinary DX12",
+                                "different-window": "replaced its HWND", "premature-show": "outside its native activation",
+                                "different-worker": "inventory worker changed"}.get(refusal, "one acknowledged")
                     with self.assertRaisesRegex(ValueError, expected):
                         operation()
                 elif refusal:
@@ -243,6 +268,22 @@ class ResidentTests(unittest.TestCase):
         self.assertEqual(requests, [b"second\n", b"invoke\n"])
         self.assertEqual(state["workerBefore"], state["workerAfter"])
         self.assertEqual(state["openedWindow"]["pid"], state["primaryPid"])
+
+    def test_real_callback_covers_first_activation_and_reopening_the_previously_closed_retained_hwnd(self):
+        for reopen in (False, True):
+            with self.subTest(reopen=reopen):
+                commands, requests, state = self.exercise(None, subject="retained", reopen=reopen)
+                self.assertEqual(commands, [b"B", b"M", b"P", b"Q"])
+                self.assertEqual(requests, [b"second\n", b"invoke\n"])
+                self.assertEqual(state["primaryArguments"], [] if reopen else ["--autostart"])
+                window = state["retainedWindow"]
+                self.assertEqual("hidden" in window, reopen)
+                self.assertEqual(window["callbackShow"]["showEvent"]["hwnd"], window["first"]["hwnd"])
+                self.assertTrue(state["keyboardFocus"]["observed"])
+                self.assertEqual(window["first"]["renderer"], window["beforeQuit"]["renderer"])
+        for wrong in ("second-generation", "different-window", "premature-show", "different-worker"):
+            with self.subTest(wrong=wrong):
+                self.exercise(wrong, subject="retained", reopen=True)
 
     def test_registration_refusal_or_unidentified_icon_still_quits_naturally_without_activation(self):
         for reason, commands, requests in (("shell", [b"B", b"Q"], []),
@@ -275,6 +316,47 @@ class ResidentTests(unittest.TestCase):
                 self.assertFalse(state["nativeShutdown"]["stableRegistration"])
                 self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
         self.exercise("no-frame")
+
+
+class TrialSelectionTests(unittest.TestCase):
+    def test_independent_retained_normal_and_autostart_profiles_obey_prior_cleanup(self):
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            @contextmanager
+            def subject(*_, **_options):
+                yield Mock(), Mock(), root / "selected-gui", {}, "revision"
+            @contextmanager
+            def profile(state, *_):
+                state["profile"] = str(len(profiles))
+                profiles.append(state)
+                try:
+                    yield root / "selected-gui", root, {}
+                finally:
+                    state["cleanupConfirmed"] = state["profile"] != unconfirmed
+            def resident(_api, _desk, gui, _trial, _env, out, state, *, subject, reopen):
+                calls.append((gui.name, subject, reopen, out.name))
+                if state["profile"] == "1":
+                    raise tray.Unavailable("Provider declined this profile")
+            for variant, unconfirmed, expected_calls in (("retained", None, 2), ("retained", "1", 1),
+                                                        ("canonical", None, 1)):
+                with self.subTest(subject=variant, unconfirmed=unconfirmed):
+                    out = root / f"{variant}-{unconfirmed}"
+                    out.mkdir()
+                    profiles, calls, result = [], [], {}
+                    with (patch.object(tray.launcher, "native_subject", subject), patch.object(tray.launcher, "staged_profile", profile),
+                          patch.object(tray, "resident", resident), patch.object(tray.launcher, "private_desktop"),
+                          patch.object(tray.c, "WinDLL", create=True), patch.object(tray, "bind")):
+                        if unconfirmed:
+                            with self.assertRaises(tray.Unavailable):
+                                tray.assess("target", out, result, subject=variant)
+                            self.assertEqual(result["inputDesktopReopen"]["status"], "not-run")
+                        else:
+                            self.assertEqual(tray.assess("target", out, result, subject=variant), "unavailable")
+                    self.assertEqual(len(calls), expected_calls)
+                    self.assertEqual(calls[0], ("selected-gui", variant, False, out.name))
+                    if expected_calls == 2:
+                        self.assertEqual(calls[1], ("selected-gui", variant, True, "inputDesktopReopen"))
+                        self.assertEqual(result["inputDesktopReopen"]["status"], "passed")
 
 
 if __name__ == "__main__":

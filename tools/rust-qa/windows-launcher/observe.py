@@ -22,8 +22,11 @@ from native import CleanupUnconfirmed, JobAccounting, ThreadEntry, pin_new_marke
 from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
 from window_readback import paint_control, snapshot
+import retained_subject
+from retained_window import LIFETIME, RetainedWindow, graphics as retained_graphics
 
 TARGETS = {"x86_64-pc-windows-msvc": 0x8664, "aarch64-pc-windows-msvc": 0xaa64}
+SUBJECTS = ("canonical", "retained")
 # Read, create windows/menus, observe events, enumerate and write this desktop's objects.
 DESKTOP_RIGHTS = 0xCF
 
@@ -114,7 +117,7 @@ def release_handle(close, label, handle):
 
 
 @contextmanager
-def child(api, desk, name, exe, arguments, area, env, stream, primary, *, private=True):
+def child(api, desk, name, exe, arguments, area, env, stream, primary, *, private=True, before_resume=None):
     job = api.new_job()
     proc = None
     try:
@@ -135,6 +138,8 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary, *, privat
             if threads != [proc.thread_id]:
                 raise ValueError("The suspended primary must have the one initial thread returned by CreateProcessW")
             thread_id = proc.thread_id
+        if before_resume is not None:
+            before_resume(proc)
         proc.resume()
         yield proc, job, thread_id
     finally:
@@ -196,7 +201,7 @@ def drain_after_failure(proc, log, result, pump):
 
 
 def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, out, label, result, *, tray=False,
-          native_tray=None):
+          native_tray=None, subject="canonical"):
     primary_log = out / (label + "-primary.log")
     autostart = label == "activation"
     private = witness is not None
@@ -209,6 +214,11 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         result.update(primaryPid=proc.pid, primaryCreation100ns=api.process_identity(int(proc._handle)))
         windows = fixture.Windows(proc.pid, desktop)
         stack.callback(release, windows.close, "Could not remove the primary's window event hook")
+        retained = None
+        if subject == "retained":
+            evidence = result["retainedWindow"] = {}
+            retained = RetainedWindow(desk, windows, fixture.TITLE, name, evidence)
+            stack.callback(release, retained.close, "Could not remove the retained HWND lifetime hook")
         def log():
             return primary_log.read_text(encoding="utf-8", errors="replace")
         def wait(check_value, message):
@@ -267,6 +277,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             native_tray.visible_window(proc, initial, result, "fallbackWindow")
         result.update(initialWindow=initial, initialWindowPid=verify_hwnd(initial),
                       initialPrimaryForeground=desk.foreground() == initial)
+        if retained is not None:
+            retained.first(initial, log, wait)
         result["stage"] = "first-inventories"
         wait(lambda: recorder.idle_complete(log()), "The primary did not finish its two empty inventories")
         worker = recorder.owned_worker(api, proc, primary_log, recorder.await_value)
@@ -278,14 +290,27 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                                                      result["primaryJobBefore"])
         if label != "restart":
             result["stage"] = "close"
-            windows.close_window(initial)
-            observe_at("hidden-before-launch", lambda: windows.visible() is None and "WINDOW_RELEASED " in log(),
+            if retained is None:
+                windows.close_window(initial)
+            else:
+                retained.close_window()
+            observe_at("hidden-before-launch", lambda: (retained.hidden(log()) if retained is not None
+                       else windows.visible() is None and "WINDOW_RELEASED " in log()),
                        "The primary window did not close")
             result["hiddenBeforeLaunch"] = True
             result["stage"] = "secondary"
             second_log = out / (label + "-secondary.log")
+            resume_options = {}
+            if retained is not None:
+                clock = bind(api.kernel, "GetTickCount64", c.c_uint64)
+                def before_resume(secondary):
+                    if not retained.hidden(log()):
+                        raise ValueError("The closed root appeared before the ordinary secondary could run")
+                    result["suspendedSecondary"] = dict(pid=secondary.pid, creation100ns=api.process_identity(int(secondary._handle)),
+                                                       events=len(windows.events), tick=clock())
+                resume_options["before_resume"] = before_resume
             with second_log.open("xb") as second_stream, child(api, desk, name, exe, [], trial, env, second_stream,
-                                                               False, private=private) as (second, second_job, _tid):
+                                                               False, private=private, **resume_options) as (second, second_job, _tid):
                 result.update(secondaryArguments=[], secondaryPid=second.pid,
                               secondaryCreation100ns=api.process_identity(int(second._handle)))
                 result["secondaryExit"] = wait_for_exit(second, windows.pump, 12)
@@ -296,15 +321,31 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             reopened = observe_at("reopen", is_visible, "The ordinary secondary did not reopen the primary GUI")
             if native_tray is not None:
                 native_tray.visible_window(proc, reopened, result, "activatedWindow")
-            wait(lambda: log().count("ADAPTER Dx12 ") >= 2, "The reopened GUI did not acquire its DX12 adapter")
             result.update(reopenedWindow=reopened, reopenedWindowPid=verify_hwnd(reopened),
                           primaryForeground=desk.foreground() == reopened)
+            if retained is not None:
+                retained.opened(reopened, log, wait)
+                start = result["suspendedSecondary"]
+                if (start["pid"], start["creation100ns"]) != (result["secondaryPid"], result["secondaryCreation100ns"]):
+                    raise ValueError("The resumed launcher secondary was not the original suspended process")
+                retained.activated_show(start["events"], start["tick"], clock(), "secondaryShow")
+            else:
+                wait(lambda: log().count("ADAPTER Dx12 ") >= 2, "The reopened GUI did not acquire its DX12 adapter")
+                result["canonicalRecreation"] = dict(initial=initial, reopened=reopened, differentHwnd=initial != reopened,
+                                                    ready=[line for line in log().splitlines()
+                                                           if line.startswith("GRAPHICS_READY ")],
+                                                    events=[row for row in windows.events if row["hwnd"] in (initial, reopened)])
             if not private:
                 result["foregroundObservation"] = passive_foreground(desk, windows, reopened, result["primaryForeground"])
             result["primaryJobAfter"] = {}
             result["workerAfter"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
                                                         result["primaryJobAfter"])
             qualify(second_log.read_text(encoding="utf-8").splitlines(), log().splitlines(), result)
+            if retained is not None:
+                result["keyboardFocus"] = {}
+                retained.focus(result["keyboardFocus"])
+        if retained is not None:
+            retained.check_visible(log, "beforeQuit")
         result["stage"] = "quit"
         command(b"Q")
         result.update(primaryExit=wait_for_exit(proc, windows.pump, 15), primaryJobEmpty=api.wait_job_empty(job, 4))
@@ -317,9 +358,11 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         if native_tray is not None:
             native_tray.check_drain(proc, job, final_log, result)
             native_tray.qualify_quiet_shell(final_log, result, no_host=True)
+        if retained is not None:
+            retained_graphics(final_log, evidence, before_quit=False)
 
 
-def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, native_tray=None):
+def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, native_tray=None, subject="canonical"):
     user = c.WinDLL("user32", use_last_error=True)
     shell = bind(user, "FindWindowW", w.HWND, w.LPCWSTR, w.LPCWSTR)
     create = bind(user, "CreateWindowExW", w.HWND, w.DWORD, w.LPCWSTR, w.LPCWSTR, w.DWORD,
@@ -341,7 +384,7 @@ def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, nat
         for label in (("activation", "restart") if native_tray is None else ("activation",)):
             result[label] = {}
             cycle(api, desk, name, desktop, anchor, fixture, exe, console, trial, env, out, label, result[label],
-                  native_tray=native_tray)
+                  native_tray=native_tray, subject=subject)
         if "restart" in result and result["activation"]["primaryCreation100ns"] == result["restart"]["primaryCreation100ns"]:
             raise ValueError("A fresh elected primary on the original shell-less desktop was required")
         if desk.receiving_input(desktop) is not False or shell("Shell_TrayWnd", None):
@@ -413,7 +456,7 @@ def foreground_tray_input(path, target, revision, run, result):
     return tray
 
 
-def foreground_case(api, desk, gui, trial, env, out, target, revision, result):
+def foreground_case(api, desk, gui, trial, env, out, target, revision, result, *, subject="canonical"):
     desktop = check(desk.thread_desktop(desk.thread()), "GetThreadDesktop(disposable runner)")
     name = desk.name(desktop)
     result["contextBefore"] = desk.context()
@@ -424,7 +467,7 @@ def foreground_case(api, desk, gui, trial, env, out, target, revision, result):
     tray = foreground_tray_input(service_path, target, revision, os.environ["GITHUB_RUN_ID"], result["trayInput"])
     try:
         cycle(api, desk, name, desktop, None, recorder.load_windows_fixture(), gui, system_console_path(api.kernel),
-              trial, env, out, "foreground", result["activation"], tray=tray)
+              trial, env, out, "foreground", result["activation"], tray=tray, subject=subject)
     finally:
         result["contextAfter"] = desk.context()
         if not ordinary_console(result["contextAfter"], name):
@@ -481,21 +524,27 @@ def staged_profile(result, api, built_gui, inventory):
         offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         offline.bind(("127.0.0.1", 0))
         env = recorder.environment(trial, "http://127.0.0.1:" + str(offline.getsockname()[1]), True, media, token)
+        for key in tuple(env):
+            if key.startswith("IFW_QA_WINDOWS_"):
+                del env[key]
         env.update(IFW_QA_WINDOWS_LAUNCHER="1", IFW_QA_LAUNCHER_SID=recorder.sid())
+        result["stagedProfile"] = dict(gui=inventory["gui"], worker=inventory["worker"], trial=trial.name,
+                                       configSha256=recorder.sha(trial / "config.yaml"), inventoryToken=token)
         yield gui, trial, env
 
 
-def run_profile(case, result, api, desk, built_gui, inventory, out, target, revision):
+def run_profile(case, result, api, desk, built_gui, inventory, out, target, revision, *, subject="canonical"):
     with staged_profile(result, api, built_gui, inventory) as (gui, trial, env):
         if case == "shellLess":
             name = "IfwQa_Launcher_" + result["profile"]
             change_thread = bind(c.WinDLL("user32", use_last_error=True), "SetThreadDesktop", w.BOOL, w.HANDLE)
             result["desktopCleanup"] = {}
             private_desktop(desk, change_thread, name,
-                            lambda desktop: desktop_cases(api, desk, name, desktop, gui, trial, env, out, result),
+                            lambda desktop: desktop_cases(api, desk, name, desktop, gui, trial, env, out, result,
+                                                          subject=subject),
                             result["desktopCleanup"])
         else:
-            foreground_case(api, desk, gui, trial, env, out, target, revision, result)
+            foreground_case(api, desk, gui, trial, env, out, target, revision, result, subject=subject)
 
 
 def run_cases(visit, result):
@@ -523,7 +572,7 @@ def run_cases(visit, result):
 
 
 @contextmanager
-def native_subject(target, out, result, extra_inputs=()):
+def native_subject(target, out, result, extra_inputs=(), *, subject="canonical"):
     if (not recorder.hosted() or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
             or os.getenv("GITHUB_REF") != "refs/heads/rewrite/rust"):
         raise ValueError("Use the dedicated disposable native rewrite runner")
@@ -531,7 +580,8 @@ def native_subject(target, out, result, extra_inputs=()):
     exe = artifacts / "gui-build/release/native-gui-assessment.exe"
     receipt_path = artifacts / "gui-native" / target / "build.json"
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    profile = json.loads((ROOT / "rust/audit/gui-profile.json").read_text(encoding="utf-8"))
+    profile_path = ROOT / "rust/audit/gui-profile.json"
+    profile = json.loads(profile_path.read_bytes())
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     gui_source = QA / "gui"
     lifecycle = ROOT / "rust/crates/desktop-lifecycle"
@@ -542,35 +592,54 @@ def native_subject(target, out, result, extra_inputs=()):
     if (revision != os.environ["GITHUB_SHA"] or receipt["source"] != revision or receipt["target"] != target
             or recorder.sha(exe) != receipt["binarySha256"]
             or recorder.pe_machine(exe) != TARGETS[target] or receipt["graphSha256"] != profile["targetReportSha256"][target]
-            or receipt["lockSha256"] != profile["lockSha256"]
+            or receipt["lockSha256"] != profile["lockSha256"] or recorder.sha(gui_source / "Cargo.lock") != receipt["lockSha256"]
+            or receipt["sourceProfileSha256"] != recorder.sha(ROOT / "rust/audit/gui-text-inputs.json")
+            or receipt["sourceReconstructionSha256"] != recorder.sha(gui_source / "source_profile.py")
             or required != set(receipt["compilerSources"])
             or any(recorder.sha(ROOT / path) != digest for path, digest in receipt["compilerSources"].items())):
         raise ValueError("The ordinary native GUI and its reviewed inputs must match the checkout")
-    api, desk = recorder.Win32(), Desktop()
+    if subject not in SUBJECTS:
+        raise ValueError("Unknown native GUI subject")
+    selected_receipt, selected_binary, lock = recorder.sha(receipt_path), receipt["binarySha256"], receipt["lockSha256"]
+    if subject == "retained":
+        api, exe, paired = retained_subject.select(target, exe, receipt, receipt_path.with_name("graph.json"), recorder.sha)
+        result["pairedBuild"] = paired
+        selected_receipt, selected_binary, lock = paired["buildReceipt"], paired["binary"], paired["lock"]
+    else:
+        api = recorder.Win32()
+    desk = Desktop()
     if api.machine(-1) != (TARGETS[target], TARGETS[target]):
         raise ValueError("A native target-matching Windows observer is required")
-    result.update(revision=revision, target=target, run=os.environ["GITHUB_RUN_ID"],
+    result.update(subject=subject, revision=revision, target=target, run=os.environ["GITHUB_RUN_ID"],
                   attempt=os.environ["GITHUB_RUN_ATTEMPT"],
-                  buildReceipt=recorder.sha(receipt_path), gui=receipt["binarySha256"], graph=receipt["graphSha256"],
-                  lock=receipt["lockSha256"],
+                  buildReceipt=selected_receipt, gui=selected_binary, graph=receipt["graphSha256"], lock=lock,
+                  guiProfile=recorder.sha(profile_path), textProfile=receipt["sourceProfileSha256"],
+                  workerProfile=recorder.sha(QA / "performance/worker-inputs.json"),
                   observerInputs={path.relative_to(ROOT).as_posix(): recorder.sha(path) for path in
                                   (Path(__file__).resolve(), HERE / "named_process.py", HERE / "window_readback.py",
+                                   HERE / "retained_subject.py", HERE / "retained_window.py", LIFETIME,
+                                   retained_subject.WARM / "inputs.py",
                                    QA / "observe-windows-gui.py", QA / "windows-desktop/win32.py", QA / "windows-desktop/job.py",
                                    QA / "windows-performance/native.py", QA / "windows-performance/run.py",
                                    QA / "windows-performance/build.py", *extra_inputs)})
     with profile_resources(api, Path(os.environ["RUNNER_TEMP"]), uuid.uuid4().hex, result) as (build, stack):
         gui, _, inventory = recorder.build_subject(build, out, exe, target, recorder.pe_machine)
         if inventory["gui"] != result["gui"]:
-            raise ValueError("The staged native GUI differs from the canonical build")
+            raise ValueError("The staged native GUI differs from the selected build")
+        result["peMachines"] = {}
         for image in (gui, gui.with_name("ifw-performance-worker.exe")):
             stack.enter_context(recorder.pin_path(api, image, False))
+            result["peMachines"][image.name] = recorder.pe_machine(image)
+            if result["peMachines"][image.name] != TARGETS[target]:
+                raise ValueError("Both pinned executables must match the native runner architecture")
         result["inventory"] = inventory
         yield api, desk, gui, inventory, revision
 
 
-def run(target, out, result):
-    with native_subject(target, out, result) as (api, desk, gui, inventory, revision):
-        first = run_cases(lambda case, state: run_profile(case, state, api, desk, gui, inventory, out, target, revision),
+def run(target, out, result, *, subject="canonical"):
+    with native_subject(target, out, result, subject=subject) as (api, desk, gui, inventory, revision):
+        first = run_cases(lambda case, state: run_profile(case, state, api, desk, gui, inventory, out, target, revision,
+                                                         subject=subject),
                           result)
         if first is not None:
             raise first
@@ -580,14 +649,20 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
+    parser.add_argument("--subject", choices=SUBJECTS, default="canonical")
     options = parser.parse_args()
-    output = ROOT / "artifacts/rust/windows-launcher" / options.target
+    directory = "windows-launcher-retained" if options.subject == "retained" else "windows-launcher"
+    output = ROOT / "artifacts/rust" / directory / options.target
     output.mkdir(exist_ok=False, parents=True)
-    results = {}
+    results = {"subject": options.subject}
     try:
-        run(options.target, output, results)
-        recorder.write(output / "result.json", dict(status="passed", **results))
+        run(options.target, output, results, subject=options.subject)
     except Exception as exc:
         chain = failures(exc)
-        recorder.write(output / "result.json", dict(status="failed", error=chain[0]["message"], failures=chain, **results))
+        results.update(status="failed", error=chain[0]["message"], failures=chain)
         raise
+    else:
+        results["status"] = "passed"
+    finally:
+        results["evidenceFiles"] = {path.name: recorder.sha(path) for path in sorted(output.iterdir()) if path.is_file()}
+        recorder.write(output / "result.json", results)
