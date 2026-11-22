@@ -233,6 +233,8 @@ fn main() -> io::Result<()> {
         _ => return Err(io::Error::other("unknown fixture mode")),
     };
     let mut watch = Watch::start(&root, scope, capacity)?;
+    #[cfg(windows)]
+    let mut registration_inputs = Some((root, nested));
     #[cfg(target_os = "linux")]
     if matches!(mode.as_str(), "tree" | "expanded") && !confirm(&watch, &root)? {
         return Err(io::Error::other(
@@ -253,6 +255,14 @@ fn main() -> io::Result<()> {
                 state("STATE", watch.wait_after(generation, timeout));
             }
             ["STATE"] => state("STATE", watch.snapshot()),
+            #[cfg(windows)]
+            ["RELEASE_INPUT_HANDLES"] => {
+                let inputs = registration_inputs
+                    .take()
+                    .ok_or_else(|| io::Error::other("registration inputs already released"))?;
+                drop(inputs);
+                println!("INPUT_HANDLES_RELEASED");
+            }
             #[cfg(target_os = "linux")]
             ["DIRFLAGS"] => println!("DIRFLAGS {} {}", DIRECTORY_FLAGS.0, DIRECTORY_FLAGS.1),
             #[cfg(target_os = "linux")]
@@ -281,11 +291,13 @@ fn main() -> io::Result<()> {
                 }
                 println!("MODULES_DONE");
             }
-            ["STOP"] => {
+            [command @ ("STOP" | "JOIN")] => {
                 let start = Instant::now();
                 watch.stop_and_join(Duration::from_secs(5))?;
                 println!("STOPPED {}", start.elapsed().as_micros());
-                return Ok(());
+                if *command == "STOP" {
+                    return Ok(());
+                }
             }
             _ => return Err(io::Error::other("invalid fixture command")),
         }

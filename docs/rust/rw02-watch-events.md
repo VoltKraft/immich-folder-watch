@@ -211,10 +211,41 @@ their Actions digests and passed CRC verification. Windows x64 artifact
 14725763446 has SHA-256 `989506eef632cdc1942c16dda5be63d2f5740d8a4687acc312d38ad18963d1fc`
 and Windows ARM64 artifact 14726270855 has SHA-256
 `450d189cd9a808cae34ab27a44c1c71c984888896a816573f7a00ceb0b356292`.
-The corrected registration uses the demonstrated lookup and independently
-compares the new handle. Both MSVC target builds passed Clippy. Native event
-and shutdown observations for this change are pending.
+The revised registration uses the demonstrated lookup and independently
+compares the new handle. Both MSVC target builds passed Clippy.
 [Four diagnostic runs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44951905544).
+
+At `d403feefce23cad5357bf3fb0b49af03f012333e`, Ubuntu x64 and ARM64 each
+passed eight unit tests and fifteen filesystem scenarios. Both Windows hosts
+passed seven unit tests. Their Rust workers opened the directory by ID and
+verified the handle identity. The first `ReadDirectoryChangesW` submission
+then returned `ERROR_INVALID_PARAMETER` (87) on both hosts, before either
+could record a wakeup or a completed shutdown. The separate Win32 controls
+again observed equal volume and file IDs after opening by ID and by fixture
+name. All four ZIPs matched their Actions digests and passed CRC and
+inner-receipt verification. [Native run 44953046277](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046277).
+
+| Target | Actions artifact | SHA-256 of verified ZIP |
+| --- | ---: | --- |
+| Ubuntu x64 | 14726730278 | `ce27f34e24b751cf3c9f060802c9ee50b199441af574e9d0bc8a481072823b08` |
+| Ubuntu ARM64 | 14726610641 | `3fc03245854921a4098a5f93c017fc403ba877a79fd47c3b63431ad5c22635e8` |
+| Windows x64 | 14726726502 | `99e7d3811601180e7205c264f526674c6caf136c7d63cbcd87b2eb79257eb071` |
+| Windows ARM64 | 14726636141 | `040069239aee2d4d44a6a2b876827968658ffbced2ab8108e033fd55b161decb` |
+
+The subsequent `windows-notification-handle-lease` scenario isolates the
+worker's handle. The observer first opens the root for `DELETE` and closes
+it. After registration the Rust fixture closes all caller-owned directory
+handles. The observer requires a sharing violation for the same access,
+checks that a sibling write leaves the generation unchanged for 350 ms, then
+creates a file under the watched tree and checks its native wakeup and full
+inventory. After `stop_and_join`, the observer obtains `DELETE` access again
+and renames the same directory while the Rust process and joined `Watch` are
+still alive. Both MSVC targets passed Clippy with warnings denied. Fedora
+x64 passed all eight unit tests and fifteen Linux scenarios in
+`independent-lease-guard-01`, and a separate live fixture answered a state
+query after joining. Native Windows results for the additional lease scenario
+are pending.
+[Fixture control](../../tools/rust-qa/watch-events/src/main.rs) and [external observer](../../tools/rust-qa/watch-events/run.py).
 
 The standalone package and FFI declarations are first-party AGPL-3.0-only
 code. The Cargo lock has SHA-256

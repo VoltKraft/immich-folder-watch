@@ -116,10 +116,13 @@ class Subject:
         require(response in ("END 0", "END 1"), "Invalid acknowledgement " + response)
         return response == "END 1"
 
-    def stop(self):
-        label, micros = self.command("STOP").split()
+    def stop(self, *, keep_process=False):
+        label, micros = self.command("JOIN" if keep_process else "STOP").split()
         require(label == "STOPPED" and int(micros) < 5_000_000, "Native watch did not drain within five seconds")
-        require(self.process.wait(timeout=5) == 0, "Watch teardown failed")
+        if keep_process:
+            require(self.process.poll() is None, "The process exited while its joined watch was under observation")
+        else:
+            require(self.process.wait(timeout=5) == 0, "Watch teardown failed")
         return int(micros)
 
     def close(self):
@@ -353,7 +356,8 @@ def missing_subtree(binary, area, rows):
         rows["missing-subdirectory-during-scan"] = {**failure, "recoveredInventory": expected, "stopMicros": subject.stop()}
 
 
-def windows_sharing(binary, area, rows):
+@contextmanager
+def windows_open(path, access, share, flags):
     from ctypes import WinDLL, WinError, c_void_p, get_last_error
     from ctypes import wintypes as w
     api = WinDLL("kernel32", use_last_error=True)
@@ -363,25 +367,63 @@ def windows_sharing(binary, area, rows):
     api.CloseHandle.argtypes = (w.HANDLE,)
     api.CloseHandle.restype = w.BOOL
 
-    @contextmanager
-    def open_object(path, access, share, flags):
-        handle = create(str(path), access, share, None, 3, flags, None)
-        if handle == c_void_p(-1).value:
+    handle = create(str(path), access, share, None, 3, flags, None)
+    if handle == c_void_p(-1).value:
+        raise WinError(get_last_error())
+    try:
+        yield
+    finally:
+        if not api.CloseHandle(handle):
             raise WinError(get_last_error())
-        try:
-            yield
-        finally:
-            if not api.CloseHandle(handle):
-                raise WinError(get_last_error())
 
-    def sharing_error(path, access, flags):
-        try:
-            with open_object(path, access, 7, flags):
-                raise RuntimeError("The original object allowed a conflicting access")
-        except OSError as denial:
-            require(denial.winerror == 32, "Original object returned an unexpected sharing result")
-            return denial.winerror
 
+def windows_sharing_error(path, access, flags):
+    try:
+        with windows_open(path, access, 7, flags):
+            raise RuntimeError("The original object allowed a conflicting access")
+    except OSError as denial:
+        require(denial.winerror == 32, "Original object returned an unexpected sharing result")
+        return denial.winerror
+
+
+def windows_notification_lease(binary, area, rows):
+    work = fixture(area, "notification-handle-lease")
+    root = work / "source"
+    sibling = work / "sibling"
+    sibling.mkdir()
+    identity = root.stat()
+    delete_access, directory_flag = 0x10000, 0x02000000
+    with windows_open(root, delete_access, 7, directory_flag):
+        pass
+    with observe(binary, work) as (subject, _):
+        require(subject.command("RELEASE_INPUT_HANDLES") == "INPUT_HANDLES_RELEASED",
+                "The Rust subject retained the caller's directory handles")
+        complete(subject, root, {})
+        denial = windows_sharing_error(root, delete_access, directory_flag)
+        baseline = subject.snapshot("STATE")
+        (sibling / "media.jpg").write_text("outside the source", encoding="ascii")
+        quiet = subject.snapshot(f"WAIT {baseline['generation']} 350")
+        require(quiet["generation"] == baseline["generation"], "A sibling directory woke the isolated watch")
+        expected = {"nested/media.jpg": "inside the source"}
+        (root / "nested/media.jpg").write_text("inside the source", encoding="ascii")
+        changed = subject.changed(quiet)
+        complete(subject, root, expected)
+        stopped = subject.stop(keep_process=True)
+        with windows_open(root, delete_access, 7, directory_flag):
+            pass
+        released = work / "released"
+        root.rename(released)
+        require(os.path.samestat(released.stat(), identity), "The released directory changed identity")
+        require(inventory(released) == (expected, True), "The released original directory has unexpected contents")
+        subject.snapshot("STATE")  # The process and joined Watch still exist after the successful rename.
+        subject.stop()
+    rows["windows-notification-handle-lease"] = {"deleteAccessBeforeWatch": True, "deleteAccessError": denial,
+                                                "quietAfterSiblingWrite": quiet, "nativeChange": changed,
+                                                "deleteAccessAfterJoin": True, "renamedWhileSubjectAlive": True,
+                                                "inventory": expected, "stopMicros": stopped}
+
+
+def windows_sharing(binary, area, rows):
     work = fixture(area, "native-sharing")
     root = work / "source"
     identity = root.stat()
@@ -390,7 +432,7 @@ def windows_sharing(binary, area, rows):
     expected = {"original.jpg": "original"}
     with observe(binary, work) as (subject, _):
         complete(subject, root, expected)
-        delete_error = sharing_error(root, 0x10000, 0x02000000)  # DELETE, directory semantics
+        delete_error = windows_sharing_error(root, 0x10000, 0x02000000)  # DELETE, directory semantics
         try:
             root.rename(work / "renamed")
         except OSError as denial:
@@ -399,15 +441,15 @@ def windows_sharing(binary, area, rows):
         else:
             raise RuntimeError("The watch-root lease allowed its own original directory to be renamed")
         require(os.path.samestat(root.stat(), identity), "The held original directory identity changed")
-        with open_object(sample, 0x80000000, 0, 0):  # GENERIC_READ, exclusive sharing
-            read_error = sharing_error(sample, 0x80000000, 0)
+        with windows_open(sample, 0x80000000, 0, 0):  # GENERIC_READ, exclusive sharing
+            read_error = windows_sharing_error(sample, 0x80000000, 0)
             failure = failed_scan(subject, root)
             # The CRT used by open() may surface EACCES without the raw Win32 status.
             require(failure["winError"] == 32 or (failure["winError"] is None and failure["errno"] == errno.EACCES),
                     "Expected a read denial on the same exclusively shared file")
         complete(subject, root, expected)
         stopped = subject.stop()
-    with open_object(root, 0x10000, 7, 0x02000000):
+    with windows_open(root, 0x10000, 7, 0x02000000):
         pass
     root.rename(work / "renamed")
     require(os.path.samestat((work / "renamed").stat(), identity), "Original identity changed after lease release")
@@ -567,6 +609,8 @@ def execute(args, output, report):
                 report["directoryFlags"] = {"O_DIRECTORY": os.O_DIRECTORY, "O_NOFOLLOW": os.O_NOFOLLOW}
             report["runtimeModules"] = module_inventory(subject)
             rows["pending-io-at-stop"] = {"stopMicros": subject.stop()}
+        if os.name == "nt":
+            windows_notification_lease(binary, area, rows)
         mutation_cases(binary, area, rows)
         cancelled_periodic_scan(binary, area, rows)
         queue_and_inventory(binary, area, rows)
