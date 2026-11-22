@@ -19,9 +19,15 @@ The two official Unicode data inputs reproduce the distinct .NET invariant
 uppercase tables observed on Fedora and on all four hosted targets. The
 Fedora Rust probe passed 5,844 requests with each independently generated
 table, and the strict comparison rejected a third synthetic mapping. The
-native workflow now requires an independently qualified profile. Existing
-database key preservation and the choice for future writes remain open.
-[Casing inputs and results](rust/rw02-legacy.md#independently-reproduced-casing-profiles).
+four native jobs at `8091469` each qualified the 15.1.0 table. The shipping
+C# store on Fedora produced two distinct insensitive keys with ICU 74.2 and
+one with ICU 78. Changing either reader's library hid the existing entries
+and repairs while leaving both accounts' transfer history readable. The
+Rust read-only probe passed 48 lookups on the original C# backups and
+twelve controls on copies across the two environments. The production
+new-key policy and installed migration remain open.
+[Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
+· [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 
 Commit `66d9fd6` produced four SPDX inventories from the verified native
 builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
@@ -33,7 +39,13 @@ At `7517e3b` the assessment workflow generated all four inventories on the
 native hosts. Local replay from the authenticated archives reproduced each
 uploaded document byte-for-byte and passed the official schema and native
 inventory controls.
-[Four build inventories and digests](rust/rw02-combined-sbom.md).
+Independent review of the four locally reconstructed development notice
+ZIPs at `577843b` found three omissions. The two Linux inventories omit
+the core Wayland protocol XML and five Plasma protocol license texts.
+All four bundles omit applicable per-file ring copyright and permission
+notices. Corrected inventory and license coverage is pending.
+[Four build inventories and digests](rust/rw02-combined-sbom.md)
+· [Development notice reconstruction](rust/rw02-combined-notices.md).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
@@ -123,10 +135,13 @@ SMB share also provided one. Both Windows storage VHDs returned FAT legacy
 file identifiers across one rename. An independent review of `16781c2`
 closed five findings in the opt-in adapter fixture. A Fedora repeat passed
 eight recovery cases and all 208 C# assertions, with 476 evidence hashes
-verified. The Windows feasibility workflow now selects the direct Rust
-adapter trial after the eight recovery cases. Native FAT results are pending.
-[Original FAT observation](rust/rw02-filesystem.md#fat-handle-observation-on-two-native-windows-hosts)
-· [Reviewed fixture](rust/rw02-storage-faults.md).
+verified. At `8091469` both Windows hosts completed all eight cases and then
+read and renamed a 45-byte file on the private FAT volume through the Rust
+adapter. The held handle and the new name returned the same bytes. The
+independent GUID readback confirmed the renamed file and the mount was removed.
+[FAT16 adapter result](rust/rw02-filesystem.md#ordinary-fat16-adapter-on-native-windows-2026-11-22)
+· [Independent recovery review](rust/rw02-storage-faults.md#native-windows-fat16-follow-up-at-8091469-2026-11-22)
+· [Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343481).
 
 The appearance-enabled desktop at `a66e045` passed all eleven fixed
 Fedora X11 budgets over three 100,000-file runs. Median startup was

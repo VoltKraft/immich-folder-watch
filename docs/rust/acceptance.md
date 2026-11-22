@@ -44,13 +44,13 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
-| RI-AC03 | Open | C#↔Rust corpus, unknown-format refusal, WAL/crash/full-disk and post-activity rollback results |
+| RI-AC03 | Open | [Stored path keys on authentic C# backups from two ICU profiles](rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles), WAL/crash and native full-volume results. Production write policy, complete migration and rollback after sync activity are pending. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
 | RI-AC05 | Open | Native lifecycle, old/new/cross-session ownership and durable task/DB shutdown tests |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
 | RI-AC07 | Open | Independent consumer on four targets and dependency/profile isolation verification |
 | RI-AC08 | Open | Exact-revision Actions packages, offline and actual installer/migration evidence |
-| RI-AC09 | Open | [Four reproducible development-build SPDX inventories](rw02-combined-sbom.md) verified against the native Cargo logs. Candidate packages still need their exact installed inventory, notices and reconstructible source inputs. |
+| RI-AC09 | Open | [Four development-build SPDX inventories](rw02-combined-sbom.md) reproduced from native Cargo logs. Review of the [development notice archives](rw02-combined-notices.md) identified missing Wayland core XML, Plasma license texts and ring source-header grants. Corrected coverage and the exact installed package, source and relink evidence remain open. |
 | RI-AC10 | Open | Independent final review with no unresolved acceptance blocker and truthful complete handoff |
 
 All four native targets confirmed old/new local activation in both directions and exclusion
@@ -72,6 +72,16 @@ At `7517e3b` both Windows targets also observed a real zero-byte completion
 after the notification buffer filled. The replacement registration recovered
 all 514 files and took the Windows total to fourteen scenarios. Both Ubuntu
 targets repeated fifteen. [Native overflow receipts](rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
+
+At `8091469` all four targets repeated these watch and filesystem checks.
+Both Windows architectures also completed the separate direct Rust adapter
+trial on FAT16 after their eight recovery cases. The 45-byte file remained
+readable through the original handle after rename. Opening the new name and
+reading it independently via the volume GUID confirmed the same content.
+The independent review matched the four detached images to the expected
+database bytes and verified the original backups after cleanup.
+[Native FAT16 results](rw02-filesystem.md#ordinary-fat16-adapter-on-native-windows-2026-11-22)
+· [Recovery archives](rw02-storage-faults.md#native-windows-fat16-follow-up-at-8091469-2026-11-22).
 
 The Windows
 [retained-window variant](rw02-windows-window.md) held the same DX12 device

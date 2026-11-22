@@ -259,11 +259,34 @@ The separate storage trial at `3b4854d` observed a file on its private
 16 MiB FAT VHD on each Windows target. `FileIdInfo` returned error 87 on
 both. Before and after one ordinary rename, the same open handle reported
 legacy file index 31328 on x64 and 31424 on ARM64. Those numbers apply only to
-the two observed files. The trial neither selected a write by cached index
-nor exercised the Rust safe-fs adapter on FAT. Qualification of the adapter
-on this provider still needs a native test with an owned volume.
+the two observed files. The later trial below exercises the Rust adapter
+directly on an owned FAT16 volume.
 [Volume receipts](rw02-storage-faults.md)
 · [Windows archives](rw02-native-gui.md#native-follow-up-at-3b4854d).
+
+### Ordinary FAT16 adapter on native Windows (2026-11-22)
+
+At `8091469` both native Windows jobs acquired a Rust read lease, renamed
+the file and read the original bytes through that lease. The old name
+ceased to identify the entry. A second lease opened the new name and
+returned the same bytes. Both children closed their handles and exited
+successfully. The supervisor used the verified volume GUID to find exactly
+`renamed.txt`. Its 45 bytes had SHA-256
+`ede36582459519e92f557282101b600f6967042f18be2bf40c03dd92cf38c176`.
+[Rust operations](../../tools/rust-qa/storage-faults/fat_provider.rs) · [Independent readback](../../tools/rust-qa/storage-faults/windows_provider.py).
+
+| Target | FAT16 volume serial | ID on first open | ID on reopen | Free bytes before and after the trial |
+| --- | ---: | ---: | ---: | ---: |
+| Windows x64 | 1,532,645,700 | 221,760 | 221,760 | 15,509,504 |
+| Windows ARM64 | 3,663,261,412 | 232,000 | 232,000 | 15,499,264 |
+
+The serials agreed with the FAT boot records. After removing the probe and
+its private NTFS mount, each volume had its original inventory and capacity
+and zero remaining mount paths. Independent examination of the detached
+images confirmed both observations. This covers one ordinary rename on
+FAT16 per target. Changes of file ID, FAT32/exFAT behavior and combined
+synchronization actions require separate evidence.
+[Recovery receipts and archive hashes](rw02-storage-faults.md#native-windows-fat16-follow-up-at-8091469-2026-11-22).
 
 ## Independent review of the feasibility boundary
 

@@ -903,3 +903,30 @@ The result SHA-256 is
 `4c0f074f66d32c9f7e4634182827b3ae62014ddd96190826b829322328df3683`
 and the evidence index SHA-256 is
 `c1235e9cf798e06ca4d0dd423654090a44a34d61bd7b5fe262300e1baefdd309`.
+
+## Native Windows FAT16 follow-up at 8091469 (2026-11-22)
+
+Windows x64 and ARM64 repeated all eight recoveries at
+`80914693b6db24a5a76f4a5035c6ec880605ddc3`. Each recorded the expected exits
+for 48 steps and 208 passing C# assertions. Both readers rejected all eight
+altered copies. The eight original 45,056-byte snapshots on each host
+matched the producer's digests before the optional filesystem test and
+after the volume detached. The separate provider receipt includes the
+SHA-256 of the durable recovery result written before that test started.
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343481).
+
+| Host | Artifact ID | ZIP bytes | ZIP SHA-256 | Provider receipt SHA-256 |
+| --- | ---: | ---: | --- | --- |
+| Windows x64 | 14771752825 | 6,814,947 | `84255e4c9db31882e6355009b627a7c1ed4301332428033752029af7a65dc1e6` | `cba61d3509daca2b48f2db5eb71ee898f8f73210d04f4ce845404626dc1ac68a` |
+| Windows ARM64 | 14772037925 | 6,815,296 | `db944b96bfcdfa147e3c383f2f959436dd9011a3a42181d325c496e04c556e2e` | `17201ebdf9bc461c95ecfdd5d09130d34f8ab19f824cd30d3e7f6b631e43c2b8` |
+
+The independent review verified 491 indexed file hashes in each 492-file
+archive. All ten provider sources matched Git byte-for-byte. Of 151
+recovery sources, 68 matched Git directly and 83 matched the recorded
+Windows checkout line endings. The reviewer reconstructed all four initial
+VHD images and read the four detached FAT16 images in memory. All four
+reached zero free bytes, Win32 error 112 and SQLite code 13. Their
+restored databases matched the producer bytes, including committed WAL
+data. The incomplete trailing frame after the volume filled did not
+become a committed transaction. Product migration and rollback after
+synchronization remain open. [Native FAT16 adapter results](rw02-filesystem.md#ordinary-fat16-adapter-on-native-windows-2026-11-22).
