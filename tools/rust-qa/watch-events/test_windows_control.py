@@ -1,8 +1,12 @@
 """Check control eligibility without substituting data for native Windows I/O."""
 
+import json
+from pathlib import Path
 import struct
+import tempfile
 import unittest
 
+from run import HERE, library_test_program
 from windows_control import (decode_notifications, flat_notification_evidence,
                              idle_cancel_passed, native_loss_evidence, require_file_id)
 
@@ -24,6 +28,25 @@ def trace_line(generation, *events):
 
 
 class WindowsControlTests(unittest.TestCase):
+    def test_native_test_selection_accepts_cargos_layout_and_binds_the_target(self):
+        with tempfile.TemporaryDirectory() as area:
+            build = Path(area).resolve()
+            target = "x86_64-pc-windows-msvc"
+            program = build / target / "debug/build/native-watch-hints/1234/out/native_watch_hints-1234.exe"
+            program.parent.mkdir(parents=True)
+            program.touch()
+            item = {"reason": "compiler-artifact", "manifest_path": str(HERE / "Cargo.toml"),
+                    "profile": {"test": True}, "executable": str(program), "filenames": [str(program)],
+                    "target": {"kind": ["lib"], "name": "native_watch_hints", "src_path": str(HERE / "src/lib.rs")}}
+            messages = json.dumps(item)
+            self.assertEqual(library_test_program(messages, build, target), program)
+            with self.assertRaises(RuntimeError):
+                library_test_program(messages, build, "aarch64-pc-windows-msvc")
+            with self.assertRaises(RuntimeError):
+                library_test_program(messages + "\n" + messages, build, target)
+            with self.assertRaises(RuntimeError):
+                library_test_program(json.dumps({**item, "filenames": []}), build, target)
+
     def test_loss_receipt_requires_a_native_result_and_complete_replacement(self):
         line = "NATIVE_WATCH_OVERFLOW completion-zero-bytes 32 512 3 15 1 1 514"
         receipt = native_loss_evidence("running 1 test\n" + line)

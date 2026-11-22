@@ -51,8 +51,10 @@ The Windows watch fixture now exercises the ordinary 32 KiB notification
 buffer with a bounded batch of 512 synthetic files. An independent review
 checked request lifetimes, full replacement inventories and cleanup. Its
 timeout finding was addressed by running the compiled test as the Python
-parent's direct child. Seven portable controls and Clippy on both Windows
-targets passed. The native Windows loss result is still pending.
+parent's direct child. A local run of the pinned Cargo compiler exposed its
+test-program layout under `debug/build`. The runner now validates the program
+from Cargo's compiler message on every host. Eight portable controls and
+Clippy on both Windows targets passed. Native Windows loss is still pending.
 [Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
 
 The .NET reference, PR CI, CodeQL and dependency submission completed

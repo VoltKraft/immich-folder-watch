@@ -483,6 +483,8 @@ The replacement watch must enumerate and acknowledge all 513 original files
 with matching names and contents, receive a new file notification, and
 acknowledge all 514 files. The Python parent runs the compiled test executable
 directly with a 90-second deadline in its disposable build and temporary
-directories. It records the executable digest, machine and output.
-Seven portable receipt controls and warnings-denied Clippy on both MSVC
+directories. Cargo's compiler message binds the program to the test library,
+manifest, source file, emitted filenames and native target's build tree.
+All four native runners verify the reported program's machine and digest.
+Eight portable receipt controls and warnings-denied Clippy on both MSVC
 targets passed locally. Native Windows execution of this trial is pending.

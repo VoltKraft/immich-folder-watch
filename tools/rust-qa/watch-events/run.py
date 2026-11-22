@@ -603,22 +603,28 @@ def module_inventory(subject):
     return modules
 
 
-def windows_loss_trial(cargo_run, target, build, scratch, env, test, report):
-    from windows_control import native_loss_evidence
-
-    messages = cargo_run("test", "--frozen", "--lib", "--target", target, "--no-run", "--message-format=json")
+def library_test_program(messages, build, target):
     programs = []
     for line in messages.splitlines():
         if not line.startswith("{"):
             continue
         item = json.loads(line)
         if (item["reason"] == "compiler-artifact" and item["executable"] and item["profile"]["test"]
-                and item["target"]["kind"] == ["lib"] and Path(item["manifest_path"]).resolve() == HERE / "Cargo.toml"):
+                and item["target"]["kind"] == ["lib"] and item["target"]["name"] == "native_watch_hints"
+                and Path(item["target"]["src_path"]).resolve() == HERE / "src/lib.rs"
+                and Path(item["manifest_path"]).resolve() == HERE / "Cargo.toml"
+                and item["executable"] in item["filenames"]):
             programs.append(Path(item["executable"]).resolve(strict=True))
-    require(len(programs) == 1 and programs[0].parent == build / target / "debug/deps",
+    require(len(programs) == 1 and programs[0].is_file() and programs[0].is_relative_to(build / target / "debug"),
             "Expected the single native watch library test executable in the owned build")
-    program = programs[0]
+    return programs[0]
+
+
+def windows_loss_trial(program, target, scratch, env, test, report):
+    from windows_control import native_loss_evidence
+
     record = {"programSha256": sha(program), "machine": machine(program, target)}
+    require(record == report["libraryTestProgram"], "Native watch test program changed after compilation")
     report["nativeLossTest"] = record
     # The test owns threads only. Python kills and waits for this exact child on timeout
     # before TemporaryDirectory can remove the fixture and the compiled test program.
@@ -668,6 +674,9 @@ def execute(args, output, report):
         # Run the Windows queue-loss trial after the other independent observations.
         unit_tests = (*tests, "--", "--skip", loss_test) if os.name == "nt" else tests
         report["unitTests"] = run(*unit_tests).strip()
+        messages = run(*tests, "--no-run", "--message-format=json")
+        library_test = library_test_program(messages, target_dir, args.target)
+        report["libraryTestProgram"] = {"programSha256": sha(library_test), "machine": machine(library_test, args.target)}
         report["releaseBuild"] = run("build", "--frozen", "--release", "--target", args.target).strip()
         binary = target_dir / args.target / "release" / ("native-watch-hints" + exe)
         report["binarySha256"] = sha(binary)
@@ -696,8 +705,7 @@ def execute(args, output, report):
             linux_overflow_and_loss(binary, area, rows)
         else:
             windows_sharing(binary, area, rows)
-            rows["native-kernel-overflow"] = windows_loss_trial(run, args.target, target_dir, area,
-                                                               env, loss_test, report)
+            rows["native-kernel-overflow"] = windows_loss_trial(library_test, args.target, area, env, loss_test, report)
 
 
 def main():
