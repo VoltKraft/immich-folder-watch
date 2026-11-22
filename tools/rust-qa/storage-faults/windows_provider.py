@@ -26,15 +26,6 @@ class ChildNotQuiescent(RuntimeError):
     """Do not remove names while an owned child might still access them."""
 
 
-def durable_json(path: Path, value: dict) -> None:
-    """Close and flush the complete receipt before granting the next phase."""
-    with path.open("x", encoding="utf-8", newline="\n") as stream:
-        json.dump(value, stream, indent=2)
-        stream.write("\n")
-        stream.flush()
-        os.fsync(stream.fileno())
-
-
 def require_recovery(path: Path) -> str:
     data = path.read_bytes()
     value = json.loads(data)
@@ -43,11 +34,6 @@ def require_recovery(path: Path) -> str:
             or value.get("original_snapshot_checks") != 8):
         raise ValueError("provider setup requires all eight completed recovery cases")
     return hashlib.sha256(data).hexdigest()
-
-
-def source_files(repository: Path) -> list[Path]:
-    crate = repository / "rust/crates/safe-fs"
-    return [repository / "rust/Cargo.toml", crate / "Cargo.toml", *sorted((crate / "src").glob("*.rs"))]
 
 
 def require_no_mount_paths(api, volume: str) -> None:
@@ -131,12 +117,28 @@ def volume_files(volume: Path) -> dict:
     return result
 
 
+def mount_parent(env: dict, evidence: Path) -> Path:
+    """Select the disposable runner's temporary directory outside every repository upload."""
+    temp = Path(env.get("RUNNER_TEMP", ""))
+    workspace = Path(env.get("GITHUB_WORKSPACE", ""))
+    if not temp.is_absolute() or not workspace.is_absolute() or ".." in temp.parts:
+        raise Unavailable("an absolute disposable runner temp directory and workspace are required")
+    image.no_reparse(temp)
+    if not temp.is_dir():
+        raise Unavailable("the disposable runner temp directory is unavailable")
+    temp, workspace = temp.resolve(strict=True), workspace.resolve(strict=True)
+    if (not evidence.resolve(strict=True).is_relative_to(workspace)
+            or temp.is_relative_to(workspace) or workspace.is_relative_to(temp)):
+        raise ValueError("mount parent must be outside the workspace and its evidence collectors")
+    return temp
+
+
 class Mount:
     """One new empty NTFS directory bound only to the already owned volume GUID."""
 
     def __init__(self, api, directory: Path, volume: str):
         self.api, self.volume = api, volume
-        self.path = directory / "provider-mount"
+        self.path = directory / ("ifw-fat-mount-" + uuid.uuid4().hex)
         self.parent = self.handle = None
         self.created = self.mounted = False
         self.identity = None
@@ -187,6 +189,8 @@ class Mount:
 
     def create(self) -> None:
         image.no_reparse(self.path.parent)
+        if self.api.GetDriveTypeW(str(self.path.anchor)) != 3:
+            raise Unavailable("private mount parent is not on a local fixed volume")
         self.parent = self.open_directory(self.path.parent)
         self.receipt["ntfs_parent_identity"] = self.identity_of(self.parent)
         fs = ct.create_unicode_buffer(32)
@@ -198,7 +202,7 @@ class Mount:
         if fs.value != "NTFS":
             raise Unavailable("private mount parent is not NTFS")
         self.receipt["parent_filesystem"] = fs.value
-        self.path.mkdir(exist_ok=False)
+        self.path.mkdir(mode=0o700, exist_ok=False)
         self.created = self.receipt["created"] = True
         self.handle = self.open_directory(self.path)
         self.identity = self.identity_of(self.handle)
@@ -268,14 +272,11 @@ def run(executable: Path, env: dict, api, volume: str, directory: Path, validate
     quiescent = True
     try:
         report["recovery_receipt_sha256"] = require_recovery(recovery)
-        try:
-            report["capacity_before"] = validate_volume()
-        except Exception as error:
-            raise Unavailable("owned recovered volume identity unavailable: " + str(error)) from error
+        report["capacity_before"] = validate_volume()
         baseline = volume_files(Path(volume))
         report["volume_files_before"] = baseline
         require_no_mount_paths(api, volume)
-        mount = Mount(api, directory, volume)
+        mount = Mount(api, mount_parent(env, recovery.parent), volume)
         mount.create()
         validate_volume()
         nonce = uuid.uuid4().hex
@@ -292,6 +293,15 @@ def run(executable: Path, env: dict, api, volume: str, directory: Path, validate
         child_env = dict(env, IFW_STORAGE_PROVIDER_ROOT=str(root), IFW_STORAGE_PROVIDER_NONCE=nonce)
         report["child"] = run_child([str(executable), str(root), nonce], child_env, directory)
         report["observation"] = validate_observation(report["child"])
+        validate_volume()
+        names = sorted(path.name for path in probe.iterdir())
+        renamed = probe / "renamed.txt"
+        if names != ["renamed.txt"] or not renamed.is_file() or renamed.stat().st_size != len(CONTENTS):
+            raise ValueError("owned volume did not retain exactly the renamed synthetic file")
+        data = renamed.read_bytes()
+        if data != CONTENTS:
+            raise ValueError("renamed file contents differ on the owned volume")
+        report["renamed_file_readback"] = {"names": names, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
         report["status"] = "passed"
     except Exception as error:
         quiescent = not isinstance(error, ChildNotQuiescent)

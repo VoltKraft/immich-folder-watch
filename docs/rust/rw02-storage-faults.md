@@ -757,24 +757,31 @@ earlier VHD receipts are not adapter qualification.
 The last, insensitive VHD remains attached while its ordinary Rust/C# checks
 finish. All eight cases, 208 C# assertions, sixteen corrupted-copy rejections
 and a new comparison of all eight actual original snapshots must succeed first.
-`recovery-before-provider.json` records those results and is closed after flush
-and fsync before any provider mount directory or file is created. It explicitly
-states that final VHD detach and detached-image readback are still pending.
-The supervisor later repeats the existing deferred snapshot checks regardless
-of a returned provider outcome. The default recovery path retains its original
-no-mount behavior and test ordering.
+`recovery-before-provider.json` records those results and is flushed, fsynced
+and closed before the supervisor reads the optional sources, imports the
+provider or starts its format, control and build commands. Final VHD detach
+and detached-image readback are pending at this checkpoint. The default path
+archives the root Cargo manifest inherited by `ifw-legacy` and runs with the
+optional sources absent. Each provider outcome returns control to the
+independent VHD recheck and detach. Successful VHD readback is followed by
+the deferred checks of all eight original snapshots.
 
 The adapter intentionally accepts drive/UNC watch roots, not a volume GUID
 namespace or a reparse point as the final root. To observe the actual FAT
 provider without changing that contract, the supervisor creates one new empty
-NTFS directory inside its owned VHD output directory. It retains and compares
-the held and named NTFS identities, associates only the already validated VHD
-GUID with that new directory, and reads the association back. Microsoft defines
+directory on the hosted runner's local fixed NTFS `RUNNER_TEMP`. Its parent
+must be disjoint from the checkout. Both the evidence collector and the
+workflow upload stay inside the checkout, including when cleanup must retain a
+mapping. The supervisor retains and compares the held and named NTFS
+identities, associates the already validated VHD GUID with that new directory
+and reads the association back. Microsoft defines
 this [mounted-folder operation](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setvolumemountpointw)
 for an empty directory; its target can be a non-NTFS volume
 ([mounted folders](https://learn.microsoft.com/en-us/windows/win32/fileio/volume-mount-points)).
 Missing existing capability, NTFS backing or usable identity is an explicit
 unavailable result, subject to successful cleanup of anything already created.
+A change to the previously qualified volume's identity, extent or capacity
+fails the observation.
 There is no privilege adjustment, service change, drive letter, global alias,
 new VHD, format, disk-number selection or alternate-path fallback.
 
@@ -789,7 +796,11 @@ does not implement a production rename operation, timestamp repair, a replacemen
 case or an attack simulation. The child exits after releasing all leases.
 
 The supervisor enforces a 15-second child timeout and a 10-second kill/wait
-bound. It then removes only the owned file names and subdirectory, undoes only
+bound. After the child's success it independently authenticates the volume
+again and reads its GUID path. It must find exactly `renamed.txt`, with the
+original length and bytes. The receipt records the name, length and SHA-256
+of those observed bytes. It then removes only the owned file names and
+subdirectory, undoes only
 the verified mount, removes its authenticated empty NTFS stub and checks that
 the volume has no remaining mount path. Existing volume-file hashes, root entry
 names and measured capacity must match their pre-probe values. Cached FAT IDs
@@ -799,13 +810,17 @@ VHD cleanup/readback path. An unexpected mapping is retained as a failure rather
 than being removed by the fixture.
 
 Provider evidence is separate in `windows-provider.json` and
-`result.json.provider_followup`; `result.json.status` retains the storage
-outcome. Only when this option is selected does `selected_checks_status`
+`result.json.provider_followup`. A provider import, preparation, execution or
+receipt-write error is recorded in the latter and returns control to the VHD
+supervisor. The recovery outcome is recorded in `result.json.status`.
+Only when this option is selected does `selected_checks_status`
 combine their statuses for the command exit code. It returns 0 only if both
-passed, 2 for unavailable capability, otherwise 1. The source inventory includes
-the unchanged safe-fs sources and workspace/crate manifests. The pinned native
-compiler builds the isolated rlib/probe, records both hashes, and verifies the
-probe's PE machine. No dependency or Cargo lockfile changes are involved.
+passed, 2 for unavailable capability, otherwise 1. The separate
+`provider-preparation/` inventory records the optional harness, unchanged
+`safe-fs` sources, workspace and crate manifests alongside the format,
+control and compiler logs. The pinned native compiler builds the isolated
+rlib and executable. The supervisor verifies their hashes, the executable's
+PE machine and the source bytes used for the build.
 
 Supported invocation after review, on the existing disposable hosted runner:
 
@@ -845,3 +860,32 @@ covers the final provider-specific cleanup refinements.
 | `linux-x64-12/evidence-hashes.json` | `2ae8c725590dfeb6f00121fb36faaae678ca74cc8038bcca5c2f8c64499e8c7b` |
 | `provider-source-check-03/result.json` | `6f167dbb2cbaf6f1dc33b0964ca9145644bbdbdba4b05e808a155071c1ddee63` |
 | `provider-source-check-03/evidence-hashes.json` | `7fa93a7555d647126065dacd06e2666940f17a2248ab869ce9a6f111850029e1` |
+
+The review follow-up in `provider-isolation-controls-01` passed 18 provider
+controls on Fedora. They exercised a failed fsync, missing provider module,
+format and build failures, wrong or changed PE bytes, a child error and a
+refused receipt write. The retained mapping stayed outside both modeled
+evidence walks. The independent rename readback rejected a missing name, the
+old name, both names, an incorrect length and changed bytes of the right
+length. The full storage control suite passed 44 tests. Its Windows-only
+mandatory byte-lock test was skipped. All 17 source bindings and 22 evidence
+file digests matched. The result and evidence index have SHA-256
+`ea3d40f34174204626b6e81cf279178e710520104d31d35bcba5b7484b599e5e` and
+`fb083056002d7a5255b114ca0a17db6d3c5b173124f6d1b74beb0e798582384b`,
+respectively. The opt-in FAT provider still requires its own native Windows
+x64 and ARM64 observations.
+
+The unselected recovery path passed on Fedora x64 in
+`linux-x64-provider-isolation-03`. Both 8-MiB tmpfs cases reached ENOSPC in
+private namespaces. All 48 command outcomes, eight recovery cases, 208 C#
+assertions, sixteen corrupted-copy rejections and eight deferred reads of the
+original backups matched. The 151 first-party source bindings included the
+inherited Cargo manifest. The run used no optional provider sources or
+preparation steps. All 476 evidence file digests matched. The result SHA-256
+is `ec2a3a93b1b9b6d617695e4bfd5d7e2b7694d16beeeee407986999afcab51841`
+and the evidence index SHA-256 is
+`be0b2d79b3f955ef0a248594e6d801ddc5d307bdb356375e5018f834c1d5f2d2`.
+The first attempt stopped at a read-only compiler cache. The second used the
+system compiler and finished the six portable cases before the outer sandbox
+refused the private loopback socket. The completed run used the same compiler
+and explicit permission for the private namespaces.

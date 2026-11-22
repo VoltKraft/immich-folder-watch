@@ -91,24 +91,31 @@ python tools/rust-qa/storage-faults/run.py x86_64-pc-windows-msvc `
 ```
 
 Use the ARM64 target and a new output for its separate native result. This option
-requires the existing hosted Windows gates, an already available mount right,
-and a private NTFS output directory with a live, nonzero extended identity. No
-privilege, service, drive letter, global alias or disk-layout change is attempted.
-Missing capability is reported as `unavailable`; there is no fallback.
+requires the existing hosted Windows gates, a mount right and a local fixed NTFS
+`RUNNER_TEMP` outside the checkout. Its path and the workspace must be disjoint.
+The supervisor creates one new, private, empty directory there and holds its
+NTFS identity. This places even a retained mapping outside the evidence
+collector and the workflow upload. Missing capability is reported as
+`unavailable`. A change to the already authenticated VHD is a failure.
 
 The last VHD stays attached while all eight existing Rust/C# recovery cases,
 208 C# assertions, corrupt-copy controls and original-snapshot comparisons finish.
-The supervisor writes and fsyncs `recovery-before-provider.json` before creating
-the empty NTFS mount directory or any provider file. Final VHD detach/readback is
-explicitly still pending at this checkpoint. Only this new directory is associated
-with the already authenticated volume GUID. The probe root is an ordinary FAT
-subdirectory beneath it: the adapter's deliberate rejection of a GUID namespace
-or a reparse point as the final watch root remains unchanged.
+The supervisor writes, fsyncs and closes `recovery-before-provider.json` before
+it reads the optional sources, imports the provider, runs Rustfmt and the
+portable controls, builds the Rust probe or verifies its native PE machine.
+The default recovery source archive includes the workspace manifest inherited
+by `ifw-legacy`. Optional source copies, hashes and command logs live under
+`provider-preparation/`. Final VHD detach and readback are pending at the
+checkpoint. Only the new NTFS directory is associated with the authenticated
+volume GUID. The child receives an ordinary FAT subdirectory beneath it.
 
 A direct native Rust child opens and reads one fixed 45-byte synthetic file,
 performs an ordinary fixture rename, reads the held lease and reopens the new
 name through `safe-fs`. Its old-name match must be false and its new-name match
-true. File-identity equality across the rename is recorded, not assumed. No
+true. The supervisor then revalidates the VHD and reads the names and bytes
+through its independent volume-GUID path. It requires exactly `renamed.txt`
+with the original length and contents and records the observed SHA-256.
+File-identity equality across the rename is recorded. No
 timestamp write, replacement, attack simulation, production rename API or cached
 identity cleanup is exercised. The child has a 15-second deadline and a
 10-second termination wait; the supervisor waits before deleting owned names.
@@ -116,9 +123,11 @@ identity cleanup is exercised. The child has a 15-second deadline and a
 The supervisor removes only the names it created, undoes only its authenticated
 mount mapping, checks the empty NTFS stub's identity before removal and requires
 no remaining volume mount path. All pre-existing volume file hashes and measured
-capacity must match after cleanup. Failure still reaches the existing VHD detach,
-detached-image readback and final snapshot checks. An unconfirmed child exit
-prevents name removal and is retained as an explicit cleanup failure.
+capacity must match after cleanup. A provider import, build, observation or
+receipt-write failure still reaches the final VHD snapshot check, detach,
+detached-image readback and all eight deferred original snapshot checks.
+An unconfirmed child exit prevents name removal and is retained as an explicit
+cleanup failure.
 
 `windows-provider.json` and `result.json.provider_followup` record this outcome
 separately from `result.json.status`, which retains the storage result. With the

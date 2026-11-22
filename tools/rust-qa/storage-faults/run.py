@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from functools import partial
 import hashlib
 import json
 import os
@@ -26,7 +27,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(STORAGE))
 from evidence import external_lock, sha256, target_graph, verify_fixture, verify_sources, write_json
 import windows_vhd
-import windows_provider
+
+PROVIDER_FILES = tuple(HERE / name for name in ("fat_provider.rs", "windows_provider.py", "test_windows_provider.py"))
 
 
 def evidence_inventory(output: Path) -> dict:
@@ -41,6 +43,93 @@ def isolated(value: Path) -> Path:
     if not path.is_relative_to(ARTIFACTS.resolve()) or path == ARTIFACTS.resolve():
         raise ValueError("output must be a new directory below artifacts/rust/storage-faults")
     return path
+
+
+def durable_json(path: Path, value: dict) -> None:
+    """Flush and close an exclusive receipt before starting the next phase."""
+    with path.open("x", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def logged_command(output: Path, env: dict, result: dict, name: str, arguments: list[str],
+                   expected_code: int = 0) -> bytes:
+    log = output / (name + ".log")
+    print("Storage faults:", name, flush=True)
+    with log.open("wb") as stream:
+        code = subprocess.run(arguments, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
+    result["steps"][name] = {"command": arguments, "exit_code": code, "expected_exit_code": expected_code, "log": log.name}
+    write_json(output / "result.json", result)
+    if code != expected_code:
+        raise RuntimeError(f"{name} failed ({code}): {log.read_text(errors='replace')[-4000:]}")
+    return log.read_bytes()
+
+
+def recovery_sources(fixtures: Path) -> list[Path]:
+    sources = []
+    for directory in (HERE, STORAGE, ROOT / "rust/crates/ifw-legacy", ROOT / "src/ImmichFolderWatch.Core", fixtures):
+        sources += [p for p in directory.rglob("*") if p not in PROVIDER_FILES and p.is_file()
+                    and not {"obj", "target", "__pycache__"}.intersection(p.relative_to(directory).parts)
+                    and ("bin" not in p.relative_to(directory).parts or p.relative_to(directory).parts[:2] == ("src", "bin"))
+                    and p.suffix != ".pyc"]
+    return sources + [ROOT / name for name in ("LICENSE", "global.json", "Directory.Build.props", "Directory.Build.targets",
+                      "NuGet.Config", "rust/Cargo.toml", "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
+
+
+def provider_sources() -> list[Path]:
+    crate = ROOT / "rust/crates/safe-fs"
+    return [*PROVIDER_FILES, ROOT / "rust/Cargo.toml", crate / "Cargo.toml", *sorted((crate / "src").glob("*.rs"))]
+
+
+def provider_followup(output: Path, checkpoint: dict, env: dict, api, volume: str,
+                      directory: Path, validate_volume) -> dict:
+    """Keep optional preparation, execution and reporting failures local to the provider."""
+    recovery = output / "recovery-before-provider.json"
+    observed = {"format": "ifw-owned-fat-provider-v1", "status": "failed"}
+    preparation = {"steps": {}}
+    try:
+        durable_json(recovery, checkpoint)
+        observed["recovery_receipt_sha256"] = sha256(recovery)
+        area = output / "provider-preparation"
+        area.mkdir()
+        files = provider_sources()
+        hashes = export_source_snapshot(ROOT, area, files)
+        preparation["source_index_sha256"] = sha256(area / "first-party-source-hashes.json")
+        import windows_provider
+        if windows_provider.require_recovery(recovery) != observed["recovery_receipt_sha256"]:
+            raise ValueError("recovery receipt changed before provider preparation")
+        command = partial(logged_command, area, env, preparation)
+        command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "fat_provider.rs")])
+        command("controls", [sys.executable, str(HERE / "test_windows_provider.py"), "-v"])
+        build = output / "build/provider"
+        build.mkdir(parents=True)
+        library, executable = build / "libsafe_fs.rlib", build / "ifw-fat-provider.exe"
+        compiler = ["rustc", "--edition=2024", "--target", checkpoint["target"], "-Dwarnings"]
+        command("library-build", [*compiler, "--crate-name", "safe_fs", "--crate-type=rlib",
+                                  str(ROOT / "rust/crates/safe-fs/src/lib.rs"), "-o", str(library)])
+        command("build", [*compiler, str(HERE / "fat_provider.rs"), "--extern", "safe_fs=" + str(library),
+                          "-o", str(executable)])
+        preparation["library_sha256"] = sha256(library)
+        preparation["binary_sha256"] = sha256(executable)
+        windows_provider.require_native_pe(executable, checkpoint["target"])
+        for path in files:
+            if sha256(path) != hashes[path.relative_to(ROOT).as_posix()]:
+                raise ValueError("provider source changed during compilation")
+        if sha256(executable) != preparation["binary_sha256"]:
+            raise ValueError("provider executable changed after compilation")
+        observed.update(windows_provider.run(executable, env, api, volume, directory, validate_volume, recovery))
+    except Exception as error:
+        observed["status"] = "failed"
+        observed["error"] = f"{type(error).__name__}: {error}"
+    observed["preparation"] = preparation
+    try:
+        durable_json(output / "windows-provider.json", observed)
+    except Exception as error:
+        observed["status"] = "failed"
+        observed["receipt_error"] = f"{type(error).__name__}: {error}"
+    return observed
 
 
 def export_source_snapshot(repository: Path, output: Path, sources: list[Path]) -> dict:
@@ -244,16 +333,7 @@ def main() -> int:
         result["limits"]["windows_volume_discovery_seconds"] = 30
         result["limits"]["windows_worker_seconds"] = 60
 
-    def command(name: str, arguments: list[str], expected_code: int = 0) -> bytes:
-        log = output / (name + ".log")
-        print("Storage faults:", name, flush=True)
-        with log.open("wb") as stream:
-            code = subprocess.run(arguments, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
-        result["steps"][name] = {"command": arguments, "exit_code": code, "expected_exit_code": expected_code, "log": log.name}
-        write_json(output / "result.json", result)
-        if code != expected_code:
-            raise RuntimeError(f"{name} failed ({code}): {log.read_text(errors='replace')[-4000:]}")
-        return log.read_bytes()
+    command = partial(logged_command, output, env, result)
 
     try:
         if args.windows_vhd:
@@ -270,33 +350,10 @@ def main() -> int:
         filtered = json.loads(command("native-graph", ["cargo", "metadata", "--manifest-path", str(HERE / "Cargo.toml"), "--frozen", "--format-version", "1", "--filter-platform", args.target]))
         if target_graph(filtered) != inputs["target_graphs"][args.target]:
             raise ValueError("native feature graph differs")
-        sources = []
-        for directory in (HERE, STORAGE, ROOT / "rust/crates/ifw-legacy", ROOT / "src/ImmichFolderWatch.Core", fixtures):
-            sources += [p for p in directory.rglob("*") if p.is_file() and not {"obj", "target", "__pycache__"}.intersection(p.relative_to(directory).parts)
-                        and ("bin" not in p.relative_to(directory).parts or p.relative_to(directory).parts[:2] == ("src", "bin")) and p.suffix != ".pyc"]
-        sources += [ROOT / name for name in ("LICENSE", "global.json", "Directory.Build.props", "Directory.Build.targets", "NuGet.Config", "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py")]
-        if args.windows_provider:
-            sources += windows_provider.source_files(ROOT)
-        hashes = export_source_snapshot(ROOT, output, sources)
+        hashes = export_source_snapshot(ROOT, output, recovery_sources(fixtures))
         result["first_party_sources"] = len(hashes)
         result["source_snapshot_paths"] = "first-party-source-paths.json"
-        command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs"), str(HERE / "fat_provider.rs")])
-        if args.windows_provider:
-            command("provider-controls", [sys.executable, str(HERE / "test_windows_provider.py"), "-v"])
-            provider_build = build / "provider"
-            provider_build.mkdir(parents=True)
-            library = provider_build / "libsafe_fs.rlib"
-            provider_binary = provider_build / "ifw-fat-provider.exe"
-            command("provider-library-build", ["rustc", "--edition=2024", "--target", args.target, "-Dwarnings",
-                "--crate-name", "safe_fs", "--crate-type=rlib", str(ROOT / "rust/crates/safe-fs/src/lib.rs"), "-o", str(library)])
-            command("provider-build", ["rustc", "--edition=2024", "--target", args.target, "-Dwarnings",
-                str(HERE / "fat_provider.rs"), "--extern", "safe_fs=" + str(library), "-o", str(provider_binary)])
-            windows_provider.require_native_pe(provider_binary, args.target)
-            for path in [*windows_provider.source_files(ROOT), HERE / "fat_provider.rs"]:
-                if sha256(path) != hashes[path.relative_to(ROOT).as_posix()]:
-                    raise ValueError("safe-fs source changed during provider compilation")
-            result["provider_binary_sha256"] = sha256(provider_binary)
-            result["provider_library_sha256"] = sha256(library)
+        command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs")])
         command("windows-image-preparation-tests", [sys.executable, str(HERE / "test_windows_image.py"), "-v"])
         command("crash-capture-tests", [sys.executable, str(HERE / "test_crash_capture.py"), "-v"])
         command("source-snapshot-tests", [sys.executable, str(HERE / "test_source_snapshot.py"), "-v"])
@@ -408,23 +465,22 @@ def main() -> int:
                                 completed["snapshot_checks"].append(snapshot_check(
                                     cases / completed["name"], completed["producer_snapshot_sha256"],
                                     "before-provider-after-all-cases"))
-                            recovery = output / "recovery-before-provider.json"
-                            windows_provider.durable_json(recovery, {
+                            assertions = sum(item["csharp"]["Assertions"] for item in result["cases"])
+                            if (len(result["cases"]), assertions) != (8, 208):
+                                raise ValueError("incomplete recovery results before the optional provider")
+                            checkpoint = {
                                 "format": "ifw-before-provider-recovery-v1", "status": "passed",
                                 "completed_cases": len(result["cases"]),
-                                "csharp_assertions": sum(item["csharp"]["Assertions"] for item in result["cases"]),
+                                "csharp_assertions": assertions,
                                 "original_snapshot_checks": len(result["cases"]),
                                 "vhd_detach_and_final_readback_pending": True,
                                 "target": args.target, "cases": result["cases"],
-                                "source_index_sha256": sha256(output / "first-party-source-hashes.json")})
+                                "source_index_sha256": sha256(output / "first-party-source-hashes.json")}
                             verified_before_provider.append(True)
-                            if sha256(provider_binary) != result["provider_binary_sha256"]:
-                                raise ValueError("provider executable changed after compilation")
-                            observed = windows_provider.run(provider_binary, env, api, volume, directory,
-                                                            validate_volume, recovery)
+                            observed = provider_followup(output, checkpoint, env, api, volume, directory, validate_volume)
                             result["provider_followup"] = observed
-                            windows_provider.durable_json(output / "windows-provider.json", observed)
-                            return {"status": observed["status"], "receipt": "windows-provider.json"}
+                            return {"status": observed["status"], "receipt": (
+                                None if "receipt_error" in observed else "windows-provider.json")}
                     private = windows_vhd.run(binary, seed, case, mode, env, ROOT, after_recovery=after_recovery)
                     result["steps"][name + "-volume"] = {"call": "windows_vhd.run", "exit_code": 0,
                         "expected_exit_code": 0, "receipt": str((case / "windows-vhd.json").relative_to(output))}
