@@ -57,8 +57,18 @@ def require_result(line, expected_errno, kind):
     if expected_errno is None:
         if not line.startswith("ACQUIRED "):
             raise ValueError(f"Expected acquired lease, got {line}")
-    elif kind == "rust" and expected_errno == errno.EAGAIN and line == "REFUSED kind=WouldBlock":
-        return
+    elif kind == "rust":
+        outcomes = {errno.ENOSYS: ("UnsupportedFileLock", "CheckPortalFileLockSupport"),
+                    errno.EOPNOTSUPP: ("UnsupportedFileLock", "CheckPortalFileLockSupport"),
+                    errno.EAGAIN: ("FileBusy", "RetryAfterWriterRelease"),
+                    errno.EACCES: ("AccessDenied", "RestoreAuthorizedAccess"),
+                    errno.EPERM: ("AccessDenied", "RestoreAuthorizedAccess")}
+        outcome, action = outcomes.get(expected_errno, ("ReadLeaseUnavailable", "InspectNativeError"))
+        native = [f"errno={expected_errno}"]
+        if expected_errno == errno.EAGAIN:
+            native.append("kind=WouldBlock")
+        if line not in [f"REFUSED {value} operation=ReadLease outcome={outcome} action={action}" for value in native]:
+            raise ValueError(f"Expected classified Rust refusal for errno {expected_errno}, got {line}")
     elif not re.match(rf"^REFUSED errno={expected_errno}( |$)", line):
         raise ValueError(f"Expected errno {expected_errno}, got {line}")
 
@@ -141,12 +151,12 @@ def observe(expected):
         grant = MOUNT / "by-app" / APP / token / "source"
         result.update(mount=found[0], grant=str(grant), documentId=token, backing=str(BACKING),
                       runningDaemon=outer["daemonSha256"], permissionStore=outer["storeSha256"])
-        def command(view, kind, hold):
+        def command(view, kind, hold, retry=False):
             path = grant if view == "grant" else BACKING
             if kind == "dotnet":
                 args = ["/runtime/dotnet", "/oracle/PortalReference.dll", "hold" if hold else "read", str(path)]
             elif kind == "rust":
-                args = ["/probe/reader", "hold" if hold else "read", str(path)]
+                args = ["/probe/reader", "retry" if retry else "hold" if hold else "read", str(path)]
             else:
                 args = ["/usr/bin/python3", "/recipe/observe.py", "native", str(path), kind, "hold" if hold else "read"]
             if view == "grant":
@@ -196,6 +206,81 @@ def observe(expected):
                             check(contender, reader, reason)
             for reader in ("rust", "dotnet"):
                 check(view, reader, errno.ENOSYS if unsupported else None)
+        # A single reader keeps the original grant and album descriptors alive
+        # across an unavailable attempt and the later explicit retry. Never
+        # restart the portal or replace the grant to manufacture recovery.
+        proc = subprocess.Popen(command("grant", "rust", False, retry=True), stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        try:
+            def response():
+                if not select.select([proc.stdout], [], [], 8)[0]:
+                    raise TimeoutError("No bounded retry response from the Rust reader")
+                return proc.stdout.readline().strip()
+            ready = response()
+            match = re.fullmatch(r"READY pid=([1-9][0-9]*) attempts=3", ready)
+            if match is None:
+                raise ValueError(f"Expected a retained grant reader, got {ready}")
+            pid = int(match.group(1))
+            with Path(f"/proc/{pid}/exe").open("rb") as image:
+                if hashlib.file_digest(image, "sha256").hexdigest() != outer["rustReaderSha256"]:
+                    raise ValueError("The retry peer is not the selected Rust reader")
+            def identities():
+                result = {}
+                for name, path in (("grant", grant), ("album", grant / "album"), ("backingFile", backing_file)):
+                    item = path.stat()
+                    result[name] = dict(device=item.st_dev, inode=item.st_ino)
+                return result
+            def descriptors():
+                result = {}
+                for fd in Path(f"/proc/{pid}/fd").iterdir():
+                    target = os.readlink(fd)
+                    if target not in (str(grant), str(grant / "album")):
+                        continue
+                    metadata = fd.stat()
+                    flags = re.search(r"^flags:\s+([0-7]+)$", Path(f"/proc/{pid}/fdinfo/{fd.name}").read_text(), re.M)
+                    required = os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+                    if (flags is None or int(flags[1], 8) & required != required
+                            or int(flags[1], 8) & os.O_ACCMODE != os.O_RDONLY or target in result):
+                        raise ValueError("The retained directory descriptor is missing or ambiguous")
+                    result[target] = dict(fd=int(fd.name), device=metadata.st_dev, inode=metadata.st_ino, flags=flags[1])
+                if set(result) != {str(grant), str(grant / "album")}:
+                    raise ValueError("The Rust reader did not retain both authorized directories")
+                return result
+            before_ids, before_fds = identities(), descriptors()
+            for name, path in (("grant", grant), ("album", grant / "album")):
+                if any(before_ids[name][key] != before_fds[str(path)][key] for key in ("device", "inode")):
+                    raise ValueError("The retained directories differ from the authorized grant")
+            attempts = []
+            def attempt(reason):
+                proc.stdin.write("attempt\n")
+                proc.stdin.flush()
+                line = response()
+                attempts.append(line)
+                observed(dict(view="grant", operation="rust", mode="retained-retry", attempt=len(attempts),
+                              expectedErrno=reason, detail=line))
+                require_result(line, reason, "rust")
+            unsupported = expected == "enosys"
+            attempt(errno.ENOSYS if unsupported else None)
+            with lease("backing", "exclusive", True, None):
+                attempt(errno.ENOSYS if unsupported else errno.EAGAIN)
+            attempt(errno.ENOSYS if unsupported else None)
+            after_ids, after_fds = identities(), descriptors()
+            if (before_ids != after_ids or before_fds != after_fds or backing_file.read_bytes() != FIXTURE
+                    or attempts[0] != attempts[2]):
+                raise ValueError("Retry changed the grant, held directories, file identity, contents or final outcome")
+            result["rustRetry"] = dict(ready=ready, documentId=token, attempts=attempts,
+                directoryDescriptorsBefore=before_fds, directoryDescriptorsAfter=after_fds,
+                identitiesBefore=before_ids, identitiesAfter=after_ids, contentUnchanged=True,
+                outcome="UnsupportedFileLockRemains" if unsupported else "FileBusyRecovered",
+                contentSha256=hashlib.sha256(backing_file.read_bytes()).hexdigest())
+            proc.stdin.write("stop\n")
+            proc.stdin.flush()
+            if proc.wait(timeout=5) != 0:
+                raise RuntimeError("The bounded Rust retry peer failed")
+        finally:
+            finish(proc)
+            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                pipe.close()
         call("RevokePermissions", GLib.Variant("(ssas)", (token, APP, ["read", "write"])))
         if grant.exists() or backing_file.read_bytes() != FIXTURE:
             raise ValueError("Revocation or final known-file readback failed")

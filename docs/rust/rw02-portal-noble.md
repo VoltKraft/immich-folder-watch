@@ -33,6 +33,75 @@ The offline run `amd64-kgndqoro` took 31.3 seconds on 2026-11-21. Its worktree w
 | Unmodified `d9c1db7cc7e00b592802a8a26ee273f062db5128845fcea51cf621acf41ce736` | `56d7c438` | 28 | `d3451b56ba68b0e3857ded0363fdabe884e020846022f5601292c90ff58efbe7` |
 | Backport `17980d7a8269396cf9a711f01e05ea2d62eddc0cb9459a0380a639eb74512852` | `e42a75c2` | 42 | `503cfb9ccd034937eff0ea27de7fe328de83e7949f18c3b78a12784b92b272f3` |
 
+## Development reader outcomes and retained-grant retry
+
+The earlier Rust caller preserved errno 38 but emitted only `REFUSED errno=38`.
+The development caller now reports an explicit outcome and next action for
+failures of the normal `Directory::open_file` read-lease acquisition. It preserves
+the native errno or Rust's normalized `WouldBlock` value. Root setup, content and
+identity-validation failures remain fatal errors outside this classification.
+
+| Read-lease failure | Outcome | Action |
+| --- | --- | --- |
+| `ENOSYS` (38), `EOPNOTSUPP` (95) | `UnsupportedFileLock` | `CheckPortalFileLockSupport` |
+| `EAGAIN` (11), normalized `WouldBlock` | `FileBusy` | `RetryAfterWriterRelease` |
+| `EPERM` (1), `EACCES` (13), normalized `PermissionDenied` | `AccessDenied` | `RestoreAuthorizedAccess` |
+| Other errors | `ReadLeaseUnavailable` | `InspectNativeError` |
+
+These are development-protocol observations for the fixed synthetic file, not a
+production UI or a new core error API. Four Rust controls exercise unsupported,
+busy, denied and unknown errors; three Python controls reject contradictory
+outcomes/actions and unauthenticated package selections. Native errno 38 and
+`WouldBlock` were observed below. The errno 95 and access-denied classifications
+have pure controls, not additional native fault injections.
+
+The `retry` mode opens the authorized root and album once and accepts exactly
+three explicit attempts followed by `stop`. Each attempt uses the unchanged
+filesystem adapter and its required shared lock. A failed acquisition returns
+no file lease. Successful reads check the expected bytes and current entry
+identity while the file lease is held. The retry releases a successful file
+lease before reporting completion, retaining both directory handles throughout.
+The observer independently reads the known Rust child's executable hash and
+`/proc/<pid>/fd` records. It requires unchanged directory descriptor numbers,
+device/inode identities and read-only `O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC`
+flags; the grant, backing-file identity and contents must also remain unchanged.
+These metadata observations validate the fixture and confer no filesystem
+authority on the consumer.
+
+The offline native x64 run `amd64-msdhalx2` passed on November 22, 2026 in 42.238
+seconds under Noble userspace and Fedora kernel `7.3.4-300.fc45.x86_64`. Its
+worktree base was `8b64330ce64485597b37f0c37657b759ff21abd9`; the receipt binds all
+fixture files and the actual workspace filesystem sources separately. The result
+SHA-256 is `7a830f8e58e8ff3491521ae05701bf7d145ef8169e20a5c7e650b827d9abb7ac`.
+The Rust reader SHA-256 is
+`eb084203c16cb93ca4b9824e2286edd4953e7e33f85412b028ef115ac3c80c54`.
+All source, executable, input and observation bindings were rechecked. The
+existing three daemon hashes above were unchanged; no new backport was made.
+
+| Service | Document ID | Lease observations | Observation JSON SHA-256 |
+| --- | --- | ---: | --- |
+| Packaged Noble | `8f7a4bea` | 32 | `a01dbe5ca24b21d775a590fe88cf8383fad5ec9715b07b3583d2e1e49dcfe0d0` |
+| Unmodified rebuild | `900dae4d` | 32 | `2affa8a01dac9fe33db41ce3b4862d7d664e13d8322e7152272ab8a1c760fef1` |
+| Existing private backport | `7433908b` | 46 | `5709fa41b3903284e13960dc819df94dcf656bf95a5098ced2eb38531d6fff1a` |
+
+The stock and unmodified services reported `UnsupportedFileLock` with errno 38
+on all three attempts, including before, during and after the independent
+exclusive backing lease. The backport reported an acquired read, then
+`FileBusy` while that exclusive lease was held, then an acquired read with the
+same file identity after release. Both held directory descriptors remained
+unchanged. All three grants were revoked after the checks. The synthetic bytes
+retained SHA-256 `b52af4136a0ecafce322a09cbb3efeb16704396715fb7458e07382e7d6d8ef55`.
+
+This demonstrates recovery from contention through the same retained grant on
+the supported private service. The stock unsupported capability did not recover.
+No retry across grant revocation, service replacement or backing identity change
+was attempted. A supported released host fix and production error/retry UI
+remain open. These added controls have run locally on x64; the earlier hosted
+x64/ARM64 counts above describe the earlier fixture. The initial local attempt
+`amd64-xxt06xb_` stopped after 28 observations because its observer incorrectly
+expected `O_PATH` directory handles. The corrected observer checks the actual
+read-only directory flags and passed in the fresh run recorded here.
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).
@@ -63,7 +132,7 @@ export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
 python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
 ```
 
-For the maintained local private Noble x64 userspace, run `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --download`. Once the signed source metadata, source archives and required development packages are in the private cache, omitting `--download` runs the comparison offline. The portable command `python3 -B tools/rust-qa/portal-noble/test_control.py` checks that a capability refusal cannot count as contention or success and that unsigned changes to the package index or dependency selection fail.
+For the maintained local private Noble x64 userspace, run `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --download`. Once the signed source metadata, source archives and required development packages are in the private cache, omitting `--download` runs the comparison offline. The portable command `python3 -B tools/rust-qa/portal-noble/test_control.py` checks that a capability refusal cannot count as contention or success, that reported actions match native errors and that unsigned changes to the package index or dependency selection fail. The native build also compiles and executes the four Rust classification controls, retaining `build/reader-tests.log` and its digest.
 
 Use `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --local-split-python` to exercise the hosted package layout offline with the local Noble userspace. The fixture verifies the two interpreter binaries are byte-identical and selects the runtime copy through a link in the newly created private compiler view. It retains the original Meson error in `build/split-python-control.log`. Every build collects the corrected interpreter and Meson inputs in `build/meson-python.log` and the final result.
 

@@ -13,15 +13,34 @@ from verify import signed_packages
 
 class Controls(unittest.TestCase):
     def test_refusal_and_real_conflict_are_distinct(self):
-        require_result("REFUSED errno=38", errno.ENOSYS, "rust")
-        require_result("REFUSED kind=WouldBlock", errno.EAGAIN, "rust")
+        unsupported = "REFUSED errno=38 operation=ReadLease outcome=UnsupportedFileLock action=CheckPortalFileLockSupport"
+        busy = "REFUSED kind=WouldBlock operation=ReadLease outcome=FileBusy action=RetryAfterWriterRelease"
+        require_result(unsupported, errno.ENOSYS, "rust")
+        require_result(busy, errno.EAGAIN, "rust")
         require_result("REFUSED errno=11 runtime=10", errno.EAGAIN, "dotnet")
         for line, reason, kind in (("REFUSED errno=38", errno.EAGAIN, "dotnet"),
                 ("REFUSED errno=11", errno.ENOSYS, "exclusive"), ("REFUSED errno=38", None, "rust"),
                 ("REFUSED kind=WouldBlock", errno.ENOSYS, "rust"), ("REFUSED kind=WouldBlock", errno.EAGAIN, "shared"),
-                ("ACQUIRED identity=1", errno.ENOSYS, "rust")):
+                ("ACQUIRED identity=1", errno.ENOSYS, "rust"), (unsupported, errno.EAGAIN, "rust"),
+                (busy, errno.ENOSYS, "rust"), ("REFUSED errno=38", errno.ENOSYS, "rust"),
+                ("REFUSED kind=WouldBlock", errno.EAGAIN, "rust")):
             with self.assertRaises(ValueError):
                 require_result(line, reason, kind)
+
+    def test_native_reason_must_match_the_reported_outcome_and_action(self):
+        cases = ((errno.ENOSYS, "UnsupportedFileLock", "CheckPortalFileLockSupport"),
+                 (errno.EOPNOTSUPP, "UnsupportedFileLock", "CheckPortalFileLockSupport"),
+                 (errno.EAGAIN, "FileBusy", "RetryAfterWriterRelease"),
+                 (errno.EACCES, "AccessDenied", "RestoreAuthorizedAccess"),
+                 (errno.EPERM, "AccessDenied", "RestoreAuthorizedAccess"),
+                 (errno.EIO, "ReadLeaseUnavailable", "InspectNativeError"))
+        for number, outcome, action in cases:
+            report = f"REFUSED errno={number} operation=ReadLease outcome={outcome} action={action}"
+            require_result(report, number, "rust")
+            for wrong in (report.replace(outcome, "Success"), report.replace(action, "IgnoreLock"),
+                          report.replace("ReadLease", "RootSetup"), report + " outcome=FileBusy"):
+                with self.assertRaises(ValueError):
+                    require_result(wrong, number, "rust")
 
     def test_unsigned_bytes_or_unsigned_package_selection_cannot_supply_a_control(self):
         with tempfile.TemporaryDirectory() as temporary:

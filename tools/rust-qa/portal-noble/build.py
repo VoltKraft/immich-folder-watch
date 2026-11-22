@@ -72,6 +72,9 @@ def pair(osroot, prepared, cache, out):
         "-Dwarnings", "/safe-fs/lib.rs", "-o", "/work/libsafe_fs.rlib")
     run("reader-build", "/toolchain/bin/rustc", "--edition=2024", "-Dwarnings", "/recipe/read.rs", "--extern",
         "safe_fs=/work/libsafe_fs.rlib", "-o", "/work/reader")
+    run("reader-test-build", "/toolchain/bin/rustc", "--edition=2024", "-Dwarnings", "--test", "/recipe/read.rs", "--extern",
+        "safe_fs=/work/libsafe_fs.rlib", "-o", "/work/reader-tests")
+    run("reader-tests", "/work/reader-tests")
     for name in ("unmodified", "backport"):
         if name == "backport":
             before_patch = inventory(src)
@@ -98,5 +101,6 @@ def pair(osroot, prepared, cache, out):
                 sourceLicenses=LICENSES, fuseBuildInputs=FUSE, runtimeLibraries=libraries,
                 distroSource=ORIGINALS, patchSeries=(src / "debian/patches/series").read_text().splitlines(),
                 rustSafeFs={p.name: sha(p) for p in sorted((ROOT / "rust/crates/safe-fs/src").glob("*.rs"))},
-                reader=sha(out / "reader"), binaries={n: sha(out / n / "document-portal/xdg-document-portal") for n in ("unmodified", "backport")},
+                reader=sha(out / "reader"), readerTests=sha(out / "reader-tests.log"),
+                binaries={n: sha(out / n / "document-portal/xdg-document-portal") for n in ("unmodified", "backport")},
                 sourceManifestSha256=hashlib.sha256(json.dumps(baseline, sort_keys=True).encode()).hexdigest())
