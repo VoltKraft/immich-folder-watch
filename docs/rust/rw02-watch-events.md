@@ -467,3 +467,22 @@ that operation to the application's safe-fs leases, applying the
 shipping debounce and five-second schedule, and reconciling the resulting
 state belong to the foundation and engine stages. The later package inventory
 must still cover its actual binary inputs. [Stage dependencies](../rust-rewrite-plan.md#staged-implementation-proposal).
+
+### Windows notification loss and recovery trial
+
+The native runner now exercises the adapter's 32 KiB Windows notification
+buffer on a fresh directory. After one confirmed nonempty completion, the
+test writes 512 distinct, one-byte files before the adapter requests the next
+batch. Windows keeps changes between reads on that directory handle. The
+trial requires an actual zero-byte completion or `ERROR_NOTIFY_ENUM_DIR`.
+It records the API stage, initial byte count, invalidated generation and
+the adapter's request for a replacement registration. [Native trial](../../tools/rust-qa/watch-events/src/windows_overflow_test.rs)
+· [Microsoft directory notification contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw).
+
+The replacement watch must enumerate and acknowledge all 513 original files
+with matching names and contents, receive a new file notification, and
+acknowledge all 514 files. The Python parent runs the compiled test executable
+directly with a 90-second deadline in its disposable build and temporary
+directories. It records the executable digest, machine and output.
+Seven portable receipt controls and warnings-denied Clippy on both MSVC
+targets passed locally. Native Windows execution of this trial is pending.

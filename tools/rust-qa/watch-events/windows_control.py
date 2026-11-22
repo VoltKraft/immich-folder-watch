@@ -7,6 +7,7 @@ adapter accepts already authorized asynchronous file objects.
 import ctypes as c
 import json
 from pathlib import Path
+import re
 import subprocess
 import struct
 import sys
@@ -26,6 +27,23 @@ def require_file_id(identifier):
 def idle_cancel_passed(result):
     return (result.get("sameDirectory") is True and result.get("idleWaitResult") == 258
             and result.get("cancelError") == 0 and result.get("completionError") == 995)
+
+
+def native_loss_evidence(test_output):
+    records = [line.split() for line in test_output.splitlines() if line.startswith("NATIVE_WATCH_OVERFLOW ")]
+    if len(records) != 1 or len(records[0]) != 9:
+        raise ValueError("Missing or ambiguous native watch loss receipt")
+    _, cause, *numbers = records[0]
+    if (cause not in {"completion-zero-bytes", "completion-error-1022", "submission-error-1022"}
+            or not all(re.fullmatch(r"[0-9]{1,5}", n) for n in numbers)):
+        raise ValueError("Invalid native watch loss receipt")
+    prime, count, generation, reasons, replace, peak, recovered = map(int, numbers)
+    if not (0 < prime <= 32768 and count == 512 and generation >= 3 and reasons & 12 == 12
+            and replace == 1 and peak == 1 and recovered == count + 2):
+        raise ValueError("Incomplete native watch loss or replacement inventory")
+    return {"nativeResult": cause, "notificationBufferBytes": 32768, "firstCompletionBytes": prime,
+            "batchFiles": count, "lostGeneration": generation, "reasons": reasons, "requiresRegistration": True,
+            "peakQueued": peak, "recoveredFiles": recovered}
 
 
 def decode_notifications(data):

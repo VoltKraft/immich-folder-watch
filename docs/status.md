@@ -47,6 +47,14 @@ Installed old/new handover and ordinary-user exclusion remain open.
 [Four-platform run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099706),
 [Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
 
+The Windows watch fixture now exercises the ordinary 32 KiB notification
+buffer with a bounded batch of 512 synthetic files. An independent review
+checked request lifetimes, full replacement inventories and cleanup. Its
+timeout finding was addressed by running the compiled test as the Python
+parent's direct child. Seven portable controls and Clippy on both Windows
+targets passed. The native Windows loss result is still pending.
+[Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
+
 The .NET reference, PR CI, CodeQL and dependency submission completed
 successfully at the same commit. The Windows storage fault and interactive
 tray steps on both architectures reported failure while the

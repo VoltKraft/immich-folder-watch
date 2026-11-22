@@ -4,7 +4,7 @@ import struct
 import unittest
 
 from windows_control import (decode_notifications, flat_notification_evidence,
-                             idle_cancel_passed, require_file_id)
+                             idle_cancel_passed, native_loss_evidence, require_file_id)
 
 
 def native_buffer(*events):
@@ -24,6 +24,18 @@ def trace_line(generation, *events):
 
 
 class WindowsControlTests(unittest.TestCase):
+    def test_loss_receipt_requires_a_native_result_and_complete_replacement(self):
+        line = "NATIVE_WATCH_OVERFLOW completion-zero-bytes 32 512 3 15 1 1 514"
+        receipt = native_loss_evidence("running 1 test\n" + line)
+        self.assertEqual(receipt["recoveredFiles"], 514)
+        self.assertEqual(receipt["firstCompletionBytes"], 32)
+        for value in ("", line + "\n" + line, line.replace("zero-bytes", "cancelled"),
+                      line.replace("32 512", "0 512"), line.replace(" 3 ", " 1 "),
+                      line.replace(" 15 ", " 4 "), line.replace("1 1 514", "0 1 514"),
+                      line.replace("514", "513"), line.replace("512", "8")):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                native_loss_evidence(value)
+
     def test_notification_decoder_checks_record_boundaries(self):
         events = ((3, "nested"), (1, "flat.jpg"))
         data = native_buffer(*events)

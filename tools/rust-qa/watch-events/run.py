@@ -603,6 +603,32 @@ def module_inventory(subject):
     return modules
 
 
+def windows_loss_trial(cargo_run, target, build, scratch, env, test, report):
+    from windows_control import native_loss_evidence
+
+    messages = cargo_run("test", "--frozen", "--lib", "--target", target, "--no-run", "--message-format=json")
+    programs = []
+    for line in messages.splitlines():
+        if not line.startswith("{"):
+            continue
+        item = json.loads(line)
+        if (item["reason"] == "compiler-artifact" and item["executable"] and item["profile"]["test"]
+                and item["target"]["kind"] == ["lib"] and Path(item["manifest_path"]).resolve() == HERE / "Cargo.toml"):
+            programs.append(Path(item["executable"]).resolve(strict=True))
+    require(len(programs) == 1 and programs[0].parent == build / target / "debug/deps",
+            "Expected the single native watch library test executable in the owned build")
+    program = programs[0]
+    record = {"programSha256": sha(program), "machine": machine(program, target)}
+    report["nativeLossTest"] = record
+    # The test owns threads only. Python kills and waits for this exact child on timeout
+    # before TemporaryDirectory can remove the fixture and the compiled test program.
+    outcome = subprocess.run([program, test, "--exact", "--show-output"], cwd=scratch, env=env,
+                             text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90)
+    record.update(output=outcome.stdout, exitCode=outcome.returncode)
+    require(outcome.returncode == 0, "The native watch loss trial failed; see nativeLossTest")
+    return native_loss_evidence(outcome.stdout)
+
+
 def execute(args, output, report):
     exe = ".exe" if os.name == "nt" else ""
     cargo, rustc = TOOLCHAIN / ("cargo" + exe), TOOLCHAIN / ("rustc" + exe)
@@ -623,9 +649,12 @@ def execute(args, output, report):
     with tempfile.TemporaryDirectory(prefix="native-", dir=output) as scratch:
         area = Path(scratch)
         target_dir = area / "build"
+        temporary = area / "tmp"
+        temporary.mkdir()
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CARGO_", "RUSTC_", "RUSTFLAGS"))}
         env.update(PATH=str(TOOLCHAIN) + os.pathsep + env["PATH"], RUSTC=str(rustc), CARGO_HOME=str(area / "cargo-home"),
-                   CARGO_TARGET_DIR=str(target_dir), CARGO_NET_OFFLINE="true")
+                   CARGO_TARGET_DIR=str(target_dir), CARGO_NET_OFFLINE="true",
+                   TMP=str(temporary), TEMP=str(temporary), TMPDIR=str(temporary))
         def run(*cmd):
             return subprocess.check_output([cargo, *cmd], cwd=HERE, env=env, text=True, stderr=subprocess.STDOUT, timeout=150)
         manifest = json.loads(run("metadata", "--frozen", "--format-version", "1"))
@@ -634,7 +663,11 @@ def execute(args, output, report):
         report["resolvedPackages"] = [p["name"] for p in manifest["packages"]]
         report["fmt"] = run("fmt", "--check").strip()
         report["clippy"] = run("clippy", "--frozen", "--all-targets", "--target", args.target, "--", "-D", "warnings").strip()
-        report["unitTests"] = run("test", "--frozen", "--lib", "--target", args.target).strip()
+        tests = ("test", "--frozen", "--lib", "--target", args.target)
+        loss_test = "native::overflow_test::native_buffer_loss_retires_the_watch_and_a_fresh_watch_recovers"
+        # Run the Windows queue-loss trial after the other independent observations.
+        unit_tests = (*tests, "--", "--skip", loss_test) if os.name == "nt" else tests
+        report["unitTests"] = run(*unit_tests).strip()
         report["releaseBuild"] = run("build", "--frozen", "--release", "--target", args.target).strip()
         binary = target_dir / args.target / "release" / ("native-watch-hints" + exe)
         report["binarySha256"] = sha(binary)
@@ -663,6 +696,8 @@ def execute(args, output, report):
             linux_overflow_and_loss(binary, area, rows)
         else:
             windows_sharing(binary, area, rows)
+            rows["native-kernel-overflow"] = windows_loss_trial(run, args.target, target_dir, area,
+                                                               env, loss_test, report)
 
 
 def main():

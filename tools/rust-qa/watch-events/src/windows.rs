@@ -253,6 +253,12 @@ pub(super) struct Backend {
     tree: bool,
 }
 
+#[derive(Clone, Copy)]
+enum ReadStage {
+    Submission,
+    Completion,
+}
+
 pub(super) fn prepare(
     directory: NotificationDirectory,
     scope: Scope<'_>,
@@ -314,6 +320,15 @@ impl Backend {
     }
 
     pub(super) fn run(self, shared: &Shared, ready: SyncSender<()>) -> io::Result<()> {
+        self.run_with_observer(shared, ready, |_, _| Ok(()))
+    }
+
+    fn run_with_observer(
+        self,
+        shared: &Shared,
+        ready: SyncSender<()>,
+        mut observe: impl FnMut(ReadStage, Result<u32, Option<i32>>) -> io::Result<()>,
+    ) -> io::Result<()> {
         let mut ready = Some(ready);
         let trace = !self.tree
             && std::env::var_os("IFW_WATCH_DIAGNOSTICS").as_deref()
@@ -349,12 +364,14 @@ impl Backend {
                 )
             };
             let error = (started == 0).then(io::Error::last_os_error);
+            let code = error.as_ref().and_then(io::Error::raw_os_error);
             if observed(
                 "ReadDirectoryChangesW",
                 windows_status::submitted(error, shared),
             )? == Next::ReplaceAfterInventory
             {
                 // No I/O was submitted. Expose overflow even on the very first arm.
+                observe(ReadStage::Submission, Err(code))?;
                 if let Some(announce) = ready.take() {
                     let _ = announce.send(());
                 }
@@ -371,6 +388,12 @@ impl Backend {
                 0 => return self.cancel_and_drain(pending),
                 1 => {
                     let completed = self.completion(pending);
+                    // No request is outstanding here. The native test adds an ordinary
+                    // batch of files between reads on this same directory handle.
+                    observe(
+                        ReadStage::Completion,
+                        completed.as_ref().copied().map_err(io::Error::raw_os_error),
+                    )?;
                     let count = completed.as_ref().ok().copied();
                     let next = windows_status::completed(completed, shared)?;
                     if trace && let Some(count) = count {
@@ -390,6 +413,10 @@ impl Backend {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "windows_overflow_test.rs"]
+mod overflow_test;
 
 #[cfg(test)]
 mod tests {
