@@ -365,6 +365,28 @@ The independent row and control readbacks have SHA-256
 `c20e3558e7945dc66dcf97e5938ffa4051884fce722c8f0eeb6622d40410e7c9`.
 [Study entry points](../../tools/rust-qa/storage/README.md).
 
+At `5d4ce2d` the direct Rust entry point created every new directory with
+mode 0700 and both database files with mode 0600 even under umask 000.
+The Fedora run recorded six targeted updates, six genuine unchanged repeats,
+nine declined mutations and 36 C# observations. Both the Python and C#
+readers rejected all six invalid input classes, including a real committed
+WAL whose main file still gave 37 while a connected reader saw 38. All
+thirteen validation steps passed. The result and verification digests are
+`8de7a7de95aec2a78ff96b6fa90b53bea23f0edb17bfd1713f0550643fb160e1`
+and `114367f29e36dd884f732956ba514634386d3a70880fd955919d69264bb95582`.
+
+Independent re-review at that revision closed all three findings. Six
+separate stale updates and six unchanged repeats preserved every input byte.
+All twelve direct destination directories had mode 0700 and their 24
+database files had mode 0600 under umask 000. A fresh ICU 17 writer
+committed size 38 while its main file still contained 37. Both readers
+refused it. Three newly executed C# readers reproduced their archived
+outputs byte-for-byte. Independent SQL matched all 72 individual lookups
+and 72 lists. The CAS/mode, WAL and clean-reader reports have SHA-256
+`555b2ba26de904bbfd47ef534833b516abcef9820c48c241cee09114f3b7ec2b`,
+`83c551179ed8e3fef17524a3da53e60db0cf4289b5357c468e9f746d124443a9` and
+`7dc596381f7a8e463c17373a471c76092af77a2b9f4ea0cc5b6d4b5bc628a57b`.
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

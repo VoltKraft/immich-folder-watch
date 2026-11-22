@@ -120,8 +120,13 @@ The Rust study at `b7190ea` updated one known physical row on each of six
 finalized copies from three genuine legacy writers. Independent review
 reproduced all twelve before/after files and confirmed all 36 shipping C#
 readbacks. It found a stale-value reporting error, permissive direct scratch
-file modes, and a C# readback that ignored a live WAL. These are open against
-that fixture revision. [Known-row update and independent findings](rust/rw02-legacy.md#updating-a-known-row-on-finalized-copies).
+file modes, and a C# readback that ignored a live WAL. The correction at
+`5d4ce2d` passed all thirteen Fedora checks, including a committed WAL and
+direct output with umask 000. Independent re-review closed all three fixture
+findings. Twelve new directories and 24 files had the required permissions,
+both readers refused a separate live WAL, and all 144 lookup/list observations
+matched raw SQL.
+[Known-row update and independent findings](rust/rw02-legacy.md#updating-a-known-row-on-finalized-copies).
 At `3b4854d` both Windows architectures passed all thirteen notification
 scenarios. Their nonrecursive watch reported the direct child directory's
 metadata and the direct file's creation and change. Both Ubuntu targets
