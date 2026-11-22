@@ -16,10 +16,13 @@ from build import REFERENCE, REFERENCE_SOURCE_SHA256
 from metrics import METRICS
 from native import CleanupUnconfirmed, owned_directory, pin_path
 from scan_present import start as trace_presentation
+import dispatch
 
 
-def measured_generation(log, mode):
+def measured_generation(log, mode, *, dispatch_trace=False):
     rows = log.read_text(encoding="utf-8", errors="replace").splitlines()
+    if not dispatch_trace and any(row.startswith(("DISPATCH", "WINDOW_WAKE ")) for row in rows):
+        raise ValueError("The ordinary measurement used a diagnostic dispatch path")
     if ([r for r in rows if r.startswith("GRAPHICS_MEMORY ")] != ["GRAPHICS_MEMORY generation=1 hint=MemoryUsage"]
             or [r for r in rows if r.startswith("GRAPHICS_READY ")] != ["GRAPHICS_READY generation=1"]
             or any(r.startswith("WGPU_ALLOCATOR ") for r in rows)):
@@ -76,16 +79,17 @@ def paired_scan(mailbox_path, fifo):
     return dict(mailboxResultSha256=sha(mailbox_path), metrics=measurements)
 
 
-def main(target, fifo_control=False):
+def main(target, fifo_control=False, dispatch_trace=False):
     api, _, binary, base, record = subjects(target)
-    out = base / ("measured-fifo" if fifo_control else "measured")
+    out = base / ("dispatch" if dispatch_trace else "measured-fifo" if fifo_control else "measured")
     mode = "Fifo" if fifo_control else "Mailbox"
     out.mkdir()
-    record.update(status="running", trials=[], presentMode=mode, diagnosticControl=fifo_control,
+    record.update(status="running", trials=[], presentMode=mode, diagnosticControl=fifo_control or dispatch_trace,
                   observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py", "scan_present.py")})
     try:
-        if "IFW_QA_WINDOWS_RESIDENCY" in os.environ or "IFW_QA_WINDOWS_PRESENT_CONTROL" in os.environ:
-            raise ValueError("Supply the diagnostic presentation control through the recorder's explicit option")
+        if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
+                                         "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE")):
+            raise ValueError("Select the requested diagnosis using the recorder option")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
@@ -136,6 +140,15 @@ def main(target, fifo_control=False):
                 offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 offline.bind(("127.0.0.1", 0))
                 endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
+                if dispatch_trace:
+                    if not files:
+                        raise ValueError("The dispatch comparison requires the native inventory observer")
+                    dispatch.run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record,
+                                 base / "measured/result.json", partial(measured_generation, dispatch_trace=True))
+                    if sha(budget) != before:
+                        raise ValueError("The WPF budget changed during the dispatch diagnosis")
+                    record["status"] = "dispatch-observed"
+                    return 0
                 for number in range(1, recorder.TRIALS + 1):
                     name = "rust-" + str(number)
                     row = recorder.trial(api, fixture, "rust", gui, present, area / name, endpoint, user_sid,
@@ -177,6 +190,8 @@ def main(target, fifo_control=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
-    parser.add_argument("--fifo-control", action="store_true", help="measure the previous DXGI interval on this same executable")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--fifo-control", action="store_true", help="measure the previous DXGI interval on this same executable")
+    mode.add_argument("--dispatch", action="store_true", help="trace two private Mailbox wake paths on the same native workload")
     args = parser.parse_args()
-    raise SystemExit(main(args.target, args.fifo_control))
+    raise SystemExit(main(args.target, args.fifo_control, args.dispatch))

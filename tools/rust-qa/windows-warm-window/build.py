@@ -44,12 +44,14 @@ def stage(project):
     env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(project.parent)}
     for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         env.pop(key, None)
-    for name in ("candidate.patch", "presentation.patch"):
+    for name in ("candidate.patch", "presentation.patch", "dispatch.patch"):
         command = ["git", "apply", "--whitespace=error", str(HERE / name)]
         subprocess.run([*command, "--check"], cwd=gui, env=env, check=True)
         subprocess.run(command, cwd=gui, env=env, check=True)
-    for name in ("loop_wake.rs", "windows_present.rs"):
+    for name in ("loop_wake.rs", "windows_present.rs", "ui_trace.rs"):
         shutil.copyfile(HERE / name, gui / "src" / name)
+    # The implicit library target isolates three read-only system queries from the unsafe-free GUI.
+    shutil.copyfile(HERE / "win32_clock.rs", gui / "src/lib.rs")
     return gui
 
 
@@ -104,7 +106,8 @@ def main(target):
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
                   variantInputs={name: sha(HERE / name) for name in
-                                 ("candidate.patch", "presentation.patch", "loop_wake.rs", "windows_present.rs", "build.py")})
+                                 ("candidate.patch", "presentation.patch", "dispatch.patch", "loop_wake.rs",
+                                  "windows_present.rs", "ui_trace.rs", "win32_clock.rs", "build.py")})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")
 

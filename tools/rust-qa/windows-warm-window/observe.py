@@ -36,7 +36,7 @@ class WindowLifetime:
         recorder.checked(self.unhook(self.hook))
 
 
-def drive(api, fixture, binary, output, name):
+def drive(api, fixture, binary, output, name, *, single_wake=False):
     background = name.startswith("background") or name == "absent-tray"
     warm = name != "cold-residency"
     has_tray = name != "absent-tray"
@@ -48,6 +48,8 @@ def drive(api, fixture, binary, output, name):
         root = stack.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
         env = {k: v for k, v in os.environ.items() if not k.startswith("IFW_QA_")}
         env.update(IFW_QA_ISOLATED="1", WGPU_DX12_COMPILER="Fxc", TEMP=str(root), TMP=str(root))
+        if single_wake:
+            env["IFW_QA_WINDOWS_SINGLE_WAKE"] = "1"
         for key in ("APPDATA", "LOCALAPPDATA", "HOME", "USERPROFILE"):
             folder = root / key
             folder.mkdir()
@@ -225,6 +227,9 @@ def drive(api, fixture, binary, output, name):
         observer.pump()
         if proc.returncode or not any(s.startswith("DRAINED passes=") for s in logs()):
             raise ValueError("The native subject failed to drain")
+        if [s for s in logs() if s.startswith("WINDOW_WAKE ")] != (["WINDOW_WAKE mode=single"] if single_wake else []):
+            raise ValueError("The owned window did not use the selected wake path")
+        result["singleWake"] = single_wake
         if name == "background-quit" and ("DRAINED passes=0" not in logs()
                 or any(line.startswith("GRAPHICS_ATTEMPT ") for line in logs())
                 or any(e["event"] == "show" for e in observer.events)):
@@ -251,13 +256,14 @@ def main(target):
     record["observerInputs"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in files}
     fixture = recorder.load_windows_fixture()
     for name in ("background-quit", "background-open", "absent-tray", "retained-edit", "visible-loss", "edited-loss", "hidden-loss",
-                 "cold-residency", "performance-residency", "warm-residency"):
-        binary = cold if name == "cold-residency" else warm
+                 "cold-residency", "performance-residency", "warm-residency", "single-wake-retained-edit", "single-wake-hidden-loss"):
+        case = name.removeprefix("single-wake-")
+        binary = cold if case == "cold-residency" else warm
         try:
             with pin_path(api, binary, False):
                 if sha(binary) != record["baseline" if binary == cold else "binary"]:
                     raise ValueError("The pinned executable changed")
-                record["controls"][name] = drive(api, fixture, binary, out / name, name)
+                record["controls"][name] = drive(api, fixture, binary, out / name, case, single_wake=name != case)
         except (OSError, subprocess.SubprocessError, RuntimeError, ValueError, TimeoutError) as exc:
             record["controls"][name] = {"error": f"{type(exc).__name__}: {exc}"}
             if recorder.CleanupUnconfirmed.in_chain(exc):

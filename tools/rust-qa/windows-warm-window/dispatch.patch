@@ -1,0 +1,137 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -17,6 +17,8 @@
+ #[cfg(target_os = "windows")]
+ mod loop_wake;
+ mod native_window;
++#[cfg(target_os = "windows")]
++mod ui_trace;
+
+ use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
+ use eframe::egui;
+@@ -58,6 +60,10 @@
+     fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
+         #[cfg(target_os = "windows")]
+         {
++            let _wake = match command {
++                Command::Open => ui_trace::span("pipe-open"),
++                _ => None,
++            };
+             // This private input thread may backpressure. Preserve a queued Quit in bursts.
+             self.sender
+                 .send(command)
+@@ -415,6 +421,10 @@
+     #[cfg(target_os = "windows")]
+     let (native, available) = windows_fixture_input(control.clone())?;
+     #[cfg(target_os = "windows")]
++    if control.loop_wake.single() {
++        println!("WINDOW_WAKE mode=single");
++    }
++    #[cfg(target_os = "windows")]
+     assessment.release()?;
+     let mut lifecycle = DesktopLifecycle::new(background);
+     lifecycle.tray_result(available);
+@@ -458,6 +468,8 @@
+     if model.borrow_mut().lifecycle.background_stopped() != Some(HostCommand::ExitEventLoop) {
+         return Err("Unexpected supervisor shutdown state".into());
+     }
++    #[cfg(target_os = "windows")]
++    ui_trace::finish(control.loop_wake.single())?;
+     println!("DRAINED passes={}", model.borrow().passes);
+     Ok(())
+ }
+--- a/src/native_window.rs
++++ b/src/native_window.rs
+@@ -59,6 +59,9 @@
+     }
+
+     fn hide(window: &Window) {
++        #[cfg(target_os = "windows")]
++        crate::ui_trace::visibility(window, false);
++        #[cfg(not(target_os = "windows"))]
+         window.set_visible(false);
+         println!("WINDOW_HIDDEN");
+     }
+@@ -70,6 +73,10 @@
+                 let Ok(command) = model.commands.try_recv() else {
+                     break;
+                 };
++                #[cfg(target_os = "windows")]
++                if matches!(command, super::Command::Open) {
++                    let _dequeued = crate::ui_trace::span("open-dequeued");
++                }
+                 model.command(command)
+             };
+             match action {
+@@ -78,10 +85,21 @@
+                     if window.is_minimized() == Some(true) {
+                         window.set_minimized(false);
+                     }
+-                    window.set_visible(true);
+-                    window.focus_window();
+                     #[cfg(target_os = "windows")]
+-                    window.request_redraw();
++                    {
++                        crate::ui_trace::visibility(window, true);
++                        {
++                            let _focus = crate::ui_trace::span("focus");
++                            window.focus_window();
++                        }
++                        let _redraw = crate::ui_trace::span("request-redraw");
++                        window.request_redraw();
++                    }
++                    #[cfg(not(target_os = "windows"))]
++                    {
++                        window.set_visible(true);
++                        window.focus_window();
++                    }
+                 }
+                 Some(HostCommand::Hide) => {
+                     #[cfg(target_os = "windows")]
+@@ -124,6 +142,8 @@
+
+ impl ApplicationHandler<eframe::UserEvent> for Handler<'_> {
+     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
++        #[cfg(target_os = "windows")]
++        let _dispatch = crate::ui_trace::event(&event);
+         if self.model.borrow().graphics.lost() {
+             event_loop.exit();
+             return;
+@@ -187,12 +207,16 @@
+     }
+     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+         #[cfg(target_os = "windows")]
++        let _dispatch = crate::ui_trace::span("new-events");
++        #[cfg(target_os = "windows")]
+         if self.hidden() {
+             return; // A hidden HWND has no paint deadline. External control and loss have their own wake.
+         }
+         self.dispatch(event_loop, |app| app.new_events(event_loop, cause));
+     }
+     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: eframe::UserEvent) {
++        #[cfg(target_os = "windows")]
++        let _dispatch = crate::ui_trace::span("user-event");
+         #[cfg(target_os = "windows")]
+         if let Some(window) = self.retained_root()
+             && !self.controls_allow_redraw(event_loop, &window)
+@@ -200,12 +224,20 @@
+         {
+             return;
+         }
++        #[cfg(target_os = "windows")]
++        if self.control.loop_wake.consumes(&event) {
++            let _consumed = crate::ui_trace::span("private-wake");
++            // Native activation already issued the root redraw after draining the queue.
++            return;
++        }
+         self.dispatch(event_loop, |app| app.user_event(event_loop, event));
+     }
+     fn device_event(&mut self, event_loop: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
+         self.dispatch(event_loop, |app| app.device_event(event_loop, id, event));
+     }
+     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
++        #[cfg(target_os = "windows")]
++        let _dispatch = crate::ui_trace::span("about-to-wait");
+         if self.model.borrow().graphics.lost() {
+             event_loop.exit();
+             return;
