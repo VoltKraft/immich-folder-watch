@@ -552,6 +552,10 @@ jobs:
             artifacts/rust/windows-reader/native-*/result.json
             artifacts/rust/windows-reader/native-*/gui/*.json
             artifacts/rust/windows-imports/runs/*/result.json
+            artifacts/rust/windows-imports/build-*/winit-published/inputs.rsp
+            artifacts/rust/windows-imports/build-*/winit-published/symbols.map
+            artifacts/rust/windows-imports/build-*/winit-llvm/inputs.rsp
+            artifacts/rust/windows-imports/build-*/winit-llvm/symbols.map
             artifacts/rust/linux-services/inputs.json
             artifacts/rust/linux-services/documents-*/*.json
             artifacts/rust/linux-services/documents-*/*.log

@@ -138,7 +138,10 @@ archives. Later runs can consume the original acquisition or the verified
 filtered tar offline. The `--transport` option needs the isolated cache
 populated by the existing native realtime assessment. All private working
 copies, build products and original downloads stay under ignored
-`artifacts/rust/windows-imports`. The hosted upload selects the run JSON.
+`artifacts/rust/windows-imports`. The hosted upload selects the run JSON
+and the x64 linker response and symbol map for both the published and
+reconstructed winit builds. Compare each file's SHA-256 with the corresponding
+`responseSha256` or `mapSha256` in the result before reviewing its contents.
 
 ```sh
 python3 tools/rust-qa/windows-imports/run.py --acquire
