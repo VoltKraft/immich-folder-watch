@@ -62,22 +62,40 @@ def main() -> None:
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                text=True, encoding="utf-8")
     events = []
+    snapshot_checks = []
+    anchor = None
     full = None
     progress = output.parent / (output.name + "-namespace-progress.json")
     error = ""
-    report = {"mountinfo": mount[0], "namespaces": namespaces, "capacity_before": before, "events": events, "seed_copies": seed_copies}
+    report = {"mountinfo": mount[0], "namespaces": namespaces, "capacity_before": before,
+              "events": events, "seed_copies": seed_copies, "snapshot_checks": snapshot_checks}
     progress.write_text(json.dumps(report, indent=2) + "\n")
+
+    def check_snapshot(phase: str) -> None:
+        actual = hashlib.sha256((output / "snapshot.db").read_bytes()).hexdigest()
+        if anchor is None or actual != anchor:
+            raise RuntimeError("SNAPSHOT_SHA256_MISMATCH: private retained backup differs from producer")
+        snapshot_checks.append({"phase": phase, "sha256": actual})
+
     try:
         for line in process.stdout:
             event = json.loads(line)
             events.append(event)
             progress.write_text(json.dumps(report, indent=2) + "\n")
+            if event["phase"] == "backup-completed" and event["file"] == "snapshot.db":
+                if anchor is not None:
+                    raise RuntimeError("repeated snapshot producer event")
+                anchor = event["sha256"]
+                check_snapshot("backup-completed")
+            if "snapshot_sha256" in event and event["snapshot_sha256"] != anchor:
+                raise RuntimeError("native marker changed original snapshot digest")
             if event["phase"] == "enospc-observed":
                 full = capacity()
                 if full["available_bytes"] != 0 or full["free_bytes"] != 0:
                     raise RuntimeError("ENOSPC barrier did not leave the actual filesystem full")
                 if event["os_errno"] != 28 or event["sqlite_extended_error"] != 13:
                     raise RuntimeError("missing native ENOSPC / SQLITE_FULL errors")
+                check_snapshot("enospc-before-release-and-restore")
                 process.stdin.write("release-space\n")
                 process.stdin.flush()
         code = process.wait(timeout=10)
@@ -87,10 +105,12 @@ def main() -> None:
         after = capacity()
         if after["available_bytes"] <= 0:
             raise RuntimeError("space was not available after releasing the owned filler")
+        check_snapshot("after-same-volume-restore")
         report = {"format": "ifw-private-tmpfs-enospc-v1", "mountinfo": mount[0],
                   "namespaces": namespaces, "effective_capabilities": effective,
                   "capacity_before": before, "capacity_at_error": full, "capacity_after": after,
-                  "events": events, "exit_code": code, "seed_copies": seed_copies}
+                  "events": events, "exit_code": code, "seed_copies": seed_copies,
+                  "snapshot_sha256": anchor, "snapshot_checks": snapshot_checks}
         (output / "tmpfs.json").write_text(json.dumps(report, indent=2) + "\n")
         print("Private 8-MiB tmpfs ENOSPC, SQLite failure and same-volume restore passed")
     finally:

@@ -33,6 +33,25 @@ def isolated(value: Path) -> Path:
     return path
 
 
+def snapshot_check(output: Path, expected: str, phase: str) -> dict:
+    if len(expected) != 64 or any(character not in "0123456789abcdef" for character in expected):
+        raise ValueError("invalid producer SHA-256")
+    actual = sha256(output / "snapshot.db")
+    if actual != expected:
+        raise ValueError(f"SNAPSHOT_SHA256_MISMATCH at {phase}: retained backup differs from producer")
+    return {"phase": phase, "sha256": actual}
+
+
+def producer_anchor(events: list[dict]) -> str:
+    """Require the earliest closed backup event, before its later confirmation."""
+    sealed = [event for event in events if event["phase"] == "backup-completed" and event["file"] == "snapshot.db"]
+    confirmed = [event for event in events if event["phase"] == "confirmed"]
+    if (len(sealed) != 1 or len(confirmed) != 1 or events.index(sealed[0]) >= events.index(confirmed[0])
+            or confirmed[0]["snapshot_sha256"] != sealed[0]["sha256"]):
+        raise ValueError("missing or inconsistent original backup completion event")
+    return sealed[0]["sha256"]
+
+
 def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str, env: dict) -> dict:
     """Kill only the owned child after its explicit native transaction barrier."""
     process = subprocess.Popen([str(executable), "worker", str(seed), str(output), mode, fault],
@@ -40,6 +59,8 @@ def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str,
                                text=True, encoding="utf-8")
     lines: queue.Queue[str | None] = queue.Queue()
     events = []
+    snapshot_checks = []
+    anchor = None
     stderr = []
 
     def receive() -> None:
@@ -60,11 +81,19 @@ def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str,
                 raise RuntimeError("worker exited before the requested crash barrier")
             event = json.loads(line)
             events.append(event)
+            if event["phase"] == "backup-completed" and event["file"] == "snapshot.db":
+                if anchor is not None:
+                    raise RuntimeError("repeated snapshot producer event")
+                anchor = event["sha256"]
+                snapshot_checks.append(snapshot_check(output, anchor, "backup-completed"))
             if event["phase"] == "confirmed":
                 confirmed = event["commit_returned"] is True
+                if event["snapshot_sha256"] != anchor:
+                    raise RuntimeError("confirmation changed the original snapshot digest")
             if event["phase"] == "kill-ready":
-                if not confirmed or event["wal_bytes"] <= 32:
+                if not confirmed or event["wal_bytes"] <= 32 or event["snapshot_sha256"] != anchor:
                     raise RuntimeError("missing confirmed transaction or actual WAL")
+                snapshot_checks.append(snapshot_check(output, anchor, "before-hard-kill"))
                 # Preserve all three files before any recovery process opens them.
                 raw = output / "before-kill"
                 raw.mkdir()
@@ -87,8 +116,12 @@ def kill_case(executable: Path, seed: Path, output: Path, mode: str, fault: str,
             shutil.copyfile(actual, after / actual.name)
         reader.join(timeout=5)
         errors.join(timeout=5)
+        if producer_anchor(events) != anchor:
+            raise RuntimeError("process event order changed the original snapshot digest")
+        snapshot_checks.append(snapshot_check(output, anchor, "after-hard-kill-before-reopen"))
         return {"mechanism": "TerminateProcess" if os.name == "nt" else "SIGKILL",
                 "exit_code": code, "events": events, "stderr": "".join(stderr),
+                "snapshot_sha256": anchor, "snapshot_checks": snapshot_checks,
                 "graceful_cleanup_ran": False, "files_unchanged_by_kill": True,
                 "after_kill_files": {p.name: {"bytes": p.stat().st_size, "sha256": sha256(p)} for p in sorted(after.iterdir())}}
     finally:
@@ -132,21 +165,23 @@ def main() -> int:
                 "DOTNET_GENERATE_ASPNET_CERTIFICATE": "false", "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1", "DOTNET_NOLOGO": "1"})
     result = {"format": "ifw-storage-faults-run-v1", "status": "running", "target": args.target,
               "host": platform.platform(), "steps": {}, "cases": [], "removed_override_names": removed,
-              "limits": {"payload_bytes": 2097152, "additional_sqlite_pages": 16, "case_timeout_seconds": 30},
+              "limits": {"payload_bytes": 2097152, "additional_sqlite_pages": 16,
+                         "command_timeout_seconds": 600, "kill_readiness_seconds": 30,
+                         "tmpfs_watchdog_seconds": 30, "termination_wait_seconds": 10},
               "unproven": ["power loss", "physical disk ENOSPC", "application migration", "external side-effect rollback", "every transaction boundary", "other native hosts"]}
     if args.tmpfs:
         result["outer_namespaces"] = {name: os.readlink("/proc/self/ns/" + name) for name in ("user", "mnt", "net", "pid")}
         result["tmpfs_limit_bytes"] = 8388608
         result["bubblewrap_sha256"] = sha256(Path(shutil.which("bwrap")))
 
-    def command(name: str, arguments: list[str]) -> bytes:
+    def command(name: str, arguments: list[str], expected_code: int = 0) -> bytes:
         log = output / (name + ".log")
         print("Storage faults:", name, flush=True)
         with log.open("wb") as stream:
             code = subprocess.run(arguments, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
-        result["steps"][name] = {"command": arguments, "exit_code": code, "log": log.name}
+        result["steps"][name] = {"command": arguments, "exit_code": code, "expected_exit_code": expected_code, "log": log.name}
         write_json(output / "result.json", result)
-        if code:
+        if code != expected_code:
             raise RuntimeError(f"{name} failed ({code}): {log.read_text(errors='replace')[-4000:]}")
         return log.read_bytes()
 
@@ -233,22 +268,71 @@ def main() -> int:
                     private = json.loads((case / "tmpfs.json").read_text())
                     if any(private["namespaces"][name] == identity for name, identity in result["outer_namespaces"].items()):
                         raise ValueError("ENOSPC namespace did not isolate all required surfaces")
+                    events = private["events"]
                 elif fault == "sqlite-full":
-                    command(name + "-fault", [str(binary), "worker", str(seed), str(case), mode, fault])
+                    raw = command(name + "-fault", [str(binary), "worker", str(seed), str(case), mode, fault])
+                    events = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
                 else:
-                    write_json(case / "process-kill.json", kill_case(binary, seed, case, mode, fault, env))
-                command(name + "-verify", [str(binary), "verify", str(case)])
-                command(name + "-csharp", [dotnet, str(assembly), str(case)])
+                    killed = kill_case(binary, seed, case, mode, fault, env)
+                    write_json(case / "process-kill.json", killed)
+                    events = killed["events"]
+                anchor = producer_anchor(events)
+                fault_evidence = json.loads((case / "fault.json").read_text())
+                if (fault_evidence["snapshot_sha256"] != anchor
+                        or any(event["snapshot_sha256"] != anchor for event in events if "snapshot_sha256" in event)):
+                    raise ValueError("raw fault marker changed original snapshot digest")
+                checks = [snapshot_check(case, anchor, "before-rust")]
+                command(name + "-verify", [str(binary), "verify", str(case), anchor])
+                checks.append(snapshot_check(case, anchor, "after-rust"))
+                checks.append(snapshot_check(case, anchor, "before-csharp"))
+                command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
+                checks.append(snapshot_check(case, anchor, "after-csharp"))
                 readback = json.loads((case / "csharp-readback.json").read_text())
                 if readback["Assertions"] != (32 if fault == "enospc" else 24):
                     raise ValueError("C# readback assertion count differs")
                 verification = json.loads((case / "verification.json").read_text())
-                if (not readback["RetainedSnapshotUnchanged"] or sha256(case / "snapshot.db") != verification["snapshot_sha256"]
-                        or readback["SnapshotSha256"] != verification["snapshot_sha256"]):
+                if (not readback["RetainedSnapshotUnchanged"]
+                        or any(verification[key] != anchor for key in ("snapshot_sha256", "snapshot_before_sha256", "snapshot_after_sha256", "snapshot_copy_sha256"))
+                        or any(readback[key] != anchor for key in ("SnapshotSha256", "SnapshotBeforeSha256", "SnapshotAfterSha256", "SnapshotCopySha256"))):
                     raise ValueError("retained pre-fault snapshot changed")
-                result["cases"].append({"name": name, "fault": json.loads((case / "fault.json").read_text()),
-                                        "verification": json.loads((case / "verification.json").read_text()), "csharp": readback})
+                # Exercise both actual preflight paths with an independently
+                # corrupted copy, without giving either reader a new baseline.
+                tampered = case / "tampered-snapshot"
+                tampered.mkdir()
+                shutil.copyfile(case / "snapshot.db", tampered / "snapshot.db")
+                snapshot_check(tampered, anchor, "negative-copy-before-change")
+                with (tampered / "snapshot.db").open("r+b") as stream:
+                    stream.seek(100)
+                    original_byte = stream.read(1)[0]
+                    stream.seek(100)
+                    stream.write(bytes([original_byte ^ 1]))
+                changed_sha256 = sha256(tampered / "snapshot.db")
+                if changed_sha256 == anchor:
+                    raise ValueError("negative control did not change actual snapshot bytes")
+                for language, arguments, code in (
+                        ("rust", [str(binary), "verify", str(tampered), anchor], 1),
+                        ("csharp", [dotnet, str(assembly), str(tampered), anchor], 42)):
+                    rejected = command(name + "-tampered-" + language, arguments, code)
+                    if b"SNAPSHOT_SHA256_MISMATCH" not in rejected:
+                        raise ValueError("tampered snapshot failed for an unrelated reason")
+                    if ({path.name for path in tampered.iterdir()} != {"snapshot.db"}
+                            or sha256(tampered / "snapshot.db") != changed_sha256):
+                        raise ValueError("rejected snapshot was opened or produced derived files")
+                checks.append(snapshot_check(case, anchor, "after-negative-controls"))
+                result["cases"].append({"name": name, "fault": fault_evidence,
+                    "producer_snapshot_sha256": anchor, "snapshot_checks": checks,
+                    "verification": verification, "csharp": readback,
+                    "byte_corruption_control": {"offset": 100, "original_byte": original_byte,
+                        "changed_byte": original_byte ^ 1, "original_sha256": anchor, "changed_sha256": changed_sha256,
+                        "rust_exit_code": 1, "csharp_exit_code": 42, "no_derived_files": True,
+                        "rejected_before_sqlite_open": True}})
                 write_json(output / "result.json", result)
+        # Compare actual originals after every reader/negative trial has finished,
+        # using the early producer anchors retained in memory, never a late hash.
+        for case_result in result["cases"]:
+            case_result["snapshot_checks"].append(snapshot_check(
+                cases / case_result["name"], case_result["producer_snapshot_sha256"], "deferred-after-all-cases"))
+        result["deferred_original_snapshot_checks"] = len(result["cases"])
         result["status"] = "passed"
         print("Storage faults passed:", output, flush=True)
     except Exception as error:

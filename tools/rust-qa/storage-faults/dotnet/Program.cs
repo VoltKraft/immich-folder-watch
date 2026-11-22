@@ -10,11 +10,21 @@ namespace ImmichFolderWatch.StorageFaults;
 
 internal static class Program
 {
-    private static async Task Main(string[] args)
+    private static string AuthenticateSnapshot(string path, string expected)
     {
-        if (args.Length != 1)
+        if (expected.Length != 64 || expected.Any(character => !char.IsAsciiHexDigitLower(character)))
+            throw new ArgumentException("Invalid producer SHA-256.");
+        var actual = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+        if (actual != expected)
+            throw new InvalidDataException("SNAPSHOT_SHA256_MISMATCH: retained backup differs from producer");
+        return actual;
+    }
+
+    private static async Task<int> Main(string[] args)
+    {
+        if (args.Length != 2)
         {
-            throw new ArgumentException("Usage: FaultReadback <isolated-fault-case>");
+            throw new ArgumentException("Usage: FaultReadback <isolated-fault-case> <producer-sha256>");
         }
         var output = Path.GetFullPath(args[0]);
         var root = Path.GetFullPath("artifacts/rust/storage-faults") + Path.DirectorySeparatorChar;
@@ -29,11 +39,27 @@ internal static class Program
         {
             throw new InvalidOperationException("Native process/OS architecture mismatch.");
         }
+        var snapshotPath = Path.Combine(output, "snapshot.db");
+        var producerSha256 = args[1];
+        string beforeSha256;
+        try
+        {
+            // Authenticate before any SQLite open or derived file. The supervisor
+            // supplies the original producer digest, not a newly measured hash.
+            beforeSha256 = AuthenticateSnapshot(snapshotPath, producerSha256);
+        }
+        catch (InvalidDataException error) when (error.Message.StartsWith("SNAPSHOT_SHA256_MISMATCH", StringComparison.Ordinal))
+        {
+            Console.Error.WriteLine(error.Message);
+            return 42;
+        }
         using var evidence = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "fault.json")));
         if (evidence.RootElement.GetProperty("format").GetString() != "ifw-storage-fault-v1")
         {
             throw new InvalidDataException("Not a synthetic fault case.");
         }
+        if (evidence.RootElement.GetProperty("snapshot_sha256").GetString() != producerSha256)
+            throw new InvalidDataException("Fault marker changed producer digest.");
         var sensitive = evidence.RootElement.GetProperty("mode").GetString() == "sensitive";
         var committedWithoutAcknowledgement = evidence.RootElement.GetProperty("fault").GetString() == "commit-before-ack";
         var checks = 0;
@@ -42,8 +68,7 @@ internal static class Program
             if (!condition) throw new InvalidDataException(message);
             checks++;
         }
-        var snapshotPath = Path.Combine(output, "snapshot.db");
-        var snapshotHash = SHA256.HashData(File.ReadAllBytes(snapshotPath));
+        string? copySha256 = null;
         var databases = new List<string> { "state.db", "snapshot.db", "restored.db" };
         if (File.Exists(Path.Combine(output, "same-volume-restored.db"))) databases.Add("same-volume-restored.db");
         foreach (var databaseName in databases)
@@ -65,10 +90,11 @@ internal static class Program
                 // byte-identical copy, never a live database's main file alone.
                 if (File.Exists(snapshotPath + "-wal") && new FileInfo(snapshotPath + "-wal").Length != 0)
                     throw new InvalidDataException("Snapshot still has live WAL data.");
+                AuthenticateSnapshot(snapshotPath, producerSha256);
                 databasePath = Path.Combine(output, "csharp-snapshot.db");
                 File.Copy(snapshotPath, databasePath, overwrite: false);
-                if (!SHA256.HashData(File.ReadAllBytes(databasePath)).SequenceEqual(snapshotHash))
-                    throw new InvalidDataException("Snapshot readback copy changed bytes.");
+                copySha256 = AuthenticateSnapshot(databasePath, producerSha256);
+                AuthenticateSnapshot(snapshotPath, producerSha256);
             }
             var store = new SqliteSyncStateStore(databasePath, NullLogger<SqliteSyncStateStore>.Instance, sensitive);
             Check((await store.GetSourceEntriesAsync(account, source)).SequenceEqual(entries), "Recovered entries differ from the real C# reader");
@@ -86,8 +112,7 @@ internal static class Program
         command.CommandText = "SELECT sqlite_version();";
         var sqliteVersion = (string)(await command.ExecuteScalarAsync())!;
         SqliteConnection.ClearAllPools();
-        if (!SHA256.HashData(File.ReadAllBytes(snapshotPath)).SequenceEqual(snapshotHash))
-            throw new InvalidDataException("Retained backup changed during C# readback.");
+        var afterSha256 = AuthenticateSnapshot(snapshotPath, producerSha256);
         File.WriteAllText(Path.Combine(output, "csharp-readback.json"), JsonSerializer.Serialize(new
         {
             Format = "ifw-storage-fault-csharp-v1",
@@ -97,8 +122,12 @@ internal static class Program
             OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
             SQLiteVersion = sqliteVersion,
             RetainedSnapshotUnchanged = true,
-            SnapshotSha256 = Convert.ToHexStringLower(snapshotHash)
+            SnapshotSha256 = producerSha256,
+            SnapshotBeforeSha256 = beforeSha256,
+            SnapshotAfterSha256 = afterSha256,
+            SnapshotCopySha256 = copySha256
         }));
         Console.WriteLine($"C# fault readback passed: {checks} assertions over recovered, snapshot and restored profiles.");
+        return 0;
     }
 }

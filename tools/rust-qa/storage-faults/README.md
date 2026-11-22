@@ -30,8 +30,11 @@ current vulnerability scan.
 
 Output must be a fresh directory strictly below `artifacts/rust/storage-faults`.
 Each failed run is retained; retry with a new name. Only this fresh synthetic tree
-is mutated. No user application profile is opened. Every native child has a
-30-second readiness timeout and a 10-second termination wait. The transaction
+is mutated. No user application profile is opened. Each ordinary command step
+(including builds, the portable page-limit worker, Rust verification and C#
+readback) has a 600-second timeout. The supervised crash worker has a 30-second
+readiness deadline and a 10-second termination wait. The private tmpfs supervisor
+has a separate 30-second watchdog and a 10-second child termination wait. The transaction
 payload is fixed at 2 MiB. The `SQLITE_FULL` case limits database growth to 16
 pages beyond its measured initial size; this is not filesystem `ENOSPC`.
 
@@ -45,8 +48,10 @@ features must equal the existing 31-package reviewed closure before compilation.
 
 The six scenarios cover both C# casing modes:
 
-1. Commit a four-table change, emit its confirmation, take a consistent snapshot
-   with the SQLite backup API while committed pages are still exclusively in WAL.
+1. Commit a four-table change and take a consistent snapshot with the SQLite
+   backup API while committed pages are still exclusively in WAL. Close the
+   completed backup, emit its SHA-256 before any verifier reopens it, then verify
+   the full content and emit the transaction confirmation with that same digest.
 2. For crash-before-commit, change all four tables, spill dirty pages to WAL, and
    block. The parent kills the child with SIGKILL/TerminateProcess; no Rust
    transaction destructor executes. A new process must see only confirmed data.
@@ -73,8 +78,23 @@ The six scenarios cover both C# casing modes:
    history, exact album ownership, account separation, 64-bit values and tombstones
    in the recovered database, snapshot and restored database (also the tmpfs
    restoration, when present). The reader initializes databases and can rewrite
-   header bookkeeping. It reads a byte-identical disposable snapshot copy; the
-   original pre-fault snapshot must retain its exact SHA-256 throughout.
+   header bookkeeping. Rust and C# each read their own disposable snapshot copy,
+   authenticated against the native producer's digest before opening SQLite.
+8. Carry that original digest through the raw process-kill and ENOSPC events.
+   Check the actual retained file before and after each Rust/C# phase and again
+   after all cases finish. The supplied CLI digest is always the early producer
+   value, never a replacement measured by a later reader. In every case, flip
+   one byte in another isolated copy. Both actual verifier entry points must
+   return the specific hash-mismatch error before opening SQLite or producing
+   derived files. The original and corrupted copy must both remain unchanged
+   throughout those rejection trials.
+
+The producer SHA-256 and its independently retained supervisor receipts establish
+byte continuity within this isolated experiment. They are not a digital signature
+or proof against an attacker who controls both the producer and supervisor.
+Individual verifier commands require the original digest as their final argument:
+`ifw-storage-faults verify <case> <producer-sha256>` and
+`dotnet FaultReadback.dll <case> <producer-sha256>`.
 
 The before/after-kill raw DB/WAL/SHM copies are forensic evidence, not recovery
 backups. Recovery uses only the completed SQLite backup API snapshot. Actual

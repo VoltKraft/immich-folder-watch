@@ -58,15 +58,63 @@ fn integrity(database: &Connection) -> Result<()> {
     )
 }
 
-fn backup(source: &Connection, destination: &Path) -> Result<()> {
+fn authenticate_snapshot(path: &Path, expected: &str) -> Result<String> {
+    check(
+        expected.len() == 64
+            && expected
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+        "invalid producer SHA-256",
+    )?;
+    let actual = digest(path)?;
+    check(
+        actual == expected,
+        "SNAPSHOT_SHA256_MISMATCH: retained backup differs from producer",
+    )?;
+    Ok(actual)
+}
+
+fn snapshot_copy(source: &Path, destination: &Path, expected: &str) -> Result<()> {
+    authenticate_snapshot(source, expected)?;
+    let wal = source.with_file_name(format!(
+        "{}-wal",
+        source
+            .file_name()
+            .ok_or("snapshot filename")?
+            .to_string_lossy()
+    ));
+    check(
+        !wal.exists() || std::fs::metadata(wal)?.len() == 0,
+        "snapshot has live WAL",
+    )?;
+    check(!destination.exists(), "snapshot copy already exists")?;
+    std::fs::copy(source, destination)?;
+    authenticate_snapshot(destination, expected)?;
+    authenticate_snapshot(source, expected)?;
+    Ok(())
+}
+
+fn backup(source: &Connection, destination: &Path) -> Result<String> {
     check(!destination.exists(), "backup target already exists")?;
+    let expected = reviewed::fault_snapshot(source)?;
     let mut target = Connection::open(destination)?;
     Backup::new(source, &mut target)?.run_to_completion(2, Duration::from_millis(1), None)?;
+    target.close().map_err(|(_, error)| error)?;
+    // Anchor the closed API result before any verifier opens the destination.
+    // The supervisor retains this producer event independently of later readers.
+    let sha256 = digest(destination)?;
+    emit(
+        &json!({"phase":"backup-completed", "file":destination.file_name().ok_or("backup filename")?.to_string_lossy(),
+        "sha256":sha256, "bytes":std::fs::metadata(destination)?.len()}),
+    )?;
+    let target = Connection::open_with_flags(destination, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     integrity(&target)?;
     check(
-        reviewed::fault_snapshot(source)? == reviewed::fault_snapshot(&target)?,
+        expected == reviewed::fault_snapshot(&target)?,
         "backup API changed full schema/table snapshot",
-    )
+    )?;
+    target.close().map_err(|(_, error)| error)?;
+    authenticate_snapshot(destination, &sha256)
 }
 
 fn expected_state(mut expected: Value, pending: bool) -> Result<Value> {
@@ -214,9 +262,13 @@ fn worker(
     let wal = database_directory.join("state.db-wal");
     let confirmed_wal = std::fs::metadata(&wal)?.len();
     check(confirmed_wal > 32, "confirmed WAL has no frames")?;
-    backup(&database, &output.join("snapshot.db"))?;
+    let snapshot_path = output.join("snapshot.db");
+    let snapshot_sha256 = backup(&database, &snapshot_path)?;
     write_json(&output.join("confirmed.expected.json"), &confirmed)?;
-    emit(&json!({"phase":"confirmed", "commit_returned":true, "wal_bytes":confirmed_wal}))?;
+    emit(
+        &json!({"phase":"confirmed", "commit_returned":true, "wal_bytes":confirmed_wal,
+        "snapshot_sha256":snapshot_sha256}),
+    )?;
     let mut pending = expected_state(confirmed.clone(), true)?;
     let page_size: i64 = database.pragma_query_value(None, "page_size", |row| row.get(0))?;
     let page_count: i64 = database.pragma_query_value(None, "page_count", |row| row.get(0))?;
@@ -288,6 +340,7 @@ fn worker(
         )?;
         integrity(&database)?;
         let mut evidence = json!({"format":"ifw-storage-fault-v1", "mode":mode, "fault":fault,
+            "snapshot_sha256":snapshot_sha256,
             "sqlite_version":rusqlite::version(), "sqlite_source_id":SOURCE_ID, "compile_options":compile_options,
             "page_size":page_size, "page_count_before":page_count, "max_page_count":cap,
             "database_limit_bytes":cap.map(|pages| pages*page_size), "sqlite_max_page_count":sqlite_max_pages,
@@ -308,7 +361,8 @@ fn worker(
                 }
             }
             emit(
-                &json!({"phase":"enospc-observed", "os_errno":28, "sqlite_extended_error":extended}),
+                &json!({"phase":"enospc-observed", "os_errno":28, "sqlite_extended_error":extended,
+                    "snapshot_sha256":authenticate_snapshot(&snapshot_path, &snapshot_sha256)?}),
             )?;
             let mut acknowledgement = String::new();
             io::stdin().read_line(&mut acknowledgement)?;
@@ -318,10 +372,10 @@ fn worker(
             )?;
             std::fs::remove_file(&filler_path)?;
             drop(database);
-            let snapshot = Connection::open_with_flags(
-                output.join("snapshot.db"),
-                OpenFlags::SQLITE_OPEN_READ_ONLY,
-            )?;
+            let snapshot_copy_path = database_directory.join("restore-source.db");
+            snapshot_copy(&snapshot_path, &snapshot_copy_path, &snapshot_sha256)?;
+            let snapshot =
+                Connection::open_with_flags(&snapshot_copy_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
             let recovered_path = database_directory.join("same-volume-restored.db");
             backup(&snapshot, &recovered_path)?;
             let recovered = Connection::open(&recovered_path)?;
@@ -331,6 +385,8 @@ fn worker(
                 "same-tmpfs backup restore differed",
             )?;
             drop(recovered);
+            drop(snapshot);
+            authenticate_snapshot(&snapshot_path, &snapshot_sha256)?;
             std::fs::copy(recovered_path, output.join("same-volume-restored.db"))?;
             for suffix in ["", "-wal", "-shm"] {
                 let name = format!("state.db{suffix}");
@@ -341,9 +397,14 @@ fn worker(
             }
             evidence["same_volume_backup_restore"] = json!(true);
             evidence["only_owned_filler_removed"] = json!(true);
+            evidence["same_volume_source_sha256"] = json!(snapshot_sha256);
         }
+        authenticate_snapshot(&snapshot_path, &snapshot_sha256)?;
         write_json(&output.join("fault.json"), &evidence)?;
-        emit(&json!({"phase":"sqlite-full", "sqlite_extended_error":extended}))?;
+        emit(
+            &json!({"phase":"sqlite-full", "sqlite_extended_error":extended,
+            "snapshot_sha256":snapshot_sha256}),
+        )?;
         return Ok(());
     }
     update?;
@@ -369,6 +430,7 @@ fn worker(
         std::mem::forget(transaction);
     }
     let evidence = json!({"format":"ifw-storage-fault-v1", "mode":mode, "fault":fault,
+        "snapshot_sha256":snapshot_sha256,
         "sqlite_version":rusqlite::version(), "sqlite_source_id":SOURCE_ID, "compile_options":compile_options,
         "confirmed_wal_bytes":confirmed_wal, "pending_wal_bytes":pending_wal,
         "page_size":page_size, "attempted_payload_bytes":PAYLOAD_BYTES,
@@ -376,7 +438,8 @@ fn worker(
         "expected_recovery":if committed {"unacknowledged-committed"} else {"confirmed-only"}});
     write_json(&output.join("fault.json"), &evidence)?;
     emit(
-        &json!({"phase":"kill-ready", "pending_commit_returned":committed, "wal_bytes":std::fs::metadata(&wal)?.len()}),
+        &json!({"phase":"kill-ready", "pending_commit_returned":committed, "wal_bytes":std::fs::metadata(&wal)?.len(),
+            "snapshot_sha256":authenticate_snapshot(&snapshot_path, &snapshot_sha256)?}),
     )?;
     // A bounded parent timeout kills this exact owned child, including on error.
     loop {
@@ -384,11 +447,18 @@ fn worker(
     }
 }
 
-fn verify(output: &Path) -> Result<()> {
+fn verify(output: &Path, producer_sha256: &str) -> Result<()> {
+    let snapshot_path = output.join("snapshot.db");
+    // Fail before any SQLite open or derived file, including in negative trials.
+    let before_sha256 = authenticate_snapshot(&snapshot_path, producer_sha256)?;
     let case = load_json(&output.join("fault.json"))?;
     check(
         case["format"] == "ifw-storage-fault-v1",
         "wrong fault profile",
+    )?;
+    check(
+        case["snapshot_sha256"] == producer_sha256,
+        "fault marker changed producer digest",
     )?;
     let recovery = if case["fault"] == "commit-before-ack" {
         "unacknowledged.expected.json"
@@ -405,8 +475,9 @@ fn verify(output: &Path) -> Result<()> {
         "recovered state is partial or lost a confirmed transaction",
     )?;
     drop(database);
-    let snapshot =
-        Connection::open_with_flags(output.join("snapshot.db"), OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let copy_path = output.join("rust-snapshot.db");
+    snapshot_copy(&snapshot_path, &copy_path, producer_sha256)?;
+    let snapshot = Connection::open_with_flags(&copy_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let confirmed = load_json(&output.join("confirmed.expected.json"))?;
     check(
         reviewed::fault_snapshot(&snapshot)? == confirmed["Snapshot"],
@@ -444,12 +515,16 @@ fn verify(output: &Path) -> Result<()> {
         reviewed::fault_snapshot(&negative)? != confirmed["Snapshot"],
         "actual unequal SQLite state escaped snapshot comparison",
     )?;
+    drop(snapshot);
+    let after_sha256 = authenticate_snapshot(&snapshot_path, producer_sha256)?;
     write_json(
         &output.join("verification.json"),
         &json!({"format":"ifw-storage-fault-verification-v1",
         "recovery_expected":recovery,"integrity_check":"ok", "recovered_full_snapshot_matched":true,
             "restored_full_snapshot_matched":true,"restored_write_rollback_passed":true,"actual_sql_mutation_detected":true,
-        "snapshot_sha256":digest(&output.join("snapshot.db"))?, "os":std::env::consts::OS,"arch":std::env::consts::ARCH}),
+        "snapshot_sha256":producer_sha256, "snapshot_before_sha256":before_sha256,
+        "snapshot_after_sha256":after_sha256, "snapshot_copy_sha256":producer_sha256,
+        "os":std::env::consts::OS,"arch":std::env::consts::ARCH}),
     )?;
     println!("Fault recovery and full backup restoration passed");
     Ok(())
@@ -464,7 +539,7 @@ fn main() -> Result<()> {
         [command, seed, output, mode, fault, storage] if command == "worker" && fault == "enospc" => worker(
             &PathBuf::from(seed), &PathBuf::from(output), mode.to_str().ok_or("mode UTF-8")?, "enospc", Some(&PathBuf::from(storage)),
         ),
-        [command, output] if command == "verify" => verify(&PathBuf::from(output)),
-        _ => Err("usage: ifw-storage-faults worker <reviewed-seed> <new-output> <sensitive|insensitive> <uncommitted|commit-before-ack|sqlite-full>; or verify <case>".into()),
+        [command, output, expected] if command == "verify" => verify(&PathBuf::from(output), expected.to_str().ok_or("SHA-256 UTF-8")?),
+        _ => Err("usage: ifw-storage-faults worker <reviewed-seed> <new-output> <sensitive|insensitive> <uncommitted|commit-before-ack|sqlite-full>; or verify <case> <producer-sha256>".into()),
     }
 }

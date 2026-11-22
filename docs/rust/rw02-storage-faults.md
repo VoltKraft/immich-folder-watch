@@ -40,10 +40,15 @@ snapshot comparison still covers every row, column, index/schema SQL and
 
 Every case starts from the reviewed backup, opens WAL with automatic checkpoint
 disabled and `synchronous=FULL`, commits the first four-table transaction, and
-emits its acknowledgement. The main database file must still have its original
+prepares its acknowledgement. The main database file must still have its original
 hash while committed WAL frames exist. The
 [SQLite backup API](https://sqlite.org/backup.html) then captures that live state;
-its destination must match the entire source snapshot and pass `integrity_check`.
+the producer closes its destination and immediately emits its SHA-256, before
+any verifier opens it. The destination must then match the entire source snapshot
+and pass `integrity_check` without changing that digest. The transaction
+confirmation repeats the original digest. Every completed backup made by the
+fault probe emits such a receipt; the retained pre-fault snapshot is the invariant source used
+through all later phases.
 
 The two crash barriers distinguish an uncommitted transaction from a committed
 transaction whose application acknowledgement was not sent. The parent observes
@@ -84,15 +89,30 @@ files and snapshot are preserved. C# Core reads the recovered, snapshot and
 restored databases independently (24 assertions per portable case; 32 with the
 extra same-tmpfs restoration). Because the C# initializer writes header metadata,
 the retained snapshot is tested through a closed, byte-identical disposable copy.
-Its original bytes must remain unchanged after every readback.
+The Rust verifier also uses its own authenticated copy. The supervisor supplies
+the original producer digest explicitly to both verifier entry points. They
+check it before opening any SQLite database, check the snapshot copy against it,
+and check the retained original again after their work. The supervisor separately
+checks before and after each language phase, carries the digest in the raw
+kill/ENOSPC receipts, and defers a final check of every actual original until all
+eight cases finish. ENOSPC restoration uses a verified private copy as well.
+
+Every case additionally flips byte 100 in another isolated snapshot copy. Both
+real verifier entry points must reject it with `SNAPSHOT_SHA256_MISMATCH` before
+any SQLite open or derived file. Rust exits 1; C# exits 42. The exact changed byte,
+original/changed hashes, error logs and absence of derived files are recorded.
+This byte-corruption check is separate from the existing semantically unequal
+but structurally valid SQL control. Authentication here means continuity against
+the producer digest retained by the independent supervisor; it is not a signature
+or protection against compromise of both processes.
 
 This proves database state recovery at these bounded points. It does not undo
 uploads, downloads, deletes or other external side effects, and it does not
 establish a production retry/idempotency policy.
 
-## Local observations
+## Pre-review local observations (2026-11-21)
 
-The final native Fedora Linux x64 run on 2026-11-21 passed all eight cases and
+The pre-review native Fedora Linux x64 run on 2026-11-21 passed all eight cases and
 208 C# assertions in ignored `artifacts/rust/storage-faults/linux-x64-05`. It
 verified 31 archives, 2,214 source files and the exact native feature graph,
 passed all 29 command steps, Rustfmt, Clippy with warnings denied, release
@@ -122,14 +142,18 @@ tested tmpfs failure had already returned to autocommit. Production integration
 must stop work and handle errors explicitly; it cannot infer one universal
 automatic rollback behavior from the shared SQLite result code.
 
-The final run records four actual SIGKILL exits (`-9`) and eight real SQL mutation
+That run records four actual SIGKILL exits (`-9`) and eight real SQL mutation
 controls. Every post-kill DB/WAL/SHM hash equals its quiescent pre-kill hash. All
-eight original snapshot hashes remain unchanged after native recovery and C#
-readback. The 138 first-party source bindings and 405 evidence-file hashes were
+eight snapshot hashes measured at the end of native verification remained
+unchanged through C# readback. Independent review correctly found that this late
+anchor did not establish byte continuity from backup completion through native
+recovery. The new producer receipt and per-phase checks above close that evidence
+gap; the preserved earlier outputs are not reinterpreted as having them.
+The 138 first-party source bindings and 405 evidence-file hashes were
 verified again against disk after execution. The actual C# process and OS were
 X64, with .NET 10.0.12 and SQLite 3.53.4; the Rust engine was SQLite 3.54.1.
 
-| Final source/evidence identity | SHA-256 |
+| Pre-review source/evidence identity | SHA-256 |
 | --- | --- |
 | Generated `tools/rust-qa/storage-faults/Cargo.lock` | `bd31bfdbcfdce6a63176a71918d64885c036bef198be096913f7be5f4fbf3eb0` |
 | Rust fault executable | `2d46ecf2a164ca1c4aefcf138405f60b98bcd0bfc6f89a9d0d06215c124a44d4` |
@@ -145,7 +169,61 @@ Run paths are relative to ignored `artifacts/rust/storage-faults`. The final
 inventory and source bindings were read back against the files after execution.
 The unchanged reference executable has the same hash in all five runs. No result
 was published and no shared workflow, lockfile, status or application source was
-edited. The primary agent owns review, native matrix integration and commits.
+edited. The primary agent owns review and native matrix integration; the remediation
+commit below is explicitly delegated and limited to this experiment's files.
+
+## Remediation and native revalidation (2026-11-22)
+
+Independent review of `e4e1cf2` identified the late snapshot-hash anchor and the
+README's overly broad 30-second timeout description. The maintained recipe now
+distinguishes ordinary 600-second command steps from the 30-second crash-worker
+readiness deadline and the private tmpfs supervisor's 30-second watchdog. Both
+supervisors retain a 10-second termination wait. No timeout was shortened or
+silently represented as a previously executed check.
+
+The fresh `linux-x64-06` run used the documented command with `--tmpfs` on native
+Fedora x64 and passed all eight cases, all 45 command steps and 208 C# semantic
+assertions. Of those steps, 16 deliberately failed with the required hash-mismatch
+diagnostic: eight Rust exits 1 and eight C# exits 42. Each negative copy differed
+from its original at exactly byte 100 and no other offset. Neither verifier
+created any file in the rejection directory, and neither changed the corrupt
+input. The original eight valid profiles still passed full Rust and actual C#
+comparison through separately authenticated copies.
+
+Each original passed six supervisor hash checkpoints: before/after Rust,
+before/after C#, after the negative controls and after all eight cases completed.
+The native verifiers also check independently. Every crash and tmpfs receipt
+includes the original `backup-completed` event and three supervisor checks
+around its fault boundary. Four actual SIGKILL exits remained `-9`; the two
+8,388,608-byte tmpfs filesystems again reported zero free/available space, OS
+errno 28 and SQLite error 13. Same-volume restoration passed in both. The added
+private restore-source copy and its locking sidecars account for the newly
+measured 8,122,368 bytes available after restoration; the earlier 8,200,192-byte
+observation above remains associated with the earlier recipe.
+
+| Retained original snapshot, all four cases per mode | Producer SHA-256, unchanged at every later checkpoint |
+| --- | --- |
+| Sensitive | `b69cd07bea7531bc989678571dcd7146468cd293bc8befe2afe85005149ecfc4` |
+| Insensitive | `2f706e13554d5cf262b67a4f0c72611157084be3423019ca71c97d8328412544` |
+
+The exact 31-package graph, 2,214 external source files, both native compiler
+flag logs, Rustfmt, Clippy with denied warnings, release build and C# build
+(zero warnings/errors) passed again. All 138 archived first-party source hashes
+matched both their archived bytes and the current source files. All 453 new
+evidence-file hashes were checked against disk after the run. The previous
+`linux-x64-05` inventory still matched all 405 original files. Engine/runtime
+versions remained Rust SQLite 3.54.1, C# SQLite 3.53.4 and native .NET 10.0.12.
+
+| Remediation evidence identity | SHA-256 |
+| --- | --- |
+| Rust fault executable | `84797f53931b7ec15c45218ce8b41c39e061c5eb7916ff09c68e2786a8514f8b` |
+| Unchanged reviewed storage executable | `a54528c312bb27726546ad1cf265b6ffd6f19ba78e40e610adeab8174e94c800` |
+| C# fault readback assembly | `d5d4ecb4346e8e4f10c830a1924d12206a008ae9ee08952c505f1a9ce23f2ffd` |
+| `linux-x64-06/result.json` | `d6fbfc44d6b62ae5442bc4bc32ff2a6225067d4e79ddd77f1fb7f4e4d0b63160` |
+| `linux-x64-06/first-party-source-hashes.json` | `15fa7d9c19245f20923001d23bc6feccc25abddd6ed697c9b13d2299f8ba55cf` |
+| `linux-x64-06/evidence-hashes.json` | `a0c5035758144586b3e743d4db04769c9dcdd9be2bcfead88e72560827b45492` |
+| `linux-x64-06/cases/sensitive-enospc/tmpfs.json` | `79581f27e9b283d2ae5bb3df5ea07e2ae723fb2da94049e20abc2ba3932e56e4` |
+| `linux-x64-06/cases/insensitive-enospc/tmpfs.json` | `84a55efc15b1280105d4177add1c12e9068a4a88831268e07315112d92e510ea` |
 
 ## Retained diagnostic attempts
 
