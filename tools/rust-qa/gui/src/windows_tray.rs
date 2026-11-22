@@ -1,15 +1,17 @@
 //! Own the elected GUI's notification icon independently of its eframe window generations.
 use crate::windows_tray_shell::{EVENTS, ICON, Icon, Image, Receiver, color, image, pump_messages};
-use crate::windows_tray_state::{Attempt, Host, Pending, Recovery, TrayEvent};
+use crate::windows_tray_state::{Attempt, BoundHost, Host, Pending, Recovery, TrayEvent};
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver as Channel, SyncSender, TrySendError, sync_channel};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
+use windows::Win32::Foundation::{HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::w;
+use windows::core::{Owned, w};
 
 #[derive(Clone, Copy)]
 pub enum TrayRequest {
@@ -82,17 +84,54 @@ fn taskbar() -> Option<Host> {
     }
 }
 
+fn shell_host() -> Option<Host> {
+    let host = taskbar()?;
+    // Corroborate the taskbar window class with the desktop Shell process reported by Windows.
+    let window = unsafe { GetShellWindow() };
+    let mut pid = 0;
+    if window.is_invalid() || unsafe { GetWindowThreadProcessId(window, Some(&mut pid)) } == 0 {
+        return None;
+    }
+    (host.1 == pid).then_some(host)
+}
+
+fn pin_shell() -> Option<(Host, Owned<HANDLE>)> {
+    let host = shell_host()?;
+    // Take ownership of a non-inheritable handle with only the right to wait on this process.
+    let process = unsafe { Owned::new(OpenProcess(PROCESS_SYNCHRONIZE, false, host.1).ok()?) };
+    (unsafe { WaitForSingleObject(*process, 0) } == WAIT_TIMEOUT && shell_host() == Some(host))
+        .then_some((host, process))
+}
+
 struct Registration<'a> {
     icon: Icon<'a>,
     images: [Image; 2],
     colors: [[u8; 3]; 2],
     selected: usize,
     available: bool,
+    host: BoundHost<Owned<HANDLE>>,
 }
 
 impl Registration<'_> {
+    fn bind(&mut self, phase: &str, candidate: Option<(Host, Owned<HANDLE>)>) {
+        let owner = self.host.confirm(candidate, shell_host(), |handle| {
+            (unsafe { WaitForSingleObject(**handle, 0) }) == WAIT_TIMEOUT
+        });
+        let (hwnd, pid) = owner.unwrap_or_default();
+        println!(
+            "TRAY_BIND phase={phase} pid={} hwnd={} id={ICON} shell_pid={pid} shell_hwnd={hwnd} verified={}",
+            std::process::id(),
+            self.icon.owner.hwnd.0 as usize,
+            u8::from(owner.is_some())
+        );
+    }
+
     fn register(&mut self, phase: &str, token: &str) -> io::Result<bool> {
+        let candidate = pin_shell();
         let (added, v4) = self.icon.register(phase, self.images[self.selected].0);
+        if added {
+            self.bind(phase, candidate);
+        }
         println!(
             "TRAY_REGISTER phase={phase} pid={} hwnd={} id={ICON} token={token} added={} version4={}",
             std::process::id(),
@@ -101,8 +140,11 @@ impl Registration<'_> {
             u8::from(v4)
         );
         self.available = added && v4;
-        if added && !v4 && !self.icon.remove("incompatible_version") {
-            return Err(io::Error::other("Failed to withdraw the rejected v4 icon"));
+        if added && !v4 {
+            if !self.icon.remove("incompatible_version") {
+                return Err(io::Error::other("Failed to withdraw the rejected v4 icon"));
+            }
+            self.host.clear();
         }
         Ok(self.available)
     }
@@ -115,12 +157,14 @@ impl Registration<'_> {
         // A broadcast can also mean a DPI change. A surviving entry still needs a v4
         // acknowledgement on this host. A duplicate NIM_ADD alone would be refused.
         if self.icon.cleanup {
+            let candidate = pin_shell();
             let mut version = self.icon.base();
             version.Anonymous.uVersion = NOTIFYICON_VERSION_4;
             if self
                 .icon
                 .call("existing.version4", NIM_SETVERSION, &version)
             {
+                self.bind(phase, candidate);
                 self.available = true;
                 return Ok(true);
             }
@@ -129,13 +173,36 @@ impl Registration<'_> {
                 .icon
                 .rect()
                 .is_ok_and(|r| r.right > r.left && r.bottom > r.top)
-                && !self.icon.remove("existing.withdraw")
             {
-                self.available = false;
-                return Ok(false);
+                // A responsive Shell has this key but did not acknowledge its version.
+                // This entry can no longer be attributed to any previous bound process.
+                self.host.clear();
+                if !self.icon.remove("existing.withdraw") {
+                    self.available = false;
+                    return Ok(false);
+                }
             }
         }
         self.register(phase, token)
+    }
+
+    fn retire_exited_host(&mut self) -> bool {
+        let absent = || unsafe {
+            FindWindowW(w!("Shell_TrayWnd"), None).is_err() && GetShellWindow().is_invalid()
+        };
+        let Some((hwnd, pid)) = self.host.departed(
+            |handle| unsafe { WaitForSingleObject(**handle, 0) } == WAIT_OBJECT_0,
+            || absent() && self.icon.rect().is_err() && absent(),
+        ) else {
+            return false;
+        };
+        println!(
+            "TRAY_RETIRED pid={} hwnd={} id={ICON} shell_pid={pid} shell_hwnd={hwnd}",
+            std::process::id(),
+            self.icon.owner.hwnd.0 as usize
+        );
+        self.icon.cleanup = false;
+        true
     }
 
     fn sample(&self, phase: &str, ok: bool) {
@@ -158,12 +225,20 @@ impl Registration<'_> {
     }
 
     fn change(&mut self) {
+        if !self.available || self.selected == 1 {
+            self.sample("changed", self.available);
+            return;
+        }
         let mut update = self.icon.base();
         update.uFlags = NIF_ICON;
         update.hIcon = self.images[1].0;
-        let ok =
-            self.available && (self.selected == 1 || self.icon.call("change", NIM_MODIFY, &update));
+        let before = shell_host();
+        let ok = self.icon.call("change", NIM_MODIFY, &update);
         if ok {
+            // An accepted marker on a replacement Shell cannot establish the original registration's owner.
+            self.host.modified(before, shell_host(), |handle| {
+                (unsafe { WaitForSingleObject(**handle, 0) }) == WAIT_TIMEOUT
+            });
             self.selected = 1;
         }
         self.sample("changed", ok);
@@ -195,6 +270,7 @@ fn run<T>(
         colors: [rgb, contrast],
         selected: 0,
         available: false,
+        host: BoundHost::default(),
     };
     let result: io::Result<()> = (|| {
         // Shell registration can dispatch a callback reentrantly before the message pump starts.
@@ -294,6 +370,7 @@ fn run<T>(
     })();
     let registered = tray.icon.cleanup;
     let removed = registered && tray.icon.remove("shutdown");
+    let retired = registered && !removed && tray.retire_exited_host();
     println!(
         "TRAY_CLEANUP pid={} hwnd={} id={ICON} registered={} removed={}",
         std::process::id(),
@@ -304,7 +381,7 @@ fn run<T>(
     drop(tray);
     let closed = receiver.close().map_err(io::Error::other);
     result?;
-    if registered && !removed {
+    if registered && !removed && !retired {
         return Err(io::Error::other(
             "The native tray icon could not be removed",
         ));
