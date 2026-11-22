@@ -56,6 +56,7 @@ jobs:
           bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET" 2>&1 | tee "artifacts/rust/feasibility/$NATIVE_TARGET/install.log"
 
       - name: Select the native development-only compatibility oracle SDK
+        id: oracle
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.401
@@ -99,5 +100,29 @@ jobs:
         with:
           name: rust-feasibility-${{ matrix.target }}-${{ github.sha }}
           path: artifacts/rust/feasibility/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Recover Windows databases after process termination and a full private volume
+        id: recovery
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          export CARGO_HOME="$PWD/artifacts/rust/storage-cargo-home"
+          cargo fetch --locked --manifest-path tools/rust-qa/storage-faults/Cargo.toml
+          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" --windows-vhd \
+            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET"
+
+      - name: Retain the full Windows recovery evidence
+        if: ${{ !cancelled() && (steps.recovery.outcome == 'success' || steps.recovery.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-recovery-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-faults/${{ matrix.target }}/
+            !artifacts/rust/storage-faults/${{ matrix.target }}/build/**
           if-no-files-found: error
           retention-days: 14

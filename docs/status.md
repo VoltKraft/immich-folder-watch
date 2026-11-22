@@ -58,10 +58,13 @@ Clippy on both Windows targets passed. Native Windows loss is still pending.
 [Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
 
 The .NET reference, PR CI, CodeQL and dependency submission completed
-successfully at the same commit. The Windows storage fault and interactive
-tray steps on both architectures reported failure while the
-desktop jobs were still running. Their final receipts are needed to identify
-which observations completed.
+successfully at the same commit. Both Windows archives at `3b4854d` reached
+six recovery cases and 144 C# checks each. Inside each test VHD, Windows
+reported disk-full error 112, SQLite reported code 13 and the supervisor
+measured zero available bytes. The Rust worker then declined a CRLF-terminated
+release command. Both VHDs detached. The capacity recovery is still open.
+The native feasibility workflow now runs this Windows trial independently of
+the desktop performance measurements and retains its entire evidence directory.
 [Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
 · [Desktop and storage](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730).
 

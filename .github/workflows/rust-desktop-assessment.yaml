@@ -148,19 +148,15 @@ jobs:
         shell: bash
         run: python3 tools/rust-qa/platform-logs/observe.py "$NATIVE_TARGET" --output "artifacts/rust/platform-logs/native-$NATIVE_TARGET"
 
-      - name: Recover native WAL transactions after process termination and bounded storage failure
-        id: storage_faults
-        if: ${{ !cancelled() && steps.storage.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
+      - name: Recover Linux WAL transactions after process termination and private tmpfs exhaustion
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.storage.outcome == 'success' && steps.desktop.outcome == 'success' }}
         shell: bash
         env:
           NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
-          options=()
-          if [[ "$RUNNER_OS" == Linux ]]; then options+=(--tmpfs); fi
-          if [[ "$RUNNER_OS" == Windows ]]; then options+=(--windows-vhd); fi
-          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" \
-            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET" "${options[@]}"
+          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" --tmpfs \
+            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET"
 
       - name: Compare native file logs and read back events from a disposable Windows log
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
@@ -187,20 +183,12 @@ jobs:
         shell: bash
         run: python3 -B tools/rust-qa/windows-services/activation.py "$NATIVE_TARGET"
 
-      - name: Retain Windows recovery and tray results before the scan measurements
-        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.storage_faults.outcome == 'success' || steps.storage_faults.outcome == 'failure' || steps.windows_tray.outcome == 'success' || steps.windows_tray.outcome == 'failure') }}
+      - name: Retain Windows tray results before the scan measurements
+        if: ${{ !cancelled() && (steps.windows_tray.outcome == 'success' || steps.windows_tray.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rust-recovery-tray-${{ matrix.target }}-${{ github.sha }}
-          path: |
-            artifacts/rust/storage-faults/${{ matrix.target }}/result.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/evidence-hashes.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/fault.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/verification.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/csharp-readback.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/process-kill.json
-            artifacts/rust/storage-faults/${{ matrix.target }}/cases/*/windows-vhd.json
-            artifacts/rust/windows-services/native-${{ matrix.target }}/activation/*.json
+          name: rust-tray-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/native-${{ matrix.target }}/activation/*.json
           if-no-files-found: error
           retention-days: 14
 
