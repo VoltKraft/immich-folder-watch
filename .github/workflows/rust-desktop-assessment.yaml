@@ -22,7 +22,7 @@ jobs:
     if: github.ref == 'refs/heads/rewrite/rust'
     name: Native assessment (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
-    # Windows runs three 100,000-file scans for each of WPF, ordinary Rust and retained-window Rust.
+    # Each Windows profile uses three independent 100,000-file trials.
     timeout-minutes: ${{ contains(matrix.target, 'windows') && 190 || 95 }}
     strategy:
       fail-fast: false
@@ -61,6 +61,7 @@ jobs:
           architecture: ${{ matrix.arch }}
 
       - name: Exercise the legacy writers, WAL backup and production readers
+        id: storage
         shell: bash
         env:
           NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
@@ -131,6 +132,18 @@ jobs:
         shell: bash
         run: python3 tools/rust-qa/platform-logs/observe.py "$NATIVE_TARGET" --output "artifacts/rust/platform-logs/native-$NATIVE_TARGET"
 
+      - name: Recover native WAL transactions after process termination and bounded storage failure
+        if: ${{ !cancelled() && steps.storage.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          options=()
+          if [[ "$RUNNER_OS" == Linux ]]; then options+=(--tmpfs); fi
+          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" \
+            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET" "${options[@]}"
+
       - name: Compare native file logs and read back events from a disposable Windows log
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
         shell: pwsh
@@ -160,6 +173,18 @@ jobs:
       - name: Observe native X11 lifecycle and AT-SPI
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: python3 tools/rust-qa/gui/native.py --backend x11 --input
+
+      - name: Observe system colors, high contrast and restored settings on the live Linux window
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/gui/build.py --test
+          python3 -B tools/rust-qa/appearance/linux.py --binary artifacts/rust/gui-build/release/native-gui-assessment
+
+      - name: Activate the visible native tray icon from the Plasma panel on Ubuntu x64
+        if: ${{ !cancelled() && matrix.target == 'x86_64-unknown-linux-gnu' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/plasma/prepare.py --acquire
+          python3 -B tools/rust-qa/plasma/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment
 
       - name: Observe native Wayland lifecycle and AT-SPI with application-selected presentation
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
@@ -373,6 +398,16 @@ jobs:
           python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET
           exit $LASTEXITCODE
 
+      - name: Measure the FIFO control on the same retained Windows GUI
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-control
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -423,6 +458,22 @@ jobs:
         timeout-minutes: 35
         run: ./tools/rust-qa/windows-ime/hosted.ps1
 
+      - name: Build the combined Linux dependency profile and relink a modified Wayland binding
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/combined-profile/run.py --native "$NATIVE_TARGET" --fetch --relink \
+            --output "artifacts/rust/combined-profile/runs/$NATIVE_TARGET"
+
+      - name: Build and exercise the combined Windows dependency profile
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' && steps.windows_transport.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --fetch --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
         run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
@@ -434,6 +485,12 @@ jobs:
           name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
           path: |
             artifacts/rust/storage-native/
+            artifacts/rust/storage-faults/${{ matrix.target }}/
+            !artifacts/rust/storage-faults/${{ matrix.target }}/build/**
+            artifacts/rust/appearance/runs/*/*.json
+            artifacts/rust/appearance/runs/*/*.log
+            artifacts/rust/plasma/runs/**
+            artifacts/rust/combined-profile/runs/**
             artifacts/rust/instance-native/${{ matrix.target }}/result.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
@@ -477,6 +534,8 @@ jobs:
             artifacts/rust/windows-warm-window/*/build.json
             artifacts/rust/windows-warm-window/*/observed/
             artifacts/rust/windows-warm-window/*/measured/
+            artifacts/rust/windows-warm-window/*/measured-fifo/*.json
+            artifacts/rust/windows-warm-window/*/measured-fifo/*.log
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json
