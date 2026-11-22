@@ -28,7 +28,11 @@ eighteen controls on copies across the two environments, including
 native source normalization and the complete same-process writer table.
 The same .NET version in globalization-invariant mode produced identical
 fixture databases to ICU 78 but a different 1,475-row casing table. Both
-reference readers refused the unfamiliar writer. The production new-key
+reference readers refused the unfamiliar writer. Independent replay at
+`b77fc12` matched all 56 lookup answers, 299 evidence hashes and 137
+source files. It also identified a whitespace-only account that the C#
+store rejects. The correction passed 60 lookups and twenty controls across
+the two genuine writers. The production new-key
 policy and installed migration remain open.
 [Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
 · [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).

@@ -235,12 +235,13 @@ its complete casing table. The reader checks its digest against both
 qualified originals, counts the recorded scalars and requires the context
 comparison. The Python observer decodes Rust output explicitly as UTF-8.
 
-The corrected native Fedora probe passed 28 lookups against each C#
+At `b77fc12` the native Fedora probe passed 28 lookups against each C#
 generation and nine controls per generation. These include a conflict
 between an entry and a repair journal, an altered snapshot with its
 original expected digest, and an unfamiliar full casing table that
-still maps ƛ exactly as the original. Each control checked the actual
-refusal and the final file hashes. The probe reads finalized synthetic
+still maps ƛ exactly as the original. Two controls returned the expected
+structured observations and seven refused the input. The original files
+stayed byte-identical. The probe reads finalized synthetic
 backups through an immutable read-only connection. Any SQLite sidecar
 causes refusal. It examines the historical rows under both qualified
 profiles. Production migration still needs a writing policy, complete
@@ -256,6 +257,17 @@ The two-profile C# reader and Rust inspector each refused that writer before
 returning any database observations. All three Fedora captures and the
 separate scalar-oracle comparison are recorded in
 `artifacts/rust/casing-profile-verified-f538495/evidence.json`.
+
+Independent replay at `b77fc12` matched all 56 answers to the four SQLite
+tables in the `f538495` writer backups, including the ambiguous and alias
+cases. The integrated Fedora run passed all 16 steps, including 40 C#
+checks on the Rust-written databases. All 299 evidence hashes and 137
+first-party files matched the archive and Git. A separate invalid query
+exposed a difference for a whitespace-only account. The corrected probe
+now refuses such a query and preserves leading and trailing whitespace
+in otherwise valid account names, matching the shipping store. Each of the
+two genuine writers passed 30 lookups and ten controls on Fedora. The
+unqualified third writer still requires separate evidence before adoption.
 
 ## Evidence and remaining work
 

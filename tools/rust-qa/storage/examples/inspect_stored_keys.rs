@@ -93,8 +93,8 @@ fn field<'a>(value: &'a Value, name: &str) -> Result<&'a str> {
     value
         .get(name)
         .and_then(Value::as_str)
-        .filter(|text| !text.is_empty())
-        .ok_or_else(|| "expected a nonempty identity field".into())
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| "expected a nonblank identity field".into())
 }
 
 fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {

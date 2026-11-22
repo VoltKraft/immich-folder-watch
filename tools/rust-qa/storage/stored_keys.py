@@ -97,6 +97,7 @@ def queries(m, mode, tables):
     missing = "absent-concordant" if sensitive else "absent-profile-dependent"
     case("new file at a source affected by casing", primary, source, "new.jpg", missing)
     case("case-distinct account", primary.upper(), source, lower, missing)
+    case("account with significant surrounding spaces", " " + primary + " ", source, lower, missing)
     case("ownership directory is opaque", primary, source, m["albumDirectory"], missing)
     case("opaque album ID is not a path identity", primary, source, m["albumId"], missing)
     return cases
@@ -179,6 +180,7 @@ def negative_controls(probe, fixture, output, m):
     results["collidingJournal"] = check_answers(probe, directory, "insensitive", digest, cases, tables)
 
     rejection = {
+        "blank-account": "expected a nonblank identity field",
         "foreign-repair-account": "repair identity contradicts its stored account",
         "future-schema": "expected a completed schema-v1 reference backup",
         "companion": "a standalone backup without SQLite companions is required",
@@ -219,7 +221,8 @@ def negative_controls(probe, fixture, output, m):
                 stream.write(bytes([original[0] ^ 1]))
         expected = "0" * 64 if name == "wrong-digest" else digest
         before = {p.name: sha256(p) for p in directory.iterdir()}
-        run = run_probe(probe, directory, "insensitive", expected, one)
+        requests = [dict(one[0], account=" \t\u00a0")] if name == "blank-account" else one
+        run = run_probe(probe, directory, "insensitive", expected, requests)
         require(run.returncode != 0 and not run.stdout and expected_error in run.stderr,
                 "Control did not reach its expected refusal: " + name)
         require(before == {p.name: sha256(p) for p in directory.iterdir()}, "Rejected snapshot changed")
