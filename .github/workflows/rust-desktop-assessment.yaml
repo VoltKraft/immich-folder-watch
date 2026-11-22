@@ -87,8 +87,10 @@ jobs:
       - name: Verify the native writer guard across same-account Windows sessions
         id: cross_session
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
-        shell: bash
-        run: python3 tools/rust-qa/instance/cross-session/observe.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET/cross-session"
+        shell: pwsh
+        run: |
+          ./tools/rust-qa/instance/cross-session/test_hosted_service.ps1
+          ./tools/rust-qa/instance/cross-session/hosted.ps1 -Target $env:NATIVE_TARGET
 
       - name: Retain the completed cross-session observation before the desktop trials
         if: ${{ !cancelled() && (steps.cross_session.outcome == 'success' || steps.cross_session.outcome == 'failure') }}
@@ -96,6 +98,7 @@ jobs:
         with:
           name: rust-writer-${{ matrix.target }}-${{ github.sha }}
           path: |
+            artifacts/rust/instance-native/${{ matrix.target }}/hosted-secondary-logon.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/scheduler.log
@@ -512,6 +515,7 @@ jobs:
             artifacts/rust/plasma/runs/**
             artifacts/rust/combined-profile/runs/**
             artifacts/rust/instance-native/${{ matrix.target }}/result.json
+            artifacts/rust/instance-native/${{ matrix.target }}/hosted-secondary-logon.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
             artifacts/rust/instance-native/${{ matrix.target }}/cross-session/scheduler.log

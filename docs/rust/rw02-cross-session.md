@@ -39,6 +39,26 @@ and [token information classes](https://learn.microsoft.com/en-us/windows/win32/
 
 ## Native reproduction
 
+At `a66e045`, Windows x64 completed both native refusal directions and
+reacquired the guard with the same account in sessions 2 and 0. Seven
+participant exits, unchanged logon rights and cleanup were verified. These
+were the runner's existing elevated tokens. The independent standard-user
+trial stopped before acquiring the guard because Secondary Logon was stopped.
+The evidence index verified all 37 files. The overall writer result SHA-256 is
+`110092561468270c6980c0bfc5d536b4479703117f7f62fab4bc1281e5685032`.
+[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
+The hosted wrapper records the installed service's state and startup type.
+For a stopped, startable service it requests a temporary start on the disposable
+runner, executes both native lock trials, then stops the service and verifies
+the original state and startup type. If preparation fails, both observations
+still run with their own authority checks. A cleanup failure fails the job.
+Seven portable PowerShell controls cover these paths. A fresh native result
+must confirm the actual standard-user lock sequence.
+[Hosted wrapper](../../tools/rust-qa/instance/cross-session/hosted.ps1),
+[Start-Service](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-service)
+and [Stop-Service](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-service).
+
 The existing hosted jobs run the following from the matching native architecture with the pinned Rust and .NET toolchains. The local account must already have its effective batch-logon assignment. The same output directory holds both per-case reports, prefixed `ambient-*` receipts and the standard trial’s original receipt names. The controller verifies the original logon rights and removal of the exact registered task. It checks the stamped process identities before deleting each temporary profile.
 
 ```bash
