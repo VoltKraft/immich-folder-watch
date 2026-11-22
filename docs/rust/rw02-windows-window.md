@@ -92,3 +92,18 @@ Preserve `build.json`, `observed/**`, `measured/**` and `measured-fifo/**` under
 Keep `dispatch/*.json` and `dispatch/*.log` from the third command. It uses the same source revision, executable, WPF budget, first-party worker and 100,000-file workload for two instrumented inventories. Each wake policy receives one trial. Qualification of a changed default requires the three-trial budget comparison and native behavior checks.
 
 Nine portable tests covered staged source, resident pages, the shared WPF budget and timing correlations, including overlapping callbacks, asynchronous observations and presents from a different thread of the same process. Rust 1.100.0 passed rustfmt and Clippy for both MSVC targets, including test targets. On each Windows target the staged diagnostic and original manifests resolved to the same 135 package/version/feature entries. The pinned external egui source emitted its existing `std::f32::EPSILON` deprecation. [Variant and budget checks](../../tools/rust-qa/windows-warm-window/test_variant.py) · [Dispatch timeline tests](../../tools/rust-qa/windows-warm-window/test_dispatch.py).
+
+## Repeat measurements before the dispatch trace
+
+Runs `45041728291` and `45047460092` used the same GUI, worker and warm-window sources as `45039099730`. Each host froze its eleven WPF limits before measuring the candidates. Mailbox and FIFO used the same native executable within each job. The table gives the count of limits met by each candidate and the retained Mailbox p95 versus its WPF-derived maximum in milliseconds, using the median of three trials. [Run at 8b64330](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45041728291) · [Run at 7517e3b](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
+
+| Revision and target | Limits met, canonical / Mailbox / FIFO | Idle close | Idle reopen | Scan close | Scan reopen | Archive SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `8b64330` x64 | 6 / 9 / 7 | **23.08** / 14.214 | 6.95 / 16.841 | 22.79 / 30.464 | **121.49** / 22.029 | `635f8cfcf6419e952b1ed64106b5d4b11eb1dadcc714145057cad898cf0add89` |
+| `8b64330` ARM64 | 6 / 11 / 10 | 3.04 / 13.234 | 4.60 / 13.622 | 8.45 / 13.856 | 3.90 / 15.171 | `51d2352ae85f03a8dacdaaf08a44b940ec5f793823a5b897cbaff10ad9e50554` |
+| `7517e3b` x64 | 6 / 7 / 7 | **18.84** / 13.811 | **56.34** / 16.207 | **47.58** / 18.731 | **122.81** / 19.555 | `7077364108250c99d95f6de2680d4404b1aacc1a1c3cfe3f3b06c2f29ebe658b` |
+| `7517e3b` ARM64 | 6 / 11 / 10 | 2.95 / 13.104 | 3.34 / 14.888 | 3.96 / 13.714 | 3.97 / 14.935 | `d13678adf699c7e9fed734fd7ce9324ec182149f317aa7a53b1a4258caf0108c` |
+
+Replaying 48 PID-bound file traces verified two passes over 100,000 distinct files in every trial. All 40 retained-window observation cases passed. The x64 Mailbox candidate exceeded idle close and scan reopen in all three runs. Idle reopen and scan close varied between runs. ARM64 Mailbox met all eleven limits three times. In the two repeats, all 1,205 ARM64 scan reopens finished within their respective limits.
+
+The active-scan request clocks place 607 of 607 and 396 of 397 x64 Mailbox reopens above their respective limits. Replaying the 24 retained-mode DXGI traces showed that exactly two successful presentations fell entirely between request and external HWND observation in 950 of those 1,004 reopens. The largest total overlap with successful DXGI calls during an over-budget reopen was 0.5522 ms. The two revisions predate `d716245`. Its paired native dispatch trace is still needed to locate the delay between the private pipe wake, UI callback, HWND visibility change and independent observation.
