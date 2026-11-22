@@ -211,6 +211,23 @@ The retained and canonical normal/build features matched on all four targets.
 Fifteen comparison tests passed, as did formatting and cross-Clippy for both
 retained Windows targets.
 
+The retained build also archives Cargo's complete release compiler message
+stream in `compiler.jsonl`. Its build receipt records the digest and the
+number of artifacts, distinct package feature sets and packages. The check
+matches each package source to the retained lock, checks the six local
+manifest locations and compares the compiled features with the native
+normal/build dependency tree. The activation checks verify the log digest
+before using the binary. [Retained build](../../tools/rust-qa/windows-warm-window/build.py)
+· [Cargo compiler messages](https://doc.rust-lang.org/cargo/reference/external-tools.html#json-messages).
+
+A native Fedora x64 release build of the retained source with the GUI and
+tray from `93ecc35` produced 289 compiler artifacts, 240 distinct feature
+sets and 235 packages. The compiler stream SHA-256 was
+`1f48bfc05d2b18c40b7266895ffff8450bcf38396890f1c86e465c3e52ae9edb`.
+The linked ELF SHA-256 was
+`21b9bf68e78096b690e823e1176a7c1e0638416e6689299e069e2dc1b66c944c`.
+The Windows builds capture their own compiler output on each architecture.
+
 The original crate SHA-256 is
 `527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580`.
 The generated Shell module is 3,585,884 bytes with SHA-256

@@ -3,10 +3,12 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
+import tomllib
+from urllib.parse import unquote
 
 HERE = Path(__file__).resolve().parent
 QA, ROOT = HERE.parent, HERE.parents[2]
@@ -75,6 +77,39 @@ def feature_rows(manifest, target, env):
     return sorted(rows)
 
 
+def compiler_graph(messages, gui, selected):
+    """Match every reported Cargo package and feature set to the retained lock and native tree."""
+    successful = {"reason": "build-finished", "success": True}
+    if (not messages or messages[-1] != successful
+            or sum(item["reason"] == "build-finished" for item in messages) != 1):
+        raise ValueError("The retained compiler log must end with one successful build")
+    lock = tomllib.loads((gui / "Cargo.lock").read_text(encoding="utf-8"))
+    locked = {(row["name"], row["version"]): row.get("source") for row in lock["package"]}
+    local = {"native-gui-assessment": gui, "desktop-lifecycle": gui.parents[2] / "rust/crates/desktop-lifecycle",
+             "eframe": gui / eframe_source.PACKAGE,
+             **{name: gui / "artifacts/text" / name for name in ("egui", "epaint", "unicode-bidi")}}
+    observed = set()
+    units = [item for item in messages if item["reason"] == "compiler-artifact"]
+    for unit in units:
+        origin, identity = unit["package_id"].rsplit("#", 1)
+        if "@" in identity:
+            name, version = identity.split("@", 1)
+        else:
+            name, version = PurePosixPath(unquote(origin)).name, identity
+        if (name, version) not in locked:
+            raise ValueError(f"Unlisted retained compiler package: {name} {version}")
+        if locked[name, version] is None:
+            if (not origin.startswith("path+file:") or name not in local
+                    or Path(unit["manifest_path"]).resolve() != (local[name] / "Cargo.toml").resolve()):
+                raise ValueError(f"Unexpected local compiler input for {name}")
+        elif origin != locked[name, version]:
+            raise ValueError(f"The compiler and lock disagree on the source of {name}")
+        observed.add((name, version, tuple(sorted(unit["features"]))))
+    if observed != set(selected):
+        raise ValueError("The retained compiler packages or features differ from the native normal/build tree")
+    return {"units": len(units), "featureSets": len(observed), "packages": len({(n, v) for n, v, _ in observed})}
+
+
 def main(target):
     if os.name != "nt" or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted" or os.getenv("GITHUB_ACTIONS") != "true":
         raise ValueError("Build this native comparison on a disposable Windows rewrite runner")
@@ -106,13 +141,18 @@ def main(target):
     compiled = subprocess.check_output(["cargo", "build", "--manifest-path", manifest, "--frozen", "--release",
                                         "--message-format=json-render-diagnostics"], cwd=gui, env=env)
     features, = [flags for name, version, flags in selected if (name, version) == ("eframe", "0.37.0")]
-    eframe_unit = eframe_source.compiled_eframe([json.loads(line) for line in compiled.splitlines()],
-                                               gui, output / "build", features)
+    messages = [json.loads(line) for line in compiled.splitlines()]
+    eframe_unit = eframe_source.compiled_eframe(messages, gui, output / "build", features)
+    compiler = compiler_graph(messages, gui, selected)
+    log = output / "compiler.jsonl"
+    log.write_bytes(compiled)
+    compiler.update(file=log.name, sha256=sha(log))
     sources = eframe_source.source_bundle(gui, output / "eframe-source.zip")
     exe = output / "build/release/native-gui-assessment.exe"
     record = dict(target=target, revision=revision, baselineReceipt=sha(ordinary_path), baseline=sha(canonical), binary=sha(exe),
                   canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
-                  selectedFeatureRows=len(selected), canonicalInputs=ORIGINALS, eframeSource=sources, eframeUnit=eframe_unit,
+                  selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=ORIGINALS,
+                  eframeSource=sources, eframeUnit=eframe_unit,
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},

@@ -21,6 +21,32 @@ spec.loader.exec_module(builder)
 
 
 class WarmTests(unittest.TestCase):
+    def test_all_compiled_features_and_source_identities_must_match_the_retained_graph(self):
+        registry = "registry+https://github.com/rust-lang/crates.io-index"
+        with tempfile.TemporaryDirectory() as temp:
+            gui = Path(temp) / "project/tools/rust-qa/gui"
+            gui.mkdir(parents=True)
+            (gui / "Cargo.lock").write_text(
+                f'[[package]]\nname="windows"\nversion="0.62.2"\nsource="{registry}"\n'
+                '[[package]]\nname="eframe"\nversion="0.37.0"\n', encoding="utf-8")
+            eframe = gui / builder.eframe_source.PACKAGE
+            local = {"reason": "compiler-artifact", "package_id": "path+" + eframe.as_uri() + "#0.37.0",
+                     "manifest_path": str(eframe / "Cargo.toml"), "features": ["wgpu_no_default_features"]}
+            win = {"reason": "compiler-artifact", "package_id": registry + "#windows@0.62.2", "features": ["std"]}
+            finished = {"reason": "build-finished", "success": True}
+            selected = [("windows", "0.62.2", ("std",)), ("eframe", "0.37.0", ("wgpu_no_default_features",))]
+            self.assertEqual(builder.compiler_graph([local, win, win, finished], gui, selected),
+                             {"units": 3, "featureSets": 2, "packages": 2})
+            for changed in ([], [local, finished], [local, win], [local, win, finished, finished],
+                            [finished, local, win],
+                            [local, win, {**finished, "success": False}],
+                            [local, {**win, "features": []}, finished],
+                            [local, {**win, "package_id": "path+file:///unreviewed#windows@0.62.2"}, finished],
+                            [local, {**win, "package_id": registry + "#windows@0.62.1"}, finished],
+                            [{**local, "manifest_path": str(gui / "Cargo.toml")}, win, finished]):
+                with self.subTest(changed=changed), self.assertRaises(ValueError):
+                    builder.compiler_graph(changed, gui, selected)
+
     def test_timed_trial_requires_one_memory_usage_device_and_no_allocator_sampling(self):
         with tempfile.TemporaryDirectory() as temp:
             log = Path(temp) / "trial.log"

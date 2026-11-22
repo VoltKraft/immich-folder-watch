@@ -33,6 +33,8 @@ def subjects(target):
             or sha(cold) != record["baseline"] or sha(warm) != record["binary"]
             or record["eframeSource"]["archive"] != "eframe-source.zip"
             or sha(output / "eframe-source.zip") != record["eframeSource"]["archiveSha256"]
+            or record["compilerEvidence"]["file"] != "compiler.jsonl"
+            or sha(output / "compiler.jsonl") != record["compilerEvidence"]["sha256"]
             or any(sha(HERE / name) != digest for name, digest in record["variantInputs"].items())):
         raise ValueError("Unexpected warm-window native build inputs")
     api = recorder.Win32()
