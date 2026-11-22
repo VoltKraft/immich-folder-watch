@@ -238,6 +238,20 @@ versions remained Rust SQLite 3.54.1, C# SQLite 3.53.4 and native .NET 10.0.12.
 | `linux-x64-06/cases/sensitive-enospc/tmpfs.json` | `79581f27e9b283d2ae5bb3df5ea07e2ae723fb2da94049e20abc2ba3932e56e4` |
 | `linux-x64-06/cases/insensitive-enospc/tmpfs.json` | `84a55efc15b1280105d4177add1c12e9068a4a88831268e07315112d92e510ea` |
 
+## Hosted native recovery at a66e045
+
+Ubuntu x64 and ARM64 each passed all eight recovery cases with four process kills, both
+SQLite page limits and both 8 MiB tmpfs exhaustion cases. The C# reader
+performed 208 assertions per host. Both readers rejected the altered snapshot in
+each case. All eight original snapshots retained the producer's hash after
+the final case. The archived 453 evidence files and 138 first-party source
+hashes on each host matched the ZIP contents and the exact Git revision.
+The x64 `result.json` SHA-256 is
+`fa374508a6c2b055ae9f8d36d875c4bb72e73bb18fed47df078810b4cd247cce`.
+The ARM64 `result.json` SHA-256 is
+`38fa36b4203f80767a8ed398d1efaa74552c0ef4b1bfb0de786af3abeb7b89f2`.
+[Verified native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 ## Prepared Windows filesystem-full experiment (2026-11-22)
 
 `--windows-vhd` extends this development fixture with a real filesystem-capacity
@@ -256,6 +270,11 @@ Promise. The native attachment uses the built-in
 [OpenVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-openvirtualdisk)
 handle and
 [NO_DRIVE_LETTER without PERMANENT_LIFETIME](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/ne-virtdisk-attach_virtual_disk_flag).
+Both calls use their documented default parameters for the verified fixed
+image. The three cleanup controls verify the open access mask and the exact
+attach arguments, including a null parameter pointer on both calls.
+[Open parameters](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-openvirtualdisk)
+and [attach parameters](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-attachvirtualdisk).
 The physical path comes only from that
 [virtual handle](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-getvirtualdiskphysicalpath).
 

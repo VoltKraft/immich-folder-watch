@@ -86,7 +86,6 @@ class WindowsImageTests(unittest.TestCase):
     def test_win32_parameter_layouts_are_native_64_bit_compatible(self) -> None:
         self.assertEqual(windows_vhd.ct.sizeof(windows_vhd.StorageType), 20)
         self.assertEqual(windows_vhd.StorageType.vendor.offset, 4)
-        self.assertEqual(windows_vhd.ct.sizeof(windows_vhd.OpenParameters), 8)
 
     def test_capability_and_post_attach_errors_close_only_owned_handles(self) -> None:
         class FakeApi:
@@ -118,13 +117,15 @@ class WindowsImageTests(unittest.TestCase):
                 buffer.value = self.path
                 return len(buffer.value)
 
-            def OpenVirtualDisk(self, *_args):
-                _args[-1]._obj.value = 202
+            def OpenVirtualDisk(self, storage, path, access, flags, parameters, handle):
+                if (storage._obj.device, path, access, flags, parameters) != (2, self.path, 0x000e0000, 0, None):
+                    raise AssertionError("unexpected VHD open request")
+                handle._obj.value = 202
                 return 0
 
-            def AttachVirtualDisk(self, handle, *_args):
-                if handle != 202 or _args[1] != 2:
-                    raise AssertionError("foreign disk or unexpected attach flags")
+            def AttachVirtualDisk(self, handle, descriptor, flags, provider_flags, parameters, overlapped):
+                if (handle, descriptor, flags, provider_flags, parameters, overlapped) != (202, None, 2, 0, None, None):
+                    raise AssertionError("foreign disk or unexpected attachment parameters")
                 return self.attach_error
 
             def physical_path(self, _handle):

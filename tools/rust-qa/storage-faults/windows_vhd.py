@@ -45,10 +45,6 @@ class StorageType(ct.Structure):
     _fields_ = [("device", U32), ("vendor", ct.c_ubyte * 16)]
 
 
-class OpenParameters(ct.Structure):
-    _fields_ = [("version", U32), ("rw_depth", U32)]
-
-
 class Api:
     def __init__(self) -> None:
         self.kernel = ct.WinDLL("kernel32", use_last_error=True, winmode=0x800)
@@ -80,7 +76,7 @@ class Api:
         bind(self.kernel, "GetDiskFreeSpaceW", ct.c_int, [string, ct.POINTER(U32), ct.POINTER(U32), ct.POINTER(U32), ct.POINTER(U32)])
         bind(self.kernel, "GetDriveTypeW", U32, [string])
         bind(self.kernel, "MoveFileW", ct.c_int, [string, string])
-        bind(self.virtual, "OpenVirtualDisk", U32, [ct.POINTER(StorageType), string, U32, U32, ct.POINTER(OpenParameters), ct.POINTER(HANDLE)])
+        bind(self.virtual, "OpenVirtualDisk", U32, [ct.POINTER(StorageType), string, U32, U32, ptr, ct.POINTER(HANDLE)])
         bind(self.virtual, "AttachVirtualDisk", U32, [HANDLE, ptr, U32, U32, ptr, ptr])
         bind(self.virtual, "DetachVirtualDisk", U32, [HANDLE, U32, U32])
         bind(self.virtual, "GetVirtualDiskPhysicalPath", U32, [HANDLE, ct.POINTER(U32), string])
@@ -210,14 +206,12 @@ def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: 
         if image.verify(vhd, new_id) != report["image"]:
             raise ValueError("backing file changed before attachment")
         storage = StorageType(2, (ct.c_ubyte * 16).from_buffer_copy(uuid.UUID("ec984aec-a0f9-47e9-901f-71415a66345b").bytes_le))
-        parameters = OpenParameters(1, 1)
         owned_handle = HANDLE()
-        code = api.OpenVirtualDisk(ct.byref(storage), str(vhd), 0x000e0000, 0, ct.byref(parameters), ct.byref(owned_handle))
+        code = api.OpenVirtualDisk(ct.byref(storage), str(vhd), 0x000e0000, 0, None, ct.byref(owned_handle))
         if code:
             raise Unavailable(f"OpenVirtualDisk capability unavailable: Win32 {code}")
         disk = owned_handle.value
-        attach_parameters = OpenParameters(1, 0)
-        code = api.AttachVirtualDisk(disk, None, 2, 0, ct.byref(attach_parameters), None)
+        code = api.AttachVirtualDisk(disk, None, 2, 0, None, None)
         if code:
             raise Unavailable(f"AttachVirtualDisk requires available native VHD/admin capability: Win32 {code}")
         attached = True
