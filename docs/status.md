@@ -16,11 +16,15 @@ The retained and canonical GUI source checks at `ccf42f1` matched on all
 four target graphs. Commit `dff8cb0` corrected the Windows build of the
 private SQLite study directory. Its normal Fedora storage run passed all
 16 steps. Commit `17b3199` added ordered Shell registration and removal
-observations. Independent review found the ordinary activation result
-still needed to require the initially observed Shell process. That
-correction and native Windows execution are the next RW-02 work.
+observations. Independent review confirmed the remaining two observer
+fixes at `a4d951d` against 35 tests and 77 reachable operation sequences.
+The corrected launcher, tray and storage trials still require native runs.
+Both hosted writer fixtures also returned empty pipes on their trust-level
+queries. The next native run can repeat that query on its own private console.
 [GUI dependency verification](rust/rw02-gui-dependencies.md#windows-notification-area-bindings)
 · [Storage example](rust/rw02-legacy.md#windows-storage-example-compilation).
+[Windows Shell review](rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+· [Standard-user query](rust/rw02-cross-session.md#trust-level-query-on-the-hosted-machines).
 
 ## Runtime selection and Windows launcher evidence (2026-11-22)
 

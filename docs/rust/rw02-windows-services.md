@@ -305,3 +305,18 @@ Success or host loss cancels the pending attempt. A marked test message
 does not start a retry. The five portable state tests cover delayed
 registration, host replacement, host absence and a full or disconnected
 GUI queue. [Retry and delivery tests](../../tools/rust-qa/gui/tests/windows_tray.rs).
+
+At `a4d951d` the independent observer holds a synchronization handle to
+the original Explorer before the registration barrier. It confirms that
+process at registration, marker change, provider invocation and shutdown.
+A stable activation requires the ordered Shell receipts for the same
+receiver and icon. A prior successful withdrawal can confirm cleanup when
+a later registration is refused. If the owner disappears and the final
+delete fails, retirement additionally requires the original process handle
+to be signalled, no Shell or taskbar before and after the icon rectangle
+query, and the exact icon to be absent. The receipt preserves the failed
+delete. That host change prevents a stable activation pass. Independent
+review reproduced 35 portable tests and 77 source-reachable operation
+sequences. Native execution of the combined observer is pending.
+[Shell lifetime and cleanup](../../tools/rust-qa/windows-launcher/native_tray.py)
+· [Observer regression cases](../../tools/rust-qa/windows-launcher/test_native_tray_lifetime.py).
