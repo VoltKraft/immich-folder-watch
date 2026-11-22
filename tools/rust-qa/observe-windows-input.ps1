@@ -110,6 +110,16 @@ function Get-AccessibleName($Element) {
     return ''
 }
 
+# UI Automation can invalidate a provider's ranges between two read-only calls.
+function Get-UiaReadFailure($Record) {
+    $cause = $Record.Exception.GetBaseException()
+    if ($cause -is [Runtime.InteropServices.COMException] -or
+        $cause.GetType().FullName -eq 'System.Windows.Automation.ElementNotAvailableException') {
+        return [ordered]@{ type=$cause.GetType().FullName; hresult=('0x{0:X8}' -f $cause.HResult) }
+    }
+    return $null
+}
+
 function Wait-ReaderCue([string]$Name) {
     if (-not $SpeechCues) { return }
     $file = Join-Path $SpeechCues $Name

@@ -93,8 +93,39 @@ function Record-Editing($Spec, $Case) {
             [ordered]@{ index=$i; left=$r.Left; right=$r.Right }
         })
     }
+    $Case.deleteStage = 'keyboard'
     Press-Key Delete
-    [void](Wait-Observation { $Case.after = $textPattern.DocumentRange.GetText(-1); $Case.after -ceq $Spec.after } 'native Delete result')
+    $Case.deleteSubmitted = $true
+    $Case.deleteStage = 'readback'
+    [void](Wait-Observation {
+        try {
+            $current = Get-Field 'Dateiname' ([Windows.Automation.ControlType]::Edit)
+            if ($null -eq $current) { return $false }
+            $focused = [Windows.Automation.AutomationElement]::FocusedElement
+            if ($current.Current.ProcessId -ne $SubjectId -or $current.Current.IsPassword -or
+                    -not [Windows.Automation.Automation]::Compare($current, $focused) -or
+                    [IfwObservedWindow]::GetForegroundWindow() -ne $handle) {
+                throw 'The owned normal filename lost foreground or keyboard focus after Delete.'
+            }
+            $valuePatternNow = $current.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+            $range = $current.GetCurrentPattern([Windows.Automation.TextPattern]::Pattern).DocumentRange
+            if ($null -eq $valuePatternNow -or $null -eq $range) {
+                $Case.lastReadFailure = [ordered]@{ type='missingPatternOrRange'; hresult=$null }
+                return $false
+            }
+            $value = $valuePatternNow.Current.Value
+            $document = $range.GetText(-1)
+            $Case.afterValue = if ($value -cin @($Spec.text,$Spec.after)) { $value } else { '<unexpected>' }
+            $Case.after = if ($document -cin @($Spec.text,$Spec.after)) { $document } else { '<unexpected>' }
+            return $Case.after -ceq $Spec.after -and $Case.afterValue -ceq $Spec.after
+        } catch {
+            $failure = Get-UiaReadFailure $_
+            if ($null -eq $failure) { throw }
+            $Case.lastReadFailure = $failure
+            return $false
+        }
+    } 'native Delete result in both text patterns')
+    $Case.deleteStage = 'verified'
 }
 
 function Record-Pixels($Sample) {
@@ -155,7 +186,7 @@ try {
         $a.StringConstantType -eq 'SingleQuotedHereString' -and $a.Value.Contains('public static class IfwObservedWindow {') },$true))
     if ($errors -or $bridge.Count -ne 1) { throw 'Could not locate the shared HWND and hit-test bridge.' }
     Add-Type -TypeDefinition ($bridge[0].Value + [Environment]::NewLine + [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Pointer.cs')))
-    foreach ($name in @('Get-AccessibleName','Get-Field','Get-SubjectFocus','Wait-Observation','Capture-SubjectField')) {
+    foreach ($name in @('Get-AccessibleName','Get-Field','Get-SubjectFocus','Get-UiaReadFailure','Wait-Observation','Capture-SubjectField')) {
         $definitions = @($ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -ceq $name },$true))
         if ($definitions.Count -ne 1) { throw "Missing shared observer function $name." }
         . ([scriptblock]::Create($definitions[0].Extent.Text))
@@ -192,7 +223,12 @@ try {
         $case=[ordered]@{ text=$spec.text; status='failed'; arrowIndices=@() }
         $result.cases += $case
         try { Record-Editing $spec $case; $case.status='observed' }
-        catch { $case.error=$_.Exception.GetBaseException().Message }
+        catch {
+            $cause=$_.Exception.GetBaseException()
+            $case.error=$cause.Message
+            $case.errorType=$cause.GetType().FullName
+            $case.errorHresult=('0x{0:X8}' -f $cause.HResult)
+        }
         Save-Result
     }
     if ($result.sample.status -ne 'observed' -or @($result.cases | Where-Object status -ne 'observed').Count) {

@@ -15,7 +15,8 @@ from run import evaluate
 
 def observation(spec):
     row = dict(status="observed", text=spec["text"], arrowIndices=spec["arrows"], selected=spec["target"],
-               selectedAt=spec["text"].index(spec["target"]), after=spec["after"], dragScreen=[15, 21, 99])
+               selectedAt=spec["text"].index(spec["target"]), after=spec["after"], afterValue=spec["after"],
+               deleteSubmitted=True, deleteStage="verified", dragScreen=[15, 21, 99])
     if spec["visualIndices"]:
         row["characters"] = [dict(index=i, left=x, right=x+4) for i, x in zip(range(2, 6), [30, 15, 20, 10])]
     return row
@@ -73,7 +74,8 @@ class TextTests(unittest.TestCase):
         case = PLAN["cases"][1]
         row = observation(case)
         editing(row,case)
-        for key,value in (("arrowIndices",[4,5,4]),("selected","ت"),("selectedAt",3),("after",case["text"]),("dragScreen",[3,3,9])):
+        for key,value in (("arrowIndices",[4,5,4]),("selected","ت"),("selectedAt",3),("after",case["text"]),
+                          ("afterValue",case["text"]),("deleteSubmitted",False),("deleteStage","keyboard"),("dragScreen",[3,3,9])):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 editing(dict(row,**{key:value}),case)
 

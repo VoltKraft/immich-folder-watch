@@ -69,6 +69,8 @@ def editing(row, spec):
     index = spec["text"].index(spec["target"])
     if (row["status"] != "observed" or row["text"] != spec["text"] or row["arrowIndices"] != spec["arrows"]
             or row["selected"] != spec["target"] or row["selectedAt"] != index or row["after"] != spec["after"]
+            or row.get("afterValue") != spec["after"] or row.get("deleteSubmitted") is not True
+            or row.get("deleteStage") != "verified"
             or len(row["dragScreen"]) != 3 or row["dragScreen"][0] >= row["dragScreen"][1]):
         raise ValueError(f"Native cursor, drag or delete differs for {spec['text']}")
     if spec["visualIndices"]:

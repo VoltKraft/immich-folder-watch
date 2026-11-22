@@ -122,4 +122,13 @@ The native invocation above writes the per-gesture record to
 receipt validation. On Linux, PowerShell parsed the observer and compiled
 the Win32 bridge. Disposable method doubles exercised both success routes,
 null-BSTR results, changed text, a noncollapsed empty range and focus loss.
-Native results for the new observer are pending on both architectures.
+At `45dc03b` both Windows architectures cleared the real selection with
+ordinary Delete, verified both empty interfaces and restored the exact name
+by native Paste. At `d403fee` ARM64 passed again. On x64 NVDA delivered
+all seven cues, then the UIA selection-prefix operation raised an error
+after the recorded Delete. The revised observer checks both empty document
+and selection endpoints directly when only position zero is possible.
+Otherwise it measures the selection relative to the document. A bounded
+retry obtains fresh ranges in the same verified focused editor and retains
+the HRESULT for read failures. Native repetition is pending.
+[Hosted receipts](rw02-native-gui.md#native-follow-up-at-d403fee).

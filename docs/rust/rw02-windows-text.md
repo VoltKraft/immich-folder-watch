@@ -28,7 +28,17 @@ In the last row, sorting the actual screen positions from left to right must yie
 
 ## Validation status
 
-Seven portable regression tests cover agreement with the executable Linux cases, translated ink and contrast, distinct original glyph crops, logical caret and deletion results, mixed-direction geometry, rejection of a different process or unavailable foreground, and survival of independent successful cases. The observer parsed in PowerShell 7.7 on Linux and its shared C# HWND code compiled together with the native pointer helper. A separate C# compilation resolved the UIA range, focus, drawing and WinForms signatures against WindowsDesktop 10.0.12 reference assemblies. These are portable checks. The Windows x64 and ARM64 observations for this ordinary-field suite require their respective native results.
+Seven portable regression tests cover agreement with the executable Linux cases, translated ink and contrast, distinct original glyph crops, logical caret and deletion results, mixed-direction geometry, rejection of a different process or unavailable foreground, and survival of independent successful cases. The observer parsed in PowerShell 7.7 on Linux and its shared C# HWND code compiled together with the native pointer helper. A separate C# compilation resolved the UIA range, focus, drawing and WinForms signatures against WindowsDesktop 10.0.12 reference assemblies.
+
+At `45dc03b` and `d403fee`, x64 completed all three ordinary editing cases.
+ARM64 rendered the full specimen, completed the first edit and returned the
+expected caret positions, selections and geometry for the two Arabic cases.
+Both Arabic cases ended with an unclassified error before recording the edited
+text. The revised observer records whether the guarded Delete completed,
+reopens both UIA text patterns from the focused normal field and requires
+their exact results. It records the native exception type and HRESULT if a
+read fails. Only read operations can repeat. The new native runs are pending.
+[Archived observations](rw02-native-gui.md#native-follow-up-at-d403fee).
 
 ```sh
 python3 -m unittest discover -s tools/rust-qa/windows-text -p 'test_*.py' -v

@@ -15,9 +15,11 @@ function Get-ReaderFilename($Element, [string]$Expected) {
     $valuePattern = $Element.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
     $textPattern = $Element.GetCurrentPattern([Windows.Automation.TextPattern]::Pattern)
     $range = $textPattern.DocumentRange
+    if ($null -eq $range -or $null -eq $valuePattern) { return $null }
     $value = $valuePattern.Current.Value
     $text = $range.GetText(-1)
     $selections = $textPattern.GetSelection()
+    if ($null -eq $selections) { return $null }
     # AccessKit can return an empty COM BSTR as null. Preserve that representation
     # alongside the lengths and the independent document endpoint comparison.
     $state = [ordered]@{
@@ -28,11 +30,19 @@ function Get-ReaderFilename($Element, [string]$Expected) {
         selectionCount = $selections.Length; selected = $null; selectionStart = $null; selectionEnd = $null
     }
     if ($selections.Length -eq 1) {
-        $state.selected = [string]$selections[0].GetText(-1)
-        foreach ($endpoint in @('Start', 'End')) {
-            $prefix = $range.Clone()
-            $prefix.MoveEndpointByRange('End', $selections[0], $endpoint)
-            $state["selection$endpoint"] = ([string]$prefix.GetText(-1)).Length
+        $selection = $selections[0]
+        $state.selected = [string]$selection.GetText(-1)
+        if ($state.documentCollapsed -and $state.documentLength -eq 0 -and $state.valueLength -eq 0 -and
+                $state.selected.Length -eq 0 -and $selection.CompareEndpoints('Start', $selection, 'End') -eq 0) {
+            # An empty document has one insertion position.
+            $state.selectionStart = 0
+            $state.selectionEnd = 0
+        } else {
+            foreach ($endpoint in @('Start', 'End')) {
+                $prefix = $range.Clone()
+                $prefix.MoveEndpointByRange('End', $selection, $endpoint)
+                $state["selection$endpoint"] = ([string]$prefix.GetText(-1)).Length
+            }
         }
     }
     foreach ($kind in @('value', 'document', 'selected')) {
@@ -52,17 +62,36 @@ function Send-ReaderGesture($Element, [string]$Gesture) {
 
 function Wait-ReaderState($Element, [string]$Expected, [string]$Phase, [scriptblock]$Accept) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
+    $lastFailure = $null
     do {
-        $state = Get-ReaderFilename $Element $Expected
-        $result.readerEdit.states[$Phase] = $state
-        if (& $Accept $state) { return $true }
+        try {
+            $current = Get-Field 'Filename' ([Windows.Automation.ControlType]::Edit)
+            if ($null -eq $current -or -not [Windows.Automation.Automation]::Compare($current,$Element)) {
+                throw 'The filename field changed identity during the native clipboard observation.'
+            }
+            $state = Get-ReaderFilename $current $Expected
+            if ($null -eq $state) {
+                $lastFailure = [ordered]@{ type='missingPatternOrRange'; hresult=$null }
+                $result.readerEdit.lastReadFailure[$Phase] = $lastFailure
+            } else {
+                $lastFailure = $null
+                $result.readerEdit.states[$Phase] = $state
+                if (& $Accept $state) { return $true }
+            }
+        } catch {
+            $failure = Get-UiaReadFailure $_
+            if ($null -eq $failure) { throw }
+            $result.readerEdit.lastReadFailure[$Phase] = $failure
+            $lastFailure = $failure
+        }
         Start-Sleep -Milliseconds 70
     } while ($timer.Elapsed.TotalSeconds -lt 5)
+    if ($null -ne $lastFailure) { throw "UI Automation read failed during $Phase ($($lastFailure.type) $($lastFailure.hresult))." }
     return $false
 }
 
 function Test-ReaderClipboard($Element, [string]$Expected) {
-    $result.readerEdit = [ordered]@{ hwnd=$handle.ToInt64(); states=[ordered]@{}; gestures=@() }
+    $result.readerEdit = [ordered]@{ hwnd=$handle.ToInt64(); states=[ordered]@{}; gestures=@(); lastReadFailure=[ordered]@{} }
     $original = { param($s) $s.value -ceq $Expected -and $s.document -ceq $Expected -and -not $s.documentCollapsed }
     $whole = { param($s) (& $original $s) -and $s.selectionCount -eq 1 -and $s.selected -ceq $Expected -and
         $s.selectionStart -eq 0 -and $s.selectionEnd -eq $Expected.Length }
