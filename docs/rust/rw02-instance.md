@@ -116,10 +116,22 @@ visible fallback, closes its HWND and verifies that it disappears. A second
 copy of the same executable then runs without arguments. Its job must contain
 exactly one process over its entire lifetime and drain with exit code zero.
 The observer independently checks the reopened window's owning process and
-desktop, and the original inventory worker's PID and creation time. It records
-whether the reopened window obtained the foreground. Quit must drain the
-primary and worker, and a fresh launch must become primary in the same test
-profile. The logs and receipt are under
-`artifacts/rust/windows-launcher/<target>/`. Both native launcher observations
-are pending. [Native observer](../../tools/rust-qa/windows-launcher/observe.py) ·
+desktop, and the original inventory worker's PID and creation time. Before
+close and after reopen it enumerates the primary job and checks its open
+process handles. It accepts the two staged executables and an optional native
+system-directory `conhost.exe` directly under each. The receipt records the
+observed PIDs, parents, executable names and creation times as the checks run.
+It also records whether the reopened window obtained the foreground. Quit
+must drain the primary and worker, and a fresh launch must become primary in
+the same test profile. The logs and receipt are under
+`artifacts/rust/windows-launcher/<target>/`.
+[Native observer](../../tools/rust-qa/windows-launcher/observe.py) ·
 [Launcher evidence controls](../../tools/rust-qa/windows-launcher/test_launcher.py).
+
+All 54 earlier Rust idle measurements across three runs recorded
+`conhost.exe` in the GUI's process tree. In all six canonical trials at
+`7517e3b` the console host was a direct child of the inventory worker.
+These observations motivated the per-member identity check. Both ordinary
+launcher steps at `8091469` failed. Native qualification remains open.
+[Earlier native measurements](rw02-windows-window.md#repeat-measurements-before-the-dispatch-trace) ·
+[Launcher run at 8091469](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500).

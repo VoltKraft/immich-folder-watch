@@ -5,7 +5,7 @@ import ctypes as c
 from ctypes import wintypes as w
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import socket
 import subprocess
 import sys
@@ -21,6 +21,65 @@ from win32 import Desktop, bind, check
 TARGETS = {"x86_64-pc-windows-msvc": 0x8664, "aarch64-pc-windows-msvc": 0xaa64}
 # Read, create windows/menus, observe events, enumerate and write this desktop's objects.
 DESKTOP_RIGHTS = 0xCF
+
+
+class JobProcessIds(c.Structure):
+    # JOBOBJECT_BASIC_PROCESS_ID_LIST has two DWORD counts followed by ULONG_PTR IDs.
+    _fields_ = [("assigned", c.c_uint32), ("listed", c.c_uint32), ("ids", c.c_size_t * 16)]
+
+
+def system_console_path(kernel):
+    directory = c.create_unicode_buffer(32768)
+    get_directory = bind(kernel, "GetSystemDirectoryW", w.UINT, w.LPWSTR, w.UINT)
+    if check(get_directory(directory, len(directory)), "GetSystemDirectoryW") >= len(directory):
+        raise ValueError("The native system directory did not fit its buffer")
+    return PureWindowsPath(directory.value) / "conhost.exe"
+
+
+def primary_job_members(api, desk, job, primary, worker, exe, console, record):
+    listing = JobProcessIds()
+    recorder.checked(api.query_job(job, 3, c.byref(listing), c.sizeof(listing), None))
+    if listing.listed != listing.assigned or listing.listed > len(listing.ids):
+        raise ValueError("The primary job process list was incomplete")
+    pids = sorted(listing.ids[:listing.listed])
+    members = []
+    record.update(pids=pids, members=members)
+    if len(pids) != len(set(pids)) or primary == worker or not {primary, worker}.issubset(pids):
+        raise ValueError("The primary job must still contain both original application processes")
+    entries = api.processes()
+    consoles = set()
+    exe = PureWindowsPath(exe)
+    for pid in pids:
+        # Only query processes returned by this job. Recheck membership on the opened handle.
+        handle = recorder.checked(api.open(0x1000, False, pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        try:
+            belongs, status = w.BOOL(), w.DWORD()
+            recorder.checked(api.in_job(handle, job, c.byref(belongs)))
+            if not belongs.value:
+                raise ValueError("A selected process no longer belongs to the primary job")
+            recorder.checked(api.exit_code(handle, c.byref(status)))
+            if status.value != 259 or pid not in entries:
+                raise ValueError("A selected job member exited before its identity was observed")
+            buffer = c.create_unicode_buffer(32768)
+            length = w.DWORD(len(buffer))
+            check(desk.image(handle, 0, buffer, c.byref(length)), "QueryFullProcessImageNameW")
+            image = PureWindowsPath(buffer.value)
+            parent = entries[pid][0]
+            member = dict(pid=pid, parent=parent, image=image.name, creation100ns=api.process_identity(handle))
+            members.append(member)
+            if pid == primary and image == exe:
+                member["role"] = "primary"
+            elif pid == worker and parent == primary and image == exe.with_name("ifw-performance-worker.exe"):
+                member["role"] = "worker"
+            elif (pid not in (primary, worker) and parent in (primary, worker)
+                  and image == console and parent not in consoles):
+                member["role"] = "systemConsoleHost"
+                consoles.add(parent)
+            else:
+                raise ValueError("Unexpected executable or parent in the primary job")
+        finally:
+            check(api.close(handle), "CloseHandle(launcher member)")
+    return [worker, next(member["creation100ns"] for member in members if member["pid"] == worker)]
 
 
 def qualify(secondary_lines, primary_lines, receipt):
@@ -75,12 +134,14 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary):
             check(api.close(job), "CloseHandle(launcher job)")
 
 
-def cycle(api, desk, name, desktop, fixture, exe, trial, env, out, label, restart):
+def cycle(api, desk, name, desktop, fixture, exe, console, trial, env, out, label, result):
     primary_log = out / (label + "-primary.log")
+    restart = label == "restart"
     with ExitStack() as stack:
         stream = stack.enter_context(primary_log.open("xb"))
         args = [] if restart else ["--autostart"]
         proc, job = stack.enter_context(child(api, desk, name, exe, args, trial, env, stream, True))
+        result.update(primaryPid=proc.pid, primaryCreation100ns=api.process_identity(int(proc._handle)))
         windows = fixture.Windows(proc.pid, desktop)
         stack.callback(windows.close)
         def log():
@@ -102,20 +163,16 @@ def cycle(api, desk, name, desktop, fixture, exe, trial, env, out, label, restar
         # The caller independently checked the private desktop for an actual notification area.
         command(b"N")
         initial = wait(is_visible, "No visible primary window on the private desktop")
+        result.update(initialWindow=initial, initialWindowPid=verify_hwnd(initial))
         wait(lambda: "READY Visible Unavailable" in log() and "ADAPTER Dx12 " in log()
              and recorder.idle_complete(log()), "The primary did not finish its two empty inventories")
         worker = recorder.owned_worker(api, proc, primary_log, recorder.await_value)
+        # Keep the worker process object alive across close and reopen to exclude PID reuse.
         handle = recorder.checked(api.open(0x100000 | 0x1000, False, worker))
         stack.callback(api.close, handle)
-        def worker_identity():
-            status = w.DWORD()
-            recorder.checked(api.exit_code(handle, c.byref(status)))
-            if (status.value != 259 or api.processes().get(worker, (0, ""))[0] != proc.pid
-                    or api.active_job_processes(job) != 2):
-                raise ValueError("The primary and its original worker must be the two live job members")
-            return [worker, api.process_identity(handle)]
-        result = dict(primaryPid=proc.pid, primaryCreation100ns=api.process_identity(int(proc._handle)),
-                      initialWindow=initial, initialWindowPid=verify_hwnd(initial), workerBefore=worker_identity())
+        result["primaryJobBefore"] = {}
+        result["workerBefore"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
+                                                     result["primaryJobBefore"])
         if not restart:
             windows.close_window(initial)
             wait(lambda: windows.visible() is None and "WINDOW_RELEASED " in log(), "The primary window did not close")
@@ -123,25 +180,28 @@ def cycle(api, desk, name, desktop, fixture, exe, trial, env, out, label, restar
             second_log = out / (label + "-secondary.log")
             with second_log.open("xb") as second_stream, child(api, desk, name, exe, [], trial, env,
                                                                 second_stream, False) as (second, second_job):
-                result.update(secondaryPid=second.pid, secondaryCreation100ns=api.process_identity(int(second._handle)),
-                              secondaryExit=second.wait(timeout=12), secondaryJobEmpty=api.wait_job_empty(second_job, 3))
+                result.update(secondaryPid=second.pid, secondaryCreation100ns=api.process_identity(int(second._handle)))
+                result["secondaryExit"] = second.wait(timeout=12)
+                result["secondaryJobEmpty"] = api.wait_job_empty(second_job, 3)
                 counts = JobAccounting()
                 recorder.checked(api.query_job(second_job, 1, c.byref(counts), c.sizeof(counts), None))
                 result["secondaryTotalProcesses"] = counts.total
             reopened = wait(is_visible, "The ordinary secondary did not reopen the primary GUI")
             wait(lambda: log().count("ADAPTER Dx12 ") >= 2, "The reopened GUI did not acquire its DX12 adapter")
             result.update(reopenedWindow=reopened, reopenedWindowPid=verify_hwnd(reopened),
-                          primaryForeground=desk.foreground() == reopened, workerAfter=worker_identity())
+                          primaryForeground=desk.foreground() == reopened)
+            result["primaryJobAfter"] = {}
+            result["workerAfter"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
+                                                        result["primaryJobAfter"])
             qualify(second_log.read_text(encoding="utf-8").splitlines(), log().splitlines(), result)
         command(b"Q")
         result.update(primaryExit=proc.wait(timeout=15), primaryJobEmpty=api.wait_job_empty(job, 4))
         if (result["primaryExit"] or not result["primaryJobEmpty"] or "DRAINED passes=" not in log()
                 or f"LAUNCHER_PRIMARY pid={proc.pid}" not in log()):
             raise ValueError("The primary and its owned inventory did not drain normally")
-        return result
 
 
-def desktop_cases(api, desk, name, desktop, exe, trial, env, out):
+def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result):
     user = c.WinDLL("user32", use_last_error=True)
     select_thread = bind(user, "SetThreadDesktop", w.BOOL, w.HANDLE)
     shell = bind(user, "FindWindowW", w.HWND, w.LPCWSTR, w.LPCWSTR)
@@ -156,12 +216,14 @@ def desktop_cases(api, desk, name, desktop, exe, trial, env, out):
     anchor = check(create(0x08000080, "STATIC", name, 0x80000000, 0, 0, 1, 1, None, None, None, None), "CreateWindowExW")
     try:
         fixture = recorder.load_windows_fixture()
-        activated = cycle(api, desk, name, desktop, fixture, exe, trial, env, out, "activation", False)
-        restarted = cycle(api, desk, name, desktop, fixture, exe, trial, env, out, "restart", True)
-        if (activated["primaryCreation100ns"] == restarted["primaryCreation100ns"]
+        console = system_console_path(api.kernel)
+        for label in ("activation", "restart"):
+            result[label] = {}
+            cycle(api, desk, name, desktop, fixture, exe, console, trial, env, out, label, result[label])
+        if (result["activation"]["primaryCreation100ns"] == result["restart"]["primaryCreation100ns"]
                 or desk.receiving_input(desktop) is not False or shell("Shell_TrayWnd", None)):
             raise ValueError("A fresh elected primary on the original shell-less desktop was required")
-        return dict(activation=activated, restart=restarted, shellAbsent=True, desktopReceivedInput=False)
+        result.update(shellAbsent=True, desktopReceivedInput=False)
     finally:
         check(destroy(anchor), "DestroyWindow(private enumeration witness)")
 
@@ -227,7 +289,7 @@ def run(target, out, result):
             desktop = check(creation.result(), "CreateDesktopW")
         try:
             with ThreadPoolExecutor(max_workers=1) as observer:
-                result.update(observer.submit(desktop_cases, api, desk, name, desktop, gui, trial, env, out).result())
+                observer.submit(desktop_cases, api, desk, name, desktop, gui, trial, env, out, result).result()
         finally:
             check(desk.close(desktop), "CloseDesktop(launcher)")
     result["cleanupConfirmed"] = True
