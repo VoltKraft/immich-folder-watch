@@ -191,3 +191,38 @@ prevents the next launch. Both Windows architectures still require a fresh
 native run of the private fallback, restart and foreground trials.
 [Launcher controls](../../tools/rust-qa/windows-launcher/test_launcher.py) ·
 [Desktop and cleanup controls](../../tools/rust-qa/windows-launcher/test_desktops.py).
+
+### Native desktop selection and ordinary reopening at `0a2b5ca`
+
+On both private desktops, the observer's own window received paint only
+after being shown. Its enumeration saw zero primary windows. Inspecting the
+primary's initial thread located the missing visible window on `Default`
+on both architectures. The actual DX12 window belonged to the expected
+process. Both primaries quit and both private desktops were released.
+
+On each runner's original desktop the ordinary second launch delivered one
+request to the elected primary. The primary reopened a new HWND, retained
+the same worker PID and creation time, and drained on Quit. The x64 HWND
+was foreground at the observer's sample. The ARM64 HWND was visible and
+did not hold foreground at that sample. Each secondary exited successfully
+and emptied its job. Both jobs had counted two processes over their lifetime.
+The receipt identifies the system console hosts in the primary job. The
+secondary job's second process remains unidentified. Both complete launcher
+results therefore failed. The revised starter at `3dbc123` supplies the
+checked desktop name in `STARTUPINFOEXW`, passes only the standard-stream
+handles and starts the ordinary secondary detached from the console.
+The observer still requires exactly one process in that secondary's job.
+[Native process starter](../../tools/rust-qa/windows-launcher/named_process.py)
+· [Windows desktop assignment](https://learn.microsoft.com/en-us/windows/win32/winstation/thread-connection-to-a-desktop)
+· [Process creation flags](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags).
+
+| Target | Original desktop primary / worker | Secondary | Archive SHA-256 |
+| --- | --- | ---: | --- |
+| Windows x64 | 8800 / 6484 | 7496 | `24507cdc2e539eaa9a376f96d2a425d053046b94e9702d4fa2a588dae72e69e3` |
+| Windows ARM64 | 1468 / 10276 | 10216 | `3361417e35cc4026af4e9ca67386ae8c1631b0ed0f90c8745ce0fb32ab3b7bdf` |
+
+The archive readback matched each primary and secondary log and all seven
+observer sources to that checkout, accounting for the Windows checkout's
+line endings. The compact readback SHA-256 is
+`108ea8d33d6a09035b1e77958abf6c38ee0d6ae97bd7b4b230b7300922f74c41`.
+[Native workflow](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).

@@ -67,6 +67,19 @@ The interactive desktop observations use separate executables.
 
 [Native assessment and ZIPs](rw02-native-gui.md#native-follow-up-at-a66e045).
 
+The GUI Shell feature at `76650d4` was already part of the combined
+Windows profile. A Fedora x64 offline replay reproduced the four combined
+graphs, the original empty-root lock and both Microsoft import-library
+comparisons. The native smoke and Clippy passed with 337 compiled packages
+and 402 units. After the LGPL binding was edited and relinked, the executable
+reported version 2 of `org_kde_kwin_blur_manager`. The run began at
+`706cb94` with the pending profile changes. All 74 recorded source files
+matched the committed Git bytes at `76650d4` and the hashes of all 21
+outputs were verified. The receipt in
+`artifacts/rust/combined-profile/runs/integrated-tray-features-02/result.json`
+has SHA-256 `506138998efe6e24b9b582e9b6a1a30d5a911177e0bf08311bb319046690e8ba`.
+[Windows GUI binding review](rw02-gui-dependencies.md#windows-notification-area-bindings).
+
 ## Reproduction
 
 Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the disposable GitHub-hosted x64 or ARM64 host, the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)

@@ -93,16 +93,30 @@ against 21.987 ms. The dispatch trace located two successful presentations
 inside each of 439 independently confirmed hidden-window intervals on x64.
 The new retained eframe policy requires native qualification.
 
+At `0a2b5ca` all four hosted C# references matched the 29 baseline files
+and 215 semantic assertions. Linux passed 37 Rust workspace tests per
+architecture and Windows passed 34, including 19 and 16 filesystem checks
+respectively. The ordinary scalar comparison passed 5,844 cases per host.
+The managed comparison rejected the hosted runtime patch on all four
+targets. Both Windows SMB steps consequently skipped. Each Windows target
+still completed its independent eight recovery cases, 208 C# assertions
+and FAT16 readback. The corrected two-process runtime selection passed on
+Fedora x64. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818246)
+· [C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818262)
+· [Runtime qualification](rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. All three ordinary editor and four standalone font cases passed, including NVDA, masking and clipboard. At `8091469` the Japanese IME passed with cleanup a third time. Retained Mailbox met eight of eleven limits. The ordinary launcher timed out waiting for the primary window. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary edits, four standalone font cases, NVDA speech, masking and clipboard passed. The Japanese IME passed with cleanup three times. Retained Mailbox met all eleven limits four times. The ordinary launcher timed out waiting for the primary window. | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Encrypted SMB passed at `8091469`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. Three ordinary editor and four font cases passed, including NVDA, masking and clipboard. Japanese IME passed with cleanup three times. Retained Mailbox met eight of eleven limits at `8091469`. A second launch reopened the foreground HWND at `0a2b5ca`. The private desktop and secondary job checks failed. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Encrypted SMB passed at `8091469`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. Three ordinary edits, four font cases, NVDA speech, masking and clipboard passed. Japanese IME passed with cleanup three times. Retained Mailbox met all eleven limits four times. A second launch reopened a visible HWND at `0a2b5ca`. Foreground focus, the private desktop and secondary job checks remain open. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 ordinary scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
-The [four archives at `8091469`](rw02-native-gui.md#native-follow-up-at-8091469)
+The [two native launcher archives at `0a2b5ca`](rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca)
+identify the private window's actual desktop and the worker retained during
+ordinary reopening. The [four archives at `8091469`](rw02-native-gui.md#native-follow-up-at-8091469)
 and [previous four archives](rw02-native-gui.md#native-follow-up-at-7517e3b)
 bind each hosted result to its revision. The [Plasma panel](rw02-plasma.md),
 [system appearance](rw02-appearance.md), [native storage faults](rw02-storage-faults.md)

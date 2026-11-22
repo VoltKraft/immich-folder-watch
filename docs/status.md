@@ -1,5 +1,39 @@
 # Project Status
 
+## Runtime selection and Windows launcher evidence (2026-11-22)
+
+RW-01 is accepted. RW-02 remains active. At `0a2b5ca` all four hosted
+C# references matched 29 files and 215 assertions. The four native Rust
+jobs passed the ordinary comparison and rejected the hosted CoreLib patch
+before the managed comparison. The clean Fedora repeat of `c1fd776` built
+the oracle once and passed all fourteen steps with both children using the
+selected .NET 10.0.12 runtime. The original feasibility and reference
+readbacks have SHA-256
+`1ba52ce8f5ae6f63acfaaa7ef00141974a79c0603b1329c9352aacc6a045aec0`
+and `b0cd60e4e9535305a4a6b197a6c9c464ab77ab9bbda4ee1fd1079ecf3927e6c6`.
+[Casing results](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+Both Windows hosts reopened the elected GUI through a normal second launch
+on the original desktop, retaining the same primary and worker. Both private
+launches created their visible window on the wrong desktop. Each secondary
+job recorded a second, unidentified process. The launcher results are failed.
+At `706cb94` the primary GUI gained its own native Shell receiver. At
+`76650d4` the four revised GUI dependency graphs and the retained eframe
+source were verified. The Fedora combined offline build and Wayland relink
+passed, including the 74 source hashes checked against that commit.
+The next Windows runs must observe the corrected private launch, actual Shell
+callback, secondary process count and same-worker cleanup on both architectures.
+Commit `3dbc123` selects the named desktop at process creation.
+Commit `8beb432` requires a visible on-screen window, an exact Shell item
+and a callback ordered after its provider invocation. Thirty launcher tests
+passed. At `9282426` the receiver retries registration if a new Shell first
+refuses the icon. Nine GUI tests passed on Fedora and both Windows MSVC
+targets passed cross-Clippy. The local repository suite passed all 178 tests.
+[Ordinary launcher](rust/rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca)
+· [Primary GUI tray](rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+· [Combined native qualification](rust/rw02-combined-profile.md#native-qualification).
+
 ## Native rewrite assessments and independent storage review (2026-11-22)
 
 RW-01 is accepted. RW-02 remains the active package of

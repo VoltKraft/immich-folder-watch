@@ -305,6 +305,22 @@ each of the ICU and managed inputs, including the full Unicode range and
 managed comparison. This scalar check does not authorize writes to original
 SQLite identities.
 
+At `0a2b5ca`, SDK 10.0.401 selected CoreLib 10.0.15 on all four native
+hosts. All four passed the 5,844 ordinary requests. Each managed oracle
+exported all 1,112,064 Unicode scalars and the expected 1,475 mappings.
+The version guard rejected CoreLib source `8e0f8ed2` before issuing a
+managed Rust request. At `c1fd776` the harness builds the oracle once and
+runs its verified DLL twice with `dotnet exec --fx-version 10.0.12 --roll-forward Disable`.
+Both children in a clean Fedora x64 checkout loaded the same DLL and
+CoreLib, SHA-256
+`26304a2985357b9ee277f273667fcd9c892edae3ee6eba76f739033e95eb39b3`.
+All fourteen steps passed, including 5,844 requests in each mode. Seven
+profile tests and the replay of an actual 10.0.15 receipt verified refusal
+of missing or different inputs. The clean local verification SHA-256 is
+`81447081a29a8948baf4588a0964e74ad154da1b05e0bb3e96bf957d330e932c`.
+[Original four-host run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818246)
+· [Runtime selection](../../tools/rust-qa/test-native.py).
+
 ### Read-only lookup across three historical writers
 
 The separate Fedora x64 study at `733194b` reads the finalized backups and
