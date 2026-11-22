@@ -19,7 +19,8 @@ ELEMENT = dict(runtimeId="42,99", matchCount=1, matchedLabel="IFW tray " + TOKEN
 
 def registration(added):
     return (f"gui_tray.initial.add={str(added).lower()}\n"
-            + ("gui_tray.initial.version4=true\n" if added else "")
+            + ("gui_tray.initial.version4=true\n"
+               "TRAY_BIND phase=initial pid=18 hwnd=43 id=23 shell_pid=81 shell_hwnd=51 verified=1\n" if added else "")
             + f"TRAY_REGISTER phase=initial pid=18 hwnd=43 id=23 token={TOKEN} added={int(added)} version4={int(added)}\n")
 
 
@@ -166,6 +167,8 @@ class ResidentTests(unittest.TestCase):
                     append("LAUNCHER_PRIMARY pid=18\n" + registration(refusal != "shell") + "READY BackgroundStartup Available\n")
                     report_icon("initial", RGB)
                 elif data in (b"M", b"P"):
+                    if data == b"M":
+                        append("gui_tray.change=true\n")
                     report_icon("changed" if data == b"M" else "sample", COMPLEMENT)
                 elif data == b"Q":
                     append(closed(refusal != "shell"))
@@ -195,7 +198,10 @@ class ResidentTests(unittest.TestCase):
             def provider(*_):
                 yield helper, receive
 
-            with (patch.object(tray, "bind", return_value=lambda: 28), patch.object(tray, "ordinary_console", return_value=True),
+            witness = Mock(markers=0)
+            witness.live.return_value = True
+            with (patch.object(tray, "ShellWitness", return_value=witness),
+                  patch.object(tray, "bind", return_value=lambda: 28), patch.object(tray, "ordinary_console", return_value=True),
                   patch.object(tray.launcher, "child", child), patch.object(tray.launcher, "snapshot", return_value={}),
                   patch.object(tray.launcher, "system_console_path"), patch.object(tray.recorder, "load_windows_fixture") as fixture,
                   patch.object(tray.recorder, "idle_complete", return_value=True), patch.object(tray.recorder, "owned_worker", return_value=28),
