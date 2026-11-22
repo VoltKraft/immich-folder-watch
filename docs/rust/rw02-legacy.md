@@ -327,6 +327,18 @@ The result and verification manifest are in
 and `6e7f5c54901bfc009b92e8e522d2433821c7f741b7e174e6c3e973dc5f1b36f7`.
 [Reproduction and corpus inputs](../../tools/rust-qa/storage/README.md).
 
+Independent review reran the three C# writers and readers with their
+original CoreLib and ICU settings. All 36 output files were byte-identical
+to the archived captures. On a fresh Rust build an additional 5,400 queries
+agreed with a separate SQL reader, including 608 existing identities, 189
+ambiguous results and 58 possible aliases. Twenty-five additional controls
+confirmed refusal for changed corpus inputs, invalid queries and SQLite
+sidecars. The study's databases have empty repair and album tables. The
+separate two-profile backups exercise populated journals and ownership.
+The independent SQL report SHA-256 is
+`cdfd454878ee5cb88722e0265f792bb3b9dd323fd902ff6c36570019a8727915`
+under `artifacts/rust/review-stored-733194b-o1xwcpjx/`.
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

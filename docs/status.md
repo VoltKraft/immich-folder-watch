@@ -63,6 +63,8 @@ entry point. [Managed casing evidence](rust/rw02-legacy.md#managed-globalization
 At `733194b` all 318 Rust lookups on the three original writer profiles
 matched the independent SQL projection. Fourteen controls passed. The separate
 two-profile qualifier still refused the managed writer.
+Independent review reproduced all 36 archived C# outputs, matched 5,400
+additional Rust queries to SQLite and confirmed 25 additional refusals.
 [Stored-key observations](rust/rw02-legacy.md#read-only-lookup-across-three-historical-writers).
 
 Commit `66d9fd6` produced four SPDX inventories from the verified native

@@ -227,3 +227,8 @@ This source comparison identified no newly released provider for a positive
 native trial. The existing ordinary grant test can evaluate the first
 distribution package containing the fix with an acquisition, a conflicting
 cooperative writer and reacquisition after release.
+The 9,401-byte local source manifest records the package URLs and digests,
+the four Fedora signature checks and the inspected handler revisions. The
+review read the original packages in memory. Its manifest is retained at
+`artifacts/rust/portal-provider-availability-20261122/sources.json`, SHA-256
+`c3c2cc70462556fa40dd9cff2a27e02fee5c163b196facf37f7a6f70d2f52e05`.
