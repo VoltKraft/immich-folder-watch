@@ -487,4 +487,22 @@ directories. Cargo's compiler message binds the program to the test library,
 manifest, source file, emitted filenames and native target's build tree.
 All four native runners verify the reported program's machine and digest.
 Eight portable receipt controls and warnings-denied Clippy on both MSVC
-targets passed locally. Native Windows execution of this trial is pending.
+targets passed locally.
+
+At `7517e3b6be84645bc0d40603750b003dd5792104` both native Windows
+architectures returned a 30-byte first completion followed by a zero-byte
+completion after the batch of 512 files. The adapter invalidated generation
+3, requested re-registration and kept one pending notification. The fresh
+watch acknowledged all 513 original files and then the new file, bringing
+the final inventory to 514. Both native test programs exited zero. Each
+Windows target passed fourteen scenarios. Both Ubuntu targets repeated all
+fifteen Linux scenarios. All four watch archives passed ZIP, size, SHA-256
+and source verification for the thirteen recorded inputs.
+[Native jobs and artifacts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460118).
+
+| Native target | Watch artifact ID | Verified archive SHA-256 |
+| --- | ---: | --- |
+| Windows x64 | 14764640809 | `cfe47439f82a2232d2a1247fa9f1015b1c6fbfc15211dd1389b9210c0c721901` |
+| Windows ARM64 | 14764268073 | `c1771d9a061c38d22497028e92c06a52ac1a9c463ac7e69e9d17b696d9b85720` |
+| Linux x64 | 14763793907 | `fcd1afc57879e052b02124b8453b2bc33656cb91614078368869a3996e5cd6ae` |
+| Linux ARM64 | 14763589338 | `01deac066c9b80098954afe44a01f992e62f5a9523d1ee59a1cab40c44a13790` |

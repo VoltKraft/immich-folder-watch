@@ -66,8 +66,11 @@ parent's direct child. A local run of the pinned Cargo compiler exposed its
 test-program layout under `debug/build`. The runner now validates the program
 from Cargo's compiler message on every host. Eight portable controls and
 Clippy on both Windows targets passed. At clean revision `21e07c4` Fedora
-ran the same entry point and passed all fifteen watch scenarios. Native
-Windows loss is still pending.
+ran the same entry point and passed all fifteen watch scenarios. At
+`7517e3b` both Windows hosts observed real notification loss, registered
+a new watch and recovered all 514 files. Each passed fourteen scenarios.
+All four targets also passed the new offline Cargo dependency boundary
+checks. [Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460118).
 [Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
 
 The .NET reference, PR CI, CodeQL and dependency submission completed
@@ -78,7 +81,10 @@ measured zero available bytes. The Rust worker then declined a CRLF-terminated
 release command. Both VHDs detached. Revision `d708301` sends the exact LF
 acknowledgement. A private Linux tmpfs reproduced the original failure and
 recovered with the corrected sender. The complete Fedora trial passed all
-eight cases and 208 C# assertions. The native Windows repeat is pending.
+eight cases and 208 C# assertions. At `7517e3b` Windows x64 and ARM64 each
+completed all eight cases and 208 C# assertions. Both path comparison modes
+recovered after zero free bytes and detached their VHD. All 465 indexed
+files and 150 retained sources per Windows archive matched their hashes.
 The native feasibility workflow now runs this Windows trial independently of
 the desktop performance measurements and retains its entire evidence directory.
 [Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
@@ -122,8 +128,9 @@ altered snapshots in both languages and verified all 453 evidence hashes.
 The two previous review findings are closed for this experiment.
 Ubuntu x64 and ARM64 each repeated all eight cases and 208 C# assertions
 in the native run at `a66e045`. All 453 files in each evidence inventory
-matched the archive. Windows recovery, the production migration and installed
-rollback remain open. [Storage sources and evidence](rust/rw02-storage-faults.md).
+matched the archive. The later Windows recovery results are recorded above.
+Production migration and installed rollback remain open.
+[Storage sources and evidence](rust/rw02-storage-faults.md).
 
 At `3b4854d` both Ubuntu jobs repeated all eight recoveries. Each archive
 contained 465 of 466 indexed evidence files. The omitted 78-byte Git

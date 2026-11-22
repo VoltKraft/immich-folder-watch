@@ -68,6 +68,11 @@ filesystem scenarios on each Ubuntu architecture and thirteen on each
 Windows architecture. The Windows nonrecursive watch reported a modification
 of the direct child directory, then an addition and a modification of the
 direct child file. Its inventory excluded the file below the child directory.
+At `7517e3b` both Windows targets also observed a real zero-byte completion
+after the notification buffer filled. The replacement registration recovered
+all 514 files and took the Windows total to fourteen scenarios. Both Ubuntu
+targets repeated fifteen. [Native overflow receipts](rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
+
 The Windows
 [retained-window variant](rw02-windows-window.md) held the same DX12 device
 across an ordinary close and passed the native idle and memory limits on
@@ -79,8 +84,8 @@ reopen took 124.14 ms at p95 against a 21.92 ms limit.
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, six database recoveries and 144 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. All three ordinary mixed-text edits, NVDA and ordinary Delete/paste passed. Japanese IME committed あ at `a66e045` and produced only literal `a` at `3b4854d`. The separate font repeat stopped at initial focus. Retained Mailbox passed eight of eleven limits. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, six database recoveries and 144 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary mixed-text edits, four standalone font cases, NVDA speech, masks and clipboard passed. At `3b4854d` the Japanese IME committed あ and restored the input environment without a reported exception. Retained Mailbox passed all eleven limits. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. All three ordinary mixed-text edits, NVDA and ordinary Delete/paste passed. Japanese IME committed あ at `a66e045` and produced only literal `a` at `3b4854d`. The separate font repeat stopped at initial focus. Retained Mailbox passed eight of eleven limits. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 14 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, eight database recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary mixed-text edits, four standalone font cases, NVDA speech, masks and clipboard passed. At `3b4854d` the Japanese IME committed あ and restored the input environment without a reported exception. Retained Mailbox passed all eleven limits. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
@@ -94,9 +99,11 @@ backport, eight WAL recovery cases and offline combined relinks. Both Windows
 targets passed the combined build, Clippy and native smoke. Each hosted
 console offered one 96-DPI output. Both private Shell hosts refused their
 initial icon registration. Their FAT volumes reached zero free bytes and the
-storage worker rejected the supervisor's line ending before recovery. Windows
-tray activation, explicit IME cleanup, reproducible x64 composition, mixed-DPI/RDP,
-x64 response limits, full-volume recovery and ordinary-user writer exclusion
+storage worker rejected the supervisor's line ending before recovery. Both
+Windows targets then restored the database in both path comparison modes at
+`7517e3b` and detached their full private volumes. Windows tray activation,
+explicit IME cleanup, reproducible x64 composition, mixed-DPI/RDP, x64
+response limits, installed migration and ordinary-user writer exclusion
 still need native evidence.
 
 The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.

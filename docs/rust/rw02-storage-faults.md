@@ -645,8 +645,8 @@ These results and exact derived-supervisor recipes are retained in ignored
 `0228828de8e69c702a31045cafe44b4d4b836062decec61adf793c23ea823636`
 and its `result.json` SHA-256 is
 `2cae516947704b2931082cbd230b1824c3ef01c0adc5f62ad1afc8d93a98ee6c`.
-This isolates the common Rust protocol gate; it does not execute corrected
-Windows VHD restoration. Both native Windows lanes must repeat that qualification.
+This isolates the common Rust protocol gate. The later native Windows
+results are recorded [below](#windows-native-recovery-at-7517e3b).
 
 The fresh native Fedora x64 `linux-x64-11 --tmpfs` regression passed all 48
 expected command outcomes, eight cases, 208 C# assertions and 16 corrupt-copy
@@ -695,16 +695,49 @@ eight-case final run. The failed attempt and progress/error records remain
 available. An automatic permission-review timeout prevented one retry from
 starting; the single allowed retry with explicit sandbox arguments succeeded.
 
+## Windows native recovery at 7517e3b
+
+Both native Windows jobs at `7517e3b6be84645bc0d40603750b003dd5792104`
+passed all eight recovery cases. Each ran four abrupt process terminations,
+two SQLite page-limit failures and two actual full FAT16 volumes, spanning
+both path comparison modes. Each job recorded 48 expected command exits,
+208 C# assertions, 16 rejected altered snapshots and eight final checks of
+the original backup bytes. All 465 indexed files and all 150 source copies
+in each ZIP matched their expected digests. The two archives were also
+checked against GitHub's size, SHA-256 and ZIP integrity.
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460118).
+
+| Native target | Artifact ID | ZIP bytes | ZIP SHA-256 | Recovery `result.json` SHA-256 |
+| --- | ---: | ---: | --- | --- |
+| Windows x64 | 14763768057 | 6,769,957 | `a6389dfc7df67982c3f4accf7bc627850af1e27f66417958748ba3c46d2f8e48` | `59532eb455854ec01211c9c5ce82fd7c5ebd02fa427b7a4046c03a7773821ea5` |
+| Windows ARM64 | 14764805345 | 6,769,994 | `b4725d2695c7a64bc26200b12d135bc25e0a0a4b87d67c6131754815d5c6e731` | `79a24e9f1c65c96f4d18cb926fe641222f05efe11f6206f6fafe24be8c4b526e` |
+
+On all four private volumes, Windows reported error 112, SQLite reported
+code 13 and the observer measured zero available and free bytes. The worker
+received the exact 14-byte LF-terminated acknowledgement, recovered the
+database on the same volume and exited zero. Each VHD detached, its volume
+disappeared and its retained layout matched. The two receipt paths for an
+individual VHD contain identical bytes and refer to a single trial.
+
+An independent read-only review parsed the detached FAT16 images. In every
+image the 45,056-byte restored database matched the producer's original
+snapshot. The reviewer separately checked WAL frame checksums and commit
+boundaries in the pre-recovery captures. Uncommitted changes were absent
+after restart, committed changes survived the missing acknowledgement, and an
+incomplete trailing frame after exhaustion did not become a commit. The review
+also compared schema, table contents and the explicit mutation controls.
+The six archived compiler and generated-source files omitted from the inner
+hash index are covered by the complete ZIP digest. Commit `39c7a57` corrects
+future indices. [Compiler evidence inventory](#retained-compiler-evidence-inventory-2026-11-22).
+
 ## Limits and next gate
 
-The Linux ARM64 fault cases above now have native execution evidence. Native
-Windows filesystem-full qualification and hosted confirmation that the corrected
-source export arrives complete remain required. Local Linux x64 results do not
-stand in for another native host. Matrix integration and the Windows result
-record belong to the primary agent. No shared workflow or application file
-changed in this assignment.
+Native Linux x64/ARM64 have exercised tmpfs exhaustion, and native Windows
+x64/ARM64 have exercised full private FAT16 VHDs. The corrected source export
+arrived complete on both Windows hosts. Product migration, recovery after
+external synchronization activity and their independent review remain open.
 
-Physical disk/filesystem ENOSPC beyond the tested tmpfs, power loss,
+Physical disk failure, power loss,
 storage-controller behavior, interrupted
 backup or restore, every app transaction boundary, unknown-schema WAL preflight,
 installed migration/ownership handover, and application-side retry/replay remain
