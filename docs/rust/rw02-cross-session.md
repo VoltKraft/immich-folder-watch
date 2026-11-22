@@ -58,6 +58,22 @@ remains open.
 
 [Native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
 
+At `3b4854d` both native hosts repeated the elevated lock sequence and
+verified its cleanup. On each host Secondary Logon was initially stopped
+with manual startup, ran for the tests, and returned to the original stopped
+state with the same startup type. In both sessions on both hosts the
+system query failed to confirm Basic User. Neither standard-user participant
+launched. The original receipt kept only the result of combining the
+command exit code and the advertised level check. The current observer
+records the exit code, numeric level codes, output byte count and SHA-256
+individually. The already-logged-on ordinary-user route below remains
+available on a disposable VM.
+
+| Early writer archive | ZIP SHA-256 | Indexed files verified |
+| --- | --- | ---: |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/artifacts/14761630150) | `63e8cc2212ee5452caad334cff4b1b742c2b7a9306e6d981b421256b57860b05` | 37 |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/artifacts/14761152466) | `5849a2df9e81cc26cf37f7fcfa15195dcc0717cd1111166fa71fb26c6bba2550` | 37 |
+
 The hosted wrapper records the installed service's state and startup type.
 For a stopped, startable service it requests a temporary start on the disposable
 runner, executes both native lock trials, then stops the service and verifies

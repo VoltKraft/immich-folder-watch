@@ -49,6 +49,17 @@ def remote_posix(profile):
 
 
 class FixtureTests(unittest.TestCase):
+    def test_system_query_distinguishes_errors_empty_output_and_advertised_numeric_levels(self):
+        output = "0x00020000 (Basic User)\r\n0x40000\r\n".encode("utf-16le")
+        observed = worker.level_inventory(0, output)
+        self.assertEqual(observed["levelCodes"], ["0x20000", "0x40000"])
+        self.assertTrue(observed["levelListed"])
+        self.assertFalse(worker.level_inventory(1, output)["levelListed"])
+        self.assertEqual(worker.level_inventory(1, output)["levelQueryExit"], 1)
+        self.assertEqual(worker.level_inventory(0, b"")["levelQueryBytes"], 0)
+        self.assertFalse(worker.level_inventory(0, b"0x000200001")["levelListed"])
+        self.assertFalse(worker.level_inventory(0, b"0x40000")["levelListed"])
+
     def test_restriction_flag_accepts_both_windows_token_result_widths(self):
         for width in (1, 4):
             self.assertFalse(restriction_flag(bytes(width)))

@@ -2,6 +2,7 @@
 
 import ctypes as c
 from ctypes import wintypes as w
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -16,6 +17,15 @@ from standard import AMBIENT, EXISTING, STANDARD, fixed_writer, qualifies, requi
 
 PHASES = {"original": (("original-hold", True), ("original-refuse", False), ("original-last", True)),
           "scheduled": (("scheduled-refuse", False), ("scheduled-hold", True))}
+
+
+def level_inventory(returncode, output):
+    # The system utility may emit a localized description in an OEM code page or UTF-16.
+    numbers = re.findall(rb"(?<![0-9a-f])0x([0-9a-f]{1,8})(?![0-9a-f])", output.replace(b"\0", b"").lower())
+    codes = sorted({int(value, 16) for value in numbers})
+    return {"levelQueryExit": returncode, "levelQueryBytes": len(output),
+            "levelQuerySha256": hashlib.sha256(output).hexdigest(), "levelCodes": [hex(code) for code in codes],
+            "levelListed": returncode == 0 and 0x20000 in codes}
 
 
 def own_identity(area, role):
@@ -101,10 +111,9 @@ def basic_user(area, role, config):
         options = dict(cwd=area, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        creationflags=0x08000000, timeout=15)
         levels = subprocess.run([runas, "/showtrustlevels"], **options)
-        report["levelListed"] = levels.returncode == 0 and bool(re.search(
-            rb"(?<![0-9a-f])0x0*20000(?![0-9a-f])", levels.stdout.replace(b"\x00", b"").lower()))
+        report.update(level_inventory(levels.returncode, levels.stdout))
         if not report["levelListed"]:
-            raise RuntimeError("Windows does not offer its Basic User trust level")
+            raise RuntimeError("The Windows trust-level query did not confirm the Basic User prerequisite")
         command = subprocess.list2cmdline([sys.executable, "-I", "-B", str(HERE / "worker.py"), "--participant", role, str(area)])
         if instance.sha(Path(sys.executable)) != config["pythonSha256"] or instance.sha(HERE / "worker.py") != config["workerSha256"]:
             raise RuntimeError("The fixed participant changed before Basic User launch")
