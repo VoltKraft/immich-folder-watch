@@ -11,6 +11,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 import uuid
 
 HERE = Path(__file__).resolve().parent
@@ -18,6 +19,7 @@ QA, ROOT = HERE.parent, HERE.parents[2]
 sys.path[:0] = [str(QA / "windows-performance"), str(QA / "windows-desktop")]
 import run as recorder
 from native import CleanupUnconfirmed, JobAccounting, ThreadEntry, pin_new_marker
+from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
 from window_readback import paint_control, snapshot
 
@@ -117,25 +119,23 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary, *, privat
     proc = None
     try:
         with ExitStack() as startup:
-            selection = {}
-            if private:
-                inheritable = check(desk.open_named(name, 0, True, DESKTOP_RIGHTS), "OpenDesktopW")
-                startup.callback(release_handle, desk.close, "CloseDesktop(child inheritance)", inheritable)
-                if desk.name(inheritable) != name or desk.receiving_input(inheritable) is not False:
-                    raise ValueError("Expected the original non-input desktop")
-                selection["startupinfo"] = subprocess.STARTUPINFO(lpAttributeList={"handle_list": [inheritable]})
-            # The secondary inherits ordinary standard input and receives no private command pipe.
-            inputs = {"stdin": subprocess.PIPE} if primary else {}
-            proc = subprocess.Popen([exe, *arguments], cwd=area, env=env, stdout=stream, stderr=subprocess.STDOUT,
-                                    creationflags=4 | subprocess.CREATE_NO_WINDOW, **selection, **inputs)
+            desktop = check(desk.open_named(name, 0, False, 1), "OpenDesktopW(verify launcher desktop)")
+            startup.callback(release_handle, desk.close, "CloseDesktop(verify launcher desktop)", desktop)
+            input_expected = not private
+            if (desk.name(desk.station()) != "WinSta0" or desk.name(desktop) != name
+                    or desk.receiving_input(desktop) is not input_expected
+                    or desk.name(desk.thread_desktop(desk.thread())) != name
+                    or (not private and (name != "Default" or not ordinary_console(desk.context(), name)))):
+                raise ValueError("Expected the original launcher thread and desktop")
+            proc = start_named(exe, arguments, cwd=area, env=env, stream=stream, desktop=name, primary=primary)
         api.assign_suspended(job, proc, exe)
         thread_id = None
         if primary:
             threads = [e.tid for e in api.snapshot_entries(4, ThreadEntry, api.walk_thread) if e.owner == proc.pid]
-            if len(threads) != 1:
-                raise ValueError("The suspended primary must have one initial thread")
-            thread_id = threads[0]
-        api.resume_owned_process(proc.pid)
+            if threads != [proc.thread_id]:
+                raise ValueError("The suspended primary must have the one initial thread returned by CreateProcessW")
+            thread_id = proc.thread_id
+        proc.resume()
         yield proc, job, thread_id
     finally:
         try:
@@ -151,8 +151,8 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary, *, privat
             raise CleanupUnconfirmed("Launcher-owned process did not exit") from exc
         finally:
             try:
-                if proc is not None and proc.stdin:
-                    release(proc.stdin.close, "Could not close the primary command pipe")
+                if proc is not None:
+                    release(proc.close, "Could not close the launcher's retained process, thread or command pipe")
             finally:
                 release_handle(api.close, "CloseHandle(launcher job)", job)
 
@@ -163,6 +163,21 @@ def wait_for_exit(proc, pump, timeout):
         code = proc.poll()
         return (code,) if code is not None else None
     return recorder.await_value(status, f"Launcher process {proc.pid} did not exit", timeout=timeout, delay=.02)[0]
+
+
+def passive_foreground(desk, windows, hwnd, initial):
+    """Observe delayed native foreground assignment without requesting focus or examining another window."""
+    started = time.monotonic()
+    matched, samples, still_visible = initial, 1, True
+    while not matched and time.monotonic() - started < 2:
+        time.sleep(.05)
+        still_visible = windows.visible() == hwnd
+        if not still_visible:
+            break
+        matched = desk.foreground() == hwnd
+        samples += 1
+    return dict(initial=initial, observed=matched, sameWindowVisible=still_visible, samples=samples,
+                elapsedMs=round((time.monotonic() - started) * 1000))
 
 
 def drain_after_failure(proc, log, result, pump):
@@ -180,7 +195,8 @@ def drain_after_failure(proc, log, result, pump):
         observation["uiPassesAtQuit"] = int(matches[0])
 
 
-def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, out, label, result, *, tray=False):
+def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, out, label, result, *, tray=False,
+          native_tray=None):
     primary_log = out / (label + "-primary.log")
     autostart = label == "activation"
     private = witness is not None
@@ -230,9 +246,15 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         def failure_drain(exc_type, _value, _traceback):
             if exc_type is not None:
                 drain_after_failure(proc, log, result, windows.pump)
+                if native_tray is not None:
+                    native_tray.check_drain(proc, job, log(), result)
 
         stack.push(failure_drain)
-        command(b"T" if tray else b"N")
+        if native_tray is None:
+            command(b"T" if tray else b"N")
+        else:
+            command(b"B")
+            native_tray.registration(proc, log, wait, result, no_host=True)
         expected = "READY Visible " + ("Available" if tray else "Unavailable")
         observe_at("startup-intent", lambda: expected in log().splitlines(),
                    "The supervisor did not select the expected visible startup")
@@ -241,6 +263,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             result["fallbackReason"] = "No Shell_TrayWnd on the private non-input desktop"
         observe_at("first-dx12-adapter", lambda: "ADAPTER Dx12 " in log(), "The primary did not initialize its DX12 adapter")
         initial = observe_at("first-visible-window", is_visible, f"No visible primary window on {name}")
+        if native_tray is not None:
+            native_tray.visible_window(proc, initial, result, "fallbackWindow")
         result.update(initialWindow=initial, initialWindowPid=verify_hwnd(initial),
                       initialPrimaryForeground=desk.foreground() == initial)
         result["stage"] = "first-inventories"
@@ -270,9 +294,13 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 recorder.checked(api.query_job(second_job, 1, c.byref(counts), c.sizeof(counts), None))
                 result["secondaryTotalProcesses"] = counts.total
             reopened = observe_at("reopen", is_visible, "The ordinary secondary did not reopen the primary GUI")
+            if native_tray is not None:
+                native_tray.visible_window(proc, reopened, result, "activatedWindow")
             wait(lambda: log().count("ADAPTER Dx12 ") >= 2, "The reopened GUI did not acquire its DX12 adapter")
             result.update(reopenedWindow=reopened, reopenedWindowPid=verify_hwnd(reopened),
                           primaryForeground=desk.foreground() == reopened)
+            if not private:
+                result["foregroundObservation"] = passive_foreground(desk, windows, reopened, result["primaryForeground"])
             result["primaryJobAfter"] = {}
             result["workerAfter"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
                                                         result["primaryJobAfter"])
@@ -286,9 +314,12 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 or final_log.splitlines().count(f"LAUNCHER_PRIMARY pid={proc.pid}") != 1):
             raise ValueError("The primary and its owned inventory did not drain normally")
         result.update(stage="drained", primaryUiPassesAtQuit=int(drained[0]))
+        if native_tray is not None:
+            native_tray.check_drain(proc, job, final_log, result)
+            native_tray.qualify_quiet_shell(final_log, result, no_host=True)
 
 
-def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result):
+def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result, *, native_tray=None):
     user = c.WinDLL("user32", use_last_error=True)
     shell = bind(user, "FindWindowW", w.HWND, w.LPCWSTR, w.LPCWSTR)
     create = bind(user, "CreateWindowExW", w.HWND, w.DWORD, w.LPCWSTR, w.LPCWSTR, w.DWORD,
@@ -307,14 +338,23 @@ def desktop_cases(api, desk, name, desktop, exe, trial, env, out, result):
             result["paintControl"]["error"] = str(exc)
         fixture = recorder.load_windows_fixture()
         console = system_console_path(api.kernel)
-        for label in ("activation", "restart"):
+        for label in (("activation", "restart") if native_tray is None else ("activation",)):
             result[label] = {}
-            cycle(api, desk, name, desktop, anchor, fixture, exe, console, trial, env, out, label, result[label])
-        if (result["activation"]["primaryCreation100ns"] == result["restart"]["primaryCreation100ns"]
-                or desk.receiving_input(desktop) is not False or shell("Shell_TrayWnd", None)):
+            cycle(api, desk, name, desktop, anchor, fixture, exe, console, trial, env, out, label, result[label],
+                  native_tray=native_tray)
+        if "restart" in result and result["activation"]["primaryCreation100ns"] == result["restart"]["primaryCreation100ns"]:
             raise ValueError("A fresh elected primary on the original shell-less desktop was required")
+        if desk.receiving_input(desktop) is not False or shell("Shell_TrayWnd", None):
+            raise ValueError("The private desktop changed during the launcher trial")
     finally:
-        release_handle(destroy, "DestroyWindow(private enumeration witness)", anchor)
+        try:
+            if native_tray is not None:
+                result["desktopAfter"] = dict(name=desk.name(desktop), receivesInput=desk.receiving_input(desktop),
+                                              shellAbsent=not bool(shell("Shell_TrayWnd", None)))
+                if result["desktopAfter"]["receivesInput"] is not False:
+                    raise CleanupUnconfirmed("The private tray desktop could not be confirmed as non-input at teardown")
+        finally:
+            release_handle(destroy, "DestroyWindow(private enumeration witness)", anchor)
 
 
 def private_desktop(desk, select, name, visit, record):
@@ -413,7 +453,8 @@ def profile_resources(api, parent, token, result):
     result["cleanupConfirmed"] = True
 
 
-def run_profile(case, result, api, desk, built_gui, inventory, out, target, revision):
+@contextmanager
+def staged_profile(result, api, built_gui, inventory):
     token = uuid.uuid4().hex
     result["profile"] = token
     with profile_resources(api, Path(os.environ["RUNNER_TEMP"]), token, result) as (root, stack):
@@ -441,8 +482,13 @@ def run_profile(case, result, api, desk, built_gui, inventory, out, target, revi
         offline.bind(("127.0.0.1", 0))
         env = recorder.environment(trial, "http://127.0.0.1:" + str(offline.getsockname()[1]), True, media, token)
         env.update(IFW_QA_WINDOWS_LAUNCHER="1", IFW_QA_LAUNCHER_SID=recorder.sid())
+        yield gui, trial, env
+
+
+def run_profile(case, result, api, desk, built_gui, inventory, out, target, revision):
+    with staged_profile(result, api, built_gui, inventory) as (gui, trial, env):
         if case == "shellLess":
-            name = "IfwQa_Launcher_" + token
+            name = "IfwQa_Launcher_" + result["profile"]
             change_thread = bind(c.WinDLL("user32", use_last_error=True), "SetThreadDesktop", w.BOOL, w.HANDLE)
             result["desktopCleanup"] = {}
             private_desktop(desk, change_thread, name,
@@ -476,7 +522,8 @@ def run_cases(visit, result):
     return first
 
 
-def run(target, out, result):
+@contextmanager
+def native_subject(target, out, result, extra_inputs=()):
     if (not recorder.hosted() or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
             or os.getenv("GITHUB_REF") != "refs/heads/rewrite/rust"):
         raise ValueError("Use the dedicated disposable native rewrite runner")
@@ -492,7 +539,8 @@ def run(target, out, result):
                 [gui_source / "Cargo.toml", *sorted((gui_source / "src").glob("*.rs")),
                  gui_source / "src/tray-icon.argb", ROOT / "rust/Cargo.toml",
                  lifecycle / "Cargo.toml", lifecycle / "src/lib.rs"]}
-    if (receipt["source"] != revision or receipt["target"] != target or recorder.sha(exe) != receipt["binarySha256"]
+    if (revision != os.environ["GITHUB_SHA"] or receipt["source"] != revision or receipt["target"] != target
+            or recorder.sha(exe) != receipt["binarySha256"]
             or recorder.pe_machine(exe) != TARGETS[target] or receipt["graphSha256"] != profile["targetReportSha256"][target]
             or receipt["lockSha256"] != profile["lockSha256"]
             or required != set(receipt["compilerSources"])
@@ -506,9 +554,10 @@ def run(target, out, result):
                   buildReceipt=recorder.sha(receipt_path), gui=receipt["binarySha256"], graph=receipt["graphSha256"],
                   lock=receipt["lockSha256"],
                   observerInputs={path.relative_to(ROOT).as_posix(): recorder.sha(path) for path in
-                                  (Path(__file__).resolve(), HERE / "window_readback.py", QA / "observe-windows-gui.py", QA / "windows-desktop/win32.py",
+                                  (Path(__file__).resolve(), HERE / "named_process.py", HERE / "window_readback.py",
+                                   QA / "observe-windows-gui.py", QA / "windows-desktop/win32.py", QA / "windows-desktop/job.py",
                                    QA / "windows-performance/native.py", QA / "windows-performance/run.py",
-                                   QA / "windows-performance/build.py")})
+                                   QA / "windows-performance/build.py", *extra_inputs)})
     with profile_resources(api, Path(os.environ["RUNNER_TEMP"]), uuid.uuid4().hex, result) as (build, stack):
         gui, _, inventory = recorder.build_subject(build, out, exe, target, recorder.pe_machine)
         if inventory["gui"] != result["gui"]:
@@ -516,6 +565,11 @@ def run(target, out, result):
         for image in (gui, gui.with_name("ifw-performance-worker.exe")):
             stack.enter_context(recorder.pin_path(api, image, False))
         result["inventory"] = inventory
+        yield api, desk, gui, inventory, revision
+
+
+def run(target, out, result):
+    with native_subject(target, out, result) as (api, desk, gui, inventory, revision):
         first = run_cases(lambda case, state: run_profile(case, state, api, desk, gui, inventory, out, target, revision),
                           result)
         if first is not None:

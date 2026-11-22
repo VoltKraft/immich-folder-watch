@@ -3,7 +3,6 @@ from contextlib import contextmanager
 import ctypes as c
 import json
 from pathlib import Path, PureWindowsPath
-import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
@@ -77,32 +76,43 @@ class PrimaryJobTests(unittest.TestCase):
 
 
 class LauncherTests(unittest.TestCase):
+    def test_passive_focus_observation_counts_only_the_same_still_visible_window(self):
+        desk, windows = Mock(), Mock()
+        hwnd = 27
+        for surfaces, foregrounds, expected in (([hwnd, hwnd], [23, hwnd], True), ([99], [], False)):
+            clock = [0.0]
+            windows.visible.side_effect = surfaces
+            desk.foreground.side_effect = foregrounds
+            with (patch.object(observe.time, "monotonic", side_effect=lambda: clock[0]),
+                  patch.object(observe.time, "sleep", side_effect=lambda duration: clock.__setitem__(0, clock[0] + duration))):
+                row = observe.passive_foreground(desk, windows, hwnd, False)
+            self.assertFalse(row["initial"])
+            self.assertEqual((row["observed"], row["sameWindowVisible"]), (expected, expected))
+
     def test_secondary_runs_the_same_image_without_arguments_or_input_pipe(self):
         api, desk = Mock(), Mock()
-        desk.name.return_value = "IfwQa_test"
+        desk.name.side_effect = lambda handle: "WinSta0" if handle is desk.station.return_value else "IfwQa_test"
         desk.receiving_input.return_value = False
         image = Path("native-gui-assessment.exe")
-        with (patch.object(subprocess, "STARTUPINFO", create=True),
-              patch.object(subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True),
-              patch.object(subprocess, "Popen") as launch):
-            launch.return_value.stdin = None
+        with patch.object(observe, "start_named") as launch:
             with observe.child(api, desk, "IfwQa_test", image, [], Path("case"), {}, None, False):
                 pass
-        self.assertEqual(launch.call_args.args, ([image],))
-        self.assertNotIn("stdin", launch.call_args.kwargs)
+        desk.open_named.assert_called_once_with("IfwQa_test", 0, False, 1)
+        launch.assert_called_once_with(image, [], cwd=Path("case"), env={}, stream=None, desktop="IfwQa_test", primary=False)
         api.assign_suspended.assert_called_once_with(api.new_job.return_value, launch.return_value, image)
+        launch.return_value.resume.assert_called_once_with()
+        launch.return_value.close.assert_called_once_with()
 
     def test_normal_secondary_uses_the_existing_desktop_without_an_inherited_desktop_or_command_pipe(self):
         api, desk, image = Mock(), Mock(), Path("native-gui-assessment.exe")
-        with (patch.object(subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True),
-              patch.object(subprocess, "Popen") as launch):
-            launch.return_value.stdin = None
+        desk.name.side_effect = lambda handle: "WinSta0" if handle is desk.station.return_value else "Default"
+        desk.receiving_input.return_value = True
+        with patch.object(observe, "ordinary_console", return_value=True), patch.object(observe, "start_named") as launch:
             with observe.child(api, desk, "Default", image, [], Path("case"), {}, None, False, private=False):
                 pass
-        desk.open_named.assert_not_called()
-        self.assertEqual(launch.call_args.args, ([image],))
-        self.assertNotIn("startupinfo", launch.call_args.kwargs)
-        self.assertNotIn("stdin", launch.call_args.kwargs)
+        desk.open_named.assert_called_once_with("Default", 0, False, 1)
+        launch.assert_called_once_with(image, [], cwd=Path("case"), env={}, stream=None, desktop="Default", primary=False)
+        launch.return_value.close.assert_called_once_with()
 
     def test_native_tray_evidence_and_missing_receipt_have_distinct_foreground_startup_inputs(self):
         with TemporaryDirectory() as directory:
