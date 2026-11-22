@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes as ct
+import io
 import json
 import os
 from pathlib import Path
@@ -26,6 +27,18 @@ INVALID_HANDLE = ct.c_void_p(-1).value
 
 class Unavailable(RuntimeError):
     """A required disposable-runner capability is unavailable; never a pass."""
+
+
+def send_release_space(pipe: io.TextIOWrapper) -> dict:
+    """Send the exact private Rust protocol token after independent full checks."""
+    # Popen text-mode stdin otherwise translates LF to CRLF on Windows. The
+    # Rust worker deliberately accepts only this exact token, without trimming.
+    pipe.reconfigure(encoding="utf-8", errors="strict", newline="\n")
+    acknowledgement = "release-space\n"
+    if pipe.write(acknowledgement) != len(acknowledgement):
+        raise OSError("incomplete private filesystem release acknowledgement")
+    pipe.flush()
+    return {"bytes": len(acknowledgement), "utf8_hex": acknowledgement.encode("utf-8").hex()}
 
 
 def hosted_gate(root: Path, env: dict) -> None:
@@ -369,8 +382,7 @@ def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: 
                 report["win32_error"] = event["win32_error"]
                 check_snapshot("filesystem-full-before-release-and-restore")
                 save()
-                process.stdin.write("release-space\n")
-                process.stdin.flush()
+                report["release_acknowledgement"] = send_release_space(process.stdin)
             save()
         code = process.wait(timeout=10)
         reader.join(timeout=5)

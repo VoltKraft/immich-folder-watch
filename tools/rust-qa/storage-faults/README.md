@@ -62,7 +62,11 @@ Only that new volume GUID is passed to the native worker, together with the
 supervisor's fresh authorization marker. The native filler must observe Win32
 39 or 112; the supervisor must independently observe zero available/free bytes
 while SQLite returns 13. It then permits removal of only the owned filler and
-the same-volume backup restore. Both modes use the existing Rust/C# recovery,
+the same-volume backup restore. This private pipe sends exactly the 14 UTF-8
+bytes `release-space\n`, with LF translation disabled even on Windows. The
+worker retains its exact-token check; no trimming or broader acknowledgement is
+accepted. The supervisor records the sent bytes only after write and flush.
+Both modes use the existing Rust/C# recovery,
 producer-hash and byte-corruption controls: eight cases and 208 C# assertions
 when the native Windows qualification passes. An ordinary synthetic file also
 records extended and legacy IDs on one handle before/after rename; a cached FAT

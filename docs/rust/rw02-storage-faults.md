@@ -549,7 +549,108 @@ unchanged at 453, 466 and 466 files respectively.
 | `linux-x64-10/evidence-hashes.json` | `f11b3fb82b29d285b8c60db0bbc14c0ac02d0bb433903643c3058c84b12647a2` |
 | Local transfer `review.json` | `752b8509cc97c08a8f283f8aefe8066e3931663432751e23be80a7a145a2d54e` |
 
+## Windows native partial results and release protocol (2026-11-22)
+
+Both Windows artifacts from run `45039099730` at `3b4854d` now have verified ZIP
+digests. Each contains **418 of 419** indexed storage evidence files with matching
+hashes. The only absent file is the same 78-byte `.gitattributes` described above;
+its separately verified Git bytes match the expected digest. All 149 source
+identities are accounted for: 65 archived source copies match Git byte-for-byte,
+the one missing file is separately reconstructed, and 83 archived text files
+differ only by the native Windows checkout's CRLF line endings. Their raw archived hashes were verified
+before comparing canonical LF bytes to `3b4854d`; no other content difference was
+found. This does not relabel the old artifact as a complete source export.
+
+On **each host**, all six portable cases completed all 37 expected command
+outcomes, 144 actual C# assertions and 12 expected corrupt-copy rejections.
+Four owned children were terminated with TerminateProcess, exit 1. The archived
+DB and WAL bytes match exactly across each kill, including the committed and
+uncommitted barriers. Each post-kill SHM is 32,768 bytes and was captured before
+reopen; no pre-kill SHM comparison is claimed. Full Rust recovered/restored
+snapshot checks, integrity checks, write/rollback and unequal-SQL controls passed.
+Each completed case has five supervisor hash checkpoints. Because the later VHD
+case failed, the run-level deferred loop did **not** execute. Independent archive
+readback nevertheless confirms that all six actual retained snapshot files still
+match their original producer digests. The two facts remain distinct.
+
+Both hosts then attached and independently verified their own bounded VHD and
+reached real Win32 error **112**, SQLite error **13**, and independently measured
+zero free/available bytes in the 15,679,488-byte FAT data region. The sensitive
+volume case then failed with worker exit 1 and
+`supervisor did not confirm full private filesystem`. Neither same-volume
+restoration nor C# verification of that volume case completed; the insensitive
+volume case was not reached. Both explicit detach calls returned 0, both volumes
+disappeared, the retained 16,777,728-byte images matched their recorded hashes and
+fixed-layout checks, and both cleanup-error lists were empty. These are real
+full-volume and cleanup observations, not passing Windows full-volume recovery.
+
+The failure is the private release-message encoding. The supervisor opened stdin
+in Python text mode and wrote `release-space\n`, while Rust requires that exact
+LF-terminated token. Python's documented
+[text-mode stdin conversion](https://docs.python.org/3.12/library/subprocess.html#frequently-used-arguments)
+turns the LF into the Windows line separator, CRLF. The corrected sender explicitly
+configures UTF-8 and untranslated LF on this one pipe, then writes and flushes all
+14 bytes and records their length/hex value. It is called only after the unchanged
+independent fullness, capacity, backing-file, volume-identity and snapshot checks.
+The Rust exact-token check is unchanged. No whitespace trimming, additional VHD
+case, disk privilege, fallback path or production behavior is introduced.
+
+| Original native evidence | Windows x64 | Windows ARM64 |
+| --- | --- | --- |
+| GitHub artifact ID | `14763571611` | `14763606202` |
+| ZIP bytes | 17,940,316 | 17,898,754 |
+| ZIP SHA-256 | `eb9cb84546da440577f10018dc09882a0ba8983989a12bfef6ff87b862b35f46` | `cbbeaafadbfa07160aaf83f38a0157e6aa20ba960874d28be41cbd4204982257` |
+| `result.json` SHA-256 | `f9002cc41f8a62a9e5a61309340ba8d8f095f89300439ee8ceb692e1d34e29f8` | `879b9098c6a8afdd4c3a6c8df4f0a50c9a5c1888be979c3807d7c84cfd4d2a9d` |
+| `evidence-hashes.json` SHA-256 | `764c491b5c856b04d8c9f3989956a35f7542de4664eb16f8cc562a8c64569267` | `958673db2c96a3922bdddc42467868bb74c626281829347555bfe17c376848ad` |
+| VHD receipt SHA-256 | `26e63ce4bf82674ca285157f96aa5028ff3b993186947b2905eb86d6308ab62d` | `077bd987c357c39dec122f9c981674204bd7412d614df1f093dc1307c5497632` |
+
+The originals stay under `artifacts/rust/hosted-desktop-storage/45039099730`.
+Separate detailed checks are in ignored
+`artifacts/rust/storage-faults/hosted-windows-45039099730-review/`.
+The x64 and ARM64 review JSON hashes are respectively
+`b3b0cd1d11020e1c362a82b18bec9d1860106b5b5b752917d62e20fad1023aa7`
+and `e440c527ddfbbf2db6955ad7afaa8adceb5906dd1a0d961fff79f856a6830a97`.
+
+Three new portable protocol controls reproduce the old CRLF translation, require
+exact LF under both host line-ending modes, and reject a closed output pipe.
+An additional real-worker comparison uses the unchanged Rust source from
+`3b4854d` in two private 8-MiB Linux tmpfs namespaces. After each independently
+confirmed actual ENOSPC/SQLite-13 barrier, the old CRLF sender produces the same
+exit 1 and diagnostic as Windows and no restored database. The corrected Windows
+sender, called through an explicitly CRLF-configured stream, delivers exactly
+14 LF-terminated bytes, returns exit 0 and completes same-volume backup restore.
+These results and exact derived-supervisor recipes are retained in ignored
+`windows-release-protocol-02`; its `recipe.json` SHA-256 is
+`0228828de8e69c702a31045cafe44b4d4b836062decec61adf793c23ea823636`
+and its `result.json` SHA-256 is
+`2cae516947704b2931082cbd230b1824c3ef01c0adc5f62ad1afc8d93a98ee6c`.
+This isolates the common Rust protocol gate; it does not execute corrected
+Windows VHD restoration. Both native Windows lanes must repeat that qualification.
+
+The fresh native Fedora x64 `linux-x64-11 --tmpfs` regression passed all 48
+expected command outcomes, eight cases, 208 C# assertions and 16 corrupt-copy
+rejections. All thirteen image/protocol controls passed, including the three
+new line-ending/closed-pipe controls. Existing source-export and crash-capture
+controls, Rustfmt, denied-warning Clippy, native compiler gates and actual C#
+readback passed; the explicitly Windows-only byte-lock control remains skipped
+on Linux. All 150 source bindings and 469 evidence hashes matched, including the
+mapped hidden source. The earlier `linux-x64-06` and `linux-x64-10` inventories
+remain unchanged. This narrow change introduces no dependency, Rust/storage
+schema change, new VHD scenario or additional disk authorization.
+
+| ACK correction regression | SHA-256 |
+| --- | --- |
+| `linux-x64-11/result.json` | `d2b4fbb20a75550e66e0ae6b95f1b12cc7fdb3cacc3c85eaf7d367893783406b` |
+| `linux-x64-11/first-party-source-hashes.json` | `4f4187aa1a9c98c5a411d67422d7a198892c9e89c44699fe395027a884b0da39` |
+| `linux-x64-11/evidence-hashes.json` | `8a215f0f6d5c39a26d2e331f306379b2367ec61d98a7d6b0ee761c5157fc7563` |
+
 ## Retained diagnostic attempts
+
+`windows-release-protocol-01` reproduced the expected Rust rejection but its
+additional audit incorrectly required zero space after the worker had exited;
+61,440 bytes were available at that later point. It is retained, with that
+failed assertion recorded. The final `-02` comparison measures and records
+capacity at the actual full barrier, before sending either acknowledgement.
 
 A Fedora x64 rerun exercised both casing modes for each portable fault
 before the platform-specific volume cases. All eight cases, 208 C# assertions

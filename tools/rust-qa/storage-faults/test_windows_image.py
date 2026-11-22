@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,30 @@ import windows_image as image
 import windows_vhd
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+class ReleaseProtocolTests(unittest.TestCase):
+    def test_windows_text_translation_changes_the_old_token(self) -> None:
+        with io.BytesIO() as raw:
+            with io.TextIOWrapper(raw, encoding="utf-8", newline="\r\n") as pipe:
+                pipe.write("release-space\n")
+                pipe.flush()
+                self.assertEqual(raw.getvalue(), b"release-space\r\n")
+                self.assertNotEqual(raw.getvalue(), b"release-space\n")
+
+    def test_release_is_exact_lf_under_both_host_line_endings(self) -> None:
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline), io.BytesIO() as raw:
+                with io.TextIOWrapper(raw, encoding="utf-8", newline=newline) as pipe:
+                    receipt = windows_vhd.send_release_space(pipe)
+                    self.assertEqual(raw.getvalue(), b"release-space\n")
+                    self.assertEqual(receipt, {"bytes": len(raw.getvalue()), "utf8_hex": raw.getvalue().hex()})
+
+    def test_closed_release_pipe_is_not_reported_as_acknowledged(self) -> None:
+        pipe = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", newline="\r\n")
+        pipe.close()
+        with self.assertRaises(ValueError):
+            windows_vhd.send_release_space(pipe)
 
 
 class WindowsImageTests(unittest.TestCase):
