@@ -96,6 +96,24 @@ Success requires both, with the native language and input desktop restored.
 The hosted wrapper also rejects any result containing an exception.
 [IME driver](../../tools/rust-qa/windows-ime/run.py) · [Private profile cleanup](../../tools/rust-qa/windows_observer.py).
 
+At `8b64330` and `7517e3b`, Windows Server x64 and Windows 11 ARM64
+each passed the strict composition and cleanup checks. All four trials
+provisioned Japanese Basic Typing, observed preedit on the first IME On
+attempt, then confirmed the Enter commit and U+3042 through UI Automation.
+Each GUI and observer exited zero and each receipt recorded
+`profileRemoved=true`. The original input layout and language list
+were restored and Basic Typing returned to `NotPresent`. On the same
+four builds the ordinary filename passed all three selection and deletion
+cases, and NVDA's OneCore speech pipeline recorded all seven expected cues
+in order. These runs predate the focused IMM mode readback in `f4d5b3a`.
+[Run 45041728291](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45041728291)
+· [Run 45047460092](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
+
+| Strict `japanese/result.json` | Windows x64 SHA-256 | Windows ARM64 SHA-256 |
+| --- | --- | --- |
+| `8b64330` | `28406dc31dd865a3c66133f70d54cc614dc6b7530b668fcbf31e5db23f7b4ee6` | `2e744c5b98d1ad6cababfee84a7ecc2fd670adc9a5691bb4da9b06b0925f5e63` |
+| `7517e3b` | `69e2c7e3d4f72cc91dc6d2c3d183326187aab4ba7b7028c83be50ad7494e101e` | `fe29d3e2de2166f872dd44be1a684d7f605be9693ea274c8f85a57af96245426` |
+
 Run both native architectures after building the existing GUI fixture. The driver uses Windows PowerShell with UI Automation, TSF, IMM and User32 from the operating system. The checked-in C# is an external development observer. The Rust application, dependency set and normal editor use the same GUI build as the other native tests.
 
 ```bash

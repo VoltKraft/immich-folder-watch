@@ -295,7 +295,27 @@ portable tests passed. The instrumented release passed offline Clippy and
 all four existing private Linux x64 cases. Its log recorded the focused
 field hit with the button up and down in each interactive case. The result
 SHA-256 is `9f308c2155ce5d0242e8f048d83e7b36f9fc9c6046430f29a3c181522dab5cbf`.
-The native Windows rerun of the revised driver remains open.
 [Windows driver](../../tools/rust-qa/font-coverage/observe.py),
 [pass observation](../../tools/rust-qa/font-coverage/font_probe.rs) and
 [pointer controls](../../tools/rust-qa/font-coverage/test_pointer.py).
+
+At `8b64330` the previous Windows x64 driver passed three of four cases.
+In the mixed field, egui received the press at (70, 52), a pointer
+departure and a move outside the field to (46, 26), all in pass 3. The
+release in pass 5 left both caret indices at −1. ARM64 passed all four.
+The standalone result SHA-256 values are
+`4ce13dd61dcd95d144f2bf6d7f8f4f738586cdfcf3db359539c7130297fd5c74` (x64)
+and `6d324c1b5e3853374b678198a520750c031fb9efcb16869f5fbe95a8d93002e0` (ARM64).
+[Run 45041728291](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45041728291).
+
+At `7517e3b` the revised driver passed all four cases on both Windows
+architectures. For the mixed case it confirmed the owned field at (71, 52)
+and then (70, 52) in x64 passes 4 and 5 and ARM64 passes 5 and 6. Egui
+registered the click on release in passes 7 and 9 respectively. Both
+hosts returned caret indices [4, 3, 4] for mixed text and [3, 4, 3] for
+the digits case, selected and deleted 界, THEH and TEH in the three
+interactive cases, and passed the pixel-order check around the digits.
+The result SHA-256 values are
+`06bd26718804ac4bd42e00e92bc15113ff575b36f1b1445c9130ecaef940a762` (x64)
+and `af4604eae57d6e7c36e926d3b947a4dc2aa2862d30ff8ec8dd046b51885f5373` (ARM64).
+[Run 45047460092](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
