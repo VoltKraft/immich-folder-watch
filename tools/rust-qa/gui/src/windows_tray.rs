@@ -1,6 +1,6 @@
 //! Own the elected GUI's notification icon independently of its eframe window generations.
 use crate::windows_tray_shell::{EVENTS, ICON, Icon, Image, Receiver, color, image, pump_messages};
-use crate::windows_tray_state::{Pending, TrayEvent};
+use crate::windows_tray_state::{Attempt, Host, Pending, Recovery, TrayEvent};
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -72,7 +72,7 @@ impl Drop for NativeTray {
     }
 }
 
-fn taskbar() -> Option<(usize, u32)> {
+fn taskbar() -> Option<Host> {
     // Observe only the notification host on the receiver's desktop.
     unsafe {
         let bar = FindWindowW(w!("Shell_TrayWnd"), None).ok()?;
@@ -105,6 +105,37 @@ impl Registration<'_> {
             return Err(io::Error::other("Failed to withdraw the rejected v4 icon"));
         }
         Ok(self.available)
+    }
+
+    fn recover(&mut self, attempt: Attempt, token: &str) -> io::Result<bool> {
+        let phase = match attempt {
+            Attempt::Recreate => "recreate",
+            Attempt::Retry => "retry",
+        };
+        // A broadcast can also mean a DPI change. A surviving entry still needs a v4
+        // acknowledgement on this host. A duplicate NIM_ADD alone would be refused.
+        if self.icon.cleanup {
+            let mut version = self.icon.base();
+            version.Anonymous.uVersion = NOTIFYICON_VERSION_4;
+            if self
+                .icon
+                .call("existing.version4", NIM_SETVERSION, &version)
+            {
+                self.available = true;
+                return Ok(true);
+            }
+            // Only this receiver's HWND/ID is withdrawn before retrying a fresh add.
+            if self
+                .icon
+                .rect()
+                .is_ok_and(|r| r.right > r.left && r.bottom > r.top)
+                && !self.icon.remove("existing.withdraw")
+            {
+                self.available = false;
+                return Ok(false);
+            }
+        }
+        self.register(phase, token)
     }
 
     fn sample(&self, phase: &str, ok: bool) {
@@ -166,15 +197,16 @@ fn run<T>(
         available: false,
     };
     let result: io::Result<()> = (|| {
-        let mut host = taskbar();
+        // Shell registration can dispatch a callback reentrantly before the message pump starts.
+        let mut seen = EVENTS.get();
+        let mut recovery = Recovery::new(taskbar());
+        // Bootstrap probes the Shell even on a shell-less desktop to establish real fallback.
         let available = tray.register("initial", token)?;
+        recovery.result(available, Instant::now());
         tray.sample("initial", available);
         ready.send(available).map_err(io::Error::other)?;
         let mut pending = Pending::default();
-        let mut seen = EVENTS.get();
         let mut next_host = Instant::now() + Duration::from_secs(1);
-        let mut retry =
-            (!available && host.is_some()).then(|| Instant::now() + Duration::from_secs(3));
         while !stopping.load(Ordering::Acquire) {
             // The window procedure records callbacks only. Delivery and Shell calls happen after dispatch.
             pump_messages(
@@ -207,29 +239,27 @@ fn run<T>(
             if recreated || now >= next_host {
                 next_host = now + Duration::from_secs(1);
                 let current = taskbar();
-                let replaced = current != host;
-                if replaced {
+                let previous = recovery.host;
+                let was_available = tray.available;
+                if current != previous {
                     println!(
                         "TRAY_HOST pid={} previous={} current={} previous_hwnd={} current_hwnd={}",
                         std::process::id(),
-                        host.map_or(0, |h| h.1),
+                        previous.map_or(0, |h| h.1),
                         current.map_or(0, |h| h.1),
-                        host.map_or(0, |h| h.0),
+                        previous.map_or(0, |h| h.0),
                         current.map_or(0, |h| h.0)
                     );
-                    if host.is_some() && (current.is_none() || tray.icon.rect().is_err()) {
+                    if current.is_none() {
                         tray.available = false;
-                        pending.available = Some(false);
                     }
-                    host = current;
                 }
-                let due = retry.is_some_and(|time| now >= time);
-                if recreated || (replaced && current.is_some()) || due {
-                    retry = None;
-                    if !tray.available || tray.icon.rect().is_err() {
-                        pending.available =
-                            Some(tray.register(if due { "retry" } else { "recreate" }, token)?);
-                    }
+                if let Some(attempt) = recovery.observe(current, recreated, now) {
+                    let acknowledged = tray.recover(attempt, token)?;
+                    recovery.result(acknowledged, Instant::now());
+                }
+                if was_available != tray.available {
+                    pending.available = Some(tray.available);
                 }
             }
             if events.open.ordinal != seen.open.ordinal && tray.available {
