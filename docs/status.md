@@ -39,6 +39,13 @@ policy and installed migration remain open.
 [Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
 · [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 
+The tagged .NET source and Unicode 16.0 independently reproduce the third
+profile. With the same twelve input filenames the legacy C# store retained
+eleven, ten or eight distinct insensitive entries under the three profiles.
+The native Fedora scalar probe passed 5,844 comparisons each using the ICU
+and managed tables. The additional hosted comparison is selected in the
+normal feasibility entry point. [Managed casing evidence](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+
 Commit `66d9fd6` produced four SPDX inventories from the verified native
 builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
 byte-for-byte. The independent review checked source licenses, font assets

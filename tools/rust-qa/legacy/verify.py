@@ -12,11 +12,43 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 import subprocess
+import sys
 import tempfile
 
 import casing_profiles
+
+
+def independent_casing(map_path: Path, manifest: dict, managed: bool) -> tuple[Path, dict]:
+    raw = map_path.read_bytes()
+    if managed:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "legacy-invariant"))
+        import invariant_profile
+
+        build = manifest.get("CoreLibBuild", "")
+        corelib = manifest.get("CoreLibSha256", "")
+        if not (manifest.get("GlobalizationInvariantRequested") is True and manifest.get("Runtime") == "10.0.12"
+                and isinstance(build, str) and build.endswith("+" + invariant_profile.VMR)
+                and isinstance(corelib, str) and re.fullmatch(r"[a-f0-9]{64}", corelib)
+                and raw == invariant_profile.three_profiles()["managed16"]):
+            raise ValueError("Expected the complete managed invariant table from the reviewed .NET runtime")
+        table = invariant_profile.TABLE
+        details = {"qualified": True, "unicode_version": "16.0.0", "rust_input": "unicode-and-corelib-derived",
+                   "unicode_data_sha256": invariant_profile.SOURCES["UnicodeData.txt"][1],
+                   "runtime_source": invariant_profile.RUNTIME, "corelib_build": build, "corelib_sha256": corelib}
+        driver = invariant_profile.__file__
+    else:
+        profile = casing_profiles.match_reference(raw)
+        table = profile.table if profile else map_path
+        details = {"qualified": profile is not None, "unicode_version": profile.version if profile else None,
+                   "unicode_data_sha256": profile.source_sha256 if profile else None,
+                   "rust_input": "unicode-derived" if profile else "native-oracle"}
+        driver = casing_profiles.__file__
+    details["profile_driver_sha256"] = hashlib.sha256(Path(driver).read_bytes()).hexdigest()
+    details["unicode_notice_sha256"] = casing_profiles.LICENSE_SHA256
+    return table, details
 
 
 def utf16_hex(value: str) -> str:
@@ -47,13 +79,17 @@ def main() -> None:
     parser.add_argument("--scalar-reference", type=Path, required=True)
     parser.add_argument("--fixtures", type=Path, default=Path("rust/tests/fixtures/legacy"))
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--require-known-casing", action="store_true",
-                        help="Require the native C# map to match an independently derived Unicode profile")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--require-known-casing", action="store_true",
+                           help="Require the native C# map to match a qualified ICU-backed profile")
+    selection.add_argument("--managed-invariant", action="store_true",
+                           help="Require the qualified .NET 10.0.12 managed invariant table and build")
+    parser.add_argument("--paired-default", type=Path, help="Check that both native modes used the same oracle and CoreLib")
     parser.add_argument("--unicode-data", type=Path,
                         help="Optional separately downloaded/pinned official UnicodeData.txt; no network is used here")
     args = parser.parse_args()
     manifest = verified_manifest(args.scalar_reference, "Payloads", "ifw-rw02-scalar-reference-v1")
-    if manifest["ScannedScalars"] != 0x110000 - 0x800 or not manifest["ContextBatchEquivalenceChecked"]:
+    if manifest["ScannedScalars"] != 0x110000 - 0x800 or manifest["ContextBatchEquivalenceChecked"] is not True:
         raise AssertionError("incomplete C# scalar reference")
     native = manifest["OS"]
     if native not in {"linux", "windows"}:
@@ -63,8 +99,20 @@ def main() -> None:
     if legacy_manifest["Platform"] != native or not legacy_manifest["SyntheticOnly"]:
         raise AssertionError("legacy reference platform or isolation mismatch")
     map_path = args.scalar_reference / "invariant-uppercase.tsv"
-    profile = casing_profiles.match_reference(map_path.read_bytes())
-    rust_map = profile.table if profile else map_path
+    rust_map, qualification = independent_casing(map_path, manifest, args.managed_invariant)
+    if args.paired_default:
+        if not args.managed_invariant:
+            parser.error("--paired-default requires --managed-invariant")
+        ordinary = verified_manifest(args.paired_default, "Payloads", "ifw-rw02-scalar-reference-v1")
+        if (ordinary.get("GlobalizationInvariantRequested") is not False
+                or not casing_profiles.match_reference((args.paired_default / "invariant-uppercase.tsv").read_bytes())
+                or not re.fullmatch(r"[0-9a-f]{64}", manifest.get("OracleAssemblySha256", ""))
+                or any(ordinary.get(key) != manifest[key] for key in
+                       ("CoreLibSha256", "CoreLibBuild", "OracleAssemblySha256", "GeneratorSources", "Runtime", "OS",
+                        "ProcessArchitecture", "OSArchitecture", "ScannedScalars", "ContextBatchEquivalenceChecked"))):
+            raise ValueError("The ordinary and managed captures do not share the same native oracle and runtime")
+        qualification["paired_manifest_sha256"] = hashlib.sha256((args.paired_default / "manifest.json").read_bytes()).hexdigest()
+        qualification["oracle_assembly_sha256"] = manifest["OracleAssemblySha256"]
     map_lines = map_path.read_text(encoding="utf-8").splitlines()
     if map_lines[0] != "IFW-INVARIANT-UPPERCASE-V1":
         raise AssertionError("unknown casing map")
@@ -226,14 +274,7 @@ def main() -> None:
         "runtime_reference": manifest["Runtime"], "passed_requests": len(requests), "categories": categories,
         "exhaustive_scalars": manifest["ScannedScalars"], "changed_scalar_mappings": len(mapping),
         "casing_map_sha256": manifest["Payloads"]["invariant-uppercase.tsv"],
-        "independent_casing_profile": {
-            "qualified": profile is not None,
-            "unicode_version": profile.version if profile else None,
-            "unicode_data_sha256": profile.source_sha256 if profile else None,
-            "rust_input": "unicode-derived" if profile else "native-oracle",
-            "profile_driver_sha256": hashlib.sha256(Path(casing_profiles.__file__).read_bytes()).hexdigest(),
-            "unicode_notice_sha256": casing_profiles.LICENSE_SHA256,
-        },
+        "independent_casing_profile": qualification,
         "probe_sha256": hashlib.sha256(args.probe.read_bytes()).hexdigest(),
         "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "scalar_manifest_sha256": hashlib.sha256((args.scalar_reference / "manifest.json").read_bytes()).hexdigest(),
@@ -247,7 +288,7 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    if args.require_known_casing and profile is None:
+    if args.require_known_casing and not qualification["qualified"]:
         raise SystemExit("Native scalar comparisons passed with the oracle input. The casing profile needs qualification.")
     print(f"Rust/C# scalar probe passed: {len(requests)} requests, {manifest['ScannedScalars']} Unicode scalars; {native}-{expected_arch}.")
 

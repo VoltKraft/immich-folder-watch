@@ -80,6 +80,13 @@ comparison. The native command also checks that its complete C# casing map
 matches a separately reproduced Unicode table before qualifying the Rust
 comparison. [Legacy checks and source pins](rust/rw02-legacy.md#independently-reproduced-casing-profiles).
 
+A second process runs the compiled oracle with managed invariant casing.
+`managed-scalar-reference/manifest.json` records CoreLib
+and the scalar payloads. `managed-legacy.json` records the independently
+derived table used by Rust and the complete comparison. On a local repeat
+pass `--output artifacts/rust/feasibility/<fresh-name>` to `test-native.py`
+to preserve earlier receipts. [Managed profile and storage behavior](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+
 The native command also writes `workspace-boundaries.json` for the selected
 target. It checks the resolved Cargo dependencies of each workspace member
 against its role. A new member needs an explicit role. The generic crates

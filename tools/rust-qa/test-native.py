@@ -19,9 +19,13 @@ def main():
     inputs = json.loads((WORKSPACE / "toolchain-inputs.json").read_text(encoding="utf-8"))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(inputs["targets"]))
+    parser.add_argument("--output", type=Path, help="Fresh receipt directory below artifacts/rust/feasibility")
     args = parser.parse_args()
-    evidence = ROOT / "artifacts/rust/feasibility" / args.target
-    evidence.mkdir(parents=True, exist_ok=True)
+    area = ROOT / "artifacts/rust/feasibility"
+    evidence = args.output.resolve() if args.output else area / args.target
+    if evidence == area or not evidence.is_relative_to(area):
+        parser.error(f"Use a receipt directory below {area}")
+    evidence.mkdir(parents=True, exist_ok=args.output is None)
     suffix = ".exe" if os.name == "nt" else ""
     cargo_target = ROOT / "artifacts/rust/build" / args.target
     scalar_project = str(QA / "legacy/LegacyScalarOracle.csproj")
@@ -45,6 +49,10 @@ def main():
         "lockSha256": hashlib.sha256((WORKSPACE / "Cargo.lock").read_bytes()).hexdigest(),
         "steps": {},
     }
+    oracle = ["dotnet", "run", "--no-restore", "--configuration", "Release", "--project", scalar_project,
+              "-p:EnableWindowsTargeting=false"]
+    compare = [sys.executable, str(QA / "legacy/verify.py"), "--probe",
+               str(cargo_target / "release" / ("legacy-probe" + suffix)), "--fixtures", str(WORKSPACE / "tests/fixtures/legacy")]
     commands = {
         "compiler": [sys.executable, str(QA / "check-toolchain.py"), args.target],
         "workspace-boundaries": [
@@ -63,14 +71,13 @@ def main():
         # sources, even though the shipping solution enables Windows targeting.
         "legacy-restore": ["dotnet", "restore", scalar_project, "--source", str(empty_feed),
                            "-p:EnableWindowsTargeting=false"],
-        "legacy-oracle": ["dotnet", "run", "--no-restore", "--configuration", "Release", "--project",
-                          scalar_project, "-p:EnableWindowsTargeting=false", "--", "export", str(evidence / "scalar-reference")],
-        "legacy-reference": [
-            sys.executable, str(QA / "legacy/verify.py"), "--probe", str(cargo_target / "release" / ("legacy-probe" + suffix)),
-            "--scalar-reference", str(evidence / "scalar-reference"),
-            "--require-known-casing",
-            "--fixtures", str(WORKSPACE / "tests/fixtures/legacy"), "--output", str(evidence / "legacy.json"),
-        ],
+        "legacy-oracle": [*oracle, "--", "export", str(evidence / "scalar-reference")],
+        "legacy-reference": [*compare, "--scalar-reference", str(evidence / "scalar-reference"),
+                             "--require-known-casing", "--output", str(evidence / "legacy.json")],
+        "legacy-managed-oracle": [*oracle, "--no-build", "--", "export", str(evidence / "managed-scalar-reference")],
+        "legacy-managed-reference": [*compare, "--scalar-reference", str(evidence / "managed-scalar-reference"),
+                                     "--managed-invariant", "--paired-default", str(evidence / "scalar-reference"),
+                                     "--output", str(evidence / "managed-legacy.json")],
     }
     for name, command in commands.items():
         log = evidence / f"{name}.log"
@@ -78,7 +85,8 @@ def main():
         directory = WORKSPACE if command[0] == "cargo" else ROOT
         with log.open("wb") as stream:
             try:
-                status = subprocess.run(command, cwd=directory, env=env, stdout=stream,
+                command_env = {**env, "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"} if name == "legacy-managed-oracle" else env
+                status = subprocess.run(command, cwd=directory, env=command_env, stdout=stream,
                                         stderr=subprocess.STDOUT, timeout=900).returncode
             except subprocess.TimeoutExpired:
                 status = 124

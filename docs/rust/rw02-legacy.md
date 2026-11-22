@@ -269,6 +269,42 @@ in otherwise valid account names, matching the shipping store. Each of the
 two genuine writers passed 30 lookups and ten controls on Fedora. The
 unqualified third writer still requires separate evidence before adoption.
 
+### Managed globalization-invariant casing in .NET 10.0.12
+
+The separate Fedora study at `86ae038` reproduced the managed table in
+two ways. Unicode 16.0 contains 1,477 simple uppercase changes. The .NET
+generator preserves dotless i (U+0131) and long s (U+017F). Decoding the
+published runtime's generated tables produced the same 1,475 changes
+across every Unicode scalar as the native writer. The study checks the
+source manifest, the exact runtime revision and the upstream data hashes.
+[Source reconstruction and original notices](../../tools/rust-qa/legacy-invariant/README.md).
+
+The shipping store wrote twelve synthetic names under the same source
+spelling in each environment. Sensitive comparison retained all twelve.
+Insensitive comparison retained eleven unique entries with ICU 74.2, ten
+with managed invariant casing and eight with ICU 78. Each of the three
+profiles stored a different source key for `Archive-ſ-ƛ`. The independent
+SQL reader retained the six original database hashes.
+
+At `3c58fc1` the production C# reader opened separate copies in all 18
+writer, reader and path-mode combinations. The 432 single-file reads, 36
+listings and 18 transfer timestamps matched the independent SQL projection.
+Using the raw ICU 78 source key made all eight filenames visible to each
+reader. The same twelve relative lookups beneath that key returned nine,
+ten and twelve matches respectively. A path migration must account for
+both key components. [Cross-profile reader evidence](../../tools/rust-qa/legacy-invariant/README.md).
+
+The native feasibility entry point now exercises the same compiled C#
+scalar oracle twice. The second child explicitly selects
+globalization-invariant mode and records its CoreLib build and SHA-256.
+The comparison verifies that the two processes used the same runtime and
+oracle assembly. The Rust probe receives the separately derived managed table. A different runtime,
+mode or table fails this comparison. Fedora x64 passed 5,844 requests with
+each of the ICU and managed inputs, including the full Unicode range and
+1,335 timestamp vectors. The hosted targets still need to run the selected
+managed comparison. This scalar check does not authorize writes to original
+SQLite identities.
+
 ## Evidence and remaining work
 
 The C# scalar exporter ran on native Linux x64 with SDK 10.0.401/runtime 10.0.12:

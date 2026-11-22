@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -76,6 +77,10 @@ internal static class Program
         {
             Format = "ifw-rw02-scalar-reference-v1",
             Runtime = Environment.Version.ToString(),
+            CoreLibBuild = typeof(string).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            CoreLibSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(typeof(string).Assembly.Location))),
+            OracleAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(typeof(Program).Assembly.Location))),
+            GlobalizationInvariantRequested = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT") == "1",
             ProcessArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
             OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
             OS = OperatingSystem.IsWindows() ? "windows" : "linux",

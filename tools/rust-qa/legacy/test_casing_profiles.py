@@ -5,9 +5,23 @@ import unittest
 from unittest.mock import patch
 
 import casing_profiles
+import verify
 
 
 class CasingProfileTests(unittest.TestCase):
+    def test_managed_mode_requires_its_own_runtime_and_complete_table(self):
+        table = Path(__file__).resolve().parents[1] / "legacy-invariant/managed-invariant-10.0.12.tsv"
+        manifest = {"GlobalizationInvariantRequested": True, "Runtime": "10.0.12", "CoreLibSha256": "e" * 64,
+                    "CoreLibBuild": "10.0.12+95017c711e6afc1085133d440e42b4bd78155701"}
+        self.assertTrue(verify.independent_casing(table, manifest, True)[1]["qualified"])
+        self.assertFalse(verify.independent_casing(table, manifest, False)[1]["qualified"])
+        for key, value in (("GlobalizationInvariantRequested", False), ("Runtime", "10.0.11"),
+                           ("CoreLibBuild", "10.0.12+different-source"), ("CoreLibSha256", None)):
+            with self.subTest(field=key), self.assertRaisesRegex(ValueError, "reviewed .NET runtime"):
+                verify.independent_casing(table, {**manifest, key: value}, True)
+        with self.assertRaisesRegex(ValueError, "complete managed invariant table"):
+            verify.independent_casing(casing_profiles.PROFILES[1].table, manifest, True)
+
     def test_both_original_tables_match_and_only_the_observed_55_scalars_differ(self):
         mappings = []
         for profile in casing_profiles.PROFILES:
