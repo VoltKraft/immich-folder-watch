@@ -114,6 +114,13 @@ Fedora x64. [Native feasibility](https://github.com/VoltKraft/immich-folder-watc
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 ordinary scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
+At `0a2b5ca`, both Ubuntu targets repeated all eleven X11 budgets and the
+sixteen transport scenarios. Direct SQL replay matched 30 stored-identity
+lookups per architecture. Each native notice ZIP and SPDX document
+reproduced byte-for-byte from its compiler evidence.
+[Ubuntu native results](rw02-native-gui.md#native-follow-up-at-0a2b5ca)
+· [Notice and SPDX receipts](rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
 The [two native launcher archives at `0a2b5ca`](rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca)
 identify the private window's actual desktop and the worker retained during
 ordinary reopening. The [four archives at `8091469`](rw02-native-gui.md#native-follow-up-at-8091469)

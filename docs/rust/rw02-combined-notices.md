@@ -159,6 +159,27 @@ the official 2.3.1 schema. The local files are retained under
 `artifacts/rust/combined-profile/runs/notice-rights-native-03/` and
 `artifacts/rust/native-notice-input-trials/9f68c58/`.
 
+## Native notices at 0a2b5ca
+
+The Ubuntu x64 and ARM64 jobs each uploaded the compiler inputs and the
+complete original-notice archive for their native development executable.
+Offline replay from the authenticated inputs reproduced each notice ZIP and
+the SPDX document in its full desktop archive byte-for-byte. Both documents
+passed the official SPDX 2.3.1 schema. Each contains 1,063 relationships.
+The seven notice controls and six SPDX controls also passed for each target.
+[Native run at `0a2b5ca`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235)
+· [Full desktop archives](rw02-native-gui.md#native-follow-up-at-0a2b5ca).
+
+| Native target | Compiler input artifact | Notice archive and SHA-256 | Notice ZIP members | SPDX packages and document SHA-256 |
+| --- | --- | --- | ---: | --- |
+| Linux x64 | [14777186242](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777186242) | [14776483777](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14776483777) · `a72d43330f20778444c50f7f5333f3be13635da3a50423164dbbf8e7f23993fa` | 1,799 | 446 · `828dfe41e7b0804bf93c9f0045afd6ba53d181f383712fc0a5a790e1eee767d1` |
+| Linux ARM64 | [14777500090](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777500090) | [14777112710](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777112710) · `4d5d82d5e63505f1097548347d7bf52b6ed43a44f65621e17fe4dc3eba9722fd` | 1,796 | 445 · `008d21d61d13d0cc5daf752f568cc736a25e632a93f6f9813fe77c0b3ba8ea18` |
+
+The two replay receipts are retained below
+`artifacts/rust/hosted-development-notices/45077818235/replay/`. They bind
+each published input digest to its build receipt, executable, notice
+archive and SPDX document.
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native

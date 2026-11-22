@@ -411,6 +411,42 @@ focus. Mixed DPI and RDP remain open. Both hosts passed the sixteen
 loopback transport cases. [Launcher fixture](rw02-instance.md#ordinary-second-launch-of-the-windows-gui)
 · [Display observations](rw02-windows-display.md) · [Native TLS readback](rw02-realtime-transport.md#tls-endpoint-identity).
 
+## Native follow-up at 0a2b5ca
+
+Both native Ubuntu desktop jobs passed at
+`0a2b5ca19bcd7cb7be7a5f77415e05b8237ca47a`. The two complete Actions
+archives matched their published digests. Recomputing the three
+100,000-file trials from the samples reproduced all eleven X11 limits and
+results per architecture. Both targets ran the X11 and Wayland lifecycle
+tests, Orca, Japanese composition, scale transitions, four font cases,
+private portal tests and all sixteen loopback transport scenarios.
+[Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).
+
+| Ubuntu target | Startup, Rust / limit | Scan reopen p95, Rust / limit | Scan close p95, Rust / limit | Complete archive SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| x64 | 177.27 / 1,059.924 ms | 1.00 / 15.70 ms | 0.45 / 15.91 ms | `9140f6d7de06c69cf7613a520a7b96be5baac1db0951ece0fef1be8f47e19bf0` |
+| ARM64 | 212.77 / 1,508.724 ms | 0.94 / 16.01 ms | 0.38 / 15.56 ms | `530df797129d78886cff29b4a77fd499d0a1daf42a20f6e0c1c3d55a2e616c2b` |
+
+Each Ubuntu target also completed two online SQLite backups, 40 C# storage
+assertions, eight recoveries with 208 C# assertions, and the YAML
+comparison with 183 Rust assertions and 116 C# assertions. A separate SQL
+reader reopened each archived C# casing database in memory, checked its
+integrity, schema and all four tables, and matched all 15 Rust lookup results
+in each comparison mode on both hosts. The hosted fixture recorded ten
+additional controls per host. Both targets produced identical fixture
+database bytes for each mode. The retained native readback has SHA-256
+`33d803a9ded82aeac9188dc00e29ab133f09815a59fcc216e1d45d1403477533`,
+and the SQL readback has
+`e620a9fd356c2a40ef15ab913ab5dd6479bd26db8ebffd4c87976bf7fd9828ba`.
+[Stored-key experiment](rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles)
+· [Native notice and SPDX replay](rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
+On both Windows targets the ordinary second launch on the original desktop
+reopened a window using the existing primary and worker. The private
+launches created the windows on the original desktop, and both secondary
+jobs counted a second, unidentified process. The Windows launcher checks
+failed. [Native launcher observations](rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

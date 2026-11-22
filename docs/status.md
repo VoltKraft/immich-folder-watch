@@ -1,5 +1,27 @@
 # Project Status
 
+## Ubuntu desktop, storage and native notices (2026-11-23)
+
+Both Ubuntu desktop jobs passed at `0a2b5ca`. Replaying the three
+100,000-file trials per target reproduced all eleven X11 response and
+resource checks. Direct SQL on the archived C# databases matched all
+30 stored-key answers per target. The two published development notice
+ZIPs and SPDX inventories reproduced byte-for-byte from their native
+compiler receipts. [Native results](rust/rw02-native-gui.md#native-follow-up-at-0a2b5ca)
+· [Original notices](rust/rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
+Commit `8e32c84` requires evidence that the original Windows Shell process
+actually exited before accepting a missing tray icon during shutdown.
+The retained and canonical GUI source checks at `ccf42f1` matched on all
+four target graphs. Commit `dff8cb0` corrected the Windows build of the
+private SQLite study directory. Its normal Fedora storage run passed all
+16 steps. Commit `17b3199` added ordered Shell registration and removal
+observations. Independent review found the ordinary activation result
+still needed to require the initially observed Shell process. That
+correction and native Windows execution are the next RW-02 work.
+[GUI dependency verification](rust/rw02-gui-dependencies.md#windows-notification-area-bindings)
+· [Storage example](rust/rw02-legacy.md#windows-storage-example-compilation).
+
 ## Runtime selection and Windows launcher evidence (2026-11-22)
 
 RW-01 is accepted. RW-02 remains active. At `0a2b5ca` all four hosted
