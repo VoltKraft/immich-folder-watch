@@ -7,6 +7,38 @@ The existing native evidence at `8a8adaa400abc7303335c624ea68abed197158da` cover
 | Windows x64 | `45bf0b4692000ee767a86e48ab9af9c49acc32d22e596836eb1c0396ba75a3f4` | `515a84bba5cb6e2d846ab8cefab15412da080edc09f4162e90edd5ecc7dd2b5d` |
 | Windows ARM64 | `438eec56d536f6f6feeacc18d904532757b20b3888dfe46652e2259deec18f5c` | `98baf7647253448f20d9707efcf1a99a3d785c7f28955721c0d7af8ddb569579` |
 
+## Hosted console results
+
+Two subsequent source revisions measured the WTS protocol and active display
+paths. All four observations found one addressable 1024 × 768 monitor at 96 DPI,
+one active CCD path and WTS console protocol 0 in session 2. Each subject
+used DX12 on the Microsoft Basic Render Driver and drained normally.
+The real x64 filename retained focus and showed changed pixels. The ARM64
+field was readable, but could not acquire foreground focus on the original
+console. For both architectures the mixed-DPI and RDP rendering results are
+unmeasured. [Run at 45dc03b](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44950398558) · [Run at d403fee](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306)
+
+| Revision | Windows | Source frame changed pixels / columns / rows | Display result SHA-256 |
+| --- | --- | --- | --- |
+| `45dc03b` | x64 | 681 / 86 / 18 | `25059ccb2cf2cb08ccf072f5321dd3e4f0a83172a83eb4fb2de6741aeb9e1cd6` |
+| `45dc03b` | ARM64 | Focus unavailable | `d67433cbde6707ca71fa37c4c1b0ab148df3e179c6affb1a9bd0ac7169a88f73` |
+| `d403fee` | x64 | 645 / 84 / 18 | `4aafa8175d8e2bb0f8741c1bd034eeb9bd140ee2bf4cc630de09694ca6bb4d43` |
+| `d403fee` | ARM64 | Focus unavailable | `27fe8068d687abb9504b4b537ade3a4db6e33a74df47be1d117606d23dce163b` |
+
+The archived SHA-256 manifests covered the native reports, logs and retained
+field images. Replaying the two original x64 PNG pairs reproduced all six
+pixel counts. All fourteen observer input hashes per report matched the
+revision, including Windows checkout line endings on three shared scripts.
+[Four-target archive identifiers](rw02-native-gui.md#native-follow-up-at-d403fee).
+
+GitHub documents the two standard VM labels and their CPU, memory and disk
+specifications. The observed jobs supplied a console already in use by the
+test, with one active output. Windows can reconfigure existing display paths.
+The indirect display model for an additional virtual monitor needs a display
+driver to announce its arrival. A second configured display and an active RDP
+session therefore remain external prerequisites for the observations below.
+The older receipts did not inventory inactive targets. [GitHub-hosted runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) · [Windows display configuration](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setdisplayconfig) · [Indirect display monitor arrival](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/iddcx-objects)
+
 ## Native observation
 
 Run after the canonical Rust GUI build on the matching Windows target. Output goes to the new `artifacts/rust/gui-native/<target>/windows-display/` directory. The fixture verifies the PE architecture, Git revision, binary digest, compiler sources, audited dependency graph and fonts. It pins the verified image, starts it in its own kill-on-close job, and limits the application profile to fresh temporary directories. [Display runner](../../tools/rust-qa/windows-display/run.py) · [Build verification](../../tools/rust-qa/windows-text/run.py)
@@ -16,15 +48,54 @@ python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
 python3 tools/rust-qa/windows-display/run.py "$NATIVE_TARGET"
 ```
 
-A separate invocation on an expressly authorized disposable native Windows VM uses `--isolated-vm`. This requires an already active, unlocked console or RDP session on its Default input desktop. On a native x64 VM, run the following after the canonical x64 build.
+### Required observations on a disposable native desktop
+
+Use a dedicated Windows x64 or ARM64 test VM with the matching MSVC build
+tools, Windows SDK, native Python, Git Bash and a working system UI Automation
+PowerShell host. Use the same rewrite revision for the build and both
+observations. The repository's compiler installer verifies and installs the
+selected native toolchain inside the checkout. In Git Bash on x64, build once
+from the repository root. Use `aarch64-pc-windows-msvc` for the ARM64 VM.
+[Native prerequisites](../development.md#rust-feasibility-workspace) · [Compiler installer](../../tools/rust-qa/install-toolchain.sh)
+
+```bash
+target=x86_64-pc-windows-msvc
+bash tools/rust-qa/install-toolchain.sh "$target"
+export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+python3 tools/rust-qa/build-gui-probe.py "$target"
+```
+
+Run the observer from a terminal in the active, unlocked Default input
+desktop. Keep the test window visible and unobstructed. For mixed DPI the
+desktop must extend across two independently addressable monitors with
+different Windows scaling, for example 100% and 150%. Allow enough usable
+space on both screens for the scaled 640 × 400 logical client and its frame.
+For the RDP trial use an already connected session to the disposable host
+and launch the observer inside that session. A single monitor is sufficient
+for the RDP rendering check. A client that presents multiple monitors can
+supply both trials in one session when Windows actually reports two DPI values.
+[Remote Desktop multimonitor behavior](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc) · [WTS protocol values](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_info_class)
 
 ```powershell
-python tools/rust-qa/windows-display/run.py x86_64-pc-windows-msvc --isolated-vm
+$target = 'x86_64-pc-windows-msvc'
+python tools/rust-qa/windows-display/run.py $target --isolated-vm --require mixed-dpi
+python tools/rust-qa/windows-display/run.py $target --isolated-vm --require rdp
 ```
+
+Run each command in its corresponding desktop. Repeating `--require` on
+one command requires both results from that session. Each required run prints
+a fresh result path under `artifacts/rust/gui-native/<target>/windows-display-runs/`.
+Keep that full run directory together with the target's `build.json` and
+`graph.json`. The receipt identifies the source, binary and original build
+digest. An unmet requested observation returns a nonzero exit and lists the
+missing qualification, including when the ordinary inventory succeeded.
+The hosted workflow continues to collect the available topology in
+`windows-display/`.
 
 | Field in `result.json` | Observation |
 | --- | --- |
 | `inventoryPassed` | The source-bound DX12 process, visible HWND, window DPI and real German filename field occupy the same measured display. The report includes the addressable HMONITORs and work areas, active DisplayConfig paths where available, physical client and DWM bounds, WTS protocol and session state. |
+| `possibleTargets` | One read of all CCD source-to-target combinations groups duplicate paths by adapter LUID and target ID. It records the native target-available and path-active flags separately. An available inactive target has no demonstrated window DPI or frame. |
 | `sourceFrameObserved` | The current input desktop allowed the observer to focus the owned filename, change its synthetic text, verify two distinct physical field frames and restore the control text. An unavailable foreground or obscured field can leave a valid one-monitor inventory. |
 | `mixedDpiPassed` | The same foreground Rust HWND moved between two addressable displays with independently measured different DPI. Its focused field retained the fixed text across the move. The window DPI, physical field height and fixed three-character range followed the new scale. Another field edit changed the drawn pixels on that monitor. |
 | `rdpSessionObserved`, `rdpRenderer`, `rdpRenderingObserved` | WTS protocol 2 identifies an existing RDP session. The application adapter and HWND are bound to that session. The raster proof runs on the source display before any mixed-DPI move. Console sessions and unmeasured raster results retain their own status. |
@@ -33,7 +104,12 @@ The observer queries active DisplayConfig paths and maps their GDI sources to th
 
 All text operations resolve the fixed process’s `Dateiname` editor through UI Automation. The physical crop is limited to the verified synthetic field. The recorder checks every point against the owned HWND before and after capture. Two same-position screenshots, matching hashes and changed row and column counts witness a new drawn frame. The mixed-DPI comparison allows pixel rounding at both measured scales. The fixture changes only its observer thread’s DPI context and the position of the owned test window. It closes the GUI through its native close message, observes the hidden window and renderer release, drains the supervisor and removes the temporary profile. [Field observer](../../tools/rust-qa/windows-display/field.ps1) · [Existing ownership and hit tests](../../tools/rust-qa/windows-text/Pointer.cs)
 
-A null qualification and its recorded prerequisite indicate an unmeasured case. Mixed DPI and RDP remain unmeasured when the respective prerequisites are absent. The new observer has seven passing portable checks for Win32 layouts, topology changes, input eligibility, geometry, focus and frame evidence. PowerShell 7.7 parsed the field observer and compiled its shared native bridge. Native execution of this observer is pending. [Regression checks](../../tools/rust-qa/windows-display/test_display.py)
+A null qualification and its recorded prerequisite indicate an unmeasured case.
+Ten portable checks cover Win32 layouts, active and possible paths, input
+eligibility, geometry, focus, frame evidence and retention of failed qualification
+attempts. PowerShell 7.7 parsed the field observer and compiled its shared native
+bridge. The additional possible-target inventory and strict invocation await a
+native run. [Regression checks](../../tools/rust-qa/windows-display/test_display.py) · [Windows active and possible paths](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) · [Target identification and availability](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_target_info)
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/windows-display -p 'test_*.py'

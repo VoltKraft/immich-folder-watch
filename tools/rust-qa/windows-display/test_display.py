@@ -1,12 +1,16 @@
 """Check evidence qualification without substituting test data for Windows observations."""
 
 import ctypes as c
+from contextlib import redirect_stdout
 import hashlib
+import io
+import json
 from pathlib import Path
 import runpy
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 import zlib
 
 DRIVER = runpy.run_path(str(Path(__file__).with_name("run.py")))
@@ -54,7 +58,9 @@ class DisplayTests(unittest.TestCase):
         native = Topology.__new__(Topology)
         for code, status in ((5, "unavailable"), (50, "unavailable"), (87, "failed")):
             native.buffer_sizes = lambda *_: code
-            self.assertEqual(native.active_paths({}), {"status": status, "api": "GetDisplayConfigBufferSizes", "win32": code})
+            for all_targets in (False, True):
+                self.assertEqual(native.display_paths({}, all_targets=all_targets),
+                                 {"status": status, "api": "GetDisplayConfigBufferSizes", "win32": code})
 
     def test_active_paths_retry_and_join_the_queried_source_monitor(self):
         native = Topology.__new__(Topology)
@@ -76,9 +82,70 @@ class DisplayTests(unittest.TestCase):
             ptr._obj.device = "DISPLAY3"
             return 0
         native.buffer_sizes, native.query, native.source_name = sizes, query, source_name
-        rows = native.active_paths({"display3": 2})["paths"]
+        rows = native.display_paths({"display3": 2})["paths"]
         self.assertEqual(calls, [2, 2])
         self.assertEqual((rows[0]["monitor"], rows[0]["sourceMode"], rows[0]["active"]), (2, [0, 0, 1440, 900], True))
+
+    def test_all_paths_count_distinct_adapter_targets_and_record_inactive_availability(self):
+        native = Topology.__new__(Topology)
+        def sizes(flags, paths, modes):
+            self.assertEqual(flags, 1)
+            paths._obj.value, modes._obj.value = 4, 1
+            return 0
+        def query(flags, count, paths, mode_count, modes, topology_id):
+            self.assertEqual(flags, 1)
+            self.assertIsNone(topology_id)
+            rows = [(0, 7, True, True), (0, 7, False, True), (1, 7, False, True), (1, 8, False, False)]
+            for path, (adapter, target_id, active, available) in zip(paths, rows):
+                path.target.adapter.low, path.target.id = adapter, target_id
+                path.flags, path.target.available = int(active), int(available)
+            return 0
+        native.buffer_sizes, native.query = sizes, query
+        report = native.display_paths({}, all_targets=True)
+        self.assertEqual(report["pathCount"], 4)
+        self.assertEqual([(r["adapterLuid"], r["targetId"], r["active"], r["available"]) for r in report["targets"]],
+                         [([0, 0], 7, True, True), ([0, 1], 7, False, True), ([0, 1], 8, False, False)])
+        def large_inventory(flags, count, modes):
+            count._obj.value, modes._obj.value = 10000, 1
+            return 0
+        native.buffer_sizes = large_inventory
+        self.assertEqual(native.display_paths({}, all_targets=True)["status"], "unavailable")
+
+    def test_explicit_qualification_cannot_pass_on_inventory_or_a_console_frame(self):
+        required = ["mixed-dpi", "rdp"]
+        report = {"inventoryPassed": True, "sourceFrameObserved": True,
+                  "rdpSessionObserved": False, "rdpRenderingObserved": None, "mixedDpiPassed": None}
+        missing = DRIVER["unmet_qualifications"]
+        self.assertEqual(missing(report, required), required)
+        rdp = {**report, "rdpSessionObserved": True, "rdpRenderingObserved": False}
+        self.assertEqual(missing(rdp, ["rdp"]), ["rdp"])
+        self.assertEqual(missing({**rdp, "rdpRenderingObserved": True}, required), ["mixed-dpi"])
+        self.assertEqual(missing({**rdp, "mixedDpiPassed": True}, required), ["rdp"])
+        self.assertEqual(missing({**rdp, "mixedDpiPassed": True, "rdpRenderingObserved": True}, required), [])
+
+    def test_qualified_runs_preserve_failed_attempts_and_return_distinct_exit_codes(self):
+        assess = DRIVER["assess"]
+        records = []
+
+        def observe(_target, build_dir, output, profile, report, *, require_interactive):
+            self.assertTrue(require_interactive)
+            self.assertTrue(profile.is_dir())
+            self.assertEqual(output.parent.parent, build_dir)
+            report.update(inventoryPassed=True, sourceFrameObserved=True, rdpRenderingObserved=len(records) == 1)
+            records.append(output / "result.json")
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(assess.__globals__, measure=observe), redirect_stdout(io.StringIO()):
+            root = Path(tmp)
+            self.assertEqual(assess("x86_64-pc-windows-msvc", root, ["rdp"], require_interactive=True), 1)
+            first = records[0].read_bytes()
+            self.assertEqual(assess("x86_64-pc-windows-msvc", root, ["rdp"], require_interactive=True), 0)
+            self.assertNotEqual(*records)
+            self.assertEqual(first, records[0].read_bytes())
+            self.assertEqual((json.loads(first)["status"], json.loads(first)["unmetQualifications"]), ("requirements-unmet", ["rdp"]))
+            self.assertEqual(json.loads(records[1].read_bytes())["status"], "observed")
+            for receipt in records:
+                self.assertTrue(json.loads(receipt.read_bytes())["profileRemoved"])
+                self.assertIn(hashlib.sha256(receipt.read_bytes()).hexdigest(), (receipt.parent / "evidence.sha256").read_text())
 
     def test_uia_geometry_must_match_both_subject_and_physical_display(self):
         row = {"status": "observed", "pid": 1, "hwnd": 2, "field": "Dateiname", "expectedText": "fixture",

@@ -28,6 +28,7 @@ from topology import Topology, active_input, contains, physical_coordinates, pro
 
 TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
 FIRST, SECOND = "IFW MMMM 27.jpg", "IFW IIII 27.jpg"
+QUALIFICATIONS = {"mixed-dpi": "mixedDpiPassed", "rdp": "rdpRenderingObserved"}
 
 
 def wait_for(read, label, timeout=35):
@@ -150,14 +151,14 @@ def stop_subject(proc, _rust):
             proc.wait(timeout=10)
 
 
-def measure(target, output, profile, report, *, require_interactive):
+def measure(target, build_dir, output, profile, report, *, require_interactive):
     api, display, processes = Desktop(), Topology(), Win32()
     binary = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
     env = environment(profile)
     with ExitStack() as resources:
         resources.enter_context(physical_coordinates(api))
         resources.enter_context(pin_path(processes, binary, False))
-        report["build"] = TEXT["check_build"](target, binary, output.parent)
+        report["build"] = TEXT["check_build"](target, binary, build_dir)
         context = api.context()
         report["desktop"] = {**context, **{key: (context[key] if context[key] in ("Default", "WinSta0") else "other")
                                            for key in ("inputDesktop", "threadDesktop", "windowStation")}}
@@ -166,6 +167,8 @@ def measure(target, output, profile, report, *, require_interactive):
         if require_interactive and not active_input(context, transport):
             raise RuntimeError("The selected test VM must already have an active, unlocked console or RDP input desktop")
         inventory = report["topology"] = display.inventory(api)
+        # Inactive connectors can be available even when only one HWND destination is active.
+        report["possibleTargets"] = display.display_paths({}, all_targets=True)
         ps, attempts = select_powershell(profile, "accessibility")
         report["observerHosts"] = [{k: v for k, v in row.items() if k != "diagnostic"} for row in attempts]
         if not ps:
@@ -290,38 +293,61 @@ def measure(target, output, profile, report, *, require_interactive):
         raise RuntimeError("The owned Rust supervisor did not close and drain normally")
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
-    parser.add_argument("--isolated-vm", action="store_true", help="explicitly authorized disposable Windows VM and current test desktop")
-    args = parser.parse_args()
-    hosted_job = hosted() and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch" and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust"
-    if (os.name != "nt" or not (hosted_job or args.isolated_vm)
-            or (os.getenv("GITHUB_ACTIONS") == "true" and not hosted_job)):
-        parser.error("Use the native rewrite job or an expressly authorized isolated Windows test VM")
-    output = ROOT / "artifacts/rust/gui-native" / args.target / "windows-display"
-    output.mkdir(exist_ok=False)
+def unmet_qualifications(report, required):
+    return [name for name in required if report.get(QUALIFICATIONS[name]) is not True]
+
+
+def assess(target, build_dir, required, *, require_interactive):
+    if required:
+        runs = build_dir / "windows-display-runs"
+        runs.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(prefix="-".join(required) + "-", dir=runs))
+    else:
+        output = build_dir / "windows-display"
+        output.mkdir(exist_ok=False)
     inputs = [*sorted(HERE.glob("*.py")), HERE / "field.ps1", QA / "windows-text/run.py", QA / "windows-text/evidence.py",
               QA / "windows-text/Pointer.cs", QA / "windows-performance/native.py", QA / "observe-windows-gui.py",
               QA / "observe-windows-input.ps1", QA / "windows_observer.py", QA / "windows-desktop/run.py",
               QA / "windows-desktop/win32.py", QA / "windows-desktop/worker.py"]
-    report = {"status": "failed", "target": args.target, "run": os.getenv("GITHUB_RUN_ID"), "attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+    report = {"status": "failed", "target": target, "run": os.getenv("GITHUB_RUN_ID"), "attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
               "inventoryPassed": False, "sourceFrameObserved": None, "mixedDpiPassed": None, "rdpRenderingObserved": None,
               "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in inputs}}
     profile = None
     try:
         with tempfile.TemporaryDirectory(prefix="ifw-display-", dir=output) as tmp:
             profile = Path(tmp)
-            measure(args.target, output, profile, report, require_interactive=not hosted_job)
+            measure(target, build_dir, output, profile, report, require_interactive=require_interactive)
         report["status"] = "observed"
     except Exception:
         report["error"] = traceback.format_exc()
     report["profileRemoved"] = None if profile is None else not profile.exists()
+    report["requiredQualifications"] = required
+    report["unmetQualifications"] = unmet_qualifications(report, required)
+    if report["status"] == "observed" and report["unmetQualifications"]:
+        report["status"] = "requirements-unmet"
     write_json(output / "result.json", report)
     (output / "evidence.sha256").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in sorted(output.iterdir()) if p.is_file()),
                                            encoding="utf-8", newline="\n")
+    print(output / "result.json")
     print(report.get("error") or f"Inventory observed, mixed DPI={report['mixedDpiPassed']}, RDP rendering={report['rdpRenderingObserved']}")
     return 0 if report["status"] == "observed" and report["inventoryPassed"] and report["profileRemoved"] else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
+    parser.add_argument("--isolated-vm", action="store_true", help="explicitly authorized disposable Windows VM and current test desktop")
+    parser.add_argument("--require", action="append", choices=sorted(QUALIFICATIONS), default=[],
+                        help="require the actual observation for success, repeat to require both in one session")
+    args = parser.parse_args()
+    hosted_job = hosted() and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch" and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust"
+    if (os.name != "nt" or not (hosted_job or args.isolated_vm)
+            or (os.getenv("GITHUB_ACTIONS") == "true" and not hosted_job)):
+        parser.error("Use the native rewrite job or an expressly authorized isolated Windows test VM")
+    build_dir = ROOT / "artifacts/rust/gui-native" / args.target
+    if not (build_dir / "build.json").is_file():
+        parser.error("Build the canonical native GUI for this target before observing its display")
+    return assess(args.target, build_dir, sorted(set(args.require)), require_interactive=not hosted_job)
 
 
 if __name__ == "__main__":

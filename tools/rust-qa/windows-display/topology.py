@@ -91,6 +91,19 @@ def contains(outer, inner):
     return rect_area(inner) > 0 and outer[0] <= inner[0] and outer[1] <= inner[1] and outer[2] >= inner[2] and outer[3] >= inner[3]
 
 
+def target_inventory(paths):
+    """Count each adapter/target once across the source-to-target path combinations."""
+    targets = {}
+    for path in paths:
+        target = path.target
+        key = (target.adapter.high, target.adapter.low, target.id)
+        row = targets.setdefault(key, {"adapterLuid": list(key[:2]), "targetId": target.id,
+                                       "active": False, "available": False})
+        row["active"] |= bool(path.flags & 1)
+        row["available"] |= bool(target.available)
+    return {"status": "observed", "pathCount": len(paths), "targets": [targets[k] for k in sorted(targets)]}
+
+
 class Topology:
     def __init__(self):
         user = c.WinDLL("user32", use_last_error=True)
@@ -112,22 +125,29 @@ class Topology:
     def awareness(self, hwnd):
         return self.get_awareness(check(self.get_context(hwnd), "GetWindowDpiAwarenessContext"))
 
-    def active_paths(self, by_device):
+    def display_paths(self, by_device, *, all_targets=False):
         def failure(api, status):
             return {"status": "unavailable" if status in (5, 50) else "failed", "api": api, "win32": status}
+        # QDC_ALL_PATHS inventories connectors. QDC_ONLY_ACTIVE_PATHS describes the desktop geometry.
+        flags = 1 if all_targets else 2
         for _ in range(5):
             num_paths, num_modes = U32(), U32()
-            status = self.buffer_sizes(2, c.byref(num_paths), c.byref(num_modes))
+            status = self.buffer_sizes(flags, c.byref(num_paths), c.byref(num_modes))
             if status:
                 return failure("GetDisplayConfigBufferSizes", status)
             if not 0 < num_paths.value <= 512 or not 0 < num_modes.value <= 2048:
+                if all_targets:
+                    return {"status": "unavailable", "reason": "Possible path counts are outside the observation bounds",
+                            "pathCount": num_paths.value, "modeCount": num_modes.value}
                 raise RuntimeError("Unexpected active display configuration size")
             paths, modes = (DisplayPath * num_paths.value)(), (Mode * num_modes.value)()
-            status = self.query(2, c.byref(num_paths), paths, c.byref(num_modes), modes, None)  # QDC_ONLY_ACTIVE_PATHS
+            status = self.query(flags, c.byref(num_paths), paths, c.byref(num_modes), modes, None)
             if status == 122:  # ERROR_INSUFFICIENT_BUFFER if the topology changed between the two calls.
                 continue
             if status:
                 return failure("QueryDisplayConfig", status)
+            if all_targets:
+                return target_inventory(paths[:num_paths.value])
             rows = []
             for path in paths[:num_paths.value]:
                 source, target = path.source, path.target
@@ -149,6 +169,9 @@ class Topology:
                     row["sourceMode"] = [s.x, s.y, s.width, s.height]
                 rows.append(row)
             return {"status": "observed", "paths": rows}
+        if all_targets:
+            return {"status": "unavailable", "api": "QueryDisplayConfig", "win32": 122,
+                    "reason": "Possible paths changed throughout the observation"}
         raise RuntimeError("The display configuration kept changing")
 
     def inventory(self, api):
@@ -189,4 +212,4 @@ class Topology:
         if not monitors:
             raise RuntimeError("No monitor accepted a private per-monitor DPI witness")
         return {"monitorCountMetric": self.metric(80), "nonaddressable": nonaddressable,
-                "monitors": monitors, "displayConfig": self.active_paths(devices)}
+                "monitors": monitors, "displayConfig": self.display_paths(devices)}
