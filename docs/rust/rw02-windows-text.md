@@ -37,8 +37,25 @@ Both Arabic cases ended with an unclassified error before recording the edited
 text. The revised observer records whether the guarded Delete completed,
 reopens both UIA text patterns from the focused normal field and requires
 their exact results. It records the native exception type and HRESULT if a
-read fails. Only read operations can repeat. The new native runs are pending.
+read fails. Only read operations can repeat.
 [Archived observations](rw02-native-gui.md#native-follow-up-at-d403fee).
+
+At `a66e045` the ordinary x64 and ARM64 GUIs completed all three edits in
+the table above. Both observers read back eight distinct glyph masks,
+the exact three caret sequences and the expected character and offset for
+each drag. After native Delete both UI Automation text interfaces returned
+the expected filename in every case. Both subjects exited with code zero
+and their jobs drained. The ARM64 test used its private active desktop
+after a different process covered the field on the original desktop.
+The x64 test used its original desktop.
+
+| Native GUI | Ordinary editor result SHA-256 |
+| --- | --- |
+| Windows x64 | `0284ca7aada43e91dccb6132a18113c81b1e8301c71f3977d7d808dc955b241c` |
+| Windows ARM64 | `d860c81aeff3ea94aa8b524bccc06d5c4ea260b2a8f91cf43edb7dae3a7e0c6e` |
+
+[Native archives](rw02-native-gui.md#native-follow-up-at-a66e045) and
+[separate font probe](rw02-font-coverage.md#windows-x64-input-timeout-at-a66e045).
 
 ```sh
 python3 -m unittest discover -s tools/rust-qa/windows-text -p 'test_*.py' -v

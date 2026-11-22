@@ -48,20 +48,22 @@ On 2026-11-21 the native Fedora x64 compiler produced 402 build-host/target unit
 
 An initial pointer-retention control passed the Cargo and text checks while the ELF contained neither the eframe entry nor its Vulkan backend. The actual UI function pointer, headless entry call and independent symbol witness address this observed gap. An initial targeted Cargo update also changed unrelated dependency edges during the LGPL control. The lock verifier rejected it before linking. Regenerating the complete private control lock offline preserved every other dependency edge. [Native checks](../../tools/rust-qa/combined-profile/native.py) · [Lock and missing-unit controls](../../tools/rust-qa/combined-profile/test_profile.py)
 
-At `a66e045` the Ubuntu x64 and ARM64 builds repeated the native smoke
-and offline Wayland rebuild. Only the deliberately changed blur interface
-version changed in the smoke output. Each of the 21 indexed outputs and
-68 source hashes per target was verified. Windows x64 built and ran its
-native smoke with 250 packages and 281 compiler units. Its 16 output
-digests and 68 source bindings agreed, including seven files checked out
-with CRLF. The Windows smoke retained the eframe function pointer and
-checked the Shell interface layout. A visible desktop has separate tests.
+At `a66e045` all four native hosts reproduced the same Cargo lock from an
+empty directory, compiled the combined profile and ran its smoke test. Both
+Ubuntu hosts also rebuilt the modified Wayland dependency offline. The blur
+interface version changed from 1 to 2 and every other smoke value matched.
+All 21 indexed outputs on each Ubuntu host and all 16 on each Windows host
+matched their hashes. Each host bound 68 source files to the tested revision,
+including seven files checked out with CRLF on Windows. The Windows smoke
+retained the eframe function pointer and checked the Shell interface layout.
+The interactive desktop observations use separate executables.
 
 | Host | Native packages / compiler units | Archived result SHA-256 |
 | --- | ---: | --- |
 | Ubuntu x64 | 337 / 402 | `127623e7888d25bc9c7e663c3b83ff01b74de131b5069aee7482deb3f7766eaf` |
 | Ubuntu ARM64 | 336 / 401 | `0fdd486ee263e298d2c6e8726b1e8a3ea9812f53dc68e78c490e8dfa7ee789e3` |
 | Windows x64 | 250 / 281 | `7967cdf54de0caa86b46017a96e94c39deb25135f0002029c7e173cb784fae94` |
+| Windows ARM64 | 249 / 280 | `8cdc361ceb3fd0f1f4616a7fa34cf90b87d6936dc5af8e04e53ca4dad3ef9bc9` |
 
 [Native assessment and ZIPs](rw02-native-gui.md#native-follow-up-at-a66e045).
 

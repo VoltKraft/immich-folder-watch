@@ -33,20 +33,30 @@ the controller's `TokenHasRestrictions` flag. The observer attempted a four-byte
 read and exited before either trial launched its Rust writer. Cleanup removed
 the temporary profiles. The observer now interprets both the observed Boolean
 and the documented DWORD representation, and rejects unexpected widths.
-The actual cross-session lock sequence at standard or ambient authority
-requires its own native result. [Latest four-target run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306)
+Those runs ended before either cross-session lock sequence. [Four-target run at `d403fee`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306)
 and [token information classes](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class).
 
 ## Native reproduction
 
-At `a66e045`, Windows x64 completed both native refusal directions and
-reacquired the guard with the same account in sessions 2 and 0. Seven
-participant exits, unchanged logon rights and cleanup were verified. These
-were the runner's existing elevated tokens. The independent standard-user
-trial stopped before acquiring the guard because Secondary Logon was stopped.
-The evidence index verified all 37 files. The overall writer result SHA-256 is
-`110092561468270c6980c0bfc5d536b4479703117f7f62fab4bc1281e5685032`.
-[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+At `a66e045`, Windows x64 and ARM64 each exercised the same elevated
+account in console session 2 and scheduled S4U session 0. While session 2
+held the guard, the contender in session 0 was refused. After release,
+session 0 acquired the same file and the session 2 contender was refused.
+Session 2 then reacquired and released it. Both observers verified seven
+participant exits, unchanged batch-logon rights and removal of the
+temporary profile. All 37 indexed files matched their hashes on each host.
+
+On both hosts Secondary Logon was stopped. Neither Basic User participant
+launched, so both overall results report an elevated pass and a failed
+standard-user trial. A handover between two logged-on standard desktops
+remains open.
+
+| Native host | Overall writer result SHA-256 |
+| --- | --- |
+| Windows x64 | `110092561468270c6980c0bfc5d536b4479703117f7f62fab4bc1281e5685032` |
+| Windows ARM64 | `2914248082d7c9f59c512d5e8194bf9372ebc71df19598a2b6baf5fe18fac2e7` |
+
+[Native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
 
 The hosted wrapper records the installed service's state and startup type.
 For a stopped, startable service it requests a temporary start on the disposable
@@ -73,7 +83,7 @@ python tools/rust-qa/instance/cross-session/existing.py controller x86_64-pc-win
 python tools/rust-qa/instance/cross-session/existing.py peer x86_64-pc-windows-msvc $PrintedFixtureDirectory
 ```
 
-Seventeen local tests passed, including an actual two-session POSIX rehearsal using the pinned native Rust writer. They cover changed authority, false or misattributed lock responses, cleanup failures and independent reporting. The Windows trials above await native execution of this version. The manual two-desktop route reports `standardUserGuardPassed` for its own result and leaves `ambientGuardPassed` unmeasured. [Regression tests](../../tools/rust-qa/instance/cross-session/test_fixture.py)
+Seventeen local tests passed, including an actual two-session POSIX rehearsal using the pinned native Rust writer. They cover changed authority, false or misattributed lock responses, cleanup failures and independent reporting. The manual two-desktop route reports `standardUserGuardPassed` for its own result and leaves `ambientGuardPassed` unmeasured. [Regression tests](../../tools/rust-qa/instance/cross-session/test_fixture.py)
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/instance/cross-session -p 'test_*.py'

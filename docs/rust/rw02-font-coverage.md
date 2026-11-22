@@ -225,6 +225,17 @@ The x64 ZIP SHA-256 is `cdba4f57b20c8514ffdc3cb6b0ca96922f0a90e03a0c42af4ce4839f
 [Windows field observer](../../tools/rust-qa/windows-text/observe.ps1)
 and [Microsoft PostMessageW delivery contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew).
 
+The Windows ARM64 standalone run completed all four cases on its private
+active desktop. Its mixed field produced the same frame hash as x64 and
+returned logical offsets [4, 3, 4] at pixels [74, 85, 74]. It selected
+and deleted THEH. With digits it returned [3, 4, 3] at [71, 88, 71] and
+deleted TEH. The raster identified TEH to the left of the digits and BEH
+to their right with overlaps of 0.797 and 0.803. Each interactive ARM64
+case recorded five pointer placements on the owned foreground window.
+Both architectures ran before the added egui event logging. The ARM64
+result SHA-256 is `898a485b1a9f561d33db2be6b92566adf6121bc62554d6526a1ddb1ecb400ed6`.
+[Native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 The standalone fixture now records client coordinates, foreground and hit
 ownership, cursor readback and the return of each posted pointer command.
 The Rust field records egui's incoming pointer and window focus events per
@@ -244,5 +255,5 @@ four cases on private X11. The mixed field received down and up at (70, 52)
 in passes 7 and 10. Its result SHA-256 is
 `6d093712c5807d4edf9fd9b5d47d0b8bbd190472fa608446af81453b85649d60`.
 Seven portable controls passed. Replaying the reported acceptance values
-accepted the completed Linux x64/ARM64 and earlier Windows x64 runs and
-rejected the incomplete Windows x64 run.
+accepted the completed Linux x64/ARM64, Windows ARM64 and earlier
+Windows x64 runs and rejected the incomplete Windows x64 run at `a66e045`.

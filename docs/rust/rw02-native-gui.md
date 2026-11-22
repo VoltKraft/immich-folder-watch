@@ -200,6 +200,7 @@ tested `a66e0456a85a62844e2de2fd155aaeac3577f87c`.
 | Ubuntu x64 | 14760086825 | 19,080,621 | `952af7287fdc998da81b8ee60b78ffc6624c34b2c9669df26068440cc3b83367` |
 | Ubuntu ARM64 | 14759414052 | 19,072,390 | `a8485efb20406d82b35a2132932ff19e1913cfe5c0e973af3b1e7ef362448e91` |
 | Windows x64 | 14759798302 | 16,166,162 | `cdba4f57b20c8514ffdc3cb6b0ca96922f0a90e03a0c42af4ce4839f8ccce12c` |
+| Windows ARM64 | 14760717709 | 16,190,262 | `d948467208066df5859e32c062074e6623cc83939086f1874ce2aa07bdcefef9` |
 
 Both Ubuntu targets passed all eight WAL recovery cases, their offline combined
 builds and modified Wayland relinks, and the Noble Documents portal comparison.
@@ -215,18 +216,31 @@ graphics experiment still uses its original digest.
 [storage fault evidence](rw02-storage-faults.md), [combined profile](rw02-combined-profile.md)
 and [Noble portal](rw02-portal-noble.md).
 
-Windows x64 passed the ordinary mixed-direction editor, real Japanese IME
-composition and NVDA speech/clipboard. The standalone font probe timed out
-waiting for the caret after its first mixed-text click. The ambient writer
-excluded its peer across two genuine OS sessions in both directions. Its
-separate standard-user launch found Secondary Logon stopped. The retained
-GUI passed the window controls. Both scan modes lacked a baseline after the
-older filesystem checksum stopped worker staging. The storage fault fixture
-stopped while copying a live SQLite WAL index before its first process kill.
-The combined profile passed its native compiler and smoke checks.
-[Japanese input](rw02-windows-ime.md#hosted-execution), [NVDA](rw02-windows-reader.md),
-[writer](rw02-cross-session.md), [storage](rw02-storage-faults.md)
-and [graphics inputs](rw02-graphics.md#local-integrated-observations).
+Both Windows targets passed all three ordinary filename edits, the NVDA
+speech and clipboard check, and the native combined-profile build and smoke
+test. The separate ARM64 font probe completed all four cases. The x64 probe
+timed out waiting for its first mixed-text caret after producing the same
+frame as ARM64. Each Windows VM exposed one active 1024 × 768 output at 96
+DPI in console session 2. Mixed-DPI moves and RDP rendering remain open.
+[Ordinary editor](rw02-windows-text.md), [standalone font probe](rw02-font-coverage.md),
+[NVDA](rw02-windows-reader.md) and [display topology](rw02-windows-display.md).
+
+The Japanese IME delivered preedit followed by a committed あ to the
+ordinary field on both hosts. Both restored the original keyboard layout,
+language list and optional capability state. The x64 trial finished. On
+ARM64, removing the temporary GUI profile raised a Windows sharing
+violation (error 32), so the composition evidence survives with failed
+cleanup. Both hosts observed their elevated same-account writers exclude
+one another across sessions 2 and 0 in both directions. The standard-user
+trials stopped before opening the guard because Secondary Logon was stopped.
+[Japanese input](rw02-windows-ime.md#hosted-execution) and [writer handover](rw02-cross-session.md).
+
+On Windows x64 the retained GUI passed the window controls. Both scan modes
+lacked a baseline after the older filesystem checksum stopped worker staging.
+The storage fault fixture stopped while copying a live SQLite WAL index
+before its first process kill. All four overall desktop jobs recorded failure.
+[Storage](rw02-storage-faults.md), [graphics inputs](rw02-graphics.md#local-integrated-observations)
+and [workflow run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002).
 
 ## First-frame regression
 

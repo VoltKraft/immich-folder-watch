@@ -90,13 +90,20 @@ The ARM64 archive SHA-256 is
 
 ## Reader-assisted editing
 
-At `a66e045`, Windows x64 repeated the native NVDA observation successfully.
-The reader remained active through the ordinary Delete and clipboard paste.
-Fifteen utterances were examined and all required spoken cues occurred in
-order. The isolated reader profile was removed after its normal Quit.
-The archived result SHA-256 is
-`77189293d23f7854fa4d260b88b0dcfc45da84fb07b1b06b0dc9b072743c9db4`.
-[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+At `a66e045`, portable x64 NVDA 2026.3.1 observed the native x64 and
+ARM64 GUIs. Its OneCore speech log recorded Dateiname, Kennwort, three
+separate password masks, English and Filename in order on both hosts.
+Each reader stayed active through ordinary Delete and the Unicode clipboard
+paste, then quit through its own window. Both temporary profiles were
+removed. The recorded utterances establish what NVDA submitted for synthesis.
+Acoustic playback remains unmeasured.
+
+| Native GUI | Utterances examined | Reader result SHA-256 |
+| --- | ---: | --- |
+| Windows x64 | 15 | `77189293d23f7854fa4d260b88b0dcfc45da84fb07b1b06b0dc9b072743c9db4` |
+| Windows ARM64 | 13 | `bc7ec5f46e995cc9cf59b4db171c3f87f9cc57ad3338f5c662cde74c8970c710` |
+
+[Native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
 
 The native reader scenario now submits the dedicated extended Delete
 scan code E0 53 through Win32 `SendInput`. Before each gesture it checks
@@ -138,5 +145,6 @@ after the recorded Delete. The revised observer checks both empty document
 and selection endpoints directly when only position zero is possible.
 Otherwise it measures the selection relative to the document. A bounded
 retry obtains fresh ranges in the same verified focused editor and retains
-the HRESULT for read failures. Native repetition is pending.
-[Hosted receipts](rw02-native-gui.md#native-follow-up-at-d403fee).
+the HRESULT for read failures. Both native repeats passed at `a66e045`.
+[Earlier receipts](rw02-native-gui.md#native-follow-up-at-d403fee) and
+[repeat results](rw02-native-gui.md#native-follow-up-at-a66e045).

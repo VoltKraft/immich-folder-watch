@@ -41,11 +41,19 @@ The older receipts did not inventory inactive targets. [GitHub-hosted runner spe
 
 ## Native observation
 
-On Windows Server x64 at `a66e045` the all-path inventory returned exactly
-one target. It was active and available. The console used one 96-DPI
-monitor and did not report an RDP transport. The stricter observer
-therefore found no second display path on that machine.
-[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+At `a66e045` Windows Server x64 and Windows 11 ARM64 each enumerated one
+1024 × 768 monitor with a 1024 × 720 work area and 96 DPI. The all-path
+DisplayConfig query returned one available, active target on each VM.
+Both used the DX12 Microsoft Basic Render Driver and WTS console session 2
+(protocol 0). Neither host exposed a second addressable target or an RDP
+session. The mixed-DPI and RDP frame results are unmeasured on both hosts.
+
+| Windows host | Filename field on the source display | Display result SHA-256 |
+| --- | --- | --- |
+| x64 | The edit changed 681 pixels across 86 columns and 18 rows. The observer restored the text. | `233acf7cb17f6e7cf05e52d939291f69a39c8541f29d43a3a5b41df55fd1658f` |
+| ARM64 | UI Automation read the field and its 280 × 22 pixel bounds. It could not focus the field for the edit, so this run captured no field frames. | `a47e08ccf16b1e44f76b0a1a1722ef587c13dec6fc096bc1f5044f398e1a1aca` |
+
+[Native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
 
 Run after the canonical Rust GUI build on the matching Windows target. Output goes to the new `artifacts/rust/gui-native/<target>/windows-display/` directory. The fixture verifies the PE architecture, Git revision, binary digest, compiler sources, audited dependency graph and fonts. It pins the verified image, starts it in its own kill-on-close job, and limits the application profile to fresh temporary directories. [Display runner](../../tools/rust-qa/windows-display/run.py) · [Build verification](../../tools/rust-qa/windows-text/run.py)
 
@@ -114,8 +122,9 @@ A null qualification and its recorded prerequisite indicate an unmeasured case.
 Ten portable checks cover Win32 layouts, active and possible paths, input
 eligibility, geometry, focus, frame evidence and retention of failed qualification
 attempts. PowerShell 7.7 parsed the field observer and compiled its shared native
-bridge. The additional possible-target inventory and strict invocation await a
-native run. [Regression checks](../../tools/rust-qa/windows-display/test_display.py) · [Windows active and possible paths](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) · [Target identification and availability](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_target_info)
+bridge. Both hosted inventories exercised the possible-target query. The
+strict mixed-DPI and RDP cases still need the corresponding native displays
+and session. [Regression checks](../../tools/rust-qa/windows-display/test_display.py) · [Windows active and possible paths](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) · [Target identification and availability](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_target_info)
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/windows-display -p 'test_*.py'
