@@ -46,6 +46,30 @@ ticks. The fixture consumer performs an authenticated HTTP read of its
 synthetic empty album inventory. [Framing](../../rust/crates/ifw-immich/src/realtime.rs)
 and [Socket.IO parser](../../tools/rust-qa/realtime/src/protocol.rs).
 
+### TLS endpoint identity
+
+The TLS observer now distinguishes a trusted issuer from a certificate that
+names the requested host. It issues two ephemeral server certificates from
+one private CA, for `127.0.0.1` and `127.0.0.2`. OpenSSL verifies each chain
+for its named address and rejects the second leaf for the first address.
+Every Rust connection goes to the private server at `127.0.0.1`. The observer
+records the TLS ClientHello independently of parsed HTTP requests and retains
+the public certificate hashes. Neither the Rust client nor the OS trusts any
+additional certificate after the process exits.
+
+The native Fedora x64 entry point passed all sixteen cases offline in a
+private loopback namespace. The matching leaf completed the Socket.IO
+upgrade and 17 HTTP requests. The valid certificate for the other address
+reached the TLS server and produced zero HTTP requests. The unrelated CA
+control also reached TLS and produced zero HTTP requests. The successful and
+wrong-address cases used the same CA digest. All seven build and test steps
+passed, including the source check for 109 registry packages and 192 notices.
+The observed wire report has SHA-256
+`e2c9b69c82811e9b9f667f6a2468a49d7bd12efab35b742eb7c6aed122c21f77`.
+The other three native targets still need to run the added case. Earlier
+four-host results cover fifteen cases. [Wire fixture](../../tools/rust-qa/realtime/verify.py)
+· [Client transport policy](../../tools/rust-qa/realtime/src/transport.rs).
+
 ## Dependency and native input review
 
 The assessment has an independent lockfile, SHA-256

@@ -113,8 +113,9 @@ def variant(work, source, rebuilt, compiler, target, run, env, native, result):
     original_exe = BASE.parent / "realtime-build" / target / "release/ifw-realtime-probe.exe"
     reference = BASE.parent / "realtime-native" / target
     receipt = json.loads((reference / "result.json").read_bytes())
+    original_sessions = json.loads((reference / "sessions.json").read_bytes())
     if (receipt.get("passed") is not True or sha(reference / "sessions.json") != receipt["outputs"]["sessions.json"]
-            or sha(original_exe) != json.loads((reference / "sessions.json").read_bytes())["probeSha256"]):
+            or sha(original_exe) != original_sessions["probeSha256"]):
         raise ValueError("Original transport executable differs from its passing native session evidence")
     result["originalRunSha256"] = sha(reference / "result.json")
     candidate = work / "target/release/ifw-realtime-probe.exe"
@@ -127,8 +128,9 @@ def variant(work, source, rebuilt, compiler, target, run, env, native, result):
     run([sys.executable, REALTIME / "verify.py", "--probe", candidate, "--output", sessions],
         project, env=env, timeout=240)
     observations = json.loads(sessions.read_bytes())
-    if (len(observations["cases"]) != 15 or observations["redirectTargetRequests"] != 0 or
-            observations["redirectTargetCredentials"] != 0):
+    cases = observations["cases"]
+    if (len(cases) != 16 or cases.keys() != original_sessions["cases"].keys() or "wrong-host-tls" not in cases
+            or observations["redirectTargetRequests"] != 0 or observations["redirectTargetCredentials"] != 0):
         raise ValueError("Native transport observations are incomplete")
     result.update(probeSha256=sha(candidate), originalProbeSha256=sha(original_exe),
                   peerSourceSha256=sha(REALTIME / "verify.py"), peImportCount=sum(map(len, candidate_imports.values())),

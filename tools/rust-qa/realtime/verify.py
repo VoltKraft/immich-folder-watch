@@ -63,6 +63,7 @@ class Peer(ThreadingHTTPServer):
         self.counts = Counter()
         self.errors = []
         self.stopping = threading.Event()
+        self.tls_client_hello = threading.Event()
         self.lock = threading.Lock()
         self.polls = {}
         self.redirect_port = 0
@@ -81,6 +82,12 @@ class Peer(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+
+    def parse_request(self):
+        if not super().parse_request():
+            return False
+        self.server.mark("httpRequests")
+        return True
 
     def log_message(self, *args):
         pass
@@ -243,7 +250,11 @@ class Handler(BaseHTTPRequestHandler):
 def peer(scenario, api="/api", tls=None):
     prefix = api.rsplit("/", 1)[0]
     instance = Peer(scenario, prefix + "," if prefix else "", api)
-    if tls:
+    if tls is not None:
+        def observe_client_hello(connection, server_name, context):
+            instance.tls_client_hello.set()
+
+        tls.set_servername_callback(observe_client_hello)
         instance.socket = tls.wrap_socket(instance.socket, server_side=True)
     worker = threading.Thread(target=instance.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
     worker.start()
@@ -254,6 +265,8 @@ def peer(scenario, api="/api", tls=None):
         instance.shutdown()
         instance.server_close()
         worker.join(2)
+        if tls is not None:
+            tls.set_servername_callback(None)
 
 
 def make_trust(directory):
@@ -264,9 +277,9 @@ def make_trust(directory):
             openssl = str(git_copy)
     if not openssl:
         raise RuntimeError("OpenSSL CLI is required to create ephemeral synthetic TLS certificates")
-    def run(*args):
-        subprocess.run([openssl, *args], cwd=directory, env={**os.environ, "OPENSSL_CONF": str(config)},
-                       check=True, capture_output=True, timeout=30)
+    def run(*args, check=True):
+        return subprocess.run([openssl, *args], cwd=directory, env={**os.environ, "OPENSSL_CONF": str(config)},
+                              check=check, capture_output=True, timeout=30)
     # Configure from scratch so the fixture never reads host OpenSSL settings.
     config = directory / "test.conf"
     config.write_text("[req]\ndistinguished_name=dn\n[dn]\n", encoding="ascii")
@@ -276,20 +289,31 @@ def make_trust(directory):
             "-keyout", label + ".key", "-out", label + ".crt")
     run("req", "-config", str(config), "-new", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=RW02-loopback",
         "-keyout", "peer.key", "-out", "peer.csr")
-    ext = directory / "peer.ext"
-    ext.write_text("basicConstraints=critical,CA:FALSE\nsubjectAltName=IP:127.0.0.1\nextendedKeyUsage=serverAuth\n",
-                   encoding="ascii")
-    run("x509", "-req", "-sha256", "-days", "1", "-in", "peer.csr", "-CA", "ca.crt", "-CAkey", "ca.key",
-        "-set_serial", "3", "-extfile", str(ext), "-out", "peer.crt")
-    tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    tls.load_cert_chain(directory / "peer.crt", directory / "peer.key")
-    return tls
+    contexts, certificates = {}, {}
+    for serial, address in enumerate(("127.0.0.1", "127.0.0.2"), start=3):
+        ext = directory / "peer.ext"
+        ext.write_text(f"basicConstraints=critical,CA:FALSE\nsubjectAltName=IP:{address}\nextendedKeyUsage=serverAuth\n",
+                       encoding="ascii")
+        leaf = directory / f"peer-{serial}.crt"
+        run("x509", "-req", "-sha256", "-days", "1", "-in", "peer.csr", "-CA", "ca.crt", "-CAkey", "ca.key",
+            "-set_serial", str(serial), "-extfile", str(ext), "-out", str(leaf))
+        verify = ("verify", "-CAfile", "ca.crt", "-purpose", "sslserver", "-verify_ip")
+        run(*verify, address, str(leaf))
+        if address != "127.0.0.1" and run(*verify, "127.0.0.1", str(leaf), check=False).returncode == 0:
+            raise ValueError("The different-address certificate unexpectedly names the fixture endpoint")
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(leaf, directory / "peer.key")
+        contexts[address] = context
+        certificates[address] = hashlib.sha256(ssl.PEM_cert_to_DER_cert(leaf.read_text("ascii"))).hexdigest()
+    return contexts, certificates
 
 
-def run_scenario(executable, name, directory, tls, redirect):
-    encrypted = name in {"tls", "untrusted-tls", "upgrade-redirect"}
+def run_scenario(executable, name, directory, contexts, redirect):
+    rejected_tls = name in {"untrusted-tls", "wrong-host-tls"}
+    encrypted = rejected_tls or name in {"tls", "upgrade-redirect"}
+    certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
     api = "/collection/api" if name in {"polling", "tls"} else "/api"
-    with peer(name, api, tls if encrypted else None) as origin:
+    with peer(name, api, contexts[certificate_address] if encrypted else None) as origin:
         origin.redirect_port = redirect.server_port
         protocol = "https" if encrypted else "http"
         url = f"{protocol}://127.0.0.1:{origin.server_port}{api}"
@@ -304,20 +328,27 @@ def run_scenario(executable, name, directory, tls, redirect):
         events = proc.stdout.splitlines()
         trace = Counter(events)
         stats = origin.counts.copy()
+        if encrypted:
+            assert origin.tls_client_hello.is_set(), "The loopback TLS server never received a ClientHello"
         if name == "http-default":
             assert proc.returncode != 0 and proc.stderr.strip() == "Origin" and not stats, (events, stats, proc.stderr)
         else:
             assert proc.returncode == 0 and not proc.stderr and events[-1:] == ["Stopped"], (events, stats, proc.stderr)
             assert budget - 50 <= elapsed < budget + 2000, (budget, elapsed)
-            assert trace["Attempt"] == (stats["openingRequests"] if name != "untrusted-tls" else 1), (events, stats)
+            assert trace["Attempt"] == (1 if rejected_tls else stats["openingRequests"]), (events, stats)
             assert trace["Periodic"] >= 1
-            if name == "untrusted-tls":
-                assert trace["Lost Transport"] == 1 and not stats, (events, stats)
+            if rejected_tls:
+                assert trace["Lost Transport"] == 1 and not stats and not trace["Connected"], (events, stats)
             else:
                 assert stats["inventoryRequests"] >= 1 and trace["Inventory"] >= 1, (events, stats)
             check_protocol(name, trace, stats, events)
         assert not origin.errors, origin.errors
-        return {"client": dict(trace), "peer": dict(stats), "budgetMs": budget, "processElapsedMs": elapsed}
+        result = {"client": dict(trace), "peer": dict(stats), "budgetMs": budget, "processElapsedMs": elapsed}
+        if encrypted:
+            result.update(tlsClientHelloObserved=True, certificateAddress=certificate_address,
+                          endpointAddress="127.0.0.1", httpRequests=stats["httpRequests"],
+                          trustAnchorDerSha256=hashlib.sha256(ssl.PEM_cert_to_DER_cert(trust.read_text("ascii"))).hexdigest())
+        return result
 
 
 def check_protocol(name, trace, stats, events):
@@ -343,7 +374,7 @@ def check_protocol(name, trace, stats, events):
         assert stats["pendingPolls"] == 1 and trace["Attempt"] == 1 and not trace["Event"], (events, stats)
     if name == "missed-heartbeat":
         assert trace["Lost Timeout"] == 1 and stats["pendingPolls"] == 1, (events, stats)
-    if name not in {"untrusted-tls", "opening-size", "redirect"}:
+    if name not in {"untrusted-tls", "wrong-host-tls", "opening-size", "redirect"}:
         assert stats["namespacePosts"] == trace["Connected"] >= 1, (events, stats)
     if name in {"redirect", "opening-size", "missed-heartbeat", "poll-size", "ws-size"}:
         after_loss = events[next(i for i, e in enumerate(events) if e.startswith("Lost ")) + 1:]
@@ -358,7 +389,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     executable = args.probe.resolve(strict=True)
-    cases = ("polling", "websocket", "tls", "untrusted-tls", "http-default", "upgrade-redirect",
+    cases = ("polling", "websocket", "tls", "untrusted-tls", "wrong-host-tls", "http-default", "upgrade-redirect",
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
              "reconnect", "cancel-poll", "missed-heartbeat")
     with executable.open("rb") as stream:
@@ -368,10 +399,10 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ifw-rw02-") as temp, peer("redirect-destination") as redirect:
         directory = Path(temp)
-        tls = make_trust(directory)
+        contexts, result["certificateDerSha256ByAddress"] = make_trust(directory)
         for case in cases:
             try:
-                result["cases"][case] = run_scenario(executable, case, directory, tls, redirect)
+                result["cases"][case] = run_scenario(executable, case, directory, contexts, redirect)
                 print("Passed " + case, flush=True)
             except Exception as error:
                 result["failure"] = {"case": case, "error": repr(error)}

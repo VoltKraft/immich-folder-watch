@@ -22,7 +22,11 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 15 wire scenarios. It does not require a local Immich account.
+build and all 16 wire scenarios. The TLS controls use a fresh private CA,
+one server certificate for the loopback endpoint and one for a different
+loopback address. The latter must complete no HTTP requests. The peer records
+the incoming TLS ClientHello separately from HTTP requests. The test uses
+only synthetic credentials and its own temporary trust files.
 
 `result.json` records each step, source and artifact hashes. `graph.json` contains
 the full selected feature graph, original inputs and notices. `sessions.json`
