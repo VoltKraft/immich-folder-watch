@@ -1,244 +1,28 @@
-use std::cell::Cell;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::*;
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::StationsAndDesktops::*;
 use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::{Error, PCWSTR, Result, w};
+use windows::core::{PCWSTR, Result, w};
 
 use crate::{invalid, wide};
 
 #[path = "tray_activation.rs"]
 pub(super) mod activation;
 
-const CALLBACK: u32 = WM_APP + 23;
-const SYNTHETIC_OPEN: u32 = WM_APP + 24;
-const SYNTHETIC_TASKBAR: usize = 0x1f02;
-const ICON: u32 = 23;
-
-#[derive(Default, Clone, Copy)]
-struct Events {
-    taskbar: u32,
-    synthetic_taskbar: u32,
-    synthetic_open: u32,
-    shell_open: u32,
-    pointer_open: u32,
-    last_pointer_code: u32,
-    last_pointer_tick: u32,
-    last_queued_tick: Option<u32>,
-    last_dispatch_tick: u64,
-    last_pointer_id: u32,
-    pointer_up: u32,
-    shell_context: u32,
-    shown: u32,
-    hidden: u32,
-    timed_out: u32,
-    clicked: u32,
-}
-
-thread_local! {
-    static REGISTERED: Cell<u32> = const { Cell::new(0) };
-    static EVENTS: Cell<Events> = Cell::new(Events::default());
-    static DISPATCHING: Cell<Option<MSG>> = const { Cell::new(None) };
-}
-
-unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    // The thread owns its hidden HWND and counters. No borrowed Rust references
-    // or heap allocations cross the Win32 callback boundary.
-    let mut e = EVENTS.get();
-    if msg != 0 && msg == REGISTERED.get() {
-        if wp.0 == SYNTHETIC_TASKBAR {
-            e.synthetic_taskbar = e.synthetic_taskbar.saturating_add(1);
-        } else {
-            e.taskbar = e.taskbar.saturating_add(1);
-        }
-    } else if msg == SYNTHETIC_OPEN {
-        e.synthetic_open = e.synthetic_open.saturating_add(1);
-    } else if msg == CALLBACK {
-        // Version 4 puts the notification code in LOWORD(lParam).
-        let code = lp.0 as u32 & 0xffff;
-        let id = (lp.0 as u32) >> 16;
-        match code {
-            NIN_SELECT | WM_LBUTTONDBLCLK => {
-                e.shell_open = e.shell_open.saturating_add(1);
-                if id == ICON {
-                    e.pointer_open = e.pointer_open.saturating_add(1);
-                    e.last_pointer_id = id;
-                    e.last_pointer_code = code;
-                    e.last_pointer_tick = unsafe { GetMessageTime() } as u32;
-                    // A nonqueued sent callback has no MSG.time of its own. GetMessageTime alone
-                    // can then describe the thread's previous, unrelated queue entry.
-                    e.last_queued_tick = DISPATCHING.get().and_then(|entry| {
-                        (entry.hwnd == hwnd
-                            && entry.message == msg
-                            && entry.wParam == wp
-                            && entry.lParam == lp
-                            && unsafe { InSendMessageEx(None) } == ISMEX_NOSEND)
-                            .then_some(entry.time)
-                    });
-                    e.last_dispatch_tick = activation::uptime_millis();
-                }
-            }
-            WM_LBUTTONUP if id == ICON => e.pointer_up = e.pointer_up.saturating_add(1),
-            key if key == NIN_SELECT + 1 => e.shell_open = e.shell_open.saturating_add(1),
-            WM_CONTEXTMENU | WM_RBUTTONUP => e.shell_context = e.shell_context.saturating_add(1),
-            NIN_BALLOONSHOW => e.shown = e.shown.saturating_add(1),
-            NIN_BALLOONHIDE => e.hidden = e.hidden.saturating_add(1),
-            NIN_BALLOONTIMEOUT => e.timed_out = e.timed_out.saturating_add(1),
-            NIN_BALLOONUSERCLICK => e.clicked = e.clicked.saturating_add(1),
-            _ => {}
-        }
-    } else {
-        // Pass through synchronous creation/destruction and ordinary OS messages.
-        return unsafe { DefWindowProcW(hwnd, msg, wp, lp) };
-    }
-    EVENTS.set(e);
-    LRESULT(0)
-}
-
-struct Receiver {
-    hwnd: HWND,
-    instance: HINSTANCE,
-}
-const CLASS: PCWSTR = w!("IFW RW02 synthetic tray receiver");
-
-impl Receiver {
-    fn new() -> Result<Self> {
-        // A hidden top-level tool window receives TaskbarCreated broadcasts.
-        // A message-only window cannot receive that broadcast.
-        unsafe {
-            let instance = HINSTANCE(GetModuleHandleW(None)?.0);
-            let registered = RegisterWindowMessageW(w!("TaskbarCreated"));
-            if registered == 0 {
-                return Err(Error::from_thread());
-            }
-            REGISTERED.set(registered);
-            EVENTS.set(Events::default());
-            let class = WNDCLASSW {
-                hInstance: instance,
-                lpszClassName: CLASS,
-                lpfnWndProc: Some(window_proc),
-                ..Default::default()
-            };
-            if RegisterClassW(&class) == 0 {
-                return Err(Error::from_thread());
-            }
-            match CreateWindowExW(
-                WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-                CLASS,
-                CLASS,
-                WS_POPUP,
-                -20_000,
-                -20_000,
-                1,
-                1,
-                None,
-                None,
-                Some(instance),
-                None,
-            ) {
-                Ok(hwnd) => Ok(Self { hwnd, instance }),
-                Err(e) => {
-                    let _ = UnregisterClassW(CLASS, Some(instance));
-                    Err(e)
-                }
-            }
-        }
-    }
-}
-
-impl Drop for Receiver {
-    fn drop(&mut self) {
-        // Drop on the registering thread, after its icon guard.
-        unsafe {
-            let _ = DestroyWindow(self.hwnd);
-            let _ = UnregisterClassW(CLASS, Some(self.instance));
-        }
-    }
-}
-
-fn copy_text<const N: usize>(buffer: &mut [u16; N], text: &str) {
-    for (out, unit) in buffer[..N - 1].iter_mut().zip(text.encode_utf16()) {
-        *out = unit;
-    }
-}
-
-struct Icon<'a> {
-    owner: &'a Receiver,
-    prefix: &'static str,
-    title: String,
-    cleanup: bool,
-}
+#[path = "../../gui/src/windows_tray_shell.rs"]
+mod shell;
+use shell::*;
 
 impl Icon<'_> {
-    fn base(&self) -> NOTIFYICONDATAW {
-        NOTIFYICONDATAW {
-            cbSize: size_of::<NOTIFYICONDATAW>() as u32,
-            hWnd: self.owner.hwnd,
-            uID: ICON,
-            ..Default::default()
-        }
-    }
-
-    fn call(&self, step: &str, op: NOTIFY_ICON_MESSAGE, data: &NOTIFYICONDATAW) -> bool {
-        // Shell_NotifyIcon documents BOOL, without a reliable extended error
-        // contract. Clear and retain raw last-error only as diagnostic context.
-        let (ok, raw) = unsafe {
-            SetLastError(WIN32_ERROR(0));
-            let ok = Shell_NotifyIconW(op, data).as_bool();
-            (ok, GetLastError().0)
-        };
-        println!(
-            "{}.{}={}\n{}.{}.raw_last_error={}",
-            self.prefix, step, ok, self.prefix, step, raw
-        );
-        ok
-    }
-
     fn add(&mut self, phase: &str) -> Result<bool> {
         // LoadIconW returns a shared system icon. Do not destroy the shared handle.
         let shared = unsafe { LoadIconW(None, IDI_APPLICATION)? };
         Ok(self.register(phase, shared).0)
-    }
-
-    fn register(&mut self, phase: &str, image: HICON) -> (bool, bool) {
-        let mut data = self.base();
-        data.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON | NIF_SHOWTIP;
-        data.uCallbackMessage = CALLBACK;
-        data.hIcon = image;
-        copy_text(&mut data.szTip, &self.title);
-        let added = self.call(&format!("{phase}.add"), NIM_ADD, &data);
-        if added {
-            self.cleanup = true;
-            let mut version = self.base();
-            version.Anonymous.uVersion = NOTIFYICON_VERSION_4;
-            return (
-                true,
-                self.call(&format!("{phase}.version4"), NIM_SETVERSION, &version),
-            );
-        }
-        (false, false)
-    }
-
-    fn remove(&mut self, phase: &str) -> bool {
-        let result = self.call(phase, NIM_DELETE, &self.base());
-        if result {
-            self.cleanup = false;
-        }
-        result
-    }
-}
-
-impl Drop for Icon<'_> {
-    fn drop(&mut self) {
-        if self.cleanup {
-            self.remove("cleanup_retry");
-        }
     }
 }
 
@@ -302,21 +86,7 @@ fn host(prefix: &str) -> bool {
 }
 
 fn pump(millis: u32) {
-    // Dispatch only messages for the current assessing thread. The outer
-    // finite deadline also handles idle desktops.
-    unsafe {
-        MsgWaitForMultipleObjectsEx(None, millis, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
-        let mut msg = MSG::default();
-        for _ in 0..256 {
-            if !PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-                break;
-            }
-            let _ = TranslateMessage(&msg);
-            let previous = DISPATCHING.replace((msg.message == CALLBACK).then_some(msg));
-            DispatchMessageW(&msg);
-            DISPATCHING.set(previous);
-        }
-    }
+    pump_messages(millis, 256);
 }
 
 fn report_events(e: Events) {
@@ -357,13 +127,7 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
     state.uFlags = NIF_TIP | NIF_SHOWTIP;
     copy_text(&mut state.szTip, &icon.title);
     icon.call("modify", NIM_MODIFY, &state);
-    let key = NOTIFYICONIDENTIFIER {
-        cbSize: size_of::<NOTIFYICONIDENTIFIER>() as u32,
-        hWnd: receiver.hwnd,
-        uID: ICON,
-        ..Default::default()
-    };
-    match unsafe { Shell_NotifyIconGetRect(&key) } {
+    match icon.rect() {
         Ok(rect) => {
             println!(
                 "tray.icon_rect_nonempty={}",

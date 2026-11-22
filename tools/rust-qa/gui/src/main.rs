@@ -27,6 +27,8 @@ use std::sync::{Arc, Mutex};
 #[derive(Clone, Copy, Debug)]
 enum Command {
     #[cfg(target_os = "windows")]
+    TrayAvailability(bool),
+    #[cfg(target_os = "windows")]
     ReadFilenameIme(u8),
     Open,
     Close,
@@ -91,6 +93,8 @@ struct Model {
 impl Model {
     fn command(&mut self, command: Command) -> Option<HostCommand> {
         match command {
+            #[cfg(target_os = "windows")]
+            Command::TrayAvailability(available) => self.lifecycle.tray_result(available),
             #[cfg(target_os = "windows")]
             Command::ReadFilenameIme(sample) => {
                 self.ime_sample = Some(sample);
@@ -425,7 +429,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(target_os = "windows")]
     let mut assessment = benchmark::Benchmark::start()?;
     #[cfg(target_os = "windows")]
-    let (native, available) = windows_fixture_input(control.clone())?;
+    let (mut native, available) = windows_fixture_input(control.clone(), launcher.is_some())?;
     #[cfg(target_os = "windows")]
     assessment.release()?;
     let mut lifecycle = DesktopLifecycle::new(background);
@@ -459,9 +463,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Stop admitting window commands when the UI exits. Retain the election through worker drain.
     #[cfg(target_os = "windows")]
     let launcher_stopped = launcher.as_mut().map_or(Ok(()), |listener| listener.stop());
+    #[cfg(target_os = "windows")]
+    let tray_stopped = native.tray.as_mut().map_or(Ok(()), |tray| tray.stop());
     assessment.finish()?;
     #[cfg(target_os = "windows")]
     launcher_stopped?;
+    #[cfg(target_os = "windows")]
+    tray_stopped?;
     #[cfg(target_os = "linux")]
     {
         if let Some(observer) = appearance.as_mut() {
@@ -471,7 +479,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     #[cfg(target_os = "windows")]
     if result.is_ok() {
-        native.join().map_err(|_| "QA control worker failed")?;
+        native
+            .reader
+            .join()
+            .map_err(|_| "QA control worker failed")?;
     }
     result?;
     if model.borrow_mut().lifecycle.background_stopped() != Some(HostCommand::ExitEventLoop) {
@@ -481,23 +492,69 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// A native Windows runner can supply a measured tray result and controls on its private inherited pipe.
-// This fixture alone provides no Shell_NotifyIcon or installed Windows evidence.
+#[cfg(target_os = "windows")]
+struct WindowsInput {
+    reader: std::thread::JoinHandle<()>,
+    tray: Option<native_gui_assessment::NativeTray>,
+}
+
 #[cfg(target_os = "windows")]
 fn windows_fixture_input(
     control: Control,
-) -> Result<(std::thread::JoinHandle<()>, bool), Box<dyn Error>> {
+    elected: bool,
+) -> Result<(WindowsInput, bool), Box<dyn Error>> {
+    use native_gui_assessment::{NativeTray, TrayEvent, TrayRequest};
     use std::io::Read;
     let mut input = std::io::stdin();
     let mut next = [0];
     let observe_ime = std::env::var("IFW_QA_FILENAME_IME").as_deref() == Ok("1");
     input.read_exact(&mut next)?;
-    let available = match next[0] {
-        b'T' => true,
-        b'N' => false,
-        _ => return Err("Expected an initial tray result".into()),
+    let (tray, available) = match std::env::var("IFW_QA_WINDOWS_TRAY").as_deref() {
+        Ok("1")
+            if next[0] == b'B'
+                && elected
+                && std::env::var("IFW_QA_BENCHMARK").as_deref() == Ok("1") =>
+        {
+            // B releases the observer barrier. This process obtains the registration result from the Shell.
+            let target = control.clone();
+            let (tray, registered) =
+                NativeTray::start(std::env::var("IFW_QA_INVENTORY_TOKEN")?, move |event| {
+                    target.sender.try_send(match event {
+                        TrayEvent::Open => Command::Open,
+                        TrayEvent::Availability(available) => Command::TrayAvailability(available),
+                    })?;
+                    target.wake();
+                    Ok(())
+                })?;
+            (Some(tray), registered)
+        }
+        Err(std::env::VarError::NotPresent) if next[0] == b'T' || next[0] == b'N' => {
+            (None, next[0] == b'T')
+        }
+        _ => {
+            return Err("Expected a tray result or the elected native tray fixture barrier".into());
+        }
     };
+    let requests = tray.as_ref().map(|owner| owner.requests.clone());
     let handle = std::thread::spawn(move || {
+        if let Some(requests) = requests {
+            while input.read_exact(&mut next).is_ok() {
+                let request = match next[0] {
+                    b'M' => TrayRequest::ChangeMarker,
+                    b'P' => TrayRequest::Sample,
+                    b'Q' => break,
+                    _ => continue,
+                };
+                if requests.send(request).is_err() {
+                    break;
+                }
+            }
+            // Only the input reader may wait for a free slot to admit the ordinary Quit.
+            if control.sender.send(Command::Quit).is_ok() {
+                control.wake();
+            }
+            return;
+        }
         loop {
             let command = match input.read_exact(&mut next) {
                 Ok(()) if next[0] == b'O' => Command::Open,
@@ -519,5 +576,11 @@ fn windows_fixture_input(
             }
         }
     });
-    Ok((handle, available))
+    Ok((
+        WindowsInput {
+            reader: handle,
+            tray,
+        },
+        available,
+    ))
 }

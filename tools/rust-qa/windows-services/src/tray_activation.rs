@@ -3,19 +3,6 @@
 use super::*;
 use std::fs;
 
-// The observer and the receiver use this system-wide, boot-relative Windows clock.
-// Importing this no-argument Kernel32 API keeps the reviewed Cargo feature set intact.
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    #[link_name = "GetTickCount64"]
-    fn get_tick_count64() -> u64;
-}
-
-pub(super) fn uptime_millis() -> u64 {
-    // The API has no preconditions or borrowed output.
-    unsafe { get_tick_count64() }
-}
-
 pub(super) fn desktop_name(tid: u32) -> Result<String> {
     let mut units = [0u16; 256];
     let mut count = 0u32;
@@ -37,61 +24,6 @@ pub(super) fn desktop_name(tid: u32) -> Result<String> {
     String::from_utf16(&units[..end]).map_err(|_| invalid())
 }
 
-struct Image(HICON);
-
-impl Drop for Image {
-    fn drop(&mut self) {
-        // Only our non-shared resource handles enter Image.
-        unsafe {
-            let _ = DestroyIcon(self.0);
-        }
-    }
-}
-
-fn image(rgb: [u8; 3]) -> Result<Image> {
-    // A 32-bpp RT_ICON resource, including the trailing 1-bpp AND bitmap.
-    // CreateIconFromResourceEx requires DWORD-aligned storage.
-    #[repr(align(4))]
-    struct Resource([u8; 40 + 32 * 32 * 4 + 32 * 4]);
-    let mut dib = Resource([0; 40 + 32 * 32 * 4 + 32 * 4]);
-    for (offset, value) in [(0, 40u32), (4, 32), (8, 64)] {
-        dib.0[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-    }
-    dib.0[12..14].copy_from_slice(&1u16.to_le_bytes());
-    dib.0[14..16].copy_from_slice(&32u16.to_le_bytes());
-    let frames: &[u8; 32656] = include_bytes!("../../gui/src/tray-icon.argb");
-    let start = (16 * 16 + 22 * 22) * 4;
-    for y in 0..32 {
-        for x in 0..32 {
-            let pixel = start + 4 * (y * 32 + x);
-            let [a, r, g, b] = [
-                frames[pixel],
-                frames[pixel + 1],
-                frames[pixel + 2],
-                frames[pixel + 3],
-            ];
-            let value = if (5..27).contains(&x) && (5..27).contains(&y) {
-                [rgb[2], rgb[1], rgb[0], 255]
-            } else {
-                [b, g, r, a]
-            };
-            let bottom_up = 40 + 4 * ((31 - y) * 32 + x);
-            dib.0[bottom_up..bottom_up + 4].copy_from_slice(&value);
-        }
-    }
-    // The API consumes the complete aligned resource synchronously and returns a new HICON.
-    unsafe { CreateIconFromResourceEx(&dib.0, true, 0x30000, 32, 32, IMAGE_FLAGS(0)).map(Image) }
-}
-
-fn color(id: &str) -> Result<[u8; 3]> {
-    let n = u32::from_str_radix(&id[..6], 16).map_err(|_| invalid())?;
-    Ok([
-        24 + ((n >> 16) & 63) as u8,
-        164 + ((n >> 8) & 63) as u8,
-        48 + (n & 63) as u8,
-    ])
-}
-
 fn publish(area: &Path, stage: &str, info: String) -> Result<()> {
     let pending = area.join(format!("{stage}.pending"));
     fs::write(&pending, info)?;
@@ -100,13 +32,7 @@ fn publish(area: &Path, stage: &str, info: String) -> Result<()> {
 }
 
 fn snapshot(area: &Path, stage: &str, icon: &Icon<'_>, ready: bool) -> Result<()> {
-    let key = NOTIFYICONIDENTIFIER {
-        cbSize: size_of::<NOTIFYICONIDENTIFIER>() as u32,
-        hWnd: icon.owner.hwnd,
-        uID: ICON,
-        ..Default::default()
-    };
-    let (hr, rect) = match unsafe { Shell_NotifyIconGetRect(&key) } {
+    let (hr, rect) = match icon.rect() {
         Ok(rect) => (0, rect),
         Err(e) => (e.code().0, RECT::default()),
     };

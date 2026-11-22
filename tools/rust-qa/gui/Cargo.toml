@@ -23,6 +23,10 @@ wgpu = { version = "=30.0.0", default-features = false, features = ["vulkan"] }
 [target.'cfg(target_os = "windows")'.dependencies]
 winit = { version = "=0.30.13", default-features = false }
 wgpu = { version = "=30.0.0", default-features = false, features = ["dx12"] }
+windows = { version = "=0.62.2", default-features = false, features = [
+    "std", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader",
+    "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging",
+] }
 
 [patch.crates-io]
 egui = { path = "artifacts/text/egui" }
