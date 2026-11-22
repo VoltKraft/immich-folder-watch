@@ -130,6 +130,20 @@ matched 715 and 2,473, Windows x64 matched 463 and 2,384, and Windows ARM64
 matched 461 and 2,383. Repeated references to the same original text account
 for the higher range counts than the distinct block counts in the table.
 
+Independent review at `9f68c58` verified all four ZIPs and SPDX documents
+against the compiler evidence and upstream sources. It closed the findings
+for Wayland core XML, the five Plasma REUSE license texts and ring's source
+grants. Two test-only comments in x11rb-protocol use `(C)` without the word
+“copyright”. The scanner does not index those two locations. The same original
+attribution text is present in the Linux bundles through the x11rb tutorial.
+
+The native workflow selects a separate single-file artifact containing the
+compiler receipt and every indexed output for that target. The notice generator
+checks its published SHA-256 before reading the inputs. The ordinary desktop
+ZIP continues to carry the native run and the target's SPDX document.
+[Native workflow and reproduction](../development.md#rust-feasibility-workspace)
+· [Pinned artifact action](https://github.com/actions/upload-artifact/blob/cf430e030ddbb5b0abf93d22962f4752f3646cd9/action.yml).
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native

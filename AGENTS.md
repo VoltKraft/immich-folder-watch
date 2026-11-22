@@ -180,8 +180,10 @@ to reconcile project decisions, defaults, and recorded state.
   Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md),
-  its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md) and the
+  its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md), the
+  [original native notices](docs/rust/rw02-combined-notices.md) and the
   original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
+  Bind hosted notices to the Actions digest of the native compiler receipt.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
   Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [Linux appearance](docs/rust/rw02-appearance.md) and

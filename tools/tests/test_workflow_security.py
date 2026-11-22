@@ -95,6 +95,20 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.check_rust_workflow("rust-desktop-assessment.yaml",
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
+    def test_native_notices_use_the_hash_of_the_uploaded_receipt(self):
+        source = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        stages = source.split("      - name: Retain the exact native compiler receipt ZIP\n", 1)[1]
+        original, rest = stages.split("      - name: Assemble and read back the original notices", 1)
+        assembly, rest = rest.split("      - name: Retain the verified native development notices", 1)
+        published = rest.split("      - name:", 1)[0]
+        self.assertIn("id: receipt_zip", original)
+        self.assertIn("archive: false", original)
+        self.assertIn("rust-native-input-${{ matrix.target }}-${{ github.sha }}.zip", original)
+        self.assertIn("steps.receipt_zip.outputs.artifact-digest", assembly)
+        self.assertEqual(assembly.count('--archive-sha256 "$digest"'), 2)
+        self.assertIn("steps.notices.outcome == 'success'", published)
+        self.assertIn("archive: false", published)
+
     def test_native_compiler_download_record_is_identical_with_windows_newlines(self):
         script = (ROOT / "tools/rust-qa/install-toolchain.sh").read_text()
         selection = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]

@@ -50,7 +50,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
 | RI-AC07 | Open | Independent consumer on four targets and dependency/profile isolation verification |
 | RI-AC08 | Open | Exact-revision Actions packages, offline and actual installer/migration evidence |
-| RI-AC09 | Open | [Four development-build SPDX inventories](rw02-combined-sbom.md) reproduced from native Cargo logs. Review of the [development notice archives](rw02-combined-notices.md) identified missing Wayland core XML, Plasma license texts and ring source-header grants. Corrected coverage and the exact installed package, source and relink evidence remain open. |
+| RI-AC09 | Open | [Four development-build SPDX inventories](rw02-combined-sbom.md) and [corrected notice archives](rw02-combined-notices.md) reproduced from native Cargo logs and original sources. Independent review at `9f68c58` closed the Wayland, Plasma and ring findings. The exact installed packages, object-level linkage, corresponding source and relink material remain open. |
 | RI-AC10 | Open | Independent final review with no unresolved acceptance blocker and truthful complete handoff |
 
 All four native targets confirmed old/new local activation in both directions and exclusion

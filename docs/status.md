@@ -32,7 +32,9 @@ reference readers refused the unfamiliar writer. Independent replay at
 `b77fc12` matched all 56 lookup answers, 299 evidence hashes and 137
 source files. It also identified a whitespace-only account that the C#
 store rejects. The correction passed 60 lookups and twenty controls across
-the two genuine writers. The production new-key
+the two genuine writers. At `727d052` the full Fedora storage entry point
+passed all 16 steps. Its 302 evidence files and 137 Git source hashes matched.
+The production new-key
 policy and installed migration remain open.
 [Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
 · [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
@@ -50,8 +52,16 @@ inventory controls.
 Independent review of the four locally reconstructed development notice
 ZIPs at `577843b` found three omissions. The two Linux inventories omit
 the core Wayland protocol XML and five Plasma protocol license texts.
-All four bundles omit applicable per-file ring copyright and permission
-notices. Corrected inventory and license coverage is pending.
+All four initial bundles omitted applicable per-file ring copyright and
+permission notices. Independent review of `9f68c58` closed all three findings
+for the development builds. Across the four corrected ZIPs, 2,356 complete
+original files and 9,714 byte-range references matched their sources. All
+four corrected SPDX documents passed the schema. The native workflow now
+selects notice generation using its uploaded compiler receipt as input.
+Offline replay reconstructed that receipt twice from each of the four
+`7517e3b` archives. All 1,798 indexed files in the resulting Linux x64
+notice ZIP matched the independently reviewed ZIP. The manifest identified
+the new receipt archive by its own SHA-256.
 [Four build inventories and digests](rust/rw02-combined-sbom.md)
 · [Development notice reconstruction](rust/rw02-combined-notices.md).
 

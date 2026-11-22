@@ -162,15 +162,25 @@ and exercise its respective winit or transport consumer. [Import-library reconst
 
 The [crash and storage exhaustion fixture](rust/rw02-storage-faults.md)
 uses separate copies for both language verifiers and preserves each
-original backup. The SQLite assessment accepts `--stored-keys` to exercise
-read-only lookups of entries, tombstones and repair journals in two additional
-synthetic C# backups. [Cross-profile storage results](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+original backup. The four native desktop jobs select `--stored-keys` in the
+SQLite assessment. Each job records the C# writer's complete casing table,
+the two synthetic backups and the Rust observations for entries, tombstones
+and repair journals. Inspect `stored-keys/result.json` and the original
+`casing-fixtures/` inside the native storage evidence. [Cross-profile storage results](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 On Linux the fault fixture's private mount requires the documented
 namespace launcher. The [combined profile](rust/rw02-combined-profile.md)
 builds from verified local archives and exercises an offline Linux relink.
 Each successful native build also generates a target-specific SPDX inventory.
 The [SBOM commands](rust/rw02-combined-sbom.md) reproduce it from the native
-run directory or an archived run with its published SHA-256.
+run directory or an archived run with its published SHA-256. The desktop
+workflow also selects the [native notice archive](rust/rw02-combined-notices.md).
+It retains the locked original crates in the project cache, builds offline,
+and uploads the native compiler receipt and its indexed outputs together as
+`rust-native-input-<target>-<commit>.zip`. The notice generator verifies this
+ZIP against the SHA-256 returned by Actions. After readback succeeds the job
+retains `rust-notices-<target>-<commit>.zip` for that development executable.
+`python3 -B tools/rust-qa/native-notice-input.py cache` checks the existing
+cache offline. `cache --fetch-missing` acquires a missing pinned input.
 The [appearance observer](rust/rw02-appearance.md) reads actual pixels after
 portal changes and the [Plasma fixture](rust/rw02-plasma.md) activates the
 visible branded panel icon. Use the individual guides for their native

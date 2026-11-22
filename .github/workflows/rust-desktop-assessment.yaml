@@ -67,7 +67,7 @@ jobs:
           NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
         run: |
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
-          python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --output "artifacts/rust/storage-native/$NATIVE_TARGET"
+          python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --stored-keys --output "artifacts/rust/storage-native/$NATIVE_TARGET"
 
       - name: Round-trip legacy YAML with the filtered offline source bundle
         id: yaml
@@ -526,25 +526,32 @@ jobs:
         timeout-minutes: 35
         run: ./tools/rust-qa/windows-ime/hosted.ps1
 
+      - name: Retain the checksum-pinned originals for the offline build and notices
+        id: notice_sources
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' && (runner.os == 'Linux' || steps.windows_transport.outcome == 'success') }}
+        shell: bash
+        run: python3 -B tools/rust-qa/native-notice-input.py cache --fetch-missing
+
       - name: Build the combined Linux dependency profile and relink a modified Wayland binding
         id: combined_linux
-        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.notice_sources.outcome == 'success' }}
         run: |
-          python3 -B tools/rust-qa/combined-profile/run.py --native "$NATIVE_TARGET" --fetch --relink \
+          python3 -B tools/rust-qa/combined-profile/run.py --native "$NATIVE_TARGET" --relink \
             --output "artifacts/rust/combined-profile/runs/$NATIVE_TARGET"
 
       - name: Build and exercise the combined Windows dependency profile
         id: combined_windows
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' && steps.windows_transport.outcome == 'success' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.notice_sources.outcome == 'success' }}
         shell: pwsh
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
-          python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --fetch --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
+          python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
       - name: Record the reviewed components of the native development build
+        id: components
         if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
         shell: bash
         run: |
@@ -554,6 +561,43 @@ jobs:
           python3 -B tools/rust-qa/combined-profile/test_sbom.py --target "$NATIVE_TARGET" \
             --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
             --document "artifacts/rust/combined-profile/sboms/$NATIVE_TARGET.spdx.json"
+          python3 -B tools/rust-qa/native-notice-input.py pack "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --output "artifacts/rust/combined-profile/receipts/rust-native-input-$NATIVE_TARGET-$GITHUB_SHA.zip"
+
+      - name: Retain the exact native compiler receipt ZIP
+        id: receipt_zip
+        if: ${{ !cancelled() && steps.components.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          archive: false
+          path: artifacts/rust/combined-profile/receipts/rust-native-input-${{ matrix.target }}-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Assemble and read back the original notices for the uploaded native build
+        id: notices
+        if: ${{ !cancelled() && steps.receipt_zip.outcome == 'success' }}
+        shell: bash
+        env:
+          UPLOADED_SHA256: ${{ steps.receipt_zip.outputs.artifact-digest }}
+        run: |
+          input="artifacts/rust/combined-profile/receipts/rust-native-input-$NATIVE_TARGET-$GITHUB_SHA.zip"
+          output="artifacts/rust/combined-profile/notices/rust-notices-$NATIVE_TARGET-$GITHUB_SHA.zip"
+          digest="${UPLOADED_SHA256#sha256:}"
+          python3 -B tools/rust-qa/combined-profile/notices.py "$NATIVE_TARGET" \
+            --input "$input" --archive-sha256 "$digest" --revision "$GITHUB_SHA" --output "$output"
+          python3 -B tools/rust-qa/combined-profile/test_notices.py --target "$NATIVE_TARGET" \
+            --input "$input" --archive-sha256 "$digest" --revision "$GITHUB_SHA" --notices "$output"
+
+      - name: Retain the verified native development notices
+        if: ${{ !cancelled() && steps.notices.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          archive: false
+          path: artifacts/rust/combined-profile/notices/rust-notices-${{ matrix.target }}-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove the job-specific namespace launcher
         if: ${{ always() && runner.os == 'Linux' }}
