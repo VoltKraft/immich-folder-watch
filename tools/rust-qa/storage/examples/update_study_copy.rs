@@ -4,14 +4,53 @@
 use ifw_sqlite_assessment::{Fixture, PathLookup, Result, digest, field, limited, verify_backup};
 use rusqlite::{Connection, OpenFlags, TransactionBehavior, params};
 use serde_json::{Value, json};
-use std::fs::{self, DirBuilder, File, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Write};
 #[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::Path;
 
 const NEW_SIZE: i64 = 37;
 const ACCOUNT: &str = "ifw-managed-invariant-study";
+
+fn new_directory(path: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        fs::DirBuilder::new().mode(0o700).create(path)
+    }
+    #[cfg(not(unix))]
+    {
+        fs::create_dir(path)
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn study_directory_requires_a_fresh_name_and_an_existing_parent() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path =
+        std::env::temp_dir().join(format!("ifw-storage-study-{}-{nonce}", std::process::id()));
+    new_directory(&path).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o077, 0);
+    }
+    assert_eq!(
+        new_directory(&path).unwrap_err().kind(),
+        io::ErrorKind::AlreadyExists
+    );
+    assert_eq!(
+        new_directory(&path.join("absent").join("copy"))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::NotFound
+    );
+    fs::remove_dir(path).unwrap();
+}
 
 fn new_file(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut options = OpenOptions::new();
@@ -107,10 +146,7 @@ fn main() -> Result<()> {
     if digest(&bytes) != expected {
         return Err("donor changed before copying".into());
     }
-    let mut builder = DirBuilder::new();
-    #[cfg(unix)]
-    builder.mode(0o700);
-    builder.create(destination)?;
+    new_directory(destination)?;
     let copy = destination.join("after.db");
     new_file(&copy, &bytes)?;
     if control {

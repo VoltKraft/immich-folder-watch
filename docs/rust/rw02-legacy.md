@@ -449,3 +449,22 @@ The separate [storage input assessment](rw02-storage-inputs.md) records real Rus
 SQLite/JSON/SHA-256 execution and C# reread. Its maintained development-only
 workspace is [`tools/rust-qa/storage`](../../tools/rust-qa/storage); those
 dependencies are not adopted by the application workspace.
+
+## Windows storage example compilation
+
+The storage driver lints all examples with warnings denied before it runs the
+SQLite and C# probes. At `0a2b5ca`, the file-size study mutated its directory
+builder only on Unix. The pinned compiler reproduced `unused_mut` on the
+original directory-creation block with both Windows MSVC target libraries.
+The updated example uses a private Unix directory and the standard
+single-directory creation operation on Windows. Both branches require a
+fresh name under an existing parent.
+
+On Fedora x64 the example test and full storage Clippy check passed. Six
+synthetic updates through the ordinary executable retained their original
+donors and gave each directory mode `0700` and each file mode `0600` under a
+zero umask. Reusing any of the six destinations failed without a byte change.
+Both authenticated casing fixtures also passed the standard stored-key
+observer, with 30 lookups and ten controls per fixture. The two MSVC target
+checks type-checked the changed function and its test. The hosted Windows jobs
+supply the independent native evidence. [Desktop assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).
