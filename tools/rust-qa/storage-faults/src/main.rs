@@ -193,9 +193,42 @@ fn worker(
         "invalid casing mode",
     )?;
     check(
-        ["uncommitted", "commit-before-ack", "sqlite-full", "enospc"].contains(&fault),
+        [
+            "uncommitted",
+            "commit-before-ack",
+            "sqlite-full",
+            "enospc",
+            "windows-full",
+        ]
+        .contains(&fault),
         "invalid fault",
     )?;
+    let filesystem_full = fault == "enospc" || fault == "windows-full";
+    if fault == "windows-full" {
+        check(
+            cfg!(windows),
+            "Windows VHD requires a native Windows worker",
+        )?;
+        let volume = storage.ok_or("missing owned VHD volume")?;
+        let path = volume.to_str().ok_or("volume GUID UTF-8")?;
+        check(
+            path.starts_with(r"\\?\Volume{")
+                && path.ends_with("}\\")
+                && std::env::var("IFW_STORAGE_VHD_VOLUME").as_deref() == Ok(path)
+                && std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+                && std::env::var("RUNNER_ENVIRONMENT").as_deref() == Ok("github-hosted"),
+            "Windows filesystem-full requires the private supervisor's volume GUID",
+        )?;
+        let authority = load_json(&volume.join("ifw-vhd-authorization.json"))?;
+        check(
+            authority["format"] == "ifw-owned-vhd-authority-v1"
+                && authority["volume_guid"] == path
+                && authority["virtual_bytes"] == 16 * 1024 * 1024
+                && authority["nonce"].as_str()
+                    == Some(std::env::var("IFW_STORAGE_VHD_NONCE")?.as_str()),
+            "missing private VHD supervisor receipt",
+        )?;
+    }
     check(
         load_json(&seed.join("result.json"))?["Format"] == "ifw-rw02-sqlite-assessment-v1",
         "not the reviewed synthetic seed",
@@ -206,8 +239,8 @@ fn worker(
         OpenFlags::SQLITE_OPEN_READ_ONLY,
     )?;
     check(
-        (fault == "enospc") == storage.is_some(),
-        "ENOSPC requires the explicit private tmpfs directory",
+        filesystem_full == storage.is_some(),
+        "filesystem-full requires the explicit private storage directory",
     )?;
     let database_directory = storage.unwrap_or(output);
     let database_path = database_directory.join("state.db");
@@ -287,7 +320,7 @@ fn worker(
         database.pragma_query_value(None, "max_page_count", |row| row.get(0))?;
     let mut os_full = Value::Null;
     let filler_path = database_directory.join("space-filler.bin");
-    if fault == "enospc" {
+    if filesystem_full {
         check(
             sqlite_max_pages * page_size > 16 * 1024 * 1024,
             "unexpected logical SQLite capacity limit",
@@ -298,9 +331,10 @@ fn worker(
             .open(&filler_path)?;
         let buffer = [0x5a_u8; 65536];
         let mut observed_error = None;
-        // The namespace must be 8 MiB; this independent ceiling prevents a
-        // missing tmpfs mount from filling an ordinary filesystem.
-        for _ in 0..256 {
+        // The private filesystem is 8 MiB (tmpfs) or 16 MiB (VHD). The
+        // independent ceiling also bounds writes if its setup is defective.
+        let maximum_chunks = if fault == "windows-full" { 512 } else { 256 };
+        for _ in 0..maximum_chunks {
             match filler.write_all(&buffer) {
                 Ok(()) => {}
                 Err(error) => {
@@ -309,16 +343,48 @@ fn worker(
                 }
             }
         }
+        if fault == "windows-full" {
+            check(
+                matches!(observed_error, Some(39 | 112)),
+                "bounded VHD filler did not encounter Win32 disk full",
+            )?;
+            // Windows may reject a multi-cluster allocation atomically. Consume
+            // only the bounded remainder, so the supervisor can require zero
+            // actual free clusters independently of this error code.
+            for (chunk_size, attempts) in [(1024, 128), (1, 2048)] {
+                for _ in 0..attempts {
+                    match filler.write_all(&buffer[..chunk_size]) {
+                        Ok(()) => {}
+                        Err(error) => {
+                            check(
+                                matches!(error.raw_os_error(), Some(39 | 112)),
+                                "VHD remainder failed for an unrelated reason",
+                            )?;
+                            observed_error = error.raw_os_error();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         check(
-            observed_error == Some(28),
-            "bounded filler did not encounter actual OS ENOSPC",
+            if fault == "windows-full" {
+                matches!(observed_error, Some(39 | 112))
+            } else {
+                observed_error == Some(28)
+            },
+            "bounded filler did not encounter actual OS filesystem full",
         )?;
-        os_full = json!({"errno":observed_error, "filler_bytes":filler.metadata()?.len(), "maximum_attempted_bytes":16777216});
+        os_full = if fault == "windows-full" {
+            json!({"win32_error":observed_error, "filler_bytes":filler.metadata()?.len(), "maximum_attempted_bytes":33687552})
+        } else {
+            json!({"errno":observed_error, "filler_bytes":filler.metadata()?.len(), "maximum_attempted_bytes":16777216})
+        };
         drop(filler);
     }
     let transaction = database.transaction()?;
     let update = update_four_tables(&transaction, &pending, true);
-    if fault == "sqlite-full" || fault == "enospc" {
+    if fault == "sqlite-full" || filesystem_full {
         let error = update.err().ok_or("SQLITE_FULL was not triggered")?;
         let sql_error = error
             .downcast_ref::<rusqlite::Error>()
@@ -349,8 +415,8 @@ fn worker(
             "uncommitted_changes_before_drop":dirty_before_drop,
             "rollback_action":"rusqlite Transaction Drop before further work",
             "confirmed_wal_bytes":confirmed_wal, "integrity_check":"ok", "result":"confirmed-only",
-            "failure_mechanism":if fault == "enospc" {"OS ENOSPC on a private bounded tmpfs"} else {"SQLite max_page_count; not filesystem ENOSPC"}});
-        if fault == "enospc" {
+            "failure_mechanism":match fault {"enospc" => "OS ENOSPC on a private bounded tmpfs", "windows-full" => "Win32 disk full on a private bounded FAT16 VHD", _ => "SQLite max_page_count; not filesystem ENOSPC"}});
+        if filesystem_full {
             let capture = output.join("at-full-before-release");
             std::fs::create_dir(&capture)?;
             for suffix in ["", "-wal", "-shm"] {
@@ -360,15 +426,19 @@ fn worker(
                     std::fs::copy(source, capture.join(name))?;
                 }
             }
-            emit(
-                &json!({"phase":"enospc-observed", "os_errno":28, "sqlite_extended_error":extended,
-                    "snapshot_sha256":authenticate_snapshot(&snapshot_path, &snapshot_sha256)?}),
-            )?;
+            let mut barrier = json!({"phase":if fault == "windows-full" {"windows-full-observed"} else {"enospc-observed"},
+                "sqlite_extended_error":extended, "snapshot_sha256":authenticate_snapshot(&snapshot_path, &snapshot_sha256)?});
+            if fault == "windows-full" {
+                barrier["win32_error"] = os_full["win32_error"].clone();
+            } else {
+                barrier["os_errno"] = json!(28);
+            }
+            emit(&barrier)?;
             let mut acknowledgement = String::new();
             io::stdin().read_line(&mut acknowledgement)?;
             check(
                 acknowledgement == "release-space\n",
-                "namespace did not confirm full tmpfs",
+                "supervisor did not confirm full private filesystem",
             )?;
             std::fs::remove_file(&filler_path)?;
             drop(database);
@@ -382,7 +452,7 @@ fn worker(
             integrity(&recovered)?;
             check(
                 reviewed::fault_snapshot(&recovered)? == confirmed["Snapshot"],
-                "same-tmpfs backup restore differed",
+                "same-volume backup restore differed",
             )?;
             drop(recovered);
             drop(snapshot);
@@ -536,8 +606,8 @@ fn main() -> Result<()> {
         [command, seed, output, mode, fault] if command == "worker" => worker(
             &PathBuf::from(seed), &PathBuf::from(output), mode.to_str().ok_or("mode UTF-8")?, fault.to_str().ok_or("fault UTF-8")?, None,
         ),
-        [command, seed, output, mode, fault, storage] if command == "worker" && fault == "enospc" => worker(
-            &PathBuf::from(seed), &PathBuf::from(output), mode.to_str().ok_or("mode UTF-8")?, "enospc", Some(&PathBuf::from(storage)),
+        [command, seed, output, mode, fault, storage] if command == "worker" && (fault == "enospc" || fault == "windows-full") => worker(
+            &PathBuf::from(seed), &PathBuf::from(output), mode.to_str().ok_or("mode UTF-8")?, fault.to_str().ok_or("fault UTF-8")?, Some(&PathBuf::from(storage)),
         ),
         [command, output, expected] if command == "verify" => verify(&PathBuf::from(output), expected.to_str().ok_or("SHA-256 UTF-8")?),
         _ => Err("usage: ifw-storage-faults worker <reviewed-seed> <new-output> <sensitive|insensitive> <uncommitted|commit-before-ack|sqlite-full>; or verify <case> <producer-sha256>".into()),

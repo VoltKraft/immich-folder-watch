@@ -37,8 +37,9 @@ rusqlite 0.43.0 with `bundled`/`backup`, SQLite 3.54.1 source ID
 serde_json 1.0.154, sha2 0.11.1 and the local legacy codecs. The source verifier
 checks every original archive, unpacked source byte, supplied notice and native
 source before building. SQLite extension loading stays omitted; actual runtime
-compile options and debug/release native compile commands are checked. No new
-license or dependency input is introduced. Existing notices are retained.
+compile options and debug/release native compile commands are checked. This
+Rust/SQLite closure is unchanged. The separately reviewed Windows development
+image/generator input is recorded below; existing notices are retained.
 
 The schema is unchanged. The synthetic workload changes one mapping, one owned
 album, account history and the repair JSON in a single transaction. Other-account
@@ -236,6 +237,126 @@ versions remained Rust SQLite 3.54.1, C# SQLite 3.53.4 and native .NET 10.0.12.
 | `linux-x64-06/evidence-hashes.json` | `a0c5035758144586b3e743d4db04769c9dcdd9be2bcfead88e72560827b45492` |
 | `linux-x64-06/cases/sensitive-enospc/tmpfs.json` | `79581f27e9b283d2ae5bb3df5ea07e2ae723fb2da94049e20abc2ba3932e56e4` |
 | `linux-x64-06/cases/insensitive-enospc/tmpfs.json` | `84a55efc15b1280105d4177add1c12e9068a4a88831268e07315112d92e510ea` |
+
+## Prepared Windows filesystem-full experiment (2026-11-22)
+
+`--windows-vhd` extends this development fixture with a real filesystem-capacity
+trial intended for native disposable Windows x64 and ARM64 candidate runners.
+It has **not executed on Windows yet**. No local emulation, image check or Linux
+run below substitutes for attachment, Win32 errors, SQLite recovery or cleanup
+on either target. The primary agent reported failed existing Windows storage
+steps in run `45034293002`; their cause is not inferred here before source-bound
+logs are available.
+
+The Windows recipe uses an already initialized FAT16 data filesystem in a fresh
+fixed VHD. It performs no online formatting or disk initialization. Microsoft's
+[VHD specification](https://www.microsoft.com/en-us/download/details.aspx?id=23850)
+describes this fixed, single-file format and declares the Open Specification
+Promise. The native attachment uses the built-in
+[OpenVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-openvirtualdisk)
+handle and
+[NO_DRIVE_LETTER without PERMANENT_LIFETIME](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/ne-virtdisk-attach_virtual_disk_flag).
+The physical path comes only from that
+[virtual handle](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-getvirtualdiskphysicalpath).
+
+Before attachment, independent readback verifies the complete initialized file,
+its single inactive partition, exact payload template, new disk signature and
+UUID, fixed footer/checksum, lack of a parent and fixed 16,777,728-byte file size.
+It refuses existing output files, extra partitions, different identities,
+payload changes, boot programs, redirects or oversized images. The backing file
+remains open without delete sharing. Its ordinary handle ID and final path must
+match the newly created, sole-link regular file. Sparse, compressed or encrypted
+backing files are refused. The host must have at least 256 MiB available.
+
+After attachment, the read-only physical handle must reproduce the exact new MBR
+and 16-MiB virtual length. Only a newly appeared volume GUID with a single
+[matching extent](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-ioctl_volume_get_volume_disk_extents)
+is accepted. Its offset, 15-MiB partition length, FAT label/serial and 7,656 data
+clusters of 2,048 bytes must match the image. No drive letter or preexisting mount
+path is accepted. All trial files use that volume GUID directly, so a lost mount
+has no host-directory fallback. The retained handle, MBR, extent and backing-file
+identity are checked again before writes and at the full/recovery barriers.
+Neither an ambient disk number nor a cached FAT file identifier selects a write,
+format, rename, delete or restore destination.
+
+The existing Rust transactions and native backup API remain the tested storage
+implementation. The fixed-volume filler has a separate maximum attempted-write
+bound of 33,687,552 bytes, including small remainder writes when Windows rejects
+a multi-cluster allocation atomically. This is a safety ceiling, not proof of
+fullness. Success instead requires actual
+[Win32 error 39 or 112](https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-),
+zero independent free/available-byte observations and SQLite error 13 with its
+ordinary large page limit. The reviewed SQLite amalgamation's Windows write
+path maps both of those Windows errors to `SQLITE_FULL`.
+
+Only after that observation may the worker remove its owned filler and perform
+the same-volume restore. The two additional casing-mode cases retain the existing
+producer-hash continuity, full-schema/data checks, C# semantic readback and
+corrupt-copy rejections: eight cases and 208 semantic assertions if the complete
+native qualification passes. A separate owned FAT file records extended and
+legacy identifiers from the same handle and observes an ordinary rename. That
+observation cannot establish that FAT IDs survive rename or authorize actions by
+cached IDs.
+
+All exit paths close owned handles and attempt explicit detach; no permanent
+attachment is requested. Passing cleanup additionally requires the new volume to
+disappear, a detached-image hash, unchanged fixed MBR/footer and the bounded file
+size. Missing hosted-runner identity, native architecture or virtual-disk/admin
+capability records `unavailable` and exits nonzero. There is no fallback to an
+existing volume, policy change, quota change, driver installation or privilege
+adjustment. The ordinary per-user application is not given these development
+fixture capabilities. System DLL paths and hashes are recorded, and loading is
+restricted to System32.
+
+The [image source/notice and reconstruction recipe](../../tools/rust-qa/storage-faults/windows-image/NOTICE.md)
+retain the original dosfstools 4.2 source archive and GPL-3.0-or-later notice.
+This compatible development-only input is separate from the unchanged 31-package
+Rust closure and excluded from product artifacts. Its archive contains 151
+regular files, no links and no image/font assets. All 448 bytes of generated x86
+boot code/message are removed from the template; the enclosing MBR has no code
+or active partition. The formatter, image and Microsoft reference documents are
+not application runtime inputs. The Microsoft firmware-scoped FAT document was
+not used to introduce a new formatter and is not redistributed.
+
+| Prepared input | SHA-256 |
+| --- | --- |
+| Original dosfstools 4.2 source archive | `64926eebf90092dca21b14259a5301b7b98e7b1943e8a201c7d726084809b527` |
+| Empty 15-MiB FAT16 template | `7a2e1de34d343d0ed8e6844c1011b7b1f4867b73df6e4d06adb6e2c362ef3f93` |
+| 15,409-byte compressed template | `adf67fb9d2e2c2d46fdeb0866eedeb318585b9654a25ef26a26524f46aad7de3` |
+| Original GPL notice | `8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903` |
+
+The unmodified upstream source built locally without installation. Its formatter
+and the installed Fedora dosfstools 4.2-19.fc45 independently generated identical
+template bytes. `fsck.fat -n -v` independently passed both after boot-code removal,
+reporting 0/7,656 allocated data clusters. The exact commands, tool hashes and
+logs remain in ignored `windows-template-01`, `windows-template-02` and
+`windows-design-reference` under `artifacts/rust/storage-faults`. The first
+source-build attempt used the host's ccache wrapper and failed during configure;
+the successful retry explicitly selected `/usr/bin/gcc`. No installed file or
+compiler configuration changed.
+
+The fresh native Linux regression `linux-x64-07 --tmpfs` passed 46 expected
+step outcomes, all eight existing fault cases, 208 C# assertions, 16 corruption
+rejections and ten portable preparation tests. The latter include three injected
+capability/post-attachment/cleanup failures using explicit test doubles; they
+verify resource ownership without loading Windows APIs. Rustfmt, denied-warning
+Clippy, both native compiler gates and the C# build passed. All 148 source bindings
+and 464 evidence hashes matched disk. All 453 files of the independently reviewed
+`linux-x64-06` remained unchanged. This is Linux regression and image preparation
+evidence, not an executed Windows filesystem-full result.
+
+| Local regression identity | SHA-256 |
+| --- | --- |
+| `linux-x64-07/result.json` | `e80a9c684179ebe16244c49e295b19090110380be57ef493e2f83207690ef95c` |
+| `linux-x64-07/first-party-source-hashes.json` | `c4bb19c8ebac574296a0680cd922a2af9b298f65dd6445feca83310e13751d54` |
+| `linux-x64-07/evidence-hashes.json` | `6fab7c8ba4c8b673aa052d4f7ef648fdbcf99d10bd7339875b870644c56fdd85` |
+| Rust fault executable | `2b0955ac696872aec5a44357355d207bed1f26e64dae65046a500c6f8ea6cad0` |
+| C# readback assembly | `60ec2b6e4007d2dfc8e8058129aca6053b2348aa0081913db02d0c96602c2517` |
+
+The only required workflow delta is to pass `--windows-vhd` to the existing
+storage-fault runner on the two native Windows lanes. Existing `--tmpfs` Linux
+lanes and artifact inclusion remain appropriate. Source review precedes that
+candidate execution; this task changes no workflow or shared acceptance record.
 
 ## Retained diagnostic attempts
 

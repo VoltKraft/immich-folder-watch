@@ -24,6 +24,7 @@ STORAGE = HERE.parent / "storage"
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(STORAGE))
 from evidence import external_lock, sha256, target_graph, verify_fixture, verify_sources, write_json
+import windows_vhd
 
 
 def isolated(value: Path) -> Path:
@@ -138,9 +139,12 @@ def main() -> int:
     parser.add_argument("--cargo-home", type=Path, default=ROOT / "artifacts/rust/storage-assessment/cargo-home")
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--tmpfs", action="store_true", help="Also run actual ENOSPC in private Linux 8-MiB tmpfs namespaces")
+    parser.add_argument("--windows-vhd", action="store_true", help="Also exhaust an owned 16-MiB FAT16 VHD on disposable hosted Windows only")
     args = parser.parse_args()
     if args.tmpfs and sys.platform != "linux":
         parser.error("--tmpfs is a native Linux experiment")
+    if args.windows_vhd and os.name != "nt":
+        parser.error("--windows-vhd requires a disposable native Windows candidate runner")
     output = isolated(args.output)
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     build = output / "build"
@@ -173,6 +177,10 @@ def main() -> int:
         result["outer_namespaces"] = {name: os.readlink("/proc/self/ns/" + name) for name in ("user", "mnt", "net", "pid")}
         result["tmpfs_limit_bytes"] = 8388608
         result["bubblewrap_sha256"] = sha256(Path(shutil.which("bwrap")))
+    if args.windows_vhd:
+        result["windows_vhd_limit_bytes"] = 16777216
+        result["limits"]["windows_volume_discovery_seconds"] = 30
+        result["limits"]["windows_worker_seconds"] = 60
 
     def command(name: str, arguments: list[str], expected_code: int = 0) -> bytes:
         log = output / (name + ".log")
@@ -186,6 +194,8 @@ def main() -> int:
         return log.read_bytes()
 
     try:
+        if args.windows_vhd:
+            windows_vhd.hosted_gate(ROOT, env)
         command("native-toolchain", [sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"), args.target])
         expected_lock = {(item["name"], item["version"]): item["archive_sha256"] for item in inputs["packages"]}
         if external_lock(HERE / "Cargo.lock") != expected_lock or external_lock(STORAGE / "Cargo.lock") != expected_lock:
@@ -213,6 +223,7 @@ def main() -> int:
         write_json(output / "first-party-source-hashes.json", hashes)
         result["first_party_sources"] = len(hashes)
         command("format", ["rustfmt", "--edition", "2024", "--check", str(HERE / "src/main.rs"), str(HERE / "build.rs")])
+        command("windows-image-preparation-tests", [sys.executable, str(HERE / "test_windows_image.py"), "-v"])
         common = ["--manifest-path", str(HERE / "Cargo.toml"), "--frozen", "--target", args.target]
         command("clippy", ["cargo", "clippy", *common, "--all-targets", "--", "-D", "warnings"])
         command("build", ["cargo", "build", *common, "--release"])
@@ -251,10 +262,16 @@ def main() -> int:
         cases = output / "cases"
         cases.mkdir()
         for mode in ("sensitive", "insensitive"):
-            for fault in ("uncommitted", "commit-before-ack", "sqlite-full", *(["enospc"] if args.tmpfs else [])):
+            for fault in ("uncommitted", "commit-before-ack", "sqlite-full", *(["enospc"] if args.tmpfs else []),
+                          *(["windows-full"] if args.windows_vhd else [])):
                 name = mode + "-" + fault
                 case = cases / name
-                if fault == "enospc":
+                if fault == "windows-full":
+                    private = windows_vhd.run(binary, seed, case, mode, env, ROOT)
+                    result["steps"][name + "-volume"] = {"call": "windows_vhd.run", "exit_code": 0,
+                        "expected_exit_code": 0, "receipt": str((case / "windows-vhd.json").relative_to(output))}
+                    events = private["events"]
+                elif fault == "enospc":
                     namespace_command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--cap-drop", "ALL",
                         "--ro-bind", "/usr", "/usr", "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
                         "--symlink", "usr/bin", "/bin", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
@@ -288,7 +305,7 @@ def main() -> int:
                 command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
                 checks.append(snapshot_check(case, anchor, "after-csharp"))
                 readback = json.loads((case / "csharp-readback.json").read_text())
-                if readback["Assertions"] != (32 if fault == "enospc" else 24):
+                if readback["Assertions"] != (32 if fault in ("enospc", "windows-full") else 24):
                     raise ValueError("C# readback assertion count differs")
                 verification = json.loads((case / "verification.json").read_text())
                 if (not readback["RetainedSnapshotUnchanged"]
@@ -336,14 +353,14 @@ def main() -> int:
         result["status"] = "passed"
         print("Storage faults passed:", output, flush=True)
     except Exception as error:
-        result["status"] = "failed"
+        result["status"] = "unavailable" if isinstance(error, windows_vhd.Unavailable) else "failed"
         result["error"] = str(error)
         traceback.print_exc()
     finally:
         write_json(output / "result.json", result)
         write_json(output / "evidence-hashes.json", {p.relative_to(output).as_posix(): sha256(p)
             for p in sorted(output.rglob("*")) if p.is_file() and "build" not in p.relative_to(output).parts and p.name != "evidence-hashes.json"})
-    return 0 if result["status"] == "passed" else 1
+    return 0 if result["status"] == "passed" else (2 if result["status"] == "unavailable" else 1)
 
 
 if __name__ == "__main__":

@@ -28,13 +28,62 @@ The runner kills only children it starts. Compilation uses `--frozen`; cached
 NuGet restore disables advisory retrieval explicitly, and does not establish a
 current vulnerability scan.
 
+On a **disposable GitHub-hosted Windows candidate** for this repository's
+`rewrite/rust` branch, select `--windows-vhd` instead of `--tmpfs`:
+
+```powershell
+python tools/rust-qa/storage-faults/run.py x86_64-pc-windows-msvc `
+  --output artifacts/rust/storage-faults/windows-x64-new --windows-vhd --dotnet dotnet
+```
+
+Use `aarch64-pc-windows-msvc` and a fresh ARM64 output for the other native target.
+The runner requires native Python/Rust/.NET architecture, hosted-runner identity
+and available Windows virtual-disk/admin capability. Missing capability records
+`unavailable` and exits nonzero; it never becomes a passing filesystem-full test.
+There is no automatic privilege/policy change or alternative host disk selection.
+Do not run the Windows volume experiment on a personal or persistent machine.
+
+The source-pinned [empty image recipe and notice](windows-image/NOTICE.md) produce
+a 15-MiB FAT16 data partition in a fixed 16-MiB VHD. Windows needs only Python
+stdlib and its installed `virtdisk.dll`/`kernel32.dll`, loaded from System32.
+It verifies the whole initialized file before attachment, retains its file
+identity without delete sharing, and attaches only its own virtual handle with
+`NO_DRIVE_LETTER` and non-permanent lifetime. It verifies the handle-derived
+physical disk's exact MBR and size, then accepts only a new volume GUID with one
+matching disk extent, filesystem serial, label and cluster geometry. No attached
+disk is formatted, initialized, brought online or selected by ambient number.
+No drive letter or directory-mount fallback exists. The fixed backing is created
+only with at least 256 MiB free on the local host filesystem.
+
+Only that new volume GUID is passed to the native worker, together with the
+supervisor's fresh authorization marker. The native filler must observe Win32
+39 or 112; the supervisor must independently observe zero available/free bytes
+while SQLite returns 13. It then permits removal of only the owned filler and
+the same-volume backup restore. Both modes use the existing Rust/C# recovery,
+producer-hash and byte-corruption controls: eight cases and 208 C# assertions
+when the native Windows qualification passes. An ordinary synthetic file also
+records extended and legacy IDs on one handle before/after rename; a cached FAT
+ID never selects a destructive action.
+
+Every exit path closes owned handles, attempts explicit detach and retains a
+cleanup receipt. Success additionally requires the volume to disappear, fixed
+MBR/footer and size to remain unchanged, and a hash of the detached VHD. The
+initialized and final images are synthetic evidence, not recovery backups or
+product assets. Native Windows execution is pending until a source-bound CI run.
+
+Portable image/layout, corruption, capability-gate and simulated cleanup checks:
+`python tools/rust-qa/storage-faults/test_windows_image.py -v`. These checks do not
+execute or substitute for Windows mounting or filesystem exhaustion.
+
 Output must be a fresh directory strictly below `artifacts/rust/storage-faults`.
 Each failed run is retained; retry with a new name. Only this fresh synthetic tree
 is mutated. No user application profile is opened. Each ordinary command step
 (including builds, the portable page-limit worker, Rust verification and C#
 readback) has a 600-second timeout. The supervised crash worker has a 30-second
 readiness deadline and a 10-second termination wait. The private tmpfs supervisor
-has a separate 30-second watchdog and a 10-second child termination wait. The transaction
+has a separate 30-second watchdog and a 10-second child termination wait.
+Windows volume discovery is bounded to 30 seconds, its native worker to 60
+seconds, termination to 10 seconds and detach readback to 10 seconds. The transaction
 payload is fixed at 2 MiB. The `SQLITE_FULL` case limits database growth to 16
 pages beyond its measured initial size; this is not filesystem `ENOSPC`.
 
