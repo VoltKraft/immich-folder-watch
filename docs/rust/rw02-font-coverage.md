@@ -245,9 +245,8 @@ input phase, most recent field state and received events. After a live
 subject drains, the observer continues with the next independent case. The
 overall command returns failure if any phase was missing or if any of the
 four cases is absent. Selection, arrow indices, deletion and digit-field
-pixel comparisons keep their original acceptance limits. A new native
-Windows run is needed to distinguish lost pointer delivery from field focus
-or hit processing. [Rust input observation](../../tools/rust-qa/font-coverage/font_probe.rs)
+pixel comparisons keep their original acceptance limits. The next native
+run captured the events below. [Rust input observation](../../tools/rust-qa/font-coverage/font_probe.rs)
 and [timeout and completeness controls](../../tools/rust-qa/font-coverage/test_observations.py).
 
 The instrumented Linux x64 release passed its offline Clippy/build and all
@@ -257,3 +256,46 @@ in passes 7 and 10. Its result SHA-256 is
 Seven portable controls passed. Replaying the reported acceptance values
 accepted the completed Linux x64/ARM64, Windows ARM64 and earlier
 Windows x64 runs and rejected the incomplete Windows x64 run at `a66e045`.
+
+## Windows pointer delivery at 3b4854d
+
+The standalone x64 probe completed the Latin control. All three interactive
+cases received a primary-button press at the intended field coordinate and
+then `PointerGone` in the same egui pass. All three fields kept their
+initial caret indices of −1. The observer recorded the failures and drained
+each process. [Four native archives from run 45039099730](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730).
+
+| Windows x64 case | Observed first press and subsequent events |
+| --- | --- |
+| CJK | At (19, 52), pass 3 contained the press, departure and a motion to (452, 301) outside the field. Pass 5 received the release. The field never acquired focus. |
+| Mixed | At (70, 52), pass 4 contained the press and departure. Both button messages had been queued for the owned foreground window. The physical cursor matched that point, but egui recorded no release. |
+| Digits | At (73, 52), pass 4 contained the press and departure. Both messages were addressed to the owned window while it lacked foreground focus. The driver made no physical cursor move. |
+
+The four x64 frame readbacks matched ARM64 byte for byte. On its private
+active desktop, ARM64 passed all four cases. In the mixed case, pass 4
+received the move and press at (70, 52) with field focus. Pass 6 received
+the release and reported a click. The ordinary Windows editors passed
+all three edits on both architectures. Both Ubuntu standalone probes
+passed all four cases. The standalone result SHA-256 values are
+`88fe2b5a97621d2e41724e1e50406405319832ececc6b79e2f56486f7f286c52` (Windows x64)
+and `49245549cc26d298ec194cdfd6147d73f7fb08be5751e1a9c07a63b5dcadc95c` (Windows ARM64).
+[Ordinary editor checks](rw02-windows-text.md).
+
+The revised Windows driver waits for the owned window and egui viewport
+to have focus. Before the first gesture it may request foreground once
+for that window on a disposable hosted runner. It approaches the target
+from an adjacent field pixel. Two successive moves must produce distinct
+egui pass numbers, the expected coordinates, a hit on the filename field
+and the expected button state. Hosted runs use native cursor positioning
+for motion and check the real cursor, foreground and window ownership
+again before sending each button message directly to the child HWND.
+Each completed gesture submits one press and one release. A missing
+prerequisite or edit fails that case and the overall result. Thirteen
+portable tests passed. The instrumented release passed offline Clippy and
+all four existing private Linux x64 cases. Its log recorded the focused
+field hit with the button up and down in each interactive case. The result
+SHA-256 is `9f308c2155ce5d0242e8f048d83e7b36f9fc9c6046430f29a3c181522dab5cbf`.
+The native Windows rerun of the revised driver remains open.
+[Windows driver](../../tools/rust-qa/font-coverage/observe.py),
+[pass observation](../../tools/rust-qa/font-coverage/font_probe.rs) and
+[pointer controls](../../tools/rust-qa/font-coverage/test_pointer.py).

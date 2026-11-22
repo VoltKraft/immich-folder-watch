@@ -114,6 +114,15 @@ def arabic_pixels(frame, bounds, initial):
     return measured
 
 
+def last_field_pointer(messages):
+    for line in reversed(messages.splitlines(keepends=True)):
+        if line.startswith("FONT_POINTER ") and line.endswith("\n"):
+            _, pass_no, x, y, focused, hit, held = line.split()
+            return {"pass": int(pass_no), "clientPixel": [int(x), int(y)], "viewportFocused": focused == "true",
+                    "fieldHit": hit == "true", "primaryDown": held == "true"}
+    return None
+
+
 class MissingObservation(RuntimeError):
     def __init__(self, phase, process_exit, messages, start):
         states = fields(messages)
@@ -131,7 +140,7 @@ class MissingObservation(RuntimeError):
                            "fieldFocused": field == "true", "fieldClicked": click == "true"})
         self.detail = {"phase": phase, "childExitAtFailure": process_exit, "fieldsBeforeAction": start,
                        "fieldCount": len(states), "eguiInputCount": len(events),
-                       "lastEguiInputs": events[-24:]}
+                       "lastEguiInputs": events[-24:], "lastFieldPointer": last_field_pointer(messages)}
         if states:
             self.detail["lastField"] = {key: states[-1][key] for key in ("primary", "secondary", "caretX", "text")}
         super().__init__(f"Missing {phase}. Child exit {process_exit}, field states {len(states)}, "

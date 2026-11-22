@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 
-from text_observations import CASES, MissingObservation, check_case
+from text_observations import CASES, MissingObservation, check_case, last_field_pointer, wait_value
 
 HERE = Path(__file__).resolve().parent
 TRIALS = (("latin", "glyphs"), ("fallback", "glyphs"), ("fallback", "mixed"), ("fallback", "numbers"))
@@ -72,8 +72,10 @@ class X11Input:
 
 class WindowsInput:
     """Send window-targeted messages only to the synthetic child's verified top-level HWND."""
-    def __init__(self, observer):
+    def __init__(self, observer, process, log):
         self.observer = observer
+        self.process, self.log = process, log
+        self.first_gesture = True
         self.pointer_positions = {"ownedDesktopPoint": 0, "windowMessagesOnly": 0}
         self.pointer_events = []
         from ctypes import wintypes as w
@@ -90,64 +92,110 @@ class WindowsInput:
         self.foreground = user.GetForegroundWindow
         self.foreground.argtypes = []
         self.foreground.restype = w.HWND
+        self.activate = user.SetForegroundWindow
+        self.activate.argtypes = [w.HWND]
+        self.activate.restype = w.BOOL
         self.point = w.POINT
         self.disposable = (os.getenv("RUNNER_ENVIRONMENT") == "github-hosted"
                            and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch"
                            and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust")
 
-    def send(self, msg, key, pos):
-        hwnd = self.observer.visible()
-        if not hwnd or not self.observer.post(hwnd, msg, key, pos):
-            raise RuntimeError("Could not deliver a native input message to the synthetic window")
+    def missing(self, phase):
+        messages = self.log.read_text(encoding="utf-8", errors="replace")
+        raise MissingObservation(phase, self.process.poll(), messages, 0)
+
+    def await_pointer(self, phase, predicate):
+        def match(messages):
+            state = last_field_pointer(messages)
+            return state if state and predicate(state) else None
+        return wait_value(match, self.process, self.log, phase, seconds=8)
+
+    def target_point(self, hwnd, x, y, event, *, check_cursor):
+        event["foregroundOwned"] = self.observer.visible() == hwnd and self.foreground() == hwnd
+        if not event["foregroundOwned"]:
+            self.missing("owned foreground window for the pointer")
+        position = self.point(x, y)
+        if not self.client_to_screen(hwnd, c.byref(position)):
+            self.missing("owned window client coordinates")
+        event["screenPixel"] = [position.x, position.y]
+        event["pointOwned"] = self.observer.ancestor(self.at_point(position), 2) == hwnd
+        if not event["pointOwned"]:
+            self.missing("uncovered point on the owned window")
+        if self.disposable and check_cursor:
+            actual = self.point()
+            event["cursorMatched"] = bool(self.cursor(c.byref(actual))) and (position.x, position.y) == (actual.x, actual.y)
+            event["cursorOnSubject"] = event["cursorMatched"] and self.observer.ancestor(self.at_point(actual), 2) == hwnd
+            if not event["cursorOnSubject"]:
+                self.missing("cursor readback at the owned window point")
+        return position
+
+    def move(self, hwnd, x, y, held, previous_pass):
+        event = {"action": "move", "hwnd": hex(hwnd), "clientPixel": [x, y], "moveHeld": held}
+        self.pointer_events.append(event)
+        position = self.target_point(hwnd, x, y, event, check_cursor=False)
+        if self.disposable:
+            event["cursorMoved"] = bool(self.set_position(position.x, position.y))
+            if not event["cursorMoved"]:
+                self.missing("native pointer motion on the disposable desktop")
+            self.pointer_positions["ownedDesktopPoint"] += 1
+        else:
+            event["movePosted"] = bool(self.observer.post(hwnd, 0x200, int(held), (y << 16) | x))
+            if not event["movePosted"]:
+                self.missing("pointer motion addressed to the owned window")
+            self.pointer_positions["windowMessagesOnly"] += 1
+        state = self.await_pointer(f"field pointer at ({x}, {y})",
+                                  lambda p: p["pass"] > previous_pass and p["clientPixel"] == [x, y]
+                                  and p["viewportFocused"] and p["fieldHit"] and p["primaryDown"] == held)
+        self.target_point(hwnd, x, y, event, check_cursor=True)
+        event["fieldPass"] = state["pass"]
+        return state["pass"]
+
+    def button(self, hwnd, x, y, pressed):
+        message = 0x201 if pressed else 0x202
+        event = {"action": "button", "hwnd": hex(hwnd), "clientPixel": [x, y], "button": message}
+        self.pointer_events.append(event)
+        self.target_point(hwnd, x, y, event, check_cursor=True)
+        event["buttonPosted"] = bool(self.observer.post(hwnd, message, int(pressed), (y << 16) | x))
+        if not event["buttonPosted"]:
+            self.missing("button addressed to the owned window")
         time.sleep(.09)
 
-    def mouse(self, x, y, held, button=None):
+    def gesture(self, x0, x1, y):
         hwnd = self.observer.visible()
         if not hwnd:
-            raise RuntimeError("The synthetic child has no visible client for the pointer")
-        position = self.point(x, y)
-        event = {"hwnd": hex(hwnd), "clientPixel": [x, y], "moveHeld": held, "button": button,
-                 "movePosted": False, "buttonPosted": False}
-        self.pointer_events.append(event)
-        moved = False
-        if self.disposable:
-            event["foregroundOwned"] = self.foreground() == hwnd
-            if event["foregroundOwned"] and self.client_to_screen(hwnd, c.byref(position)):
-                event["screenPixel"] = [position.x, position.y]
-                event["pointOwned"] = self.observer.ancestor(self.at_point(position), 2) == hwnd
-                if event["pointOwned"]:
-                    moved = bool(self.set_position(position.x, position.y))
-                    actual = self.point()
-                    if moved and self.cursor(c.byref(actual)):
-                        event["cursorMatched"] = (position.x, position.y) == (actual.x, actual.y)
-                        event["cursorOnSubject"] = self.observer.ancestor(self.at_point(actual), 2) == hwnd
-        self.pointer_positions["ownedDesktopPoint" if moved else "windowMessagesOnly"] += 1
-        packed = (y << 16) | x
-        event["movePosted"] = bool(self.observer.post(hwnd, 0x200, int(held), packed))
-        if not event["movePosted"]:
-            raise RuntimeError("Could not deliver client pointer coordinates to the owned HWND")
-        # Winit uses TrackMouseEvent and egui drops a click after WM_MOUSELEAVE clears its
-        # last pointer position. Put the position and button in the same queue burst.
-        if button is not None:
-            event["buttonPosted"] = bool(self.observer.post(hwnd, button, int(button == 0x201), packed))
-            if not event["buttonPosted"]:
-                raise RuntimeError("Could not deliver the owned window's pointer button")
-        time.sleep(.09)
+            self.missing("visible owned window for the pointer")
+        if self.first_gesture and self.disposable and self.foreground() != hwnd:
+            self.pointer_events.append({"action": "activate", "hwnd": hex(hwnd), "accepted": bool(self.activate(hwnd))})
+        self.first_gesture = False
+        start = self.await_pointer("active owned viewport before pointer motion",
+                                   lambda p: p["viewportFocused"] and not p["primaryDown"]
+                                   and self.observer.visible() == hwnd and self.foreground() == hwnd)
+        # Winit filters duplicate coordinates. Approach from a distinct in-field pixel,
+        # then witness the resolved field at the actual hit point before pressing once.
+        approach = x0 + (2 if start["clientPixel"] == [x0 + 1, y] else 1)
+        pass_no = self.move(hwnd, approach, y, False, start["pass"])
+        pass_no = self.move(hwnd, x0, y, False, pass_no)
+        self.button(hwnd, x0, y, True)
+        if x0 != x1:
+            self.move(hwnd, x1, y, True, pass_no)
+        self.button(hwnd, x1, y, False)
 
     def click(self, x, y):
-        self.mouse(x, y, False, 0x201)
-        self.mouse(x, y, True, 0x202)
+        self.gesture(x, x, y)
 
     def drag(self, x0, x1, y):
-        self.mouse(x0, y, False, 0x201)
-        self.mouse(x1, y, True)
-        self.mouse(x1, y, True, 0x202)
+        self.gesture(x0, x1, y)
 
     def key(self, name):
         vk, scan = {"Right": (0x27, 0x4d), "Left": (0x25, 0x4b), "Delete": (0x2e, 0x53)}[name]
         bits = 1 | (scan << 16) | (1 << 24)
-        self.send(0x100, vk, bits)
-        self.send(0x101, vk, bits | (3 << 30))
+        hwnd = self.observer.visible()
+        for message, lparam in ((0x100, bits), (0x101, bits | (3 << 30))):
+            if not hwnd or self.observer.visible() != hwnd or self.foreground() != hwnd:
+                self.missing("focused owned window for the keyboard")
+            if not self.observer.post(hwnd, message, vk, lparam):
+                self.missing("key addressed to the owned window")
+            time.sleep(.09)
 
 
 def digest(path):
@@ -206,7 +254,7 @@ def run(binary, work, observer=None, display="Windows test desktop"):
             if windows:
                 target = module.Windows(process.pid)
                 cleanup.callback(target.close)
-                controls = WindowsInput(target)
+                controls = WindowsInput(target, process, log)
                 process.stdin.write(b"N")
                 process.stdin.flush()
             else:
@@ -243,6 +291,8 @@ def run(binary, work, observer=None, display="Windows test desktop"):
             continue
         adapter = next(line.removeprefix("ADAPTER ") for line in output.splitlines() if line.startswith("ADAPTER "))
         result.update(frameSha256=digest(directory / "observed.ppm"), nativeLogSha256=digest(log), adapter=adapter)
+        if windows:
+            result["pointerSha256"] = digest(directory / "pointer.json")
         report["runs"].append(result)
         save_report(work, report)
         print(profile, name, result["renderedCoverageMatches"], ascii(result["observedVisual"]),

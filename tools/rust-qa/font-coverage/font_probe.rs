@@ -58,6 +58,15 @@ pub(super) fn filename_edit(ui: &mut egui::Ui, text: &mut String, label: egui::I
     // Observe what reached egui after the window system processed the fixture's
     // pointer commands. Do not request focus or change the field's interaction.
     ui.input(|input| {
+        let (x, y) = input.pointer.hover_pos().map_or((-1, -1), |p| {
+            ((p.x * scale).round() as i32, (p.y * scale).round() as i32)
+        });
+        println!(
+            "FONT_POINTER {pass} {x} {y} {} {} {}",
+            input.focused,
+            output.response.contains_pointer(),
+            input.pointer.primary_down()
+        );
         for event in &input.raw.events {
             let (kind, pos) = match event {
                 egui::Event::PointerMoved(pos) => ("move", Some(pos)),
