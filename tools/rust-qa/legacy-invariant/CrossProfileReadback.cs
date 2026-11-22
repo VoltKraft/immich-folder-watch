@@ -27,7 +27,7 @@ internal static partial class CasingCases
         if (members.Length != names.Length || members.Any(file => file is not FileInfo || file.LinkTarget is not null ||
                 file.Attributes.HasFlag(FileAttributes.ReparsePoint) || !names.Contains(file.Name, StringComparer.Ordinal)))
             throw new IOException("Expected only the four regular files of a finalized synthetic capture.");
-        return members.ToDictionary(file => file.Name, file => HashFile(file.FullName), StringComparer.Ordinal);
+        return names.ToDictionary(name => name, name => HashFile(Path.Combine(directory, name)), StringComparer.Ordinal);
     }
 
     private static StudyWriter CheckStudyWriter(string path, StudyProfile profile, string os, string arch,

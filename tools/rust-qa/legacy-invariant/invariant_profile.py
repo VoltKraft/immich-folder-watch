@@ -181,7 +181,7 @@ def main():
         if args.readers:
             from readers import verify_readers
             result["actualReaderComparisons"] = verify_readers(args.readers, args.writers, tables, result["storeObservations"])
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
