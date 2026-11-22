@@ -5,17 +5,27 @@ import unittest
 from unittest.mock import patch
 
 import casing_profiles
+import oracle_runtime
 import verify
 
 
 class CasingProfileTests(unittest.TestCase):
+    def test_runtime_selection_requires_the_exact_installed_patch(self):
+        pin = "Microsoft.NETCore.App 10.0.12 [/sdk/shared/Microsoft.NETCore.App]"
+        newer = "Microsoft.NETCore.App 10.0.15 [/sdk/shared/Microsoft.NETCore.App]"
+        path, versions = oracle_runtime.installed_corelib("\r\n".join([newer, pin]))
+        self.assertEqual(path, Path("/sdk/shared/Microsoft.NETCore.App/10.0.12/System.Private.CoreLib.dll"))
+        self.assertEqual(versions, ["10.0.15", "10.0.12"])
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            oracle_runtime.installed_corelib(newer)
+
     def test_managed_mode_requires_its_own_runtime_and_complete_table(self):
         table = Path(__file__).resolve().parents[1] / "legacy-invariant/managed-invariant-10.0.12.tsv"
         manifest = {"GlobalizationInvariantRequested": True, "Runtime": "10.0.12", "CoreLibSha256": "e" * 64,
                     "CoreLibBuild": "10.0.12+95017c711e6afc1085133d440e42b4bd78155701"}
         self.assertTrue(verify.independent_casing(table, manifest, True)[1]["qualified"])
         self.assertFalse(verify.independent_casing(table, manifest, False)[1]["qualified"])
-        for key, value in (("GlobalizationInvariantRequested", False), ("Runtime", "10.0.11"),
+        for key, value in (("GlobalizationInvariantRequested", False), ("Runtime", "10.0.11"), ("Runtime", "10.0.15"),
                            ("CoreLibBuild", "10.0.12+different-source"), ("CoreLibSha256", None)):
             with self.subTest(field=key), self.assertRaisesRegex(ValueError, "reviewed .NET runtime"):
                 verify.independent_casing(table, {**manifest, key: value}, True)

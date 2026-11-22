@@ -6,6 +6,16 @@ SQLite path keys. A table describes observable behavior. The writer installation
 that produced an existing database can remain unknown. The storage migration
 qualifier continues to accept its two independently reviewed ICU tables.
 
+The native feasibility runner builds the scalar oracle once with the SDK in
+`global.json`. Both captures execute the resulting Release DLL using
+`dotnet exec --fx-version 10.0.12 --roll-forward Disable`. The ordinary
+process selects the host's ICU and the managed process enables invariant
+globalization. `legacy-runtime.json` binds both manifests' process and OS
+architecture, runtime version, and assembly hashes to the local Release DLL
+and the installed 10.0.12 CoreLib. It records the SDK and all installed
+Microsoft.NETCore.App versions. The managed comparison also checks the
+CoreLib build and the complete table against the reconstructed source.
+
 ## Source reconstruction
 
 The native CoreLib reports the version suffix

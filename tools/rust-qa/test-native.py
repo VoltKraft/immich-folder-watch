@@ -9,6 +9,8 @@ import platform
 import subprocess
 import sys
 
+from legacy.oracle_runtime import RUNTIME_VERSION
+
 
 ROOT = Path(__file__).resolve().parents[2]
 QA = ROOT / "tools/rust-qa"
@@ -49,8 +51,10 @@ def main():
         "lockSha256": hashlib.sha256((WORKSPACE / "Cargo.lock").read_bytes()).hexdigest(),
         "steps": {},
     }
-    oracle = ["dotnet", "run", "--no-restore", "--configuration", "Release", "--project", scalar_project,
-              "-p:EnableWindowsTargeting=false"]
+    oracle_dll = cargo_target / "scalar-oracle/LegacyScalarOracle.dll"
+    oracle = ["dotnet", "exec", "--fx-version", RUNTIME_VERSION, "--roll-forward", "Disable", str(oracle_dll), "export"]
+    ordinary = evidence / "scalar-reference"
+    managed = evidence / "managed-scalar-reference"
     compare = [sys.executable, str(QA / "legacy/verify.py"), "--probe",
                str(cargo_target / "release" / ("legacy-probe" + suffix)), "--fixtures", str(WORKSPACE / "tests/fixtures/legacy")]
     commands = {
@@ -71,12 +75,16 @@ def main():
         # sources, even though the shipping solution enables Windows targeting.
         "legacy-restore": ["dotnet", "restore", scalar_project, "--source", str(empty_feed),
                            "-p:EnableWindowsTargeting=false"],
-        "legacy-oracle": [*oracle, "--", "export", str(evidence / "scalar-reference")],
-        "legacy-reference": [*compare, "--scalar-reference", str(evidence / "scalar-reference"),
+        "legacy-build": ["dotnet", "build", scalar_project, "--no-restore", "--configuration", "Release",
+                         "--output", str(oracle_dll.parent), "-p:EnableWindowsTargeting=false"],
+        "legacy-oracle": [*oracle, str(ordinary)],
+        "legacy-reference": [*compare, "--scalar-reference", str(ordinary),
                              "--require-known-casing", "--output", str(evidence / "legacy.json")],
-        "legacy-managed-oracle": [*oracle, "--no-build", "--", "export", str(evidence / "managed-scalar-reference")],
-        "legacy-managed-reference": [*compare, "--scalar-reference", str(evidence / "managed-scalar-reference"),
-                                     "--managed-invariant", "--paired-default", str(evidence / "scalar-reference"),
+        "legacy-managed-oracle": [*oracle, str(managed)],
+        "legacy-runtime": [sys.executable, "-B", str(QA / "legacy/oracle_runtime.py"), args.target, str(oracle_dll),
+                           str(ordinary), str(managed), str(evidence / "legacy-runtime.json")],
+        "legacy-managed-reference": [*compare, "--scalar-reference", str(managed),
+                                     "--managed-invariant", "--paired-default", str(ordinary),
                                      "--output", str(evidence / "managed-legacy.json")],
     }
     for name, command in commands.items():
@@ -85,7 +93,10 @@ def main():
         directory = WORKSPACE if command[0] == "cargo" else ROOT
         with log.open("wb") as stream:
             try:
-                command_env = {**env, "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"} if name == "legacy-managed-oracle" else env
+                command_env = env
+                if name in {"legacy-oracle", "legacy-managed-oracle"}:
+                    mode = "1" if name == "legacy-managed-oracle" else "0"
+                    command_env = {**env, "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": mode}
                 status = subprocess.run(command, cwd=directory, env=command_env, stdout=stream,
                                         stderr=subprocess.STDOUT, timeout=900).returncode
             except subprocess.TimeoutExpired:
