@@ -68,7 +68,7 @@ def received(area, stage, duration, proc):
 
 
 def snapshot(area, name, proc, report):
-    values = received(area, name, 8, proc)
+    values = received(area, name, 14 if name == "first" else 8, proc)
     if len(values) != 10 or values[0] != proc.pid or values[1] <= 0 or values[2] != ICON:
         raise ValueError("Invalid source identity in the Rust tray observation")
     item = {"pid": values[0], "hwnd": values[1], "iconId": values[2], "ready": values[3] == 1,
@@ -79,6 +79,19 @@ def snapshot(area, name, proc, report):
     if item["opensBeforeInput"]:
         raise Unavailable("The Rust receiver already had an activation before observer input")
     return item
+
+
+def check_registration_cleanup(metrics):
+    first = metrics.get("private_tray.initial.add")
+    retry = metrics.get("private_tray.startup_retry.add")
+    registered = metrics.get("private_tray.registered")
+    if type(first) is not bool or type(registered) is not bool:
+        raise RuntimeError("Missing the original or final Shell registration result")
+    if retry is not None:
+        if type(retry) is not bool or first or metrics.get("private_tray.startup_host_unchanged") is not True:
+            raise RuntimeError("Unexpected retry of the fixture's Shell registration")
+    if registered != (first or retry is True) or (registered and metrics.get("private_tray.remove") is not True):
+        raise RuntimeError("The final registration or removal of the fixture icon was not confirmed")
 
 
 def wait_color(sample, rgb, duration, record):
@@ -265,9 +278,9 @@ def trial(target, name, host, output, report):
                         log.flush()
                         metrics = module("service_readback", HERE / "run.py").read_native(output / "native.txt")
                         report["native"] = metrics
-                        if (proc.returncode or metrics.get("private_tray.synthetic_open") != 0 or
-                                (metrics.get("private_tray.initial.add") and metrics.get("private_tray.remove") is not True)):
+                        if proc.returncode or metrics.get("private_tray.synthetic_open") != 0:
                             raise RuntimeError("The native receiver, callback isolation or icon removal failed")
+                        check_registration_cleanup(metrics)
                     if metrics.get("private_tray.pointer_open", 0) < 1:
                         raise RuntimeError("The receiver did not retain the independently observed activation")
     finally:

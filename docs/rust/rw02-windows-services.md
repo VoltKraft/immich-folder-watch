@@ -233,8 +233,28 @@ controls, the PowerShell parser and the embedded observer's C# compiler. Rustfmt
 and warnings-denied offline Clippy passed for both pinned MSVC targets. A fresh
 audit verified the unpacked dependencies against their archives and reproduced
 both pinned target graph hashes. The new Win32 calls use the
-system's User32, Shell32, Gdi32 and Kernel32 libraries. Native private-desktop
-results on Windows x64 and ARM64 are pending. This fixture qualifies a
-shell-dispatched activation of the Rust receiver. Actual Explorer crash
-recovery, visible user notification presentation and end-to-end opening of
-the product GUI retain separate acceptance evidence.
+system's User32, Shell32, Gdi32 and Kernel32 libraries.
+
+At `3b4854d` both Windows targets observed a visible taskbar owned by their
+fresh private Explorer. Each Shell refused the receiver's initial icon
+registration. The rectangle query returned `0x80004005` and empty bounds.
+Both fixtures stopped before pointer input and recorded zero activations.
+Both removed the temporary directory, closed the empty Explorer job and
+restored the original input desktop. In the separate original-desktop
+control, x64 registered and removed the icon and recorded a balloon callback.
+ARM64 declined registration there. The two private activation receipts have
+SHA-256 `13037d65b9fbd331fb606d204a327c07327760bac2d64d6587f81c0829da6a95`
+(x64) and `e4d5e5168962e858d25728455cba6717c9eeb93722a0cdc4b25ea2f32c33c14b`
+(ARM64). [Four native archives](rw02-native-gui.md#native-follow-up-at-3b4854d).
+
+The follow-up gives the newly started Shell one more opportunity to register
+the application's icon. After an initial refusal, the Rust receiver processes
+its own messages until `TaskbarCreated` or a three-second deadline. It retries
+once if the visible taskbar still has the original HWND, process, thread and
+desktop. A successful first registration skips the retry. The receipt retains
+each Shell response and requires successful removal of any registered icon.
+Rustfmt, offline Clippy on both Windows targets and 22 portable observer
+tests passed. Native activation, Explorer restart, visible notification
+presentation and opening the product GUI still need direct observation.
+[Shell registration](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyiconw)
+· [Taskbar creation notification](https://learn.microsoft.com/en-us/windows/win32/shell/taskbar).

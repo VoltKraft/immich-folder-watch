@@ -11,10 +11,23 @@ import unittest
 from unittest.mock import Mock, patch
 
 from activation_native import ICON, Native, Unavailable, callback_tick, center, expected_colors, matches, same_spot
-from activation_worker import challenge, gesture, overflow, snapshot
+from activation_worker import challenge, check_registration_cleanup, gesture, overflow, snapshot
 
 
 class Activation(unittest.TestCase):
+    def test_native_registration_retry_requires_the_same_shell_and_confirmed_cleanup(self):
+        first = {"private_tray.initial.add": True, "private_tray.registered": True, "private_tray.remove": True}
+        retried = {**first, "private_tray.initial.add": False, "private_tray.startup_retry.add": True,
+                   "private_tray.startup_host_unchanged": True}
+        for case in (first, retried, {"private_tray.initial.add": False, "private_tray.registered": False},
+                     {**retried, "private_tray.startup_retry.add": False, "private_tray.registered": False}):
+            check_registration_cleanup(case)
+        for case in ({**retried, "private_tray.initial.add": True},
+                     {**retried, "private_tray.startup_host_unchanged": False},
+                     {**retried, "private_tray.remove": False}, {**first, "private_tray.registered": False}, {}):
+            with self.subTest(case=case), self.assertRaises(RuntimeError):
+                check_registration_cleanup(case)
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

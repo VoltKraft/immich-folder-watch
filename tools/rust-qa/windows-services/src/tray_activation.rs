@@ -143,8 +143,59 @@ fn requested(area: &Path, name: &str, until: Instant) -> Result<bool> {
     }
 }
 
+fn private_taskbar(desktop: &str) -> Result<Option<(HWND, u32, u32)>> {
+    // Only inspect the visible Shell window on the current synthetic desktop.
+    unsafe {
+        let Ok(bar) = FindWindowW(w!("Shell_TrayWnd"), None) else {
+            return Ok(None);
+        };
+        let mut pid = 0;
+        let thread = GetWindowThreadProcessId(bar, Some(&mut pid));
+        if thread == 0
+            || pid == 0
+            || !IsWindowVisible(bar).as_bool()
+            || desktop_name(thread)? != desktop
+        {
+            return Ok(None);
+        }
+        Ok(Some((bar, pid, thread)))
+    }
+}
+
+fn register_on_startup(
+    icon: &mut Icon<'_>,
+    image: HICON,
+    area: &Path,
+    desktop: &str,
+) -> Result<(bool, bool)> {
+    let original = private_taskbar(desktop)?;
+    let initial = icon.register("initial", image);
+    if initial.0 {
+        return Ok(initial);
+    }
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(3)
+        && EVENTS.get().taskbar == 0
+        && !area.join("finish").is_file()
+    {
+        pump(50);
+    }
+    let same = original.is_some() && original == private_taskbar(desktop)?;
+    println!(
+        "private_tray.startup_wait_ms={}",
+        start.elapsed().as_millis()
+    );
+    println!("private_tray.startup_broadcasts={}", EVENTS.get().taskbar);
+    println!("private_tray.startup_host_unchanged={same}");
+    if same && !area.join("finish").is_file() {
+        return Ok(icon.register("startup_retry", image));
+    }
+    Ok(initial)
+}
+
 pub(crate) fn assess(area: &Path, id: &str) -> Result<()> {
-    if desktop_name(unsafe { GetCurrentThreadId() })? != format!("IfwQa_{id}") {
+    let desktop = format!("IfwQa_{id}");
+    if desktop_name(unsafe { GetCurrentThreadId() })? != desktop {
         return Err(invalid());
     }
     // Both observers operate on the primary desktop's physical screen coordinates.
@@ -166,7 +217,8 @@ pub(crate) fn assess(area: &Path, id: &str) -> Result<()> {
         title: format!("IFW tray {id}"),
         cleanup: false,
     };
-    let (added, version4) = icon.register("initial", first.0);
+    let (added, version4) = register_on_startup(&mut icon, first.0, area, &desktop)?;
+    println!("private_tray.registered={added}");
     snapshot(area, "first", &icon, added && version4)?;
     let until = Instant::now() + Duration::from_secs(100);
     if added && version4 && requested(area, "change", until)? {
