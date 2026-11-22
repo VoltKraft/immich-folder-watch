@@ -180,6 +180,16 @@ The artifact ZIPs matched SHA-256
 on x64 and `4292e401d20f84e73f65e16c8c34d7aee279fedd3b6ed261cba071320bef5502`
 on ARM64. [Native SMB run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44820760908).
 
+At `93ecc35` both native Windows hosts again negotiated encrypted SMB 3.1.1
+and matched the UNC read with its backing file. All 16 filesystem tests
+passed per host. Thirteen synthetic UNC roots opened and each fixture
+removed its share and scratch directory. The local NTFS tests also observed
+a distinct short name and verified its refusal. An independent replay of
+the two recovery archives checked all four tables, schema, integrity and
+row contents in 24 original, recovered or restored databases per target.
+All eight recovery cases and 208 C# assertions passed on each architecture.
+[Native Windows and Linux results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215).
+
 The real Fedora Documents grant allowed enumeration, private staging,
 no-replace publication, cancellation and revocation. Its distro daemon
 returned `ENOSYS` for the shared media read lock. A private build containing

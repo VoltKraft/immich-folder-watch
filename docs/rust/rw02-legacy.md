@@ -301,9 +301,8 @@ The comparison verifies that the two processes used the same runtime and
 oracle assembly. The Rust probe receives the separately derived managed table. A different runtime,
 mode or table fails this comparison. Fedora x64 passed 5,844 requests with
 each of the ICU and managed inputs, including the full Unicode range and
-1,335 timestamp vectors. The hosted targets still need to run the selected
-managed comparison. This scalar check does not authorize writes to original
-SQLite identities.
+1,335 timestamp vectors. Database write qualification is tracked separately
+under the stored-identity and migration checks.
 
 At `0a2b5ca`, SDK 10.0.401 selected CoreLib 10.0.15 on all four native
 hosts. All four passed the 5,844 ordinary requests. Each managed oracle
@@ -320,6 +319,24 @@ of missing or different inputs. The clean local verification SHA-256 is
 `81447081a29a8948baf4588a0964e74ad154da1b05e0bb3e96bf957d330e932c`.
 [Original four-host run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818246)
 · [Runtime selection](../../tools/rust-qa/test-native.py).
+
+At `93ecc35` both Ubuntu and both Windows hosts passed all fourteen native
+steps. For each host the two processes used the same oracle DLL and CoreLib
+10.0.12 from runtime build `95017c711e6afc1085133d440e42b4bd78155701`,
+despite 10.0.15 being installed alongside it. Both runs covered 1,112,064
+Unicode scalars and 1,335 timestamp vectors. The ordinary and managed Rust
+results each passed 5,844 requests and reproduced the independently derived
+1,449- and 1,475-mapping tables respectively. The readback compared the
+complete tables, timestamp and UTF-16 payload digests, mode, native machine,
+compiled oracle and Rust binary within each native pair.
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215).
+
+| Native host | Original feasibility archive | CoreLib SHA-256 |
+| --- | --- | --- |
+| Linux x64 | [14778251690](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215/artifacts/14778251690) | `26304a2985357b9ee277f273667fcd9c892edae3ee6eba76f739033e95eb39b3` |
+| Linux ARM64 | [14777204379](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215/artifacts/14777204379) | `87ec81f7dafea078d904b79c8c52056f494bdcb7312fbb168261aee7ba18e406` |
+| Windows x64 | [14777998886](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215/artifacts/14777998886) | `1125acc8106c43fc8bad2d203c4c4485df6182d292846c2fff415c1040c54678` |
+| Windows ARM64 | [14778675110](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215/artifacts/14778675110) | `7cc56b492774fff48f2156b738f5fbef0a50dd65aba40969118d4261f7efbc8c` |
 
 ### Read-only lookup across three historical writers
 
@@ -466,5 +483,8 @@ donors and gave each directory mode `0700` and each file mode `0600` under a
 zero umask. Reusing any of the six destinations failed without a byte change.
 Both authenticated casing fixtures also passed the standard stored-key
 observer, with 30 lookups and ten controls per fixture. The two MSVC target
-checks type-checked the changed function and its test. The hosted Windows jobs
-supply the independent native evidence. [Desktop assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).
+checks type-checked the changed function and its test. The original native
+Windows logs both identify the same `unused_mut` at `update_study_copy.rs:110`
+and Cargo exit 101. At `dff8cb0` the example uses the platform-specific
+construction described above. [Original desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235)
+· [Desktop assessment with the fix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235).

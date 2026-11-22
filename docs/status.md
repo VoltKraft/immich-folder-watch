@@ -1,5 +1,29 @@
 # Project Status
 
+## Four native compatibility runs at 93ecc35 (2026-11-23)
+
+RW-01 is accepted and RW-02 is active. All four targets passed the complete
+native feasibility run at `93ecc35`. Both scalar modes passed 5,844 requests
+per target. Each Windows target passed encrypted SMB and all eight recovery
+cases, including 208 C# assertions. The native and C# reference archives
+were independently replayed. The two readback SHA-256 values are
+`0b479754d9b3f1e49ceef572dde4163994b6c5c66f63b4f71e1f575c7852753d`
+and `db19d34284b8ba1c51ffc6db5f8f327f32250486a687ff761eaf854cb76f2d9f`.
+The desktop and installer criteria have separate evidence gates.
+[Native casing receipts](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012)
+· [Filesystem and recovery](rust/rw02-filesystem.md#four-native-hosts)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+The completed desktop run at `0a2b5ca` qualified all eleven retained Mailbox
+limits on both Windows hosts. During a 100,000-file scan, reopening took
+11.343 ms at p95 on x64 and 4.261 ms on ARM64. The x64 regular root-wake
+trace had zero hidden presentations in 303 intervals. Each target's
+original notice ZIP and development SPDX document reproduced byte-for-byte.
+Both native Windows logs confirm the SQLite example warning corrected at
+`dff8cb0`. Native activation of the integrated window and Shell remains
+open. [Windows performance evidence](rust/rw02-windows-window.md#native-retained-window-results-at-0a2b5ca)
+· [Four-target notice and SPDX readback](rust/rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
 ## Ubuntu desktop, storage and native notices (2026-11-23)
 
 Both Ubuntu desktop jobs passed at `0a2b5ca`. Replaying the three

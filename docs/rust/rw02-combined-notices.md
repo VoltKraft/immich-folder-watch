@@ -161,11 +161,12 @@ the official 2.3.1 schema. The local files are retained under
 
 ## Native notices at 0a2b5ca
 
-The Ubuntu x64 and ARM64 jobs each uploaded the compiler inputs and the
+All four native jobs uploaded the compiler inputs and the
 complete original-notice archive for their native development executable.
 Offline replay from the authenticated inputs reproduced each notice ZIP and
-the SPDX document in its full desktop archive byte-for-byte. Both documents
-passed the official SPDX 2.3.1 schema. Each contains 1,063 relationships.
+the SPDX document in its full desktop archive byte-for-byte. Each document
+passed the official SPDX 2.3.1 schema. Each Ubuntu document contains 1,063
+relationships. Windows x64 contains 615 and Windows ARM64 contains 614.
 The seven notice controls and six SPDX controls also passed for each target.
 [Native run at `0a2b5ca`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235)
 · [Full desktop archives](rw02-native-gui.md#native-follow-up-at-0a2b5ca).
@@ -174,8 +175,10 @@ The seven notice controls and six SPDX controls also passed for each target.
 | --- | --- | --- | ---: | --- |
 | Linux x64 | [14777186242](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777186242) | [14776483777](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14776483777) · `a72d43330f20778444c50f7f5333f3be13635da3a50423164dbbf8e7f23993fa` | 1,799 | 446 · `828dfe41e7b0804bf93c9f0045afd6ba53d181f383712fc0a5a790e1eee767d1` |
 | Linux ARM64 | [14777500090](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777500090) | [14777112710](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777112710) · `4d5d82d5e63505f1097548347d7bf52b6ed43a44f65621e17fe4dc3eba9722fd` | 1,796 | 445 · `008d21d61d13d0cc5daf752f568cc736a25e632a93f6f9813fe77c0b3ba8ea18` |
+| Windows x64 | [14778711094](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778711094) | [14777714233](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14777714233) · `6ed2c9b1a579c43dd5b380df2db806bab79e18a7da609328f8ef83cb2a92d521` | 1,517 | 258 · `b93089dd3fb421dc2f12f7177b0f4337959cf8398dac864db0f35ddcaa82bf9d` |
+| Windows ARM64 | [14779070622](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14779070622) | [14778905925](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778905925) · `2dc78b75080991f09600e7c75188131b86b64f7a2d46fe59800c19231fd716f9` | 1,514 | 257 · `c30613e324736a54ca52146f2c61a5014f3b153686fb38c3e1f7353ff3b51bc1` |
 
-The two replay receipts are retained below
+The four replay receipts are retained below
 `artifacts/rust/hosted-development-notices/45077818235/replay/`. They bind
 each published input digest to its build receipt, executable, notice
 archive and SPDX document.

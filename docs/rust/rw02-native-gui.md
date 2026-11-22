@@ -447,6 +447,16 @@ launches created the windows on the original desktop, and both secondary
 jobs counted a second, unidentified process. The Windows launcher checks
 failed. [Native launcher observations](rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca).
 
+Both original Windows archives also contain the first four-host run where
+the Linux X11 subjects and the retained Windows Mailbox subjects all met
+their eleven same-host limits. Windows x64 scan reopen p95 was 11.343 ms
+against 22.096 ms. ARM64 measured 4.261 ms against 15.175 ms. The x64
+ordinary root-wake trace had zero successful presentations in 303 hidden
+intervals. The original-policy control had 423 in 204 intervals. ARM64
+recorded none in any of its three traces. Both canonical Windows subjects
+met six of eleven limits and both retained FIFO subjects met ten.
+[Windows budgets, interval counts and source archives](rw02-windows-window.md#native-retained-window-results-at-0a2b5ca).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

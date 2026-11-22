@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native desktop](rw02-native-gui.md#native-follow-up-at-8091469) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native desktop](rw02-native-gui.md#native-follow-up-at-0a2b5ca) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -91,7 +91,7 @@ WPF-derived limits on ARM64 four times. Windows x64 met eight, nine, seven
 and eight. At `8091469` the x64 scan reopen took 119.95 ms at p95
 against 21.987 ms. The dispatch trace located two successful presentations
 inside each of 439 independently confirmed hidden-window intervals on x64.
-The new retained eframe policy requires native qualification.
+The [native follow-up](rw02-windows-window.md#native-retained-window-results-at-0a2b5ca) qualified the revised retained policy on both Windows targets. Its integration with the actual Shell icon and ordinary activation has separate checks.
 
 At `0a2b5ca` all four hosted C# references matched the 29 baseline files
 and 215 semantic assertions. Linux passed 37 Rust workspace tests per
@@ -105,14 +105,25 @@ Fedora x64. [Native feasibility](https://github.com/VoltKraft/immich-folder-watc
 · [C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818262)
 · [Runtime qualification](rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
 
+At `93ecc35` the four native jobs passed all fourteen steps with the pinned
+10.0.12 scalar oracle. Each architecture passed 5,844 requests in each of
+the two casing modes. Both Windows hosts also passed their encrypted SMB
+and eight recovery cases. The independent replay checked the published
+digests of all ten native archives, the original source and both complete
+mapping tables. The separate C# reference run used 10.0.15 and again
+matched 29 fixture files and 215 assertions per target. Its TRX results
+show 566 passed tests on each Ubuntu host and 557 passed with nine
+platform-specific skips on each Windows host. [Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264215)
+· [C# reference jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264125).
+
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Encrypted SMB passed at `8091469`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. Three ordinary editor and four font cases passed, including NVDA, masking and clipboard. Japanese IME passed with cleanup three times. Retained Mailbox met eight of eleven limits at `8091469`. A second launch reopened the foreground HWND at `0a2b5ca`. The private desktop and secondary job checks failed. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Encrypted SMB passed at `8091469`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. Three ordinary edits, four font cases, NVDA speech, masking and clipboard passed. Japanese IME passed with cleanup three times. Retained Mailbox met all eleven limits four times. A second launch reopened a visible HWND at `0a2b5ca`. Foreground focus, the private desktop and secondary job checks remain open. | Pending |
-| Linux x64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 ordinary scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
-| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 ordinary scalar comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. Three ordinary editor and four font cases passed, including NVDA, masking and clipboard. Japanese IME preedit, commit and cleanup passed again at `0a2b5ca`. Retained Mailbox met all eleven limits at `0a2b5ca`. A second launch reopened the foreground HWND at `0a2b5ca`. The private desktop and secondary job checks failed. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. Three ordinary edits, four font cases, NVDA speech, masking and clipboard passed. Japanese IME preedit, commit and cleanup passed again at `0a2b5ca`. Retained Mailbox met all eleven limits again at `0a2b5ca`. A second launch reopened a visible HWND at `0a2b5ca`. Foreground focus, the private desktop and secondary job checks remain open. | Pending |
+| Linux x64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
+| Linux ARM64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
 At `0a2b5ca`, both Ubuntu targets repeated all eleven X11 budgets and the
 sixteen transport scenarios. Direct SQL replay matched 30 stored-identity
