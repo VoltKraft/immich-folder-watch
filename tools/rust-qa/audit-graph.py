@@ -26,6 +26,30 @@ def sha256(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def notice_path(path, license_file=None):
+    name = path.name.lower()
+    return (any(word in name for word in ("license", "licence", "copying", "copyright", "notice"))
+            or path.stem.lower() in {"authors", "contributors", "credits", "attribution", "attributions", "patents"}
+            or any(part.lower().lstrip(".") in {"licenses", "licences"} for part in path.parts[:-1])
+            or path.as_posix() == license_file)
+
+
+def protocol_input(name, path):
+    # wayland-client generates both its core interfaces and client bindings from wayland.xml.
+    # wayland-scanner's two scanner_assets XMLs are test fixtures of the generator.
+    return (name.startswith("wayland-protocols") and path.suffix == ".xml"
+            or name == "wayland-client" and path.as_posix() == "wayland.xml")
+
+
+def protocol_record(original):
+    protocol = ET.fromstring(original)
+    if protocol.tag != "protocol":
+        return None
+    notice = protocol.findtext("copyright", default="").strip()
+    return {"sha256": hashlib.sha256(original).hexdigest(), "copyright": notice,
+            "licenseIds": sorted(set(re.findall(r"SPDX-License-Identifier:\s*([^\r\n]+)", notice)))}
+
+
 def archive_inputs(package, locked, verify_unpacked):
     root = Path(package["manifest_path"]).parent
     registry = root.parent
@@ -42,20 +66,13 @@ def archive_inputs(package, locked, verify_unpacked):
             if not member.isfile():
                 continue
             path = Path(member.name).relative_to(root.name)
-            name = path.name.lower()
             relative = path.as_posix()
-            if package["name"].startswith("wayland-protocols") and path.suffix == ".xml":
+            if protocol_input(package["name"], path):
                 with contents.extractfile(member) as stream:
-                    original = stream.read()
-                protocol = ET.fromstring(original)
-                if protocol.tag == "protocol":
-                    notice = protocol.findtext("copyright", default="").strip()
-                    files.setdefault("protocols", {})[relative] = {
-                        "sha256": hashlib.sha256(original).hexdigest(), "copyright": notice,
-                        "licenseIds": sorted(set(re.findall(r"SPDX-License-Identifier:\s*([\w.+-]+)", notice))),
-                    }
-            if (any(word in name for word in ("license", "licence", "copying", "copyright", "notice"))
-                    or relative == package.get("license_file")):
+                    protocol = protocol_record(stream.read())
+                if protocol is not None:
+                    files.setdefault("protocols", {})[relative] = protocol
+            if notice_path(path, package.get("license_file")):
                 with contents.extractfile(member) as stream:
                     files["notices"][relative] = hashlib.file_digest(stream, "sha256").hexdigest()
             for category, suffixes in (("fonts", FONT), ("native", NATIVE), ("shaders", SHADER)):

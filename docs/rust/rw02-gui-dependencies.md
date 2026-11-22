@@ -42,8 +42,10 @@ source trees. Each Linux normal/build graph selects 230 registry and three
 reconstructed packages. Each Windows graph selects 130 registry and the same
 three reconstructed packages. The graphs also contain the two repository
 packages. Their union contains 253 external packages, including 52 packages
-with a build script or procedural macro. The registry archive inventory lists
-449 notice files. All five font payloads enter through explicit build paths.
+with a build script or procedural macro. The revised registry archive inventory
+lists 456 notice files. It adds five original Plasma REUSE texts,
+linebender_resource_handle's AUTHORS and winit's documentation artwork
+attribution to the earlier 449 entries. All five font payloads enter through explicit build paths.
 The four reports found no bundled font files in the selected crate sources and
 no excluded egui font or inspection package or feature. The earlier prototype
 at `6c953e3` used 374 registry archives and two explicit fonts.
@@ -54,9 +56,13 @@ every unpacked source against the authenticated archive and the full inventory
 against the [reviewed target digest](../../rust/audit/gui-profile.json).
 The four reports also verify each reconstructed tree and the exact target
 feature sets independently established by the isolated text-engine comparison.
-All four target inventories were verified locally. The Linux graph records 100
-Wayland protocol definitions with the SHA-256 and embedded attribution of
-each XML. Plasma's historical `fullscreen-shell.xml` lacks an inline notice.
+All four target inventories were regenerated locally from verified unpacked
+sources. On Linux, wayland-client 0.31.15 generates both its interfaces and
+client code from its core `wayland.xml`, SHA-256
+`cc860987e54f8d85c940e97fa1270c69b6e4ad31fbcf5a7f00107ce1157f5e07`.
+Together with the 100 extension XMLs, the inventory covers 101 protocols.
+The two upstream scanner test XMLs belong to its test suite. Plasma's
+historical `fullscreen-shell.xml` lacks an inline notice.
 The original KDE import explicitly names Weston 1.5. Its 9,898 bytes match
 the XML in the official release tarball, SHA-256
 `2ccd919a865e8d5cc107842a387989746d78ec6c1ff07e163ffd6aa78e3807b5`.
@@ -95,7 +101,8 @@ permissive Rust packages.
 | HarfRust 0.12.0 and unicode-general-category 1.1.0 | Preserve Unicode data headers and the [Unicode data license](../../tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt), SHA-256 `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`. |
 | unicode-bidi 0.3.18 | Preserve the original source headers, AUTHORS, COPYRIGHT, both MIT and Apache grants, the Unicode 16 UCD readme and the Unicode data license. The original generator reproduces the compiled bidirectional class and paired-bracket table from the pinned UCD bytes. [Unicode 16.0 data](https://www.unicode.org/Public/16.0.0/ucd/) |
 | spirv 0.4.0+sdk-1.4.341.0 | The archive omits the rspirv Apache notice. Its generated grammar also carries Khronos' MIT terms. Both upstream notices are retained. The reviewed grammar hash is `508e6677e27b0b58eac8395aa49a90ac1766a8d392c247a0aba7b03f4fdd85b9`. [Grammar](https://github.com/KhronosGroup/SPIRV-Headers/blob/04f10f650d514df88b76d25e83db360142c7b174/include/spirv/unified1/spirv.core.grammar.json) |
-| Wayland protocol bindings | Seventeen protocol XML files in wayland-protocols-plasma 0.3.12 declare LGPL-2.1-or-later. This includes `blur.xml`, used by winit's KWin blur bindings. The misc 0.3.12 copy of `server-decoration.xml` carries the same terms. Plasma's `surface-extension.xml` declares BSD-3-Clause. Retain the complete XML with individual authors and matching license texts. The archive's `COPYING.LIB` is the LGPL text. |
+| Wayland protocol bindings | Seventeen Plasma XMLs and the misc copy of `server-decoration.xml` carry LGPL-2.1-or-later. The other tagged Plasma XMLs declare MIT-CMU, BSD-3-Clause or MIT. Preserve each assignment with the complete XML, its corresponding original REUSE text and the original `COPYING.LIB`. The REUSE directory also includes CC0-1.0. |
+| Adobe Glyph List | read-fonts 0.41.0 cites Adobe's list for the nonbreaking space and soft hyphen glyph names in `src/ps/encoding.rs`. The packaged `data/glyphlist.txt` contains Adobe's copyright, binary redistribution condition, endorsement restriction and disclaimer. The notice archive retains the complete original header. [Upstream data cited in the source](https://github.com/adobe-type-tools/agl-aglfn/blob/4036a9ca80a62f64f9de4f7321a9a045ad0ecfd6/glyphlist.txt) |
 
 For Linux static linking, distribute the corresponding application and library
 sources, generator inputs, notices and reproducible relink instructions. Before

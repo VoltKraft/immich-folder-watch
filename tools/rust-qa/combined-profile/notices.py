@@ -1,7 +1,6 @@
 """Assemble original notices for a source-matched native combined development executable, offline."""
 import argparse
 import hashlib
-import io
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -13,8 +12,8 @@ import tempfile
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
 import sbom
+import source_notices
 from sbom import require, sha
-from sources import local_caches
 
 
 SQLITE_HEADER = "sqlite3/sqlite3.h"
@@ -28,29 +27,29 @@ def safe_path(path):
     return path
 
 
-def crate_members(prefix, archive_sha, wanted, caches):
+def crate_members(prefix, archive_sha, wanted, caches, attributions=None):
     """Read only the selected regular members, preserving original bytes under their original paths."""
     require("/" not in safe_path(prefix), "Invalid crate identity")
     expected = {prefix + "/" + safe_path(path): digest for path, digest in wanted.items()}
-    filename = prefix + ".crate"
-    archive = next((directory / filename for directory in caches if (directory / filename).is_file()), None)
-    require(archive is not None, f"Missing {filename} in reviewed local Cargo caches")
-    with archive.open("rb") as stream:
-        raw = stream.read(64 * 1024 * 1024 + 1)
-    require(len(raw) <= 64 * 1024 * 1024 and sha(raw) == archive_sha, f"Original archive mismatch: {filename}")
-    found = {}
-    with tarfile.open(fileobj=io.BytesIO(raw), mode="r|gz") as contents:
+    spans = {prefix + "/" + path: item for path, item in (attributions or {}).items()}
+    selected = expected.keys() | spans.keys()
+    found, result = set(), {}
+    with source_notices.original(prefix, archive_sha, caches) as contents:
         for member in contents:
-            if member.name not in expected:
+            if member.name not in selected:
                 continue
-            require(member.isfile() and member.name not in found and member.size <= 4 * 1024 * 1024,
+            require(member.isfile() and member.name not in found and member.size <= 32 * 1024 * 1024,
                     f"Invalid or duplicate notice member: {member.name}")
             with contents.extractfile(member) as source:
                 data = source.read()
-            require(sha(data) == expected[member.name], f"Notice checksum mismatch: {member.name}")
-            found[member.name] = data
-    require(found.keys() == expected.keys(), f"Missing notice members: {sorted(expected.keys() - found.keys())}")
-    return {"crates/" + path: data for path, data in found.items()}
+            if member.name in expected:
+                require(sha(data) == expected[member.name], f"Notice checksum mismatch: {member.name}")
+                result["crates/" + member.name] = data
+            if member.name in spans:
+                result.update(source_notices.excerpt_members(spans[member.name], data))
+            found.add(member.name)
+    require(found == selected, f"Missing notice members: {sorted(selected - found)}")
+    return result
 
 
 def git_member(members, revision, path, digest):
@@ -61,7 +60,7 @@ def git_member(members, revision, path, digest):
     return dest
 
 
-def external_notices(row, inventory, revision, caches, members):
+def external_notices(row, inventory, revision, caches, members, reuse, target):
     prefix = row["name"] + "-" + row["version"]
     root = "crates/" + prefix + "/"
     source = row.get("originalCrate", f"https://static.crates.io/crates/{row['name']}/{prefix}.crate")
@@ -83,15 +82,39 @@ def external_notices(row, inventory, revision, caches, members):
     protocols = row.get("protocols", {})
     if protocols:
         record["protocolXml"] = []
+        record["protocolGrants"] = {}
         for path, item in sorted(protocols.items()):
             require(path.endswith(".xml") and path not in originals, f"Unexpected protocol path: {path}")
             originals[path] = item["sha256"]
             record["protocolXml"].append(root + path)
+            xml = sbom.protocol_package(prefix, path, item, row, {}, reuse)
+            grant = xml["licenseConcluded"]
+            reference = root + path
+            if item["licenseIds"]:
+                reference = reuse[grant]["path"]
+            elif not item["copyright"]:
+                reference = "repository/rust/audit/notices/weston-1.5.0-COPYING"
+            record["protocolGrants"][root + path] = {"license": grant, "text": reference}
+    if "coreProtocolGenerator" in row:
+        generator = row["coreProtocolGenerator"]
+        originals[generator["path"]] = generator["sha256"]
+        record["coreProtocolGenerator"] = generator
+    if "ringSourceInputs" in row:
+        originals["build.rs"] = row["ringSourceInputs"]["build.rs"]
+        record["ringSourceInputs"] = row["ringSourceInputs"]
+        record["ringTargetSelection"] = row["ringTargets"][target]
     if row["name"] == "libsqlite3-sys":
         originals[SQLITE_HEADER] = row["native"][SQLITE_HEADER]
         record["sqlitePublicDomainHeader"] = root + SQLITE_HEADER
-    if originals:
-        members.update(crate_members(prefix, row["archiveSha256"], originals, caches))
+    attributions = row.get("sourceAttributions", {})
+    if attributions:
+        record["sourceAttributions"] = attributions
+    if attributions and row.get("reconstructedSource"):
+        compiler = source_notices.reconstructed_root(row)
+        for path, item in attributions.items():
+            members.update(source_notices.excerpt_members(item, (compiler / safe_path(path)).read_bytes()))
+    elif originals or attributions:
+        members.update(crate_members(prefix, row["archiveSha256"], originals, caches, attributions))
     return record
 
 
@@ -102,7 +125,11 @@ def readme(manifest):
              "The build compiled the Cargo packages listed below. Host roles include build scripts and",
              "procedural macros. The five embedded font faces have individual attributions and OFL texts.",
              "manifest.json maps the original files to authenticated source archives or Git blobs and",
-             "records their SHA-256 digests. Installed product packages require separate evidence.", "",
+             "records their SHA-256 digests. source-notices/SHA256.txt contains original, byte-exact",
+             "source notices. Each package maps these to source hashes and byte ranges. This conservative",
+             "set covers source comments, data, license sections, generators, documentation and test inputs.",
+             "Ring's build.rs and input hashes identify the source-selection rules for its architectures.",
+             "Installed product packages require separate evidence.", "",
              "Embedded fonts", ""]
     for name, font in manifest["fonts"].items():
         lines.extend([name, font["version"], font["copyright"], *font["trademark"], font["notice"], ""])
@@ -116,21 +143,23 @@ def readme(manifest):
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def assemble(receipt, receipt_sha, files, revision, target, archive_sha):
+def assemble(receipt, receipt_sha, files, revision, target, archive_sha, supplemental=None):
     inventory, _, units, root, _ = sbom.verify(receipt, files, revision, target)
+    inventory = source_notices.qualified(inventory, supplemental)
+    reuse = source_notices.protocol_license_texts(inventory, units)
     reviewed = {row["name"] + " v" + row["version"]: row for row in inventory["packages"]}
     local = sbom.first_party(revision, receipt["sources"])
     require(local.keys() <= units.keys() and root in local and not (local.keys() & reviewed.keys()),
             "Inconsistent first-party package identities")
     executable, = (u["targetName"] for u in units[root] if "bin" in u["kinds"] and target in u["compiledFor"])
-    manifest = {"format": 1, "scope": "Combined development executable", "revision": revision, "target": target,
+    manifest = {"format": 2, "scope": "Combined development executable", "revision": revision, "target": target,
                 "executable": executable + (".exe" if "windows" in target else ""),
                 "executableSha256": receipt["native"]["binarySha256"], "nativeArchiveSha256": archive_sha,
                 "nativeReceiptSha256": receipt_sha, "compilerUnitsSha256": receipt["outputs"]["compiler-units.json"],
-                "sourceInventorySha256": receipt["outputs"]["inventory.json"], "packages": {}, "fonts": {}}
+                "sourceInventorySha256": receipt["outputs"]["inventory.json"],
+                "qualifiedInventorySha256": sha(sbom.canonical(inventory).encode()), "packages": {}, "fonts": {}}
     members = {"repository/LICENSE": sbom.blob(revision, "LICENSE")}
-    caches = sorted(directory for home in local_caches() for directory in (home / "registry/cache").glob("*")
-                    if directory.is_dir())
+    caches = source_notices.caches()
     for key, compiled in sorted(units.items()):
         if key in local:
             project = local[key]
@@ -138,7 +167,7 @@ def assemble(receipt, receipt_sha, files, revision, target, archive_sha):
             row = {"reviewedTopLevelLicense": project["licenseDeclared"], "gitSource": project["sourceInfo"],
                    "notices": ["repository/LICENSE"]}
         else:
-            row = external_notices(reviewed[key], inventory, revision, caches, members)
+            row = external_notices(reviewed[key], inventory, revision, caches, members, reuse, target)
         row["compiledFor"] = sorted({role for u in compiled for role in u["compiledFor"]})
         row["compiledUnits"] = len(compiled)
         manifest["packages"][key] = row
@@ -195,12 +224,13 @@ def main():
     parser.add_argument("--archive-sha256", required=True, help="Published SHA-256 of the entire native ZIP")
     parser.add_argument("--revision", required=True, help="Full Git commit of the native build")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--source-inventory", type=Path, help="Pinned supplemental source inventory for historical receipts")
     args = parser.parse_args()
     require(re.fullmatch("[0-9a-f]{40}", args.revision), "Supply a full Git source revision")
     review = json.loads(sbom.blob(args.revision, sbom.PROFILE + "/review.json"))
     require(args.target in review["targets"], "Unsupported native target")
     receipt, digest, files = sbom.read_run(args.input, args.target, args.archive_sha256)
-    members = assemble(receipt, digest, files, args.revision, args.target, args.archive_sha256)
+    members = assemble(receipt, digest, files, args.revision, args.target, args.archive_sha256, args.source_inventory)
     print(write_archive(args.output, members), args.output)
 
 

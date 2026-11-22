@@ -1,6 +1,6 @@
 {
   "allCompilerTreesSha256": "da9dcbf427adf97fd0072344c1fd2209e73af7cbfe17fda0c73dc87420f06489",
-  "inventorySha256": "244bec73e64cb8702e4c8a409c1d5f985160f173b11ea601a17c0ae027a456ca",
+  "inventorySha256": "689a15afb366727d89ed22233bd6c64b841e5d0a2520ef8cdd10bf1b7d7c6640",
   "lockSha256": "6bbe711bfc27f7e8389f3073871defda19249d6c7121fd78aaf0337e2235aae7",
   "registryLockCount": 472,
   "summary": {
@@ -68,10 +68,12 @@
       ]
     },
     "native": 509,
-    "notices": 632,
-    "protocols": 100,
+    "notices": 639,
+    "protocols": 101,
     "registryPackages": 348,
     "shaders": 16,
+    "sourceAttributionBlocks": 1187,
+    "sourceAttributionFiles": 1981,
     "supplementalNoticeFiles": 19
   },
   "targets": {

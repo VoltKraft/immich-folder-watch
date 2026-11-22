@@ -83,7 +83,7 @@ class Controls(unittest.TestCase):
 def check_build(args):
     case = unittest.TestCase()
     receipt, digest, files = sbom.read_run(args.input, args.target, args.archive_sha256)
-    doc = sbom.assemble(receipt, digest, files, args.revision, args.target)
+    doc = sbom.assemble(receipt, digest, files, args.revision, args.target, args.source_inventory)
     case.assertEqual(doc, json.loads(args.document.read_bytes()))
     if args.schema:
         # Optional development validation. The generator and ordinary control suite require only the stdlib.
@@ -110,9 +110,20 @@ def check_build(args):
     case.assertIn("LicenseRef-GranitParserNotice-" + sbom.sha(sbom.GRANIT_NOTICE.encode()),
                   {e["licenseId"] for e in doc["hasExtractedLicensingInfos"]})
     protocols = [p for k, p in packages.items() if k.startswith("SPDXRef-Protocol-")]
-    case.assertEqual(len(protocols), 100 if "linux" in args.target else 0)
+    case.assertEqual(len(protocols), 101 if "linux" in args.target else 0)
     case.assertEqual(sum(p["licenseConcluded"] == "LGPL-2.1-or-later" for p in protocols),
                      18 if "linux" in args.target else 0)
+    ring = next(p for p in cargo.values() if p["name"] == "ring")
+    case.assertEqual(ring["licenseConcluded"], "NOASSERTION")
+    details = json.loads(ring["sourceInfo"])
+    case.assertIn("crypto/fipsmodule/aes/aes_nohw.c", details["ringTargetSelection"]["archSourceCandidates"])
+    case.assertIn("crypto/fipsmodule/ec/ecp_nistz.c", details["sourceAttributions"])
+    if "linux" in args.target:
+        core = next(p for p in protocols if p["name"] == "wayland.xml")
+        case.assertEqual(core["licenseConcluded"], "MIT")
+        case.assertIn("generate_client_code", core["sourceInfo"])
+        case.assertEqual(core["checksums"][0]["checksumValue"], "cc860987e54f8d85c940e97fa1270c69b6e4ad31fbcf5a7f00107ce1157f5e07")
+        case.assertEqual(sum("/LICENSES/MIT-CMU.txt" in p.get("licenseComments", "") for p in protocols), 10)
     if "windows" in args.target:
         arch = args.target.split("-")[0]
         imports = next(p for p in cargo.values() if p["name"] == f"windows_{arch}_msvc")
@@ -135,7 +146,7 @@ def check_build(args):
                 for name in files_to_copy:
                     (run / name).write_bytes(archive.read(prefix + name))
         direct_receipt, direct_digest, direct = sbom.read_run(run, args.target, None)
-        case.assertEqual(doc, sbom.assemble(direct_receipt, direct_digest, direct, args.revision, args.target))
+        case.assertEqual(doc, sbom.assemble(direct_receipt, direct_digest, direct, args.revision, args.target, args.source_inventory))
         inventory = json.loads((run / "inventory.json").read_bytes())
         inventory["packages"][0]["selected"] = "CC0-1.0"
         altered = json.dumps(inventory).encode()
@@ -165,6 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--archive-sha256")
     parser.add_argument("--document", type=Path)
     parser.add_argument("--schema", type=Path)
+    parser.add_argument("--source-inventory", type=Path)
     options = parser.parse_args()
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(Controls)
     if not unittest.TextTestRunner().run(suite).wasSuccessful():

@@ -3,6 +3,7 @@ from collections import Counter
 from pathlib import Path
 
 from sources import QA, ROOT, read, sha256, source_profile
+import source_notices
 
 # Exact alternatives in the reviewed GUI archives. Preserve cumulative terms and file-level additions.
 GUI_BRANCH = {
@@ -78,10 +79,11 @@ def inventory(rows, vendor, staged, text):
         for sample in originals:
             if "assets" in sample:
                 row["reviewedArchiveAssets"] = sample["assets"]
-    return {"packages": rows, "fonts": fonts, "originalNoticeFiles": {
+    record = {"packages": rows, "fonts": fonts, "originalNoticeFiles": {
             **{"rust/" + f["path"]: f["sha256"] for f in read(ROOT / "rust/audit/gui-inputs.json")["files"]
                if Path(f["path"]).suffix not in {".ttf", ".otf"}},
             **text["noticeFiles"]}}
+    return source_notices.complete_inventory(record, [vendor.parent.parent / "cache" / vendor.name])
 
 
 def totals(record):
@@ -89,6 +91,9 @@ def totals(record):
     native = {name: sum(len(p[name]) for p in rows) for name in ("native", "shaders", "notices", "protocols")
               if name != "protocols"}
     native["protocols"] = sum(len(p.get("protocols", {})) for p in rows)
+    native["sourceAttributionFiles"] = sum(len(p.get("sourceAttributions", {})) for p in rows)
+    native["sourceAttributionBlocks"] = len({b["sha256"] for p in rows for f in p.get("sourceAttributions", {}).values()
+                                            for b in f["ranges"]})
     by_name = Counter(p["name"] for p in rows)
     return {"activeExternalPackages": len(rows), "registryPackages": sum(bool(p["source"]) for p in rows),
             "buildScriptOrMacroPackages": sum(bool(p["buildScriptsAndMacros"]) for p in rows),
