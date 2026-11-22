@@ -14,11 +14,14 @@ Both Japanese IMEs composed あ and restored the input layout. The ARM64
 driver reported a sharing violation while removing its profile after
 observing the edit. Revision `21b6938` makes cleanup part of the result and
 preserves the successful composition separately. Each hosted Windows console
-offered a single 96-DPI display. At `3b4854d` each Ubuntu desktop job
-completed successfully. Their three full scan trials passed all eleven X11
+offered a single 96-DPI display. At `3b4854d` ARM64 again committed あ and
+restored its language settings without an exception. The x64 repeat
+produced a literal `a` on both attempts. Both Windows targets passed the
+ordinary filename and NVDA checks. Each Ubuntu desktop job completed
+successfully. Their three full scan trials passed all eleven X11
 limits, and both hosts exercised native graphics recovery, Orca speech and
 masks under X11 and Wayland, and the native journal.
-[Linux desktop results](rust/rw02-native-gui.md#native-follow-up-at-3b4854d)
+[Four desktop archives](rust/rw02-native-gui.md#native-follow-up-at-3b4854d)
 · [Four earlier archives](rust/rw02-native-gui.md#native-follow-up-at-a66e045)
 · [IME receipts](rust/rw02-windows-ime.md).
 
@@ -29,13 +32,16 @@ and all 74 indexed build outputs. The documents cover 337 and 336 compiled
 Cargo packages on Linux x64 and ARM64, and 250 and 249 on Windows x64 and
 ARM64. The packaged product inventory remains open under RI-AC09.
 The assessment workflow now runs generation and replay after a successful
-combined build. Local replay of the two Ubuntu archives at `3b4854d` also
+combined build. Local replay of all four native archives at `3b4854d` also
 passed the official schema and all native inventory controls.
 [Four build inventories and digests](rust/rw02-combined-sbom.md).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
-Native 100,000-file timings still exceeded the WPF close/reopen limits.
+At `3b4854d` ARM64 met all eleven WPF-derived limits with Mailbox.
+The x64 window met eight. Reopening during the scan took 124.14 ms at p95
+against 21.92 ms. Both private Explorer instances declined the initial tray
+registration and both tasks returned to their original input desktop.
 At `3b4854d` both Windows architectures passed all thirteen notification
 scenarios. Their nonrecursive watch reported the direct child directory's
 metadata and the direct file's creation and change. Both Ubuntu targets
@@ -54,7 +60,9 @@ timeout finding was addressed by running the compiled test as the Python
 parent's direct child. A local run of the pinned Cargo compiler exposed its
 test-program layout under `debug/build`. The runner now validates the program
 from Cargo's compiler message on every host. Eight portable controls and
-Clippy on both Windows targets passed. Native Windows loss is still pending.
+Clippy on both Windows targets passed. At clean revision `21e07c4` Fedora
+ran the same entry point and passed all fifteen watch scenarios. Native
+Windows loss is still pending.
 [Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
 
 The .NET reference, PR CI, CodeQL and dependency submission completed
@@ -62,7 +70,10 @@ successfully at the same commit. Both Windows archives at `3b4854d` reached
 six recovery cases and 144 C# checks each. Inside each test VHD, Windows
 reported disk-full error 112, SQLite reported code 13 and the supervisor
 measured zero available bytes. The Rust worker then declined a CRLF-terminated
-release command. Both VHDs detached. The capacity recovery is still open.
+release command. Both VHDs detached. Revision `d708301` sends the exact LF
+acknowledgement. A private Linux tmpfs reproduced the original failure and
+recovered with the corrected sender. The complete Fedora trial passed all
+eight cases and 208 C# assertions. The native Windows repeat is pending.
 The native feasibility workflow now runs this Windows trial independently of
 the desktop performance measurements and retains its entire evidence directory.
 [Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
@@ -90,7 +101,9 @@ passed the native NTFS and encrypted SMB tests at `a66e045`. Revision
 review and native tests on all four hosts passed. Linux ran 19 filesystem
 checks per host. Windows ran 16 per host on local storage and again over
 encrypted SMB. Both NTFS hosts observed a distinct short alias. The ARM64
-SMB share also provided one. Native FAT observation remains open.
+SMB share also provided one. Both Windows storage VHDs returned FAT legacy
+file identifiers across one rename. A direct Rust safe-fs trial on FAT is
+still open. [FAT observation](rust/rw02-filesystem.md#fat-handle-observation-on-two-native-windows-hosts).
 
 The appearance-enabled desktop at `a66e045` passed all eleven fixed
 Fedora X11 budgets over three 100,000-file runs. Median startup was
@@ -122,8 +135,9 @@ and recovered after a portal service restart. Both Ubuntu hosts repeated the com
 Noble portal comparison and light/dark changes at `a66e045`. Ubuntu x64
 repeated two actual Plasma panel clicks. Both Windows combined smoke tests
 passed. The earlier scan trials rejected a stale filesystem input digest.
-Windows capacity, tray and scan-time results are being collected at
-`3b4854d`. Mixed-DPI and RDP require an appropriate Windows session.
+The four subsequent archives at `3b4854d` contain the capacity, tray
+and scan-time results above. Mixed-DPI and RDP require an appropriate
+Windows session.
 Released distro portals on the tested Linux hosts still refuse the required
 cooperative file lock. [Combined build](rust/rw02-combined-profile.md),
 [Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and

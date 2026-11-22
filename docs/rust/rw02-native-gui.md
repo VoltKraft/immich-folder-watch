@@ -246,15 +246,18 @@ and [workflow run](https://github.com/VoltKraft/immich-folder-watch/actions/runs
 
 [Run 45039099730](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
 tested `3b4854d867f614a956042dfe987ecc7c008e53ec`. Both Ubuntu jobs passed.
-Each complete ZIP matched the size and SHA-256 published by Actions and
-passed ZIP integrity checks.
+Both Windows jobs finished with failed checks and uploaded their results.
+Each of the four ZIPs matched the size and SHA-256 published by Actions and
+passed archive integrity checks.
 
 | Native target | Actions artifact | Bytes | Verified ZIP SHA-256 |
 | --- | ---: | ---: | --- |
 | Ubuntu x64 | 14762715938 | 19,506,512 | `a495111a590cc54b72753cf57fba93f17e24802acddf873dea88170c12d92114` |
 | Ubuntu ARM64 | 14761634190 | 19,567,805 | `e70016232c6a366280d2181de23d67fa400eac7255b9683a4b89e414bbc3b000` |
+| Windows x64 | 14763571611 | 17,940,316 | `eb9cb84546da440577f10018dc09882a0ba8983989a12bfef6ff87b862b35f46` |
+| Windows ARM64 | 14763606202 | 17,898,754 | `cbbeaafadbfa07160aaf83f38a0157e6aa20ba960874d28be41cbd4204982257` |
 
-On each host the Rust and .NET references used the same X11 server,
+On each Ubuntu host the Rust and .NET references used the same X11 server,
 workload and recorder. All eleven limits passed over three independent
 100,000-file trials. The native runs exercised Mesa device loss during
 X11 and Wayland rendering as well as startup without a driver.
@@ -264,7 +267,7 @@ X11 and Wayland rendering as well as startup without a driver.
 | Ubuntu x64 | 252.05 | 124.371 | 0.39 | 0.93 |
 | Ubuntu ARM64 | 204.15 | 119.957 | 0.33 | 0.89 |
 
-Both hosts repeated eight storage fault recoveries with 208 C# assertions,
+Both Ubuntu hosts repeated eight storage fault recoveries with 208 C# assertions,
 16 corruption rejections and eight final snapshot checks. In each ZIP 465
 of 466 indexed storage files matched directly. Actions omitted one tracked
 `.gitattributes` file from its source snapshot. Its exact 78 bytes were
@@ -273,6 +276,28 @@ native builds and modified Wayland relinks also passed.
 [Linux x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319428)
 · [Linux ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319481)
 · [Storage fixture](rw02-storage-faults.md).
+
+On Windows ARM64 the retained DX12 window using Mailbox passed all eleven
+limits against WPF. Its scan close/reopen p95 was 7.00/4.20 ms against
+13.94/15.09 ms. Windows x64 passed eight limits. Its scan close took
+22.23 ms against 30.85 ms and reopen took 124.14 ms against 21.92 ms.
+Its idle close and reopen also exceeded their limits. The ordinary filename
+editor and NVDA passed on both targets. The separate font observer passed
+four ARM64 cases and stopped at initial field focus on x64. Japanese input
+produced a real preedit and commit on ARM64. On x64 both input gestures
+inserted a literal `a`. Both restored the original language and input layout.
+[Native window measurements](rw02-windows-window.md) · [Font controls](rw02-font-coverage.md)
+· [IME receipts](rw02-windows-ime.md).
+
+Each Windows host completed six storage recovery cases and 144 C# assertions
+before the private FAT volume filled. Both recorded Windows error 112, SQLite
+error 13 and zero available bytes. The Rust worker rejected the supervisor's
+line ending before recovery, and both volumes detached. Both private Explorer
+instances declined the initial tray registration. The fixture stopped before
+input and restored the original desktop. Neither hosted console provided
+mixed-DPI or RDP. [Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319529)
+· [Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319278)
+· [Storage](rw02-storage-faults.md) · [Shell](rw02-windows-services.md).
 
 ## First-frame regression
 

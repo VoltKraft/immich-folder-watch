@@ -47,13 +47,29 @@ with code zero. The input layout and the account's language list were
 restored, and Basic Typing returned to `NotPresent`. Removing the private
 profile then raised Windows sharing violation 32. The old driver had already
 written `passed` into its result and returned zero despite this traceback.
-The ARM64 composition is verified. A clean end-to-end ARM64 run remains
-open. The SHA-256 digests are
+The ARM64 composition was verified in that run. The SHA-256 digests are
 `9cf73126e33820653cdbf31c0dc42e27b5cbe2b1e1b13ddca0ec90713b194e01`
 for the composition and
 `93e850fbb9be7e76d491a2b8257dab4b27805b7d9ccc4914616156445647c0ea`
 for the result with the cleanup failure.
 [Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002/job/137244473575).
+
+At `3b4854d` the ARM64 observer again saw preedit before Enter, a commit of
+U+3042 and the edited filename through UI Automation. Both processes exited
+zero. The driver reported no exception. The original input layout, language
+list and `NotPresent` capability state were restored. This driver predates
+the explicit `profileRemoved` field. On x64 the same revision restored the
+original layout and servicing state, but both ordinary IME gestures produced
+a literal `a`. The observer exited 1 without a qualifying preedit. The GUI
+exited zero. The previous x64 composition and the unsuccessful repeat are
+both retained. [Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319529)
+· [Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730/job/137259319278).
+
+| Receipt at `3b4854d` | Windows x64 SHA-256 | Windows ARM64 SHA-256 |
+| --- | --- | --- |
+| Japanese composition | `8126d69dff09c76cfcd4df9b0a0e5c8852c3fe95b524cce0ac187fe0803a0b3d` | `5b5bae51eac8568817a07e37dbd8272fb5362c75e51ca637bc183c6fa5ecfcf2` |
+| Japanese GUI result | `fe654f222d33ed91fd84438d4fae90081aeb158b3bcb6c0b144d0a3f5ac26b95` | `0857d9a38beeab3badc6a9e763c8f56dc6403159a62b08135c7ead0ddfbd17a8` |
+| Language servicing | `fa327c36031356b549d1834fc78fed04a2df44742faa91fd73c83cfb293ea7f8` | `954a73028da7580a1fc2d2c908e376cda0d9c6107412aee7c8586d5481575ee2` |
 
 The revised IME and ordinary text observers start child processes in their
 retained evidence directory. Profile, cache and temporary data use the

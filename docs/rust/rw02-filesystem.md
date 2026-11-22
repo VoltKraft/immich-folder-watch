@@ -253,6 +253,18 @@ They do not establish native SMB/FUSE disconnection recovery, integrated engine
 deletion authority or installed rollback. Those remain distinct integration
 and recovery gates.
 
+### FAT handle observation on two native Windows hosts
+
+The separate storage trial at `3b4854d` observed a file on its private
+16 MiB FAT VHD on each Windows target. `FileIdInfo` returned error 87 on
+both. Before and after one ordinary rename, the same open handle reported
+legacy file index 31328 on x64 and 31424 on ARM64. Those numbers apply only to
+the two observed files. The trial neither selected a write by cached index
+nor exercised the Rust safe-fs adapter on FAT. Qualification of the adapter
+on this provider still needs a native test with an owned volume.
+[Volume receipts](rw02-storage-faults.md)
+· [Windows archives](rw02-native-gui.md#native-follow-up-at-3b4854d).
+
 ## Independent review of the feasibility boundary
 
 The independent review of `2ff988095045739b6eeb0735750f5ec9aa9baca6`

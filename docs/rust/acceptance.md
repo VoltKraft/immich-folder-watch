@@ -71,28 +71,33 @@ direct child file. Its inventory excluded the file below the child directory.
 The Windows
 [retained-window variant](rw02-windows-window.md) held the same DX12 device
 across an ordinary close and passed the native idle and memory limits on
-both architectures. Close/reopen latency during a real scan remains open.
+both architectures in earlier trials. At `3b4854d` its Mailbox variant met
+all eleven WPF-derived limits on ARM64 and eight on x64. The x64 scan
+reopen took 124.14 ms at p95 against a 21.92 ms limit.
 
 ## Native evidence matrix
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five policy traces and 5,844 scalar comparisons. The local NTFS alias gate passed. | Four DX12 lifecycle cases, Startup readback, Shell registration and balloon callback. The replacement DX12 window restored the draft and accepted input. All three ordinary mixed-text edits, NVDA speech and ordinary Delete/paste passed. The Japanese IME committed あ in the normal editor. The separate font repeat stopped at field focus. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five traces and 5,844 scalar comparisons. The NTFS and SMB alias gates passed. | Four DX12 lifecycle cases and independent Startup readback. All three ordinary mixed-text edits, four standalone font cases, NVDA speech, masks and clipboard passed on the private input desktop. The Japanese IME committed あ and restored the input layout. The private profile cleanup failed. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five policy traces and 5,844 scalar comparisons. NTFS alias gate, six database recoveries and 144 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. All three ordinary mixed-text edits, NVDA and ordinary Delete/paste passed. Japanese IME committed あ at `a66e045` and produced only literal `a` at `3b4854d`. The separate font repeat stopped at initial focus. Retained Mailbox passed eight of eleven limits. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 33 workspace tests, 16 filesystem checks locally and over encrypted SMB, 13 watch scenarios, five traces and 5,844 scalar comparisons. NTFS and SMB alias gates, six database recoveries and 144 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. All three ordinary mixed-text edits, four standalone font cases, NVDA speech, masks and clipboard passed. At `3b4854d` the Japanese IME committed あ and restored the input environment without a reported exception. Retained Mailbox passed all eleven limits. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | 36 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 comparisons. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
-The [earlier four archives](rw02-native-gui.md#native-follow-up-at-d403fee) and
-[follow-up archives](rw02-native-gui.md#native-follow-up-at-a66e045) bind each
-hosted result to its revision. The [Plasma panel](rw02-plasma.md),
+The [four archives at `3b4854d`](rw02-native-gui.md#native-follow-up-at-3b4854d)
+and [previous four archives](rw02-native-gui.md#native-follow-up-at-a66e045)
+bind each hosted result to its revision. The [Plasma panel](rw02-plasma.md),
 [system appearance](rw02-appearance.md), [native storage faults](rw02-storage-faults.md)
 and [four combined offline builds](rw02-combined-profile.md) have separate
 source and runtime evidence. Both Ubuntu hosts completed the private Noble
 backport, eight WAL recovery cases and offline combined relinks. Both Windows
 targets passed the combined build, Clippy and native smoke. Each hosted
-console offered one 96-DPI output. Interactive Shell activation, clean ARM64
-IME completion, mixed-DPI/RDP, Windows scan-time limits and standard-user
-cross-session writer exclusion retain their native gates.
+console offered one 96-DPI output. Both private Shell hosts refused their
+initial icon registration. Their FAT volumes reached zero free bytes and the
+storage worker rejected the supervisor's line ending before recovery. Windows
+tray activation, explicit IME cleanup, reproducible x64 composition, mixed-DPI/RDP,
+x64 response limits, full-volume recovery and ordinary-user writer exclusion
+still need native evidence.
 
 The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.
 
