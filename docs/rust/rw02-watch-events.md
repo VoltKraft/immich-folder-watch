@@ -352,8 +352,14 @@ nested file both before and after this direct write. The Linux quiet-nested
 assertion remains in place. Failed record qualification preserves the raw
 trace and states in the receipt.
 
-The follow-up passed ten library tests, six Python controls and fifteen native
-Fedora x64 scenarios. Both MSVC targets passed Clippy with warnings denied.
+The receipt field `parentMetadataObservedDuringNestedPhase` describes only
+the nested-write observation interval. A parent modification delivered later
+in the direct-child phase remains in `batches` but does not set this field.
+The Python controls cover that delayed-delivery distinction.
+
+The raw-record implementation at `b7c6577` passed ten library tests, six Python
+controls and fifteen native Fedora x64 scenarios. Both MSVC targets passed
+Clippy with warnings denied.
 `artifacts/rust/watch-events/x86_64-unknown-linux-gnu/flat-notification-guard-01/result.json`
 has SHA-256 `afefd9df972c060093932eab57b75c0813f36ce7ec7adbc96f4bcc809a2b0563`.
 Its native Windows raw-record observations remain pending.

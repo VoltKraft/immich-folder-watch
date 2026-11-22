@@ -39,10 +39,13 @@ class WindowsControlTests(unittest.TestCase):
     def test_flat_scope_accepts_proven_parent_metadata_and_a_direct_child(self):
         result = flat_notification_evidence(trace_line(2, (3, "nested")) +
                                             trace_line(3, (1, "flat.jpg")), 1, 2, 3)
-        self.assertTrue(result["parentMetadataObserved"])
+        self.assertTrue(result["parentMetadataObservedDuringNestedPhase"])
         self.assertTrue(result["directChildObserved"])
         quiet = flat_notification_evidence(trace_line(2, (1, "flat.jpg")), 1, 1, 2)
-        self.assertFalse(quiet["parentMetadataObserved"])
+        self.assertFalse(quiet["parentMetadataObservedDuringNestedPhase"])
+        late = flat_notification_evidence(trace_line(2, (1, "flat.jpg"), (3, "nested")), 1, 1, 2)
+        self.assertFalse(late["parentMetadataObservedDuringNestedPhase"])
+        self.assertIn({"action": 3, "name": "nested"}, late["batches"][0]["notifications"])
 
     def test_flat_scope_rejects_nested_names_gaps_and_unproven_direct_changes(self):
         for event in ((3, "nested/item.jpg"), (3, "nested\\item.jpg"), (1, "nested"), (3, "other")):

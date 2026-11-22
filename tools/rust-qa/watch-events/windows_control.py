@@ -82,7 +82,7 @@ def flat_notification_evidence(trace, before, nested, direct):
     direct_rows = [event for row in active if row["generation"] > nested for event in row["notifications"]]
     if {"action": 1, "name": "flat.jpg"} not in direct_rows:
         raise ValueError("The flat watch did not report its direct child creation")
-    return {"batches": batches, "parentMetadataObserved": nested > before,
+    return {"batches": batches, "parentMetadataObservedDuringNestedPhase": nested > before,
             "directChildObserved": True}
 
 
