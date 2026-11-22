@@ -190,6 +190,44 @@ before starting a writer while reading a one-byte token flag.
 [Shell](rw02-windows-services.md), [display](rw02-windows-display.md),
 [Japanese input](rw02-windows-ime.md) and [writer fixture](rw02-cross-session.md).
 
+## Native follow-up at a66e045
+
+[Run 45034293002](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002)
+tested `a66e0456a85a62844e2de2fd155aaeac3577f87c`.
+
+| Native target | Actions artifact | Bytes | Verified ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| Ubuntu x64 | 14760086825 | 19,080,621 | `952af7287fdc998da81b8ee60b78ffc6624c34b2c9669df26068440cc3b83367` |
+| Ubuntu ARM64 | 14759414052 | 19,072,390 | `a8485efb20406d82b35a2132932ff19e1913cfe5c0e973af3b1e7ef362448e91` |
+| Windows x64 | 14759798302 | 16,166,162 | `cdba4f57b20c8514ffdc3cb6b0ca96922f0a90e03a0c42af4ce4839f8ccce12c` |
+
+Both Ubuntu targets passed all eight WAL recovery cases, their offline combined
+builds and modified Wayland relinks, and the Noble Documents portal comparison.
+Both desktops followed light/dark settings across hide/reopen and a portal
+restart. Their portals exported only the color-scheme setting. On x64 two
+real Plasma panel clicks reopened the window. On each target the integrated
+graphics workload rejected the newly reviewed filesystem sources against its
+older worker digest and the job failed. Revision `c5606ec` binds the
+current workload to the individually reviewed worker inputs. Its Fedora
+replay recovered the renderer, focus and background work. The historical
+graphics experiment still uses its original digest.
+[Graphics replay](rw02-graphics.md#local-integrated-observations),
+[storage fault evidence](rw02-storage-faults.md), [combined profile](rw02-combined-profile.md)
+and [Noble portal](rw02-portal-noble.md).
+
+Windows x64 passed the ordinary mixed-direction editor, real Japanese IME
+composition and NVDA speech/clipboard. The standalone font probe timed out
+waiting for the caret after its first mixed-text click. The ambient writer
+excluded its peer across two genuine OS sessions in both directions. Its
+separate standard-user launch found Secondary Logon stopped. The retained
+GUI passed the window controls. Both scan modes lacked a baseline after the
+older filesystem checksum stopped worker staging. The storage fault fixture
+stopped while copying a live SQLite WAL index before its first process kill.
+The combined profile passed its native compiler and smoke checks.
+[Japanese input](rw02-windows-ime.md#hosted-execution), [NVDA](rw02-windows-reader.md),
+[writer](rw02-cross-session.md), [storage](rw02-storage-faults.md)
+and [graphics inputs](rw02-graphics.md#local-integrated-observations).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

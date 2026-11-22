@@ -10,15 +10,21 @@ Orca speech and three password masks under X11 and Wayland, and six native
 journal readbacks. Both Windows targets passed NVDA speech and clipboard at
 `45dc03b`. ARM64 repeated that pass. In the x64 repeat the UI Automation
 range read after Delete failed. The ordinary Windows editor passed all
-three mixed-text cases on x64 and one on ARM64. Cross-session exclusion,
-native Japanese composition, mixed-DPI/RDP and interactive Windows tray
-activation remain open. [Archived results](rust/rw02-native-gui.md#native-follow-up-at-d403fee).
+three mixed-text cases on x64 and one on ARM64. At `a66e045`, x64 passed the repeated NVDA edit and
+real Japanese preedit, commit and UI Automation readback of あ. Its existing
+account excluded the other writer in sessions 2 and 0 and reacquired the
+guard. The standard-user trial stopped before either participant entered.
+Mixed-DPI/RDP and interactive Windows tray activation remain open. [Archived results](rust/rw02-native-gui.md#native-follow-up-at-d403fee).
 
 The retained Windows candidate reduced visible working set to about 60 MiB
 on x64 and 70 MiB on ARM64. Idle and memory measurements passed twice.
 Native 100,000-file timings still exceeded the WPF close/reopen limits.
-Both Windows watch handles opened by ID, but the first asynchronous
-notification call returned error 87 before any event arrived.
+At `a66e045`, both Windows architectures delivered seven notification
+scenarios including real writes and lease release after shutdown. Their
+flat-watch check failed before recording the relative name. Revisions
+`b7c6577` and `ac0d25c` retain bounded native action/name batches. Both
+Ubuntu targets passed all fifteen watch scenarios. The four-target
+compatibility reference, PR CI and CodeQL passed at the same head.
 [Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
 
 Revision `26ed5dd` compares two non-tearing DX12 presentation modes and
@@ -30,28 +36,50 @@ The [strict display checks](rust/rw02-windows-display.md) at `6a88744`
 require a real mixed-DPI or RDP session when that qualification is selected.
 The [filesystem adapter](rust/rw02-filesystem.md) at `f538828` declines
 missing file identifiers. All eighteen Linux filesystem checks and Clippy
-for Linux x64 and both Windows targets passed.
+for Linux x64 and both Windows targets passed. Both Windows targets then
+passed the native NTFS and encrypted SMB tests at `a66e045`. Revision
+`88fd180` also checks the current identity of the held file. An independent
+review and nineteen Fedora tests passed. Native FAT observation remains open.
+
+The appearance-enabled desktop at `a66e045` passed all eleven fixed
+Fedora X11 budgets over three 100,000-file runs. Median startup was
+194.18 ms. Scan p95 was 5.60 ms to close and 1.95 ms to reopen.
+[Paired .NET and Rust measurements](rust/rw02-performance.md#system-appearance-on-fedora-x64).
 
 At `966b861` the Linux x64 storage fixture passed four real process kills,
 two SQLite page limits and two 8 MiB tmpfs exhaustion cases. An independent
 reviewer replayed all eight recoveries and 208 C# assertions, rejected 16
 altered snapshots in both languages and verified all 453 evidence hashes.
-The two previous review findings are closed for this experiment. The
-production migration, installed rollback and three other native executions
-remain open. [Storage sources and evidence](rust/rw02-storage-faults.md).
+The two previous review findings are closed for this experiment.
+Ubuntu x64 and ARM64 each repeated all eight cases and 208 C# assertions
+in the native run at `a66e045`. All 453 files in each evidence inventory
+matched the archive. Windows recovery, the production migration and installed
+rollback remain open. [Storage sources and evidence](rust/rw02-storage-faults.md).
 
 The combined dependency assessment at `f22015a` built the native
 Linux x64 executable offline and relinked a changed Wayland binding. A real
 Plasma panel at `26b7aac` reopened the hidden application twice. At `6f55f36`
 the visible panel followed system light, dark and high-contrast settings
-and recovered after a portal service restart. The updated assessment
-exercises these fixtures on their applicable targets. Next verify the
-native runs for Windows notification delivery, GUI readback, presentation
-during real scans, Japanese input and cross-session ownership. The Windows
+and recovered after a portal service restart. Both Ubuntu hosts repeated the combined offline relink, the native
+Noble portal comparison and light/dark changes at `a66e045`. Ubuntu x64
+repeated two actual Plasma panel clicks. The Windows x64 combined smoke
+passed. Its timing trial stopped before the scan, after rejecting the
+updated filesystem against an older digest. The revised worker input
+checks, Windows capacity trial, tray observation and standard-user lock
+trial need native results. The Windows
 console topology and supported Linux portal lock deployment each still need
 an appropriate runtime environment. [Combined build](rust/rw02-combined-profile.md),
 [Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and
 [acceptance matrix](rust/acceptance.md).
+
+The next native assessment uses `c5606ec` for the scan workload,
+`c19a88e` for tray input ownership, `048cc27` for the disposable writer
+service and `0ed4dc4` for the locked Windows WAL-index capture. The tray
+review closed all three findings. The separate VHD review closed its
+parameter-layout finding at `2a49051`. At `daf7d85` Fedora repeated all
+eight storage cases, including six portable cases before the volume
+trials. The 14 workflow security checks passed. Cargo version-update
+configuration is prepared on the rewrite branch at `54fac8b`.
 
 ## Windows directory identity at cd1d7d7 (2026-11-21)
 

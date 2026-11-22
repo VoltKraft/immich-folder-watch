@@ -47,6 +47,16 @@ These samples cover the named Linux window and its first label. The
 remaining screens, Windows appearance and user accessibility evaluation
 have separate acceptance work.
 
+Ubuntu 24.04 x64 and ARM64 at `a66e045` ran the same native fixture on
+Xvfb. Each portal exported `color-scheme`. Both panels went from RGB 248
+to 27 and back to 248 on the same window after a hidden settings change.
+Each replacement portal had a new PID and the GUI followed its next two
+changes before clean shutdown. Neither host exported a contrast setting.
+The x64 result SHA-256 is `56037dbb1baea9c3636f3f3de54703c8a438ca419141f7ba3d90e15a0245b4b1`.
+The ARM64 result SHA-256 is
+`38bad20b406431c813060b6abe05fb772398495dbf9ee8d3eac627df137a5a6b`.
+[Verified native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 From the repository root after preparing the pinned GUI inputs, run
 
 ```sh

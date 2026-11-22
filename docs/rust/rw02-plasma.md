@@ -8,6 +8,13 @@ Plasma Shell ran as separate Ubuntu 24.04.5 processes on the local Fedora
 Xvfb display. The application rendered with Vulkan llvmpipe. [Native observer](../../tools/rust-qa/plasma/observe.py)
 and [previous watcher lifecycle controls](rw02-linux-services.md).
 
+Ubuntu x64 repeated two actual X11 pointer clicks on the Plasma-owned tray
+in `a66e045`. Both delivered `Activate` from the shell's bus connection to
+the Rust item, reopened the same window and were followed by a native close.
+Quit drained the application and removed the item. The result SHA-256 is
+`c4d3ac2c06725eb072249bc3da929cb5cd287ddaf684af18bd48b9b8a85d2d50`.
+[Verified archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 ## The visible tray entry
 
 The original Rust GUI registered `org.example.IfwGuiProbe/StatusNotifierItem`.

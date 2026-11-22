@@ -79,6 +79,27 @@ The four eligible reports retain every measurement window and the reference
 budgets. [Archive identities](rw02-native-gui.md#native-follow-up-at-8a8adaa)
 and [hosted execution](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
 
+## System appearance on Fedora x64
+
+The integrated desktop at `a66e045` passed all eleven original X11 limits
+with its system appearance observer active. In each of three 100,000-file
+trials the worker completed both inventories and the observer saw all 100
+directories. It collected 48, 49 and 34 close/reopen samples respectively.
+The median startup was 194.18 ms. Visible and hidden median RSS were both
+127.812 MiB. The measured idle intervals had zero CPU ticks, damage and
+render passes. The median trial p95 during scanning was 5.60 ms to close
+and 1.95 ms to reopen.
+
+The paired .NET run used the same driver and retained the original reference
+limits. It measured 1,207.98 ms startup, 232.164/233.621 MiB visible/hidden
+RSS and 6.47/7.48 ms close/reopen p95. Under `artifacts/rust/performance/`,
+the SHA-256 of `dotnet-linux-x64-appearance-20261122.json` is
+`845c1b0d80c108b9f79a85d7df291fdac416fa62e15bc34fa9d06dcba952d4f8`.
+The SHA-256 of `rust-linux-x64-appearance-a66e045.json` is
+`a5ab450dbea9854043222fc01079006b2e275424f0828f58a11b78f358eea707`.
+The tested GUI SHA-256 is `a63c608efc27ea636649bccc3a52295d24ac53d2b23d7be9d4f67af27468e9e7`.
+[Native appearance observation](rw02-appearance.md).
+
 ## Workload and isolation
 
 Each invocation creates new mount, user, PID, IPC and network namespaces. The runner creates a software-rendered X11 screen of 1280 × 900 at depth 24 and a D-Bus session with no activation directories. It binds the system libraries, fonts, the selected build output, the driver, and the selected .NET runtime components read-only. The only writable mounts are disposable test storage, private temporary files, private device nodes and the namespace's procfs. The application has its own empty HOME, all XDG locations, and a per-user activation socket for every launch. There is no portal, tray, compositor or external network endpoint. Port 9 on the private loopback is deliberately closed. This exercises the offline path, including real status updates, reconnects and update-check failure.

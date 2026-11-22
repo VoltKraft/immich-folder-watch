@@ -90,6 +90,14 @@ The ARM64 archive SHA-256 is
 
 ## Reader-assisted editing
 
+At `a66e045`, Windows x64 repeated the native NVDA observation successfully.
+The reader remained active through the ordinary Delete and clipboard paste.
+Fifteen utterances were examined and all required spoken cues occurred in
+order. The isolated reader profile was removed after its normal Quit.
+The archived result SHA-256 is
+`77189293d23f7854fa4d260b88b0dcfc45da84fb07b1b06b0dc9b072743c9db4`.
+[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 The native reader scenario now submits the dedicated extended Delete
 scan code E0 53 through Win32 `SendInput`. Before each gesture it checks
 the input desktop, foreground HWND, GUI thread's active and keyboard-focus

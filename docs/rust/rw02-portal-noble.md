@@ -1,8 +1,16 @@
 # Ubuntu Noble Documents portal file locks
 
-The released Ubuntu 24.04 package `xdg-desktop-portal 1.18.4-1ubuntu2.24.04.3` refused cooperative file locking on a private Documents grant. Both the shipping C# reader and the Rust filesystem reader received `ENOSYS`. Building the exact Ubuntu sources produced the same result. Applying upstream's single `xdp_fuse_flock` function let both readers acquire shared leases and excluded a consenting exclusive writer across the backing and FUSE views. The local execution used native x86-64 Ubuntu 24.04.5 userspace on Fedora kernel `7.3.4-300.fc45.x86_64`. Native Ubuntu runner results for x64 and ARM64 are pending. Availability of a supported Ubuntu package that implements this capability remains open. [Ubuntu package and source](https://packages.ubuntu.com/noble-updates/xdg-desktop-portal) · [Upstream change](https://github.com/flatpak/xdg-desktop-portal/commit/caa5ae9e21e44c70c0cf3e7fa78de557acd3ea57).
+The released Ubuntu 24.04 package `xdg-desktop-portal 1.18.4-1ubuntu2.24.04.3` refused cooperative file locking on a private Documents grant. Both the shipping C# reader and the Rust filesystem reader received `ENOSYS`. Building the exact Ubuntu sources produced the same result. Applying upstream's single `xdp_fuse_flock` function let both readers acquire shared leases and excluded a consenting exclusive writer across the backing and FUSE views. The local execution used native x86-64 Ubuntu 24.04.5 userspace on Fedora kernel `7.3.4-300.fc45.x86_64`. Native Ubuntu x64 and ARM64 subsequently reproduced all three outcomes on their own kernels. Availability of a supported Ubuntu package that implements this capability remains open. [Ubuntu package and source](https://packages.ubuntu.com/noble-updates/xdg-desktop-portal) · [Upstream change](https://github.com/flatpak/xdg-desktop-portal/commit/caa5ae9e21e44c70c0cf3e7fa78de557acd3ea57).
 
 ## Native observations
+
+At `a66e045` each Ubuntu runner recorded 28 checks against the packaged
+daemon, 28 against its pristine rebuild and 42 against the private backport.
+The packaged and pristine daemons returned errno 38 for the required
+lease. Only the backport enforced contention across the portal and backing
+views. All grants were revoked. The x64 case was `amd64-hmi8ytft` and
+the ARM64 case was `arm64-f72e6u80`. The six observation/input hashes per
+target matched their archived files. [Verified native archives](rw02-native-gui.md#native-follow-up-at-a66e045).
 
 Each private service returned a fresh opaque document ID and a kernel mount of type `fuse.portal`. The exporter used the D-Bus `AddFull` method with a descriptor for a temporary directory and read/write authorization for `org.example.IfwServices`. A second mount namespace hid the entire producer directory from each grant consumer and dropped its capabilities. Both views contained the same regular synthetic JPEG fixture. The C# probe called `SecureWatchRoot.OpenRead`; the Rust probe called the workspace's `Directory::open_file`, checked the contents and revalidated the entry identity while keeping the handle open. A third, independent process requested nonblocking shared or exclusive `flock` leases on the same file. [Managed caller](../../tools/rust-qa/linux-services/dotnet/Program.cs) · [Rust caller](../../tools/rust-qa/portal-noble/read.rs) · [D-Bus and lock observations](../../tools/rust-qa/portal-noble/observe.py).
 
@@ -31,7 +39,7 @@ Both Ubuntu architectures in workflow run `44950398558` authenticated the Docume
 
 The local x64 control selected the same distribution Python executable from the read-only Noble runtime and kept Meson in the development layer. Python followed the interpreter symlink and chose `/noble-usr` as its prefix. The package was visible under the merged `/usr`, but Python searched only the runtime layer. Executing the real Meson launcher reproduced the hosted traceback byte for byte. The build now supplies `PYTHONHOME=/usr`, gives the distribution package directory priority, and disables the user site. Before configuration it starts the real launcher, checks its version against the imported package, and records the resolved interpreter, launcher, module paths and file hashes. [Python module search path initialization](https://docs.python.org/3.12/library/sys_path_init.html) · [Meson check](../../tools/rust-qa/portal-noble/meson_python.py).
 
-Two offline runs under the local Noble x64 userspace on November 21, 2026 confirmed the correction. Both compiled the same pair of daemon binaries as the earlier control. Each performed 28 lock checks with the packaged service, 28 with the source control and 42 with the private backport, then revoked all three grants. The next hosted x64 and ARM64 runs must independently complete these steps.
+Two offline runs under the local Noble x64 userspace on November 21, 2026 confirmed the correction. Both compiled the same pair of daemon binaries as the earlier control. Each performed 28 lock checks with the packaged service, 28 with the source control and 42 with the private backport, then revoked all three grants. Both hosted architectures subsequently completed these steps on November 22.
 
 | Private compiler layout | Run under `artifacts/rust/portal-noble/runs/` | Result SHA-256 |
 | --- | --- | --- |

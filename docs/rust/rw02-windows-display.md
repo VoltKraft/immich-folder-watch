@@ -41,6 +41,12 @@ The older receipts did not inventory inactive targets. [GitHub-hosted runner spe
 
 ## Native observation
 
+On Windows Server x64 at `a66e045` the all-path inventory returned exactly
+one target. It was active and available. The console used one 96-DPI
+monitor and did not report an RDP transport. The stricter observer
+therefore found no second display path on that machine.
+[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 Run after the canonical Rust GUI build on the matching Windows target. Output goes to the new `artifacts/rust/gui-native/<target>/windows-display/` directory. The fixture verifies the PE architecture, Git revision, binary digest, compiler sources, audited dependency graph and fonts. It pins the verified image, starts it in its own kill-on-close job, and limits the application profile to fresh temporary directories. [Display runner](../../tools/rust-qa/windows-display/run.py) · [Build verification](../../tools/rust-qa/windows-text/run.py)
 
 ```bash

@@ -44,9 +44,26 @@ The single-process smoke opens one synthetic file through the existing directory
 
 Linux x64 builds run with a private home and network, mount, process and IPC namespaces. The process has a read-only synthetic root. Existing desktop, portal, transport and migration fixtures retain responsibility for window input, a real grant, certificate validation against peers and shipping-format parity. Before release, inspect the four installed artifact graphs, corresponding sources and notices, runtime-loaded GPU/window-system components and actual shader compiler selection. The platform's portal/FUSE, IME, accessibility services and graphics drivers remain deployment-specific. The normal Windows path uses the runner's native Visual Studio environment. [Desktop evidence](rw02-native-gui.md) · [Portal deployment constraint](rw02-portal-noble.md) · [Acceptance record](acceptance.md)
 
-On 2026-11-21 the native Fedora x64 compiler produced 402 build-host/target units for the 337 package identities. Release Clippy passed with warnings denied. The normal executable SHA-256 was `251fa576febb4d5e7cdfa3f7536770a1d14c18242a377eb9d1fc6bc79153719d`. After the private LGPL source change it was `e60ce41f42a4085ba4d4d9de60104a3440861a9648b159f823db013926b64bbf`. Both retained one native eframe entry and 541 Vulkan backend symbols and both returned the expected private winit error. Only the observed blur-manager version changed from 1 to 2 in the application output. The ordinary source bytes, matching LGPL license and all other lock edges stayed intact. The raw local records are in `artifacts/rust/combined-profile/first/native-renderer/{native,relink}.json`. Windows x64/ARM64 and Linux ARM64 currently have verified combined resolvers here. Native combined linkage, platform import readback and runtime behavior require their corresponding host receipts.
+On 2026-11-21 the native Fedora x64 compiler produced 402 build-host/target units for the 337 package identities. Release Clippy passed with warnings denied. The normal executable SHA-256 was `251fa576febb4d5e7cdfa3f7536770a1d14c18242a377eb9d1fc6bc79153719d`. After the private LGPL source change it was `e60ce41f42a4085ba4d4d9de60104a3440861a9648b159f823db013926b64bbf`. Both retained one native eframe entry and 541 Vulkan backend symbols and both returned the expected private winit error. Only the observed blur-manager version changed from 1 to 2 in the application output. The ordinary source bytes, matching LGPL license and all other lock edges stayed intact. The raw local records are in `artifacts/rust/combined-profile/first/native-renderer/{native,relink}.json`. This first Fedora run examined the other three target resolvers. The later hosted native observations appear below.
 
 An initial pointer-retention control passed the Cargo and text checks while the ELF contained neither the eframe entry nor its Vulkan backend. The actual UI function pointer, headless entry call and independent symbol witness address this observed gap. An initial targeted Cargo update also changed unrelated dependency edges during the LGPL control. The lock verifier rejected it before linking. Regenerating the complete private control lock offline preserved every other dependency edge. [Native checks](../../tools/rust-qa/combined-profile/native.py) · [Lock and missing-unit controls](../../tools/rust-qa/combined-profile/test_profile.py)
+
+At `a66e045` the Ubuntu x64 and ARM64 builds repeated the native smoke
+and offline Wayland rebuild. Only the deliberately changed blur interface
+version changed in the smoke output. Each of the 21 indexed outputs and
+68 source hashes per target was verified. Windows x64 built and ran its
+native smoke with 250 packages and 281 compiler units. Its 16 output
+digests and 68 source bindings agreed, including seven files checked out
+with CRLF. The Windows smoke retained the eframe function pointer and
+checked the Shell interface layout. A visible desktop has separate tests.
+
+| Host | Native packages / compiler units | Archived result SHA-256 |
+| --- | ---: | --- |
+| Ubuntu x64 | 337 / 402 | `127623e7888d25bc9c7e663c3b83ff01b74de131b5069aee7482deb3f7766eaf` |
+| Ubuntu ARM64 | 336 / 401 | `0fdd486ee263e298d2c6e8726b1e8a3ea9812f53dc68e78c490e8dfa7ee789e3` |
+| Windows x64 | 250 / 281 | `7967cdf54de0caa86b46017a96e94c39deb25135f0002029c7e173cb784fae94` |
+
+[Native assessment and ZIPs](rw02-native-gui.md#native-follow-up-at-a66e045).
 
 ## Reproduction
 

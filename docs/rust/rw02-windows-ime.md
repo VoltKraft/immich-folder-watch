@@ -32,6 +32,15 @@ Only observed preedit, commit and independently read text count as a pass.
 
 ## Hosted execution
 
+Windows Server x64 at `a66e045` installed the Microsoft Japanese Basic
+Typing capability in its disposable account. The ordinary focused Rust
+filename received a real IME preedit before Enter, committed U+3042 (あ)
+after Enter and returned the same character through native UI Automation.
+The input layout and language list were restored and the temporary
+capability returned to its original `NotPresent` state. The composition
+receipt SHA-256 is `5758eac22dae57e9862d0a3ec32870a130a0540a74fdd48f9c083a37c40a6286`.
+[Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
+
 Run both native architectures after building the existing GUI fixture. The driver uses Windows PowerShell with UI Automation, TSF, IMM and User32 from the operating system. The checked-in C# is an external development observer. The Rust application, dependency set and normal editor use the same GUI build as the other native tests.
 
 ```bash
