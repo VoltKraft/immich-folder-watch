@@ -179,7 +179,11 @@ to reconcile project decisions, defaults, and recorded state.
   and the original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
   The [Linux appearance](docs/rust/rw02-appearance.md) and
   [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
-  Use the dedicated native service fixtures with disposable profiles. The
+  Use the dedicated native service fixtures with disposable profiles.
+  The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
+  owned desktop, a visible synthetic icon and a matching native Shell callback.
+  Keep the integrated Linux and Windows inventory subjects bound to the
+  [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned

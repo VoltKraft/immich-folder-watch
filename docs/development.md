@@ -171,6 +171,13 @@ exercises the packaged Ubuntu daemon, a pristine Ubuntu rebuild and the
 backport with both the C# and Rust readers in the same run. The
 [Windows service tests](rust/rw02-windows-services.md) exercise per-user
 shortcut registration, Shell notifications and independent UI Automation.
+After the native Shell build on a disposable target, run
+`python3 -B tools/rust-qa/windows-services/activation.py "$NATIVE_TARGET"`
+to exercise the private Explorer taskbar and retain its activation receipt.
+The integrated graphics and Windows scan fixtures use the same
+[reviewed worker sources](../tools/rust-qa/performance/worker-inputs.json).
+Update these hashes after reviewing changes to the inventory or its filesystem
+adapter. The historical comparison uses its original source receipts.
 The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises
 X11 and Wayland parents, selection and denial. The local Flatpak variant
 installs an isolated test app in a temporary repository. The GNOME variant
