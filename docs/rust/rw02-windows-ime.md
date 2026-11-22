@@ -58,6 +58,15 @@ Run the same launcher in the matching checkout with the native binary and its bu
 python tools/rust-qa/windows-ime/run.py artifacts/rust/gui-build/release/native-gui-assessment.exe artifacts/rust/windows-ime-vm --isolated-vm --build-receipt artifacts/rust/gui-native/x86_64-pc-windows-msvc/build.json
 ```
 
+At `d403fee`, both native Windows images installed Japanese Basic Typing,
+accepted the requested `ja-JP` entry, and returned `ja` in the account's
+language list. The observer missed that entry and the input trial stopped
+before composition. Both images restored their original language list and
+removed the temporary package. The observer now recognizes both Japanese
+tags, retains the input-method identifiers, and still requires actual
+preedit, commit and field readback for acceptance.
+[Native servicing run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
+
 Three portable regression tests check input-service eligibility, the independent preedit/commit/final-text conditions and the executable/source receipt. PowerShell 7.7 parsed the script and compiled both the TSF/Win32 observer and the existing shared ownership bridge. The 64-bit TSF profile structure measured 88 bytes. The local Linux workstation supplies these static checks. An actual Windows trace and UIA value are required for native acceptance.
 
 ```bash

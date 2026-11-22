@@ -28,6 +28,15 @@ For the standard-user trial each primary token must report no elevation, default
 
 Each Rust process starts suspended and belongs to its owner’s private kill-on-close job. Before the first thread resumes, the controller checks its exact image, creation time, PID, account, native session and authority. It inspects each live holder again after its `WRITER_HELD` response. In order, the first process holds, its peer refuses, the first releases, the peer holds, the original side refuses, the peer releases, and the original side reacquires and releases. Each completion ties the actual response and exit code to the exact process and volume/file ID. The ordered events appear in `observedWriterEvents`. The managed oracle only reads the account identity. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Independent observation](../../tools/rust-qa/instance/cross-session/observe.py)
 
+Both native Windows targets at `45dc03b` and `d403fee` returned one byte for
+the controller's `TokenHasRestrictions` flag. The observer attempted a four-byte
+read and exited before either trial launched its Rust writer. Cleanup removed
+the temporary profiles. The observer now interprets both the observed Boolean
+and the documented DWORD representation, and rejects unexpected widths.
+The actual cross-session lock sequence at standard or ambient authority
+requires its own native result. [Latest four-target run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306)
+and [token information classes](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class).
+
 ## Native reproduction
 
 The existing hosted jobs run the following from the matching native architecture with the pinned Rust and .NET toolchains. The local account must already have its effective batch-logon assignment. The same output directory holds both per-case reports, prefixed `ambient-*` receipts and the standard trial’s original receipt names. The controller verifies the original logon rights and removal of the exact registered task. It checks the stamped process identities before deleting each temporary profile.

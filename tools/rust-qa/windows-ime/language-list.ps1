@@ -1,6 +1,6 @@
 function Get-IfwJapaneseLanguage($List) {
     foreach ($item in $List) {
-        if ($item.LanguageTag -ieq 'ja-JP') { $item }
+        if ($item.LanguageTag -in @('ja', 'ja-JP')) { $item }
     }
 }
 

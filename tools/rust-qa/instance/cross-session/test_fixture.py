@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from batch import eligible
 from fixture import HOSTED, INSTANCE, MARKER, ROOT, guard_id, instance, read, subject_env, wait, write
-from standard import AMBIENT, STANDARD, qualifies, required_authority
+from standard import AMBIENT, STANDARD, qualifies, required_authority, restriction_flag
 import observe
 import worker
 
@@ -49,6 +49,15 @@ def remote_posix(profile):
 
 
 class FixtureTests(unittest.TestCase):
+    def test_restriction_flag_accepts_both_windows_token_result_widths(self):
+        for width in (1, 4):
+            self.assertFalse(restriction_flag(bytes(width)))
+            self.assertTrue(restriction_flag((1).to_bytes(width, "little")))
+        self.assertTrue(restriction_flag(bytes([0, 1, 0, 0])))
+        for invalid in (b"", bytes(2), bytes(8)):
+            with self.assertRaisesRegex(ValueError, "result size"):
+                restriction_flag(invalid)
+
     def test_no_registration_without_existing_batch_right(self):
         bits = {"directAllow": False, "directDeny": False, "enabledGroupAllow": False, "groupDeny": False}
         self.assertFalse(eligible(bits))

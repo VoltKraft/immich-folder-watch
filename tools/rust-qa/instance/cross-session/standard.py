@@ -46,6 +46,14 @@ def sid_string(accounts, ptr):
         accounts.free(result)
 
 
+def restriction_flag(buffer):
+    """Read TokenHasRestrictions on hosts returning BOOLEAN or DWORD."""
+    value = bytes(buffer)
+    if len(value) not in (1, 4):
+        raise ValueError("Unexpected TokenHasRestrictions result size")
+    return int.from_bytes(value, "little") != 0
+
+
 def authority(accounts, token):
     advapi = c.WinDLL("advapi32", use_last_error=True)
     lookup = bind(advapi, "LookupPrivilegeNameW", w.BOOL, w.LPCWSTR, c.POINTER(Luid), w.LPWSTR, c.POINTER(w.DWORD))
@@ -91,7 +99,7 @@ def authority(accounts, token):
     return dict(authorityInventorySha256=digest, enabledAdministrativeGroups=enabled_admin, denyOnlyAdministrativeGroups=deny_only_admin,
                 privilegeCount=n, privilegesOutsideStandard=outside, enabledOutsideStandard=enabled_outside,
                 integrityRid=int(label[len(prefix):]), tokenType=scalar(8), uiAccess=bool(scalar(26)),
-                capabilityCount=len(capabilities), hasRestrictions=bool(scalar(21)))
+                capabilityCount=len(capabilities), hasRestrictions=restriction_flag(accounts.token_info(token, 21)))
 
 
 def qualifies(receipt):

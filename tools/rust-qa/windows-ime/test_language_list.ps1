@@ -9,6 +9,14 @@ if (@(Get-IfwJapaneseLanguage (Read-LanguageFixture)).Count) { throw 'Unexpected
 $entries.Add([pscustomobject]@{LanguageTag='ja-JP'; InputMethodTips=@('0411:test'); Handwriting=$false})
 $actual = @(Get-IfwJapaneseLanguage (Read-LanguageFixture))
 if ($actual.Count -ne 1 -or $actual[0].InputMethodTips[0] -cne '0411:test') { throw 'Nested language list lookup failed' }
+$entries[1].LanguageTag = 'ja'
+$actual = @(Get-IfwJapaneseLanguage (Read-LanguageFixture))
+if ($actual.Count -ne 1 -or $actual[0].LanguageTag -cne 'ja' -or $actual[0].InputMethodTips[0] -cne '0411:test') {
+    throw 'Windows returned the neutral Japanese tag without its input profile'
+}
+$entries[1].LanguageTag = 'ja-Latn'
+if (@(Get-IfwJapaneseLanguage (Read-LanguageFixture)).Count) { throw 'Unexpected Japanese input language variant' }
+$entries[1].LanguageTag = 'ja-JP'
 $encoded = Get-IfwLanguageState (Read-LanguageFixture)
 if ((ConvertFrom-Json $encoded).Count -ne 2 -or $initial -ceq $encoded) { throw 'Language snapshot lost an entry' }
 $entries.RemoveAt(1)
