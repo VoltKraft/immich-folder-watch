@@ -10,3 +10,13 @@ function Get-IfwLanguageState($List) {
     })
     return (ConvertTo-Json -InputObject $rows -Depth 4 -Compress)
 }
+
+function Test-IfwImeProfile($Observation) {
+    return ($null -ne $Observation -and $null -eq $Observation.PSObject.Properties['error'] -and
+            $Observation.profileRemoved -is [bool] -and $Observation.profileRemoved)
+}
+
+function Test-IfwImeObservation($Observation, [int]$ExitCode) {
+    return ($ExitCode -eq 0 -and (Test-IfwImeProfile $Observation) -and $Observation.status -ceq 'passed' -and
+            $Observation.compositionObserved -is [bool] -and $Observation.compositionObserved)
+}

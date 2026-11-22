@@ -14,6 +14,8 @@ $serviced = $changedList = $false
 $report = [ordered]@{ tested=$false; passed=$false; capability=$feature; nativeTarget=$target }
 . (Join-Path $PSScriptRoot 'language-list.ps1')
 & (Join-Path $PSScriptRoot 'test_language_list.ps1')
+& python -B -m unittest discover -s $PSScriptRoot
+if ($LASTEXITCODE -ne 0) { throw 'The native IME observation and cleanup controls failed.' }
 
 try {
     $initial = Join-Path $parent 'installed'
@@ -21,9 +23,10 @@ try {
     $status = $LASTEXITCODE
     $before = [IO.File]::ReadAllText((Join-Path $initial 'result.json')) | ConvertFrom-Json
     $report.initial = $before.status
-    if ($status -eq 0 -and $before.status -ceq 'passed') {
+    if (Test-IfwImeObservation $before $status) {
         $report.tested = $true
-    } elseif ($before.status -cne 'unavailable' -or -not $before.hasActiveInputDesktop) {
+    } elseif ($status -ne 1 -or $before.status -cne 'unavailable' -or -not $before.hasActiveInputDesktop -or
+              -not (Test-IfwImeProfile $before)) {
         throw 'The native desktop or field observation failed before a missing language service could be remedied.'
     } else {
         $current = Get-WindowsCapability -Online -Name $feature
@@ -71,8 +74,8 @@ try {
         $status = $LASTEXITCODE
         $observation = [IO.File]::ReadAllText((Join-Path $after 'result.json')) | ConvertFrom-Json
         $report.afterProvisioning = $observation.status
-        if ($status -ne 0 -or $observation.status -cne 'passed') {
-            throw 'Native composition, commit and filename readback did not pass with the Japanese locale.'
+        if (-not (Test-IfwImeObservation $observation $status)) {
+            throw 'Native Japanese composition, filename readback and private-profile cleanup must all pass.'
         }
         $report.tested = $true
     }

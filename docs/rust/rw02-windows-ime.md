@@ -41,6 +41,28 @@ capability returned to its original `NotPresent` state. The composition
 receipt SHA-256 is `5758eac22dae57e9862d0a3ec32870a130a0540a74fdd48f9c083a37c40a6286`.
 [Native archive](rw02-native-gui.md#native-follow-up-at-a66e045).
 
+The ARM64 native window at the same revision also composed あ and returned
+the edited filename through UI Automation. The GUI and observer exited
+with code zero. The input layout and the account's language list were
+restored, and Basic Typing returned to `NotPresent`. Removing the private
+profile then raised Windows sharing violation 32. The old driver had already
+written `passed` into its result and returned zero despite this traceback.
+The ARM64 composition is verified. A clean end-to-end ARM64 run remains
+open. The SHA-256 digests are
+`9cf73126e33820653cdbf31c0dc42e27b5cbe2b1e1b13ddca0ec90713b194e01`
+for the composition and
+`93e850fbb9be7e76d491a2b8257dab4b27805b7d9ccc4914616156445647c0ea`
+for the result with the cleanup failure.
+[Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45034293002/job/137244473575).
+
+The revised IME and ordinary text observers start child processes in their
+retained evidence directory. Profile, cache and temporary data use the
+fresh private profile. A Windows file lock can delay cleanup for up to 20
+seconds. The result records the composition and the removal separately.
+Success requires both, with the native language and input desktop restored.
+The hosted wrapper also rejects any result containing an exception.
+[IME driver](../../tools/rust-qa/windows-ime/run.py) · [Private profile cleanup](../../tools/rust-qa/windows_observer.py).
+
 Run both native architectures after building the existing GUI fixture. The driver uses Windows PowerShell with UI Automation, TSF, IMM and User32 from the operating system. The checked-in C# is an external development observer. The Rust application, dependency set and normal editor use the same GUI build as the other native tests.
 
 ```bash

@@ -22,3 +22,18 @@ if ((ConvertFrom-Json $encoded).Count -ne 2 -or $initial -ceq $encoded) { throw 
 $entries.RemoveAt(1)
 if ((Get-IfwLanguageState (Read-LanguageFixture)) -cne $initial) { throw 'The original language snapshot differs' }
 Write-Output 'Language list enumeration and restoration passed'
+
+$observed = [pscustomobject]@{ status='passed'; compositionObserved=$true; profileRemoved=$true }
+if (-not (Test-IfwImeObservation $observed 0)) { throw 'A clean composition receipt was rejected' }
+if (Test-IfwImeObservation $observed 1) { throw 'A failed observer exit was accepted' }
+foreach ($incomplete in @(
+    [pscustomobject]@{ status='passed'; error='WinError 32' },
+    [pscustomobject]@{ status='passed'; compositionObserved=$true; profileRemoved=$true; error='WinError 32' },
+    [pscustomobject]@{ status='passed'; compositionObserved=$true; profileRemoved=$false },
+    [pscustomobject]@{ status='passed'; compositionObserved=$false; profileRemoved=$true },
+    [pscustomobject]@{ status='passed'; compositionObserved=$true; profileRemoved='false' },
+    [pscustomobject]@{ status='unavailable'; compositionObserved=$true; profileRemoved=$true }
+)) {
+    if (Test-IfwImeObservation $incomplete 0) { throw 'An incomplete native IME trial was accepted' }
+}
+Write-Output 'Native IME receipt requires an observed composition and a removed profile'

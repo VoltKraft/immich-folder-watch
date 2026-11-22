@@ -5,12 +5,48 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
-from run import KEYBOARD_CATEGORY, QA, ROOT, accepted, checked_build, digest, eligibility
+from run import KEYBOARD_CATEGORY, QA, ROOT, accepted, checked_build, digest, eligibility, run
 
 
 class ImeTests(unittest.TestCase):
+    def test_observed_composition_remains_failed_when_removing_its_profile_raises(self):
+        with tempfile.TemporaryDirectory() as area:
+            output = Path(area)
+            profile = output / "ime-profile-fixture"
+            profile.mkdir()
+            args = SimpleNamespace(output=output, binary=output / "probe.exe", build_receipt=None, inventory_only=False)
+            context = {"threadDesktop": "Default"}
+            directory = Mock(name="private temporary directory")
+            directory.name = str(profile)
+            error = PermissionError(13, "in use", str(profile))
+            error.winerror = 32
+            directory.cleanup.side_effect = error
+            self.enterContext(patch("windows_observer.tempfile.TemporaryDirectory", return_value=directory))
+            self.enterContext(patch("windows_observer.time.monotonic", side_effect=[0, 21]))
+            self.enterContext(patch("run.Desktop")).return_value.context.return_value = context
+            self.enterContext(patch("run.ordinary_console", return_value=True))
+            host = self.enterContext(patch("run.select_powershell", return_value=("pwsh", [])))
+            self.enterContext(patch("run.launch_ps", return_value=0))
+            self.enterContext(patch("run.read", return_value={"status": "observed", "layouts": [
+                {"language": 0x411, "immIme": True}]}))
+            self.enterContext(patch("run.native_target", return_value=("aarch64-pc-windows-msvc", 0xaa64)))
+            self.enterContext(patch("run.checked_build", return_value={}))
+            observed = self.enterContext(patch("run.subject"))
+            result = {"status": "failed"}
+            with self.assertRaises(PermissionError):
+                result["status"] = run(args, result)
+            observed.assert_called_once()
+            self.assertEqual(host.call_args.args[0], output)
+            self.assertEqual(host.call_args.kwargs["env"]["USERPROFILE"], str(profile))
+            self.assertTrue(result["compositionObserved"])
+            self.assertFalse(result["profileRemoved"])
+            self.assertEqual(result["profileCleanupError"]["winerror"], 32)
+            self.assertEqual(result["status"], "failed")
+
     def test_inventory_requires_loaded_layout_and_usable_engine(self):
         row = {"language": 0x411, "immIme": False}
         profile = {"type": 1, "language": 0x411, "enabled": True, "category": KEYBOARD_CATEGORY}

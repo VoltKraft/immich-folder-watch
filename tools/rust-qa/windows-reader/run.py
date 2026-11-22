@@ -1,7 +1,6 @@
 """Run a checksum-pinned, temporary portable NVDA against the owned Windows GUI fixture."""
 
 import argparse
-from contextlib import contextmanager
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -22,6 +21,10 @@ from speech import EXPECTED, LogTail, Speech
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+sys.path.insert(0, str(HERE.parent))
+from windows_observer import private_profile
+
+
 VERSION = "2026.3.1"
 ASSET = f"nvda_{VERSION}.exe"
 DIGEST = "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052"
@@ -85,29 +88,6 @@ def stop(process):
             process.wait(timeout=10)
 
 
-@contextmanager
-def private_profile(report):
-    directory = tempfile.TemporaryDirectory(prefix="ifw-reader-", dir=os.environ["RUNNER_TEMP"])
-    try:
-        yield Path(directory.name)
-    finally:
-        # NVDA's per-process accessibility helpers can outlive its main window briefly.
-        prior_error = sys.exc_info()[0]
-        deadline = time.monotonic() + 20
-        while True:
-            try:
-                directory.cleanup()
-                report["profileRemoved"] = True
-                break
-            except PermissionError as error:
-                if time.monotonic() >= deadline:
-                    report.update(profileRemoved=False, cleanupLockedFile=Path(error.filename or "").name)
-                    if prior_error is None:
-                        raise
-                    break
-                time.sleep(.25)
-
-
 def close_reader(process):
     if process.poll() is not None:
         return "already exited"
@@ -165,7 +145,7 @@ def assess(installer, binary, output, report):
         "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "GITHUB_REF": "refs/heads/rewrite/rust",
         "GITHUB_REPOSITORY": "VoltKraft/immich-folder-watch"}.items()):
         raise ValueError("A disposable Windows rewrite runner is required")
-    with private_profile(report) as area:
+    with private_profile(os.environ["RUNNER_TEMP"], "ifw-reader-", report) as area:
         temp = str(area)
         config = area / "config"
         portable = area / "portable"

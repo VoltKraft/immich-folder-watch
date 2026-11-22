@@ -8,7 +8,6 @@ import platform
 import runpy
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
 
@@ -22,7 +21,7 @@ from gui import source_profile
 from storage.evidence import sha256, write_json
 from win32 import Desktop, ordinary_console, same_name
 from worker import hosted, powershell, shared_windows
-from windows_observer import select_powershell
+from windows_observer import private_profile, select_powershell
 
 DESKTOP = runpy.run_path(str(QA / "windows-desktop/run.py"))
 TARGETS = dict(DESKTOP["TARGET"].values())
@@ -83,14 +82,14 @@ def evaluate(record, output, pid, hwnd, report):
         raise RuntimeError(record.get("error") or "Incomplete native text or raster evidence")
 
 
-def observe(binary, output, profile, env, ps, report):
+def observe(binary, output, env, ps, report):
     api = Desktop()
     context = report["desktop"] = api.context()
     name = context["threadDesktop"]
     eligible = isinstance(name, str) and ordinary_console(context, name)
     log = output / "subject.log"
     observer_type = shared_windows()
-    with log.open("wb") as stream, subprocess.Popen([binary], cwd=profile, env=env, stdin=subprocess.PIPE,
+    with log.open("wb") as stream, subprocess.Popen([binary], cwd=output, env=env, stdin=subprocess.PIPE,
             stdout=stream, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW) as child:
         observer = None
         try:
@@ -116,7 +115,7 @@ def observe(binary, output, profile, env, ps, report):
                     "-OutputFile", output / "observations.json"]
             if not eligible:
                 args += ["-ReadOnly"]
-            report["observerExit"] = powershell(ps, HERE / "observe.ps1", args, env, profile, output / "observer.log", 140)
+            report["observerExit"] = powershell(ps, HERE / "observe.ps1", args, env, output, output / "observer.log", 140)
             evaluate(read(output / "observations.json"), output, child.pid, hwnd, report)
             if report["observerExit"] or not eligible or not ordinary_console(api.context(), name):
                 raise RuntimeError("The native observer failed or its active desktop changed")
@@ -164,20 +163,20 @@ def main():
         binary = DESKTOP["GUI_BINARY"]
         report["build"] = check_build(args.target, binary, folder)
         write_json(output / "plan.json", PLAN)
-        with tempfile.TemporaryDirectory(dir=output, prefix="profile-") as scratch:
-            profile = Path(scratch)
+        with private_profile(output, "profile-", report) as profile:
+            scratch = str(profile)
             env = {**os.environ, "USERPROFILE": scratch, "HOME": scratch, "TEMP": scratch, "TMP": scratch,
                    "IFW_QA_ISOLATED": "1", "WGPU_DX12_COMPILER": "Fxc",
                    "POWERSHELL_TELEMETRY_OPTOUT": "1", "POWERSHELL_UPDATECHECK": "Off"}
             for key in ("APPDATA", "LOCALAPPDATA"):
                 (profile / key).mkdir()
                 env[key] = str(profile / key)
-            ps, report["observerHosts"] = select_powershell(profile, "accessibility")
+            ps, report["observerHosts"] = select_powershell(output, "accessibility", env=env)
             if not ps:
                 report["status"] = "unavailable"
                 raise RuntimeError("Native Windows UI Automation is unavailable")
-            observe(binary, output, profile, env, ps, report)
-            report["status"] = "passed"
+            observe(binary, output, env, ps, report)
+        report["status"] = "passed"
     except Exception:
         report["error"] = traceback.format_exc()
     finally:

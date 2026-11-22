@@ -10,7 +10,6 @@ import platform
 import struct
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
 
@@ -20,7 +19,7 @@ ROOT = QA.parents[1]
 sys.path.insert(0, str(QA / "windows-desktop"))
 from win32 import Desktop, check, ordinary_console, same_name
 from worker import shared_windows
-from windows_observer import select_powershell
+from windows_observer import private_profile, select_powershell
 
 KEYBOARD_CATEGORY = "34745c63-b2f0-4784-8b67-5e12c8701a31"
 
@@ -86,16 +85,16 @@ def accepted(data, pid):
             and data.get("restoredLayout") == data.get("originalLayout") and bool(data.get("restoredLayout")))
 
 
-def launch_ps(host, mode, output, private, env, extra=()):
+def launch_ps(host, mode, output, env, extra=()):
     cmd = [host, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta",
            "-File", HERE / "observe.ps1", "-Mode", mode, "-OutputFile", output / (mode + ".json"), *map(str, extra)]
     with (output / (mode + ".log")).open("wb") as log:
-        return subprocess.run(cmd, cwd=private, env=env, stdin=subprocess.DEVNULL, stdout=log,
+        return subprocess.run(cmd, cwd=output, env=env, stdin=subprocess.DEVNULL, stdout=log,
                               stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW,
                               timeout=115, check=False).returncode
 
 
-def subject(args, api, env, private, host, result):
+def subject(args, api, env, host, result):
     native_windows = shared_windows()
     context = api.context()
     result["beforeInput"] = context
@@ -103,7 +102,7 @@ def subject(args, api, env, private, host, result):
         raise RuntimeError("The disposable worker is outside an active unlocked native input desktop")
     log = args.output / "subject.log"
     with log.open("wb") as stream, subprocess.Popen(
-            [args.binary], cwd=private, env=env, stdin=subprocess.PIPE, stdout=stream,
+            [args.binary], cwd=args.output, env=env, stdin=subprocess.PIPE, stdout=stream,
             stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW) as child:
         observer = None
         try:
@@ -126,7 +125,7 @@ def subject(args, api, env, private, host, result):
             if (not same_name(info["subject"]["threadDesktop"], context["threadDesktop"])
                     or info["subject"]["session"] != context["session"]):
                 raise RuntimeError("The subject and observer do not share the active desktop and OS session")
-            exit_code = launch_ps(host, "compose", args.output, private, env,
+            exit_code = launch_ps(host, "compose", args.output, env,
                                   ["-SubjectId", child.pid, "-WindowHandle", hwnd, "-SubjectLog", log])
             result["observerExit"] = exit_code
             result["afterInput"] = api.context()
@@ -157,8 +156,8 @@ def run(args, result):
     result["desktop"] = api.context()
     desktop = result["desktop"]["threadDesktop"]
     result["hasActiveInputDesktop"] = isinstance(desktop, str) and ordinary_console(result["desktop"], desktop)
-    with tempfile.TemporaryDirectory(prefix="ime-profile-", dir=args.output) as scratch:
-        private = Path(scratch)
+    with private_profile(args.output, "ime-profile-", result) as private:
+        scratch = str(private)
         env = {**os.environ, "USERPROFILE": scratch, "HOME": scratch, "TMP": scratch, "TEMP": scratch,
                "IFW_QA_ISOLATED": "1", "WGPU_DX12_COMPILER": "Fxc",
                "POWERSHELL_TELEMETRY_OPTOUT": "1", "POWERSHELL_UPDATECHECK": "Off"}
@@ -166,26 +165,28 @@ def run(args, result):
             folder = private / key
             folder.mkdir()
             env[key] = str(folder)
-        host, attempts = select_powershell(private, "accessibility")
+        host, attempts = select_powershell(args.output, "accessibility", env=env)
         result["observerHosts"] = attempts
         if not host:
             raise RuntimeError("A local PowerShell with UI Automation is required")
-        if launch_ps(host, "inventory", args.output, private, env):
+        if launch_ps(host, "inventory", args.output, env):
             raise RuntimeError("System IME inventory did not complete")
         inventory = read(args.output / "inventory.json")
         if inventory["status"] != "observed":
             raise RuntimeError("System IME inventory is incomplete")
         result["prerequisite"] = eligibility(inventory)
         if args.inventory_only:
-            result["status"] = "inventory-only"
+            outcome = "inventory-only"
         elif result["prerequisite"]:
-            result["status"] = "unavailable"
+            outcome = "unavailable"
         else:
             target, machine = native_target()
             receipt = args.build_receipt or ROOT / "artifacts/rust/gui-native" / target / "build.json"
             result["guiBuild"] = checked_build(args.binary, receipt, target, machine, os.getenv("GITHUB_SHA"))
-            subject(args, api, env, private, host, result)
-            result["status"] = "passed"
+            subject(args, api, env, host, result)
+            result["compositionObserved"] = True
+            outcome = "passed"
+    return outcome
 
 
 def main():
@@ -213,7 +214,7 @@ def main():
               "host": platform.platform(), "machine": platform.machine(), "binarySha256": digest(args.binary),
               "inputs": {p.relative_to(ROOT).as_posix(): digest(p) for p in source}}
     try:
-        run(args, result)
+        result["status"] = run(args, result)
     except Exception:
         result["error"] = traceback.format_exc()
     finally:
