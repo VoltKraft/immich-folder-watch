@@ -32,7 +32,9 @@ def main(args):
     target = f"{platform.machine()}-unknown-linux-gnu"
     version = subprocess.check_output([sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"),
                                        target, "--rustc", str(toolchain / "bin/rustc")], text=True)
-    build = OUTPUT / "gui-build"
+    build = args.output.resolve()
+    if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
+        raise ValueError("Use a build directory below artifacts/rust")
     build.mkdir(exist_ok=True, parents=True)
     with tempfile.TemporaryDirectory(dir=build) as home:
         (Path(home) / "registry").symlink_to(registry, target_is_directory=True)
@@ -64,6 +66,9 @@ def main(args):
         subprocess.run([*command, "clippy", "--frozen", "--all-targets", "--jobs", str(args.jobs),
                         "--", "-D", "warnings"], check=True)
         return
+    if args.test:
+        subprocess.run([*command, "test", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
+        return
     subprocess.run([*command, "build", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
     sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", *sorted((HERE / "src").glob("*.rs")), HERE / "src/tray-icon.argb",
                ROOT / "rust/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/Cargo.toml",
@@ -86,8 +91,12 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, default=OUTPUT / "toolchain")
+    parser.add_argument("--output", type=Path, default=OUTPUT / "gui-build",
+                        help="Build directory for this isolated comparison")
     parser.add_argument("--registry", type=Path, default=OUTPUT / "assessment-cache/registry",
                         help="An offline Cargo registry directory containing all locked crate archives")
     parser.add_argument("--jobs", type=int, default=4)
-    parser.add_argument("--clippy", action="store_true", help="Lint every native fixture target with warnings denied")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--clippy", action="store_true", help="Lint every native fixture target with warnings denied")
+    mode.add_argument("--test", action="store_true", help="Run native GUI library and adapter checks offline")
     main(parser.parse_args())

@@ -1,25 +1,22 @@
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -9,8 +9,10 @@
- mod fonts;
- mod graphics;
- #[cfg(target_os = "linux")]
+@@ -14,6 +14,8 @@
  mod linux;
+ #[cfg(target_os = "linux")]
+ mod linux_appearance;
 +#[cfg(target_os = "windows")]
 +mod loop_wake;
  mod native_window;
-
+ 
  use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
- use eframe::egui;
-@@ -25,34 +27,51 @@
-     Open,
+@@ -30,12 +32,16 @@
      Close,
      Quit,
      DestroyGraphics,
 +    #[cfg(target_os = "windows")]
 +    AllocatorReport,
  }
-
+ 
  #[derive(Clone)]
  struct Control {
      sender: SyncSender<Command>,
@@ -28,15 +25,17 @@
 +    loop_wake: Arc<loop_wake::LoopWake>,
      #[cfg(target_os = "linux")]
      graphics_attention: Arc<std::sync::atomic::AtomicBool>,
+     #[cfg(target_os = "linux")]
+@@ -43,21 +49,34 @@
  }
-
+ 
  struct Wake {
 +    #[cfg(target_os = "linux")]
      context: egui::Context,
 -    x11: Option<Arc<winit::window::Window>>,
 +    retained: Option<Arc<winit::window::Window>>,
  }
-
+ 
  impl Control {
      fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
 -        self.sender.try_send(command)?;
@@ -71,10 +70,8 @@
 +        }
      }
  }
-
- #[derive(Clone, Copy, PartialEq)]
-@@ -81,8 +100,13 @@
-             Command::Close => self.lifecycle.close_window(),
+ 
+@@ -88,6 +107,11 @@
              Command::Quit => self.lifecycle.request_quit(),
              Command::DestroyGraphics => {
                  self.graphics.request_test_fault();
@@ -86,9 +83,7 @@
                  None
              }
          }
-     }
-@@ -128,25 +152,24 @@
-                 .push(name.to_owned());
+@@ -137,7 +161,7 @@
          }
          fonts::add_fallbacks(&mut fonts);
          creation.egui_ctx.set_fonts(fonts);
@@ -97,7 +92,7 @@
          if let Some(render) = &creation.wgpu_render_state {
              let info = render.adapter.get_info();
              println!(
-                 "ADAPTER {:?} {:?} {}",
+@@ -145,15 +169,14 @@
                  info.backend, info.device_type, info.name
              );
          }
@@ -119,20 +114,16 @@
          });
          if !can_hide {
              creation.egui_ctx.request_repaint();
+@@ -192,6 +215,8 @@
+                 self.applied_appearance = Some(state);
+             }
          }
-@@ -169,8 +192,10 @@
- }
-
- impl eframe::App for Window {
-     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 +        #[cfg(target_os = "windows")]
 +        self.control.loop_wake.observe(ctx);
          self.model.borrow_mut().graphics.apply_surface_choice(frame);
          // Count native composition stages without disclosing entered text.
          ctx.input(|i| {
-             for event in &i.events {
-@@ -185,9 +210,9 @@
-                 }
+@@ -208,7 +233,7 @@
              }
          });
          if self.can_hide {
@@ -141,9 +132,7 @@
          }
          let mut model = self.model.borrow_mut();
          if ctx.input(|i| i.viewport().close_requested())
-             && model.lifecycle.shutdown() == Shutdown::Running
-@@ -337,8 +362,10 @@
-     let (sender, commands) = mpsc::sync_channel(8);
+@@ -360,6 +385,8 @@
      let control = Control {
          sender,
          window: Arc::new(Mutex::new(None)),
@@ -151,10 +140,8 @@
 +        loop_wake: Arc::default(),
          #[cfg(target_os = "linux")]
          graphics_attention: Arc::default(),
-     };
-     #[cfg(target_os = "linux")]
-@@ -405,12 +432,23 @@
-         b'N' => false,
+         #[cfg(target_os = "linux")]
+@@ -451,10 +478,21 @@
          _ => return Err("Expected an initial tray result".into()),
      };
      let handle = std::thread::spawn(move || {
@@ -176,7 +163,6 @@
                  Ok(()) if next[0] == b'G' => {
                      if graphics::allows_test_fault() {
                          Command::DestroyGraphics
-                     } else {
 --- a/src/native_window.rs
 +++ b/src/native_window.rs
 @@ -47,15 +47,15 @@

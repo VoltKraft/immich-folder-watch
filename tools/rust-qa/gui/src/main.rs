@@ -2,6 +2,8 @@
 #![forbid(unsafe_code)]
 
 #[cfg(target_os = "linux")]
+mod appearance_style;
+#[cfg(target_os = "linux")]
 mod benchmark;
 #[cfg(target_os = "windows")]
 #[path = "windows_worker.rs"]
@@ -10,6 +12,8 @@ mod fonts;
 mod graphics;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+mod linux_appearance;
 mod native_window;
 
 use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
@@ -34,6 +38,8 @@ struct Control {
     window: Arc<Mutex<Option<Wake>>>,
     #[cfg(target_os = "linux")]
     graphics_attention: Arc<std::sync::atomic::AtomicBool>,
+    #[cfg(target_os = "linux")]
+    appearance: Arc<Mutex<linux_appearance::Appearance>>,
 }
 
 struct Wake {
@@ -92,6 +98,8 @@ struct Window {
     model: Rc<RefCell<Model>>,
     control: Control,
     can_hide: bool,
+    #[cfg(target_os = "linux")]
+    applied_appearance: Option<linux_appearance::Appearance>,
 }
 
 impl Window {
@@ -154,6 +162,8 @@ impl Window {
             model,
             control,
             can_hide,
+            #[cfg(target_os = "linux")]
+            applied_appearance: None,
         }
     }
 }
@@ -170,6 +180,18 @@ impl Drop for Window {
 
 impl eframe::App for Window {
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(target_os = "linux")]
+        {
+            let state = *self
+                .control
+                .appearance
+                .lock()
+                .expect("appearance mutex poisoned");
+            if self.applied_appearance != Some(state) {
+                appearance_style::apply(ctx, state);
+                self.applied_appearance = Some(state);
+            }
+        }
         self.model.borrow_mut().graphics.apply_surface_choice(frame);
         // Count native composition stages without disclosing entered text.
         ctx.input(|i| {
@@ -340,9 +362,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         window: Arc::new(Mutex::new(None)),
         #[cfg(target_os = "linux")]
         graphics_attention: Arc::default(),
+        #[cfg(target_os = "linux")]
+        appearance: Arc::default(),
     };
     #[cfg(target_os = "linux")]
     let (native, available) = linux::start(control.clone())?;
+    #[cfg(target_os = "linux")]
+    let mut appearance = {
+        let handle = control.clone();
+        linux_appearance::Monitor::start(move |state| {
+            let mut current = handle.appearance.lock().expect("appearance mutex poisoned");
+            if state != *current {
+                *current = state;
+                drop(current);
+                if let Some(wake) = &*handle.window.lock().expect("window wake mutex poisoned") {
+                    wake.context.request_repaint();
+                }
+            }
+        })
+        .map_err(|error| eprintln!("Desktop appearance unavailable: {error}"))
+        .ok()
+    };
     #[cfg(target_os = "windows")]
     let mut assessment = benchmark::Benchmark::start()?;
     #[cfg(target_os = "windows")]
@@ -377,7 +417,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     assessment.finish()?;
     #[cfg(target_os = "linux")]
-    futures_lite::future::block_on(native.graceful_shutdown());
+    {
+        if let Some(observer) = appearance.as_mut() {
+            observer.stop()?;
+        }
+        futures_lite::future::block_on(native.graceful_shutdown());
+    }
     #[cfg(target_os = "windows")]
     if result.is_ok() {
         native.join().map_err(|_| "QA control worker failed")?;

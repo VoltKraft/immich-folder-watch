@@ -14,7 +14,7 @@ GUI = QA / "gui"
 AREA = ROOT / "artifacts/rust/windows-warm-window"
 TARGETS = ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")
 ORIGINALS = {
-    "main.rs": "f8e39611a025754a01bb006936220a7526f67437d15e1f8960f373adb89d6d93",
+    "main.rs": "5c8f2421c723ffa06edb11dc02a6399cd32fe4b2df391b4db3d3db801b6cbe58",
     "native_window.rs": "68f5025187929bea6121de9b5aca6d821a80cf0156406837fa9188c71399641f",
     "graphics.rs": "d13c3087261770a73f3e904d677b71ace1deba6efce47f68061f3a40184d828e",
 }
