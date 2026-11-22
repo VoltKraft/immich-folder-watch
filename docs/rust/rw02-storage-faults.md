@@ -549,6 +549,27 @@ unchanged at 453, 466 and 466 files respectively.
 | `linux-x64-10/evidence-hashes.json` | `f11b3fb82b29d285b8c60db0bbc14c0ac02d0bb433903643c3058c84b12647a2` |
 | Local transfer `review.json` | `752b8509cc97c08a8f283f8aefe8066e3931663432751e23be80a7a145a2d54e` |
 
+## Retained compiler evidence inventory (2026-11-22)
+
+The inventory excludes only the run output's top-level `build/` scratch tree.
+Copied compiler logs and generated reviewed sources under
+`native-build-logs/.../build/...` and `generated-source/.../build/...` are retained
+evidence and now receive individual hashes. The former filter excluded every
+path containing a `build` component, so these copies could be present in an
+archive without appearing in its index. Original archives and indexes remain
+unchanged. A targeted control distinguishes the scratch tree from nested build
+evidence and detects changed bytes in a retained generated-source copy.
+
+Independent readback of both native Windows archives from run `45047460118`
+confirmed all 465 original indexed hashes and exactly six additional retained
+files per archive: two generated-source copies and four compiler log streams.
+The corrected inventory would cover 471 files, excluding the index itself.
+Both debug/release generated copies on both targets have SHA-256
+`d1db8115be5497134d4dac1d3777fe34e4adc377b03469e25d922762447b5fae`.
+The separate per-file review is retained in ignored
+`artifacts/rust/storage-faults/inventory-review-45047460118/`; no original index
+was rewritten. All seven source-export/inventory controls passed locally.
+
 ## Windows native partial results and release protocol (2026-11-22)
 
 Both Windows artifacts from run `45039099730` at `3b4854d` now have verified ZIP

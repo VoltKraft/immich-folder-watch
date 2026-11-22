@@ -46,6 +46,26 @@ class SourceSnapshotTests(unittest.TestCase):
             [self.repository / logical for logical in (logical_names or self.inventory)])
         return output
 
+    def test_evidence_inventory_excludes_only_top_level_scratch_build(self) -> None:
+        output = self.base / "evidence"
+        retained = {
+            "result.json": b"synthetic result",
+            "native-build-logs/target/release/build/sqlite/run/stdout": b"actual compile options",
+            "native-build-logs/target/release/build/sqlite/run/stderr": b"compiler diagnostics",
+            "generated-source/target/release/build/faults/out/reviewed-storage.rs": b"reviewed source copy",
+            "first-party-sources/build/notice.txt": b"retained synthetic source notice",
+        }
+        for relative, contents in {**retained, "build/scratch/large-object": b"excluded scratch",
+                                   "evidence-hashes.json": b"old index"}.items():
+            path = output / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(contents)
+        expected = {name: hashlib.sha256(contents).hexdigest() for name, contents in retained.items()}
+        self.assertEqual(runner.evidence_inventory(output), expected)
+        changed = output / "generated-source/target/release/build/faults/out/reviewed-storage.rs"
+        changed.write_bytes(b"changed source copy")
+        self.assertNotEqual(runner.evidence_inventory(output), expected)
+
     def test_hidden_filter_preserves_every_inventoried_byte_and_notice(self) -> None:
         output = self.export("original")
         transferred = self.base / "transferred"

@@ -28,6 +28,13 @@ from evidence import external_lock, sha256, target_graph, verify_fixture, verify
 import windows_vhd
 
 
+def evidence_inventory(output: Path) -> dict:
+    """Exclude only the top-level scratch tree, retaining copied build evidence."""
+    return {path.relative_to(output).as_posix(): sha256(path)
+            for path in sorted(output.rglob("*")) if path.is_file()
+            and path.relative_to(output).parts[0] != "build" and path.name != "evidence-hashes.json"}
+
+
 def isolated(value: Path) -> Path:
     path = value.resolve()
     if not path.is_relative_to(ARTIFACTS.resolve()) or path == ARTIFACTS.resolve():
@@ -406,8 +413,7 @@ def main() -> int:
         traceback.print_exc()
     finally:
         write_json(output / "result.json", result)
-        write_json(output / "evidence-hashes.json", {p.relative_to(output).as_posix(): sha256(p)
-            for p in sorted(output.rglob("*")) if p.is_file() and "build" not in p.relative_to(output).parts and p.name != "evidence-hashes.json"})
+        write_json(output / "evidence-hashes.json", evidence_inventory(output))
     return 0 if result["status"] == "passed" else (2 if result["status"] == "unavailable" else 1)
 
 
