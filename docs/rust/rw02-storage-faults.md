@@ -889,3 +889,17 @@ The first attempt stopped at a read-only compiler cache. The second used the
 system compiler and finished the six portable cases before the outer sandbox
 refused the private loopback socket. The completed run used the same compiler
 and explicit permission for the private namespaces.
+
+The `-03` process started with a missing home directory. During restore NuGet
+created two empty migration markers under the checkout, one at the repository
+root and one relative to the C# project. Both were verified and moved into
+that run's ignored build directory. A repeat in `linux-x64-provider-isolation-04`
+also started with a missing outer home. Every .NET invocation used the run's
+new private home and XDG directories. NuGet wrote its single marker at
+`build/dotnet-cli/data/NuGet/Migrations/1`, and neither source directory
+acquired a marker. All 48 command outcomes, eight recoveries, 208 C#
+assertions, 151 source bindings and 476 evidence file hashes matched.
+The result SHA-256 is
+`4c0f074f66d32c9f7e4634182827b3ae62014ddd96190826b829322328df3683`
+and the evidence index SHA-256 is
+`c1235e9cf798e06ca4d0dd423654090a44a34d61bd7b5fe262300e1baefdd309`.

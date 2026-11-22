@@ -29,7 +29,9 @@ requires existing Bubblewrap and permission to create a private user/mount/netwo
 namespace. Its tmpfs is capped at exactly 8 MiB and exists only in that namespace.
 The runner kills only children it starts. Compilation uses `--frozen`; cached
 NuGet restore disables advisory retrieval explicitly, and does not establish a
-current vulnerability scan.
+current vulnerability scan. On Linux the .NET processes use a private home and
+XDG directories below the run's `build/dotnet-cli/`. Set `NUGET_PACKAGES`
+to the populated fixture package cache for an offline restore.
 
 On a **disposable GitHub-hosted Windows candidate** for this repository's
 `rewrite/rust` branch, select `--windows-vhd` instead of `--tmpfs`:

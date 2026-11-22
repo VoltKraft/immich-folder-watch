@@ -386,10 +386,19 @@ def main() -> int:
         seed = output / "seed"
         command("reviewed-seed", [str(seed_binary), str(fixtures), str(seed)])
         dotnet = str(Path(args.dotnet).resolve()) if Path(args.dotnet).is_file() else args.dotnet
+        sdk_env = env.copy()
+        if native_os == "linux":
+            # NuGet can resolve an absent home relative to the project during restore.
+            home = build / "dotnet-cli"
+            for key, path in (("HOME", home), ("XDG_DATA_HOME", home / "data"),
+                              ("XDG_CONFIG_HOME", home / "config"), ("XDG_CACHE_HOME", home / "cache")):
+                path.mkdir(mode=0o700, parents=True, exist_ok=True)
+                sdk_env[key] = str(path)
+        sdk_command = partial(logged_command, output, sdk_env, result)
         project = HERE / "dotnet/FaultReadback.csproj"
         dotnet_common = [str(project), "--artifacts-path", str(build / "dotnet"), "-p:EnableWindowsTargeting=false"]
-        command("csharp-restore", [dotnet, "restore", *dotnet_common, "--ignore-failed-sources", "-p:NuGetAudit=false"])
-        command("csharp-build", [dotnet, "build", *dotnet_common, "--no-restore", "--configuration", "Release"])
+        sdk_command("csharp-restore", [dotnet, "restore", *dotnet_common, "--ignore-failed-sources", "-p:NuGetAudit=false"])
+        sdk_command("csharp-build", [dotnet, "build", *dotnet_common, "--no-restore", "--configuration", "Release"])
         assembly = build / "dotnet/bin/FaultReadback/release/FaultReadback.dll"
         result["csharp_assembly_sha256"] = sha256(assembly)
         cases = output / "cases"
@@ -404,7 +413,7 @@ def main() -> int:
             command(name + "-verify", [str(binary), "verify", str(case), anchor])
             checks.append(snapshot_check(case, anchor, "after-rust"))
             checks.append(snapshot_check(case, anchor, "before-csharp"))
-            command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
+            sdk_command(name + "-csharp", [dotnet, str(assembly), str(case), anchor])
             checks.append(snapshot_check(case, anchor, "after-csharp"))
             readback = json.loads((case / "csharp-readback.json").read_text())
             if readback["Assertions"] != (32 if fault in ("enospc", "windows-full") else 24):
@@ -428,10 +437,10 @@ def main() -> int:
             changed_sha256 = sha256(tampered / "snapshot.db")
             if changed_sha256 == anchor:
                 raise ValueError("negative control did not change actual snapshot bytes")
-            for language, arguments, code in (
-                    ("rust", [str(binary), "verify", str(tampered), anchor], 1),
-                    ("csharp", [dotnet, str(assembly), str(tampered), anchor], 42)):
-                rejected = command(name + "-tampered-" + language, arguments, code)
+            for language, invoke, arguments, code in (
+                    ("rust", command, [str(binary), "verify", str(tampered), anchor], 1),
+                    ("csharp", sdk_command, [dotnet, str(assembly), str(tampered), anchor], 42)):
+                rejected = invoke(name + "-tampered-" + language, arguments, code)
                 if b"SNAPSHOT_SHA256_MISMATCH" not in rejected:
                     raise ValueError("tampered snapshot failed for an unrelated reason")
                 if ({path.name for path in tampered.iterdir()} != {"snapshot.db"}
