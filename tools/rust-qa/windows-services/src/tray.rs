@@ -13,6 +13,9 @@ use windows::core::{Error, PCWSTR, Result, w};
 
 use crate::{invalid, wide};
 
+#[path = "tray_activation.rs"]
+pub(super) mod activation;
+
 const CALLBACK: u32 = WM_APP + 23;
 const SYNTHETIC_OPEN: u32 = WM_APP + 24;
 const SYNTHETIC_TASKBAR: usize = 0x1f02;
@@ -24,6 +27,12 @@ struct Events {
     synthetic_taskbar: u32,
     synthetic_open: u32,
     shell_open: u32,
+    pointer_open: u32,
+    last_pointer_code: u32,
+    last_pointer_tick: u32,
+    last_dispatch_tick: u64,
+    last_pointer_id: u32,
+    pointer_up: u32,
     shell_context: u32,
     shown: u32,
     hidden: u32,
@@ -50,8 +59,20 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
         e.synthetic_open = e.synthetic_open.saturating_add(1);
     } else if msg == CALLBACK {
         // Version 4 puts the notification code in LOWORD(lParam).
-        match (lp.0 as u32) & 0xffff {
-            NIN_SELECT | WM_LBUTTONDBLCLK => e.shell_open = e.shell_open.saturating_add(1),
+        let code = lp.0 as u32 & 0xffff;
+        let id = (lp.0 as u32) >> 16;
+        match code {
+            NIN_SELECT | WM_LBUTTONDBLCLK => {
+                e.shell_open = e.shell_open.saturating_add(1);
+                if id == ICON {
+                    e.pointer_open = e.pointer_open.saturating_add(1);
+                    e.last_pointer_id = id;
+                    e.last_pointer_code = code;
+                    e.last_pointer_tick = unsafe { GetMessageTime() } as u32;
+                    e.last_dispatch_tick = activation::uptime_millis();
+                }
+            }
+            WM_LBUTTONUP if id == ICON => e.pointer_up = e.pointer_up.saturating_add(1),
             key if key == NIN_SELECT + 1 => e.shell_open = e.shell_open.saturating_add(1),
             WM_CONTEXTMENU | WM_RBUTTONUP => e.shell_context = e.shell_context.saturating_add(1),
             NIN_BALLOONSHOW => e.shown = e.shown.saturating_add(1),
@@ -168,20 +189,28 @@ impl Icon<'_> {
     }
 
     fn add(&mut self, phase: &str) -> Result<bool> {
+        // LoadIconW returns a shared system icon. Do not destroy the shared handle.
+        let shared = unsafe { LoadIconW(None, IDI_APPLICATION)? };
+        Ok(self.register(phase, shared).0)
+    }
+
+    fn register(&mut self, phase: &str, image: HICON) -> (bool, bool) {
         let mut data = self.base();
         data.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON | NIF_SHOWTIP;
         data.uCallbackMessage = CALLBACK;
-        // LoadIconW returns a shared system icon. Do not destroy the shared handle.
-        data.hIcon = unsafe { LoadIconW(None, IDI_APPLICATION)? };
+        data.hIcon = image;
         copy_text(&mut data.szTip, &self.title);
         let added = self.call(&format!("{phase}.add"), NIM_ADD, &data);
         if added {
             self.cleanup = true;
             let mut version = self.base();
             version.Anonymous.uVersion = NOTIFYICON_VERSION_4;
-            self.call(&format!("{phase}.version4"), NIM_SETVERSION, &version);
+            return (
+                true,
+                self.call(&format!("{phase}.version4"), NIM_SETVERSION, &version),
+            );
         }
-        Ok(added)
+        (false, false)
     }
 
     fn remove(&mut self, phase: &str) -> bool {
@@ -231,11 +260,25 @@ fn host(prefix: &str) -> bool {
         }
         if let Some(bar) = bar {
             let mut pid = 0;
-            GetWindowThreadProcessId(bar, Some(&mut pid));
+            let tid = GetWindowThreadProcessId(bar, Some(&mut pid));
+            let mut host_session = 0;
+            if ProcessIdToSessionId(pid, &mut host_session).is_ok() {
+                println!("{prefix}.taskbar_session={host_session}");
+            }
+            println!(
+                "{prefix}.taskbar_hwnd={}\n{prefix}.taskbar_tid={tid}",
+                bar.0 as usize
+            );
+            if let Ok(name) = activation::desktop_name(tid) {
+                println!("{prefix}.taskbar_desktop={name}");
+            }
             println!(
                 "{prefix}.taskbar_pid={pid}\n{prefix}.taskbar_visible={}",
                 IsWindowVisible(bar).as_bool()
             );
+        }
+        if let Ok(name) = activation::desktop_name(GetCurrentThreadId()) {
+            println!("{prefix}.thread_desktop={name}");
         }
         println!(
             "{prefix}.taskbar_present={}\n{prefix}.shell_window={}",
@@ -292,6 +335,10 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
         cleanup: false,
     };
     let first = icon.add("initial")?;
+    println!(
+        "tray.owner_hwnd={}\ntray.icon_id={ICON}",
+        receiver.hwnd.0 as usize
+    );
     let mut state = icon.base();
     state.uFlags = NIF_TIP | NIF_SHOWTIP;
     copy_text(&mut state.szTip, &icon.title);
@@ -303,10 +350,16 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
         ..Default::default()
     };
     match unsafe { Shell_NotifyIconGetRect(&key) } {
-        Ok(rect) => println!(
-            "tray.icon_rect_nonempty={}",
-            rect.right > rect.left && rect.bottom > rect.top
-        ),
+        Ok(rect) => {
+            println!(
+                "tray.icon_rect_nonempty={}",
+                rect.right > rect.left && rect.bottom > rect.top
+            );
+            println!(
+                "tray.rect_left={}\ntray.rect_top={}\ntray.rect_right={}\ntray.rect_bottom={}",
+                rect.left, rect.top, rect.right, rect.bottom
+            );
+        }
         Err(e) => println!("tray.icon_rect_hresult={}", e.code().0),
     }
     match unsafe { SHQueryUserNotificationState() } {

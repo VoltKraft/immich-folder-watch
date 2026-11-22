@@ -15,8 +15,8 @@ Clippy and rustfmt, native MSVC tools and Windows PowerShell. On a GitHub-hosted
 Windows runner, run from the repository root with the matching target.
 
 ```powershell
-python tools/rust-qa/windows-services/run.py x86_64-pc-windows-msvc --hosted-startup --output artifacts/rust/windows-services/native-x64
-python tools/rust-qa/windows-services/run.py aarch64-pc-windows-msvc --hosted-startup --output artifacts/rust/windows-services/native-arm64
+python tools/rust-qa/windows-services/run.py $env:NATIVE_TARGET --hosted-startup --output "artifacts/rust/windows-services/native-$env:NATIVE_TARGET"
+python tools/rust-qa/windows-services/activation.py $env:NATIVE_TARGET
 ```
 
 Use an empty output directory. The default Cargo cache is
@@ -129,5 +129,96 @@ same-session Explorer button for hidden icons, inspect the temporary flyout
 and invoke the exact test icon through its provider. It records the native
 activation callback independently and restores the flyout if the test opened
 it. Four deterministic controls cover cleanup and an Explorer process change.
-The native result for this observer is pending. [Explorer observer](../../tools/rust-qa/windows-services/tray-overflow.ps1)
+The native observations from the later run follow below. [Explorer observer](../../tools/rust-qa/windows-services/tray-overflow.ps1)
 and [Microsoft notification area guidance](https://learn.microsoft.com/en-us/windows/win32/shell/notification-area).
+
+## Same-session controls at d403fee
+
+Run 44953046306 used the system's shared `IDI_APPLICATION` icon for these
+controls. Both targets reported session 2, a visible taskbar, a Shell window
+and notification state 6, which Microsoft calls `QUNS_QUIET_TIME`. The
+observer saw one Shell accessibility root on each. Neither root exposed the
+unique tooltip or generated an activation. The earlier probe retained only
+the nonempty-rectangle flag. Its coordinates cannot be reconstructed.
+[Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306)
+and [Microsoft notification states](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state).
+
+| Native observation | Windows x64 | Windows ARM64 |
+| --- | --- | --- |
+| Explorer taskbar PID | 3012 | 4176 |
+| Add, version 4, rectangle | All accepted, nonempty rectangle | Add refused, raw last-error `0x80004005`. Rectangle HRESULT `0x80004005` |
+| Notification and activation | Request accepted, one balloon-show callback, zero shell-open callbacks | Request refused, zero balloon-show and shell-open callbacks |
+| Shell-less non-input desktop | Registration refused, fallback visible | Registration refused, fallback visible |
+| SHA-256 of native control result | `fb895481c4d6d5fa46aaaf499d2be7acc44718bd82ae429a7fe4f870d6424559` | `fcc61056605b9b546ab1bff9b83651025aacb1c516928878ff55b9de0b117859` |
+
+Every indexed service artifact in both ZIPs matched its digest. The
+hosted ZIP SHA-256 values were
+`6e4391e0eebe43292f538115201178642a8395fba1aaece3900733fa20387c17`
+on x64 and `454cf16b2d6a637d0fcce5b20c9bb082bd3e7fcc68c052e2f951bd46be9455ca`
+on ARM64. A balloon-show callback records what the shell reported.
+
+## Private input desktop and notification-area activation
+
+The second command above requires a disposable GitHub-hosted Windows runner,
+its active unlocked `WinSta0\Default` console and the first command's result
+for the same target, binary, sources and workflow run. It creates
+`artifacts/rust/windows-services/native-<target>/activation/result.json`.
+The private worker writes `worker.json` and, when a verified shell can host
+the Rust receiver, `native.txt`. Exit 0 requires native activation and
+cleanup. Exit 2 records an unavailable capability. Exit 1 records a failed
+control or cleanup. [Launcher](../../tools/rust-qa/windows-services/activation.py).
+
+1. The supervisor creates and selects a fresh named desktop. The worker
+   checks that the desktop has no notification-area host, starts the OS copy
+   of Explorer suspended with that explicit desktop, assigns it to a verified
+   empty kill-on-close job, and resumes it. The worker pins the actual
+   taskbar process, verifies its full image, session, thread desktop and
+   membership in the same job. The Rust receiver and optional accessibility
+   observer inherit a handle to the exact private desktop. A launch that delegates to another Explorer
+   cannot qualify. [Desktop startup](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfow),
+   [desktop inheritance](https://learn.microsoft.com/en-us/windows/win32/winstation/thread-connection-to-a-desktop)
+   and [job membership](https://learn.microsoft.com/en-us/windows/win32/api/jobapi/nf-jobapi-isprocessinjob).
+2. The hidden Rust receiver registers a version-4 icon identified by its HWND
+   and numeric ID 23. It uses the first-party 32-pixel tray image with a
+   fixture-specific opaque center. Its source asset SHA-256 is
+   `402073a5d81779a92c54629de7fb16a511c0764391bcdec060095c691b3d0a31`.
+   The independently running worker queries that exact identifier and samples
+   one screen pixel at the center of the returned rectangle. It requires the
+   point to hit the private Explorer taskbar or overflow. If necessary, the
+   exact private Explorer accessibility button may temporarily expose the
+   hidden icons. Rust updates only its own icon to a second, contrasting
+   center color. The worker must see both colors within eight levels per RGB
+   channel at the same HWND, bounds and hit target. The Rust process must
+   confirm the same bounds before input. [Source tray image](../../tools/rust-qa/gui/src/tray-icon.argb),
+   [Shell rectangle](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyicongetrect)
+   and [screen pixel observation](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getpixel).
+3. Before each pointer gesture, every visible window on the active fixture
+   desktop must belong to the subject or the private Explorer job. The worker
+   rechecks the color, geometry, cursor position and HWND owners. It queues
+   one left-button down/up pair, with an optional second independently guarded
+   pair inside the system double-click interval. Rust must receive
+   `NIN_SELECT` or `WM_LBUTTONDBLCLK` with the correct version-4 icon ID and
+   a dispatch time inside the input interval. It records Windows' message
+   time, callback code, icon ID and system uptime. The receiver has a zero
+   activation baseline and its private mode sends no test messages to the
+   callback HWND. [Version-4 notifications](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-notifyicondataw),
+   [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
+   and [shared system clock](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64).
+4. Cleanup removes the fixture icon, closes the owned Explorer job after
+   readback of zero active processes, removes the marked temporary directory
+   by identity and restores the original input desktop. The negative controls
+   include a stale callback, a different HWND at the same coordinates, a
+   rectangle containing the wrong pixel, and a private desktop lost before
+   flyout cleanup. [Private observer](../../tools/rust-qa/windows-services/activation_worker.py)
+   and [input qualification](../../tools/rust-qa/windows-services/test_activation.py).
+
+The Linux host ran the 13 Python controls, the five PowerShell tray cleanup
+controls, the PowerShell parser and the embedded observer's C# compiler. Rustfmt
+and warnings-denied offline Clippy passed for both pinned MSVC targets. A fresh
+audit verified the unpacked dependencies against their archives and reproduced
+both pinned target graph hashes. The new Win32 calls use the
+system's User32, Shell32, Gdi32 and Kernel32 libraries. Native private-desktop
+results on Windows x64 and ARM64 are pending. This fixture qualifies a
+shell-dispatched activation of the Rust receiver. Actual Explorer crash
+recovery, visible user notification presentation and end-to-end opening of
+the product GUI retain separate acceptance evidence.

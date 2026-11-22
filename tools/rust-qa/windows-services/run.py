@@ -93,6 +93,8 @@ def read_native(file):
             continue
         if raw in ("true", "false"):
             metrics[key] = raw == "true"
+        elif key.endswith((".taskbar_desktop", ".thread_desktop")):
+            metrics[key] = raw
         else:
             metrics[key] = int(raw)
     return metrics
@@ -215,6 +217,7 @@ def main():
               "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     files = list(HERE.glob("*")) + list((HERE / "src").glob("*.rs")) + [QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "windows_observer.py", ROOT / "rust/toolchain-inputs.json"]
+    files.append(QA / "gui/src/tray-icon.argb")
     result["sourceFiles"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(files) if p.is_file()}
 
     def step(name, cmd):
@@ -227,8 +230,10 @@ def main():
     try:
         if result["locked"] != inputs["lockSha256"]:
             raise ValueError("Unreviewed Windows lockfile")
+        if sha(QA / "gui/src/tray-icon.argb") != inputs["trayArgbSha256"]:
+            raise ValueError("The embedded first-party tray image differs from the reviewed input")
         step("compiler", [sys.executable, QA / "check-toolchain.py", args.target])
-        step("recovery", [sys.executable, "-m", "unittest", "test_recovery"])
+        step("recovery", [sys.executable, "-m", "unittest", "test_recovery", "test_activation"])
         step("tray-cleanup", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                               "-File", HERE / "test_tray_state.ps1"])
         if not args.offline:

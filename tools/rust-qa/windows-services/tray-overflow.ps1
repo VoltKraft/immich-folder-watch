@@ -18,7 +18,7 @@ function Get-IfwOverflowWindow([uint32]$ExplorerId) {
     return [IntPtr]::Zero
 }
 
-function Open-IfwTrayOverflow($Record) {
+function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null) {
     $bar = [IfwSyntheticShellObserver]::FindWindow('Shell_TrayWnd', $null)
     $explorer = Get-IfwShellOwner $bar
     if (-not $explorer -or -not [IfwSyntheticShellObserver]::IsWindowVisible($bar)) { return }
@@ -46,6 +46,7 @@ function Open-IfwTrayOverflow($Record) {
             $action = @{ method = 'Invoke'; provider = $provider }
         } else { continue }
         if ((Get-IfwShellOwner $bar) -ne $explorer -or (Get-IfwOverflowWindow $explorer) -ne [IntPtr]::Zero) { return }
+        if ($null -ne $BeforeChange -and -not (& $BeforeChange $bar $explorer)) { return }
         $Record.overflow = 'requested'
         $Record.overflowProvider = $action.method
         $state = @{ bar = $bar; explorer = $explorer; button = $button; action = $action }
@@ -56,11 +57,14 @@ function Open-IfwTrayOverflow($Record) {
     }
 }
 
-function Restore-IfwTrayOverflow($State, $Record) {
+function Restore-IfwTrayOverflow($State, $Record, [scriptblock]$BeforeChange = $null) {
     if ($null -eq $State) { return }
     $action = $State.action
     if ((Get-IfwShellOwner $State.bar) -ne $State.explorer -or $State.button.Current.ProcessId -ne $State.explorer) {
         throw 'Explorer changed while observing the temporary flyout'
+    }
+    if ($null -ne $BeforeChange -and -not (& $BeforeChange $State.bar $State.explorer)) {
+        throw 'The private desktop or its pinned shell changed before flyout cleanup'
     }
     $open = (Get-IfwOverflowWindow $State.explorer) -ne [IntPtr]::Zero
     if ($action.method -eq 'Expand') {

@@ -50,6 +50,9 @@ fn run() -> Result<()> {
     {
         return Err(invalid());
     }
+    if mode == "--hosted-private-tray" && hosted() && known == "private" {
+        return tray::activation::assess(area, id);
+    }
     if mode != "--isolated-session" && !(mode == "--github-hosted" && hosted()) {
         return Err(invalid());
     }
