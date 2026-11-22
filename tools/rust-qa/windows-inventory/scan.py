@@ -211,7 +211,8 @@ def coverage(text, requests, first_complete, second_complete, frequency, target,
                 nativeOperationEnds=counts[0][1], eligibleResponses=accepted)
 
 
-def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, output, await_value, stop_subject, p95, owner_token):
+def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, output, await_value, stop_subject, p95, owner_token,
+            *, presentation_trace=None):
     from native import CleanupUnconfirmed, finish_owned_trace, start_owned_subject
     rust = subject == "rust"
     area.mkdir()
@@ -232,6 +233,7 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
         target_handle = checked(api.open(0x0410, False, target))
         stack.callback(api.close, target_handle)
         identity = api.process_identity(target_handle)
+        presentation = presentation_trace(stack, proc, area, output) if presentation_trace else None
         stream = stack.enter_context(observer_log.open("wb", buffering=0))
         etl = area / "files.etl"
         session = "IFW-Files-" + uuid.uuid4().hex
@@ -339,6 +341,8 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
                   for event in ("show", "hide")}
         if min(events.values()) < MIN_RESPONSES:
             raise ValueError("Independent Windows show/hide events failed the active input control")
+        if presentation:
+            observed["presentation"] = presentation(observed)
         metrics = {}
         for action in ("close", "reopen"):
             values = [(q["responseQpc"] - q["issuedQpc"]) * 1000 / api.frequency

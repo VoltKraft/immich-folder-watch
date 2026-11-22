@@ -1,26 +1,37 @@
 """Compare the staged warm GUI with the complete WPF trials on this very same runner."""
 import argparse
 from contextlib import ExitStack
+from functools import partial
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import uuid
 
 from inputs import HERE, QA, ROOT, TARGETS, recorder, sha, subjects
 from build import REFERENCE, REFERENCE_SOURCE_SHA256
+from metrics import METRICS
 from native import CleanupUnconfirmed, owned_directory, pin_path
+from scan_present import start as trace_presentation
 
 
-def measured_generation(log):
+def measured_generation(log, mode):
     rows = log.read_text(encoding="utf-8", errors="replace").splitlines()
     if ([r for r in rows if r.startswith("GRAPHICS_MEMORY ")] != ["GRAPHICS_MEMORY generation=1 hint=MemoryUsage"]
             or [r for r in rows if r.startswith("GRAPHICS_READY ")] != ["GRAPHICS_READY generation=1"]
             or any(r.startswith("WGPU_ALLOCATOR ") for r in rows)):
         raise ValueError("Expected a single warm MemoryUsage device and a measurement without allocator sampling")
-    return dict(generation=1, memoryHint="MemoryUsage")
+    offered = [re.fullmatch(r"GRAPHICS_SURFACE generation=1 desktop=WindowsDx12Cpu offered=\[([A-Za-z, ]+)\]", row)
+               for row in rows if row.startswith("GRAPHICS_SURFACE ")]
+    selection = f"GRAPHICS_PRESENT generation=1 desktop=WindowsDx12Cpu mode={mode} latency=Some(1)"
+    if (len(offered) != 1 or not offered[0] or mode not in offered[0].group(1).split(", ")
+            or [row for row in rows if row.startswith("GRAPHICS_PRESENT ")] != [selection]):
+        raise ValueError("Expected a supported presentation mode on the selected DX12 CPU device and the original frame latency")
+    return dict(generation=1, memoryHint="MemoryUsage", presentMode=mode, offered=offered[0].group(1).split(", "),
+                desiredMaximumFrameLatency=1)
 
 
 def reference(target, metadata):
@@ -43,18 +54,45 @@ def reference(target, metadata):
     return path, fixed, inputs, report.get("comparison", {})
 
 
-def main(target):
+def paired_scan(mailbox_path, fifo):
+    mailbox = json.loads(mailbox_path.read_text(encoding="utf-8"))
+    if (mailbox["presentMode"] != "Mailbox" or mailbox["diagnosticControl"] or fifo["presentMode"] != "Fifo"
+            or any(mailbox[key] != fifo[key] for key in
+                   ("target", "run", "attempt", "revision", "binary", "buildReceipt", "referenceBudgetSha256", "observerInputs"))
+            or mailbox["inputs"]["workload"] != fifo["inputs"]["workload"]):
+        raise ValueError("The two DXGI presentation measurements use different inputs")
+    measurements = {}
+    for mode, data in (("Mailbox", mailbox), ("Fifo", fifo)):
+        if (len(data["trials"]) != recorder.TRIALS
+                or any(data["comparison"][name]["passed"] is None for name in METRICS)):
+            raise ValueError("The DXGI comparison needs all eleven measured metrics from each mode")
+        metrics = {}
+        for name in ("scan_close_p95_ms", "scan_reopen_p95_ms"):
+            sample = data["comparison"][name]
+            if sample["maximum"] != fifo["comparison"][name]["maximum"]:
+                raise ValueError("The two presentation measurements use different WPF maximums")
+            metrics[name] = sample
+        measurements[mode] = metrics
+    return dict(mailboxResultSha256=sha(mailbox_path), metrics=measurements)
+
+
+def main(target, fifo_control=False):
     api, _, binary, base, record = subjects(target)
-    out = base / "measured"
+    out = base / ("measured-fifo" if fifo_control else "measured")
+    mode = "Fifo" if fifo_control else "Mailbox"
     out.mkdir()
-    record.update(status="running", trials=[], observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py")})
+    record.update(status="running", trials=[], presentMode=mode, diagnosticControl=fifo_control,
+                  observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py", "scan_present.py")})
     try:
-        if "IFW_QA_WINDOWS_RESIDENCY" in os.environ:
-            raise ValueError("Start the timed run with its default device memory hint")
+        if "IFW_QA_WINDOWS_RESIDENCY" in os.environ or "IFW_QA_WINDOWS_PRESENT_CONTROL" in os.environ:
+            raise ValueError("Supply the diagnostic presentation control through the recorder's explicit option")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
         with ExitStack() as scope:
+            if fifo_control:
+                os.environ["IFW_QA_WINDOWS_PRESENT_CONTROL"] = "fifo"
+                scope.callback(os.environ.pop, "IFW_QA_WINDOWS_PRESENT_CONTROL")
             area = scope.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
             gui, files, sources = recorder.build_subject(area, out, binary, target, recorder.pe_machine)
             for key in ("compiledEntry", "approvedBundle", "packages", "sources"):
@@ -103,14 +141,15 @@ def main(target):
                     row = recorder.trial(api, fixture, "rust", gui, present, area / name, endpoint, user_sid,
                                          expected, out / (name + ".log"), token)
                     record["trials"].append(row)
-                    row["device"] = measured_generation(out / (name + ".log"))
+                    row["device"] = measured_generation(out / (name + ".log"), mode)
                     try:
                         if not files:
                             raise ValueError("File observer was not built")
                         row["scan"] = recorder.measure_scan(api, fixture, "rust", gui, files, area / (name + "-scan"),
                                                             endpoint, user_sid, out, recorder.await_value,
-                                                            recorder.stop_subject, recorder.p95, token)
-                        row["scan"]["device"] = measured_generation(out / (name + "-scan.log"))
+                                                            recorder.stop_subject, recorder.p95, token,
+                                                            presentation_trace=partial(trace_presentation, api, present, mode))
+                        row["scan"]["device"] = measured_generation(out / (name + "-scan.log"), mode)
                         row["metrics"].update(row["scan"]["metrics"])
                     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                         if CleanupUnconfirmed.in_chain(exc):
@@ -123,6 +162,10 @@ def main(target):
         record["comparison"] = rows
         record["status"] = ("over-budget" if any(r["passed"] is False for r in rows.values()) else
                             "partial" if any(r["passed"] is None for r in rows.values()) else "measured-metrics-passed")
+        if fifo_control:
+            # A complete old-policy control records its genuine failures against the same WPF maximums.
+            record["pairedScan"] = paired_scan(base / "measured/result.json", record)
+            return 0
         return int(record["status"] != "measured-metrics-passed")
     except Exception as exc:
         record.update(status="error", error=f"{type(exc).__name__}: {exc}")
@@ -134,4 +177,6 @@ def main(target):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
-    raise SystemExit(main(parser.parse_args().target))
+    parser.add_argument("--fifo-control", action="store_true", help="measure the previous DXGI interval on this same executable")
+    args = parser.parse_args()
+    raise SystemExit(main(args.target, args.fifo_control))

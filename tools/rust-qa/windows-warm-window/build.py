@@ -44,10 +44,12 @@ def stage(project):
     env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(project.parent)}
     for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         env.pop(key, None)
-    command = ["git", "apply", "--whitespace=error", str(HERE / "candidate.patch")]
-    subprocess.run([*command, "--check"], cwd=gui, env=env, check=True)
-    subprocess.run(command, cwd=gui, env=env, check=True)
-    shutil.copyfile(HERE / "loop_wake.rs", gui / "src/loop_wake.rs")
+    for name in ("candidate.patch", "presentation.patch"):
+        command = ["git", "apply", "--whitespace=error", str(HERE / name)]
+        subprocess.run([*command, "--check"], cwd=gui, env=env, check=True)
+        subprocess.run(command, cwd=gui, env=env, check=True)
+    for name in ("loop_wake.rs", "windows_present.rs"):
+        shutil.copyfile(HERE / name, gui / "src" / name)
     return gui
 
 
@@ -101,7 +103,8 @@ def main(target):
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
-                  variantInputs={p.name: sha(p) for p in (HERE / "candidate.patch", HERE / "loop_wake.rs", Path(__file__))})
+                  variantInputs={name: sha(HERE / name) for name in
+                                 ("candidate.patch", "presentation.patch", "loop_wake.rs", "windows_present.rs", "build.py")})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")
 

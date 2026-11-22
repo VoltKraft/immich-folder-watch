@@ -18,7 +18,9 @@ static const GUID dxgi = {0xca11c036, 0x0102, 0x4a2d, {0xa6, 0xad, 0xf0, 0x3c, 0
 static const GUID d3d9 = {0x783aca0a, 0x790e, 0x4d7f, {0x84, 0x51, 0xaa, 0x85, 0x05, 0x11, 0xc6, 0xb9}};
 static ULONG subject{};
 static ULONG missing_metadata{};
-static std::map<std::pair<bool, ULONG>, ULONG> outstanding;
+static bool record_timing{};
+struct PresentStart { ULONG flags; ULONG sync_interval; LONGLONG tick; };
+static std::map<std::pair<USHORT, ULONG>, PresentStart> outstanding;
 
 static bool property(EVENT_RECORD* record, PCWSTR name, ULONG* value) {
     PROPERTY_DATA_DESCRIPTOR field{};
@@ -34,20 +36,29 @@ static void WINAPI event_record(EVENT_RECORD* record) {
     const bool is_dxgi = IsEqualGUID(h.ProviderId, dxgi);
     if (h.ProcessId != subject || (!is_dxgi && !IsEqualGUID(h.ProviderId, d3d9))) return;
     const USHORT id = h.EventDescriptor.Id;
-    const auto key = std::make_pair(is_dxgi, h.ThreadId);
-    if ((is_dxgi && (id == 42 || id == 55)) || (!is_dxgi && id == 1)) {
-        ULONG flags{};
-        if (property(record, L"Flags", &flags)) outstanding[key] = flags;
+    const bool starting = (is_dxgi && (id == 42 || id == 55)) || (!is_dxgi && id == 1);
+    if (!starting && !((is_dxgi && (id == 43 || id == 56)) || (!is_dxgi && id == 2))) return;
+    const auto key = std::make_pair(static_cast<USHORT>(starting ? id : id - 1), h.ThreadId);
+    if (starting) {
+        PresentStart start{0, 0, h.TimeStamp.QuadPart};
+        if (property(record, L"Flags", &start.flags) &&
+            (!record_timing || id != 42 || property(record, L"SyncInterval", &start.sync_interval))) {
+            outstanding[key] = start;
+        }
         return;
     }
-    if (!((is_dxgi && (id == 43 || id == 56)) || (!is_dxgi && id == 2))) return;
     const auto start = outstanding.find(key);
     if (start == outstanding.end()) return;
-    const bool test_only = is_dxgi && (start->second & 1U) != 0;
+    const auto call = start->second;
+    const bool test_only = is_dxgi && (call.flags & 1U) != 0;
     outstanding.erase(start);
     ULONG result{};
     if (property(record, L"Result", &result) && !test_only && result == 0) {
         std::printf("P %s %lld\n", is_dxgi ? "DXGI" : "D3D9", static_cast<long long>(h.TimeStamp.QuadPart));
+        if (record_timing && id == 43) {
+            std::printf("DXGI %lu %lu %lu %lu %lld %lld\n", subject, h.ThreadId, call.sync_interval, call.flags,
+                        static_cast<long long>(call.tick), static_cast<long long>(h.TimeStamp.QuadPart));
+        }
     }
 }
 
@@ -71,8 +82,9 @@ static ULONG enable(TRACEHANDLE session, const GUID& provider, USHORT* ids, USHO
 }
 
 int wmain(int argc, wchar_t** argv) {
-    if (argc != 4) return 2;
-    if (!wcscmp(argv[1], L"--stop-owned")) return ifw_etw::stop_owned(argv[3], argv[2], L"IFW-RW02-", L"subject.etl");
+    if (argc == 4 && !wcscmp(argv[1], L"--stop-owned")) return ifw_etw::stop_owned(argv[3], argv[2], L"IFW-RW02-", L"subject.etl");
+    record_timing = argc == 5 && !wcscmp(argv[4], L"--timings");
+    if (argc != 4 && !record_timing) return 2;
     subject = std::wcstoul(argv[1], nullptr, 10);
     if (!subject) return 2;
     const std::wstring file = argv[2], name = argv[3];
@@ -120,6 +132,14 @@ int wmain(int argc, wchar_t** argv) {
     input.EventRecordCallback = event_record;
     TRACEHANDLE trace = OpenTraceW(&input);
     if (trace == INVALID_PROCESSTRACE_HANDLE) return 5;
+    if (record_timing) {
+        LARGE_INTEGER frequency{};
+        if (!QueryPerformanceFrequency(&frequency) || input.LogfileHeader.PerfFreq.QuadPart != frequency.QuadPart) {
+            CloseTrace(trace);
+            return 5;
+        }
+        std::printf("QPC %lu %lld\n", subject, static_cast<long long>(frequency.QuadPart));
+    }
     status = ProcessTrace(&trace, 1, nullptr, nullptr);
     CloseTrace(trace);
     if (status != ERROR_SUCCESS || missing_metadata) {

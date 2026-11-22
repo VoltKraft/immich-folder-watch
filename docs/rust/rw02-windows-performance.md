@@ -23,6 +23,28 @@ The ARM64 host also met six of nine limits. Its visible working set was
 and [Windows ARM64 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642/job/136960549022).
 [Shipping publish recipe](../../packaging/windows/build-msi.ps1) · [Desktop standard](../rust-desktop-standard.md).
 
+## Completed paired inventories
+
+The Windows x64 and ARM64 jobs in two subsequent runs completed all eleven metrics. Each host ran three WPF trials, three Rust trials that recreated the renderer, and three trials that retained the HWND and DX12 device. Replaying the 36 archived file-ETW logs against their recorded QPC request timelines recovered the same per-pass file counts, eligible requests, p95 values and WPF-derived thresholds. Each of the 72 passes saw all 100,000 distinct expected files. [Run 44950398558](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44950398558) · [Run 44953046306](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44953046306).
+
+Values below are the three-trial median of each first-pass p95 in milliseconds. The first value is close and the second is reopen.
+
+| Run and architecture | WPF | WPF maximum | Rust, recreated device | Rust, retained device |
+| --- | ---: | ---: | ---: | ---: |
+| 44950398558 x64 | 13.75 / 9.13 | 23.75 / 19.13 | 99.36 / 171.86 | 35.85 / 65.78 |
+| 44950398558 ARM64 | 4.57 / 5.59 | 14.57 / 15.59 | 224.47 / 176.15 | 20.85 / 4.56 |
+| 44953046306 x64 | 16.49 / 10.15 | 26.49 / 20.15 | 107.73 / 196.85 | 42.59 / 65.56 |
+| 44953046306 ARM64 | 4.08 / 5.24 | 14.08 / 15.24 | 209.13 / 163.74 | 17.98 / 4.11 |
+
+The retained candidate met nine of eleven limits on x64 and ten on ARM64 in both runs. On x64 in run `44953046306`, the median individual reopen across each trial was 39.70–41.20 ms. On ARM64 the median individual close was 2.77–2.83 ms and its p95 reached 17.57–18.32 ms. Startup, idle transitions, both working sets, both CPU measurements and both idle presentation rates passed on both machines. The remaining regression concerns transitions during active inventory. [Window lifetime, memory and presentation comparison](rw02-windows-window.md).
+
+| Downloaded desktop archive | SHA-256 |
+| --- | --- |
+| `44950398558/windows-x64.zip` | `c01bebb040e54f617098a76c7f4c8151503d8427ed841cff9405b7dc2c2cc257` |
+| `44950398558/windows-arm64.zip` | `4d36f5aba113af7c32fb72d74b7ba145be147c851dd3cc0fa91bad6af6c844b6` |
+| `44953046306/windows-x64.zip` | `6e4391e0eebe43292f538115201178642a8395fba1aaece3900733fa20387c17` |
+| `44953046306/windows-arm64.zip` | `454cf16b2d6a637d0fcce5b20c9bb082bd3e7fcc68c052e2f951bd46be9455ca` |
+
 ## Worker-integrated Windows run
 
 At `72fff407a964b9e28b16de45fb890018832ecb53`, each host completed
@@ -95,7 +117,7 @@ The observer pairs each regular-file open and identity query with its
 completion status, requires all 100,000 expected names in each of two passes
 and checks directory enumerations independently. A private Windows job owns
 the tested process tree. Profile removal requires the original pinned
-directory and marker and a drained job. Native paired scan results are pending.
+directory and marker and a drained job.
 [Scan fixture and observations](../../tools/rust-qa/windows-inventory/README.md).
 [Process CPU accounting](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes) · [Working set](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo).
 

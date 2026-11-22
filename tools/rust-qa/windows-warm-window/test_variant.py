@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 import inputs
 import measure
 import residency
+from scan_present import correlate
 
 spec = importlib.util.spec_from_file_location("warm_builder", inputs.HERE / "build.py")
 builder = importlib.util.module_from_spec(spec)
@@ -22,14 +23,45 @@ class WarmTests(unittest.TestCase):
     def test_timed_trial_requires_one_memory_usage_device_and_no_allocator_sampling(self):
         with tempfile.TemporaryDirectory() as temp:
             log = Path(temp) / "trial.log"
-            device = "GRAPHICS_MEMORY generation=1 hint=MemoryUsage\nGRAPHICS_READY generation=1\n"
+            device = ("GRAPHICS_MEMORY generation=1 hint=MemoryUsage\nGRAPHICS_READY generation=1\n"
+                      "GRAPHICS_SURFACE generation=1 desktop=WindowsDx12Cpu offered=[Mailbox, Fifo]\n"
+                      "GRAPHICS_PRESENT generation=1 desktop=WindowsDx12Cpu mode=Mailbox latency=Some(1)\n")
             log.write_text(device)
-            self.assertEqual(measure.measured_generation(log)["memoryHint"], "MemoryUsage")
+            self.assertEqual(measure.measured_generation(log, "Mailbox")["memoryHint"], "MemoryUsage")
             for invalid in (device.replace("MemoryUsage", "Performance"), device + "GRAPHICS_READY generation=2\n",
                             device + "WGPU_ALLOCATOR unavailable\n"):
                 log.write_text(invalid)
                 with self.assertRaisesRegex(ValueError, "single warm MemoryUsage"):
-                    measure.measured_generation(log)
+                    measure.measured_generation(log, "Mailbox")
+            for invalid in (device.replace("[Mailbox, Fifo]", "[Fifo]"), device.replace("Some(1)", "Some(2)"),
+                            device.replace("mode=Mailbox", "mode=Fifo")):
+                log.write_text(invalid)
+                with self.assertRaisesRegex(ValueError, "supported presentation mode"):
+                    measure.measured_generation(log, "Mailbox")
+
+    def test_only_owned_non_tearing_presents_on_the_same_work_clock_can_supply_the_comparison(self):
+        requests = [dict(action="reopen" if i % 2 == 0 else "close", issuedQpc=20 + 10 * i, responseQpc=25 + 10 * i)
+                    for i in range(15)]
+        inventory = dict(passes=[dict(firstFileQpc=10, lastFileQpc=200)], eligibleResponses=requests)
+        # Every close overlaps one 4 ms present for 3 ms. Reopens share no present call.
+        rows = [f"DXGI 42 7 0 0 {32 + 20 * i} {36 + 20 * i}" for i in range(7)]
+        trace = "\n".join(["READY", "QPC 42 1000", *rows, "COMPLETE"])
+
+        def read(text, mode="Mailbox"):
+            return correlate(text, 42, 1000, [8, 205], inventory, mode)
+
+        result = read(trace)
+        self.assertEqual((result["successfulPresents"], result["presentP95Ms"]), (7, 4))
+        self.assertEqual(result["actions"]["close"], dict(requests=7, requestsIntersectingPresent=7, longestPresentOverlapP95Ms=3))
+        self.assertEqual(result["actions"]["reopen"]["requestsIntersectingPresent"], 0)
+        self.assertEqual(read(trace.replace("42 7 0 0", "42 7 1 0"), "Fifo")["syncInterval"], 1)
+        for invalid in (trace.replace("QPC 42", "QPC 7"), trace.replace("QPC 42 1000", "QPC 42 2000"),
+                        trace.replace("DXGI 42", "DXGI 7"), trace.replace("42 7 0 0", "42 7 1 0"),
+                        trace.replace("42 7 0 0", "42 7 0 512"), trace.replace("42 7 0 0", "42 7 0 1"),
+                        trace.replace("32 36", "4 36"), trace.replace("COMPLETE", "TRACE_ERROR"),
+                        "\n".join(["READY", "QPC 42 1000", *rows[:3], "COMPLETE"])):
+            with self.assertRaises(ValueError):
+                read(invalid)
 
     def test_staging_preserves_the_shared_inputs(self):
         if not (builder.GUI / "artifacts/text/egui").is_dir():
@@ -39,6 +71,7 @@ class WarmTests(unittest.TestCase):
             for name in ("Cargo.lock", "Cargo.toml", "src/windows_worker.rs", "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
                 self.assertEqual(builder.sha(builder.GUI / name), builder.sha(gui / name))
             self.assertEqual(builder.sha(gui / "src/loop_wake.rs"), builder.sha(builder.HERE / "loop_wake.rs"))
+            self.assertEqual(builder.sha(gui / "src/windows_present.rs"), builder.sha(builder.HERE / "windows_present.rs"))
             for name, digest in builder.ORIGINALS.items():
                 self.assertEqual(builder.sha(builder.GUI / "src" / name), digest)
                 self.assertNotEqual(builder.sha(gui / "src" / name), digest)
@@ -94,6 +127,24 @@ class WarmTests(unittest.TestCase):
                 budget.write_text(json.dumps(fixed))
                 with self.assertRaisesRegex(ValueError, "matching frozen WPF"):
                     measure.reference(inputs.TARGETS[0], meta)
+
+    def test_fifo_can_report_a_full_over_budget_control_but_cannot_pair_different_or_missing_work(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "mailbox.json"
+            values = {key: {"candidate": 22.0, "maximum": 14.0, "passed": False} for key in measure.METRICS}
+            common = dict(target=inputs.TARGETS[0], run="test", attempt="1", revision="rev", binary="bin",
+                          buildReceipt="build", referenceBudgetSha256="budget", observerInputs={}, trials=[{}] * 3,
+                          inputs={"workload": {"files": 100000}}, comparison=values)
+            fifo = dict(common, presentMode="Fifo", diagnosticControl=True)
+            mailbox = dict(common, presentMode="Mailbox", diagnosticControl=False)
+            path.write_text(json.dumps(mailbox))
+            self.assertEqual(measure.paired_scan(path, fifo)["metrics"]["Fifo"]["scan_close_p95_ms"], values["scan_close_p95_ms"])
+            with self.assertRaisesRegex(ValueError, "different inputs"):
+                measure.paired_scan(path, dict(fifo, binary="different"))
+            with self.assertRaisesRegex(ValueError, "eleven measured"):
+                measure.paired_scan(path, dict(fifo, comparison={**values, "startup_ms": {"passed": None}}))
+            with self.assertRaisesRegex(ValueError, "different WPF"):
+                measure.paired_scan(path, dict(fifo, comparison={**values, "scan_close_p95_ms": {**values["scan_close_p95_ms"], "maximum": 20}}))
 
 
 if __name__ == "__main__":

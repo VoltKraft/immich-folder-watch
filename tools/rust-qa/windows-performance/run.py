@@ -35,14 +35,17 @@ def await_value(get, label, timeout=35, delay=.002):
         time.sleep(delay)
 
 
-def trace_start(stack, observer, pid, area):
-    log = area / "present.log"
+def trace_start(stack, observer, pid, area, *, timed_log=None):
+    log = timed_log if timed_log is not None else area / "present.log"
     if observer is None:
         log.write_text("The Windows SDK observer did not compile; see observer-build.log.\n")
         return lambda: None, log
     stream = stack.enter_context(log.open("wb", buffering=0))
     etl, name = area / "subject.etl", "IFW-RW02-" + uuid.uuid4().hex
-    helper = subprocess.Popen([observer, str(pid), etl, name],
+    command = [observer, str(pid), etl, name]
+    if timed_log is not None:
+        command.append("--timings")
+    helper = subprocess.Popen(command,
                               stdin=subprocess.PIPE, stdout=stream, stderr=subprocess.STDOUT, cwd=area)
     finished = False
     def finish():
