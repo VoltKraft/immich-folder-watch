@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows text and scan response at 1904be7 (2026-11-23)
+
+Both native Windows targets passed the ordinary and reopened filename
+checks. Four original images matched byte for byte. During a 100,000-file
+scan the default retained x64 GUI took 38.75 ms to close and 39.32 ms
+to reopen against 29.88 and 21.08 ms limits. ARM64 again met all eleven
+limits. The separate x64 trace places much of the delay before Present on
+close and inside the visibility call on reopen. Further timing of frame
+acquisition and thread scheduling is in progress. [Original measurements](rust/rw02-windows-window.md#native-results-at-1904be7) · [Native glyphs and editing](rust/rw02-windows-text.md#captured-ordinary-and-reopened-filenames-at-1904be7).
+
 ## Windows system colors in the Rust feasibility window (2026-11-23)
 
 The canonical and retained Windows sources passed frozen compiler checks

@@ -103,3 +103,22 @@ python3 -B tools/rust-qa/windows-warm-window/filename.py "$NATIVE_TARGET" --repl
 The first command uses the existing desktop placement decision after the retained build. Run the second from a Git checkout of the originating revision with the extracted artifact's sibling compiler stream, original source archive, canonical graph and build receipts in place. It verifies the observer files against that revision with Windows checkout filters. The field's HWND, PID, thread desktop and session must agree with the unlocked input desktop before and after the PowerShell observation.
 
 The retained case writes under `artifacts/rust/windows-warm-window/<target>/windows-text/`. Failures preserve the native hook observations, current phase, subject log and available glyph or editing results. The normal teardown GUI continues to write its own results under `gui-native/<target>/windows-text/`.
+
+### Captured ordinary and reopened filenames at 1904be7
+
+On Windows x64 and ARM64, both the ordinary editor and the reopened
+retained editor passed the three mixed-direction mouse, caret and Delete
+cases. Both native UI Automation text interfaces returned the exact
+edited text in all twelve cases. The eight glyph masks were distinct in
+each image. All four original 276 × 18 PNGs were byte-identical and
+contained 152 colors. Their SHA-256 is
+`94941c7babf5dc81e363d64cf9e4ba4ab52c8e1ccf98371a2cac093d2c0371ab`.
+Detached replay checked the compiler and source archive, original window
+identity, hide and reopen events, exact field rectangle, decoded pixels
+and native editing events. Each retained subject stayed at renderer
+generation one across hide and reopen.
+
+| Native host | Ordinary result SHA-256 | Reopened retained result SHA-256 |
+| --- | --- | --- |
+| [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14859761846) | `62858e399afff8b8dff68fd5fbb827fd2a5e81d34bf8ee4ab71916f87c754f76` | `f4f2b3a4734fcd457773c9c368194f20c0cf32b2ce5518b1c8ea60bd43597af4` |
+| [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14857840215) | `ca315e10e2af185af7b72e246c3a200e7e094e411feeba41d5336d0e9bafe342` | `051eaa6b03d8e11bd0559e1e1922368350729096667255a5e475823679119d51` |

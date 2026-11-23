@@ -565,3 +565,31 @@ on x64 and `9761aba2ce38f58571d56744e61991b1ac280fdfd34f2b4fe3b2960b8379f0e7`
 on ARM64. The separate ordinary-filename tests completed all three edits
 on each host and failed at the caret-free capture with the older focus
 check. [Corrected focus check](rw02-windows-text.md#focus-when-capturing-the-caret-free-field).
+
+### Native results at 1904be7
+
+Windows ARM64 again met all eleven WPF limits at both retained Mailbox
+depths. On x64 the default one-frame profile exceeded both response limits
+during scans. Each of the three uninstrumented trials completed two
+100,000-file inventories. The median of their close p95 values was
+38.7492 ms against a 29.882 ms limit. Reopen took 39.3171 ms against
+21.083 ms. The two-frame profile also exceeded idle close. Its scan
+close/reopen took 38.9101/45.5639 ms. FIFO with one frame exceeded the
+same three x64 limits. ARM64 FIFO exceeded scan close at 17.5066 ms
+against 13.774 ms. Keep the one-frame Mailbox measurement open on x64.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14859761846) · [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14857840215).
+
+Detached comparison of the original x64 traces from `1b95ba0`,
+`653f255` and `1904be7` matched the compiler and renderer inputs and
+54 two-pass inventory traces. In the separate instrumented one-frame
+trial at `1904be7`, all 64 over-limit closes out of 566 overlapped a
+visible redraw. In 50, that redraw occupied at least half the observed
+response. Within those slow redraws the median times before, inside and
+after DXGI Present were 39.2886, 0.0650 and 0.0243 ms respectively.
+Of the 153 over-limit reopens, 152 spent at least half the response
+inside the synchronous visibility call. Focus took at most 0.8195 ms.
+There were no presents in the 566 confirmed hidden intervals. The trace
+locates the delay before Present and during ShowWindow. Separating frame
+acquisition, rendering and scheduling requires further native observations.
+The x64 dispatch report SHA-256 is
+`e8f2cc88e2d1e933aa7145e5a2fb53d8f2b477a937fe26a861d558b74f8973fd`.

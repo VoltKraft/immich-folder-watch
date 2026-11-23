@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-653f255), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-653f255) and [realtime transport](rw02-realtime-transport.md). The [Documents grant comparison](rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open) covers the private backport. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-1904be7), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-1904be7) and [realtime transport](rw02-realtime-transport.md). The [Documents grant comparison](rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open) covers the private backport. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -117,6 +117,13 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 · [C# reference jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264125).
 
 ## Native evidence matrix
+
+At `1904be7` both Windows targets passed all three mixed-direction edits
+in the ordinary window and after reopening the retained window. All four
+glyph images matched. The default retained x64 GUI passed nine of eleven
+limits. Its scan close and reopen exceeded the same-host WPF limits. ARM64
+passed eleven of eleven at both Mailbox frame depths. RI-AC06 remains open.
+[Native timing](rw02-windows-window.md#native-results-at-1904be7) · [Original text and glyph evidence](rw02-windows-text.md#captured-ordinary-and-reopened-filenames-at-1904be7).
 
 At `1904be7` all four native targets passed four shipping-worker restarts
 from Rust-produced SQLite backups. Detached replay matched the 16 reports,

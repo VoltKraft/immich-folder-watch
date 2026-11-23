@@ -63,6 +63,11 @@ selected feasibility inputs, exact target features and offline reconstruction.
 The [native evidence matrix](rust/acceptance.md#native-evidence-matrix)
 tracks their observed coverage across all four targets.
 
+On November 23 the user selected an isolated installation and rollback
+trial for Ubuntu's Documents portal. Its scope is feasibility of the file
+lock through a real application grant. Distribution approval and any
+commitment to maintaining host packages require a separate decision.
+
 The following acceptance criteria are fixed for this run. Their evidence is
 conjunctive: a missing required platform/test/artifact remains open.
 
