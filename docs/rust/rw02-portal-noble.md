@@ -370,8 +370,11 @@ descriptor using the file's held mount and directory entry.
 [Ubuntu source package and patch inputs](../../tools/rust-qa/portal-noble/inputs.py)
 · [Linux procfs descriptor lookup](https://github.com/torvalds/linux/blob/v7.0/fs/proc/fd.c#L165-L184).
 
-The observer first identifies one uniquely named, open directory for
-each role in the waiting Rust process. Before each read and after the
+The observer first opens the named grant and its relative album in the
+waiting Rust process's mount namespace. It matches each to one unique
+reader descriptor by role, directory type, device, inode, mount ID and
+the full set of flags on the independent read-only open. It rechecks
+both numbered slots. Before each read and after the
 last read it opens the named grant in that process's mount namespace and
 opens `album` relative to it with `O_NOFOLLOW`. It compares the directory
 types, devices, inode numbers and mount IDs to the reader's original
@@ -389,6 +392,20 @@ descriptor, denied grant or different child stops the request. The actual
 Rust read still runs through the two handles it opened at startup.
 [Observer](../../tools/rust-qa/portal-noble/observe.py)
 · [Regression checks](../../tools/rust-qa/portal-noble/test_descriptors.py).
+
+In the first native test of the relative walk, the x64 Noble userspace
+on the Fedora kernel completed 32, 32 and 46 operations with the three
+services. Six detached-name observations confirmed the document rights
+and both directory identities through the reader's root. The result
+SHA-256 for `amd64-71qu46tv` is
+`8b19cc9df0412e2a862c0deb89318e009fcb32def8b902cd2c5eb5a219ba164f`.
+At `ce62051` the stock service exposed a detached album label during the
+initial binding. The earlier observer stopped there after 28 operations.
+The unmodified rebuild and backport passed, and all three grants were
+revoked. The `amd64-e_4ucz7a` result SHA-256 is
+`3900ccdbfd15cf3a2f81b019bad4902bd94e3289050eb92d2cd03f434915941e`.
+The revised initial binding applies the permission and original-parent
+checks to a detached name at this first observation as well.
 
 ## Meson on the Ubuntu runners
 

@@ -30,6 +30,11 @@ print("ready", flush=True)
 for line in sys.stdin:
     if line == "duplicate\\n":
         duplicate = os.dup(album)
+    elif line in ("path-only\\n", "nonblocking\\n"):
+        extra = os.O_PATH if line == "path-only\\n" else os.O_NONBLOCK
+        changed = os.open(root / "album", flags | extra)
+        os.dup2(changed, album, inheritable=False)
+        os.close(changed)
     elif line == "missing\\n":
         os.close(album)
     elif line == "regular\\n":
@@ -308,7 +313,97 @@ class Descriptors(unittest.TestCase):
                                     "typeBits": stat.S_IFDIR, "mountId": before[str(path)]["mountId"],
                                 })
 
-    def test_initial_binding_requires_exact_names_and_rechecks_uniqueness_when_a_slot_is_detached(self):
+    def test_initial_binding_uses_both_directory_walks_for_one_or_two_detached_slots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                baseline = retained_fds(peer, paths, {})
+                for detached in (("album",), ("grant",), ("grant", "album")):
+                    with self.subTest(roles=detached):
+                        def label(fd, authorized):
+                            role = link_label(fd, authorized)
+                            return role + "-deleted" if role in detached else role
+                        lookup = Mock(return_value=(os.fsencode(BACKING), {APP: ["read", "write"]}))
+                        evidence = {}
+                        with patch("observe.link_label", side_effect=label):
+                            self.assertEqual(retained_fds(peer, paths, evidence, lookup=lookup), baseline)
+                        self.assertEqual(lookup.call_count, 2)
+                        self.assertEqual(evidence["throughOriginalGrant"], evidence["namedDirectories"])
+                        self.assertEqual(set(evidence["detachedGrantChecks"]), {"bindingEnumeration", "bindingConfirmation"})
+                        for phase in evidence["detachedGrantChecks"].values():
+                            self.assertEqual(set(phase["roles"]), set(detached))
+                        for role, path in paths.items():
+                            row, = evidence["named"][role]
+                            self.assertEqual(row, evidence["boundOriginals"][role])
+                            self.assertEqual(row["flags"], evidence["bindingDirectoryFlags"][role])
+                            self.assertEqual(row["mountId"], evidence["namedDirectories"][role]["mountId"])
+
+    def test_initial_binding_refuses_a_withdrawn_grant_and_a_replaced_slot_before_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                def detached(fd, authorized):
+                    label = link_label(fd, authorized)
+                    return label + "-deleted" if label == "album" else label
+                with patch("observe.link_label", side_effect=detached):
+                    rights = (os.fsencode(BACKING), {APP: ["read", "write"]})
+                    withdrawn = (rights[0], {APP: ["write"]})
+                    for answers, stage in (([withdrawn], "bindingEnumeration"), ([rights, withdrawn], "bindingConfirmation")):
+                        evidence = {}
+                        with self.subTest(stage=stage), self.assertRaisesRegex(ValueError, "confirm the original document"):
+                            retained_fds(peer, paths, evidence, lookup=Mock(side_effect=answers))
+                        self.assertFalse(evidence["detachedGrantChecks"][stage]["permission"]["read"])
+                        self.assertNotIn("throughOriginalGrant", evidence)
+
+                    def change_slot():
+                        proc.stdin.write("regular\n")
+                        proc.stdin.flush()
+                        self.assertEqual(proc.stdout.readline(), "done\n")
+                        return rights
+                    evidence = {}
+                    with self.assertRaisesRegex(ValueError, "changed before a retry"):
+                        retained_fds(peer, paths, evidence, lookup=change_slot)
+                    self.assertEqual(evidence["boundOriginals"]["album"]["fileType"], "regular")
+
+    def test_initial_binding_refuses_a_detached_name_attached_to_a_different_object(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                before = retained_fds(peer, paths, {})
+                paths["album"].rename(root / "previous")
+                paths["album"].mkdir()
+                def stale_label(fd, authorized):
+                    if int(fd.name) == before[str(paths["album"])]["fd"]:
+                        return "album-deleted"
+                    return link_label(fd, authorized)
+                evidence, lookup = {}, Mock()
+                with patch("observe.link_label", side_effect=stale_label), self.assertRaisesRegex(ValueError, "differs"):
+                    retained_fds(peer, paths, evidence, lookup=lookup)
+                lookup.assert_not_called()
+                row, = evidence["named"]["album"]
+                self.assertEqual(row["link"], "album-deleted")
+                self.assertNotEqual(row["inode"], evidence["namedDirectories"]["album"]["inode"])
+
+    def test_initial_binding_refuses_path_only_and_extra_open_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                for action, expected in (("path-only", os.O_PATH), ("nonblocking", os.O_NONBLOCK)):
+                    with self.subTest(action=action):
+                        proc.stdin.write(action + "\n")
+                        proc.stdin.flush()
+                        self.assertEqual(proc.stdout.readline(), "done\n")
+                        evidence = {}
+                        with self.assertRaisesRegex(ValueError, "flags"):
+                            retained_fds(peer, paths, evidence)
+                        row, = evidence["named"]["album"]
+                        self.assertEqual(int(row["flags"], 8) & expected, expected)
+
+    def test_binding_and_later_enumeration_reject_duplicate_detached_descriptors(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             paths = {"grant": root, "album": root / "album"}
@@ -317,15 +412,13 @@ class Descriptors(unittest.TestCase):
                 def detached(fd, authorized):
                     label = link_label(fd, authorized)
                     return label + "-deleted" if label == "album" else label
-                with patch("observe.link_label", side_effect=detached):
-                    with self.assertRaises(ValueError):
-                        retained_fds(peer, paths, {})
-                    proc.stdin.write("duplicate\n")
-                    proc.stdin.flush()
-                    self.assertEqual(proc.stdout.readline(), "done\n")
+                proc.stdin.write("duplicate\n")
+                proc.stdin.flush()
+                self.assertEqual(proc.stdout.readline(), "done\n")
+                for binding in (None, before):
                     evidence = {}
-                    with self.assertRaisesRegex(ValueError, "unambiguously"):
-                        retained_fds(peer, paths, evidence, before, lambda: (os.fsencode(BACKING), {APP: ["read", "write"]}))
+                    with patch("observe.link_label", side_effect=detached), self.assertRaisesRegex(ValueError, "unambiguously"):
+                        retained_fds(peer, paths, evidence, binding, lambda: (os.fsencode(BACKING), {APP: ["read", "write"]}))
                     duplicate = evidence["named"]["album"]
                     self.assertEqual(len(duplicate), 2)
                     self.assertNotEqual(duplicate[0]["fd"], duplicate[1]["fd"])

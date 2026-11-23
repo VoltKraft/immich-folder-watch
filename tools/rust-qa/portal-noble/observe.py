@@ -106,9 +106,8 @@ def named_fds(peer, paths, evidence, before=None):
     found = {}
     for role, (row,) in rows.items():
         flags = int(row.get("flags", "0"), 8)
-        allowed_labels = (role,) if before is None else (role, role + "-deleted")
-        if (row.get("link") not in allowed_labels or row.get("fileType") != "directory" or flags & required != required
-                or flags & os.O_ACCMODE != os.O_RDONLY):
+        if (row.get("link") not in (role, role + "-deleted") or row.get("fileType") != "directory"
+                or flags & required != required or flags & os.O_PATH or flags & os.O_ACCMODE != os.O_RDONLY):
             raise ValueError("The retained directory descriptor is missing or has unexpected flags")
         identity = {key: row[key] for key in ("fd", "device", "inode", "flags")}
         if "mountId" in row:
@@ -150,17 +149,23 @@ def directory_pair(holders, root, root_flags, evidence, paths, expected=None):
     """Hold the root and its relative child. Record identities in the mount namespace of the opened path."""
     child_flags = os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
     parent = None
+    opened_flags = {}
     for role, name, flags in (("grant", root, root_flags), ("album", "album", child_flags)):
         fd = os.open(name, flags, dir_fd=parent)
         holders.callback(os.close, fd)
         item = os.fstat(fd)
         row = evidence[role] = dict(typeBits=stat.S_IFMT(item.st_mode), device=item.st_dev, inode=item.st_ino)
-        mount = re.search(r"^mnt_id:\s+([0-9]+)$", Path(f"/proc/self/fdinfo/{fd}").read_text(), re.M)
+        info = Path(f"/proc/self/fdinfo/{fd}").read_text()
+        mount = re.search(r"^mnt_id:\s+([0-9]+)$", info, re.M)
         if mount:
             row["mountId"] = int(mount[1])
+        actual_flags = re.search(r"^flags:\s+([0-7]+)$", info, re.M)
+        if actual_flags:
+            opened_flags[role] = actual_flags[1]
         if expected is not None:
             check_directory(row, expected[str(paths[role])])
         parent = fd
+    return opened_flags
 
 
 def check_directory(opened, original):
@@ -179,17 +184,27 @@ def retained_fds(peer, paths, evidence, before=None, lookup=None):
         # same authorized path there, so the mount IDs can be compared directly.
         named = evidence["namedDirectories"] = {}
         root = peer / "root" / paths["grant"].relative_to("/")
-        directory_pair(holders, root, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
-                       named, paths, before)
+        opened_flags = directory_pair(holders, root, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                                      named, paths, before)
         if before is not None:
             confirmed = evidence["confirmedOriginals"] = original_fds(peer, paths, before)
             check_slots(confirmed, paths, before, lookup, evidence, "confirmed")
         current = named_fds(peer, paths, evidence, before)
+        enumerated = {role: rows[0] for role, rows in evidence["named"].items()}
         if before is None:
+            evidence["bindingDirectoryFlags"] = opened_flags
+            if not named["grant"].get("mountId") or named["grant"]["mountId"] != named["album"].get("mountId"):
+                raise ValueError("The named grant and album must be on the same known mount")
             for role, path in paths.items():
-                check_directory(named[role], current[str(path)])
+                original = current[str(path)]
+                if original.get("mountId") != named[role]["mountId"] or original["flags"] != opened_flags.get(role):
+                    raise ValueError("The initial reader slot differs from the named directory's mount or open flags")
+                check_directory(named[role], original)
+            before = current
+            check_slots(enumerated, paths, before, lookup, evidence, "bindingEnumeration")
+            bound = evidence["boundOriginals"] = original_fds(peer, paths, before)
+            check_slots(bound, paths, before, lookup, evidence, "bindingConfirmation")
         else:
-            enumerated = {role: rows[0] for role, rows in evidence["named"].items()}
             check_slots(enumerated, paths, before, lookup, evidence, "enumerated")
             if current != before:
                 raise ValueError("The retry peer's original directory descriptors changed")
@@ -551,7 +566,7 @@ def observe(expected):
             before = trace["before"] = {}
             with diagnosed():
                 before_ids = identities(before)
-                before_fds = retained_fds(peer, paths, before)
+                before_fds = retained_fds(peer, paths, before, lookup=lookup)
                 for name, path in paths.items():
                     if any(before_ids[name][key] != before_fds[str(path)][key] for key in ("device", "inode")):
                         raise ValueError("The retained directories differ from the authorized grant")
