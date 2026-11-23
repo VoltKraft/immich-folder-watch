@@ -1,0 +1,61 @@
+name: Rust foundation CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, converted_to_draft]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-foundation-codeql-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    if: >-
+      github.repository == 'VoltKraft/immich-folder-watch' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'rewrite/rust' && github.event.pull_request.draft
+    name: Rust CodeQL (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc]
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - name: Check out the exact Rust PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Prepare the CodeQL bundle and its analysis toolchain
+        shell: bash
+        run: |
+          export RUSTUP_HOME="$RUNNER_TEMP/ifw-analysis-rustup" CARGO_HOME="$RUNNER_TEMP/ifw-analysis-cargo"
+          rustup toolchain install 1.99.0 --profile minimal --component rust-src --target "$TARGET" --no-self-update
+          curl --proto '=https' --proto-redir '=https' --fail --location --silent --show-error --retry 3 \
+            --output "$RUNNER_TEMP/codeql-bundle.tar.zst" \
+            https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.5/codeql-bundle-linux64.tar.zst
+
+      - name: Analyze the tracked foundation with the selected target configuration
+        id: scan
+        shell: bash
+        run: |
+          export RUSTUP_HOME="$RUNNER_TEMP/ifw-analysis-rustup" CARGO_HOME="$RUNNER_TEMP/ifw-analysis-cargo"
+          bash tools/codeql-rust/scan.sh "$RUNNER_TEMP/codeql-bundle.tar.zst" "$TARGET" "$RUNNER_TEMP/ifw-codeql" "$SOURCE_SHA"
+
+      - name: Retain analysis, source coverage and diagnostics
+        if: ${{ !cancelled() && (steps.scan.outcome == 'success' || steps.scan.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-codeql-${{ matrix.target }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/ifw-codeql/results/
+          if-no-files-found: error
+          retention-days: 14

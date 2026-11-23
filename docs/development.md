@@ -384,6 +384,41 @@ The app reads its config from `%LOCALAPPDATA%\Immich Folder Watch\config.yaml`. 
 - `packaging/flatpak/`: the shared Flatpak manifest, metadata, local-build
   instructions, and Flathub submission requirements
 
+### Rust foundation CodeQL
+
+The rewrite draft PR runs the Rust security-extended suite on the five-crate
+workspace under `rust/`. A fresh Git archive binds each scan to the PR head.
+Two Linux-hosted jobs select the Linux and Windows x64 compiler configurations.
+Each compares every extracted Rust file with its original Git blob and checks
+which files have semantic information for that target. The standalone GUI and
+QA probes under `tools/rust-qa/` are outside this scan. Platform runtime and
+filesystem evidence comes from the native assessment workflows.
+[Workflow](../.github/workflows/rust-codeql.yaml) · [Native evidence](rust/acceptance.md#native-evidence-matrix).
+
+CodeQL CLI 2.27.5 uses the MIT-licensed `rust-queries` 0.1.47 and
+`rust-all` 0.2.26 packs. The development-only CLI license permits automated
+analysis of this public open-source repository on GitHub. Its Rust extractor
+selects 1.99.0. The workspace builds with the compiler in
+`rust/rust-toolchain.toml`. Each Actions artifact contains the SARIF results,
+extractor log, semantic coverage and a summary with source hashes and reported
+alerts. Incomplete coverage, a CodeQL database quality warning, a reported
+security alert or an analysis error fails the check. These jobs use a read-only
+repository token and retain the artifacts for 14 days. GitHub's existing default code scanning operates
+independently. [CLI terms](https://github.com/github/codeql-cli-binaries/blob/v2.27.5/LICENSE.md)
+· [Query license](https://github.com/github/codeql/blob/codeql-cli/v2.27.5/LICENSE)
+· [Extractor toolchain](https://github.com/github/codeql/blob/codeql-cli/v2.27.5/rust/extractor/src/toolchain.rs).
+
+To reproduce a scan on Linux x64, download the official `codeql-bundle-linux64.tar.zst`.
+Use an isolated Rustup environment with 1.99.0, `rust-src` and the selected
+target installed. Supply the bundle path, target, fresh output directory and
+full checkout revision. The script checks the bundle's SHA-256 before
+unpacking it. Cargo operates offline during extraction.
+[Official bundle](https://github.com/github/codeql-action/releases/tag/codeql-bundle-v2.27.5) · [Analysis script](../tools/codeql-rust/scan.sh).
+
+```bash
+bash tools/codeql-rust/scan.sh /tmp/codeql-bundle-linux64.tar.zst x86_64-pc-windows-msvc /tmp/ifw-codeql-windows "$(git rev-parse HEAD)"
+```
+
 ### Publication workflow trust
 
 The Flatpak release job explicitly checks out the repository's default branch and
