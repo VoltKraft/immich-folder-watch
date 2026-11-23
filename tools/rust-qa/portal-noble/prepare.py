@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import urllib.parse
 
-from inputs import BASE, PORTS, UBUNTU, fetch, sha
+from inputs import BASE, fetch, sha, snapshot_url
 
 DEVELOPMENT = ("dpkg-dev", "patch", "gcc", "libc6-dev", "pkg-config", "gettext", "meson", "ninja-build",
                "libgdk-pixbuf-2.0-dev", "libfuse3-dev", "libglib2.0-dev", "libjson-glib-dev", "libpipewire-0.3-dev")
@@ -124,7 +124,7 @@ def observe_split_python(osroot, prepared, output):
 def prepare(osroot, aptroot, output, arch, download):
     from verify import signed_packages
     packages = package_plan(aptroot, output)
-    signed_packages(aptroot, arch, packages, output)
+    signed = signed_packages(aptroot, arch, packages, output)
     cache = BASE / "cache/debs"
     cache.mkdir(parents=True, exist_ok=True)
     layer = output / "extra"
@@ -139,7 +139,7 @@ def prepare(osroot, aptroot, output, arch, download):
             if cached.is_file() and sha(cached) == digest:
                 shutil.copyfile(cached, raw / filename)
                 return
-        url = (UBUNTU if arch == "amd64" else PORTS) + item["Filename"]
+        url = snapshot_url(signed["snapshots"][item["Filename"]], item["Filename"])
         archive = fetch(url, cache / filename, digest, download, int(item["Size"]))
         shutil.copyfile(archive, raw / filename)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:

@@ -133,6 +133,27 @@ and [package and notice inventory](../../tools/rust-qa/plasma/ubuntu-amd64.tsv).
 
 ## Reproduction
 
+In the desktop runs at `549066f` and `ba02f8b`, the public binary-pool
+request received HTTP 403 on both architectures after fetching Ubuntu Base.
+The corresponding Noble source acquisitions also received HTTP 403. The
+logs omit the affected package names. Both Plasma package manifests now
+name the dated Ubuntu snapshot corresponding to their signed review.
+Independent retrieval matched all six original InRelease files including
+their archive signatures, and the architecture-specific `libxcb-keysyms1`
+files matched their frozen sizes and SHA-256. The snapshot times are
+`20261121T210000Z` for x64 and `20261123T100000Z` for ARM64. The package
+and notice checks still apply to every file at reconstruction.
+[Ubuntu Snapshot Service](https://snapshot.ubuntu.com/) · [First native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471) · [Second native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405).
+
+The local x64 guest rebuilt offline from Ubuntu Base and all 696 reviewed
+archives. Its first probe used a Fedora-linked binary. The Noble loader
+reported missing GLIBC_2.43 and GLIBC_2.44 before the application started.
+The matching Noble-linked Rust binary `e346e5e7` then registered its icon
+and reopened through two real panel clicks. The panel list was empty after
+Quit. The new result in
+`artifacts/rust/plasma/snapshot-native-check/plasma-qrvees5k/result.json`
+has SHA-256 `746f9f2ebd381b513296ec64e3f92e9944d77128ff3437ba159998972eab6878`.
+
 The private ARM64 guest uses the Ubuntu Base 24.04.5 ARM64 image and 691
 packages totalling 415,479,768 bytes. APT resolved them against the ARM64
 image's installed-package database. Independent verification authenticated

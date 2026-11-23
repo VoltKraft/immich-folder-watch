@@ -10,7 +10,7 @@ from unittest.mock import Mock, call, patch
 from urllib.error import HTTPError
 from urllib.response import addinfourl
 
-from inputs import POOL, SOURCE, VERSION, fetch
+from inputs import POOL, SOURCE, VERSION, fetch, snapshot_url
 from observe import require_result
 from verify import signed_packages
 
@@ -30,6 +30,15 @@ class ArchiveTransfers(unittest.TestCase):
 
     def response(self, body, url=None):
         return addinfourl(BytesIO(body), {}, url or self.url, 200)
+
+    def test_snapshot_uses_the_dated_signed_pool_path(self):
+        stamp = "20261121T181410Z"
+        self.assertEqual(snapshot_url(stamp, "pool/main/f/fixture/fixture+test~1_amd64.deb"),
+                         "https://snapshot.ubuntu.com/ubuntu/20261121T181410Z/pool/main/f/fixture/fixture+test~1_amd64.deb")
+        for timestamp, path in (("latest", "pool/main/f/source"), (stamp, "https://example.invalid/input"),
+                                (stamp, "pool/main/../elsewhere")):
+            with self.assertRaises(ValueError):
+                snapshot_url(timestamp, path)
 
     def test_pre_header_disconnects_retry_the_same_input_then_reuse_verified_bytes(self):
         responses = [RemoteDisconnected(), RemoteDisconnected(), self.response(self.body)]
@@ -64,7 +73,9 @@ class ArchiveTransfers(unittest.TestCase):
         disconnected_body.read = Mock(side_effect=RemoteDisconnected("body disconnected"))
         cases = (
             (HTTPError(self.url, 404, "missing", {}, None), HTTPError, "404"),
+            (HTTPError(self.url, 403, "forbidden", {}, None), HTTPError, "403"),
             (self.response(self.body, "https://example.invalid/fixture.deb"), ValueError, "redirect"),
+            (self.response(self.body, self.url.replace("https:", "http:")), ValueError, "redirect"),
             (self.response(body=self.body + b"!"), ValueError, "Oversize"),
             (self.response(body=b"changed"), ValueError, "Unexpected Ubuntu input"),
             (disconnected_body, RemoteDisconnected, "body disconnected"),
@@ -75,8 +86,10 @@ class ArchiveTransfers(unittest.TestCase):
                 patch("inputs.urllib.request.urlopen", side_effect=[response]) as opening,
                 patch("inputs.time.sleep") as delay,
             ):
-                with self.assertRaisesRegex(error, message):
+                with self.assertRaisesRegex(error, message) as failed:
                     self.acquire()
+                if error is HTTPError:
+                    self.assertIn("Ubuntu archive input: " + self.url, failed.exception.__notes__)
                 opening.assert_called_once_with(self.url, timeout=60)
                 delay.assert_not_called()
                 self.assertEqual(list(self.path.parent.iterdir()), [])
@@ -136,8 +149,10 @@ class Controls(unittest.TestCase):
             index.write_bytes(content)
             rows = {"main/binary-amd64/Packages": (hashlib.sha256(content).hexdigest(), len(content))}
             plan = [{"Filename": item, "SHA256": digest}]
-            with patch("verify.signed_release", return_value=("", rows)):
-                self.assertEqual(signed_packages(root, "amd64", plan, root)["packages"][control], digest)
+            with patch("verify.signed_release", return_value=("Date: Sat, 21 Nov 2026 18:14:10 UTC\n", rows)):
+                report = signed_packages(root, "amd64", plan, root)
+                self.assertEqual(report["packages"][control], digest)
+                self.assertEqual(report["snapshots"], {name: "20261121T181410Z" for name in (control, item)})
                 with self.assertRaisesRegex(ValueError, "do not cover"):
                     signed_packages(root, "amd64", [{"Filename": item, "SHA256": "1" * 64}], root)
                 index.write_bytes(content.replace(digest.encode(), b"2" * 64))

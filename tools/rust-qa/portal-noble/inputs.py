@@ -4,10 +4,12 @@ import hashlib
 from http.client import RemoteDisconnected
 import os
 from pathlib import Path
+import re
 import tempfile
 import time
+from urllib.error import HTTPError
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -16,8 +18,8 @@ BASE = ART / "portal-noble"
 VERSION = "1.18.4-1ubuntu2.24.04.3"
 SOURCE = "xdg-desktop-portal"
 POOL = "pool/main/x/xdg-desktop-portal/"
-UBUNTU = "https://archive.ubuntu.com/ubuntu/"
-PORTS = "https://ports.ubuntu.com/ubuntu-ports/"
+SOURCE_SNAPSHOT = "20261121T210000Z"
+SOURCE_RELEASE = "8be819b6d76c7d2490956220620307768159877e9d7a838508a41b0c3bfa6398"
 PATCH = HERE.parent / "portal-reference/flock-upstream.patch"
 PATCH_SHA = "5d7a386866288358b46621e85cbb68e9f008a19f669acc18859cd82f82f7fc5b"
 ORIGINALS = {
@@ -36,6 +38,13 @@ def sha(path):
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
+def snapshot_url(timestamp, relative):
+    if (not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", timestamp)
+            or not relative.startswith(("pool/", "dists/")) or ".." in relative.split("/")):
+        raise ValueError("Expected a dated Ubuntu archive member")
+    return f"https://snapshot.ubuntu.com/ubuntu/{timestamp}/" + quote(relative, safe="/+~")
+
+
 def fetch(url, path, digest, download, max_bytes=16_000_000):
     if path.is_file() and not path.is_symlink() and sha(path) == digest:
         return path
@@ -45,6 +54,10 @@ def fetch(url, path, digest, download, max_bytes=16_000_000):
         try:
             response = urllib.request.urlopen(url, timeout=60)
             break
+        except HTTPError as error:
+            error.add_note(f"Ubuntu archive input: {url}")
+            error.close()
+            raise
         except RemoteDisconnected as error:
             if attempt == CONNECTION_ATTEMPTS:
                 raise RemoteDisconnected(
@@ -52,7 +65,7 @@ def fetch(url, path, digest, download, max_bytes=16_000_000):
                 ) from error
             time.sleep(attempt)
     with response as data, tempfile.NamedTemporaryFile(dir=path.parent) as temp:
-        if urlsplit(data.geturl()).hostname != urlsplit(url).hostname:
+        if urlsplit(data.geturl())[:2] != urlsplit(url)[:2]:
             raise ValueError("Unexpected Ubuntu archive redirect")
         while chunk := data.read(262144):
             if temp.tell() + len(chunk) > max_bytes:
@@ -69,7 +82,7 @@ def source_inputs(download):
     cache = BASE / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        list(pool.map(lambda entry: fetch(UBUNTU + POOL + entry[0], cache / entry[0], entry[1], download),
+        list(pool.map(lambda entry: fetch(snapshot_url(SOURCE_SNAPSHOT, POOL + entry[0]), cache / entry[0], entry[1], download),
                       ORIGINALS.items()))
     if sha(PATCH) != PATCH_SHA:
         raise ValueError("Changed upstream flock implementation")

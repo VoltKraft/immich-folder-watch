@@ -10,14 +10,13 @@ import platform
 import subprocess
 import sys
 import tempfile
-from urllib.parse import quote
 
 from audit import native_architecture, sha
 
 HERE = Path(__file__).resolve().parent
 ART = HERE.parents[2] / "artifacts/rust/plasma"
 sys.path.insert(0, str(HERE.parent / "portal-noble"))
-from inputs import PORTS, UBUNTU, fetch
+from inputs import fetch, snapshot_url
 
 
 def namespace():
@@ -62,8 +61,7 @@ def prepare(output, cache, acquire):
         pool = entry["Filename"]
         if not pool.startswith(("pool/main/", "pool/universe/")) or ".." in Path(pool).parts:
             raise ValueError("Expected an Ubuntu main/universe package")
-        mirror = PORTS if arch == "arm64" else UBUNTU
-        return fetch(mirror + quote(pool, safe="/+~"), cache / Path(pool).name, entry["SHA256"], acquire, int(entry["Size"]))
+        return fetch(snapshot_url(review["snapshot"], pool), cache / Path(pool).name, entry["SHA256"], acquire, int(entry["Size"]))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as workers:
         files = list(workers.map(archive, entries))

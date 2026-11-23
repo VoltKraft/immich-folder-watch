@@ -125,6 +125,16 @@ The patch is a development adaptation of Sebastian Wick's upstream change. The o
 
 ## Reproduction
 
+The dated Ubuntu snapshot at `20261121T210000Z` supplies the four pinned
+source files and their signed Noble Updates index. The checked index is
+`b429a53b7e513a73ef21d49ae88e619434efc8fc2789b9b389a2eaeca3c7d42f`.
+The helper verifies Ubuntu's release signature, source record, sizes and
+file hashes. For development and control binaries it uses the date from
+the authenticated runner index that supplied each package hash. Locally
+the frozen release, all four source files, 147 selected development package
+records and the original native control package verified. An HTTP refusal
+retains the specific public URL in the error report. [Ubuntu Snapshot Service](https://snapshot.ubuntu.com/) · [Acquisition and verification](../../tools/rust-qa/portal-noble/verify.py).
+
 On a disposable Ubuntu Noble x64 or ARM64 runner, first build the existing `linux-services/native.py oracle` and install the project's pinned Rust toolchain. The runtime needs the packaged Documents portal, its permission store, Python GI, Bubblewrap, a usable private user namespace and `/dev/fuse`. The build consumes the runner's existing authenticated Noble APT lists. Missing Meson, Ninja, compiler tools and development headers are resolved against signed Ubuntu package indices and extracted into a private compiler view. No APT installation, maintainer script or host service restart is performed.
 
 ```sh

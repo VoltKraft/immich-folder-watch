@@ -3,14 +3,14 @@ import gzip
 import hashlib
 import json
 import lzma
-import os
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 import re
 import subprocess
 import tempfile
-import urllib.request
 
-from inputs import KEYRING, ORIGINALS, POOL, PORTS, SIGNER, SOURCE, UBUNTU, VERSION, fetch, sha
+from inputs import KEYRING, ORIGINALS, POOL, SIGNER, SOURCE, SOURCE_RELEASE, SOURCE_SNAPSHOT, VERSION, fetch, sha, snapshot_url
 
 
 def signed_release(key, path):
@@ -35,28 +35,14 @@ def signed_release(key, path):
 
 def authenticate(aptroot, cache, download):
     key = aptroot / "usr/share/keyrings/ubuntu-archive-keyring.gpg"
-    signed = cache / "noble-updates.InRelease"
-    if not signed.is_file():
-        if not download:
-            raise ValueError("Missing the signed Ubuntu source release metadata")
-        with tempfile.NamedTemporaryFile(dir=cache) as f:
-            url = UBUNTU + "dists/noble-updates/InRelease"
-            with urllib.request.urlopen(url, timeout=45) as response:
-                if response.geturl() != url:
-                    raise ValueError("Unexpected Ubuntu release redirect")
-                data = response.read(3_000_001)
-            if len(data) > 3_000_000:
-                raise ValueError("Oversize Ubuntu release metadata")
-            f.write(data)
-            f.flush()
-            signed_release(key, Path(f.name))
-            os.link(f.name, signed)
+    signed = fetch(snapshot_url(SOURCE_SNAPSHOT, "dists/noble-updates/InRelease"), cache / (SOURCE_RELEASE + ".InRelease"),
+                   SOURCE_RELEASE, download, 126125)
     text, rows = signed_release(key, signed)
     if "Suite: noble-updates\n" not in text:
         raise ValueError("Expected the signed Noble Updates source index")
     entry = "main/source/Sources.xz"
     digest, size = rows[entry]
-    index = fetch(UBUNTU + "dists/noble-updates/" + entry, cache / (digest + ".xz"), digest, download, size)
+    index = fetch(snapshot_url(SOURCE_SNAPSHOT, "dists/noble-updates/" + entry), cache / (digest + ".xz"), digest, download, size)
     data = lzma.decompress(index.read_bytes()).decode()
     rows = [p for p in data.split("\n\n") if p.startswith("Package: " + SOURCE + "\n") and
             "\nVersion: " + VERSION + "\n" in p and "\nDirectory: " + POOL.rstrip("/") + "\n" in p]
@@ -65,7 +51,7 @@ def authenticate(aptroot, cache, download):
     listed = dict((n, h) for h, _, n in re.findall(r"^ ([0-9a-f]{64}) (\d+) (\S+)$", rows[0], re.M))
     if listed != ORIGINALS:
         raise ValueError("Ubuntu-signed source archive identities differ")
-    return dict(keyFingerprint=SIGNER, keyring=KEYRING, index=digest, release=sha(signed),
+    return dict(keyFingerprint=SIGNER, keyring=KEYRING, index=digest, release=sha(signed), snapshot=SOURCE_SNAPSHOT,
                 date=re.search(r"^Date: (.+)$", text, re.M)[1], sourceVersion=VERSION)
 
 
@@ -99,6 +85,7 @@ def signed_packages(root, arch, plan, output):
     control = POOL + SOURCE + "_" + VERSION + "_" + arch + ".deb"
     wanted = {*expected, control}
     found = {}
+    snapshots = {}
     signed = {}
     releases = sorted(lists.glob("*InRelease"), key=lambda p: ("noble-updates" not in p.name, p.name))
     for release in releases:
@@ -107,7 +94,9 @@ def signed_packages(root, arch, plan, output):
         # Discard unrelated configured repositories before checking the Ubuntu signature.
         if "Origin: Ubuntu\n" not in release.read_text():
             continue
-        _, rows = signed_release(root / "usr/share/keyrings/ubuntu-archive-keyring.gpg", release)
+        authenticated, rows = signed_release(root / "usr/share/keyrings/ubuntu-archive-keyring.gpg", release)
+        issued = parsedate_to_datetime(re.search(r"^Date: (.+)$", authenticated, re.M)[1])
+        snapshot = issued.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         for component in ("main", "universe"):
             key = component + "/binary-" + arch + "/Packages"
             prefix = release.name.removesuffix("InRelease") + key.replace("/", "_")
@@ -131,6 +120,7 @@ def signed_packages(root, arch, plan, output):
                         if name in wanted:
                             digest = entry.split(b"\nSHA256: ", 1)[1].split(b"\n", 1)[0].decode()
                             found[name] = digest
+                            snapshots[name] = snapshot
                 if block.strip():
                     raise ValueError("Unterminated Ubuntu package index")
             if rows.get(key) != (sha256.hexdigest(), count):
@@ -142,7 +132,7 @@ def signed_packages(root, arch, plan, output):
             break
     if set(found) != wanted or any(found[n] != digest for n, digest in expected.items()):
         raise ValueError(f"The signed Noble indices do not cover the selected development/control packages: {sorted(wanted-set(found))}")
-    record = dict(indices=signed, control=control, packages=found)
+    record = dict(indices=signed, control=control, packages=found, snapshots=snapshots)
     (output / "apt-packages.json").write_text(json.dumps(record, indent=2) + "\n")
     return record
 
@@ -155,7 +145,7 @@ def check_control(osroot, aptroot, arch, cache, download, out):
     digest = signed["packages"][public]
     installed = aptroot / "var/cache/apt/archives" / filename
     archive = installed if installed.is_file() and sha(installed) == digest else fetch(
-        (UBUNTU if arch == "amd64" else PORTS) + public, cache / filename, digest, download)
+        snapshot_url(signed["snapshots"][public], public), cache / filename, digest, download)
     dest = out / "distributed"
     dest.mkdir()
     cmd = guest(osroot, osroot / "usr", extra=["--ro-bind", str(archive), "/package.deb", "--bind", str(dest), "/dest", "--"])
