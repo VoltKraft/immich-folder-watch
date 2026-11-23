@@ -407,6 +407,20 @@ revoked. The `amd64-e_4ucz7a` result SHA-256 is
 The revised initial binding applies the permission and original-parent
 checks to a detached name at this first observation as well.
 
+At `f57e680` the private x64 comparison in `amd64-k8xur4fc` passed all
+110 operations in 48.215 seconds with Noble userspace on the Fedora
+kernel. Independent readback matched all eleven fixture sources and five
+filesystem sources to Git, both rebuilt daemons and the Rust reader to
+their recorded binaries. All 24 post-binding slot comparisons matched.
+Seven observations covered thirteen detached labels. For each, the same
+document still granted read and write access, and the original-parent walk
+matched both named objects and their mount IDs. Initial binding was
+canonical in all three trials. The delayed initial-label case is covered
+by the 26-test fixture suite. Both stock services reported errno 38 in all
+three Rust attempts. The backport returned the original file after release,
+and all three revocations preserved the original bytes. The result SHA-256
+is `5746a94c3bd2f37982024530da3596da05b73fcbca6b34f12cc0ff9cebc509ab`.
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).
