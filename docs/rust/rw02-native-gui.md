@@ -638,6 +638,26 @@ patch observed acquisition, a competing writer and successful
 reacquisition. The respective fixtures recorded 32, 32 and 46
 operations per target. [Portal comparison](rw02-portal-noble.md).
 
+## Ubuntu native results at 653f255
+
+On both Noble desktops two clicks on the Plasma panel reopened the original
+Rust window. Each button image contained 277 gold pixels on the first click
+and 259 on the second. Both adjacent control images contained zero. Three
+native trials per subject supplied the X11 measurements.
+
+| Target | Startup ms, Rust / limit | Scan show p95 ms, Rust / limit | Scan close p95 ms, Rust / limit | X11 limits met |
+| --- | ---: | ---: | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14848454057) | 169.20 / 1042.644 | 0.95 / 15.63 | 0.59 / 15.82 | 11/11 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14848615669) | 208.11 / 1501.404 | 0.92 / 16.18 | 0.38 / 15.54 | 11/11 |
+
+The Plasma result SHA-256 values are
+`2f5821b945108573fe5467a5c0215b192b9c13778b3ffe1389c421c797e5c673`
+on x64 and
+`f754c5637396732b2bdab1dfe38ecd36142e9d43368cc5be8c838dc941a6bf00`
+on ARM64. All other x64 steps passed. The ARM64 job failed the final
+descriptor observation for the private Documents backport.
+[Portal evidence](rw02-portal-noble.md#incomplete-arm64-retry-at-653f255).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

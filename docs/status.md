@@ -1,5 +1,25 @@
 # Project Status
 
+## Noble portal directory names during a held writer (2026-11-23)
+
+Both hosted Ubuntu desktops at `653f255` passed all eleven X11 resource
+limits and reopened the original window on two Plasma panel clicks. The
+private x64 portal comparison passed. ARM64 completed all 46 backport
+operations and lacked the final proof for the two directory handles.
+[Desktop archives](rust/rw02-native-gui.md#ubuntu-native-results-at-653f255) · [ARM64 evidence](rust/rw02-portal-noble.md#incomplete-arm64-retry-at-653f255).
+
+Locally, the observer recorded the original descriptor numbers, type,
+device, inode, flags and kernel link labels. All three private services
+showed both names as detached before the second retry. Independent lookup
+matched the same directories and the test application's current grant.
+All three explicit revocations passed. The three original failures remain
+in the results. Eighteen focused tests, including seven original descriptor
+controls and independent failure/cleanup cases, and actionlint passed.
+Next, compare the still-open Rust descriptors while the corresponding
+named directories are observed. The supported host's upload lock and
+the interactive Windows requirements remain open.
+[Source and native observations](rust/rw02-portal-noble.md#name-and-permission-observations-during-a-refused-retry).
+
 ## Retained display selection for an interactive Windows VM (2026-11-23)
 
 The existing mixed-DPI and RDP observer now accepts the paired retained

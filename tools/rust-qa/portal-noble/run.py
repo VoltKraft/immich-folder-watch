@@ -61,6 +61,34 @@ def run_probe(osroot, out, portal, reader, expected, binary_source):
                 observation=sha(out / "observation.json"), inputs=sha(out / "input.json"))
 
 
+def compare_services(osroot, out, facts):
+    build = out / "build"
+    failed = []
+    for name, expected in (("packaged", "enosys"), ("unmodified", "enosys"), ("backport", "supported")):
+        case = out / name
+        executable = (osroot / "usr/libexec/xdg-document-portal" if name == "packaged" else
+                      build / name / "document-portal/xdg-document-portal")
+        try:
+            receipt = run_probe(osroot, case, executable, build / "reader", expected, name)
+            receipt["status"] = "passed"
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            # Each service uses a new private mount, bus, grant and synthetic backing file.
+            failed.append(name)
+            receipt = dict(status="failed", errorType=type(error).__name__,
+                           files={path: sha(case / path) for path in ("input.json", "observation.json", "probe.log")
+                                  if (case / path).is_file()})
+            if isinstance(error, subprocess.CalledProcessError):
+                receipt["exitCode"] = error.returncode
+            elif isinstance(error, subprocess.TimeoutExpired):
+                receipt["timeoutSeconds"] = error.timeout
+            else:
+                receipt["error"] = str(error)
+        facts["results"][name] = receipt
+        record(out / "result.json", facts)
+    if failed:
+        raise RuntimeError("Native Documents comparison failed for " + ", ".join(failed))
+
+
 def main(hosted, download, split_python=False):
     if hosted:
         if split_python:
@@ -100,11 +128,7 @@ def main(hosted, download, split_python=False):
         if split_python:
             facts["splitPythonControl"] = observe_split_python(osroot, dev, build)
         facts["build"] = pair(osroot, dev, cache, build)
-        for name, expect in (("packaged", "enosys"), ("unmodified", "enosys"), ("backport", "supported")):
-            executable = (osroot / "usr/libexec/xdg-document-portal" if name == "packaged" else
-                          build / name / "document-portal/xdg-document-portal")
-            facts["results"][name] = run_probe(osroot, out / name, executable, build / "reader", expect, name)
-            record(out / "result.json", facts)
+        compare_services(osroot, out, facts)
         facts["status"] = "passed"
         return 0
     except Exception as error:

@@ -3,7 +3,9 @@ import errno
 import hashlib
 from http.client import RemoteDisconnected
 from io import BytesIO
+import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, call, patch
@@ -12,6 +14,7 @@ from urllib.response import addinfourl
 
 from inputs import POOL, SOURCE, VERSION, fetch, snapshot_url
 from observe import require_result
+from run import compare_services
 from verify import signed_packages
 
 
@@ -104,6 +107,38 @@ class ArchiveTransfers(unittest.TestCase):
 
 
 class Controls(unittest.TestCase):
+    def test_failed_comparisons_preserve_their_own_evidence_and_allow_the_remaining_services(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            calls = []
+            def probe(osroot, case, executable, reader, expected, name):
+                calls.append((name, expected))
+                self.assertEqual(case, root / name)
+                case.mkdir()
+                (case / "input.json").write_text(name)
+                if name == "packaged":
+                    (case / "probe.log").write_text("partial observation")
+                    raise subprocess.CalledProcessError(20, ["private-observer"])
+                if name == "unmodified":
+                    raise subprocess.TimeoutExpired(["private-observer"], 170)
+                return {"operations": 46}
+
+            facts = {"status": "running", "results": {}}
+            with patch("run.run_probe", side_effect=probe):
+                with self.assertRaisesRegex(RuntimeError, "packaged, unmodified"):
+                    compare_services(root, root, facts)
+            self.assertEqual(calls, [("packaged", "enosys"), ("unmodified", "enosys"), ("backport", "supported")])
+            saved = json.loads((root / "result.json").read_bytes())["results"]
+            self.assertEqual(saved, facts["results"])
+            self.assertEqual(saved["packaged"]["exitCode"], 20)
+            self.assertEqual(saved["packaged"]["files"], {
+                "input.json": hashlib.sha256(b"packaged").hexdigest(),
+                "probe.log": hashlib.sha256(b"partial observation").hexdigest(),
+            })
+            self.assertEqual(saved["unmodified"]["timeoutSeconds"], 170)
+            self.assertEqual(saved["unmodified"]["status"], "failed")
+            self.assertEqual(saved["backport"], {"operations": 46, "status": "passed"})
+
     def test_refusal_and_real_conflict_are_distinct(self):
         unsupported = "REFUSED errno=38 operation=ReadLease outcome=UnsupportedFileLock action=CheckPortalFileLockSupport"
         busy = "REFUSED kind=WouldBlock operation=ReadLease outcome=FileBusy action=RetryAfterWriterRelease"

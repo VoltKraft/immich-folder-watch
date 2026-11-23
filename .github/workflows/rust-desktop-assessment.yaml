@@ -349,6 +349,7 @@ jobs:
         if: ${{ !cancelled() && steps.portal_oracle.outcome == 'success' }}
         run: |
           export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 -B -m unittest discover -s tools/rust-qa/portal-noble -p 'test_*.py'
           python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
 
       - name: Observe native Windows show events, close and reopen

@@ -68,6 +68,19 @@ flags; the grant, backing-file identity and contents must also remain unchanged.
 These metadata observations validate the fixture and confer no filesystem
 authority on the consumer.
 
+The observer binds the retry reader to its private input and output pipes and
+holds its procfs process directory. `retryObservation` in `observation.json`
+records the original grant and album descriptors before each attempt and on
+failure. Each sample contains the descriptor number, file type, device, inode,
+open flags and mount ID when the kernel provides one. Link labels identify the
+two authorized directories, their deleted forms or an unrecognized target.
+Before sending each attempt, the observer saves the sample and requires both
+original numbered slots to match their directory identity, link and open flags.
+Separate records retain the last verified stage, the failing stage and any
+native metadata errors. Before deletion the observer records the explicit
+revocation call, the grant's disappearance and the backing-file read separately.
+A cleanup failure retains the primary observation error and fails the trial.
+
 The offline native x64 run `amd64-msdhalx2` passed on November 22, 2026 in 42.238
 seconds under Noble userspace and Fedora kernel `7.3.4-300.fc45.x86_64`. Its
 worktree base was `8b64330ce64485597b37f0c37657b759ff21abd9`; the receipt binds all
@@ -101,6 +114,58 @@ x64/ARM64 counts above describe the earlier fixture. The initial local attempt
 `amd64-xxt06xb_` stopped after 28 observations because its observer incorrectly
 expected `O_PATH` directory handles. The corrected observer checks the actual
 read-only directory flags and passed in the fresh run recorded here.
+
+### Incomplete ARM64 retry at `653f255`
+
+Ubuntu ARM64 completed 32 operations with the packaged service and 32 with
+the pristine rebuild. Both returned errno 38 and revoked the grant. With
+the private backport, the Rust reader acquired file identity
+`(58, 9330425294979592092)`, reported `FileBusy` while the writer held its
+lease and acquired the same identity after release. After operation 46 the
+observer could no longer identify both original directory handles by name.
+That version saved neither the original descriptor numbers nor the final
+revocation result on this error path. The reason for the missing names
+remains unknown. The same ARM64 Rust reader and observer completed the
+comparison in eight earlier archived runs, most recently at `1b95ba0`.
+[ARM64 run and archived observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514) · [Earlier native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209).
+
+The ARM64 archive ID is `14848615669`, SHA-256
+`2212804cf475e4867013fcc2f909728ddf34d3e997ae28ee40fa8f07ef89fb68`.
+The partial backport observation hashes to
+`c4b114f8440d14fcb7cbe6b7ed6835d8ae16961a46a2dd80d87af132607555bd`.
+Locally, the unmodified observer at `873ad3f` completed 32, 32 and 46
+operations on Fedora x64 with Noble userspace and verified all three
+revocations. Its offline result at `amd64-dfx16b7p/result.json` hashes to
+`fb4df7254a71c5a5a7b853dc3dc7b6dfbd1cb00edb1b080d678ecb1e15c2183a`.
+
+Ubuntu x64 at the same hosted commit completed all 110 observations and
+all three revocations. Its `amd64-tbpus43w/result.json` hashes to
+`ffebe0015aa7a4ac6e72337ac796d730a223f09a4a9b230b289bcbc2449d49a0`.
+[x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14848454057).
+
+### Name and permission observations during a refused retry
+
+In the local Noble x64 run `amd64-ign09cwt`, the packaged service reached
+30 operations. Before the second retry the kernel labelled the original
+FDs 3 and 4 as the known grant and album paths with ` (deleted)` appended.
+Both remained directories with their original device, inode, mount and
+open flags. The observer stopped the request. Its original record hashes
+to `20a7f0ab580b249762a5e24efb466227a148ced0ca2f6777fb6af7a7c283f34c`.
+
+A second offline run, `amd64-bu6v8flq`, measured the names and permissions
+before releasing the synthetic writer or revoking each grant. The packaged,
+pristine and patched services reached 30, 30 and 44 operations respectively.
+All three recorded both detached names. A fresh lookup through the named
+grant returned the same device and inode for each directory. The private
+exporter's `Documents.Info` call for the original document ID reported the
+synthetic source and the test application's read and write permissions.
+A later sample of both original FDs again showed the original names. In
+each case the observer kept the failed result, verified grant revocation
+and read back the original synthetic bytes. The result SHA-256 is
+`3dc6eefa7d196dcda7d72113f74ad543a8739eae7786fe69e4b915d02a93124e`.
+Noble's implementation schedules cache invalidation after a successful
+lookup of a physical entry. The precise kernel event in the failed ARM64
+run remains unknown. [Ubuntu source inputs](../../tools/rust-qa/portal-noble/inputs.py).
 
 ## Meson on the Ubuntu runners
 
@@ -142,7 +207,16 @@ export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
 python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
 ```
 
-For the maintained local private Noble x64 userspace, run `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --download`. Once the signed source metadata, source archives and required development packages are in the private cache, omitting `--download` runs the comparison offline. The portable command `python3 -B tools/rust-qa/portal-noble/test_control.py` checks that a capability refusal cannot count as contention or success, that reported actions match native errors and that unsigned changes to the package index or dependency selection fail. The native build also compiles and executes the four Rust classification controls, retaining `build/reader-tests.log` and its digest.
+For the maintained local private Noble x64 userspace, run `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --download`. Once the signed source metadata, source archives and required development packages are in the private cache, omitting `--download` runs the comparison offline. Run the following controls from the repository root on Linux. The hosted Ubuntu jobs run them before the native comparison.
+
+```sh
+python3 -B -m unittest discover -s tools/rust-qa/portal-noble -p 'test_*.py'
+```
+
+The controls cover signed package selection, native error classification,
+descriptor identity before every retry and separate records for read and
+revocation failures. The native build also compiles and executes the four
+Rust classification controls, retaining `build/reader-tests.log` and its digest.
 
 Use `python3 -B tools/rust-qa/portal-noble/run.py --local-noble --local-split-python` to exercise the hosted package layout offline with the local Noble userspace. The fixture verifies the two interpreter binaries are byte-identical and selects the runtime copy through a link in the newly created private compiler view. It retains the original Meson error in `build/split-python-control.log`. Every build collects the corrected interpreter and Meson inputs in `build/meson-python.log` and the final result.
 
