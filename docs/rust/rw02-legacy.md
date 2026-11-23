@@ -488,3 +488,35 @@ Windows logs both identify the same `unused_mut` at `update_study_copy.rs:110`
 and Cargo exit 101. At `dff8cb0` the example uses the platform-specific
 construction described above. [Original desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235)
 · [Desktop assessment with the fix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235).
+
+## Native desktop storage at 93ecc35
+
+At `93ecc354f9be40ad0c76e33c46bdadb55f2e2fb8`, Ubuntu x64 and ARM64 each
+passed all 16 storage steps, including Clippy with warnings denied. Each
+original ZIP matched its Actions digest. Independent readback verified all
+306 storage hashes, 141 first-party files against Git and 31 pinned crate
+archives containing 2,214 files per host.
+[Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14780360288)
+· [Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14779783396).
+
+In both path modes, Rust SQLite 3.54.1 backed up committed changes while
+24,752 bytes remained in the live WAL. Read-only SQL reproduced the schema,
+index and all nine rows in each finalized main database and its backup. The
+download size was exactly 9,007,199,254,740,995 bytes, and the repair retained
+the single tick after `1900-01-02T03:04:05Z`. Both version-99 fixtures retained
+their original rows. The shipping C# reader passed 40 assertions per host
+using .NET 10.0.15 and SQLite 3.53.4.
+
+Each C# writer produced the complete 1,449-mapping Unicode 15.1 profile and
+two standalone schema-v1 backups. Both architectures produced byte-identical
+backups for the same path mode. Direct SQL reproduced all 30 path lookup
+answers per host, including the two ambiguous matches in insensitive mode,
+and confirmed the standalone repair, tombstone, distinct album IDs and both
+accounts' transfer times. The native probes also passed ten controls per
+host. The independent reports in
+`artifacts/rust/hosted-desktop-storage/45083264235/` have SHA-256
+`16d040918b307649a0b4125d224bf4e3e83b5a4b8754a02bd7b389d98c4a3262` (x64) and
+`24c41015ced128438a27420fe0a1989c5397544136dd2f5ea900743735737228` (ARM64).
+
+The same Actions storage step passed on Windows x64 and ARM64. Independent
+SQL readback on Windows still awaits the two complete desktop archives.
