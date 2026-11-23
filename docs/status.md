@@ -21,6 +21,14 @@ trial. Its lookup passed the independent receiver and error-path review.
 Both comparisons await native Windows results. RW-02 remains open.
 [Renderer procedure](../tools/rust-qa/windows-gdi-control/README.md) · [Shipping tray control](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).
 
+Commit `effae21` closes the earlier gap between the UIA observer's baseline
+and the return of the Windows notification request. Independent review
+replayed four timing edge cases. All 41 Python checks, the PowerShell
+pixel and timing controls and the 178 repository tooling tests passed.
+The native measurements still need to establish
+whether the real desktop presents the unique title and body.
+[Notification timing](rust/rw02-windows-services.md#sampling-across-the-shell-request).
+
 ## Legacy YAML byte compatibility (2026-11-23)
 
 At `a7a62fa`, a clean Fedora x64 build passed all 13 offline assessment

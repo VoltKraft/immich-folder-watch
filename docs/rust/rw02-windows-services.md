@@ -339,6 +339,28 @@ repeated sampling after the synchronous Shell request returned. A
 presentation during the call remains unobserved.
 [x64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14808178866) · [ARM64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14807909745).
 
+### Sampling across the Shell request
+
+At `effae21` the observer begins reading the notification surface before
+the supervisor releases the sender. A complete baseline sweep must find
+the fresh title and body absent. The Rust sender records the start and
+return of its single synchronous `NIM_MODIFY` using the same Windows
+performance counter as the supervisor and the independent UIA observer.
+The observer records each sweep and continues for ten seconds after
+acknowledgement, including when it has already found both strings.
+[Native sender](../../tools/rust-qa/windows-services/src/tray.rs) · [UIA sweeps](../../tools/rust-qa/windows-services/notification.ps1).
+
+The readback requires a new sweep after the request began for a positive
+observation. It records whether the title and body were verified during
+the call, across its return, or later. If a fast call falls between two
+sweeps, a subsequent physical match retains its own time. A post-request
+sweep or interval between sweep starts longer than one second marks
+the sampling interval incomplete. Any valid physical match stays in the
+report. Independent review exercised all four timing corrections. The 41
+Python tests and the PowerShell pixel and timing controls passed. Native
+Windows presentation with this observer awaits results.
+[Evidence readback](../../tools/rust-qa/windows-services/notification_probe.py) · [Timing controls](../../tools/rust-qa/windows-services/test_notification.py).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
