@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -183,16 +182,13 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         }
         File.Move(temporary, Path.Combine(directory.FullName, "request.json"));
 
-        var wait = Stopwatch.StartNew();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         while (!exchange.FileExists("ready.json"))
         {
-            if (wait.Elapsed >= TimeSpan.FromSeconds(60)) throw new TimeoutException("The Rust backup did not publish ready.json within 60 seconds.");
+            if (deadline.IsCancellationRequested) throw new TimeoutException("The Rust backup did not publish ready.json within 60 seconds.");
             await Task.Delay(50);
         }
-        using var ready = exchange.OpenRead("ready.json");
-        Assert.InRange(ready.Length, 1, 4096);
-        var payload = new byte[(int)ready.Length];
-        await ready.Stream.ReadExactlyAsync(payload);
+        var payload = await ReadExchangeFileAsync(exchange, "ready.json", 4096, deadline.Token);
         using var response = JsonDocument.Parse(payload);
         var fields = response.RootElement;
         Assert.Equal(["afterSha256", "format", "restoredSha256", "token"],
@@ -203,14 +199,28 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         var reported = fields.GetProperty("restoredSha256").GetString();
         Assert.Matches(@"\A[0-9a-f]{64}\z", reported);
 
-        using var returned = exchange.OpenRead("returned.db");
+        const int maxDatabaseBytes = 16 * 1024 * 1024;
+        var returned = await ReadExchangeFileAsync(exchange, "returned.db", maxDatabaseBytes, deadline.Token);
+        Assert.Equal(reported, Convert.ToHexStringLower(SHA256.HashData(returned)));
         await using (var restored = new FileStream(restoredPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            await returned.Stream.CopyToAsync(restored);
+            await restored.WriteAsync(returned, deadline.Token);
         }
         var consumed = ActivitySha256(restoredPath);
         Assert.Equal(reported, consumed);
         return consumed;
+    }
+
+    private static async Task<byte[]> ReadExchangeFileAsync(SecureWatchRoot exchange, string name, int maxBytes, CancellationToken token)
+    {
+        using var file = exchange.OpenRead(name);
+        var length = file.Length;
+        Assert.InRange(length, 1, maxBytes);
+        var bytes = new byte[(int)length];
+        await file.Stream.ReadExactlyAsync(bytes, token);
+        Assert.Equal(0, await file.Stream.ReadAsync(new byte[1], token));
+        Assert.Equal(length, file.Length);
+        return bytes;
     }
 
     private sealed record ActivityWorkerRun(SyncStateEntry Entry, DateTimeOffset LastSuccess, int AlbumLists, int Downloads, int Uploads);
