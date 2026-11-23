@@ -6,35 +6,17 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import socket
 import subprocess
 import uuid
 
-from inputs import HERE, QA, ROOT, TARGETS, recorder, sha, subjects
+from inputs import DX12_WAIT_OPTION, HERE, QA, ROOT, TARGETS, recorder, sha, subjects
+from frame_latency import measured_generation, paired_frame_latency, visible_edits
 from build import REFERENCE, REFERENCE_SOURCE_SHA256
 from metrics import METRICS
 from native import CleanupUnconfirmed, owned_directory, pin_path
 from scan_present import start as trace_presentation
 import dispatch
-
-
-def measured_generation(log, mode, *, dispatch_trace=False):
-    rows = log.read_text(encoding="utf-8", errors="replace").splitlines()
-    if not dispatch_trace and any(row.startswith(("DISPATCH", "WINDOW_WAKE ", "WINDOW_HIDDEN_PAINT ")) for row in rows):
-        raise ValueError("The ordinary measurement used a diagnostic dispatch path")
-    if ([r for r in rows if r.startswith("GRAPHICS_MEMORY ")] != ["GRAPHICS_MEMORY generation=1 hint=MemoryUsage"]
-            or [r for r in rows if r.startswith("GRAPHICS_READY ")] != ["GRAPHICS_READY generation=1"]
-            or any(r.startswith("WGPU_ALLOCATOR ") for r in rows)):
-        raise ValueError("Expected a single warm MemoryUsage device and a measurement without allocator sampling")
-    offered = [re.fullmatch(r"GRAPHICS_SURFACE generation=1 desktop=WindowsDx12Cpu offered=\[([A-Za-z, ]+)\]", row)
-               for row in rows if row.startswith("GRAPHICS_SURFACE ")]
-    selection = f"GRAPHICS_PRESENT generation=1 desktop=WindowsDx12Cpu mode={mode} latency=Some(1)"
-    if (len(offered) != 1 or not offered[0] or mode not in offered[0].group(1).split(", ")
-            or [row for row in rows if row.startswith("GRAPHICS_PRESENT ")] != [selection]):
-        raise ValueError("Expected a supported presentation mode on the selected DX12 CPU device and the original frame latency")
-    return dict(generation=1, memoryHint="MemoryUsage", presentMode=mode, offered=offered[0].group(1).split(", "),
-                desiredMaximumFrameLatency=1)
 
 
 def reference(target, metadata):
@@ -79,13 +61,19 @@ def paired_scan(mailbox_path, fifo):
     return dict(mailboxResultSha256=sha(mailbox_path), metrics=measurements)
 
 
-def main(target, fifo_control=False, dispatch_trace=False):
+def main(target, variant="mailbox"):
     api, _, binary, base, record = subjects(target)
-    out = base / ("dispatch" if dispatch_trace else "measured-fifo" if fifo_control else "measured")
-    mode = "Fifo" if fifo_control else "Mailbox"
+    folder, mode, frames = {
+        "mailbox": ("measured", "Mailbox", 1),
+        "fifo": ("measured-fifo", "Fifo", 1),
+        "dispatch": ("dispatch", "Mailbox", 1),
+        "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
+    }[variant]
+    out = base / folder
     out.mkdir()
-    record.update(status="running", trials=[], presentMode=mode, diagnosticControl=fifo_control or dispatch_trace,
-                  observerInputs={n: sha(HERE / n) for n in ("measure.py", "inputs.py", "scan_present.py")})
+    record.update(status="running", trials=[], presentMode=mode, desiredMaximumFrameLatency=frames,
+                  diagnosticControl=variant != "mailbox",
+                  observerInputs={n: sha(HERE / n) for n in ("measure.py", "frame_latency.py", "inputs.py", "scan_present.py")})
     try:
         if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
                                          "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE",
@@ -95,8 +83,13 @@ def main(target, fifo_control=False, dispatch_trace=False):
         before = sha(budget)
         record["referenceBudgetSha256"] = before
         with ExitStack() as scope:
-            if fifo_control:
-                os.environ["IFW_QA_WINDOWS_PRESENT_CONTROL"] = "fifo"
+            if DX12_WAIT_OPTION in os.environ and os.environ[DX12_WAIT_OPTION].casefold() != "wait":
+                raise ValueError("The native DX12 frame latency comparison requires Wait mode")
+            if DX12_WAIT_OPTION not in os.environ:
+                os.environ[DX12_WAIT_OPTION] = "Wait"
+                scope.callback(os.environ.pop, DX12_WAIT_OPTION)
+            if variant in ("fifo", "mailbox-two"):
+                os.environ["IFW_QA_WINDOWS_PRESENT_CONTROL"] = variant
                 scope.callback(os.environ.pop, "IFW_QA_WINDOWS_PRESENT_CONTROL")
             area = scope.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
             gui, files, sources = recorder.build_subject(area, out, binary, target, recorder.pe_machine)
@@ -141,7 +134,7 @@ def main(target, fifo_control=False, dispatch_trace=False):
                 offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 offline.bind(("127.0.0.1", 0))
                 endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
-                if dispatch_trace:
+                if variant == "dispatch":
                     if not files:
                         raise ValueError("The dispatch comparison requires the native inventory observer")
                     dispatch.run(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record,
@@ -155,7 +148,7 @@ def main(target, fifo_control=False, dispatch_trace=False):
                     row = recorder.trial(api, fixture, "rust", gui, present, area / name, endpoint, user_sid,
                                          expected, out / (name + ".log"), token)
                     record["trials"].append(row)
-                    row["device"] = measured_generation(out / (name + ".log"), mode)
+                    row["device"] = measured_generation(out / (name + ".log"), mode, frame_latency=frames)
                     try:
                         if not files:
                             raise ValueError("File observer was not built")
@@ -163,7 +156,7 @@ def main(target, fifo_control=False, dispatch_trace=False):
                                                             endpoint, user_sid, out, recorder.await_value,
                                                             recorder.stop_subject, recorder.p95, token,
                                                             presentation_trace=partial(trace_presentation, api, present, mode))
-                        row["scan"]["device"] = measured_generation(out / (name + "-scan.log"), mode)
+                        row["scan"]["device"] = measured_generation(out / (name + "-scan.log"), mode, frame_latency=frames)
                         row["metrics"].update(row["scan"]["metrics"])
                     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                         if CleanupUnconfirmed.in_chain(exc):
@@ -176,10 +169,13 @@ def main(target, fifo_control=False, dispatch_trace=False):
         record["comparison"] = rows
         record["status"] = ("over-budget" if any(r["passed"] is False for r in rows.values()) else
                             "partial" if any(r["passed"] is None for r in rows.values()) else "measured-metrics-passed")
-        if fifo_control:
+        if variant == "fifo":
             # A complete old-policy control records its genuine failures against the same WPF maximums.
             record["pairedScan"] = paired_scan(base / "measured/result.json", record)
             return 0
+        if variant == "mailbox-two":
+            record["pairedFrameLatency"] = paired_frame_latency(base, record, fixed["maximums"])
+            record["visibleEdits"] = visible_edits(base, record)
         return int(record["status"] != "measured-metrics-passed")
     except Exception as exc:
         record.update(status="error", error=f"{type(exc).__name__}: {exc}")
@@ -192,7 +188,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--fifo-control", action="store_true", help="measure the previous DXGI interval on this same executable")
-    mode.add_argument("--dispatch", action="store_true", help="trace Mailbox activation and compare hidden-root paint policies")
+    parser.set_defaults(variant="mailbox")
+    mode.add_argument("--fifo-control", dest="variant", action="store_const", const="fifo", help="measure the previous DXGI interval on this same executable")
+    mode.add_argument("--mailbox-two", dest="variant", action="store_const", const="mailbox-two", help="compare one and two queued DX12 Mailbox frames on this executable")
+    mode.add_argument("--dispatch", dest="variant", action="store_const", const="dispatch", help="trace Mailbox activation and compare hidden-root paint policies")
     args = parser.parse_args()
-    raise SystemExit(main(args.target, args.fifo_control, args.dispatch))
+    raise SystemExit(main(args.target, args.variant))

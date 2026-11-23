@@ -11,13 +11,13 @@ import subprocess
 import time
 import uuid
 
-from inputs import HERE, QA, ROOT, TARGETS, recorder, sha, subjects
+from inputs import DX12_WAIT_OPTION, HERE, QA, ROOT, TARGETS, TWO_FRAME_EDIT, recorder, sha, subjects
 from native import owned_directory, pin_path
 from residency import sample
 from window_lifetime import WindowLifetime
 
 
-def drive(api, fixture, binary, output, name, *, single_wake=False):
+def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=False):
     background = name.startswith("background") or name == "absent-tray"
     warm = name != "cold-residency"
     has_tray = name != "absent-tray"
@@ -29,6 +29,10 @@ def drive(api, fixture, binary, output, name, *, single_wake=False):
         root = stack.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
         env = {k: v for k, v in os.environ.items() if not k.startswith("IFW_QA_")}
         env.update(IFW_QA_ISOLATED="1", WGPU_DX12_COMPILER="Fxc", TEMP=str(root), TMP=str(root))
+        if warm:
+            env[DX12_WAIT_OPTION] = "Wait"
+        if mailbox_two:
+            env["IFW_QA_WINDOWS_PRESENT_CONTROL"] = "mailbox-two"
         if single_wake:
             env["IFW_QA_WINDOWS_SINGLE_WAKE"] = "1"
         for key in ("APPDATA", "LOCALAPPDATA", "HOME", "USERPROFILE"):
@@ -150,7 +154,7 @@ def drive(api, fixture, binary, output, name, *, single_wake=False):
                                 "-RecoveryPhase", phase], cwd=root, env=env, stdin=subprocess.DEVNULL,
                                stdout=trace, stderr=subprocess.STDOUT, check=True, timeout=85)
             found = json.loads(evidence.read_text(encoding="utf-8-sig"))
-            if found.get("status") != "passed" or found.get("processId") != proc.pid:
+            if found.get("status") != "passed" or found.get("processId") != proc.pid or found.get("windowHandle") != hwnd:
                 raise ValueError("Unverified owned HWND editing observation")
             result[phase + "Field"] = sha(evidence)
 
@@ -237,14 +241,16 @@ def main(target):
     record["observerInputs"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in files}
     fixture = recorder.load_windows_fixture()
     for name in ("background-quit", "background-open", "absent-tray", "retained-edit", "visible-loss", "edited-loss", "hidden-loss",
-                 "cold-residency", "performance-residency", "warm-residency", "single-wake-retained-edit", "single-wake-hidden-loss"):
-        case = name.removeprefix("single-wake-")
+                 "cold-residency", "performance-residency", "warm-residency", "single-wake-retained-edit", "single-wake-hidden-loss",
+                 TWO_FRAME_EDIT):
+        case = name.removeprefix("single-wake-").removeprefix("mailbox-two-")
         binary = cold if case == "cold-residency" else warm
         try:
             with pin_path(api, binary, False):
                 if sha(binary) != record["baseline" if binary == cold else "binary"]:
                     raise ValueError("The pinned executable changed")
-                record["controls"][name] = drive(api, fixture, binary, out / name, case, single_wake=name != case)
+                record["controls"][name] = drive(api, fixture, binary, out / name, case,
+                                                 single_wake=name.startswith("single-wake-"), mailbox_two=name == TWO_FRAME_EDIT)
         except (OSError, subprocess.SubprocessError, RuntimeError, ValueError, TimeoutError) as exc:
             record["controls"][name] = {"error": f"{type(exc).__name__}: {exc}"}
             if recorder.CleanupUnconfirmed.in_chain(exc):

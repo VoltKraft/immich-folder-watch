@@ -487,3 +487,25 @@ discards colors whenever either test position loses HWND ownership.
 The GDI result measures the small drawing workload. Full egui, text,
 accessibility and editing require the actual application path.
 [ARM64 at `549066f`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14821439705) · [ARM64 at `ba02f8b`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14829680035).
+
+## One or two queued frames on the Windows software adapter
+
+The additional `--mailbox-two` trial uses the retained executable, its
+existing egui editor and the same advertised DX12 CPU Mailbox surface as
+the one-frame reference. It changes maximum frame latency to two.
+On the pinned DX12 backend this configures three swap-chain buffers
+instead of two and passes two to `SetMaximumFrameLatency`. Both
+measurements check the actual `Wait` instance option and the selected
+surface configuration. A successful DXGI event proves presentation. Time
+spent waiting for an individual surface texture is unmeasured.
+[Surface policy](../../tools/rust-qa/windows-warm-window/windows_present.rs) · [Pinned DX12 implementation](https://github.com/gfx-rs/wgpu/blob/v30.0.2/wgpu-hal/src/dx12/mod.rs).
+
+Each mode runs three original WPF-budget comparisons with two inventory
+passes over 100,000 files. The paired readback validates each process's
+original file events, window requests and DXGI start/stop events. A
+separate editor test requires the same retained HWND and input field,
+readable text, keyboard focus and changed glyph pixels after reopening.
+It records native timing results even if the separate desktop cannot
+supply keyboard input. Independent replay on twelve original one-frame
+scan trials verified the new reader. The native two-frame results are
+pending. [Paired readback](../../tools/rust-qa/windows-warm-window/frame_latency.py).

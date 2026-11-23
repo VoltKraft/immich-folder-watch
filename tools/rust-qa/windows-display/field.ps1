@@ -47,25 +47,6 @@ function Capture-Field([string]$suffix) {
     return $capture
 }
 
-function Frame-Difference {
-    $before=[Drawing.Bitmap]::new("$OutputFile.before.png")
-    try {
-        $after=[Drawing.Bitmap]::new("$OutputFile.after.png")
-        try {
-            if ($before.Size -ne $after.Size) { throw 'The stationary physical field crop changed size.' }
-            $columns=[Collections.Generic.HashSet[int]]::new(); $rows=[Collections.Generic.HashSet[int]]::new()
-            $changed=0
-            for ($y=0; $y -lt $before.Height; $y++) { for ($x=0; $x -lt $before.Width; $x++) {
-                if ($before.GetPixel($x,$y).ToArgb() -ne $after.GetPixel($x,$y).ToArgb()) {
-                    [void]$columns.Add($x); [void]$rows.Add($y); $changed++
-                }
-            } }
-            # The evidence must span multiple strokes, beyond a single blinking insertion caret.
-            return [ordered]@{pixels=$changed; columns=$columns.Count; rows=$rows.Count}
-        } finally { $after.Dispose() }
-    } finally { $before.Dispose() }
-}
-
 try {
     Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
     $qa=Split-Path $PSScriptRoot
@@ -75,7 +56,7 @@ try {
         $n.StringConstantType -eq 'SingleQuotedHereString' -and $n.Value.Contains('public static class IfwObservedWindow {')},$true))
     if ($errors -or $bridge.Count -ne 1) { throw 'Missing shared native window observer.' }
     Add-Type -TypeDefinition ($bridge[0].Value + [Environment]::NewLine + [IO.File]::ReadAllText((Join-Path $qa 'windows-text/Pointer.cs')))
-    foreach ($name in @('Wait-Observation','Get-AccessibleName','Get-Field','Capture-SubjectField')) {
+    foreach ($name in @('Wait-Observation','Get-AccessibleName','Get-Field','Capture-SubjectField','Get-FieldPixelDifference')) {
         $definitions=@($ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true))
         if ($definitions.Count -ne 1) { throw "Missing shared observer function $name." }
         . ([scriptblock]::Create($definitions[0].Extent.Text))
@@ -126,9 +107,8 @@ try {
         if ($framePhase) {
             [void](Wait-Observation {
                 $result.after=Capture-Field 'after'
-                $result.difference=Frame-Difference
-                $result.difference.columns -ge [Math]::Ceiling(6*$result.dpi/96) -and
-                    $result.difference.rows -ge [Math]::Ceiling(3*$result.dpi/96)
+                $result.difference=Get-FieldPixelDifference "$OutputFile.before.png" "$OutputFile.after.png" $result.before $result.after $result.dpi
+                $result.difference.textChanged
             } 'a changed stationary filename frame')
             if (-not $r.Equals($field.Current.BoundingRectangle) -or -not (Field-Equals $next)) { throw 'The stationary frame geometry or text changed.' }
             if ($Phase -eq 'SourceFrame') {

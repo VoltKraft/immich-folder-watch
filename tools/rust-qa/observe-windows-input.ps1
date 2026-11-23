@@ -88,7 +88,7 @@ if ($SpeechCues) {
 Add-Type -TypeDefinition $windowSource
 
 $handle = [IntPtr]::new($WindowHandle)
-$result = [ordered]@{ processId = $SubjectId; status = 'failed'; focus = @() }
+$result = [ordered]@{ processId = $SubjectId; windowHandle = $WindowHandle; status = 'failed'; focus = @() }
 $scope = [Windows.Automation.TreeScope]::Descendants
 $root = $null
 
@@ -140,18 +140,34 @@ function Capture-SubjectField($Element, [string]$Suffix) {
     if ($width -lt 10 -or $width -gt 1024 -or $height -lt 5 -or $height -gt 128) {
         throw 'Unexpected bounds for the synthetic filename field.'
     }
-    foreach ($px in @($x, ($x + $width - 1))) {
-        foreach ($py in @($y, ($y + $height - 1))) {
-            if (-not [IfwObservedWindow]::SubjectAt($handle, $SubjectId, $px, $py)) {
-                throw 'The synthetic field is obscured on the desktop.'
+    $checkOwnership = {
+        $focused = [Windows.Automation.AutomationElement]::FocusedElement
+        if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle -or -not [IfwObservedWindow]::OnInputDesktop() -or
+            $null -eq $focused -or $focused.Current.ProcessId -ne $SubjectId -or $Element.Current.IsPassword -or
+            -not [Windows.Automation.Automation]::Compare($focused, $Element) -or -not $r.Equals($Element.Current.BoundingRectangle)) {
+            throw 'The synthetic field lost focus, ownership or its original bounds.'
+        }
+        foreach ($px in @($x, ($x + $width - 1))) {
+            foreach ($py in @($y, ($y + $height - 1))) {
+                if (-not [IfwObservedWindow]::SubjectAt($handle, $SubjectId, $px, $py)) {
+                    throw 'The synthetic field is obscured on the desktop.'
+                }
             }
         }
+        $centerX = $x + [int][Math]::Floor($width / 2)
+        $centerY = $y + [int][Math]::Floor($height / 2)
+        if (-not [IfwObservedWindow]::SubjectAt($handle, $SubjectId, $centerX, $centerY)) {
+            throw 'Another window obscures the synthetic field center.'
+        }
     }
-    if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle) { throw 'The synthetic window lost foreground.' }
     $bitmap = [Drawing.Bitmap]::new($width, $height)
     try {
         $graphics = [Drawing.Graphics]::FromImage($bitmap)
-        try { $graphics.CopyFromScreen($x, $y, 0, 0, $bitmap.Size) } finally { $graphics.Dispose() }
+        try {
+            & $checkOwnership
+            $graphics.CopyFromScreen($x, $y, 0, 0, $bitmap.Size)
+            & $checkOwnership
+        } finally { $graphics.Dispose() }
         $colors = [Collections.Generic.HashSet[int]]::new()
         for ($col = 0; $col -lt $width; $col++) {
             for ($row = 0; $row -lt $height; $row++) { [void]$colors.Add($bitmap.GetPixel($col, $row).ToArgb()) }
@@ -159,8 +175,39 @@ function Capture-SubjectField($Element, [string]$Suffix) {
         if ($colors.Count -lt 5) { throw 'Filename capture did not show a drawn text field.' }
         $png = "$OutputFile.$Suffix.png"
         $bitmap.Save($png, [Drawing.Imaging.ImageFormat]::Png)
-        return [ordered]@{ width=$width; height=$height; colors=$colors.Count; sha256=(Get-FileHash $png).Hash.ToLowerInvariant() }
+        return [ordered]@{ x=$x; y=$y; width=$width; height=$height; colors=$colors.Count; sha256=(Get-FileHash $png).Hash.ToLowerInvariant() }
     } finally { $bitmap.Dispose() }
+}
+
+function Get-FieldPixelDifference([string]$BeforeFile, [string]$AfterFile, $BeforeFrame, $AfterFrame, [int]$Dpi) {
+    if ($Dpi -le 0 -or $BeforeFrame.x -ne $AfterFrame.x -or $BeforeFrame.y -ne $AfterFrame.y) {
+        throw 'The two field frames require the same origin and a positive window DPI.'
+    }
+    $before = [Drawing.Bitmap]::new($BeforeFile)
+    try {
+        $after = [Drawing.Bitmap]::new($AfterFile)
+        try {
+            if ($before.Size -ne $after.Size -or $before.Width -ne $BeforeFrame.width -or $before.Height -ne $BeforeFrame.height -or
+                $after.Width -ne $AfterFrame.width -or $after.Height -ne $AfterFrame.height) {
+                throw 'The stationary physical field crop changed size.'
+            }
+            $columns = [Collections.Generic.HashSet[int]]::new()
+            $rows = [Collections.Generic.HashSet[int]]::new()
+            $changed = 0
+            for ($y = 0; $y -lt $before.Height; $y++) {
+                for ($x = 0; $x -lt $before.Width; $x++) {
+                    if ($before.GetPixel($x, $y).ToArgb() -ne $after.GetPixel($x, $y).ToArgb()) {
+                        [void]$columns.Add($x)
+                        [void]$rows.Add($y)
+                        $changed++
+                    }
+                }
+            }
+            # Count distinct columns and rows so a blinking or displaced insertion caret cannot qualify the edit.
+            $material = $columns.Count -ge [Math]::Ceiling(6 * $Dpi / 96) -and $rows.Count -ge [Math]::Ceiling(3 * $Dpi / 96)
+            return [ordered]@{pixels=$changed; columns=$columns.Count; rows=$rows.Count; textChanged=$material}
+        } finally { $after.Dispose() }
+    } finally { $before.Dispose() }
 }
 
 function Get-Field([string]$Name, $Role) {
@@ -314,10 +361,15 @@ try {
         }
         [void](Wait-Observation { (Get-FieldText $file) -ceq $draft } 'native filename edit')
         Start-Sleep -Milliseconds 160
-        $result.editedFrame = Capture-SubjectField $file 'edited'
         if ($RecoveryPhase -ceq 'after') {
-            if ($result.restoredFrame.sha256 -ceq $result.editedFrame.sha256) { throw 'The filename screen pixels did not update.' }
+            [void](Wait-Observation {
+                $result.editedFrame = Capture-SubjectField $file 'edited'
+                $result.difference = Get-FieldPixelDifference "$OutputFile.restored.png" "$OutputFile.edited.png" $result.restoredFrame $result.editedFrame $result.dpi
+                $result.difference.textChanged
+            } 'material changes in the stationary filename pixels')
             if ($result.focusBeforeActivation -cne 'Dateiname') { throw 'Native focus required observer intervention after recovery.' }
+        } else {
+            $result.editedFrame = Capture-SubjectField $file 'edited'
         }
         $result.draft = $draft
         $result.status = 'passed'

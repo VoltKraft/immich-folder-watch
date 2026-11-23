@@ -27,7 +27,19 @@
              attempt: 0,
              generation: 0,
              raw: scenario == "raw-loss",
-@@ -156,6 +164,10 @@
+@@ -75,6 +83,11 @@
+         {
+             let original = Arc::clone(&setup.device_descriptor);
++            let dx12 = &setup.instance_descriptor.backend_options.dx12;
++            println!(
++                "GRAPHICS_DX12_WAIT generation={} policy={:?}",
++                self.generation, dx12.latency_waitable_object
++            );
+             let control =
+                 std::env::var("IFW_QA_WINDOWS_RESIDENCY").as_deref() == Ok("performance-control");
+             let generation = self.generation;
+             setup.device_descriptor = Arc::new(move |adapter| {
+@@ -156,6 +169,10 @@
                      .and_then(|w| w.window_handle().ok())
                      .is_some_and(|h| matches!(h.as_raw(), RawWindowHandle::Wayland(_)));
          }
@@ -38,7 +50,7 @@
          let render = creation
              .wgpu_render_state
              .as_ref()
-@@ -183,6 +195,10 @@
+@@ -183,6 +200,10 @@
      }
 
      pub(super) fn apply_surface_choice(&mut self, frame: &mut eframe::Frame) {

@@ -9,6 +9,8 @@ import sys
 HERE = Path(__file__).resolve().parent
 QA, ROOT = HERE.parent, HERE.parents[2]
 TARGETS = ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")
+DX12_WAIT_OPTION = "WGPU_DX12_USE_FRAME_LATENCY_WAITABLE_OBJECT"
+TWO_FRAME_EDIT = "mailbox-two-retained-edit"
 sys.path.insert(0, str(QA / "windows-performance"))
 import run as recorder
 

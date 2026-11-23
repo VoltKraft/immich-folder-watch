@@ -532,6 +532,20 @@ jobs:
           python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-control
           exit $LASTEXITCODE
 
+      - name: Verify Windows bitmap and native trace controls for the frame comparison
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        run: python -B -m unittest discover -s tools/rust-qa/windows-warm-window -p test_frame_latency.py
+
+      - name: Measure two queued Mailbox frames on the same Windows software adapter
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --mailbox-two
+          exit $LASTEXITCODE
+
       - name: Trace retained-window activation and hidden presentations during the Windows scan
         if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
@@ -769,6 +783,7 @@ jobs:
             artifacts/rust/windows-warm-window/*/observed/
             artifacts/rust/windows-warm-window/*/eframe-source.zip
             artifacts/rust/windows-warm-window/*/measured/
+            artifacts/rust/windows-warm-window/*/measured-mailbox-two/
             artifacts/rust/windows-warm-window/*/measured-fifo/*.json
             artifacts/rust/windows-warm-window/*/measured-fifo/*.log
             artifacts/rust/windows-warm-window/*/dispatch/*.json

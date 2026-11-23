@@ -71,11 +71,19 @@ class WarmTests(unittest.TestCase):
     def test_timed_trial_requires_one_memory_usage_device_and_no_allocator_sampling(self):
         with tempfile.TemporaryDirectory() as temp:
             log = Path(temp) / "trial.log"
-            device = ("GRAPHICS_MEMORY generation=1 hint=MemoryUsage\nGRAPHICS_READY generation=1\n"
+            device = ("GRAPHICS_DX12_WAIT generation=1 policy=Wait\nGRAPHICS_MEMORY generation=1 hint=MemoryUsage\nGRAPHICS_READY generation=1\n"
                       "GRAPHICS_SURFACE generation=1 desktop=WindowsDx12Cpu offered=[Mailbox, Fifo]\n"
                       "GRAPHICS_PRESENT generation=1 desktop=WindowsDx12Cpu mode=Mailbox latency=Some(1)\n")
             log.write_text(device)
             self.assertEqual(measure.measured_generation(log, "Mailbox")["memoryHint"], "MemoryUsage")
+            deeper = device.replace("Some(1)", "Some(2)")
+            log.write_text(deeper)
+            self.assertEqual(measure.measured_generation(log, "Mailbox", frame_latency=2)["desiredMaximumFrameLatency"], 2)
+            for invalid in (deeper.replace("policy=Wait", "policy=DontWait"), deeper.replace("policy=Wait", "policy=None"),
+                            deeper.replace("GRAPHICS_DX12_WAIT", "IGNORED"), deeper + "GRAPHICS_DX12_WAIT generation=2 policy=Wait\n"):
+                log.write_text(invalid)
+                with self.assertRaisesRegex(ValueError, "waitable object"):
+                    measure.measured_generation(log, "Mailbox", frame_latency=2)
             for invalid in (device.replace("MemoryUsage", "Performance"), device + "GRAPHICS_READY generation=2\n",
                             device + "WGPU_ALLOCATOR unavailable\n"):
                 log.write_text(invalid)

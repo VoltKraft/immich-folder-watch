@@ -37,6 +37,12 @@ pub(super) fn choose(
 pub(super) fn apply(frame: &mut eframe::Frame, generation: u64, mode: PresentMode) {
     if let Some(mut config) = frame.wgpu_surface_config() {
         config.present_mode = mode;
+        if mode == PresentMode::Mailbox
+            && std::env::var("IFW_QA_ISOLATED").as_deref() == Ok("1")
+            && std::env::var("IFW_QA_WINDOWS_PRESENT_CONTROL").as_deref() == Ok("mailbox-two")
+        {
+            config.desired_maximum_frame_latency = Some(2);
+        }
         frame.set_wgpu_surface_config(config);
         println!(
             "GRAPHICS_PRESENT generation={generation} desktop=WindowsDx12Cpu mode={mode:?} latency={:?}",
