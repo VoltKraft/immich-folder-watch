@@ -118,6 +118,12 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 
 ## Native evidence matrix
 
+At `1904be7` all four native targets passed four shipping-worker restarts
+from Rust-produced SQLite backups. Detached replay matched the 16 reports,
+including the peer's retained upload and trash, the pending repair journal
+and the completed repair after restart. The installed Rust sync engine's own
+rollback still requires RW-07. [Original archives and counts](rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
 At `653f255`, all four targets passed the shipping reference suite and both
 cross-language backup exchanges. In each upload case the separate peer
 retained the eight original bytes and asset ID. Each restarted C# worker

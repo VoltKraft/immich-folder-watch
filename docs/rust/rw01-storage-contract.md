@@ -278,3 +278,29 @@ different JSON whitespace survived byte-for-byte. The detached reader
 rejected four inconsistent receipts and reproduced 24 earlier native
 upload and download reports. The reviewed four-exchange receipt has
 SHA-256 `c2975117c3966efa6db6f27afe9bbfe78151cef5d38c4e68b1b3cbad784a3900`.
+
+### Four worker restarts on each native target
+
+At `1904be715b0615ba496ca177e5fe3cddf2971d7a` the shipping C# workers
+resumed on all four systems after Rust backed up their SQLite state.
+The four initial states followed an actual download, an upload, a propagated
+deletion and an interrupted timestamp repair. Each of the 16 successful xUnit
+executions identified the exact database returned by Rust. Independent replay
+recovered its four tables, matched all 16 reports byte-for-byte and checked
+158 first-party sources per archive.
+
+The upload peer retained all eight bytes and the asset ID. The deletion peer
+retained nine bytes in trash and received no second deletion request. The
+pending repair was still present in the returned database. The worker
+completed it with the original mapping, file timestamp and account history.
+The detached four-host readback covers 1,454 indexed files and has SHA-256
+`3d78051c4578db4aba46a43c54cfa1f21f81d59dca9586e989fd302ff27117e7`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106/artifacts/14847212368) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106/artifacts/14846268177) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106/artifacts/14847716353) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106/artifacts/14847288755).
+
+The separate C# reference suite passed 571 cases on each Ubuntu target and
+562 on each Windows target, with nine Linux-specific skips on each Windows
+host. Its original databases, retained media, loaded assemblies and xUnit
+results reproduced the reference readback with SHA-256
+`4120b41b8164540b54ba562f97b1046f9a21e3b663b6869c11720540a4cbe27f`.
+Rollback after the installed Rust sync engine's own activity remains open.
+[Native C# reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230320974).

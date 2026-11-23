@@ -1,5 +1,21 @@
 # Project Status
 
+## Sixteen native worker restores through Rust SQLite backups (2026-11-23)
+
+At `1904be7` the original C# worker resumed after download, upload, deletion
+and interrupted timestamp repair on Windows and Ubuntu, x64 and ARM64.
+Two independent readbacks matched all 16 xUnit execution IDs, the returned
+databases, 1,454 indexed files and the external file or peer state. The
+separate C# reference passed 2,266 tests across the four hosts, with 18
+Linux-specific skips on Windows. [Archive identifiers and readback digests](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
+The four-target feasibility run passed. Each Ubuntu architecture passed
+37 Rust workspace tests and 15 watch scenarios. Each Windows architecture
+passed 34 and 14, plus 208 C# recovery assertions. CI and Rust CodeQL
+passed on this source revision. The desktop run for the corrected glyph
+capture and reopened filename is queued behind the first WinRT history
+trial. RW-02 remains open. [Feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230336154) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230335666) · [Desktop](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156).
+
 ## Complete filename check on the reopened Windows executable (2026-11-23)
 
 The new native step runs the ordinary eight-glyph and three-edit
