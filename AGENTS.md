@@ -220,6 +220,8 @@ to reconcile project decisions, defaults, and recorded state.
   shipping sources. The actual Windows IPC names require a disposable runner.
   The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses
   original release packages, disposable installs and the synthetic legacy corpus.
+  Preserve the [worker rollback fixtures](docs/development.md#repair-and-deletion-after-restoring-the-worker-database)
+  and their external media, journal, peer request and assembly evidence.
   The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only
   after the eight recovery cases on the owned Windows test volume. Preserve
   the separate provider outcome, volume readback and cleanup evidence.

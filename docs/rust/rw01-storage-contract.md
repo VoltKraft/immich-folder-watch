@@ -217,3 +217,34 @@ upload backup SHA-256 was
 `0a570ff0f671119d060c0cfe14e245d3f9a1658fc5f9f2c4562c4915a8009d2f`.
 The original records and detached readback are in
 `artifacts/rust/worker-backup-native-c4b876c/`.
+
+At `653f255` both exchanges passed on Windows and Ubuntu, x64 and ARM64.
+The eight replayed reports matched byte-for-byte. Each archive contained
+154 archived Git sources. The detached check verified 1,270 indexed
+files across the four archives and confirmed zero transfers after each
+restart. Every receiving peer retained the original eight bytes and
+recorded zero rejected calls. The four-host readback has SHA-256
+`6099697c7aa98840aeab7bef95ac2ffc48728e998b29c32cf62243e6b4a75709`.
+The C# reference suite passed 569 cases on each Ubuntu host and 560 on
+each Windows host, with nine Linux-specific skips.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595626/artifacts/14839740550) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595626/artifacts/14838732149) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595626/artifacts/14839217031) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595626/artifacts/14838078683) · [Native reference suite](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595572).
+
+## External state after deletion and timestamp repair
+
+The repair reference interrupts the C# worker after it changes the
+synthetic photo's native timestamp and before the database records
+completion. It retains three standalone backups. Restoring the first
+leaves the photo's repaired timestamp in place. A new worker reading
+the pending backup completes the journal, preserving the original
+mapping's transfer date and the separate account Last Sync.
+[Repair fixture](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.RepairBackup.cs).
+
+The deletion reference downloads a synthetic photo through the shipping
+Immich client, then removes the local copy while the worker runs. The
+client requests trash for the exact asset with `force=false`. Its
+in-process peer moves the nine original bytes to a separate directory.
+Reading the stale mapping leaves both the local and peer album
+directories empty. Restart from the post-deletion backup retains the
+tombstone and reconciles the empty album without a second trash request.
+The installed Rust candidate's own repair and deletion remain to be
+exercised. [Deletion fixture](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.DeletionBackup.cs) · [Independent database and media reader](../../tools/RustCompatibilityOracle/verify_rollback.py).

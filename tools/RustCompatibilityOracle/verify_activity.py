@@ -1,7 +1,7 @@
 """Read a shipping worker's archived transfer, standalone backups and xUnit result."""
 
 import argparse
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import datetime
 from hashlib import sha256
 import json
@@ -23,11 +23,13 @@ TEST_CLASS = "ImmichFolderWatch.Tests.Core.Services.FolderWatchWorkerPersistence
 TEST_METHOD = "Download_RetainsBeforeAndAfterBackupsAndRestartsFromLatest"
 UPLOAD_METHOD = "Upload_PeerRetainsReceivedBytesWhenWorkerRestartsFromLatestBackup"
 UPLOAD_FILE = TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests.UploadActivity.cs"
+REPAIR_FILE = TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests.RepairBackup.cs"
+DELETION_FILE = TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests.DeletionBackup.cs"
 LEGACY_INPUTS = (
     "src/ImmichFolderWatch.Core", "src/ImmichFolderWatch.Immich", "src/ImmichFolderWatch.App.Shared",
     "src/ImmichFolderWatch.App.Linux/Platform", TEST_PROJECT + "/ImmichFolderWatch.Tests.Core.csproj",
     TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests*.cs", ":!" + TEST_FILE,
-    ":!" + UPLOAD_FILE,
+    ":!" + UPLOAD_FILE, ":!" + REPAIR_FILE, ":!" + DELETION_FILE,
     "Directory.Build.props", "Directory.Build.targets", "global.json", "NuGet.Config",
 )
 UPLOAD_BYTES = bytes.fromhex("ff d8 00 01 7f 80 ff d9")
@@ -83,9 +85,8 @@ def artifact_hashes(root, upload=False):
     return {name: sha256(original_bytes(root / name, limits[name])).hexdigest() for name in sorted(limits)}
 
 
-def verify_trx(trx, manifest_hash, rust_backup_hash=None, *, upload=False):
-    run = ElementTree.fromstring(original_bytes(trx, 32 << 20))
-    method_name = UPLOAD_METHOD if upload else TEST_METHOD
+def passed_activity(trx_bytes, method_name, manifest_hash):
+    run = ElementTree.fromstring(trx_bytes)
     name = TEST_CLASS + "." + method_name
     definition, = (e for e in run.findall("./{*}TestDefinitions/{*}UnitTest") if e.get("name") == name)
     method = definition.find("{*}TestMethod")
@@ -97,6 +98,12 @@ def verify_trx(trx, manifest_hash, rust_backup_hash=None, *, upload=False):
     stdout = result.findtext("./{*}Output/{*}StdOut", "")
     markers = [line.strip() for line in stdout.splitlines() if line.strip().startswith("IFW_ACTIVITY_SHA256=")]
     equal(markers, ["IFW_ACTIVITY_SHA256=" + manifest_hash], "test result does not identify the original activity file")
+    return execution_id, stdout
+
+
+def verify_trx(trx, manifest_hash, rust_backup_hash=None, *, upload=False):
+    execution_id, stdout = passed_activity(original_bytes(trx, 32 << 20), UPLOAD_METHOD if upload else TEST_METHOD,
+                                           manifest_hash)
     consumed = [line.strip() for line in stdout.splitlines() if line.strip().startswith("IFW_RUST_BACKUP_SHA256=")]
     equal(consumed, ["IFW_RUST_BACKUP_SHA256=" + rust_backup_hash] if rust_backup_hash else [],
           "test result does not identify the expected restore path and bytes")
@@ -119,7 +126,8 @@ def reviewed_schema(revision, platform):
         return schema(golden)
 
 
-def read_backup(path, expected_schema, expected_digest):
+@contextmanager
+def standalone_database(path, expected_schema, expected_digest):
     data = original_bytes(path, 16 << 20)
     require(sha256(data).hexdigest() == expected_digest and data.startswith(b"SQLite format 3\0") and data[18:20] == b"\1\1",
             f"expected the identified, standalone rollback-mode database: {path.name}")
@@ -132,10 +140,15 @@ def read_backup(path, expected_schema, expected_digest):
             require(db.execute("PRAGMA integrity_check").fetchall() == [("ok",)], f"damaged {path.name}")
             require(db.execute("PRAGMA user_version").fetchone() == (1,), f"unexpected schema version in {path.name}")
             require(schema(db) == expected_schema, f"schema differs from the reviewed legacy corpus in {path.name}")
-            for table in ("owned_albums", "sync_timestamp_repairs"):
-                require(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,), f"unexpected {table} row")
-            entries = [dict(zip(MAPPING_FIELDS, row, strict=True)) for row in db.execute("SELECT * FROM sync_entries")]
-            return entries, db.execute("SELECT account_scope, last_successful_sync_utc FROM sync_account_status").fetchall()
+            yield db
+
+
+def read_backup(path, expected_schema, expected_digest):
+    with standalone_database(path, expected_schema, expected_digest) as db:
+        for table in ("owned_albums", "sync_timestamp_repairs"):
+            require(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,), f"unexpected {table} row")
+        entries = [dict(zip(MAPPING_FIELDS, row, strict=True)) for row in db.execute("SELECT * FROM sync_entries")]
+        return entries, db.execute("SELECT account_scope, last_successful_sync_utc FROM sync_account_status").fetchall()
 
 
 def check_transfer(observed, downloads):
@@ -147,6 +160,17 @@ def utc_timestamp(stamp):
     require(isinstance(stamp, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{7}\+00:00", stamp),
             "invalid UTC timestamp encoding")
     datetime.fromisoformat(stamp)
+
+
+def watch_root_key(source, windows, revision):
+    native_path = PureWindowsPath(source) if windows else PurePosixPath(source)
+    require(native_path.is_absolute() and native_path.name == "watch" and
+            re.fullmatch("immich-folder-watch-worker-tests-[a-f0-9]{32}", native_path.parent.name), "wrong synthetic watch root")
+    if not windows:
+        return source
+    # A native Windows temporary directory can include non-ASCII characters.
+    table = git("show", revision + ":tools/rust-qa/legacy/casing/unicode-15.1.0.tsv").decode().splitlines()
+    return source.translate({int(a, 16): int(b, 16) for a, b in (line.split() for line in table[1:])})
 
 
 def verify(root, trx, platform, arch, revision, *, rust_backup_hash=None, upload=False):
@@ -164,15 +188,7 @@ def verify(root, trx, platform, arch, revision, *, rust_backup_hash=None, upload
     require(bool(case["osDescription"].strip()), "missing OS description")
     require(case["accountScope"] == ACCOUNT, "incorrect account identity")
     windows = platform == "windows"
-    source = case["sourcePath"]
-    native_path = PureWindowsPath(source) if windows else PurePosixPath(source)
-    require(native_path.is_absolute() and native_path.name == "watch" and
-            re.fullmatch("immich-folder-watch-worker-tests-[a-f0-9]{32}", native_path.parent.name), "wrong synthetic watch root")
-    source_key = source
-    if windows:
-        # Use the qualified Windows scalar map, including non-ASCII characters in a native temp path.
-        table = git("show", revision + ":tools/rust-qa/legacy/casing/unicode-15.1.0.tsv").decode().splitlines()
-        source_key = source.translate({int(a, 16): int(b, 16) for a, b in (line.split() for line in table[1:])})
+    source_key = watch_root_key(case["sourcePath"], windows, revision)
 
     expected_schema = reviewed_schema(revision, platform)
     equal(read_backup(root / "before.db", expected_schema, hashes["before.db"]), [[], []], "before backup already contains activity")

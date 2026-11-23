@@ -85,11 +85,15 @@ jobs:
         run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
 
       - name: Execute portable behavior and security reference
+        id: worker_reference
         env:
           IFW_QA_ACTIVITY_OUTPUT: ${{ github.workspace }}/artifacts/rust/worker-activity
+          IFW_QA_REPAIR_ACTIVITY_OUTPUT: ${{ github.workspace }}/artifacts/rust/worker-repair
+          IFW_QA_DELETION_ACTIVITY_OUTPUT: ${{ github.workspace }}/artifacts/rust/worker-deletion
         run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --logger "trx;LogFileName=core-reference.trx" --results-directory artifacts/rust/test-results
 
       - name: Read the worker backups and downloaded bytes independently
+        if: ${{ !cancelled() && (steps.worker_reference.outcome == 'success' || steps.worker_reference.outcome == 'failure') }}
         shell: bash
         env:
           ACTIVITY_PLATFORM: ${{ matrix.platform }}
@@ -97,6 +101,40 @@ jobs:
           python3 -B tools/RustCompatibilityOracle/verify_activity.py artifacts/rust/worker-activity \
             artifacts/rust/test-results/core-reference.trx "$ACTIVITY_PLATFORM" "$IFW_ORACLE_EXPECT_ARCH" "$GITHUB_SHA" \
             > artifacts/rust/test-results/worker-activity-readback.json
+
+      - name: Retain the three assemblies built for the native worker references
+        id: worker_assemblies
+        if: ${{ !cancelled() && (steps.worker_reference.outcome == 'success' || steps.worker_reference.outcome == 'failure') }}
+        shell: bash
+        run: |
+          assemblies=artifacts/rust/worker-assemblies
+          built=src/ImmichFolderWatch.Tests.Core/bin/Release/net10.0
+          mkdir "$assemblies"
+          for name in ImmichFolderWatch.Tests.Core ImmichFolderWatch.Core ImmichFolderWatch.Immich; do
+            cp "$built/$name.dll" "$assemblies/"
+          done
+
+      - name: Read the three original repair snapshots and the external file observations
+        if: ${{ !cancelled() && steps.worker_assemblies.outcome == 'success' }}
+        shell: bash
+        env:
+          ACTIVITY_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python3 -B tools/RustCompatibilityOracle/verify_rollback.py repair artifacts/rust/worker-repair \
+            artifacts/rust/test-results/core-reference.trx artifacts/rust/worker-assemblies \
+            "$ACTIVITY_PLATFORM" "$IFW_ORACLE_EXPECT_ARCH" "$GITHUB_SHA" > "$RUNNER_TEMP/worker-repair-readback.json"
+          cp "$RUNNER_TEMP/worker-repair-readback.json" artifacts/rust/test-results/
+
+      - name: Read the original deletion backups, peer requests and retained trash bytes
+        if: ${{ !cancelled() && steps.worker_assemblies.outcome == 'success' }}
+        shell: bash
+        env:
+          ACTIVITY_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python3 -B tools/RustCompatibilityOracle/verify_rollback.py deletion artifacts/rust/worker-deletion \
+            artifacts/rust/test-results/core-reference.trx artifacts/rust/worker-assemblies \
+            "$ACTIVITY_PLATFORM" "$IFW_ORACLE_EXPECT_ARCH" "$GITHUB_SHA" > "$RUNNER_TEMP/worker-deletion-readback.json"
+          cp "$RUNNER_TEMP/worker-deletion-readback.json" artifacts/rust/test-results/
 
       - name: Upload synthetic reference evidence
         if: always()
@@ -107,5 +145,8 @@ jobs:
             artifacts/rust/oracle/
             artifacts/rust/test-results/
             artifacts/rust/worker-activity/
+            artifacts/rust/worker-repair/
+            artifacts/rust/worker-deletion/
+            artifacts/rust/worker-assemblies/
           if-no-files-found: error
           retention-days: 14

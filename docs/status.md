@@ -1,5 +1,31 @@
 # Project Status
 
+## Eight native worker restores and two external side effects (2026-11-23)
+
+All four targets at `653f255` passed the shipping worker upload and
+download through Rust's SQLite backup API. Independent replay matched
+all eight reports, all 1,270 indexed files and the 154 original source
+files in each archive. The detached readback SHA-256 is
+`6099697c7aa98840aeab7bef95ac2ffc48728e998b29c32cf62243e6b4a75709`.
+All four reference suites also passed. Ubuntu ran 569 cases on each
+architecture. Windows passed 560 and skipped nine Linux-only cases per
+host. [Native results](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+Two separate working-tree references ran on Fedora x64. After an
+interrupted timestamp correction, the C# worker reopened a standalone
+backup with the repair still pending. The corrected file time survived
+both database restores and the worker completed the journal. Three
+negative trials detected an incorrect donor, an incorrect file time
+and altered file content. In the deletion trial the shipping HTTP client
+trashed one exact asset. Its synthetic peer retained the original bytes
+and observed zero additional trash requests after restart. The original
+grouped timestamp suite passed nine of ten locally. A separate inotify
+watch on an empty test directory returned `ENOSPC` immediately before
+the repeat, and the existing cancellation test timed out on its file event.
+Both new tests passed in their focused runs. The next check uses the
+same revision and original first-party DLLs on the four native targets.
+[Side effects and replay](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
 ## Worker backup replay and Windows notification history (2026-11-23)
 
 At `c4b876c`, the offline Fedora x64 storage trial restored both a download

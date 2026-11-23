@@ -77,6 +77,28 @@ retains the remote asset and records unexpected album and file operations.
 `rust-feasibility.yaml` retains the source, build and per-test evidence from
 each native target in its `rust-worker-backup` archive.
 
+### Repair and deletion after restoring the worker database
+
+The Core reference suite can export an interrupted timestamp repair and a
+local deletion propagated to the peer. Set `IFW_QA_REPAIR_ACTIVITY_OUTPUT`
+and `IFW_QA_DELETION_ACTIVITY_OUTPUT` to separate fresh absolute
+directories. The native reference workflow retains the databases, media,
+xUnit report and three first-party assemblies in each `rust-reference`
+archive. From the repository root, replay each case against the commit
+that produced the archive. Here `archive` is its extracted directory and
+`revision` is the full commit ID.
+
+```bash
+for kind in repair deletion; do
+  python3 -B tools/RustCompatibilityOracle/verify_rollback.py "$kind" "$archive/worker-$kind" \
+    "$archive/test-results/core-reference.trx" "$archive/worker-assemblies" linux x64 "$revision"
+done
+```
+
+Pass the archive's actual operating system and architecture. The reader
+checks the loaded assembly hashes, immutable databases, raw media and the
+test execution that produced each manifest. [Reference behavior](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
 ### Original package install and repair
 
 Use the common runner on a native Linux x64 or ARM64 machine with Flatpak,
