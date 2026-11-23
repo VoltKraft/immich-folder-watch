@@ -64,9 +64,9 @@ The frame check requires at least eight colors and twelve gold-colored
 pixels in the actual button. AT-SPI supplies the button name and the screen
 capture supplies the visible pixels. The negative control accepts only the frozen
 original binary and build receipt, requires missing icon properties and
-demands exactly one color in its screen crop. The next dimensions of this
-assessment are native ARM64, Plasma Wayland and installation of a released
-application package.
+demands exactly one color in its screen crop. The ARM64 inputs and native
+test are described below. Plasma Wayland and installed-candidate behavior
+have separate evidence requirements.
 
 ## Private Noble runtime
 
@@ -94,7 +94,27 @@ and [package and notice inventory](../../tools/rust-qa/plasma/ubuntu-amd64.tsv).
 
 ## Reproduction
 
-On an Ubuntu Linux x64 assessment runner with Python 3.11 or newer,
+The private ARM64 guest uses the Ubuntu Base 24.04.5 ARM64 image and 691
+packages totalling 415,479,768 bytes. APT resolved them against the ARM64
+image's installed-package database. Independent verification authenticated
+the Base checksum with the Ubuntu CD image key and all package fields
+against the three signed Noble releases and their six ARM64 main/universe
+indexes. Of these packages, 598 target ARM64 and 93 are architecture
+independent. The review checked all 691 archive checksums and complete
+copyright files. The shared package names have the same versions and notices
+as x64. The two ARM64-specific C preprocessor packages carry the same
+version and notice as their x64 counterparts. The GUI uses these tools as
+external test inputs. [Ubuntu Base image](https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/) · [Ubuntu Ports repository](https://ports.ubuntu.com/ubuntu-ports/dists/noble/InRelease) · [ARM64 runtime review](../../tools/rust-qa/plasma/ubuntu-arm64.json) · [Frozen package records](../../tools/rust-qa/plasma/ubuntu-arm64.tsv).
+
+The native launcher checks the ELF architecture of the Rust executable,
+Python, KWin, KDED, Plasma and the selected binary libraries. During the
+panel run the observer reads the running service executables and the
+Qt Core, Qt Quick, XCB and watcher libraries mapped in the shell and KDED.
+The original x64 blank-icon control passed this readback with two actual
+panel clicks. Native ARM64 activation still requires the hosted run.
+[Native workflow](../../.github/workflows/rust-desktop-assessment.yaml).
+
+On an Ubuntu Linux x64 or ARM64 assessment runner with Python 3.11 or newer,
 Bubblewrap and tar, run the ordinary audited GUI build, then run these
 commands from the repository root.
 
@@ -103,9 +123,9 @@ python3 tools/rust-qa/plasma/prepare.py --acquire
 python3 tools/rust-qa/plasma/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment
 ```
 
-The first command creates `artifacts/rust/plasma/guest-amd64`. It downloads
-approximately 402 MiB of package archives plus the 29 MiB base image into
-the private cache. With the cache present, omitting `--acquire` reproduces
+The first command creates `artifacts/rust/plasma/guest-amd64` or
+`artifacts/rust/plasma/guest-arm64` and populates its private cache.
+With the cache present, omitting `--acquire` reproduces
 the guest offline in a fresh output directory. Package data is unpacked
 inside Bubblewrap. Each assessment creates a fresh run directory. Retain
 `artifacts/rust/plasma/runs/**` for the JSON receipts, the target-limited

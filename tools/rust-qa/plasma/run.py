@@ -1,7 +1,6 @@
 """Launch a fresh, offline Plasma display with a source-bound native Rust GUI."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,33 +9,37 @@ import subprocess
 import tempfile
 import uuid
 
+from audit import native_architecture, sha, verify_elf
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 ART = ROOT / "artifacts/rust/plasma"
 
 
-def sha(path):
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--userspace", type=Path, default=ART / "guest-amd64", help="private, audited Ubuntu Noble guest root")
+    parser.add_argument("--userspace", type=Path, help="private, audited Ubuntu Noble guest root")
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--blank-control", action="store_true", help="replay the frozen pre-IconPixmap native binary")
     parser.add_argument("--output", type=Path, default=ART / "runs")
     args = parser.parse_args()
-    guest = args.userspace.resolve(strict=True)
+    arch = native_architecture()
+    guest = (args.userspace or ART / f"guest-{arch}").resolve(strict=True)
     if not guest.is_relative_to(ART) or "VERSION_CODENAME=noble" not in (guest / "usr/lib/os-release").read_text().splitlines():
         parser.error("Supply a separate, prepared Ubuntu Noble userspace")
     binary = args.binary.resolve(strict=True)
     if not binary.is_relative_to(ROOT / "artifacts/rust") or not args.output.resolve().is_relative_to(ART):
         parser.error("Use the private assessment artifact directories")
-    review_file = HERE / "ubuntu-amd64.json"
+    review_file = HERE / f"ubuntu-{arch}.json"
     review = json.loads(review_file.read_text())
-    if platform.machine() != "x86_64" or any(sha(guest / p) != digest for p,digest in review["keyPayloads"].items()):
-        raise ValueError("The native Plasma/KWin tools or the panel implementation differ from the reviewed x64 payloads")
+    for relative, expected in review["keyPayloads"].items():
+        path = (guest / relative).resolve(strict=True)
+        if not path.is_relative_to(guest) or sha(path) != expected:
+            raise ValueError(f"The native Plasma payload differs from the {arch} review: {relative}")
+        if path.suffix != ".qml":
+            verify_elf(path, arch)
+    verify_elf(guest / "usr/bin/python3", arch)
+    verify_elf(binary, arch)
     manifest = binary.with_suffix(".inputs.json")
     build = json.loads(manifest.read_text())
     if platform.system() != "Linux" or build["target"] != f"{platform.machine()}-unknown-linux-gnu" or sha(binary) != build["binary_sha256"]:
@@ -59,7 +62,7 @@ def main():
     (run / "inputs.json").write_text(json.dumps({"binary": build["binary_sha256"], "target": build["target"],
         "build": sha(manifest), "blankControl": args.blank_control, "icon": sha(icon), "ubuntuReview": sha(review_file),
         "brandingSvg": sha(ROOT / "assets/branding/logo.svg"),
-        "drivers": {p.name: sha(p) for p in (Path(__file__), HERE / "observe.py", HERE / "brand.py",
+        "drivers": {p.name: sha(p) for p in (Path(__file__), HERE / "prepare.py", HERE / "audit.py", HERE / "observe.py", HERE / "brand.py",
                                               HERE.parent / "performance/session.py", HERE.parent / "performance/x11.py")},
         "namespaces": namespaces}, indent=2) + "\n")
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv"]

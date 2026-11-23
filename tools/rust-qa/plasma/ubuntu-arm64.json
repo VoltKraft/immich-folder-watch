@@ -1,0 +1,39 @@
+{
+  "baseFile": "ubuntu-base-24.04.5-base-arm64.tar.gz",
+  "baseBytes": 29936675,
+  "baseSha256": "a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2",
+  "archiveKeyringSha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+  "archiveSigner": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+  "signedAptInputs": {
+    "ports.ubuntu.com_ubuntu-ports_dists_noble_InRelease": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble_main_binary-arm64_Packages": "423c9185185cfc15df7bb3e748afc94b79ed09e0c437a0589aace46b61090d29",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble_universe_binary-arm64_Packages": "adb1c01115c3b11d2a5cde43b17ce3c53fa7cc48f834b930f63910d2c7dc74f5",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-updates_InRelease": "42f3c1180ad0e1c0cb8ccfa2edfdb6eb631a2d3680cc5015ee0b93d6b68dbad1",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-updates_main_binary-arm64_Packages": "cf655afa09767d2aee80b8f7a36ff9d4e9a9fe2f7c20401e872080a394cbabb7",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-updates_universe_binary-arm64_Packages": "9b8c75320d06977480ad16aaed75efb18ffa3a03c987fcf0c8ee57879beaf681",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-security_InRelease": "467c8b9d6552b853172a56fcd949bf8ebd6f4231aade89bb31f63f0543c19bdf",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-security_main_binary-arm64_Packages": "51f221ab1129dfbca9fffaa61e539f9068b1b8d95f8c84cd424cb01e95a7a349",
+    "ports.ubuntu.com_ubuntu-ports_dists_noble-security_universe_binary-arm64_Packages": "2cd1b76292bc5830ac55841a1e27caaea079905906843cd3c73c249a0bb37ee3"
+  },
+  "packages": 691,
+  "packageTableSha256": "b40a1f6af8882c939e91fbf5f3c89a2560a9f9ca403cc33b551b85a7f1efd2c5",
+  "keyPayloads": {
+    "usr/bin/kwin_x11": "4d4c8677c5bc8533bb164d4c89e084c353371dd111a923f7f445f6560bdd1709",
+    "usr/bin/kded5": "9e36707eca0a54588e2db70ab433273764ecda17ccfd02b4be6b843b1c947fa9",
+    "usr/bin/plasmashell": "39cb72a07f1688d25afa3629ed36ea32c204537ee3cb82eebf04d75e2b03087d",
+    "usr/lib/aarch64-linux-gnu/qt5/plugins/kf5/kded/statusnotifierwatcher.so": "0e507aa4a4b445e2be1d8ab11f60f6aa090272cb6567dd1ad0aaf66e611d1653",
+    "usr/lib/aarch64-linux-gnu/qt5/plugins/plasma/dataengine/plasma_engine_statusnotifieritem.so": "b061c721227aa3dc91bf3e2f1fa025f075ae1886244a5aa472333d5d98a78a33",
+    "usr/lib/aarch64-linux-gnu/qt5/plugins/plasma/applets/org.kde.plasma.systemtray.so": "0ec9b0a48528f9af23572f3ee471d4beadf1aa310e9c231c673d7a86f9a89902",
+    "usr/lib/aarch64-linux-gnu/qt5/plugins/plasma/applets/org.kde.plasma.private.systemtray.so": "4d808d07fa657d9b8ccdfc96cfbd85fd0ad4b3be157ef4de1aac7b8d15cd2540",
+    "usr/share/plasma/plasmoids/org.kde.plasma.private.systemtray/contents/ui/items/StatusNotifierItem.qml": "602815376dcd618d8c80fb02130acc041d6b73744831d496f383bf9291a90084",
+    "usr/lib/aarch64-linux-gnu/librsvg-2.so.2": "1cf428ecc44539f70cd5c0996b02ef950597230a54787bde01b843aebadfcb65",
+    "usr/lib/aarch64-linux-gnu/libgdk_pixbuf-2.0.so.0": "364892c377f8d37bea42bc88147b6d1de88f48e09fccc59fe96f1dc2526d09a0",
+    "usr/lib/aarch64-linux-gnu/libQt5Core.so.5": "d944efca3fc0e166a46c8c696756869b9deb5e30b784c38d98b9ad13f32c2ea7",
+    "usr/lib/aarch64-linux-gnu/libQt5Quick.so.5": "443ae88dae451cf62015ae4f1b644e17b66cc86a01538f9a479618deaea0edaf",
+    "usr/lib/aarch64-linux-gnu/qt5/plugins/platforms/libqxcb.so": "f8f809aec5aa47d44b2d4a5ba86e68695c1764b3c03d425f9700afdf461fccd1"
+  },
+  "iconSha256": "402073a5d81779a92c54629de7fb16a511c0764391bcdec060095c691b3d0a31",
+  "imageSumsSha256": "30f23cec3a46679bcf21dbe0c0a0ab51440e9b2f5ac69b3ae1d4a7a71c0ffc69",
+  "imageSignatureSha256": "5164e25bab9ff0467fc83415c8f759bb79cbd4e0264b9a11f49ff1e6a10a4c1f",
+  "imageSigner": "843938DF228D22F7B3742BC0D94AA3F0EFE21092"
+}

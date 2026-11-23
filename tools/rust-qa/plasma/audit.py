@@ -5,10 +5,13 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+import platform
 import re
 import sys
 
 HERE = Path(__file__).resolve().parent
+DEBIAN_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
+ELF_MACHINE = {"amd64": 62, "arm64": 183}
 
 
 def sha(path):
@@ -16,12 +19,30 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def verify_archive_indices(apt):
+def native_architecture():
+    machine = platform.machine()
+    if platform.system() != "Linux" or machine not in DEBIAN_ARCH:
+        raise ValueError("The Plasma assessment requires a native Linux x64 or ARM64 host")
+    return DEBIAN_ARCH[machine]
+
+
+def verify_elf(path, arch):
+    with path.open("rb") as stream:
+        header = stream.read(20)
+    machine = int.from_bytes(header[18:20], "little")
+    if (len(header) != 20 or header[:7] != b"\x7fELF\x02\x01\x01"
+            or int.from_bytes(header[16:18], "little") not in (2, 3)
+            or machine != ELF_MACHINE[arch]):
+        raise ValueError(f"Expected a native {arch} ELF executable or library: {path.name}")
+    return machine
+
+
+def verify_archive_indices(apt, arch):
     """Verify every frozen pool path against an index named by an authenticated Ubuntu InRelease."""
     sys.path.insert(0, str(HERE.parent / "portal-noble"))
     from verify import signed_release
-    review = json.loads((HERE / "ubuntu-amd64.json").read_text())
-    table = HERE / "ubuntu-amd64.tsv"
+    review = json.loads((HERE / f"ubuntu-{arch}.json").read_text())
+    table = HERE / f"ubuntu-{arch}.tsv"
     if sha(table) != review["packageTableSha256"]:
         raise ValueError("Changed package table")
     with table.open() as stream:
@@ -36,7 +57,7 @@ def verify_archive_indices(apt):
             continue
         _, signed = signed_release(key, lists / filename)
         for component in ("main", "universe"):
-            relative = component + "/binary-amd64/Packages"
+            relative = component + f"/binary-{arch}/Packages"
             path = lists / (filename.removesuffix("InRelease") + relative.replace("/", "_"))
             if not path.exists():
                 continue
@@ -57,13 +78,14 @@ def verify_archive_indices(apt):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frozen-indices", type=Path, help="original authenticated APT root with unpacked Noble indexes")
+    parser.add_argument("--architecture", choices=ELF_MACHINE, help="architecture of the archived APT inputs")
     parser.add_argument("--userspace", type=Path)
     parser.add_argument("--packages", type=Path, help="APT records authenticated against signed Noble indexes")
     parser.add_argument("--archives", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.frozen_indices:
-        return verify_archive_indices(args.frozen_indices)
+        return verify_archive_indices(args.frozen_indices, args.architecture or native_architecture())
     if not all((args.userspace, args.packages, args.archives, args.output)):
         parser.error("supply all four package/notice review paths or --frozen-indices")
     guest = args.userspace.resolve(strict=True)

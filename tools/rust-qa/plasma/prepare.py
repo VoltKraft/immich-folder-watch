@@ -1,4 +1,4 @@
-"""Reconstruct the reviewed x64 Plasma guest from Ubuntu's pinned QA archives."""
+"""Reconstruct the native Plasma guest from Ubuntu's reviewed QA archives."""
 
 import argparse
 import concurrent.futures
@@ -12,12 +12,12 @@ import sys
 import tempfile
 from urllib.parse import quote
 
-from audit import sha
+from audit import native_architecture, sha
 
 HERE = Path(__file__).resolve().parent
 ART = HERE.parents[2] / "artifacts/rust/plasma"
 sys.path.insert(0, str(HERE.parent / "portal-noble"))
-from inputs import UBUNTU, fetch
+from inputs import PORTS, UBUNTU, fetch
 
 
 def namespace():
@@ -40,15 +40,15 @@ def unpack_base(base, dest):
 
 
 def prepare(output, cache, acquire):
-    if platform.machine() != "x86_64" or platform.system() != "Linux":
-        raise ValueError("This package review and Qt plugin layout cover native Linux x64")
-    review = json.loads((HERE / "ubuntu-amd64.json").read_text())
-    table = HERE / "ubuntu-amd64.tsv"
+    arch = native_architecture()
+    review = json.loads((HERE / f"ubuntu-{arch}.json").read_text())
+    table = HERE / f"ubuntu-{arch}.tsv"
+    triplet = platform.machine() + "-linux-gnu"
     if sha(table) != review["packageTableSha256"]:
         raise ValueError("The frozen Ubuntu package table differs")
     with table.open() as source:
         entries = list(csv.DictReader(source, delimiter="\t"))
-    if len(entries) != review["packages"]:
+    if len(entries) != review["packages"] or any(e["Architecture"] not in (arch, "all") for e in entries):
         raise ValueError("Incomplete package review")
     if output.exists() or not output.is_relative_to(ART) or not cache.is_relative_to(ART):
         raise ValueError("Select a fresh destination and a private cache under artifacts/rust/plasma")
@@ -62,7 +62,8 @@ def prepare(output, cache, acquire):
         pool = entry["Filename"]
         if not pool.startswith(("pool/main/", "pool/universe/")) or ".." in Path(pool).parts:
             raise ValueError("Expected an Ubuntu main/universe package")
-        return fetch(UBUNTU + quote(pool, safe="/+~"), cache / Path(pool).name, entry["SHA256"], acquire, int(entry["Size"]))
+        mirror = PORTS if arch == "arm64" else UBUNTU
+        return fetch(mirror + quote(pool, safe="/+~"), cache / Path(pool).name, entry["SHA256"], acquire, int(entry["Size"]))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as workers:
         files = list(workers.map(archive, entries))
@@ -90,8 +91,8 @@ def prepare(output, cache, acquire):
                 raise ValueError(f"Changed native Plasma payload {relative}")
         subprocess.run(["bwrap", "--bind", str(root), "/", *namespace()[1:], "--", "bash", "-euo", "pipefail", "-c",
                         'ldconfig\nglib-compile-schemas /usr/share/glib-2.0/schemas\n'
-                        'gio-querymodules /usr/lib/x86_64-linux-gnu/gio/modules\n'
-                        '/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders --update-cache\n'
+                        f'gio-querymodules /usr/lib/{triplet}/gio/modules\n'
+                        f'/usr/lib/{triplet}/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders --update-cache\n'
                         'update-mime-database /usr/share/mime\nfc-cache -f'], check=True)
         root.rename(output)
     print(f"Prepared {output} from Ubuntu Base and {len(entries)} authenticated packages")
@@ -99,8 +100,9 @@ def prepare(output, cache, acquire):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ART / "guest-amd64")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--cache", type=Path, default=ART / "cache")
     parser.add_argument("--acquire", action="store_true", help="download missing pinned archives from Ubuntu")
     args = parser.parse_args()
-    prepare(args.output.resolve(), args.cache.resolve(), args.acquire)
+    destination = args.output or (ART / f"guest-{native_architecture()}")
+    prepare(destination.resolve(), args.cache.resolve(), args.acquire)

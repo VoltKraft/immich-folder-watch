@@ -19,6 +19,7 @@ from gi.repository import Atspi, Gdk, Gio, GLib
 sys.path.insert(0, "/app/performance")
 from session import checked_start, check_alive, wait_for
 from x11 import Display, WindowAttributes, bind
+from audit import native_architecture, sha, verify_elf
 from brand import SIZES, render
 
 WORK = Path("/qa")
@@ -160,16 +161,21 @@ def click_item(x, shell_pid, number):
 
 def run(stack, report, blank):
     bus = session(stack)
+    arch = native_architecture()
+    if report["target"] != os.uname().machine + "-unknown-linux-gnu":
+        raise ValueError("The GUI target and the native observer kernel differ")
     def start(label, cmd):
         return checked_start(stack, cmd, WORK / f"{label}.log")
     def wait_owner(name):
         result = wait_for(lambda: owner(bus, name), 24, f"No owned {name}")
+        result["elfMachine"] = verify_elf(Path(f"/proc/{result['pid']}/exe"), arch)
         report.setdefault("services", {})[name] = result
         return result
     start("atspi", ["/usr/libexec/at-spi-bus-launcher", "--launch-immediately"])
     wait_owner("org.a11y.Bus")
-    start("kwin", ["/usr/bin/kwin_x11", "--replace"])
-    wait_owner("org.kde.KWin")
+    kwin = start("kwin", ["/usr/bin/kwin_x11", "--replace"])
+    if wait_owner("org.kde.KWin")["pid"] != kwin.pid:
+        raise ValueError("KWin's bus owner does not match the started window manager")
     start("kded", ["/usr/bin/kded5"])
     kded = wait_owner("org.kde.kded5")
     call(bus, "org.kde.kded5", "/kded", "org.kde.kded5", "loadModule", GLib.Variant("(s)", ("statusnotifierwatcher",)))
@@ -258,6 +264,18 @@ def run(stack, report, blank):
         wait_for(lambda: not subject_window(x, subject.pid) and gui_log.read_text().count("WINDOW_HIDDEN") == number,
                  10, "The native close request did not hide the GUI")
         hidden()
+    # Check the actual Qt platform and watcher serving these two clicks.
+    lib = Path("/usr/lib") / (os.uname().machine + "-linux-gnu")
+    report["loadedLibraries"] = {}
+    for pid, relatives in ((shell.pid, ("libQt5Core.so.5", "libQt5Quick.so.5", "qt5/plugins/platforms/libqxcb.so")),
+                           (kded["pid"], ("qt5/plugins/kf5/kded/statusnotifierwatcher.so",))):
+        mappings = {line.split(maxsplit=5)[5] for line in Path(f"/proc/{pid}/maps").read_text().splitlines()
+                    if len(line.split(maxsplit=5)) == 6}
+        for relative in relatives:
+            path = (lib / relative).resolve(strict=True)
+            if str(path) not in mappings:
+                raise ValueError(f"Missing native Plasma library in the observed process: {path.name}")
+            report["loadedLibraries"][relative] = dict(pid=pid, file=str(path), elfMachine=verify_elf(path, arch), sha256=sha(path))
     call(bus, app["owner"], "/org/example/IfwGuiProbe", "org.freedesktop.Application", "ActivateAction",
          GLib.Variant("(sava{sv})", ("quit", [], {})))
     if subject.wait(timeout=8) or "DRAINED" not in gui_log.read_text():

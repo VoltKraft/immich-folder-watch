@@ -271,8 +271,8 @@ jobs:
           python3 -B tools/rust-qa/gui/build.py --test
           python3 -B tools/rust-qa/appearance/linux.py --binary artifacts/rust/gui-build/release/native-gui-assessment
 
-      - name: Activate the visible native tray icon from the Plasma panel on Ubuntu x64
-        if: ${{ !cancelled() && matrix.target == 'x86_64-unknown-linux-gnu' && steps.gui.outcome == 'success' }}
+      - name: Activate the visible native tray icon from the Plasma panel on Ubuntu
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: |
           python3 -B tools/rust-qa/plasma/prepare.py --acquire
           python3 -B tools/rust-qa/plasma/run.py --binary artifacts/rust/gui-build/release/native-gui-assessment
