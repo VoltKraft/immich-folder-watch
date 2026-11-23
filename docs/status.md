@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows foreground keyboard launch (2026-11-23)
+
+The new retained-window trial launches the ordinary secondary from a real
+Win32 key message addressed to a fixture-owned foreground window. It
+records the two process identities, window, worker and actual keyboard
+focus, then restores the original input desktop. Independent review found
+that the first control class could not take keyboard focus. The fixture
+now uses a focusable button. Native focus on x64 and ARM64 is pending.
+[Native procedure](rust/rw02-instance.md#second-launch-from-a-foreground-test-window).
+
 ## Native Ubuntu desktop and Documents observations at 6084b23 (2026-11-23)
 
 Both desktops passed all eleven X11 resource limits and two Plasma panel

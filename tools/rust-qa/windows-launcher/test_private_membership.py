@@ -67,6 +67,20 @@ class PrivateWindows:
 
 
 class PrivateMembershipTests(unittest.TestCase):
+    def test_gesture_mode_requires_active_named_desktop_and_its_owned_hidden_witness(self):
+        world = PrivateWindows()
+        world.name = "IfwQa_" + "7" * 32
+        world.names[world.anchor] = "IFW native test enumeration"
+        world.desk.receiving_input.return_value = True
+        membership = readback.PrivateMembership(world.desk, world.windows, world.name, world.desktop, world.anchor,
+                                                world.proc, world.tid, world.creation, world.api, world.title,
+                                                world.record, named_input=True)
+        with patch.object(c, "set_last_error", create=True), patch.object(c, "get_last_error", return_value=0, create=True):
+            self.assertEqual(membership.verify(world.gui, "start", visible=True)["pid"], world.pid)
+            world.desk.receiving_input.return_value = False
+            with self.assertRaisesRegex(ValueError, "private desktop"):
+                membership.verify(world.gui, "after", visible=True)
+
     def setUp(self):
         self.enterContext(patch.object(c, "set_last_error", create=True))
         self.enterContext(patch.object(c, "get_last_error", return_value=0, create=True))

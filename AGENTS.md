@@ -177,7 +177,8 @@ to reconcile project decisions, defaults, and recorded state.
   The [retained Windows window comparison](docs/rust/rw02-windows-window.md)
   reconstructs its eframe and winit sources and measures against the same
   host's WPF references. Preserve the native results, both library receipts,
-  compiler stream and source archive together. Exercise ordinary second-launch
+  compiler stream and source archive together. Exercise ordinary second-launch,
+  the [foreground keyboard launch](docs/rust/rw02-instance.md#second-launch-from-a-foreground-test-window)
   and actual Shell activation for the same retained executable. Verify its
   [ordinary filename after reopening](docs/rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd)
   with the native glyph and editing observer. Use the same executable for

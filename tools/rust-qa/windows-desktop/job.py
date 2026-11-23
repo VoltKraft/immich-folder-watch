@@ -28,7 +28,7 @@ class ExtendedLimits(c.Structure):
     _fields_ = [("basic", BasicLimits), ("io_counters", c.c_uint64 * 6), ("memory_limits", c.c_size_t * 4)]
 
 
-def run_worker(worker, args, desktop, cwd, record, *, timeout_seconds=180):
+def run_worker(worker, args, desktop, cwd, record, *, timeout_seconds=180, environment_block=None):
     if (c.sizeof(Startup), c.sizeof(Process), c.sizeof(ExtendedLimits)) != (104, 24, 144):
         raise RuntimeError("Expected the native Windows x64 or ARM64 structure layout")
     if not 1 <= timeout_seconds <= 900:
@@ -54,8 +54,11 @@ def run_worker(worker, args, desktop, cwd, record, *, timeout_seconds=180):
         start = Startup()
         start.size, start.desktop = c.sizeof(start), "WinSta0\\" + desktop
         cmdline = c.create_unicode_buffer(subprocess.list2cmdline([sys.executable, "-B", str(worker), *map(str, args)]))
+        flags = subprocess.CREATE_NO_WINDOW | 4
+        if environment_block is not None:
+            flags |= 0x400  # CREATE_UNICODE_ENVIRONMENT
         check(create(sys.executable, cmdline, None, None, False,
-                     subprocess.CREATE_NO_WINDOW | 4, None, str(cwd), c.byref(start), c.byref(process)),
+                     flags, environment_block, str(cwd), c.byref(start), c.byref(process)),
               "CreateProcessW(CREATE_SUSPENDED)")
         record["workerPid"] = process.pid
         check(assign(job, process.process), "AssignProcessToJobObject")

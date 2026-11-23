@@ -84,8 +84,22 @@ class NamedProcessTests(unittest.TestCase):
         output._obj.value = self.status
         return True
 
-    def start(self, desktop="Default", arguments=(), primary=True):
-        return subject.start(IMAGE, arguments, cwd=CWD, env=self.env, stream=self.log, desktop=desktop, primary=primary)
+    def start(self, desktop="Default", arguments=(), primary=True, **options):
+        return subject.start(IMAGE, arguments, cwd=CWD, env=self.env, stream=self.log, desktop=desktop,
+                             primary=primary, **options)
+
+    def test_gesture_launch_requires_the_separate_input_mode_and_same_profile_token(self):
+        named = "IfwQa_" + TOKEN
+        for name, enabled in ((named, False), ("Default", True), ("IfwQa_" + "c" * 32, True)):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.start(name, primary=False, named_input=enabled)
+        self.api.create.assert_not_called()
+        before = Mock(side_effect=lambda: self.api.create.assert_not_called())
+        proc = self.start(named, primary=False, named_input=True, before_create=before)
+        self.addCleanup(proc.close)
+        before.assert_called_once_with()
+        self.assertEqual(self.command, f'"{IMAGE}"')
+        self.assertEqual(self.desktop, "WinSta0\\" + named)
 
     def test_private_named_primary_has_only_its_input_and_log_and_retains_original_thread(self):
         name = "IfwQa_Launcher_" + TOKEN

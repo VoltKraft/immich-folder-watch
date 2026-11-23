@@ -271,8 +271,8 @@ class RetainedWindow:
         row.update(status="inconclusive", reason="The SHOW and activation could not be ordered within the Windows timer tick")
         return False
 
-    def focus(self, record):
-        if self.name != "Default":
+    def focus(self, record, *, named_input=False):
+        if self.name != "Default" and not named_input:
             record.update(applicable=False, reason="Private non-input desktop")
             return
         end = time.monotonic() + 2

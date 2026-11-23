@@ -418,3 +418,37 @@ host the native launcher and tray logs matched the archived receipts and
 34 source files matched the Git revision. The combined readback SHA-256 is
 `1ec9fd1fa5f2bba87b45b983bdc8ff2ca110202e1cf66d312654a418f148bb1f`.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854302616) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854152253).
+
+## Second launch from a foreground test window
+
+The ordinary launcher trial starts the secondary process directly from
+its observer. The keyboard trial exercises a different condition in the
+Windows foreground rules. A process started by the foreground process
+can be eligible to request foreground access. Windows decides whether
+the reopened primary actually receives it.
+[Microsoft's foreground-window rules](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow).
+
+On a disposable native Windows runner, the supervisor creates a temporary
+input desktop and checks the retained GUI against the build used in the
+ordinary launch. After the original GUI hides, the fixture shows its own
+launch window. It checks the input desktop, the window owner, foreground,
+keyboard focus and center hit before sending one tagged F24 keystroke.
+The fixture's native message loop receives the tagged key-up and starts
+the same GUI without arguments. The observation
+records the parent and child process identities, the primary's foreground
+request, the original window and worker, and the actual foreground and
+keyboard focus after reopening. The supervisor restores the runner's
+original desktop. Explorer icon activation has its own trial.
+
+From the native build environment, after the ordinary retained launcher,
+run the following command. The original logs and result are in
+`artifacts/rust/windows-launcher-input/<target>/` in the final desktop
+archive. The recorded status distinguishes observed focus, a failed
+handoff, and an unavailable input desktop or test window.
+
+```powershell
+python -B tools/rust-qa/windows-launcher/input_launch.py $env:NATIVE_TARGET
+```
+
+[Keyboard trial](../../tools/rust-qa/windows-launcher/input_launch.py)
+· [Native input and handler](../../tools/rust-qa/windows-launcher/input_gesture.py).

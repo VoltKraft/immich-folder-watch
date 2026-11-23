@@ -165,13 +165,14 @@ class Child:
         setattr(self.info, field, None)
 
 
-def start(exe, arguments, *, cwd, env, stream, desktop, primary):
+def start(exe, arguments, *, cwd, env, stream, desktop, primary, named_input=False, before_create=None):
     """Return a suspended child. The caller must check its image and job before resume and close it after use."""
     import msvcrt
 
     token = env.get("IFW_QA_INVENTORY_TOKEN", "")
+    allowed = ("IfwQa_" + token,) if named_input else ("Default", "IfwQa_Launcher_" + token, "IfwQa_Tray_" + token)
     if (not re.fullmatch("[0-9a-f]{32}", token) or env.get("IFW_QA_ISOLATED") != "1"
-            or desktop not in ("Default", "IfwQa_Launcher_" + token, "IfwQa_Tray_" + token)):
+            or desktop not in allowed):
         raise ValueError("Expected the verified fixture desktop and its original profile")
     if not PureWindowsPath(exe).is_absolute() or not PureWindowsPath(cwd).is_absolute():
         raise ValueError("The staged executable and working directory must have absolute paths")
@@ -211,6 +212,8 @@ def start(exe, arguments, *, cwd, env, stream, desktop, primary):
             flags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT
             flags |= CREATE_NO_WINDOW if primary else DETACHED_PROCESS
             original = Process()
+            if before_create is not None:
+                before_create()
             check(api.create(args[0], cmdline, None, None, True, flags, block, os.fspath(cwd),
                              c.byref(info), c.byref(original)), "CreateProcessW(owned desktop)")
             child.info = original

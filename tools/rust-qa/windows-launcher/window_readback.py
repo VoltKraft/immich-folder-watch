@@ -46,13 +46,14 @@ def visible_surface(desk, desktop_name, pid, hwnd, result, stage, *, monitor_are
     window.update(minimized=bool(desk.iconic(hwnd)), cloakHresult=hr,
                   cloaked=cloaked.value if hr == 0 else None)
     result[stage] = window
-    if desktop_name == "Default" and window["cloaked"] != 0:
+    input_desktop = desktop_name == "Default" or (private is not None and private.named_input is True)
+    if input_desktop and window["cloaked"] != 0:
         raise unavailable("DWM did not confirm an uncloaked GUI window on the input desktop")
     rect = window["rect"]
     if (not desk.visible(hwnd) or window["minimized"]
             or not isinstance(rect, list) or rect[0] >= rect[2] or rect[1] >= rect[3]):
         raise ValueError("The native launcher window did not have a visible, non-minimized surface")
-    if desktop_name == "Default":
+    if input_desktop:
         work = window["monitorWorkArea"] = monitor_area(hwnd)
         if work is None:
             raise ValueError("The activated GUI window did not intersect a real monitor")
@@ -97,14 +98,17 @@ def window_identity(desk, windows, hwnd, expected_pid):
 class PrivateMembership:
     """Prove top-level HWND membership on the held private HDESK, bracketed by identity checks."""
 
-    def __init__(self, desk, windows, name, desktop, witness, proc, initial_tid, creation, api, title, record):
+    def __init__(self, desk, windows, name, desktop, witness, proc, initial_tid, creation, api, title, record,
+                 *, named_input=False):
+        pattern = r"IfwQa_[0-9a-f]{32}" if named_input else r"IfwQa_(?:Launcher|Tray)_[0-9a-f]{32}"
         if (not desktop or not witness or windows.desktop != desktop or windows.pid != proc.pid
-                or not initial_tid or not creation or not re.fullmatch(r"IfwQa_(?:Launcher|Tray)_[0-9a-f]{32}", name)):
+                or not initial_tid or not creation or not re.fullmatch(pattern, name)):
             raise ValueError("Expected the owned named private desktop, witness and retained primary")
         self.desk, self.windows, self.name, self.desktop = desk, windows, name, desktop
         self.witness, self.observer_tid = witness, desk.thread()
         self.proc, self.initial_tid, self.creation, self.api = proc, initial_tid, creation, api
         self.title, self.record = title, record
+        self.named_input = named_input
 
     def process(self):
         return dict(pid=self.proc.pid, creation100ns=self.api.process_identity(int(self.proc._handle)),
@@ -114,7 +118,7 @@ class PrivateMembership:
         desk, windows = self.desk, self.windows
         row = self.record[stage] = dict(desktopHandle=self.desktop, desktop=desk.name(self.desktop),
                                         receivesInput=desk.receiving_input(self.desktop), qualified=False)
-        if (row["desktop"] != self.name or row["receivesInput"] is not False or not hwnd or hwnd == self.witness
+        if (row["desktop"] != self.name or row["receivesInput"] is not self.named_input or not hwnd or hwnd == self.witness
                 or desk.thread() != self.observer_tid):
             raise ValueError("The private desktop, its witness or its observer thread changed")
         expected_process = dict(pid=windows.pid, creation100ns=self.creation, exit=None)
@@ -145,15 +149,16 @@ class PrivateMembership:
         row["after"] = identities()
         row["afterProcess"] = self.process()
         row["desktopAfter"] = dict(name=desk.name(self.desktop), receivesInput=desk.receiving_input(self.desktop))
-        if row["desktopAfter"]["name"] != self.name or row["desktopAfter"]["receivesInput"] is not False:
+        if row["desktopAfter"]["name"] != self.name or row["desktopAfter"]["receivesInput"] is not self.named_input:
             raise ValueError("The selected desktop changed while checking private HWND membership")
         if row["afterProcess"] != expected_process:
             raise ValueError("The retained primary changed during private desktop enumeration")
         if counts != dict(witness=1, target=1):
             raise ValueError("The owned private desktop did not enumerate the unique witness and primary HWND")
+        witness_title = "IFW native test enumeration" if self.named_input else self.name
         for phase in (row["before"], row["after"]):
             for key, pid, thread, caption, window_class, shown in (
-                    ("witness", os.getpid(), self.observer_tid, self.name, "static", False),
+                    ("witness", os.getpid(), self.observer_tid, witness_title, "static", False),
                     ("target", windows.pid, target_tid, title, kind, visible)):
                 obj = phase[key]
                 actual_class = obj.get("windowClass", "")

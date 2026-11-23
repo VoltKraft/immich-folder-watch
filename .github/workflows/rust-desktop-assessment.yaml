@@ -708,6 +708,18 @@ jobs:
           python3 -B -m unittest discover -s tools/rust-qa/appearance -p 'test_windows*.py'
           python3 -B tools/rust-qa/appearance/windows.py "$NATIVE_TARGET"
 
+      - name: Open the retained Windows app from a foreground test window using keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.warm.outcome == 'success' && hashFiles(format('artifacts/rust/windows-launcher-retained/{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-launcher -p 'test_input*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-launcher/input_launch.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
       - name: Record the reviewed components of the native development build
         id: components
         if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
@@ -788,6 +800,7 @@ jobs:
             artifacts/rust/windows-launcher/${{ matrix.target }}/
             artifacts/rust/windows-gui-tray/${{ matrix.target }}/
             artifacts/rust/windows-launcher-retained/${{ matrix.target }}/
+            artifacts/rust/windows-launcher-input/${{ matrix.target }}/
             artifacts/rust/windows-gui-tray-retained/${{ matrix.target }}/
             artifacts/rust/windows-reader/native-*/result.json
             artifacts/rust/windows-reader/native-*/gui/*.json

@@ -129,7 +129,8 @@ def release_handle(close, label, handle):
 
 
 @contextmanager
-def child(api, desk, name, exe, arguments, area, env, stream, primary, *, private=True, before_resume=None):
+def child(api, desk, name, exe, arguments, area, env, stream, primary, *, private=True, before_resume=None,
+          named_input=False, before_create=None):
     job = api.new_job()
     proc = None
     try:
@@ -137,12 +138,15 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary, *, privat
             desktop = check(desk.open_named(name, 0, False, 1), "OpenDesktopW(verify launcher desktop)")
             startup.callback(release_handle, desk.close, "CloseDesktop(verify launcher desktop)", desktop)
             input_expected = not private
-            if (desk.name(desk.station()) != "WinSta0" or desk.name(desktop) != name
+            expected_input_name = ("IfwQa_" + env["IFW_QA_INVENTORY_TOKEN"]) if named_input else "Default"
+            if (named_input and private or desk.name(desk.station()) != "WinSta0" or desk.name(desktop) != name
                     or desk.receiving_input(desktop) is not input_expected
                     or desk.name(desk.thread_desktop(desk.thread())) != name
-                    or (not private and (name != "Default" or not ordinary_console(desk.context(), name)))):
+                    or (not private and (name != expected_input_name or not ordinary_console(desk.context(), name)))):
                 raise ValueError("Expected the original launcher thread and desktop")
-            proc = start_named(exe, arguments, cwd=area, env=env, stream=stream, desktop=name, primary=primary)
+            launch_options = {"named_input": True, "before_create": before_create} if named_input else {}
+            proc = start_named(exe, arguments, cwd=area, env=env, stream=stream, desktop=name, primary=primary,
+                               **launch_options)
         api.assign_suspended(job, proc, exe)
         thread_id = None
         if primary:
@@ -213,26 +217,28 @@ def drain_after_failure(proc, log, result, pump):
 
 
 def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, out, label, result, *, tray=False,
-          native_tray=None, subject="canonical"):
+          native_tray=None, subject="canonical", keyboard_launcher=None):
     primary_log = out / (label + "-primary.log")
     autostart = label == "activation"
-    private = witness is not None
+    private = witness is not None and keyboard_launcher is None
     args = ["--autostart"] if autostart else []
     show_ordered = True
     result.update(stage="primary-start", primaryArguments=args, initialTrayAvailable=tray,
                   windowReadbacks={})
     with ExitStack() as stack:
         stream = stack.enter_context(primary_log.open("xb"))
-        proc, job, tid = stack.enter_context(child(api, desk, name, exe, args, trial, env, stream, True, private=private))
+        input_options = {"named_input": True} if keyboard_launcher is not None else {}
+        proc, job, tid = stack.enter_context(child(api, desk, name, exe, args, trial, env, stream, True,
+                                                  private=private, **input_options))
         result.update(primaryPid=proc.pid, primaryCreation100ns=api.process_identity(int(proc._handle)))
         windows = fixture.Windows(proc.pid, desktop)
         stack.callback(release, windows.close, "Could not remove the primary's window event hook")
         membership = None
-        if private:
+        if witness is not None:
             result["privateWindowMembership"] = {}
             membership = PrivateMembership(desk, windows, name, desktop, witness, proc, tid,
                                            result["primaryCreation100ns"], api, fixture.TITLE,
-                                           result["privateWindowMembership"])
+                                           result["privateWindowMembership"], **input_options)
         retained = None
         if subject == "retained":
             evidence = result["retainedWindow"] = {}
@@ -266,7 +272,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             row = snapshot(desk, windows, desktop, witness, tid, result["primaryCreation100ns"])
             row["recentPrimaryEvents"] = windows.events[-16:]
             result["windowReadbacks"][stage] = row
-            if private:
+            if witness is not None:
                 check_private_snapshot(row, name)
 
         def observe_at(stage, check_value, message):
@@ -326,16 +332,25 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             result["stage"] = "secondary"
             second_log = out / (label + "-secondary.log")
             resume_options = {}
+            gesture = None
+            if keyboard_launcher is not None:
+                gesture = stack.enter_context(keyboard_launcher(desk, name, result.setdefault("inputGesture", {})))
+                resume_options["before_create"] = gesture.before_create
             if retained is not None:
                 clock = bind(api.kernel, "GetTickCount64", c.c_uint64)
                 def before_resume(secondary):
+                    if gesture is not None:
+                        gesture.observe_child(api, secondary, exe)
                     if not retained.hidden(log()):
                         raise ValueError("The closed root appeared before the ordinary secondary could run")
                     result["suspendedSecondary"] = dict(pid=secondary.pid, creation100ns=api.process_identity(int(secondary._handle)),
                                                        events=len(windows.events), tick=clock())
                 resume_options["before_resume"] = before_resume
-            with second_log.open("xb") as second_stream, child(api, desk, name, exe, [], trial, env, second_stream,
-                                                               False, private=private, **resume_options) as (second, second_job, _tid):
+            with second_log.open("xb") as second_stream, ExitStack() as secondary_scope:
+                def start_secondary():
+                    return secondary_scope.enter_context(child(api, desk, name, exe, [], trial, env, second_stream,
+                                                              False, private=private, **input_options, **resume_options))
+                second, second_job, _tid = start_secondary() if gesture is None else gesture.launch(start_secondary)
                 pump_secondary = windows.pump
                 if retained is not None:
                     result["suspendedSecondary"]["resumeReturnedMs"] = clock()
@@ -344,7 +359,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                         if "afterTrigger" not in evidence and f"LAUNCHER_OPEN client={second.pid}\n" in log().splitlines(keepends=True):
                             retained.sample_after_trigger("secondaryShow", dict(secondaryPid=second.pid), clock)
                 result.update(secondaryArguments=[], secondaryPid=second.pid,
-                              secondaryLaunch=dict(api="CreateProcessW", source="observer", callerPid=os.getpid()),
+                              secondaryLaunch=dict(api="CreateProcessW", callerPid=os.getpid(),
+                                                   source="observer" if gesture is None else "foreground-key-handler"),
                               secondaryCreation100ns=api.process_identity(int(second._handle)))
                 result["secondaryExit"] = wait_for_exit(second, pump_secondary, 12)
                 result["secondaryJobEmpty"] = api.wait_job_empty(second_job, 3)
@@ -377,7 +393,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         try:
             if retained is not None and label != "restart":
                 result["keyboardFocus"] = {}
-                retained.focus(result["keyboardFocus"])
+                retained.focus(result["keyboardFocus"], **input_options)
         finally:
             # A negative keyboard observation still permits normal Quit and the independent
             # grant, HWND and job checks. The focus failure propagates with those observations.
@@ -551,8 +567,10 @@ def profile_resources(api, parent, token, result):
 
 
 @contextmanager
-def staged_profile(result, api, built_gui, inventory):
-    token = uuid.uuid4().hex
+def staged_profile(result, api, built_gui, inventory, *, token=None):
+    token = uuid.uuid4().hex if token is None else token
+    if not re.fullmatch(r"[0-9a-f]{32}", token):
+        raise ValueError("Expected a synthetic launcher profile token")
     result["profile"] = token
     with profile_resources(api, Path(os.environ["RUNNER_TEMP"]), token, result) as (root, stack):
         pin_new_marker(stack, api, root / "inventory.owner", token)

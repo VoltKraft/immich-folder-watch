@@ -241,6 +241,12 @@ Read the per-case results in `rust-retained-activation-<target>-<commit>`.
 The complete desktop archive includes the paired build receipts, raw Cargo
 compiler stream, reviewed eframe source and window-event evidence.
 
+The [foreground keyboard launch](rust/rw02-instance.md#second-launch-from-a-foreground-test-window)
+uses the same retained executable on a newly created input desktop. It
+starts the secondary from the test window's native key handler and records
+the focus of the original primary. Run it after the ordinary retained
+launcher and the resource measurements.
+
 The native feasibility workflow runs the Windows storage recovery trial after
 the watch tests. Its `rust-recovery-<target>-<commit>` artifact contains the
 complete evidence inventory for both path comparison modes, including VHD
