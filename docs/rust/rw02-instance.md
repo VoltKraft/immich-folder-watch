@@ -329,3 +329,25 @@ readback matched seven archived file hashes and 30 source hashes on each
 target, including the native grant, primary request and process identities.
 [Canonical x64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805400187)
 · [Canonical ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805481046).
+
+### Private launcher cleanup at 8566f81
+
+Both native launchers reopened the canonical GUI on the original Default
+desktop and retained the initial worker. Windows x64 granted foreground
+on the first sample. ARM64 kept the reopened HWND in the background in all
+40 samples over 2,005 ms. Seven archived logs and 30 source hashes per
+target matched the Git revision and recorded PIDs. The combined readback
+SHA-256 is `0cd15b0537fea9b1305aba8d2bf6a21f605277a2d17becc79dbc516eab5d850c`.
+[x64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14810329735) · [ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14810518540).
+
+The private ARM64 activation and restart drained both jobs and restored
+the original desktop. Subsequent profile cleanup received Win32 error 145
+for a nonempty directory. The receipt did not identify the remaining
+entry. Commit `579fbcc` records the first error, relative directory and
+volume/file ID. It allows up to five seconds for previously requested
+deletions to take effect and checks the identity and type of the held
+directory before each retry. A persistent entry or a changed error fails
+cleanup. The independent review and portable controls passed. The new
+native control holds a synthetic child across the first real disposition
+attempt, then releases it through the original handle.
+[Cleanup implementation](../../tools/rust-qa/windows-performance/native.py) · [Native control](../../tools/rust-qa/windows-performance/test_owned_subject.py).

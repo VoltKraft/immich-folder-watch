@@ -29,6 +29,13 @@ The native measurements still need to establish
 whether the real desktop presents the unique title and body.
 [Notification timing](rust/rw02-windows-services.md#sampling-across-the-shell-request).
 
+The original Windows launcher at `8566f81` reopened on both architectures.
+x64 obtained foreground immediately. ARM64 stayed in the background for
+40 samples over 2,005 ms. Its separate private restart drained, then profile
+cleanup received error 145. Commit `579fbcc` preserves the error and limits
+retries to the same verified directory handle. Independent review passed.
+[Native launcher results and cleanup test](rust/rw02-instance.md#private-launcher-cleanup-at-8566f81).
+
 ## Legacy YAML byte compatibility (2026-11-23)
 
 At `a7a62fa`, a clean Fedora x64 build passed all 13 offline assessment
