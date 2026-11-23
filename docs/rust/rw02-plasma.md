@@ -15,6 +15,36 @@ Quit drained the application and removed the item. The result SHA-256 is
 `c4d3ac2c06725eb072249bc3da929cb5cd287ddaf684af18bd48b9b8a85d2d50`.
 [Verified archive](rw02-native-gui.md#native-follow-up-at-a66e045).
 
+## Native Ubuntu ARM64 panel at 6af7100
+
+At `6af71006c17e4f3014f6046ccd32b2f9dd192c72`, two X11 pointer clicks on
+the branded item in the Plasma panel reopened the hidden Rust GUI on a
+native ARM64 runner. The shell's D-Bus messages 248 and 250 carried the
+observed screen coordinates (163, 878) to the application's registered
+item. Both openings mapped window `0x1a00002`. Two window-manager close
+requests hid it. Quit drained after 12 UI passes and KDED removed the item.
+[Native ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/job/137590852330) · [Original archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805991978).
+
+Independent decoding of the two 22 × 28 button images counted 303 and
+294 colors, including 277 and 259 gold pixels. The neighboring button
+had seven colors each time. The first button image matched the same region
+of the full 1280 × 900 screenshot byte for byte after RGB decoding.
+KWin, KDED, the watcher, Plasma Shell and the GUI reported AArch64 ELF
+machine 183. KDED owned the watcher. The loaded Qt Core, Qt Quick and XCB
+objects in the shell and the watcher plugin in KDED matched the actual
+ELF files extracted from the four authenticated ARM64 packages.
+
+The GUI executable SHA-256 was
+`aed7d2f2e5d9e67c5f249710e25de72090df8d0ad60433d4ad8f7ec132899b3c`.
+The archive bound its native build to 23 application inputs and seven
+observer sources. All five embedded icon frames matched the project
+artwork. The original result had SHA-256
+`f754c5637396732b2bdab1dfe38ecd36142e9d43368cc5be8c838dc941a6bf00`,
+the Actions archive `39953a567e721e356eeb54a8587848e94cfe117c6ecdc88e6e875ea366fd9015`,
+and the independent readback `24a65cb2bea2f7ad609d5d226067973f77e8f4058f7220baf2cab7d5bfced522`.
+The 21 original panel files are under `plasma/runs/plasma-yb6be126/` in
+that archive.
+
 ## The visible tray entry
 
 The original Rust GUI registered `org.example.IfwGuiProbe/StatusNotifierItem`.
@@ -110,8 +140,9 @@ The native launcher checks the ELF architecture of the Rust executable,
 Python, KWin, KDED, Plasma and the selected binary libraries. During the
 panel run the observer reads the running service executables and the
 Qt Core, Qt Quick, XCB and watcher libraries mapped in the shell and KDED.
-The original x64 blank-icon control passed this readback with two actual
-panel clicks. Native ARM64 activation still requires the hosted run.
+Both the frozen x64 blank-icon control and a fresh x64 build from
+`725f1cd` passed the new observer on an isolated local display.
+The ARM64 run above also passed on Ubuntu's own kernel.
 [Native workflow](../../.github/workflows/rust-desktop-assessment.yaml).
 
 On an Ubuntu Linux x64 or ARM64 assessment runner with Python 3.11 or newer,
