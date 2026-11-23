@@ -4,10 +4,13 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::StationsAndDesktops::*;
-use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
+use windows::Win32::System::Threading::{
+    GetCurrentProcessId, GetCurrentThreadId, GetProcessTimes, OpenProcess,
+    PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::{PCWSTR, Result, w};
+use windows::core::{Owned, PCWSTR, Result, w};
 
 use crate::{invalid, wide};
 
@@ -23,6 +26,22 @@ impl Icon<'_> {
         // LoadIconW returns a shared system icon. Do not destroy the shared handle.
         let shared = unsafe { LoadIconW(None, IDI_APPLICATION)? };
         Ok(self.register(phase, shared).0)
+    }
+}
+
+fn taskbar_creation(hwnd: HWND, pid: u32, tid: u32) -> Option<u64> {
+    unsafe {
+        let process = Owned::new(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?);
+        let mut times = [FILETIME::default(); 4];
+        let [created, exit, kernel, user] = &mut times;
+        GetProcessTimes(*process, created, exit, kernel, user).ok()?;
+        let mut owner = 0;
+        (exit.dwLowDateTime == 0
+            && exit.dwHighDateTime == 0
+            && FindWindowW(w!("Shell_TrayWnd"), None).ok() == Some(hwnd)
+            && GetWindowThreadProcessId(hwnd, Some(&mut owner)) == tid
+            && owner == pid)
+            .then_some((u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
     }
 }
 
@@ -57,6 +76,9 @@ fn host(prefix: &str) -> bool {
         if let Some(bar) = bar {
             let mut pid = 0;
             let tid = GetWindowThreadProcessId(bar, Some(&mut pid));
+            if let Some(created) = taskbar_creation(bar, pid, tid) {
+                println!("{prefix}.taskbar_creation={created}");
+            }
             let mut host_session = 0;
             if ProcessIdToSessionId(pid, &mut host_session).is_ok() {
                 println!("{prefix}.taskbar_session={host_session}");
@@ -75,6 +97,14 @@ fn host(prefix: &str) -> bool {
         }
         if let Ok(name) = activation::desktop_name(GetCurrentThreadId()) {
             println!("{prefix}.thread_desktop={name}");
+        }
+        if !shell.is_invalid() {
+            let mut pid = 0;
+            let tid = GetWindowThreadProcessId(shell, Some(&mut pid));
+            println!(
+                "{prefix}.shell_hwnd={}\n{prefix}.shell_pid={pid}\n{prefix}.shell_tid={tid}",
+                shell.0 as usize
+            );
         }
         println!(
             "{prefix}.taskbar_present={}\n{prefix}.shell_window={}",
@@ -133,8 +163,9 @@ pub(super) fn notification_only(area: &Path, id: &str) -> Result<()> {
     let mut receiver = Receiver::new()?;
     host("notice");
     println!(
-        "notice.pid={}\nnotice.owner_hwnd={}\nnotice.icon_id={ICON}",
+        "notice.pid={}\nnotice.tid={}\nnotice.owner_hwnd={}\nnotice.icon_id={ICON}",
         std::process::id(),
+        unsafe { GetCurrentThreadId() },
         receiver.hwnd.0 as usize
     );
     let mut icon = Icon {
@@ -177,6 +208,7 @@ pub(super) fn notification_only(area: &Path, id: &str) -> Result<()> {
             }
         }
         let after = EVENTS.get();
+        host("notice_after");
         println!(
             "notice.balloon_show={}\nnotice.balloon_hide={}\nnotice.balloon_timeout={}\nnotice.balloon_click={}\nnotice.taskbar_created={}",
             after.shown.saturating_sub(before.shown),

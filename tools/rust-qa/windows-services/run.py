@@ -18,7 +18,7 @@ HERE = Path(__file__).resolve().parent
 QA = HERE.parent
 ROOT = QA.parents[1]
 sys.path.insert(0, str(QA))
-from windows_observer import select_powershell
+from service_sources import service_files, verify_checkout
 
 
 def sha(path):
@@ -101,6 +101,7 @@ def read_native(file):
 
 
 def measure(exe, output, hosted, known):
+    from windows_observer import select_powershell
     token = uuid.uuid4().hex
     observations = {}
     temp_root = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir()))
@@ -216,10 +217,6 @@ def main():
               "steps": {}, "workflowRun": os.getenv("GITHUB_RUN_ID"),
               "workflowAttempt": os.getenv("GITHUB_RUN_ATTEMPT"), "runner": os.getenv("RUNNER_NAME"),
               "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
-    files = list(HERE.glob("*")) + list((HERE / "src").glob("*.rs")) + [QA / "audit-graph.py",
-             QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "windows_observer.py", ROOT / "rust/toolchain-inputs.json"]
-    files.extend(QA / "gui/src" / name for name in ("tray-icon.argb", "windows_tray_shell.rs"))
-    result["sourceFiles"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(files) if p.is_file()}
 
     def step(name, cmd):
         result["steps"][name] = "started"
@@ -229,6 +226,15 @@ def main():
         finished.check_returncode()
 
     try:
+        files = service_files()
+        result["checkoutVerified"] = False
+        if hosted:
+            if result["head"] != os.environ["GITHUB_SHA"]:
+                raise ValueError("The native service checkout differs from this hosted job")
+            result["sourceFiles"] = verify_checkout(ROOT, files, result["head"], HERE)
+            result["checkoutVerified"] = True
+        else:
+            result["sourceFiles"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(files)}
         if result["locked"] != inputs["lockSha256"]:
             raise ValueError("Unreviewed Windows lockfile")
         if sha(QA / "gui/src/tray-icon.argb") != inputs["trayArgbSha256"]:
@@ -237,6 +243,8 @@ def main():
         step("recovery", [sys.executable, "-m", "unittest", "test_recovery", "test_activation", "test_notification"])
         step("tray-cleanup", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                               "-File", HERE / "test_tray_state.ps1"])
+        step("notification-points", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                     "-File", HERE / "test_notification_points.ps1"])
         if not args.offline:
             step("fetch", ["cargo", "fetch", "--locked"])
         step("inventory", [sys.executable, QA / "audit-graph.py", HERE / "Cargo.toml", args.target, output / "graph.json",
@@ -250,6 +258,11 @@ def main():
         step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
         step("balloon-id", ["cargo", "test", "--frozen", "balloon_callbacks_belong_to_the_registered_v4_icon"])
         step("build", ["cargo", "build", "--frozen", "--release"])
+        if hosted:
+            result["checkoutVerified"] = False
+            if verify_checkout(ROOT, service_files(), result["head"], HERE) != result["sourceFiles"]:
+                raise ValueError("The first-party fixture sources changed during the native build")
+            result["checkoutVerified"] = True
         exe = build / "release/ifw-windows-services-probe.exe"
         result["probeSha256"] = sha(exe)
         tick = ctypes.WinDLL("kernel32").GetTickCount64

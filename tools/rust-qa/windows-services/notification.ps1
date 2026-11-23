@@ -75,7 +75,8 @@ public static class IfwNoticeDesktop {
         Path.Combine(windows,"explorer.exe"), Path.Combine(windows,@"System32\ShellHost.exe"),
         Path.Combine(windows,@"SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe"),
         Path.Combine(windows,@"SystemApps\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe"),
-        Path.Combine(windows,@"SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\ShellHost.exe")
+        Path.Combine(windows,@"SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\ShellHost.exe"),
+        Path.Combine(windows,@"SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe")
     };
     static void Close(IntPtr h) { if (!CloseHandle(h)) throw new Win32Exception(Marshal.GetLastWin32Error()); }
     static Root Describe(IntPtr hwnd) {
@@ -122,41 +123,73 @@ public static class IfwNoticeDesktop {
         }
         return result.ToArray();
     }
-    public static bool Covers(Root root, int x, int y) {
-        if (!Active()) return false;
+    public sealed class NativeHit { public long hwnd, root, monitor; public uint pid, tid; }
+    public static NativeHit Hit(Root root, int x, int y) {
+        if (!Active()) return null;
         var hwnd = new IntPtr(root.hwnd);
         var now = Describe(hwnd);
         var point = new Point{X=x,Y=y};
         var hit = WindowFromPoint(point); uint pid;
-        return now != null && now.pid == root.pid && now.creation == root.creation && now.image == root.image &&
-               MonitorFromPoint(point,0) != IntPtr.Zero && GetWindowThreadProcessId(hit,out pid) != 0 &&
-               pid == root.pid && GetAncestor(hit,2) == hwnd;
+        var monitor = MonitorFromPoint(point,0);
+        var tid = GetWindowThreadProcessId(hit,out pid);
+        var ancestor = GetAncestor(hit,2);
+        if (now == null || now.pid != root.pid || now.creation != root.creation || now.image != root.image ||
+            monitor == IntPtr.Zero || tid == 0 || !OnDefault(GetThreadDesktop(tid)) || pid != root.pid || ancestor != hwnd) return null;
+        return new NativeHit{hwnd=hit.ToInt64(),root=ancestor.ToInt64(),monitor=monitor.ToInt64(),pid=pid,tid=tid};
+    }
+
+    // Work in integer desktop pixels with half-open bounds, including negative monitor origins.
+    public static int[] LabelPoint(double[] own, double[] other) {
+        var r = new int[4]; var s = new int[4];
+        for (int i=0;i<4;i++) {
+            if (Double.IsNaN(own[i]) || Double.IsInfinity(own[i]) || Math.Abs(own[i]) > 10000000 ||
+                Double.IsNaN(other[i]) || Double.IsInfinity(other[i]) || Math.Abs(other[i]) > 10000000) return null;
+            r[i]=(int)Math.Ceiling(own[i]); s[i]=(int)Math.Ceiling(other[i]);
+        }
+        if (r[2] <= r[0] || r[3] <= r[1]) return null;
+        var tiles = new int[][] {
+            new int[]{r[0],r[1],Math.Min(r[2],s[0]),r[3]}, new int[]{Math.Max(r[0],s[2]),r[1],r[2],r[3]},
+            new int[]{r[0],r[1],r[2],Math.Min(r[3],s[1])}, new int[]{r[0],Math.Max(r[1],s[3]),r[2],r[3]}
+        };
+        long best=0; int[] chosen=r;
+        foreach (var tile in tiles) {
+            int width=tile[2]-tile[0], height=tile[3]-tile[1];
+            if (width>0 && height>0 && (long)width*height>best) {best=(long)width*height; chosen=tile;}
+        }
+        return new int[]{chosen[0]+(chosen[2]-chosen[0])/2,chosen[1]+(chosen[3]-chosen[1])/2};
     }
 }
 '@
 
-function Read-Label($Node, $Root, [string]$Expected, $Container, [bool]$AllowParentHit) {
+function Read-Label($Node, $Root, [string]$Expected, $Container, [bool]$AllowParentHit, $Bounds, $Point) {
     $c = $Node.Current
     $r = $c.BoundingRectangle
-    if ($c.ProcessId -ne $Root.pid -or $c.IsOffscreen -or $c.Name -cne $Expected -or $r.IsEmpty -or
-        $r.Width -lt 1 -or $r.Height -lt 1) { return }
-    $x = [Math]::Floor($r.Left + $r.Width / 2)
-    $y = [Math]::Floor($r.Top + $r.Height / 2)
-    if (-not [IfwNoticeDesktop]::Covers($Root,$x,$y)) { return }
-    $hit = [Windows.Automation.AutomationElement]::FromPoint([Windows.Point]::new($x,$y))
-    # Text often delegates hit testing to its immediate container. Require the actual
-    # label or that exact shared container, never another notification in the same flyout.
-    $buttonHit = $AllowParentHit -and $null -ne $hit -and [Windows.Automation.Automation]::Compare($hit,$Container) -and
-        [Windows.Automation.Automation]::Compare([Windows.Automation.TreeWalker]::RawViewWalker.GetParent($Node),$Container)
-    for ($depth = 0; -not $buttonHit -and $null -ne $hit -and $depth -lt 8; $depth++) {
+    if ($c.ProcessId -ne $Root.pid -or $c.IsOffscreen -or $c.Name -cne $Expected -or $r.IsEmpty -or -not $r.Equals($Bounds)) { return }
+    $nativeHit = [IfwNoticeDesktop]::Hit($Root,$Point[0],$Point[1])
+    if ($null -eq $nativeHit) { return }
+    $hit = [Windows.Automation.AutomationElement]::FromPoint([Windows.Point]::new($Point[0],$Point[1]))
+    $walker = [Windows.Automation.TreeWalker]::RawViewWalker
+    $directParent = $walker.GetParent($Node)
+    if ($null -eq $directParent -or $directParent.Current.ProcessId -ne $Root.pid) { return }
+    $parentId = $directParent.GetRuntimeId() -join ','
+    $path = @(); $kind = $null
+    for ($depth=0; $null -ne $hit -and $depth -lt 8; $depth++) {
         if ($hit.Current.ProcessId -ne $Root.pid) { return }
-        if ([Windows.Automation.Automation]::Compare($hit,$Node)) { $buttonHit = $true; break }
-        if ([Windows.Automation.Automation]::Compare($hit,$Container)) { break }
-        $hit = [Windows.Automation.TreeWalker]::RawViewWalker.GetParent($hit)
+        $path += ($hit.GetRuntimeId() -join ',')
+        if ([Windows.Automation.Automation]::Compare($hit,$Node)) {
+            $kind = if ($depth -eq 0) { 'label' } else { 'descendant' }
+            break
+        }
+        if ([Windows.Automation.Automation]::Compare($hit,$Container)) {
+            if ($depth -eq 0 -and $AllowParentHit -and [Windows.Automation.Automation]::Compare($directParent,$Container)) { $kind='sharedParent' }
+            break
+        }
+        $hit = $walker.GetParent($hit)
     }
-    if ($buttonHit) {
-        return @{text=$Expected; pid=$c.ProcessId; bounds=@($r.Left,$r.Top,$r.Right,$r.Bottom); point=@($x,$y)
-                 offscreen=$c.IsOffscreen; nativeHit=$true; providerHit=$true; runtimeId=($Node.GetRuntimeId() -join ',')}
+    if ($null -ne $kind) {
+        return @{text=$Expected; pid=$c.ProcessId; bounds=@($r.Left,$r.Top,$r.Right,$r.Bottom); point=$Point
+                 offscreen=$c.IsOffscreen; runtimeId=($Node.GetRuntimeId() -join ','); directParent=$parentId
+                 nativeHit=$nativeHit; providerHit=@{kind=$kind; runtimePath=$path; pid=$Root.pid}}
     }
 }
 
@@ -177,13 +210,23 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
         for ($i = 0; $null -ne $parent -and $i -lt 5; $i++) {
             if ($parent.Current.ProcessId -ne $HostWindow.pid) { break }
             if ([Windows.Automation.Automation]::Compare($parent,$container)) {
-                $allowParentHit = -not [Windows.Automation.Automation]::Compare($uia,$container)
-                $a = Read-Label $titleNode $HostWindow $title $container $allowParentHit
-                $b = Read-Label $bodyNode $HostWindow $body $container $allowParentHit
-                if ($null -ne $a -and $null -ne $b -and [IfwNoticeDesktop]::Covers($HostWindow,$a.point[0],$a.point[1]) -and
-                    [IfwNoticeDesktop]::Covers($HostWindow,$b.point[0],$b.point[1])) {
+                $titleBounds = $titleNode.Current.BoundingRectangle; $bodyBounds = $bodyNode.Current.BoundingRectangle
+                if ($titleBounds.IsEmpty -or $bodyBounds.IsEmpty) { return }
+                $ta = @($titleBounds.Left,$titleBounds.Top,$titleBounds.Right,$titleBounds.Bottom)
+                $ba = @($bodyBounds.Left,$bodyBounds.Top,$bodyBounds.Right,$bodyBounds.Bottom)
+                $tp = [IfwNoticeDesktop]::LabelPoint($ta,$ba); $bp = [IfwNoticeDesktop]::LabelPoint($ba,$ta)
+                if ($null -eq $tp -or $null -eq $bp -or ($tp[0] -eq $bp[0] -and $tp[1] -eq $bp[1])) { return }
+                $allowParentHit = $level -eq 0 -and $i -eq 0 -and -not [Windows.Automation.Automation]::Compare($uia,$container) -and
+                    -not ($tp[0] -ge $ba[0] -and $tp[0] -lt $ba[2] -and $tp[1] -ge $ba[1] -and $tp[1] -lt $ba[3]) -and
+                    -not ($bp[0] -ge $ta[0] -and $bp[0] -lt $ta[2] -and $bp[1] -ge $ta[1] -and $bp[1] -lt $ta[3])
+                $a = Read-Label $titleNode $HostWindow $title $container $allowParentHit $titleBounds $tp
+                $b = Read-Label $bodyNode $HostWindow $body $container $allowParentHit $bodyBounds $bp
+                if ($null -ne $a -and $null -ne $b -and $titleNode.Current.BoundingRectangle.Equals($titleBounds) -and
+                    $bodyNode.Current.BoundingRectangle.Equals($bodyBounds)) {
+                    $lastA = [IfwNoticeDesktop]::Hit($HostWindow,$tp[0],$tp[1]); $lastB = [IfwNoticeDesktop]::Hit($HostWindow,$bp[0],$bp[1])
+                    if ($null -eq $lastA -or $null -eq $lastB -or $lastA.hwnd -ne $a.nativeHit.hwnd -or $lastB.hwnd -ne $b.nativeHit.hwnd) { return }
                     return @{title=$a; body=$b; host=$HostWindow; container=($container.GetRuntimeId() -join ',')
-                             tick=[IfwNoticeDesktop]::GetTickCount64(); desktop='Default'}
+                             rootId=($uia.GetRuntimeId() -join ','); tick=[IfwNoticeDesktop]::GetTickCount64(); desktop='Default'}
                 }
                 return
             }
