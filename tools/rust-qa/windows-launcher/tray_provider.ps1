@@ -348,7 +348,8 @@ function Get-ChevronHintReadback($Guard,$Surface,$KnownNames) {
         if (-not $bound) { return @{status='unbound-uia-hit'} }
         # Exact predicates disclose only these public system labels, including the Windows settings term.
         $terms = @($KnownNames) + 'Hidden icon menu'
-        $items = @(foreach ($element in $path) {
+        $items = @()
+        foreach ($element in $path) {
             $current = $element.Current
             if ($current.ProcessId -ne $script:ShellPid) { return @{status='changed-uia-hit'} }
             $item = @{type=$current.ControlType.Id; enabled=$current.IsEnabled; offscreen=$current.IsOffscreen
@@ -365,8 +366,8 @@ function Get-ChevronHintReadback($Guard,$Surface,$KnownNames) {
                     if ($null -ne $element.FindFirst([Windows.Automation.TreeScope]::Element,$filter)) { $item[$field]=$term; break }
                 }
             }
-            $item
-        })
+            $items += $item
+        }
         if ($Guard.ButtonHit($point.X,$point.Y) -ne $Surface.hit -or
             -not [Windows.Automation.Automation]::Compare($hit,[Windows.Automation.AutomationElement]::FromPoint($point))) {
             return @{status='changed-hit'}

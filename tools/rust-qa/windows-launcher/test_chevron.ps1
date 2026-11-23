@@ -49,7 +49,14 @@ namespace IfwChevronTest {
         }
         public void Invoke() { Actions++; } public void Toggle() { Actions++; } public void Expand() { Actions++; }
     }
-    public static class Automation { public static bool Compare(object a,object b) { return Object.ReferenceEquals(a,b); } }
+    public static class Automation {
+        public static bool ReplaceAfterBinding;
+        public static bool Compare(object a,object b) {
+            bool same=Object.ReferenceEquals(a,b);
+            if (same && ReplaceAfterBinding && Object.ReferenceEquals(a,AutomationElement.Root)) AutomationElement.Hit.Current.ProcessId=17;
+            return same;
+        }
+    }
     public sealed class TreeWalker {
         public static readonly TreeWalker RawViewWalker=new TreeWalker();
         public AutomationElement GetParent(AutomationElement e) { return e.Parent; }
@@ -126,15 +133,17 @@ if ($snapshot.status -cne 'bound-taskbar-point' -or $snapshot.elements.Count -ne
     $snapshot.elements[1].Name -cne 'Hidden icon menu' -or $snapshot.elements[1].HelpText -cne 'Show hidden icons' -or
     -not $snapshot.elements[1].invoke -or $snapshot.elements[1].toggle -or -not $snapshot.elements[1].containsPoint -or
     $json -match 'Private' -or $button.Actions -ne 1) { throw 'The read-only observations lost their scope or disclosed unrelated text' }
-foreach ($case in @('other-root','foreign-uia','changed-native')) {
+foreach ($case in @('other-root','foreign-uia','changed-uia','changed-native')) {
     $script:reads=0; $script:changed=($case -eq 'changed-native'); $leaf.Parent=$button
     $leaf.Current.ProcessId=if ($case -eq 'foreign-uia') { 17 } else { 81 }
+    [IfwChevronTest.Automation]::ReplaceAfterBinding=($case -eq 'changed-uia')
     if ($case -eq 'other-root') { $leaf.Parent=$null }
     $previous=$leaf.CapabilityReads
     $snapshot=Get-ChevronHintReadback $guard $surface @('Show hidden icons')
-    if ($snapshot.elements -or $snapshot.status -eq 'bound-taskbar-point' -or
+    $expected=if ($case -eq 'changed-uia') { 'changed-uia-hit' } elseif ($case -eq 'changed-native') { 'changed-hit' } else { 'unbound-uia-hit' }
+    if ($snapshot.elements -or $snapshot.status -cne $expected -or
         ($case -ne 'changed-native' -and $leaf.CapabilityReads -ne $previous) -or $button.Actions -ne 1) {
         throw "Reported unbound system control capabilities for $case"
     }
 }
-Write-Output 'Fourteen selection controls and four passive taskbar hit controls passed.'
+Write-Output 'Fourteen selection controls and five passive taskbar hit controls passed.'
