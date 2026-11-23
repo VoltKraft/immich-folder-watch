@@ -3,6 +3,7 @@ param(
     [switch]$VerifyCleanup
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'scheduler_cleanup.ps1')
 if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:GITHUB_ACTIONS -cne 'true' -or
     $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') {
     throw 'This fixture requires the disposable Windows rewrite job.'
@@ -120,14 +121,7 @@ try {
                 if ($null -eq $registeredXml -or $current.Xml -cne $registeredXml -or $current.Name -cne $taskName) {
                     Assert-Definition $current
                 }
-                $instances = $current.GetInstances(0)
-                for ($index = $instances.Count; $index -gt 0; $index--) {
-                    $ownInstance = $instances.Item($index)
-                    if ($null -ne $running -and $ownInstance.InstanceGuid -ne $running.InstanceGuid) {
-                        throw 'An unexpected instance appeared under the private task name.'
-                    }
-                    $ownInstance.Stop()
-                }
+                $report.instanceExitedDuringStop = Stop-IfwOwnedTaskInstances $current $running
                 $deadline = [DateTime]::UtcNow.AddSeconds(10)
                 while ($current.GetInstances(0).Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {
                     Start-Sleep -Milliseconds 100

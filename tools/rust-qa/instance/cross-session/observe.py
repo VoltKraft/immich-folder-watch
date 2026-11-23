@@ -266,7 +266,7 @@ def main():
     runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     metadata = {"source": os.environ["GITHUB_SHA"], "run": os.environ["GITHUB_RUN_ID"], "target": args.target,
                 "sources": {p.relative_to(ROOT).as_posix(): instance.sha(p)
-                            for p in sorted([*HERE.glob("*.py"), HERE / "scheduler.ps1"])}}
+                            for p in sorted([*HERE.glob("*.py"), *HERE.glob("*.ps1")])}}
     ambient, standard = {}, {}
     build = None
     try:

@@ -136,6 +136,21 @@ Seventeen local tests passed, including an actual two-session POSIX rehearsal us
 python3 -B -m unittest discover -s tools/rust-qa/instance/cross-session -p 'test_*.py'
 ```
 
+## Task cleanup after a normal instance exit
+
+During x64 cleanup at `93ecc35` the Scheduler returned
+`SCHED_E_TASK_NOT_RUNNING` (`0x8004130B`). The archived exception identifies
+the cleanup block. The separate verification pass found the owned
+registration, removed it and verified that it was gone. The first pass now
+handles an enumerated member exiting before its identity or stop is read. A fresh enumeration must
+find zero running instances. A different instance, a different HRESULT
+or a still-running instance fails the check. Registration ownership,
+the bounded wait and final removal readback are checked separately.
+Six portable PowerShell controls cover ordinary stop, disappearance
+during enumeration or stop, surviving members, access denial and a
+different instance. [Task Scheduler error codes](https://learn.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-error-and-success-constants)
+· [Regression controls](../../tools/rust-qa/instance/cross-session/test_scheduler_cleanup.ps1).
+
 ## Hosted private-console and lock results at 93ecc35
 
 Both native Windows hosts passed the elevated writer handover at
