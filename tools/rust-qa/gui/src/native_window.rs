@@ -20,6 +20,31 @@ struct Handler<'a> {
 }
 
 impl<'a> Handler<'a> {
+    #[cfg(windows)]
+    fn focus_if_requested(&self, event_loop: &ActiveEventLoop) {
+        if event_loop.exiting() || self.model.borrow().graphics.lost() {
+            return;
+        }
+        // eframe shows a newly created root after its first render. Take the request
+        // only once that HWND is visible, and release the model before calling User32.
+        let window = {
+            let mut model = self.model.borrow_mut();
+            let Model {
+                foreground,
+                root_window,
+                ..
+            } = &mut *model;
+            foreground.take_visible(|| {
+                root_window
+                    .upgrade()
+                    .filter(|w| w.is_visible() == Some(true))
+            })
+        };
+        if let Some(window) = window {
+            native_gui_assessment::focus_owned_window(&window);
+        }
+    }
+
     fn dispatch(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -46,7 +71,11 @@ impl<'a> Handler<'a> {
             } else {
                 resume_unwind(panic);
             }
+            #[cfg(windows)]
+            return;
         }
+        #[cfg(windows)]
+        self.focus_if_requested(event_loop);
     }
     fn x11_root(&self) -> Option<Arc<Window>> {
         self.control
@@ -69,6 +98,7 @@ impl<'a> Handler<'a> {
             match model.command(command) {
                 Some(HostCommand::ShowAndFocus) => {
                     window.set_visible(true);
+                    #[cfg(not(windows))]
                     window.focus_window();
                 }
                 Some(HostCommand::Hide) => Self::hide(window),
@@ -107,7 +137,9 @@ impl ApplicationHandler<eframe::UserEvent> for Handler<'_> {
         if let Some(window) = self.x11_root().filter(|window| window.id() == id) {
             match event {
                 WindowEvent::CloseRequested => {
-                    if self.model.borrow_mut().lifecycle.close_window() == Some(HostCommand::Hide) {
+                    if self.model.borrow_mut().command(super::Command::Close)
+                        == Some(HostCommand::Hide)
+                    {
                         Self::hide(&window);
                         return;
                     }

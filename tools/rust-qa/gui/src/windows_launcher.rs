@@ -11,9 +11,47 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::TrySendError;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
+use windows::Win32::Foundation::{FILETIME, HANDLE, WAIT_TIMEOUT};
+use windows::Win32::System::Threading::{
+    GetCurrentProcess, GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    PROCESS_SYNCHRONIZE, WaitForSingleObject,
+};
+use windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow;
+use windows::core::Owned;
 
 const SHOW: &[u8] = b"SHOW_GUI";
 const TIMEOUT: Duration = Duration::from_secs(2);
+
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn GetThreadDesktop(tid: u32) -> RawHandle;
+    fn GetUserObjectInformationW(
+        object: RawHandle,
+        index: i32,
+        value: *mut c_void,
+        bytes: u32,
+        used: *mut u32,
+    ) -> i32;
+}
+
+fn on_input_desktop() -> bool {
+    const UOI_IO: i32 = 6;
+    let mut active = 0i32;
+    let mut used = 0;
+    // The current thread lends its desktop. UOI_IO reports whether it accepts user input.
+    unsafe {
+        let desktop = GetThreadDesktop(super::GetCurrentThreadId());
+        !desktop.is_null()
+            && GetUserObjectInformationW(
+                desktop,
+                UOI_IO,
+                (&raw mut active).cast(),
+                size_of_val(&active) as u32,
+                &mut used,
+            ) != 0
+            && active != 0
+    }
+}
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
@@ -103,6 +141,44 @@ fn read_bounded(file: &File, limit: usize) -> io::Result<String> {
         return Err(io::ErrorKind::InvalidData.into());
     }
     Ok(text)
+}
+
+fn creation_time(process: HANDLE) -> Option<u64> {
+    let mut times = [FILETIME::default(); 4];
+    let [created, exit, kernel, user] = &mut times;
+    // Both callers retain the process handle throughout this query.
+    unsafe { GetProcessTimes(process, created, exit, kernel, user) }.ok()?;
+    Some((u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
+}
+
+fn offer_foreground(connection: &File, expected: u32, created: Option<u64>) -> io::Result<String> {
+    if local::peer_pid(connection, true)? != expected {
+        return Err(io::Error::other("unexpected local activation peer"));
+    }
+    let Some(created) = created else {
+        return Ok("unavailable reason=legacy-pid".into());
+    };
+    if !on_input_desktop() {
+        return Ok("unavailable reason=input-desktop".into());
+    }
+    unsafe {
+        let access = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE;
+        let Ok(process) = OpenProcess(access, false, expected) else {
+            return Ok("unavailable reason=process-handle".into());
+        };
+        let process = Owned::new(process);
+        // Bind the live process object to the elected primary before offering only
+        // that PID the caller's existing foreground permission. Windows may decline.
+        if creation_time(*process) != Some(created)
+            || WaitForSingleObject(*process, 0) != WAIT_TIMEOUT
+        {
+            return Ok("unavailable reason=process-identity".into());
+        }
+        Ok(match AllowSetForegroundWindow(expected) {
+            Ok(()) => "granted".into(),
+            Err(error) => format!("denied hresult={}", error.code().0),
+        })
+    }
 }
 
 fn received(mut pipe: &File, stopping: &AtomicBool) -> io::Result<bool> {
@@ -223,16 +299,26 @@ pub fn start_launcher<T>(
         // The primary publishes and pins its PID before making its first pipe available.
         let connection = local::connect(&pipe, TIMEOUT)?;
         let pid_file = pinned(&root.join("launcher.pid"), false, false)?;
-        let expected = read_bounded(&pid_file, 10)?
-            .parse::<u32>()
-            .map_err(io::Error::other)?;
+        let (expected, created) =
+            launcher_delivery::primary_identity(&read_bounded(&pid_file, 31)?)?;
+        let grant = if std::env::args_os().len() == 1 {
+            Some(offer_foreground(&connection, expected, created)?)
+        } else {
+            None
+        };
         local::send(&connection, expected, SHOW)?;
+        if let Some(state) = grant {
+            println!("LAUNCHER_FOREGROUND_GRANT server={expected} state={state}");
+        }
         println!("LAUNCHER_SECONDARY server={expected}");
         return Ok(Launch::Secondary);
     }
     let pid_file = pinned(&root.join("launcher.pid"), false, true)?;
     pid_file.set_len(0)?;
     write!(&pid_file, "{}", std::process::id())?;
+    if let Some(created) = creation_time(unsafe { GetCurrentProcess() }) {
+        write!(&pid_file, " {created}")?;
+    }
     let server = local::inbound(&pipe, &sid)?;
     let stopping = Arc::new(AtomicBool::new(false));
     let shutdown = Arc::clone(&stopping);

@@ -210,12 +210,13 @@ class LauncherTests(unittest.TestCase):
                 self.assertIsNone(windows.visible())
                 if before_resume:
                     before_resume(second)
-                stream.write(b"LAUNCHER_SECONDARY server=12\n")
+                stream.write(b"LAUNCHER_FOREGROUND_GRANT server=12 state=denied hresult=-2147024891\nLAUNCHER_SECONDARY server=12\n")
                 emit("LAUNCHER_OPEN client=15\n")
                 if subject == "canonical":
                     windows.hwnd = 22
                     emit("GRAPHICS_READY generation=2\nADAPTER Dx12 Cpu\n")
                 windows.show(20, create=subject == "canonical")
+                emit(f"WINDOW_FOREGROUND_REQUEST pid=12 hwnd={windows.hwnd} accepted=false\n")
                 yield second, 3, None
 
             def accounting(_job, _kind, value, _size, _returned):
@@ -273,12 +274,18 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(result["keyboardFocus"]["applicable"], not private)
 
     def test_receipt_requires_the_original_primary_and_its_worker(self):
-        secondary = ["LAUNCHER_SECONDARY server=12"]
-        primary = ["LAUNCHER_OPEN client=15"]
+        secondary = ["LAUNCHER_FOREGROUND_GRANT server=12 state=denied hresult=-2147024891", "LAUNCHER_SECONDARY server=12"]
+        primary = ["LAUNCHER_OPEN client=15", "WINDOW_FOREGROUND_REQUEST pid=12 hwnd=32 accepted=false"]
         receipt = dict(primaryPid=12, secondaryPid=15, initialWindowPid=12, reopenedWindowPid=12,
+                       reopenedWindow=32,
                        hiddenBeforeLaunch=True, workerBefore=[13, 1234], workerAfter=[13, 1234],
                        secondaryExit=0, secondaryJobEmpty=True, secondaryTotalProcesses=1)
         observe.qualify(secondary, primary, receipt)
+        self.assertEqual(receipt["foregroundHandoff"], dict(server=12, grant="denied", hwnd=32,
+                                                           hresult=-2147024891, unavailableReason=None, requestAccepted=False))
+        for grant in ("granted", "unavailable reason=input-desktop"):
+            observe.qualify([f"LAUNCHER_FOREGROUND_GRANT server=12 state={grant}", secondary[1]], primary, receipt)
+            self.assertEqual(receipt["foregroundHandoff"]["grant"], grant.split()[0])
         for key, value in (("hiddenBeforeLaunch", False), ("reopenedWindowPid", 15),
                            ("workerAfter", [13, 4321]), ("secondaryTotalProcesses", 2)):
             with self.subTest(key=key), self.assertRaises(ValueError):
@@ -286,6 +293,9 @@ class LauncherTests(unittest.TestCase):
         for wrong_secondary, wrong_primary in [
             (["READY Visible Unavailable"], primary), (secondary, []),
             (secondary, ["LAUNCHER_OPEN"]), (secondary, primary * 2),
+            ([secondary[0].replace("server=12", "server=15"), secondary[1]], primary),
+            (secondary, [primary[0], primary[1].replace("hwnd=32", "hwnd=31")]),
+            (secondary, primary + [primary[1]]),
         ]:
             with self.assertRaises(ValueError):
                 observe.qualify(wrong_secondary, wrong_primary, receipt)

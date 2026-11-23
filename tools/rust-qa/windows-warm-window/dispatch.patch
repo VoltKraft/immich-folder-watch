@@ -63,11 +63,12 @@
                  model.command(command)
              };
              match action {
-@@ -78,10 +85,21 @@
+@@ -78,11 +85,21 @@
                      if window.is_minimized() == Some(true) {
                          window.set_minimized(false);
                      }
 -                    window.set_visible(true);
+-                    #[cfg(not(windows))]
 -                    window.focus_window();
                      #[cfg(target_os = "windows")]
 -                    window.request_redraw();
@@ -75,7 +76,7 @@
 +                        crate::ui_trace::visibility(window, true);
 +                        {
 +                            let _focus = crate::ui_trace::span("focus");
-+                            window.focus_window();
++                            self.focus_if_requested(event_loop);
 +                        }
 +                        let _redraw = crate::ui_trace::span("request-redraw");
 +                        window.request_redraw();

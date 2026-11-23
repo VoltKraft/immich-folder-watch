@@ -10,6 +10,32 @@ use std::thread;
 use std::time::Duration;
 
 #[test]
+fn primary_identity_accepts_old_pid_records_and_rejects_unusable_grant_targets() {
+    assert_eq!(
+        launcher_delivery::primary_identity("34").unwrap(),
+        (34, None)
+    );
+    assert_eq!(
+        launcher_delivery::primary_identity("34 122").unwrap(),
+        (34, Some(122))
+    );
+    for invalid in [
+        "0",
+        "4294967295",
+        "2 0",
+        "3 ",
+        "12 44 trailing",
+        "0 4",
+        "xyz",
+    ] {
+        assert!(
+            launcher_delivery::primary_identity(invalid).is_err(),
+            "{invalid}"
+        );
+    }
+}
+
+#[test]
 fn full_queue_delivers_exactly_one_activation_after_the_first_slot_opens() {
     let (sender, receiver) = sync_channel(8);
     for command in 0..8 {

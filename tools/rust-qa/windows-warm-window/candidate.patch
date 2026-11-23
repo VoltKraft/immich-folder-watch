@@ -79,7 +79,7 @@
 +                self.graphics.report_allocator();
                  None
              }
-         }
+         };
 @@ -150,7 +177,7 @@
          }
          fonts::add_fallbacks(&mut fonts);
@@ -163,9 +163,9 @@
 --- a/src/native_window.rs
 +++ b/src/native_window.rs
 @@ -47,15 +47,15 @@
-                 resume_unwind(panic);
-             }
          }
+         #[cfg(windows)]
+         self.focus_if_requested(event_loop);
      }
 -    fn x11_root(&self) -> Option<Arc<Window>> {
 +    fn retained_root(&self) -> Option<Arc<Window>> {
@@ -180,7 +180,7 @@
      }
 
      fn hide(window: &Window) {
-@@ -63,28 +63,52 @@
+@@ -63,29 +63,53 @@
          println!("WINDOW_HIDDEN");
      }
 
@@ -203,6 +203,7 @@
 +                        window.set_minimized(false);
 +                    }
                      window.set_visible(true);
+                     #[cfg(not(windows))]
                      window.focus_window();
 -                }
 -                Some(HostCommand::Hide) => Self::hide(window),
@@ -238,7 +239,7 @@
 
      fn flush_mapping(&mut self, event_loop: &ActiveEventLoop, window: &Window) {
          for event in std::mem::take(&mut self.mapping_events) {
-@@ -103,15 +127,25 @@
+@@ -103,17 +127,25 @@
          if self.model.borrow().graphics.lost() {
              event_loop.exit();
              return;
@@ -247,8 +248,10 @@
 +        if let Some(window) = self.retained_root().filter(|window| window.id() == id) {
              match event {
                  WindowEvent::CloseRequested => {
--                    if self.model.borrow_mut().lifecycle.close_window() == Some(HostCommand::Hide) {
-+                    let action = self.model.borrow_mut().lifecycle.close_window();
+-                    if self.model.borrow_mut().command(super::Command::Close)
+-                        == Some(HostCommand::Hide)
+-                    {
++                    let action = self.model.borrow_mut().command(super::Command::Close);
 +                    if action == Some(HostCommand::Hide) {
 +                        #[cfg(target_os = "windows")]
 +                        {

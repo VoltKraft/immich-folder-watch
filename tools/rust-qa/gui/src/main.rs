@@ -9,6 +9,8 @@ mod benchmark;
 #[path = "windows_worker.rs"]
 mod benchmark;
 mod fonts;
+#[cfg(windows)]
+mod foreground_request;
 mod graphics;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -79,6 +81,10 @@ enum ControlId {
 struct Model {
     #[cfg(target_os = "windows")]
     ime_sample: Option<u8>,
+    #[cfg(windows)]
+    foreground: foreground_request::ForegroundRequest,
+    #[cfg(windows)]
+    root_window: std::sync::Weak<winit::window::Window>,
     lifecycle: DesktopLifecycle,
     commands: Receiver<Command>,
     filename: String,
@@ -92,7 +98,7 @@ struct Model {
 
 impl Model {
     fn command(&mut self, command: Command) -> Option<HostCommand> {
-        match command {
+        let action = match command {
             #[cfg(target_os = "windows")]
             Command::TrayAvailability(available) => self.lifecycle.tray_result(available),
             #[cfg(target_os = "windows")]
@@ -107,7 +113,11 @@ impl Model {
                 self.graphics.request_test_fault();
                 None
             }
-        }
+        };
+        #[cfg(windows)]
+        self.foreground
+            .update(matches!(command, Command::Open), action);
+        action
     }
 }
 
@@ -125,6 +135,13 @@ impl Window {
         model: Rc<RefCell<Model>>,
         control: Control,
     ) -> Self {
+        #[cfg(windows)]
+        {
+            model.borrow_mut().root_window = creation
+                .winit_window()
+                .map(Arc::downgrade)
+                .unwrap_or_default();
+        }
         let mut fonts = egui::FontDefinitions::empty();
         for (family, name, data) in [
             (
@@ -187,6 +204,10 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
+        #[cfg(windows)]
+        {
+            self.model.borrow_mut().root_window = std::sync::Weak::new();
+        }
         *self
             .control
             .window
@@ -231,12 +252,13 @@ impl eframe::App for Window {
         if ctx.input(|i| i.viewport().close_requested())
             && model.lifecycle.shutdown() == Shutdown::Running
         {
-            model.lifecycle.close_window();
+            model.command(Command::Close);
             return;
         }
         while let Ok(command) = model.commands.try_recv() {
             match model.command(command) {
                 Some(HostCommand::ShowAndFocus) => {
+                    #[cfg(not(windows))]
                     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
                 }
                 Some(HostCommand::Hide | HostCommand::StopBackground) => {
@@ -361,7 +383,7 @@ fn supervise(
             }
             // Some compositors end the window session without a prior CloseRequested event.
             if model.lifecycle.window_intent() == WindowIntent::Visible {
-                model.lifecycle.close_window();
+                model.command(Command::Close);
             }
             println!("WINDOW_RELEASED passes={}", model.passes);
         } else {
@@ -442,6 +464,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let model = Rc::new(RefCell::new(Model {
         #[cfg(target_os = "windows")]
         ime_sample: None,
+        #[cfg(windows)]
+        foreground: Default::default(),
+        #[cfg(windows)]
+        root_window: Default::default(),
         lifecycle,
         commands,
         filename: "Grüße – Sommer.jpg".to_owned(),

@@ -91,8 +91,20 @@ def primary_job_members(api, desk, job, primary, worker, exe, console, record):
 
 
 def qualify(secondary_lines, primary_lines, receipt):
-    if secondary_lines != [f"LAUNCHER_SECONDARY server={receipt['primaryPid']}"]:
+    pid = receipt["primaryPid"]
+    if len(secondary_lines) != 2 or secondary_lines[1] != f"LAUNCHER_SECONDARY server={pid}":
         raise ValueError("The no-argument secondary did not exit through the launcher")
+    grant = re.fullmatch(rf"LAUNCHER_FOREGROUND_GRANT server={pid} state="
+                         r"(granted|denied hresult=(-?\d+)|unavailable reason=(legacy-pid|input-desktop|process-handle|process-identity))",
+                         secondary_lines[0])
+    requests = [line for line in primary_lines if line.startswith("WINDOW_FOREGROUND_REQUEST ")]
+    request = (re.fullmatch(rf"WINDOW_FOREGROUND_REQUEST pid={pid} hwnd={receipt['reopenedWindow']} accepted=(true|false)",
+                            requests[0]) if len(requests) == 1 else None)
+    if grant is None or request is None:
+        raise ValueError("The foreground handoff did not match one explicit request on the reopened primary HWND")
+    receipt["foregroundHandoff"] = dict(server=pid, grant=grant[1].split()[0], hwnd=receipt["reopenedWindow"],
+                                       hresult=int(grant[2]) if grant[2] else None,
+                                       unavailableReason=grant[3], requestAccepted=request[1] == "true")
     signals = [line for line in primary_lines if line.startswith("LAUNCHER_OPEN ")]
     if signals != [f"LAUNCHER_OPEN client={receipt['secondaryPid']}"]:
         raise ValueError("The primary did not receive the ordinary secondary's local request")
@@ -309,6 +321,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                        else windows.visible() is None and "WINDOW_RELEASED " in log()),
                        "The primary window did not close")
             result["hiddenBeforeLaunch"] = True
+            if any(line.startswith("WINDOW_FOREGROUND_REQUEST ") for line in log().splitlines()):
+                raise ValueError("The GUI requested foreground before the second launch")
             result["stage"] = "secondary"
             second_log = out / (label + "-secondary.log")
             resume_options = {}
@@ -359,7 +373,6 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             result["primaryJobAfter"] = {}
             result["workerAfter"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
                                                         result["primaryJobAfter"])
-            qualify(second_log.read_text(encoding="utf-8").splitlines(), log().splitlines(), result)
             if retained is not None:
                 result["keyboardFocus"] = {}
                 retained.focus(result["keyboardFocus"])
@@ -369,6 +382,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         command(b"Q")
         result.update(primaryExit=wait_for_exit(proc, windows.pump, 15), primaryJobEmpty=api.wait_job_empty(job, 4))
         final_log = log()
+        if label != "restart":
+            qualify(second_log.read_text(encoding="utf-8").splitlines(), final_log.splitlines(), result)
         drained = re.findall(r"^DRAINED passes=(\d+)$", final_log, re.MULTILINE)
         if (result["primaryExit"] or not result["primaryJobEmpty"] or len(drained) != 1
                 or final_log.splitlines().count(f"LAUNCHER_PRIMARY pid={proc.pid}") != 1):

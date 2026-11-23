@@ -17,6 +17,43 @@ use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 type Handle = *mut c_void;
 
+/// Request foreground for the visible root on its creating UI thread after explicit activation.
+pub fn focus_owned_window(root: &winit::window::Window) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GA_ROOT, GetAncestor, IsWindowVisible, SetForegroundWindow,
+    };
+
+    let Ok(borrowed) = root.window_handle() else {
+        return;
+    };
+    let RawWindowHandle::Win32(window) = borrowed.as_raw() else {
+        return;
+    };
+    let hwnd = HWND(window.hwnd.get() as Handle);
+    let mut pid = 0;
+    // The borrow keeps the root alive. Query and activate it only on its own UI thread.
+    unsafe {
+        if GetWindowThreadProcessId(hwnd.0, &mut pid) != GetCurrentThreadId()
+            || pid != std::process::id()
+            || GetAncestor(hwnd, GA_ROOT) != hwnd
+            || !IsWindowVisible(hwnd).as_bool()
+        {
+            return;
+        }
+        if root.is_minimized() == Some(true) {
+            root.set_minimized(false);
+        }
+        let accepted = SetForegroundWindow(hwnd).as_bool();
+        if std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").is_some() {
+            println!(
+                "WINDOW_FOREGROUND_REQUEST pid={pid} hwnd={} accepted={accepted}",
+                window.hwnd
+            );
+        }
+    }
+}
+
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetCurrentThreadId() -> u32;
