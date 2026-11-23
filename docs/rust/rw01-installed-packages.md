@@ -48,6 +48,13 @@ rows. The evidence index SHA-256 is
 `6796b7ab797bf7723d20f47d5e84788058a5924502f86b017ff223e422bfb910`.
 [Reproduction](../development.md#original-package-install-and-repair).
 
+The complete Fedora trial repeated from commit `285101b` with a clean
+fixture source record. Reading the retained database independently
+reproduced the full SQL dump of the shipping fixture. All nine sources and
+16 evidence files verified. The index in
+`artifacts/rust/shipping-install-fedora-285101b/` has SHA-256
+`39c118eacde33f01eeafa59d1b5ecf4f8e8909d16da55d4b62f4b5279e2d2b79`.
+
 RI-AC08 still requires the four Rust packages, native old-to-new upgrades,
 repair, removal and rollback after activity in the installed Rust application.
 [Acceptance matrix](acceptance.md#overall-acceptance).

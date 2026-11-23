@@ -186,3 +186,12 @@ album rename during restart. Each failed the corresponding assertion.
 The clean Fedora x64 TRX contains the peer digest and asset ID. The fixture
 removes its temporary upload databases and media after the test.
 [Upload reference](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.UploadActivity.cs).
+
+At `9efe6f4`, the test passed on all four native hosts. Each independently
+replayed TRX identifies the eight uploaded bytes retained by the separate
+peer. Reconciliation after restoring SQLite preserved the local file and
+remote asset, with zero repeat transfers, trash requests or album mutations.
+Ubuntu passed 568 tests on each architecture. Windows passed 559 on each
+and skipped the nine Linux-only tests. The four-archive readback SHA-256
+is `9368522d6c4834f6b5d16c8d3c67372f40b315b43d4e0412723681709ecb2921`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14819601003) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14819470624) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14818820858) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14818925892).

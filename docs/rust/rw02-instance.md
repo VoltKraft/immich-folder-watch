@@ -358,3 +358,25 @@ sample. On ARM64 the reopened window remained in the background throughout
 the retained tray fixture, the x64 private cleanup also encountered error
 145, so neither original-desktop tray attempt ran.
 [x64 retained tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14814786519) · [Windows Shell observations](rw02-windows-services.md#original-desktop-at-8566f81).
+
+## Launcher cleanup and foreground at 549066f and ba02f8b
+
+Across the two revisions, eight private restart trials ran on Windows x64
+and ARM64. All 24 primary processes drained and exited zero.
+All 16 ordinary second launches exited with the original worker still
+running in the primary process tree. Its PID and native creation time
+matched before and after the second launch.
+All 36 separate test profiles were removed. None of the launcher profiles
+needed to retry directory removal. In the separate retained tray case
+at `ba02f8b`, both private profiles did encounter Windows error 145.
+The original directory handle accepted disposition after five retries on
+x64 and sixteen on ARM64. The evidence does not identify which child
+entry had delayed either removal.
+[x64 tray and launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14825115763) · [ARM64 tray and launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14826595019).
+
+On ARM64 the original desktop reopened the visible canonical and retained
+windows at both revisions and kept them in the background for every
+sample across two seconds. The canonical process recreated its HWND. The
+retained process recovered its original HWND. Ordinary foreground keyboard
+handover on ARM64 remains open.
+[First ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14819371268) · [Second ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14824351734).

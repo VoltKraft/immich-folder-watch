@@ -1,5 +1,56 @@
 # Project Status
 
+## Four native upload references and package migration baseline (2026-11-23)
+
+At `9efe6f4` all four shipping upload references passed. Ubuntu passed
+568 tests on each architecture. Windows passed 559 and skipped nine
+Linux-only tests per host. All four independent feasibility jobs passed,
+including 37 workspace tests and 15 watch cases on each Linux host and
+34 and 14 on each Windows host. Both Windows targets completed 208 C#
+recovery assertions. [Upload reference](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload) · [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252054).
+
+The original 3.0.4 Flatpak completed a clean, private Fedora x64 install,
+repair and uninstall. The 785-entry payload and both retained synthetic
+profile files matched. The two original Windows cabinets supplied the
+expected hashes for 877 files. Independent review verified the original
+cabinet contents and the full Fedora result, including all 16 evidence
+hashes. The four native hosted package jobs are the next check.
+[Installed package reference](rust/rw01-installed-packages.md).
+
+The Fedora rehearsal repeated at `285101b` from clean fixture sources.
+Direct SQL replay again recovered the full synthetic corpus. The eight
+portable Python tests, PowerShell controls and both workflow syntax checks
+passed locally. The repository tooling suite completed 178 tests with
+five platform skips using a temporary GPG keyring and the reviewed
+PowerShell 7.7.0 executable.
+
+At `549066f` and `ba02f8b` the x64 GDI control met all four WPF response
+limits. Full egui exceeded the scan close and reopen limits on x64 and
+met all eleven limits on ARM64. The ARM64 GDI control stopped at its first
+screen observation. The dated Ubuntu snapshots reproduced all six
+authenticated release indexes and the four original portal source files.
+The local Noble guest rebuilt from all 696 x64 packages and the
+Noble-linked GUI reopened after two Plasma panel clicks.
+RW-02 remains active. Next, test the full egui software renderer with the
+second frame-queue setting on the two Windows targets and repeat the
+Ubuntu desktop trials with these pinned inputs.
+[Windows controls](rust/rw02-windows-window.md#visible-gdi-and-retained-egui-under-the-same-inventory) · [Ubuntu sources](rust/rw02-plasma.md#reproduction).
+
+The two-frame software-adapter trial at `a44848d` passed both Windows
+cross-Clippy configurations, native Fedora release compilation and local
+offline reconstruction. Thirty-seven portable window, text and display
+tests passed. A native Windows bitmap test remains for the hosted run.
+Independent review replayed twelve original scan trials and rejected
+missing or corrupt raw traces. The portable editor controls rejected
+cursor-only changes. [Frame queue comparison](rust/rw02-windows-window.md#one-or-two-queued-frames-on-the-windows-software-adapter).
+
+On both recent Windows runs, independent replay confirmed the x64 Shell's
+show callback without observing the notification title and body. On ARM64
+the Shell refused registration before the send. All 16 launcher profiles
+were removed. Two separate retained-tray profiles at `ba02f8b` completed
+removal on the same handles after Windows error 145. Foreground keyboard
+handover on ARM64 remains open. [Notification results](rust/rw02-windows-services.md#sampling-across-the-shell-request) · [Launcher results](rust/rw02-instance.md#launcher-cleanup-and-foreground-at-549066f-and-ba02f8b).
+
 ## Worker download reference and Ubuntu desktop checks (2026-11-23)
 
 The shipping worker downloaded a six-byte synthetic photo on Fedora x64.

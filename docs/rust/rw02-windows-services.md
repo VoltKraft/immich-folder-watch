@@ -380,6 +380,19 @@ Python tests and the PowerShell pixel and timing controls passed. Native
 Windows presentation with this observer awaits results.
 [Evidence readback](../../tools/rust-qa/windows-services/notification_probe.py) · [Timing controls](../../tools/rust-qa/windows-services/test_notification.py).
 
+At `549066f` and `ba02f8b`, x64 Explorer registered the synthetic icon,
+accepted its notification request and sent one show callback in each trial.
+One independent UIA sample overlapped the 19.29 ms and 19.18 ms synchronous
+requests respectively. Across 91 and 97 sweeps, including more than ten
+seconds after each request, the observer found no matching visible title
+and body. ARM64 Explorer refused icon registration in both trials. The Rust
+sender consequently made no notification request. Its two observers
+completed 109 and 108 sweeps. All four reported zero provider errors.
+Readback matched the two original source revisions, all 37 observer inputs
+per target and the small archives to their copies in the full desktop
+archives. Windows notification presentation remains open.
+[First x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14822014126) · [First ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14822831355) · [Second x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14826514476) · [Second ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14828277542).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
@@ -566,3 +579,8 @@ rectangle establish that result. The Shell add return value belongs to the
 WPF process and the source records no return receipt. Visible presentation,
 pointer activation and focus each require their own observations.
 [Rectangle result](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyicongetrect).
+
+Across the same two runs, the shipping WPF receiver returned a visible-area
+Shell rectangle on all six x64 idle trials. All six ARM64 trials found the
+WPF receiver but returned `E_FAIL` for its icon rectangle.
+[Same-host renderer and Shell results](rw02-windows-window.md#visible-gdi-and-retained-egui-under-the-same-inventory).
