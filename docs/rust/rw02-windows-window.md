@@ -217,3 +217,64 @@ under `artifacts/rust/hosted-desktop-storage/45077818235/`.
 | --- | --- | --- |
 | [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778955008) | `589f02834ed6fe5227a087a92db8a575c5daa5208ae72753e307788183ae7074` | `e65c12aa50d665def1c0634cb8deec4fdd665b52b76cf6f112eb3997756f0f9c` |
 | [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235/artifacts/14778472175) | `9a7b632c69fb4979982f72b758a6356cc5475e8ccf2b766d27e849b0145e8661` | `372dd4c7a66e1d1ac3fa04df818f2c1c0db386b2ea228ec3ed1956079c914e20` |
+
+## Native retained-window repeat at 93ecc35
+
+The retained Mailbox GUI passed eight of eleven limits on Windows Server 2025 x64
+and all eleven on Windows 11 ARM64 at `93ecc354f9be40ad0c76e33c46bdadb55f2e2fb8`.
+Each host supplied its own three WPF reference trials. The table shows every
+metric that exceeded a limit in any configuration. Bold measurements exceeded
+the same-host limit before display rounding. Close and reopen values are the
+median of three trial p95s with UI dispatch tracing disabled. All three x64
+Mailbox trials exceeded the same three timing limits. Startup, hidden working
+set and both idle CPU and presentation rates passed for all three Rust configurations.
+[x64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275435) · [ARM64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275454).
+
+| Host and configuration | Visible working set (MiB) | Idle close (ms) | Idle reopen (ms) | Scan close (ms) | Scan reopen (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| x64 WPF-derived limit | 142.897 | 14.264 | 16.755 | 31.576 | 22.786 |
+| x64 canonical teardown | **189.133** | **190.814** | **172.123** | **259.601** | **211.306** |
+| x64 retained Mailbox | 59.895 | **46.724** | 6.554 | **37.553** | **39.102** |
+| x64 retained FIFO | 59.945 | **70.849** | 7.028 | **72.071** | **41.997** |
+| ARM64 WPF-derived limit | 147.014 | 13.209 | 15.665 | 14.414 | 15.441 |
+| ARM64 canonical teardown | **197.449** | **140.720** | **161.851** | **212.401** | **166.273** |
+| ARM64 retained Mailbox | 69.754 | 2.893 | 3.930 | 8.067 | 4.633 |
+| ARM64 retained FIFO | 67.805 | 2.756 | 4.457 | **18.373** | 4.806 |
+
+All twelve window-behavior cases passed on each host. The create, destroy,
+hide and show records confirmed reuse of the owned HWND and renderer on
+ordinary retained reopen, replacement after device loss and no root window or
+renderer on background quit. The editing cases also restored the focused
+filename draft. The observer issued these reopens over the fixture input.
+[Separate ordinary second-launch evidence](rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35).
+
+The three instrumented scans covered every eligible hidden interval. On x64,
+root repaint and single wake recorded zero hidden presentations across 547 and
+518 intervals respectively. The original hidden-paint control recorded 418 in
+209 intervals, one in each empty-modifier callback and one in each focus-loss
+callback. Both corrected configurations still delivered those callbacks in
+every interval. On ARM64 all three counts were zero across 201, 187 and 200
+intervals respectively.
+
+The x64 root-repaint trace located two delays during inventory. In all 54
+close requests above the same-host scan limit, visible redraw callbacks
+occupied at least half the time between issuing the request and entering the
+close callback. Median overlap was 33.230 ms across those requests. For
+177 of 179 over-limit reopens, the native show call overlapped at least half
+the time to the external visibility observation. Pipe read to UI dequeue was
+0.561 ms at p95 across all 547 reopens. Single wake showed the same pattern
+in all 36 over-limit closes and 172 of 176 over-limit reopens. The traces
+leave the work inside the visible redraw and native show calls unresolved.
+Idle close was timed from the external HWND observer.
+
+Replay from the tested Git revision checked 21 canonical and 21 reconstructed
+retained application inputs per host. Each of the 30 file-I/O traces covered
+two passes over 100,000 distinct files. All 18 timed DXGI traces completed
+their decoder and session-loss checks. Both hosts archived the same eframe
+source ZIP, SHA-256 `ce55769b1e721136161c6bf19fdd46665ccb6b00cca5f0b3290c23f1f8a06b7f`.
+The replay and its JSON reports are in `artifacts/rust/hosted-desktop-storage/45083264235/`.
+
+| Target | Actions archive SHA-256 | Independent retained readback SHA-256 |
+| --- | --- | --- |
+| [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782395756) | `f7fe684395b02e0d05c20eec390aa17a2ad811c35964097b5c9b4c9c94cd2769` | `35b2018c94bbfaaac000bb42e90af81b218ae74287c71b9ed5d4cebc14afb35b` |
+| [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782220563) | `f22eea1c70b66207a7646f2557ee169037d2d7418611dd0108b0581aabf6b1ae` | `dc58618ed23534a168c3f4747f8fa114dbe818b96ab81e903b88db162930179d` |
