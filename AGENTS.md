@@ -163,6 +163,8 @@ to reconcile project decisions, defaults, and recorded state.
   features, native libraries and fonts before adoption; pin compiler and lockfile.
   Required native runtime/GUI evidence on four targets cannot be replaced by a
   cross-build. Independently review filesystem, migration and final integration.
+  Use the [worker activity reference](docs/development.md#download-activity-backups-and-restart)
+  for the actual C# download, its backups and the restart against the same watch root.
   The [RW-02 stack decision](docs/rust/rw02-stack-decision.md) records the
   qualified components, native resource limits and remaining desktop checks.
   Follow the [Windows import-library reconstruction](docs/rust/rw02-windows-imports.md)

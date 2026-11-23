@@ -1,5 +1,26 @@
 # Project Status
 
+## Worker download reference and Ubuntu desktop checks (2026-11-23)
+
+The shipping worker downloaded a six-byte synthetic photo on Fedora x64.
+The before backup contained no mapping or account history. The after backup
+contained the downloaded asset and its account Last Sync. Restart from that
+backup reconciled the same album and watch root with zero additional
+transfers. Independent review added a positive album-list observation on
+both runs and bound the two loaded assemblies and the original evidence
+to their xUnit result. The new four-target reference workflow captures
+the database and file evidence for detached readback.
+[Download activity reference](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
+
+At `8566f81`, the original Linux archives verified all eleven X11 budgets
+and the SQLite and realtime results on both architectures. ARM64 observed
+two real Plasma panel clicks. Both x64 fixture downloads lost their HTTP
+connection before response headers. Commit `549066f` passed seven
+downloader tests and a private HTTP replay. Its hosted desktop run also
+exercises the Windows GDI, tray, notification and profile-cleanup changes.
+RW-02 remains open.
+[Ubuntu results](rust/rw02-native-gui.md#ubuntu-native-results-at-8566f81) · [Native run at 549066f](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471).
+
 ## Four-target checks and the Windows renderer comparison (2026-11-23)
 
 At `8566f81`, the raw YAML round trip passed its native step on Windows

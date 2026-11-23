@@ -108,3 +108,30 @@ startup sequence requires the separate behavior/security corpus.
 No Rust production codec, migration, cross-session writer exclusion or installer
 result is claimed by this corpus. The [rewrite plan](../rust-rewrite-plan.md#data-compatibility-and-migration)
 and [filesystem contract](../watch-root-security.md) remain binding.
+
+## Download activity and the latest backup
+
+The [worker test](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.ActivityBackup.cs)
+captures online backups before and after one completed download. The shipping
+worker reconciles the synthetic `Camera` album and writes six bytes to
+`photo.jpg` in a newly created watch root. The fixture waits for the persisted
+mapping and account Last Sync, captures the second backup, drains the worker
+and reads the first backup alongside the existing file. The older database
+contains neither the mapping nor the transfer history. Reading it leaves the
+downloaded file in place.
+
+A second worker opens a copy of the latest backup and reconciles the same
+album and live watch root. It must retain both original time stamps, the
+downloaded file and its native file times, with zero additional transfers.
+The peer supplies synthetic album metadata and asset bytes in-process.
+The two backups, original file, JSON observations and passed test result
+can be independently checked after relocation. The verifier checks all four
+table definitions against the reviewed SQL corpus, reads all thirteen mapping
+columns, and matches the observer's digest in that specific xUnit execution.
+Both executing assemblies identify the source revision. The C# test measures
+native file times before export. ZIP extraction can change filesystem metadata.
+[Detached readback](../../tools/RustCompatibilityOracle/verify_activity.py) · [Local and hosted commands](../development.md#download-activity-backups-and-restart).
+
+This reference establishes the legacy result for a completed synthetic
+download. The installed candidate still needs to preserve external effects
+and history across its own uploads, downloads, deletions and repairs.

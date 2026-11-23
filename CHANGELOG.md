@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Rust CodeQL checks for the Linux and Windows configurations of the foundation workspace on the rewrite draft PR.
 - Compare original UTF-8, UTF-16 and UTF-32 configuration files against the shipping reader and preserve damaged inputs during the rewrite assessment.
 - Compare Windows visibility timings across the shipping WPF application, retained eframe window and a Rust GDI control during a 100,000-file scan.
+- Capture the shipping worker’s SQLite backups and downloaded bytes around a synthetic transfer, then check its restart and account history on the native reference runners.
 
 ## [3.0.4] - 2026-11-13
 

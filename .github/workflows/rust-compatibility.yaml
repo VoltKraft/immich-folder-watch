@@ -11,6 +11,7 @@ on:
       - 'NuGet.Config'
       - 'src/**'
       - 'rust/tests/**'
+      - 'tools/rust-qa/legacy/casing/unicode-15.1.0.tsv'
       - 'tools/RustCompatibilityOracle/**'
   workflow_dispatch:
 
@@ -58,6 +59,7 @@ jobs:
           GIT_CONFIG_VALUE_0: ${{ runner.os == 'Windows' && 'true' || 'false' }}
         with:
           persist-credentials: false
+          fetch-depth: 0 # Compare the executing worker sources to the shipping reference.
 
       - name: Setup native reference SDK
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -83,7 +85,18 @@ jobs:
         run: dotnet run --no-build --configuration Release --project tools/RustCompatibilityOracle/RustCompatibilityOracle.csproj -- verify rust/tests/fixtures/legacy
 
       - name: Execute portable behavior and security reference
+        env:
+          IFW_QA_ACTIVITY_OUTPUT: ${{ github.workspace }}/artifacts/rust/worker-activity
         run: dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj --configuration Release --logger "trx;LogFileName=core-reference.trx" --results-directory artifacts/rust/test-results
+
+      - name: Read the worker backups and downloaded bytes independently
+        shell: bash
+        env:
+          ACTIVITY_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python3 -B tools/RustCompatibilityOracle/verify_activity.py artifacts/rust/worker-activity \
+            artifacts/rust/test-results/core-reference.trx "$ACTIVITY_PLATFORM" "$IFW_ORACLE_EXPECT_ARCH" "$GITHUB_SHA" \
+            > artifacts/rust/test-results/worker-activity-readback.json
 
       - name: Upload synthetic reference evidence
         if: always()
@@ -93,5 +106,6 @@ jobs:
           path: |
             artifacts/rust/oracle/
             artifacts/rust/test-results/
+            artifacts/rust/worker-activity/
           if-no-files-found: error
           retention-days: 14

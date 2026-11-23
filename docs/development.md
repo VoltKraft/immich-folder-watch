@@ -46,6 +46,30 @@ runner availability follows the [GitHub runner reference](https://docs.github.co
 Actual runs, missing platforms and independent workflow review belong in the
 acceptance record. Native reference tests do not qualify the future Rust GUI.
 
+### Download activity, backups and restart
+
+The portable Core test `Download_RetainsBeforeAndAfterBackupsAndRestartsFromLatest`
+runs the shipping worker twice against the same disposable watch root. To retain
+the two SQLite backups, the downloaded file and the observer's JSON, set
+`IFW_QA_ACTIVITY_OUTPUT` to a fresh absolute directory for the test process.
+For example, on Linux x64 with SDK 10.0.401, use a clean checkout of the revision
+under test and run the following from the repository root.
+
+```bash
+export IFW_QA_ACTIVITY_OUTPUT="$PWD/artifacts/rust/worker-activity"
+dotnet test src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj -c Release \
+  --filter FullyQualifiedName~Download_RetainsBeforeAndAfterBackupsAndRestartsFromLatest \
+  --logger 'trx;LogFileName=core-reference.trx' --results-directory artifacts/rust/test-results
+python3 -B tools/RustCompatibilityOracle/verify_activity.py "$IFW_QA_ACTIVITY_OUTPUT" \
+  artifacts/rust/test-results/core-reference.trx linux x64 "$(git rev-parse HEAD)"
+```
+
+The same reader works on a downloaded archive. Supply the original target
+(`linux` or `windows`), architecture (`x64` or `arm64`) and full source revision.
+The checkout needs that commit and the 3.0.4 reference commit. The reader uses
+immutable SQLite connections and prints a JSON receipt with the original hashes.
+The test uses an in-process synthetic Immich peer. [Activity and source checks](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

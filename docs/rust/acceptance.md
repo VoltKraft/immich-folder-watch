@@ -44,7 +44,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
-| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [Detached YAML file readback on Fedora x64](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. Production write policy, complete migration and rollback after sync activity are pending. |
+| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [Detached YAML file readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. The [C# worker reference](rw01-storage-contract.md#download-activity-and-the-latest-backup) captures external file effects and durable history across restart. Production write policy, migration and Rust rollback after sync activity are pending. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
 | RI-AC05 | Open | Native lifecycle, old/new/cross-session ownership and durable task/DB shutdown tests |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |

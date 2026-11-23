@@ -576,6 +576,29 @@ title and body. The ARM64 Shell declined the initial icon registration.
 Both Windows notice archives and SPDX documents reproduced offline.
 [Retained measurements](rw02-windows-window.md#native-retained-window-results-at-6af7100) · [Four native notice results](rw02-combined-notices.md#native-notices-at-6af7100).
 
+## Ubuntu native results at 8566f81
+
+Independent archive readback verified all eleven same-host X11 limits on
+both architectures. During the x64 scan the Rust window closed in 0.45 ms
+and reopened in 0.98 ms at p95. The corresponding Avalonia-derived limits
+were 11.11 and 16.121 ms. Both targets also passed the sixteen loopback
+transport cases. Their compiler inputs, notice archives and SPDX reports
+reproduced offline. The ARM64 Plasma panel delivered both clicks to the
+same window and the worker drained on quit.
+[x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14813839731) · [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14812923204).
+
+The x64 job failed during acquisition of two test inputs. Both the Plasma
+guest setup and the private Documents portal comparison encountered
+`RemoteDisconnected` before receiving HTTP response headers. Their
+original log did not identify the affected package. This x64 run produced
+no panel observation and no portal-lock measurement. The x64 GUI executable
+was byte-identical to the one that passed the preceding panel test.
+At `549066f` the shared downloader repeats this specific failure twice
+before surfacing the package name and the three failed attempts. A private
+HTTP server reproduced the disconnect, recovery on the third request and
+terminal refusal. The existing size, redirect and digest checks still apply.
+[Original x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/job/137640979079) · [Downloader and regression checks](../../tools/rust-qa/portal-noble/test_control.py).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop
