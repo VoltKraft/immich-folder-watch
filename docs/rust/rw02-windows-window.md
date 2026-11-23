@@ -507,5 +507,38 @@ separate editor test requires the same retained HWND and input field,
 readable text, keyboard focus and changed glyph pixels after reopening.
 It records native timing results even if the separate desktop cannot
 supply keyboard input. Independent replay on twelve original one-frame
-scan trials verified the new reader. The native two-frame results are
-pending. [Paired readback](../../tools/rust-qa/windows-warm-window/frame_latency.py).
+scan trials verified the new reader. [Paired readback](../../tools/rust-qa/windows-warm-window/frame_latency.py).
+
+### Native results at 1b95ba0
+
+Both retained frame depths met all eleven preselected WPF limits on both
+native Windows systems. Each depth ran the same full egui executable on
+its host in three trials, each with two complete 100,000-file inventories.
+The teardown GUI met six limits on each host. Each value below is the
+median of the three trial p95s, in milliseconds.
+
+| Host | Frame depth | Idle close / reopen | Scan close / reopen | WPF scan maximums |
+| --- | ---: | ---: | ---: | ---: |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14843990978) | 1 | 4.43 / 6.83 | 16.21 / 11.34 | 29.932 / 21.364 |
+| Windows x64 | 2 | 4.43 / 8.86 | 14.03 / 12.41 | 29.932 / 21.364 |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14845081343) | 1 | 2.79 / 3.61 | 5.79 / 4.48 | 14.259 / 15.063 |
+| Windows ARM64 | 2 | 3.22 / 3.83 | 6.19 / 4.77 | 14.259 / 15.063 |
+
+Detached replay checked the 153 compiler units per host, original window
+requests, file activity and successful DXGI events. All twelve retained
+trials recorded zero idle presentations in both window states, with
+positive reopen controls. Four independent edit observations kept the
+same HWND, renderer generation, focused filename field and draft through
+hide and reopen. Decoding the two post-reopen PNGs reproduced 209 changed
+pixels in 29 columns on x64 and 177 in 28 columns on ARM64 at both depths.
+The detached reports' SHA-256 values are
+`7579902a60c486f89a7b487922d88764a16f27db5f890113f6f14873262d17ab`
+(x64) and `1a7b3f9c4e5f447591d90a0aea990e98b6cf8494338f43523de9b8b4fea6be71`
+(ARM64).
+
+Keep the existing one-frame Mailbox policy for the retained GUI. A second
+frame improved x64 scan close in this run. Scan reopen took longer on
+both hosts. Prior x64 runs exceeded their own WPF limits. The small GDI
+control met the four window-response limits on x64. On ARM64 neither
+observed sample point belonged to the GDI window on the final attempt
+before its first close. That control collected no ARM64 scan timing.

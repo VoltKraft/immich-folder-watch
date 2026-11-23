@@ -395,6 +395,16 @@ archives. Windows notification presentation remains open.
 
 ## Windows notification history
 
+At `1b95ba0`, Explorer on Windows x64 accepted the ordinary Shell
+notification and reported a show callback. Across 86 samples the
+independent screen observer could not identify its exact title and body.
+The native receiver recorded zero clicks. ARM64 refused initial icon registration and issued no
+notification request. The late observer took 112 samples. Both observers
+recorded zero provider errors. Detached replay matched the sender output,
+observer log and recorder sources, SHA-256
+`4918ea23985230b6e49db9fae4d33010f9b9e0e179a4e19d577a5b54d3afaa31`.
+[x64 Shell archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14845265609) · [ARM64 Shell archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14843191637).
+
 The separate inbox WinRT trial registers a per-run shortcut under a disposable
 runner's Programs folder and sends two uniquely tagged notifications under its
 own app identity. One requests ordinary delivery and the other suppresses the

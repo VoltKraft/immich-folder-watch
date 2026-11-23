@@ -1,5 +1,26 @@
 # Project Status
 
+## One- and two-frame Windows measurements (2026-11-23)
+
+At `1b95ba0` the retained egui window passed all eleven same-host WPF
+limits at both DX12 frame depths on Windows x64 and ARM64. All twelve
+timed trials completed two 100,000-file inventories. The original PNGs
+showed 209 changed filename pixels on x64 and 177 on ARM64 after
+reopening. Keep the existing one-frame configuration for the retained
+GUI. Both Ubuntu hosts also passed all eleven X11 limits. The two
+Windows desktop jobs finished with failures in independent steps.
+[Timing and raw archives](rust/rw02-windows-window.md#native-results-at-1b95ba0) · [Ubuntu](rust/rw02-native-gui.md#ubuntu-native-results-at-1b95ba0).
+
+Both native Windows text observers completed all three edits and failed
+the caret-free screenshot at the shared focus guard. The fix at `e2ec5e9`
+requires the exact owned password control to hold focus while capturing
+the verified filename rectangle. Its native rerun remains pending. The
+x64 Shell sent a show callback, and the visible title and body remained
+unobserved. ARM64 refused icon registration. The separate WinRT history
+run at `653f255` has started. RW-02 still requires interactive Windows
+activation and display evidence.
+[Text observer](rust/rw02-windows-text.md#focus-when-capturing-the-caret-free-field) · [Notification evidence](rust/rw02-windows-services.md#windows-notification-history) · [Active native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514).
+
 ## Windows glyph capture and fixed-revision worker restore (2026-11-23)
 
 The Fedora x64 run at `e728e86` exercised all four shipping worker

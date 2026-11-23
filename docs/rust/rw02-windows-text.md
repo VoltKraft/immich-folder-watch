@@ -68,6 +68,16 @@ patterns. The shared capture change at `a44848d` required the captured
 element itself to have keyboard focus, which conflicted with the preceding
 Tab. [Native run at 549066f](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471) · [Native run at ba02f8b](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405).
 
+At `1b95ba0`, both original archives confirm the failure occurred in the
+capture guard before it wrote the PNG. The three ordinary editing cases
+passed on both hosts, including the visual order 5, 3, 4, 2 and the exact
+Delete result from both text interfaces. The x64 observer used the
+original desktop. ARM64 exercised the private desktop and restored the
+original one. Both subjects exited successfully. Independent replay
+matched the original plan and the 22 compiler and 22 observer inputs
+per host. The separate font specimen rendered its eight glyphs on both.
+[x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14843990978) · [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14845081343).
+
 The glyph observer now resolves the exact owned password field by name,
 role and process, then verifies that it holds focus on both sides of the
 capture. The bitmap comes from the non-password filename field. Its
