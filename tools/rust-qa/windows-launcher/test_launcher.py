@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import ctypes as c
 import json
+import os
 from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
 import unittest
@@ -142,15 +143,35 @@ class LauncherTests(unittest.TestCase):
     def test_foreground_cycle_requires_close_second_process_worker_identity_and_quit(self):
         self.exercise_cycle()
 
-    def exercise_cycle(self, subject="canonical", *, private=False):
+    def exercise_cycle(self, subject="canonical", *, private=False, restart=False):
         api, desk = Mock(), Mock()
         windows = OwnedRoot(12)
         primary, second = Mock(pid=12, _handle=2), Mock(pid=15, _handle=5)
         primary.poll.return_value = None
         second.poll.return_value = 0
-        name = "IfwQa_Launcher_private" if private else "Default"
-        label = "activation" if private else "foreground"
+        name = "IfwQa_Launcher_" + "3" * 32 if private else "Default"
+        label = "restart" if restart else ("activation" if private else "foreground")
         desk.name.return_value = name
+        if private:
+            windows.desktop = 9
+            windows.enum_callback = lambda callback: callback
+            windows.enumerate = lambda desktop, visit, _: desktop == 9 and all(visit(hwnd, 0) for hwnd in (2, windows.hwnd))
+            def owner(hwnd, pid):
+                if hwnd != 2:
+                    return OwnedRoot.owner(windows, hwnd, pid)
+                pid._obj.value = os.getpid()
+                return 7
+            def text(buf, value):
+                buf.value = value
+                return len(value)
+            windows.owner = owner
+            windows.caption = lambda hwnd, buf, _: text(buf, name if hwnd == 2 else windows.title)
+            desk.window_class.side_effect = lambda hwnd, buf, _: text(buf, "Static" if hwnd == 2 else "Window Class")
+            desk.thread.return_value = 7
+            desk.thread_desktop.side_effect = lambda tid: 9 if tid == 7 else None
+            desk.name.side_effect = lambda desktop: name if desktop == 9 else {"win32Error": 5}
+            desk.receiving_input.return_value = False
+            desk.iconic.return_value = False
         desk.foreground.side_effect = lambda: windows.hwnd
         api.process_identity.side_effect = lambda handle: handle * 10
         api.wait_job_empty.return_value = True
@@ -205,7 +226,10 @@ class LauncherTests(unittest.TestCase):
             api.query_job.side_effect = accounting
             fixture = Mock(TITLE=TITLE)
             fixture.Windows.return_value = windows
-            with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value={"witnessSeen": private}),
+            scan = dict(witnessSeen=private, desktop=name,
+                        initialThreadDesktop={"win32Error": 5} if private else name, windows=[])
+            with (patch.object(observe, "child", launch), patch.object(observe, "snapshot", return_value=scan),
+                  patch.object(c, "set_last_error", create=True),
                   patch.object(observe, "bind", return_value=Mock(side_effect=[14, 16, 23])),
                   patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
                   patch.object(retained_window, "visible_surface"), patch.object(retained_window, "focus_sample",
@@ -215,15 +239,30 @@ class LauncherTests(unittest.TestCase):
                   patch.object(observe, "primary_job_members", side_effect=[[13, 1300], [13, 1300]])):
                 observe.cycle(api, desk, name, 9, 2 if private else None, fixture, GUI, CONSOLE, out, {}, out,
                               label, result, tray=not private, subject=subject)
-        self.assertEqual(launches, [(name, GUI, ["--autostart"] if private else [], True, private),
-                                    (name, GUI, [], False, private)])
         self.assertEqual(result["stage"], "drained")
         self.assertTrue(result["primaryJobEmpty"])
+        if restart:
+            self.assertEqual(launches, [(name, GUI, [], True, True)])
+            self.assertEqual(result["workerBefore"], [13, 1300])
+            self.assertTrue(result["privateWindowMembership"]["first-visible-window"]["qualified"])
+            return result
+        self.assertEqual(launches, [(name, GUI, ["--autostart"] if private else [], True, private),
+                                    (name, GUI, [], False, private)])
         self.assertEqual((result["initialWindow"], result["reopenedWindow"], result["workerAfter"]),
                          (21, 21 if subject == "retained" else 22, [13, 1300]))
         self.assertEqual(list(result["windowReadbacks"]), ["startup-intent", "first-dx12-adapter", "first-visible-window",
                                                           "hidden-before-launch", "reopen"])
         return result
+
+    def test_private_activation_and_restart_require_the_witness_on_both_gui_subjects(self):
+        for subject in ("canonical", "retained"):
+            for restart in (False, True):
+                with self.subTest(subject=subject, restart=restart):
+                    result = self.exercise_cycle(subject, private=True, restart=restart)
+                    members = result["privateWindowMembership"]
+                    for stage in (["first-visible-window"] if restart else ["first-visible-window", "reopen"]):
+                        self.assertTrue(members[stage]["qualified"])
+                        self.assertEqual(members[stage]["after"]["target"]["desktop"], {"win32Error": 5})
 
     def test_retained_no_argument_secondary_and_shellless_fallback_reopen_original_native_root_and_worker(self):
         for private in (False, True):

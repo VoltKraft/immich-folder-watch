@@ -50,12 +50,18 @@ class TrayProofTests(unittest.TestCase):
                             text.replace(TOKEN, "0" * 32), text.replace("version4=true", "version4=false"), text + text):
                 with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                     probe.registration(proc, lambda: invalid, lambda callback, _: callback(), {}, no_host=False)
-            with self.assertRaises(tray.Unavailable):
+            with self.assertRaises(ValueError):
                 probe.registration(proc, lambda: text, lambda callback, _: callback(), {}, no_host=True)
             self.assertEqual(tray.records(text.rstrip(), "TRAY_REGISTER"), [])
+        probe.name = "IfwQa_Tray_" + TOKEN
+        probe.desk.name.return_value = {"win32Error": 5}
+        private = Mock()
+        private.name = probe.name
+        private.proc = proc
         for observed, expect in ((dict(hresult=-1, rect=None), False), (dict(hresult=0, rect=RECT), True)):
             with patch.object(tray, "shell_rect", return_value=observed):
-                verify = lambda: probe.registration(proc, lambda: registration(False), lambda fn, _: fn(), {}, no_host=True)
+                verify = lambda: probe.registration(proc, lambda: registration(False), lambda fn, _: fn(), {},
+                                                    no_host=True, private=private)
                 if expect:
                     with self.assertRaises(tray.Unavailable):
                         verify()

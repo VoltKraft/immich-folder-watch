@@ -21,7 +21,7 @@ import run as recorder
 from native import CleanupUnconfirmed, JobAccounting, ThreadEntry, pin_new_marker
 from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
-from window_readback import paint_control, snapshot
+from window_readback import PrivateMembership, check_private_snapshot, paint_control, snapshot
 import retained_subject
 from retained_window import LIFETIME, RetainedWindow, ShowOrderUnavailable, graphics as retained_graphics
 
@@ -215,10 +215,16 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         result.update(primaryPid=proc.pid, primaryCreation100ns=api.process_identity(int(proc._handle)))
         windows = fixture.Windows(proc.pid, desktop)
         stack.callback(release, windows.close, "Could not remove the primary's window event hook")
+        membership = None
+        if private:
+            result["privateWindowMembership"] = {}
+            membership = PrivateMembership(desk, windows, name, desktop, witness, proc, tid,
+                                           result["primaryCreation100ns"], api, fixture.TITLE,
+                                           result["privateWindowMembership"])
         retained = None
         if subject == "retained":
             evidence = result["retainedWindow"] = {}
-            retained = RetainedWindow(desk, windows, fixture.TITLE, name, evidence)
+            retained = RetainedWindow(desk, windows, fixture.TITLE, name, evidence, membership)
             stack.callback(release, retained.close, "Could not remove the retained HWND lifetime hook")
         def log():
             return primary_log.read_text(encoding="utf-8", errors="replace")
@@ -231,9 +237,13 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         def is_visible():
             return windows.visible(waiting_for_first=True)
         def verify_hwnd(hwnd):
+            if windows.visible() != hwnd:
+                raise ValueError("The launcher did not find the same visible primary window")
+            if membership is not None:
+                return membership.verify(hwnd, result["stage"], visible=True)["pid"]
             pid = w.DWORD()
             tid = windows.owner(hwnd, c.byref(pid))
-            if windows.visible() != hwnd or pid.value != proc.pid or desk.name(desk.thread_desktop(tid)) != name:
+            if pid.value != proc.pid or desk.name(desk.thread_desktop(tid)) != name:
                 raise ValueError("The GUI window does not belong to the primary on the selected desktop")
             return pid.value
         def command(data):
@@ -244,8 +254,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             row = snapshot(desk, windows, desktop, witness, tid, result["primaryCreation100ns"])
             row["recentPrimaryEvents"] = windows.events[-16:]
             result["windowReadbacks"][stage] = row
-            if private and not row["witnessSeen"]:
-                raise ValueError("Private desktop enumeration lost the observer's own witness")
+            if private:
+                check_private_snapshot(row, name)
 
         def observe_at(stage, check_value, message):
             result["stage"] = stage
@@ -265,7 +275,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             command(b"T" if tray else b"N")
         else:
             command(b"B")
-            native_tray.registration(proc, log, wait, result, no_host=True)
+            native_tray.registration(proc, log, wait, result, no_host=True, private=membership)
         expected = "READY Visible " + ("Available" if tray else "Unavailable")
         observe_at("startup-intent", lambda: expected in log().splitlines(),
                    "The supervisor did not select the expected visible startup")
@@ -275,7 +285,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
         observe_at("first-dx12-adapter", lambda: "ADAPTER Dx12 " in log(), "The primary did not initialize its DX12 adapter")
         initial = observe_at("first-visible-window", is_visible, f"No visible primary window on {name}")
         if native_tray is not None:
-            native_tray.visible_window(proc, initial, result, "fallbackWindow")
+            native_tray.visible_window(proc, initial, result, "fallbackWindow", private=membership)
         result.update(initialWindow=initial, initialWindowPid=verify_hwnd(initial),
                       initialPrimaryForeground=desk.foreground() == initial)
         if retained is not None:
@@ -328,7 +338,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 result["secondaryTotalProcesses"] = counts.total
             reopened = observe_at("reopen", is_visible, "The ordinary secondary did not reopen the primary GUI")
             if native_tray is not None:
-                native_tray.visible_window(proc, reopened, result, "activatedWindow")
+                native_tray.visible_window(proc, reopened, result, "activatedWindow", private=membership)
             result.update(reopenedWindow=reopened, reopenedWindowPid=verify_hwnd(reopened),
                           primaryForeground=desk.foreground() == reopened)
             if retained is not None:

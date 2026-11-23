@@ -73,9 +73,9 @@ def graphics(log, record, *, before_quit=True):
 class RetainedWindow:
     """Watch this primary before releasing its barrier and until the ordinary quit request."""
 
-    def __init__(self, desk, windows, title, desktop_name, record):
+    def __init__(self, desk, windows, title, desktop_name, record, private=None):
         self.desk, self.windows, self.title, self.name = desk, windows, title, desktop_name
-        self.record = record
+        self.record, self.private = record, private
         self.lifetime = WindowLifetime(windows.pid)
         self.hwnd = None
         self.start = 0
@@ -86,12 +86,19 @@ class RetainedWindow:
     def events(self, start=0):
         return [e for e in self.windows.events[start:] if e["hwnd"] == self.hwnd]
 
-    def identity(self):
+    def surface(self, row, phase):
+        options = {"private": self.private, "membership_stage": "retained." + phase + ".surface"} if self.private else {}
+        visible_surface(self.desk, self.name, self.windows.pid, self.hwnd, row, "surface", **options)
+
+    def identity(self, phase, visible=None):
         owner = w.DWORD()
         caption = c.create_unicode_buffer(256)
         hwnd = self.hwnd
         tid = self.windows.owner(hwnd, c.byref(owner))
-        if (not tid or owner.value != self.windows.pid or self.desk.name(self.desk.thread_desktop(tid)) != self.name
+        if self.private is not None:
+            self.private.verify(hwnd, "retained." + phase, visible=visible, tid=tid)
+        if (not tid or owner.value != self.windows.pid
+                or (self.private is None and self.desk.name(self.desk.thread_desktop(tid)) != self.name)
                 or self.windows.ancestor(hwnd, 2) != hwnd
                 or not self.windows.caption(hwnd, caption, len(caption)) or caption.value != self.title):
             raise ValueError("The retained root lost its native title, owner or desktop")
@@ -107,9 +114,9 @@ class RetainedWindow:
              "No native show and creation events for the first retained GUI window")
         if [e["event"] for e in self.events()] != ["show"] or self.windows.visible() != hwnd:
             raise ValueError("The first retained HWND did not have one visible startup")
-        self.record["first"] = self.identity()
+        self.record["first"] = self.identity("first", True)
         self.record["first"]["showEvent"] = self.events()[0]
-        visible_surface(self.desk, self.name, self.windows.pid, hwnd, self.record["first"], "surface")
+        self.surface(self.record["first"], "first")
         text = log()
         if "WINDOW_HIDDEN" in text.splitlines():
             raise ValueError("The retained GUI had already been closed before its first visible observation")
@@ -126,7 +133,7 @@ class RetainedWindow:
         if (self.windows.is_visible(self.hwnd) or [e["event"] for e in self.events(self.start)] != ["hide"]
                 or log.splitlines().count("WINDOW_HIDDEN") != 1):
             raise ValueError("The retained HWND did not remain hidden after its genuine close")
-        row = self.record["hidden"] = self.identity()
+        row = self.record["hidden"] = self.identity("hidden", False)
         row["hideEvent"] = self.events(self.start)[0]
         graphics(log, row)
         return True
@@ -145,8 +152,8 @@ class RetainedWindow:
         expected = ["hide", "show"] if "hidden" in self.record else ["show"]
         if [e["event"] for e in events] != expected:
             raise ValueError("Unexpected native visibility events for the retained root")
-        row = self.record[phase] = {**self.identity(), "events": events}
-        visible_surface(self.desk, self.name, self.windows.pid, self.hwnd, row, "surface")
+        row = self.record[phase] = {**self.identity(phase, True), "events": events}
+        self.surface(row, phase)
         text = log()
         if text.splitlines().count("WINDOW_HIDDEN") != int("hidden" in self.record):
             raise ValueError("The retained GUI reported another close during activation")
@@ -159,7 +166,7 @@ class RetainedWindow:
             row["state"] = "visible"
             return
         if self.hwnd is not None:
-            row["root"] = self.identity()
+            row["root"] = self.identity("afterTrigger")
             row["queryBeganMs"] = clock()
             if self.windows.is_visible(self.hwnd):
                 row["state"] = "visible"

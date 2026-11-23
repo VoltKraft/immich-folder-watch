@@ -11,7 +11,7 @@ import sys
 
 import observe as launcher
 from observe import CleanupUnconfirmed, bind, check, ordinary_console, recorder
-from window_readback import monitor_work_area, visible_surface
+from window_readback import RECEIVER_CLASS, monitor_work_area, visible_surface
 
 PROVIDER = launcher.HERE / "tray_provider.ps1"
 RECORDS = {
@@ -313,7 +313,7 @@ class NativeTray:
         if not self.original_at(stage, surface):
             raise Unavailable(f"The retained original Shell could not be confirmed at {stage}")
 
-    def registration(self, proc, log, wait, result, *, no_host):
+    def registration(self, proc, log, wait, result, *, no_host, private=None):
         entries = wait(lambda: records(log(), "TRAY_REGISTER"), "No initial native registration outcome")
         initial = one([row for row in entries if row[0] == "initial"], "initial registration")
         _, pid, hwnd, ident, token, added, v4 = initial
@@ -329,9 +329,15 @@ class NativeTray:
         actual_desktop = self.desk.name(self.desk.thread_desktop(window["tid"])) if window else None
         result["registration"] = dict(pid=int(pid), hwnd=int(hwnd), iconId=int(ident), token=token,
                                       added=added == "1", version4=v4 == "1", receiver=window, desktop=actual_desktop)
-        if (not window or window["pid"] != proc.pid or window["class"] != "IFW RW02 synthetic tray receiver"
-                or actual_desktop != self.name):
+        if not window or window["pid"] != proc.pid or window["class"] != RECEIVER_CLASS:
             raise ValueError("The receiver HWND did not belong to the retained primary on the selected desktop")
+        if no_host:
+            if (private is None or private.proc is not proc or private.name != self.name or self.name == "Default"
+                    or actual_desktop not in (self.name, {"win32Error": 5})):
+                raise ValueError("The receiver lacked a consistent thread or private desktop membership witness")
+            private.verify(int(hwnd), "trayReceiver", visible=False, tid=window["tid"], receiver=True)
+        elif actual_desktop != self.name:
+            raise ValueError("The receiver HWND did not belong to the original desktop")
         independent = result["registration"]["shellReadback"] = shell_rect(int(hwnd))
         binds = [row for row in records(log(), "TRAY_BIND") if row[0] == "initial"]
         if added == "1":
@@ -354,9 +360,13 @@ class NativeTray:
                 raise Unavailable("The first v4 acknowledgement did not match the independently pinned original Shell")
         return key
 
-    def visible_window(self, proc, hwnd, result, stage):
-        visible_surface(self.desk, self.name, proc.pid, hwnd, result, stage, monitor_area=monitor_work_area,
-                        unavailable=Unavailable)
+    def visible_window(self, proc, hwnd, result, stage, *, private=None):
+        if private is not None:
+            receiver = result["registration"]
+            private.verify(receiver["hwnd"], stage + ".receiver", visible=False,
+                           tid=receiver["receiver"]["tid"], receiver=True)
+        visible_surface(self.desk, self.name, proc.pid, hwnd, result, stage, private=private,
+                        monitor_area=monitor_work_area, unavailable=Unavailable)
 
     def check_drain(self, proc, job, log, result):
         """Retain normal app exit, job accounting and exact icon removal even on observation failure."""
