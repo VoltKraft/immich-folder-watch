@@ -20,7 +20,7 @@ are part of the evidence. [Synthetic fixtures](../../rust/tests/fixtures/legacy)
 | Platform | Installed-package checks |
 | --- | --- |
 | Linux x64 and ARM64 | Deploy the original bundle into a fresh per-user Flatpak installation in a private mount, user, PID, network and IPC namespace. Compare the installed tree against the original OSTree commit. Remove its verified metainfo file, repair from a local repository imported from that bundle, compare the complete tree again, and perform ordinary uninstall. Inspect the ELF machine, runtime declaration and installed application metadata. The application stays stopped. |
-| Windows x64 and ARM64 | On a fresh disposable Actions runner, inspect the original MSI, verify that the targeted product, paths, registry values and service are absent, seed the isolated profile, then run Windows Installer. Check all installed bytes against the embedded cabinet digest and inspect the native PE headers. Remove the verified SQLite library, repair missing files, compare the payload again and perform ordinary uninstall. Retain the original Windows Installer logs, registration observations and profile. Record Windows Installer’s start markers for the migration and relaunch actions and the actual Startup shortcut at each checkpoint. |
+| Windows x64 and ARM64 | Inspect the original MSI tables on a fresh disposable runner, verify that the product footprint is absent, seed the isolated profile and run Windows Installer. Check every installed file against the embedded cabinet and inspect the native PE headers. Remove the verified SQLite library, repair missing files, compare the payload again and perform ordinary uninstall. Retain the original logs, registration observations and profile. Check the executable's desktop shortcut and the absence of an application-created Startup link while the app is stopped. |
 
 The x64 MSI contains 439 files totalling 149,235,325 bytes. The ARM64 MSI
 contains 438 totalling 160,659,509 bytes. A local reconstruction of the two
@@ -54,6 +54,36 @@ reproduced the full SQL dump of the shipping fixture. All nine sources and
 16 evidence files verified. The index in
 `artifacts/rust/shipping-install-fedora-285101b/` has SHA-256
 `39c118eacde33f01eeafa59d1b5ecf4f8e8909d16da55d4b62f4b5279e2d2b79`.
+
+## First native package run
+
+At `1b95ba0` Windows Installer completed the initial installation and cleanup
+uninstall on both hosted Windows targets. The x64 logs recorded 439 file
+copies and removals, and the ARM64 logs recorded 438. Independent inspection
+of both released MSI databases found four custom actions, 29 execute-sequence
+entries and one desktop shortcut. The compiled packages omit the migration
+and GUI relaunch actions present in the WiX source fragment. The original
+test expected the migration action and stopped before checking the installed
+payload or running repair. The corrected check binds each verbose log to the
+product, package, operation and completed transaction. It checks the stopped
+application's actual shortcuts. [x64 logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426419/artifacts/14835059083) · [ARM64 logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426419/artifacts/14835003224).
+
+Both Ubuntu hosts imported the original release into OSTree and then
+failed to deploy. An x64 Noble 1.14.6 reproduction traced a failed connection
+to the absent system bus. The fixture now runs a D-Bus daemon under its own
+temporary mount. The only activatable name is the daemon itself.
+Flatpak 1.14.6 reports its shared permissions as `network;ipc;`; Fedora's
+1.18.4 reports `ipc;network;`. Both declare exactly the same permissions.
+The upstream package bytes remain fixed. [Ubuntu x64 log](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426419/artifacts/14836270852) · [Ubuntu ARM64 log](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426419/artifacts/14835164322).
+
+With the private bus, the original x64 Flatpak installed, repaired and
+uninstalled in both the Noble userspace and Fedora 45 on the Fedora host.
+Each of the 785 original payload entries and the two retained profile files
+matched. The local evidence indexes in
+`artifacts/rust/shipping-install-noble-local-replay/` and
+`artifacts/rust/shipping-install-fedora-private-bus/` have SHA-256
+`8a5d3d06713d6cf4b229acfc8a3320287f07a3a264d18e0dc885d08ac1ab24e2`
+and `d1485b18398fe3792a778af0eea2cd439fc377ba3810b5b6021c18c943071884`.
 
 RI-AC08 still requires the four Rust packages, native old-to-new upgrades,
 repair, removal and rollback after activity in the installed Rust application.

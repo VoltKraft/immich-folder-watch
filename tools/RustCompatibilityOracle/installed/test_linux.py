@@ -13,6 +13,16 @@ import linux
 
 
 class LinuxFlatpakTests(unittest.TestCase):
+    def test_effective_permissions_allow_both_native_orders_and_exactly_the_shipping_rights(self):
+        permissions = ("[Context]\nshared=ipc;network;\nsockets=x11;\ndevices=dri;\n"
+                       "[Session Bus Policy]\norg.kde.StatusNotifierWatcher=talk\n")
+        expected = linux.keyfile(permissions)
+        self.assertEqual(linux.shipping_permissions(permissions), expected)
+        self.assertEqual(linux.shipping_permissions(permissions.replace("ipc;network;", "network;ipc;")), expected)
+        for changed in ("network;", "network;ipc;ipc;", "network;ipc;files;", "network;ipc;\nfilesystems=host;"):
+            with self.subTest(shared=changed), self.assertRaisesRegex(ValueError, "sandbox permissions"):
+                linux.shipping_permissions(permissions.replace("ipc;network;", changed))
+
     def test_payload_records_links_without_following_targets_or_linked_directories(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)

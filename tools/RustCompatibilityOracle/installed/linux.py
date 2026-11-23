@@ -28,6 +28,8 @@ PROFILE = Path("/tmp/home/.var/app") / APP / "config" / COMMAND
 INSTALLATION = Path("/tmp/installation")
 REPOSITORY = Path("/tmp/release-source")
 ORIGINAL = Path("/tmp/original")
+BUS = Path("/tmp/shipping-installer-bus")
+BUS_ADDRESS = "unix:path=" + str(BUS)
 NAMES = ("config.yaml", "sync-state.db")
 NAMESPACES = ("user", "mnt", "net", "ipc", "pid")
 ENV = {
@@ -83,11 +85,31 @@ def user_flatpak(*arguments):
     return command("flatpak", "--user", *arguments)
 
 
+def observe_private_bus():
+    check(os.environ.get("DBUS_SYSTEM_BUS_ADDRESS") == BUS_ADDRESS and BUS.is_socket(),
+          "Expected the shipping fixture's private system bus")
+    base = ["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.DBus", "/org/freedesktop/DBus"]
+    bus_id = re.findall(r'^\s*string "([0-9a-f]{32})"\s*$', command(*base, "org.freedesktop.DBus.GetId"), re.M)
+    names = re.findall(r'^\s*string "([^"]+)"\s*$', command(*base, "org.freedesktop.DBus.ListActivatableNames"), re.M)
+    check(len(bus_id) == 1 and names == ["org.freedesktop.DBus"], "Unexpected services on the private installer bus")
+    return {"address": BUS_ADDRESS, "id": bus_id[0], "activatableNames": names}
+
+
 def keyfile(contents):
     parsed = configparser.ConfigParser(interpolation=None)
     parsed.optionxform = str
     parsed.read_string(contents)
     return {section: dict(parsed[section]) for section in parsed.sections()}
+
+
+def shipping_permissions(contents):
+    actual = keyfile(contents)
+    if actual.get("Context", {}).get("shared") == "network;ipc;":
+        actual["Context"]["shared"] = "ipc;network;"
+    expected = {"Context": {"shared": "ipc;network;", "sockets": "x11;", "devices": "dri;"},
+                "Session Bus Policy": {"org.kde.StatusNotifierWatcher": "talk"}}
+    check(actual == expected, "Unexpected effective sandbox permissions")
+    return actual
 
 
 def payload(root):
@@ -153,6 +175,7 @@ def private_inputs():
 
 def run_inside():
     inputs, ids = private_inputs()
+    bus = observe_private_bus()
     for path in ENV.values():
         Path(path).mkdir(mode=0o700, parents=True, exist_ok=True)
     check(verified_package(PACKAGE) == inputs["asset"], "Unexpected package in the isolated mount")
@@ -198,9 +221,7 @@ def run_inside():
     check(metadata == keyfile((ORIGINAL / "metadata").read_text()) and metadata["Application"] == {
         "name": APP, "runtime": runtime, "sdk": f"org.freedesktop.Sdk/{arch}/26.08", "command": COMMAND,
     } and info["runtime"] == runtime, "Unexpected deployed application metadata")
-    permissions = {"Context": {"shared": "ipc;network;", "sockets": "x11;", "devices": "dri;"},
-                   "Session Bus Policy": {"org.kde.StatusNotifierWatcher": "talk"}}
-    check(keyfile(info["permissions"]) == permissions, "Unexpected effective sandbox permissions")
+    permissions = shipping_permissions(info["permissions"])
     check(user_flatpak("list", "--columns=ref") == ref.removeprefix("app/"), "Unexpected installed refs")
     files = location / "files"
     installed = payload(files)
@@ -238,8 +259,8 @@ def run_inside():
               "repair": {"source": REPOSITORY.as_uri(), "removed": METAINFO.as_posix(),
                          "restoredSha256": repaired[METAINFO.as_posix()]["sha256"]},
               "profileHashes": profile, "retainedRows": database_state(retained / "sync-state.db"),
-              "namespaces": ids, "deployedRefsAfterUninstall": [], "tools": {}}
-    for tool in ("bwrap", "flatpak", "ostree"):
+              "namespaces": ids, "privateBus": bus, "deployedRefsAfterUninstall": [], "tools": {}}
+    for tool in ("bwrap", "flatpak", "ostree", "dbus-daemon"):
         result["tools"][tool] = {"version": command(tool, "--version"), "sha256": digest(Path(shutil.which(tool)))}
     write_json(QA / "observations.json", result)
 
@@ -259,7 +280,7 @@ def run_native(package, evidence, seed_info):
                   "seedFileIds": {name: profile_file_id(seed / name) for name in NAMES}}
         write_json(evidence / "inputs.json", inputs)
         harness = ROOT / "tools/rust-qa/performance/linux.py"
-        paths = [HERE / name for name in ("linux.py", "run.py", "release.json")]
+        paths = [HERE / name for name in ("linux.py", "run.py", "release.json", "flatpak-bus.conf")]
         sources = {str(path.relative_to(ROOT)): digest(path) for path in [harness, *paths]}
         with tempfile.TemporaryDirectory(prefix="ifw-shipping-flatpak-", dir="/tmp") as staging:
             scripts = Path(staging) / HERE.relative_to(ROOT)
@@ -275,8 +296,10 @@ def run_native(package, evidence, seed_info):
                 command_line += ["--ro-bind", str((seed / name).absolute()), str(SEED / name)]
             for key, value in ENV.items():
                 command_line += ["--setenv", key, value]
-            command_line += ["--chdir", "/qa", "--", "/usr/bin/python3", "-B",
-                             str(Path("/app") / HERE.relative_to(ROOT) / "linux.py"), "--inside"]
+            guest = Path("/app") / HERE.relative_to(ROOT)
+            command_line += ["--setenv", "DBUS_SYSTEM_BUS_ADDRESS", BUS_ADDRESS, "--chdir", "/qa", "--",
+                             "dbus-run-session", "--config-file=" + str(guest / "flatpak-bus.conf"), "--",
+                             "/usr/bin/python3", "-B", str(guest / "linux.py"), "--inside"]
             with (evidence / "namespace.log").open("wb") as log:
                 child = subprocess.run(command_line, stdout=log, stderr=subprocess.STDOUT, timeout=900)
             check(child.returncode == 0, f"Private Flatpak run exited with {child.returncode}, see namespace.log and commands.jsonl")

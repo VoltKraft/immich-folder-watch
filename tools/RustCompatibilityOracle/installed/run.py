@@ -141,7 +141,7 @@ def run(target, output, local_package):
                "releaseTag": RELEASE["tag"], "releaseId": RELEASE["releaseId"], "nativeMachine": platform.machine(),
                "pythonVersion": platform.python_version(), "sqliteVersion": sqlite3.sqlite_version,
                "fixtureInputs": {str(p.relative_to(ROOT).as_posix()): digest(p) for p in
-                                 [HERE / name for name in ("run.py", "release.json", "linux.py", "windows.ps1")] +
+                                 [HERE / name for name in ("run.py", "release.json", "linux.py", "flatpak-bus.conf", "windows.ps1")] +
                                  [ROOT / name for name in dependencies]},
                "workflowRun": os.environ.get("GITHUB_RUN_ID"), "workflowAttempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
                "status": "failed"}

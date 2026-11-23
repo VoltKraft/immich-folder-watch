@@ -141,6 +141,27 @@ function Get-FileLayout($DirectoryRows, $ComponentRows, $FileRows) {
     return $layout
 }
 
+function Get-ReleaseIntegration($CustomActions, $Sequence, $Shortcuts, [string]$Architecture) {
+    $suffix = @{ x64 = 'X64'; arm64 = 'A64' }[$Architecture]
+    $reviewed = @('EnsureAppClosed', "Wix4CloseApplications_$suffix", "Wix4CloseApplicationsDeferred_$suffix",
+        "Wix4CheckRebootRequired_$suffix")
+    $actions = @($CustomActions | ForEach-Object { $_.Action })
+    $scheduled = @($Sequence | ForEach-Object { $_.Action })
+    if ($actions.Count -ne $reviewed.Count -or (Compare-Object $actions $reviewed -CaseSensitive) -or
+        $scheduled.Count -ne 29 -or $scheduled -cnotcontains "Wix4CloseApplications_$suffix" -or
+        $scheduled -ccontains 'MigrateLegacyUserConfig' -or $scheduled -ccontains 'RelaunchAppAfterUpgrade') {
+        throw 'Unexpected custom actions or sequence in the original release MSI.'
+    }
+    if ($Shortcuts.Count -ne 1) { throw 'Expected one authored desktop shortcut in the release MSI.' }
+    $link = $Shortcuts[0]
+    if ($link.Shortcut -cne 'DesktopShortcut' -or $link.Directory -cne 'DesktopFolder' -or
+        $link.Component -cne 'DesktopShortcutComponent' -or $link.Target -cne '[BINDIR]ImmichFolderWatch.exe' -or
+        $link.Arguments -cne '' -or $link.WorkingDirectory -cne 'INSTALLFOLDER') {
+        throw 'The compiled desktop shortcut differs from the original release.'
+    }
+    return [ordered]@{ customActions = $actions; installExecuteSequence = $Sequence; shortcut = $link }
+}
+
 function Read-ReleaseMsi([string]$MsiPath, [string]$Architecture, $Expected) {
     . (Join-Path $PSScriptRoot '../../../packaging/windows/Test-InstallerUpgradeContract.ps1')
     Test-InstallerUpgradeContract -Path $MsiPath -ExpectedPlatform $Architecture -ExpectedVersion '3.0.4'
@@ -163,11 +184,16 @@ function Read-ReleaseMsi([string]$MsiPath, [string]$Architecture, $Expected) {
         $dirs = @(Read-MsiRows $db 'SELECT `Directory`, `Directory_Parent`, `DefaultDir` FROM `Directory`' @('Directory', 'Parent', 'Name'))
         $components = @(Read-MsiRows $db 'SELECT `Component`, `Directory_` FROM `Component`' @('Component', 'Directory'))
         $files = @(Read-MsiRows $db 'SELECT `File`, `Component_`, `FileName`, `FileSize` FROM `File`' @('File', 'Component', 'Name', 'Bytes'))
+        $actions = @(Read-MsiRows $db 'SELECT `Action` FROM `CustomAction` ORDER BY `Action`' @('Action'))
+        $sequence = @(Read-MsiRows $db 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence` ORDER BY `Sequence`' @('Action', 'Sequence'))
+        $shortcutSql = 'SELECT `Shortcut`, `Directory_`, `Component_`, `Target`, `Arguments`, `WkDir` FROM `Shortcut`'
+        $shortcuts = @(Read-MsiRows $db $shortcutSql @('Shortcut', 'Directory', 'Component', 'Target', 'Arguments', 'WorkingDirectory'))
         $layout = Get-FileLayout $dirs $components $files
         if ($layout.Count -ne $Expected.files -or $layout.AppExecutableFile.path -cne 'ImmichFolderWatch.exe' -or
             $layout.SqliteNativeFile.path -cne 'e_sqlite3.dll') { throw 'Original MSI file table changed.' }
         return @{
             layout = $layout
+            integration = Get-ReleaseIntegration $actions $sequence $shortcuts $Architecture
             identity = [ordered]@{ productCode = $properties.ProductCode; packageCode = $packageCode; template = $template
                 upgradeCode = $properties.UpgradeCode; productName = $properties.ProductName
                 manufacturer = $properties.Manufacturer; version = $properties.ProductVersion; allUsers = $properties.ALLUSERS }
@@ -428,11 +454,12 @@ function Assert-InstalledState($State, $Paths, $Identity) {
         throw 'Installed Windows shortcuts, event registration, user registry marker or directories differ.'
     }
     Assert-Shortcut $desktop[0] $Paths.exe ''
-    Assert-Shortcut $State.startup $Paths.exe '--autostart'
+    if ($State.startup.exists) { throw 'Unexpected Startup shortcut for a stopped application.' }
 }
 
 function Assert-Removed($State) {
     Assert-NoInterference $State
+    if ($State.startup.exists) { throw 'Unexpected Startup shortcut left untouched after uninstall.' }
     if ($State.registered.Count -ne 0 -or $State.relatedProducts.Count -ne 0 -or $State.installDirectory -or
         @($State.desktop | Where-Object { $_.exists }).Count -ne 0 -or $State.userMarker.values.Count -ne 0 -or
         $State.eventLog.values.Count -ne 0 -or $State.eventSource.values.Count -ne 0) {
@@ -440,15 +467,49 @@ function Assert-Removed($State) {
     }
 }
 
-function Get-MsiActionStarts([string]$LogPath) {
-    $log = Get-Content -Raw -LiteralPath $LogPath
-    return [ordered]@{
-        migrationActionStarted = $log -match '(?im)^Action start [^\r\n]*: MigrateLegacyUserConfig\.'
-        guiRelaunchActionStarted = $log -match '(?im)^Action start [^\r\n]*: RelaunchAppAfterUpgrade\.'
+function Read-MsiOperationLog([string]$Log, [string]$LogPath, [ValidateSet('/i', '/fp', '/x')][string]$Operation, $Identity) {
+    $lines = $Log.TrimEnd([char[]]"`r`n") -split '\r?\n'
+    if ($lines.Count -lt 3 -or $lines[0] -cnotmatch '^=== Verbose logging started: .+ ===$' -or
+        $lines[-2] -cnotmatch '^MSI \(c\) .+: MainEngineThread is returning 0$' -or
+        $lines[-1] -cnotmatch '^=== Verbose logging stopped: .+ ===$') {
+        throw "Incomplete successful Windows Installer log: $LogPath"
     }
+    foreach ($line in @("Property(S): ProductCode = $($Identity.productCode)",
+                         "Property(S): PackageCode = $($Identity.packageCode)", "Property(S): MsiLogFileLocation = $LogPath")) {
+        if ($lines -inotcontains $line) { throw "Windows Installer log identity differs: $line" }
+    }
+    $suffix = if ($Identity.template -ieq 'x64;1033') { 'X64' } else { 'A64' }
+    $starts = @([regex]::Matches($Log, '(?m)^Action start [\d:]+: (\w+)\.\r?$') | ForEach-Object { $_.Groups[1].Value })
+    foreach ($action in @("Wix4CloseApplications_$suffix", 'InstallInitialize', 'InstallFinalize', 'INSTALL')) {
+        if ($starts -cnotcontains $action -or $Log -cnotmatch "(?m)^Action ended [\d:]+: $action\. Return value 1\.\r?$") {
+            throw "Missing completed Windows Installer action '$action' in $LogPath"
+        }
+    }
+    if ($starts -ccontains 'MigrateLegacyUserConfig' -or $starts -ccontains 'RelaunchAppAfterUpgrade') {
+        throw "Unexpected migration or GUI relaunch action in $LogPath"
+    }
+    $verb, $result = switch ($Operation) {
+        '/i'  { 'installed', 'Installation' }
+        '/fp' { 'reconfigured', 'Reconfiguration' }
+        '/x'  { 'removed', 'Removal' }
+    }
+    $success = "Windows Installer $verb the product. Product Name: $($Identity.productName). Product Version: $($Identity.version). " +
+               "Product Language: 1033. Manufacturer: $($Identity.manufacturer). $result success or error status: 0."
+    if ($Log -cnotmatch "(?m)^MSI \(s\) [^\r\n]+: $([regex]::Escape($success))\r?$") {
+        throw "Missing successful product $result in $LogPath"
+    }
+    $fileOp = if ($Operation -eq '/x') { 'FileRemove\([^)\r\n]*\bFileName=e_sqlite3\.dll,' }
+              else { 'FileCopy\([^)\r\n]*\bSourceCabKey=SqliteNativeFile,DestName=e_sqlite3\.dll,' }
+    if ($Log -cnotmatch "(?m)^MSI \(s\) [^\r\n]+: Executing op: $fileOp" -or
+        ($Operation -eq '/fp' -and $lines -inotcontains 'Property(S): REINSTALLMODE = p') -or
+        ($Operation -eq '/x' -and $lines -cnotcontains 'Property(S): REMOVE = ALL')) {
+        throw "Missing requested $Operation file operation in $LogPath"
+    }
+    return [ordered]@{ migrationActionStarted = $false; guiRelaunchActionStarted = $false
+        actionStarts = $starts.Count; productOperation = $result; sqliteFileOperation = $true }
 }
 
-function Invoke-ReleaseMsi([string]$Switch, [string]$Subject, [string]$LogPath, $Operations) {
+function Invoke-ReleaseMsi([string]$Switch, [string]$Subject, [string]$LogPath, $Operations, $Identity) {
     Assert-Absent $LogPath
     $entry = [ordered]@{ operation = $Switch; subject = $Subject; log = [IO.Path]::GetFileName($LogPath)
         exitCode = $null; timedOut = $false }
@@ -465,10 +526,7 @@ function Invoke-ReleaseMsi([string]$Switch, [string]$Subject, [string]$LogPath, 
         }
         $entry.exitCode = $process.ExitCode
         if ($entry.exitCode -ne 0) { throw "Windows Installer returned $($entry.exitCode). See $($entry.log)." }
-        $entry.actions = Get-MsiActionStarts $LogPath
-        if ($entry.actions.guiRelaunchActionStarted -or $entry.actions.migrationActionStarted -ne ($Switch -in @('/i', '/fp'))) {
-            throw "Unexpected migration or GUI relaunch action in $($entry.log)."
-        }
+        $entry.actions = Read-MsiOperationLog (Get-Content -Raw -LiteralPath $LogPath) $LogPath $Switch $Identity
     }
     finally { $process.Dispose() }
 }
@@ -492,7 +550,6 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
     $ownProfile = $false
     $installationStarted = $false
     $installRemoved = $false
-    $startupDigest = $null
     $failure = $null
     try {
         $item = Get-Item -LiteralPath $package -Force
@@ -500,13 +557,13 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
             (Get-FileDigest $package) -cne $asset.sha256) { throw 'The release MSI name, size or digest differs.' }
         $msi = Read-ReleaseMsi $package $architecture $expected
         $receipt.identity = $msi.identity
+        $receipt.integration = $msi.integration
         $hashes = Get-ProfileHashes $seed
         $config = Join-Path $PSScriptRoot '../../../rust/tests/fixtures/legacy/windows/config/defaults.written.yaml'
         if ($hashes['config.yaml'] -cne (Get-FileDigest $config)) { throw 'Expected the checked-in synthetic Windows YAML.' }
         $receipt.seed = $hashes
         $paths = Get-HostPaths
-        # Some custom actions remove an entire legacy directory, delete a service or overwrite a link.
-        # Check their names before reading any pre-existing user state or acquiring cleanup ownership.
+        # Require an empty product footprint before creating the stopped synthetic profile.
         foreach ($name in @('install', 'profile', 'legacy', 'startup', 'desktop', 'publicDesktop')) {
             Assert-PlainPath $paths[$name]
             Assert-Absent $paths[$name]
@@ -522,7 +579,7 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
         $ownProfile = $true
         Copy-Profile $seed $paths.profile $hashes
         $installationStarted = $true
-        Invoke-ReleaseMsi '/i' $package (Join-Path $evidence 'install.log') $receipt.operations
+        Invoke-ReleaseMsi '/i' $package (Join-Path $evidence 'install.log') $receipt.operations $msi.identity
         foreach ($stage in @('installed', 'repaired')) {
             if ($stage -eq 'repaired') {
                 # The source, destination and bytes of this one owned component were verified after install.
@@ -538,14 +595,10 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
                     missing = $challenge.path; originalSha256 = $challenge.sha256
                     profile = Assert-Profile $paths.profile $hashes
                 }
-                Invoke-ReleaseMsi '/fp' $package (Join-Path $evidence 'repair.log') $receipt.operations
+                Invoke-ReleaseMsi '/fp' $package (Join-Path $evidence 'repair.log') $receipt.operations $msi.identity
             }
             $state = Get-HostState $paths $msi.identity
             $receipt.checkpoints[$stage] = $state
-            if ($state.startup.exists) {
-                Assert-Shortcut $state.startup $paths.exe '--autostart'
-                $startupDigest = $state.startup.sha256
-            }
             Assert-InstalledState $state $paths $msi.identity
             $state.profile = Assert-Profile $paths.profile $hashes
             $payload = Get-VerifiedPayload $paths.bin $msi.layout $expected
@@ -559,15 +612,11 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
             $state.payload = [ordered]@{ files = $payload.files; bytes = $payload.bytes; sha256 = $payload.sha256
                 sqliteSha256 = $payload.entries['SqliteNativeFile'].sha256; peMachine = $native }
         }
-        Invoke-ReleaseMsi '/x' $msi.identity.productCode (Join-Path $evidence 'uninstall.log') $receipt.operations
+        Invoke-ReleaseMsi '/x' $msi.identity.productCode (Join-Path $evidence 'uninstall.log') $receipt.operations $msi.identity
         $installRemoved = $true
         $removed = Get-HostState $paths $msi.identity
         $receipt.checkpoints.uninstalled = $removed
         Assert-Removed $removed
-        if ($removed.startup.exists) {
-            Assert-Shortcut $removed.startup $paths.exe '--autostart'
-            if ($removed.startup.sha256 -cne $startupDigest) { throw 'The retained Startup shortcut changed on uninstall.' }
-        }
         $removed.profile = Assert-Profile $paths.profile $hashes
         $kept = Join-Path $evidence 'retained'
         New-FixtureDirectory $kept
@@ -589,20 +638,12 @@ function Invoke-InstalledBaseline([string]$Package, [string]$Seed, [string]$Evid
                     Assert-NoInterference $current
                     if ($current.registered.Count -or $current.relatedProducts.Count) {
                         Assert-OwnedRegistration $current $msi.identity
-                        Invoke-ReleaseMsi '/x' $msi.identity.productCode (Join-Path $evidence 'cleanup-uninstall.log') $receipt.operations
+                        Invoke-ReleaseMsi '/x' $msi.identity.productCode (Join-Path $evidence 'cleanup-uninstall.log') $receipt.operations $msi.identity
                     }
                 }
                 $after = Get-HostState $paths $msi.identity
                 Assert-Removed $after
-                if ($after.startup.exists) {
-                    Assert-Shortcut $after.startup $paths.exe '--autostart'
-                    if (-not $startupDigest -or $after.startup.sha256 -cne $startupDigest) {
-                        throw 'Unrecognized Startup shortcut left untouched.'
-                    }
-                    [IO.File]::Delete($paths.startup)
-                    Assert-Absent $paths.startup
-                }
-                $receipt.cleanup.ownedStartupRemoved = $after.startup.exists
+                $receipt.cleanup.startupAbsent = -not $after.startup.exists
                 $receipt.cleanup.msiRemoved = $true
                 $receipt.cleanup.remainingRegistryKeys = @(
                     foreach ($name in @('eventLog', 'eventSource', 'userMarker')) {

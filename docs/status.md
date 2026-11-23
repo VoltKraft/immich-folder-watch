@@ -1,5 +1,17 @@
 # Project Status
 
+## Released installer behavior on the four hosted targets (2026-11-23)
+
+At `1b95ba0`, both original Windows MSI files installed and uninstalled
+successfully during cleanup. The test stopped before repair because it
+expected a migration action absent from the compiled MSI tables. Both Noble
+jobs imported the original OSTree commit and failed to reach a system bus at
+deployment. The revised Linux fixture completed the entire offline installation,
+repair and removal in Noble and Fedora x64 userspace on the local Fedora kernel.
+The Windows fixture now checks the actual compiled actions and sole desktop
+shortcut. Native hosted repair and post-removal profile checks are due next.
+[Original run and receipts](rust/rw01-installed-packages.md#first-native-package-run).
+
 ## Four native upload references and package migration baseline (2026-11-23)
 
 At `9efe6f4` all four shipping upload references passed. Ubuntu passed

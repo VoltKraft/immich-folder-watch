@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends flatpak ostree bubblewrap
+          sudo apt-get install --yes --no-install-recommends flatpak ostree bubblewrap dbus-bin dbus-daemon
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
       - name: Check package and retained-profile verification

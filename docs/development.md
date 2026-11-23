@@ -78,7 +78,8 @@ each native target in its `rust-worker-backup` archive.
 ### Original package install and repair
 
 Use the common runner on a native Linux x64 or ARM64 machine with Flatpak,
-OSTree and Bubblewrap. It creates a new private installation and evidence
+OSTree, Bubblewrap, `dbus-run-session` and `dbus-send`. It creates a private
+bus inside the test namespace, a fresh Flatpak installation and an evidence
 directory. From the repository root, a local x64 run with a previously
 downloaded release bundle is:
 

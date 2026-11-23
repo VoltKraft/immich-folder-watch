@@ -61,7 +61,8 @@ try {
     Assert-Refused { Get-FileLayout $dirs $components $files } 'no destination under'
     Assert-Refused { Get-TargetName '..\outside' } 'Unsafe MSI destination'
 
-    $identity = @{ productCode = (Get-ReleasePayload 'x64').productCode; version = '3.0.4'
+    $identity = @{ productCode = (Get-ReleasePayload 'x64').productCode; packageCode = (Get-ReleasePayload 'x64').packageCode
+        template = 'x64;1033'; version = '3.0.4'
         manufacturer = 'VoltKraft'; productName = 'Immich Folder Watch' }
     $paths = @{ exe = 'synthetic-executable' }
     $arp = @{ root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'; productCode = $identity.productCode
@@ -72,18 +73,68 @@ try {
         eventLog = @{ values = @{ MaxSize = 1048576; Retention = 0 } }
         eventSource = @{ values = @{ TypesSupported = 7; EventMessageFile = '%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll' } }
         desktop = @(@{ exists = $true; target = $paths.exe; arguments = '' }, @{ exists = $false })
-        startup = @{ exists = $true; target = $paths.exe; arguments = '--autostart' } }
+        startup = @{ exists = $false } }
     Assert-InstalledState $state $paths $identity
+    $state.startup = @{ exists = $true; target = 'unrelated'; arguments = '' }
+    Assert-Refused { Assert-InstalledState $state $paths $identity } 'Unexpected Startup shortcut'
+    Assert-Refused { Assert-Removed $state } 'Startup shortcut left untouched'
+    $state.startup = @{ exists = $true; target = $paths.exe; arguments = '--autostart' }
+    Assert-Refused { Assert-InstalledState $state $paths $identity } 'Unexpected Startup shortcut'
+    $state.startup = @{ exists = $false }
     $arp.productCode = (Get-ReleasePayload 'arm64').productCode
     Assert-Refused { Assert-OwnedRegistration $state $identity } 'per-machine ARP'
     $state.pendingAppOperations = @('deferred')
     Assert-Refused { Assert-NoInterference $state } 'pending product operation'
-    $log = Join-Path $area 'test-msi.log'
-    [IO.File]::WriteAllText($log, "Action start 14:03:15: MigrateLegacyUserConfig.`r`nMSI (s) : Skipping action: RelaunchAppAfterUpgrade (condition is false)")
-    $actions = Get-MsiActionStarts $log
-    if (-not $actions.migrationActionStarted -or $actions.guiRelaunchActionStarted) { throw 'A skipped relaunch produced an action-start observation.' }
-    [IO.File]::AppendAllText($log, "`r`nAction start 14:03:18: RelaunchAppAfterUpgrade.")
-    if (-not (Get-MsiActionStarts $log).guiRelaunchActionStarted) { throw 'The GUI relaunch action-start line was missed.' }
+
+    $custom = @('EnsureAppClosed', 'Wix4CloseApplications_X64', 'Wix4CloseApplicationsDeferred_X64',
+                'Wix4CheckRebootRequired_X64') | ForEach-Object { @{ Action = $_ } }
+    $sequence = @(@{ Action = 'Wix4CloseApplications_X64' }) + @(1..28 | ForEach-Object { @{ Action = "StandardAction$_" } })
+    $shortcut = @{ Shortcut = 'DesktopShortcut'; Directory = 'DesktopFolder'; Component = 'DesktopShortcutComponent'
+        Target = '[BINDIR]ImmichFolderWatch.exe'; Arguments = ''; WorkingDirectory = 'INSTALLFOLDER' }
+    [void](Get-ReleaseIntegration $custom $sequence @($shortcut) 'x64')
+    $sequence[-1].Action = 'MigrateLegacyUserConfig'
+    Assert-Refused { Get-ReleaseIntegration $custom $sequence @($shortcut) 'x64' } 'custom actions or sequence'
+    $sequence[-1].Action = 'InstallFinalize'
+    $shortcut.Directory = 'StartupFolder'
+    Assert-Refused { Get-ReleaseIntegration $custom $sequence @($shortcut) 'x64' } 'compiled desktop shortcut'
+
+    $label = 'C:\synthetic\repair.log'
+    $log = @"
+=== Verbose logging started: 11/23/2026  14:00:00  Calling process: C:\Windows\System32\msiexec.exe ===
+Action start 14:00:00: INSTALL.
+Action start 14:00:00: Wix4CloseApplications_X64.
+Action ended 14:00:00: Wix4CloseApplications_X64. Return value 1.
+Action start 14:00:01: InstallInitialize.
+Action ended 14:00:01: InstallInitialize. Return value 1.
+Action start 14:00:02: InstallFinalize.
+MSI (s) (04:04) [14:00:02:001]: Executing op: FileCopy(SourceName=a|e_sqlite3.dll,SourceCabKey=SqliteNativeFile,DestName=e_sqlite3.dll,FileSize=1)
+Action ended 14:00:02: InstallFinalize. Return value 1.
+Action ended 14:00:02: INSTALL. Return value 1.
+Property(S): ProductCode = $($identity.productCode)
+Property(S): PackageCode = $($identity.packageCode)
+Property(S): MsiLogFileLocation = $label
+Property(S): REINSTALLMODE = p
+MSI (s) (04:04) [14:00:02:003]: Windows Installer reconfigured the product. Product Name: Immich Folder Watch. Product Version: 3.0.4. Product Language: 1033. Manufacturer: VoltKraft. Reconfiguration success or error status: 0.
+MSI (c) (08:04) [14:00:02:004]: MainEngineThread is returning 0
+=== Verbose logging stopped: 11/23/2026  14:00:02 ===
+"@
+    $actions = Read-MsiOperationLog $log $label '/fp' $identity
+    if ($actions.productOperation -cne 'Reconfiguration' -or -not $actions.sqliteFileOperation -or
+        $actions.actionStarts -ne 4 -or $actions.migrationActionStarted -or $actions.guiRelaunchActionStarted) {
+        throw 'The repair observations differ.'
+    }
+    Assert-Refused { Read-MsiOperationLog '' $label '/fp' $identity } 'Incomplete'
+    Assert-Refused { Read-MsiOperationLog ($log.Split('=== Verbose logging stopped:')[0]) $label '/fp' $identity } 'Incomplete'
+    $summaryOnly = (($log -split '\r?\n') | Where-Object { $_ -notmatch '^Action |Executing op:' }) -join "`r`n"
+    Assert-Refused { Read-MsiOperationLog $summaryOnly $label '/fp' $identity } 'completed Windows Installer action'
+    Assert-Refused { Read-MsiOperationLog $log $label '/i' $identity } 'successful product Installation'
+    Assert-Refused { Read-MsiOperationLog $log 'C:\synthetic\elsewhere.log' '/fp' $identity } 'log identity differs'
+    Assert-Refused { Read-MsiOperationLog ($log.Replace('SourceCabKey=SqliteNativeFile,', 'SourceCabKey=Other,')) $label '/fp' $identity } 'requested /fp file operation'
+    Assert-Refused { Read-MsiOperationLog ($log.Replace('InstallInitialize. Return value 1.', 'InstallInitialize. Return value 3.')) $label '/fp' $identity } 'completed Windows Installer action'
+    foreach ($name in @('MigrateLegacyUserConfig', 'RelaunchAppAfterUpgrade')) {
+        $changed = $log.Replace('Action start 14:00:02: InstallFinalize.', "Action start 14:00:01: $name.`r`nAction start 14:00:02: InstallFinalize.")
+        Assert-Refused { Read-MsiOperationLog $changed $label '/fp' $identity } 'Unexpected migration or GUI relaunch'
+    }
 
     $seed = Join-Path $area 'source'
     $owned = Join-Path $area 'owned'
