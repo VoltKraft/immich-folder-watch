@@ -114,6 +114,8 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         {
             await worker.StopAsync(CancellationToken.None);
         }
+        Assert.Empty(client.TrashedAssets);
+        Assert.Empty(client.MutatedAlbums);
         Assert.Null(status.LastSyncErrorMessage);
         Assert.Equal(0, logger.SyncPullFailureCount);
         Assert.NotEmpty(listings);
