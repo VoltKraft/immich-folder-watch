@@ -258,3 +258,27 @@ the raw process logs with the visibility, worker and cleanup records.
 The readback SHA-256 is
 `c1f17ca8f95defa38ed4639f5d90746da72ced35a564e33605d2d8b573e626d0`.
 [Integrated Shell results](rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
+
+### Explicit Windows foreground requests
+
+The canonical supervisor used to consume an explicit Open before the recreated
+root had a visible HWND. Commit `648501a` keeps the request until the owning UI
+thread has a visible root and consumes it once. The retained root uses the same
+request after showing its existing HWND. A normal second launch on the input
+desktop can offer the foreground right to the connected pipe server. It first
+checks the server PID, process creation time and live process handle. An
+unavailable or denied grant still allows the ordinary activation message to
+reach the primary. The primary calls `SetForegroundWindow` on its own visible
+root and records the return value. Automatic startup requests no grant.
+[Windows foreground grant](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-allowsetforegroundwindow)
+· [Windows foreground request](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+· [Application launcher](../../tools/rust-qa/gui/src/windows_launcher.rs)
+· [Pending activation](../../tools/rust-qa/gui/src/foreground_request.rs).
+
+The secondary log records its grant result. The primary log names the exact
+HWND and result of its request. The desktop observer samples actual foreground
+ownership and, on the retained input desktop, keyboard focus. A retained focus
+timeout leaves both process logs available for diagnosis. Independent source
+review reproduced the retained patch and checked the first synchronous eframe
+paint and the ordinary reopen. Native Windows results for this change belong
+to the [assessment at `1e58541`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708).

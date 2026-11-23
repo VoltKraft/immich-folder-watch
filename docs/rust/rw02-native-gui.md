@@ -497,6 +497,27 @@ with 1,063 relationships.
 · [Windows ordinary launcher](rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35)
 · [Windows integrated Shell](rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
 
+### Fedora input and lifecycle after the focus change
+
+On Fedora x64 the frozen native build from the application sources at
+`1e58541` ran on both a private X11 desktop and a private Wayland desktop
+with Mailbox presentation. On each, the external observer verified all
+four lifecycle cases, including startup without a tray, activation from
+the background and quit before any window was shown. Native keyboard input
+traversed the filename, password and language controls. The German filename
+round-tripped through the system clipboard, the password exposed three
+mask characters, and the keyboard switch changed the labels to English.
+
+The readback matched 45 Git inputs on each backend and the running binary
+to SHA-256 `5a85ad18b635e016856d1ddbd3f616ac0be1500b8d99d3b14239ff1799754c6d`.
+The X11 and Wayland result hashes are respectively
+`4fd25b4792a917291199b4e80775e1f61ef688e03a5483a8a08850db323529ae` and
+`09e8382b645bd8020657516d58df980cd97127f06b4f8183f5d7f1f93ad6bd50`.
+The combined readback is `artifacts/rust/gui-run/source-readback-1e58541.json`
+with SHA-256 `241946cc32b0750c5b907b7c5d09fcece10533e74549b4128e57b767f061c09d`.
+[Isolated native observer](../../tools/rust-qa/gui/native.py)
+· [Windows foreground mechanism](rw02-instance.md#explicit-windows-foreground-requests).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

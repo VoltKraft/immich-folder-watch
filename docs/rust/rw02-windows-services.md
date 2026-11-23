@@ -384,3 +384,11 @@ running for its own first two scheduled retries, up to 15 seconds. It
 records the receiver, Shell return values and independent icon rectangles
 while holding the original Explorer process. The initial registration and
 activation results retain their original outcome. [Passive retry observation](../../tools/rust-qa/windows-launcher/tray_retry.py).
+
+Commit `1e58541` binds each marker read and invocation to the original popup's
+HWND, PID, thread and class. Cleanup reads DWM visibility and observes the
+popup's absence for at least 750 ms. Independent replay rejected a reused HWND
+on a different thread. A popup already hidden by Explorer and an effective
+invocation followed by a COM error each caused zero additional invocations.
+Seven PowerShell controls also passed. The corrected path is included in the
+[native Windows run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708).

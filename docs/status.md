@@ -1,5 +1,41 @@
 # Project Status
 
+## Four-host storage and the Windows desktop rerun (2026-11-23)
+
+RW-01 is accepted and RW-02 is active under the original RW-01–07 goal.
+At `93ecc35` all four targets passed the storage build and native tests.
+Direct SQL readback covered 32 databases, eight live-WAL backups, 120
+stored-key lookups and eight untouched version-99 controls. All eight
+database files per operating system were byte-identical between x64 and
+ARM64. The native compiler inputs, notice archives and SPDX documents
+for the combined development executable also reproduced on all four hosts.
+[Storage readback](rust/rw02-legacy.md#native-desktop-storage-at-93ecc35)
+· [Four notice and SPDX receipts](rust/rw02-combined-notices.md#native-notices-at-93ecc35).
+
+Both Ubuntu desktop jobs passed. Windows ARM64 met all eleven retained
+window performance limits. Windows x64 met eight. Its idle close took
+46.72 ms at p95, its scan close 37.55 ms and its scan reopen 39.10 ms.
+The x64 limits were 14.26, 31.58 and 22.79 ms respectively. Root repaint
+produced zero DXGI presentations in all 547 verified hidden x64 intervals.
+Earlier x64 results at `0a2b5ca` met all eleven limits. Windows interactive
+tray activation, ordinary-user writer exclusion and the mixed-DPI/RDP
+observations remain open. [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235)
+· [Retained-window measurements](rust/rw02-windows-window.md).
+
+The candidate at `1e58541` preserves an explicit Windows Open until the
+new or retained window is visible. Its original-Explorer check preserves the
+identity of the popup and handles an invocation that already took effect
+when COM returned an error. Both changes received independent source and
+regression review. The same native Linux build passed all four lifecycle
+cases, keyboard input, clipboard and password masking on private Fedora
+X11 and Wayland desktops. The corrected Windows paths and the comparison
+with the original WPF budgets are in the new native run.
+[Explicit activation](rust/rw02-instance.md#explicit-windows-foreground-requests)
+· [Fedora results](rust/rw02-native-gui.md#fedora-input-and-lifecycle-after-the-focus-change)
+· [Four native desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708)
+· [Native filesystem and compatibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494628)
+· [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
+
 ## Windows ordinary launch, Shell registration and writer authority (2026-11-23)
 
 At `93ecc35` a second launch on each original Windows desktop reopened the
@@ -42,8 +78,8 @@ Both Ubuntu jobs at `93ecc35` subsequently passed. All eleven X11 limits
 held, including scan reopen p95 of 1.08 ms on x64 and 0.92 ms on ARM64.
 Both original compiler and notice ZIPs reproduced on each architecture.
 The direct SQL replay checked all nine rows of both WAL backups, all 30
-stored-key lookups and the ten controls per host. The new Windows storage
-build steps also passed. Readback of their full archives follows upload.
+stored-key lookups and the ten controls per host. The four-host storage
+readback above includes the completed Windows jobs.
 [Ubuntu desktop, transport and notices](rust/rw02-native-gui.md#native-follow-up-at-93ecc35)
 · [Storage and SQL](rust/rw02-legacy.md#native-desktop-storage-at-93ecc35).
 

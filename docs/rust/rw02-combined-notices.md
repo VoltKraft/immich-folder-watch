@@ -183,6 +183,26 @@ The four replay receipts are retained below
 each published input digest to its build receipt, executable, notice
 archive and SPDX document.
 
+## Native notices at 93ecc35
+
+The native compiler receipts, the complete notice ZIPs and the SPDX documents
+reproduced byte-for-byte on all four targets. The input ZIPs were reconstructed
+from 22 members per Linux host and 17 per Windows host. Each target also passed
+the seven notice controls, six SPDX controls and the SPDX 2.3.1 schema. These
+archives cover the combined development executable. Packaged candidates have
+their own inventory gate. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235).
+
+| Native target | Published native input | Published notice ZIP | ZIP members | SPDX packages / relationships | SPDX SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| Linux x64 | [14780350330](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14780350330) | [14779114668](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14779114668) | 1,799 | 446 / 1,063 | `32e5acfbb9ad065091be913adc6cfce056809ca07ece0beed55fa4771a3ba963` |
+| Linux ARM64 | [14780375735](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14780375735) | [14780470054](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14780470054) | 1,796 | 445 / 1,063 | `19994e26daed0250a90bb104a1cc9e8280d4357f1642bd4618627ddba652091f` |
+| Windows x64 | [14782291297](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782291297) | [14781977151](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14781977151) | 1,517 | 258 / 615 | `0cf78142992380b02a3c88a2e8ef6092a297a4332506385f1e5b02a885b4ba58` |
+| Windows ARM64 | [14781658421](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14781658421) | [14781821258](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14781821258) | 1,514 | 257 / 614 | `8ba375b88536def905f3b5824884420d4d8ac64616a5de331d5135ee19f02f89` |
+
+Per-target `notice-rebuild/<target>/result.json` under the local
+`artifacts/rust/hosted-desktop-storage/45083264235/` directory binds all
+three published artifact IDs and digests to the reconstructed SPDX bytes.
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native
