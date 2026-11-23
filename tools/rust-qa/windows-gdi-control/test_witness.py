@@ -4,8 +4,9 @@ import ctypes as c
 from ctypes import wintypes as w
 import io
 import unittest
+from unittest.mock import Mock
 
-from witness import PHASES, Screen, Witness, color, frame_log, verify, visibility_log
+from witness import PHASES, Screen, Witness, WitnessTimeout, color, frame_log, verify, visibility_log
 from assess import visible_frames_during_work
 from scan import coverage
 
@@ -127,16 +128,47 @@ class EvidenceTests(unittest.TestCase):
         screen.get_dc = lambda _: 3
         screen.release_dc = lambda _hwnd, dc: releases.append(dc) or True
         screen.pixel = lambda _dc, x, y: reads.append((x, y)) or (0x563412 if y == 100 else 0xa9cbed)
-        for owners, expected, read in (([17, 18], None, False), ([17, 17, 17, 18], None, True),
-                                       ([17] * 4, [0x123456, 0xedcba9], True)):
+        for owners, expected, read, stage in (([17, 18], None, False, "point-ownership-before"),
+                                               ([17, 17, 17, 18], None, True, "point-ownership-after"),
+                                               ([17] * 4, [0x123456, 0xedcba9], True, None)):
             with self.subTest(owners=owners):
                 values = iter(owners)
                 screen.at = lambda _point: next(values)
                 reads.clear()
                 releases.clear()
-                self.assertEqual(screen.sample(17), expected)
+                receipt = {}
+                self.assertEqual(screen.sample(17, receipt), expected)
+                self.assertEqual(receipt.get("stage"), stage)
+                self.assertEqual(receipt["points"], [[320, 100], [320, 300]])
+                self.assertNotIn("ownedPixels", receipt)
                 self.assertEqual(reads, [(320, 100), (320, 300)] if read else [])
                 self.assertEqual(releases, [3] if read else [])
+
+    def test_timeout_retains_only_the_last_attempt_and_qualifies_no_request(self):
+        observer = object.__new__(Witness)
+        observer.hwnd, observer.pid, observer.rows = 17, 9, []
+        observer.seed, observer.api, observer.screen = 123, Mock(), Mock()
+        observer.api.clock.return_value = 11
+        observer.life, observer.frames = Mock(events=[]), []
+        observer.read_frames = lambda: None
+        def owner(_hwnd, pid):
+            c.cast(pid, c.POINTER(w.DWORD)).contents.value = 9
+            return 1
+        observer.screen.owner.side_effect = owner
+        def expire(sample, label, **options):
+            self.assertIsNone(sample())
+            observer.frames = [(17, 1, 8, 9, color(123, 1))]
+            observer.screen.sample.return_value = [1, 2]
+            self.assertIsNone(sample())
+            raise TimeoutError(label)
+        observer.await_value = expire
+        with self.assertRaises(WitnessTimeout) as caught:
+            observer("before", "close", 17, 9)
+        report = caught.exception.observation
+        self.assertEqual((report["pid"], report["hwnd"], report["attempts"]), (9, 17, 2))
+        self.assertEqual(report["last"], {"stage": "frame-color", "ownedPixels": [1, 2],
+                                         "expected": [color(123, 1), color(123, 1) ^ 0xffffff]})
+        self.assertEqual(observer.rows, [])
 
 
 if __name__ == "__main__":

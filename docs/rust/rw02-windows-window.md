@@ -456,3 +456,34 @@ in its name table. Its glyph provenance needs resolution before adoption.
 Seven published source archives matched the Cargo index. Native iced
 performance and reader behavior remain unmeasured.
 [Accessibility issue](https://github.com/iced-rs/iced/issues/552) · [Embedded fonts](https://github.com/iced-rs/iced/blob/3997291f318a8bc06fa522f5579836fb3feb94df/graphics/src/text.rs#L110-L129) · [First icon font revision](https://github.com/iced-rs/iced/commit/2c8ba652a7929ac6c2af28ac60a8bd4b8e8e2f10).
+
+## Visible GDI and retained egui under the same inventory
+
+The x64 GDI surface met the four WPF window-response limits twice.
+Each cell below gives the median of three trial p95 values, in
+milliseconds. The WPF controls ran on the same desktop as both Rust
+subjects. The retained egui Mailbox window met nine of eleven total
+resource limits at `549066f` and eight at `ba02f8b`. It met all eleven
+on ARM64 at both revisions.
+
+| Windows x64 | GDI scan close / reopen | Retained egui scan close / reopen | WPF maximum close / reopen |
+| --- | ---: | ---: | ---: |
+| [`549066f`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14821874640) | 4.069 / 9.608 | 23.703 / 32.348 | 20.175 / 20.677 |
+| [`ba02f8b`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14828200604) | 3.920 / 9.765 | 25.047 / 31.380 | 16.108 / 19.740 |
+
+Each of the six x64 GDI trials inventoried 100,000 files twice. Independent
+replay matched 184 close and 182 reopen requests at the first revision,
+and 131 close and 129 reopen requests at the second, to original HWND
+observations, screen pixels and active file work. Each reopen
+also had its own completed BitBlt and GdiFlush. Across these trials,
+the p95 from the reopen request to GdiFlush was 12.50–13.80 ms. The
+external window-visibility timer ends when the HWND becomes visible.
+Separately reading both colors took 53.79–69.45 ms per trial at the median.
+
+Both ARM64 GDI traces contain a first flushed frame. Both stopped at the
+external witness before the first close. No ARM64 GDI response timings were
+obtained. The observer now retains the last sampling stage on timeout. It
+discards colors whenever either test position loses HWND ownership.
+The GDI result measures the small drawing workload. Full egui, text,
+accessibility and editing require the actual application path.
+[ARM64 at `549066f`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14821439705) · [ARM64 at `ba02f8b`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14829680035).

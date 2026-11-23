@@ -85,3 +85,9 @@ identifies the idle calibration prefix. `evidence-hashes.json` indexes the
 files in the output directory. An `observed` result requires complete coverage
 even when a metric exceeds its WPF-derived limit. Iced behavior, user-input
 focus, accessibility and product parity require their own native tests.
+
+A timed-out screen witness records its last completed check, number of
+attempts, phase, PID and HWND. The last check distinguishes visibility,
+the flushed-frame log, client geometry, point ownership, GetPixel and
+frame color. On ownership loss the report contains only the two ownership
+flags and the synthetic test positions.

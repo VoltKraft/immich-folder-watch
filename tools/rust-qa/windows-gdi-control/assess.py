@@ -19,7 +19,7 @@ from measure import reference
 from native import owned_directory, pin_path, start_owned_subject
 from scan import MIN_RESPONSES, coverage
 from window_lifetime import WindowLifetime
-from witness import Witness
+from witness import Witness, WitnessTimeout
 
 NAMES = ("idle_close_p95_ms", "idle_reopen_p95_ms", "scan_close_p95_ms", "scan_reopen_p95_ms")
 
@@ -221,6 +221,8 @@ def assess(target):
         record["status"] = "observed"
     except Exception as error:
         record.update(status="incomplete", error=f"{type(error).__name__}: {error}")
+        if isinstance(error, WitnessTimeout):
+            record["lastObservation"] = error.observation
         raise
     finally:
         recorder.write(out / "result.json", record)

@@ -98,14 +98,24 @@ class Screen:
         while self.peek(c.byref(message), None, 0, 0, 1):
             self.dispatch(c.byref(message))
 
-    def sample(self, hwnd):
+    def sample(self, hwnd, observation):
         rect = w.RECT()
-        if not self.rect(hwnd, c.byref(rect)) or (rect.left, rect.top, rect.right, rect.bottom) != (0, 0, WIDTH, HEIGHT):
+        if not self.rect(hwnd, c.byref(rect)):
+            observation["stage"] = "GetClientRect"
+            return None
+        bounds = [rect.left, rect.top, rect.right, rect.bottom]
+        observation["clientRect"] = bounds
+        if bounds != [0, 0, WIDTH, HEIGHT]:
+            observation["stage"] = "client-size"
             return None
         points = [w.POINT(WIDTH // 2, HEIGHT // 4), w.POINT(WIDTH // 2, 3 * HEIGHT // 4)]
         if not all(self.client(hwnd, c.byref(point)) for point in points):
+            observation["stage"] = "ClientToScreen"
             return None
-        if not all(self.at(point) == hwnd for point in points):
+        observation["points"] = [[point.x, point.y] for point in points]
+        owned = [self.at(point) == hwnd for point in points]
+        if not all(owned):
+            observation.update(stage="point-ownership-before", owned=owned)
             return None
         dc = self.get_dc(None)
         if not dc:
@@ -115,7 +125,12 @@ class Screen:
         finally:
             if not self.release_dc(None, dc):
                 raise OSError("Could not release the screen DC")
-        if 0xffffffff in values or not all(self.at(point) == hwnd for point in points):
+        owned = [self.at(point) == hwnd for point in points]
+        if not all(owned):
+            observation.update(stage="point-ownership-after", owned=owned)
+            return None
+        if 0xffffffff in values:
+            observation.update(stage="GetPixel", invalid=[v == 0xffffffff for v in values])
             return None
         # GetPixel returns COLORREF (0x00bbggrr), while 32-bit BI_RGB stores 0x00rrggbb.
         return [((v & 255) << 16) | (v & 0xff00) | (v >> 16) for v in values]
@@ -150,8 +165,13 @@ class Witness:
         generation = 1 + (index + 1) // 4
         visible = (phase, action) in (("before", "close"), ("after", "reopen"))
         rgb = color(self.seed, generation)
+        last = {}
+        attempts = 0
 
         def observe():
+            nonlocal attempts
+            attempts += 1
+            last.clear()
             owner = w.DWORD()
             thread = self.screen.owner(hwnd, c.byref(owner))
             self.screen.pump()
@@ -159,25 +179,33 @@ class Witness:
                     or any(handle == hwnd for handle, _, _ in self.life.events)):
                 raise RuntimeError("The original HWND did not survive the observation")
             if bool(self.screen.is_visible(hwnd)) != visible:
+                last["stage"] = "window-visibility"
                 return None
             if not visible:
                 return {"pixels": [], "pixelQpc": []}
             self.read_frames()
             if len(self.frames) < generation:
+                last.update(stage="frame-log", flushedFrames=len(self.frames))
                 return None
             owner, sequence, _, _, claimed = self.frames[generation - 1]
             if (owner, sequence, claimed) != (hwnd, generation, rgb):
                 raise ValueError("The flushed GDI frame does not match the expected generation")
             # The external attribution reads only these two owned screen positions.
             pixel_start = self.api.clock()
-            pixels = self.screen.sample(hwnd)
+            pixels = self.screen.sample(hwnd, last)
             pixel_end = self.api.clock()
             if pixels != [rgb, rgb ^ 0xffffff]:
+                if pixels is not None:
+                    last.update(stage="frame-color", ownedPixels=pixels, expected=[rgb, rgb ^ 0xffffff])
                 return None
             return {"pixels": pixels, "pixelQpc": [pixel_start, pixel_end]}
 
-        pixels = self.await_value(observe, f"No owned GDI frame {generation} for {phase} {action}",
-                                  timeout=4, delay=.004)
+        label = f"No owned GDI frame {generation} for {phase} {action}"
+        try:
+            pixels = self.await_value(observe, label, timeout=4, delay=.004)
+        except TimeoutError as error:
+            raise WitnessTimeout(label, {"hwnd": hwnd, "pid": pid, "phase": phase, "action": action,
+                                        "generation": generation, "attempts": attempts, "last": last}) from error
         self.rows.append(dict(phase=phase, action=action, hwnd=hwnd, pid=pid, generation=generation,
                               visible=visible, start=start, end=self.api.clock(), **pixels))
 
@@ -197,3 +225,9 @@ class Witness:
             raise ValueError("The GDI supervisor did not drain after the observed frame sequence")
         return dict(hwnd=self.hwnd, pid=self.pid, seed=self.seed, events=self.life.events, frames=frames, showWindow=calls,
                     observations=self.rows)
+
+
+class WitnessTimeout(TimeoutError):
+    def __init__(self, label, observation):
+        super().__init__(label)
+        self.observation = observation
