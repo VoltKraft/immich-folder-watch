@@ -278,3 +278,62 @@ The replay and its JSON reports are in `artifacts/rust/hosted-desktop-storage/45
 | --- | --- | --- |
 | [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782395756) | `f7fe684395b02e0d05c20eec390aa17a2ad811c35964097b5c9b4c9c94cd2769` | `35b2018c94bbfaaac000bb42e90af81b218ae74287c71b9ed5d4cebc14afb35b` |
 | [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782220563) | `f22eea1c70b66207a7646f2557ee169037d2d7418611dd0108b0581aabf6b1ae` | `dc58618ed23534a168c3f4747f8fa114dbe818b96ab81e903b88db162930179d` |
+
+## Retained measurements with explicit foreground requests at 1e58541
+
+At `1e58541a784c909ad772ba47fb35515844552fb2`, the uninstrumented Mailbox
+build again passed eight of eleven Windows x64 limits and all eleven ARM64
+limits. Every x64 trial exceeded the same three timing limits. Each host
+supplied a fresh three-trial WPF reference. Bold values exceeded the
+limit before display rounding. [x64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/job/137525629804) · [ARM64 native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/job/137525629530).
+
+| Metric | x64 Mailbox | x64 limit | ARM64 Mailbox | ARM64 limit |
+| --- | ---: | ---: | ---: | ---: |
+| Startup (ms) | 131.187 | 692.233 | 208.928 | 1059.079 |
+| Visible working set (MiB) | 60.371 | 143.357 | 69.711 | 147.325 |
+| Hidden working set (MiB) | 59.105 | 140.281 | 68.328 | 144.000 |
+| Visible CPU (% of one core) | 0 | 3.787 | 0 | 4.122 |
+| Hidden CPU (% of one core) | 0 | 3.892 | 0 | 4.531 |
+| Visible presentations/s | 0 | 0.133 | 0 | 0.134 |
+| Hidden presentations/s | 0 | 0.067 | 0 | 0.067 |
+| Idle close p95 (ms) | **24.488** | 13.426 | 2.997 | 13.477 |
+| Idle reopen p95 (ms) | 5.176 | 15.866 | 3.144 | 15.506 |
+| Scan close p95 (ms) | **23.011** | 16.143 | 5.087 | 14.209 |
+| Scan reopen p95 (ms) | **27.737** | 19.055 | 4.755 | 15.393 |
+
+The canonical teardown build exceeded the visible working-set limit and
+all four close/reopen limits on each host. FIFO exceeded the three x64
+limits for idle close, scan close and scan reopen at 46.348, 66.352 and
+24.785 ms respectively. Its single ARM64 miss was scan close at 18.342 ms.
+All twelve window-lifetime, editing and recovery cases passed per host.
+
+The file-I/O traces confirmed both 100,000-file passes in all 30 inventories.
+All 18 timed DXGI traces completed their decoder and session-loss checks.
+On x64 the regular root wake had zero hidden presents in 244 verified
+intervals and the single wake had zero in 285. The original hidden-paint
+control had 188 in 94 intervals, one per empty-modifier and focus-loss
+callback. ARM64 recorded zero in all 222, 221 and 209 intervals respectively.
+
+During the x64 root-wake scan, visible redraw callbacks accounted for at
+least half the time to enter the close callback in all 58 over-limit closes.
+The native show call overlapped at least half the external response time in
+78 of 81 over-limit reopens. The observer saw the HWND before the focus call
+started in 200 of 244 reopens. Across the 81 slow reopens, that call's overlap
+with the measured response was 0.0173 ms at p95 and 0.7134 ms at maximum.
+The focus call itself took 0.0525 ms at p95 on x64 and 0.0741 ms on ARM64.
+The preceding run measured 0.0014 and 0.8454 ms. The two runs used separate
+WPF baselines. This fixture sends Open through the GUI's standard input and
+measures visibility. Ordinary second-launch foreground and keyboard focus have their
+own observations. [Explicit Windows foreground requests](rw02-instance.md#explicit-windows-foreground-requests).
+
+Per host, the replay verified 22 canonical and 22 reconstructed application
+inputs. The archived Cargo stream contained 153 compiler artifacts covering
+all 135 expected package and feature combinations. It identified the local
+GUI executable and retained eframe library. The native build receipt supplies
+the executable digest. The replay and reports are in
+`artifacts/rust/hosted-desktop-storage/45124494708/`.
+
+| Target | Actions archive SHA-256 | Independent retained readback SHA-256 |
+| --- | --- | --- |
+| [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14797058450) | `85eaf2cbf71148aa4f4052345ea214ab904c9a5237872cb364c3304c9273fabb` | `1600feda6b48d8d2ca25ca0eb7ed95627179a6448197a68acfc2af2003d12324` |
+| [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14798644285) | `09ba75b8bb7d0fc3efc338f184c4f6f24b5e694a9464c4ffab7042132ff8920f` | `8d7ede78aa041bb50cd5b27ac2e966e1b39413bbc1e093309d7968dc16493a1b` |
