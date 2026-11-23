@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-1904be7), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-1904be7) and [realtime transport](rw02-realtime-transport.md). The [Documents grant comparison](rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open) covers the private backport. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-1904be7), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-6084b23) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-descriptor-replay-at-6084b23) include the x64 stock-observer stop. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -44,7 +44,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
-| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [Detached YAML file readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. The [C# worker reference](rw01-storage-contract.md#download-activity-and-the-latest-backup) captures external file effects and durable history across restart. Production write policy, migration and Rust rollback after sync activity are pending. |
+| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [Detached YAML file readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. On all four targets the shipping worker resumed from a Rust-created backup after download, upload, deletion and interrupted timestamp repair. [Original records](rw01-storage-contract.md#four-worker-restarts-on-each-native-target). Production write policy, migration and rollback after the Rust engine performs these operations remain open. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
 | RI-AC05 | Open | Native lifecycle, old/new/cross-session ownership and durable task/DB shutdown tests |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
@@ -57,10 +57,10 @@ All four native targets confirmed old/new local activation in both directions an
 between two cooperative Rust writers. The shipping coordinator could still
 start with the new guard held. Both Windows targets observed both lock refusal
 directions and reacquisition in sessions 2 and 0 of the same elevated account.
-At `3b4854d` the fixture temporarily started and restored Secondary Logon on
-both hosts. The standard-user probe stopped during trust-level enumeration,
-before any ordinary-user process acquired the guard. Installed handover and
-standard-user cross-session exclusion remain open.
+At `1b95ba0` the system listed Basic User in the original console on both
+hosts. Its attempt to start the participant at that level returned exit
+code 1 with zero output bytes. Neither host started an ordinary-user
+writer. Installed handover and standard-user cross-session exclusion remain open.
 [Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
 At `3b4854d` the [watch adapter](rw02-watch-events.md) passed fifteen
@@ -240,8 +240,11 @@ and [portal and tray results](rw02-linux-services.md).
 Ubuntu Noble's published portal and its pristine rebuild also refused the
 cooperating lock on a native x64 Noble userspace and Fedora kernel. The
 private source backport passed all 42 lock operations with both the ordinary
-C# and Rust readers. A supported Ubuntu package and native Ubuntu-kernel
-results are still outstanding. [Noble controls](rw02-portal-noble.md).
+C# and Rust readers. Subsequent tests on native Ubuntu x64 and ARM64
+confirmed the original refusal and the backport's lock enforcement. On
+x64 the complete package also passed installation and rollback with the
+installed Flatpak. Ubuntu package distribution remains open.
+[Noble controls and installed results](rw02-portal-noble.md).
 
 Three native Intel-to-software Wayland recoveries preserved editing and
 worker progress. The measured visible and hidden idle intervals recorded

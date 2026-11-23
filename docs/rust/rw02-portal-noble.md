@@ -342,6 +342,23 @@ The `arm64-k2icsihg` result SHA-256 is
 `0dc0dcdbd9f60e8e06e139f2eee9686ac556c1e573f71f4606cfd690eaa6c191`.
 [Original native ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14861975652).
 
+On x64 the Ubuntu package completed 31 operations. Before the third Rust
+read the observer saw the exact grant and album names on descriptors 3
+and 4. While it held both independently opened named directories, the
+kernel added ` (deleted)` to the grant's descriptor label. The album
+retained its name. Both descriptors kept their original device, inode,
+flags and mount ID 504. The observer stopped before sending the third
+request. The original document still granted read and write permission
+to the test application. Its subsequent revocation and deletion succeeded.
+
+The unmodified rebuild completed all 32 operations and returned errno 38
+for all seventeen grant lock attempts. The private backport completed all
+46 operations, including contention and reacquisition of the same file.
+All three original files survived revocation with the expected contents.
+The `amd64-w9i6r7vr` result SHA-256 is
+`7f7be799c7cf3163fc2634ff17d0350715a706fe7fd64d143318da30a5af59dd`.
+[Original native x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14863376245).
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).

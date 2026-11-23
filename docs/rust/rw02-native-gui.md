@@ -690,6 +690,18 @@ trial completed all three grant revocations.
 [Native ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14861975652)
 · [Original Documents handles](rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
 
+The x64 archive had 1,414 members and SHA-256
+`7b9a65b2fd5ae44b6a8f8c55b43ac8bee42bf55a48e4e4514f026e5edb46ba32`.
+The Plasma panel reopened the same window twice, with 277 and 259 gold
+pixels in the icon crops and zero in both controls. All 117 Rust requests
+fell within the three two-pass inventories of 100,000 files. The GUI met
+all eleven X11 limits. Startup took 169.39 ms against 1,037.664 ms. Scan
+show and close p95 took 1.10 and 0.42 ms against 15.91 and 15.63 ms.
+The stock Documents observer stopped before its third retained read. The
+unmodified rebuild and the private backport completed their separate trials.
+[Native x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14863376245)
+· [Stock refusal and grant readback](rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

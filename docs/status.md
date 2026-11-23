@@ -1,5 +1,17 @@
 # Project Status
 
+## Native Ubuntu desktop and Documents observations at 6084b23 (2026-11-23)
+
+Both desktops passed all eleven X11 resource limits and two Plasma panel
+clicks reopened each original window. ARM64 completed all 110 portal
+operations. On x64 the stock-package observer stopped before sending its
+third Rust read when the grant descriptor's displayed name changed during
+the check. The unmodified source and backport completed 32 and 46 operations
+respectively. All three x64 grants were revoked and the original bytes
+survived. The x64 guest's independent installed-package comparison passed.
+[Desktop times and original archives](rust/rw02-native-gui.md#ubuntu-native-results-at-6084b23)
+· [Descriptor observations](rust/rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
+
 ## Windows x64 visible frame and visibility observer (2026-11-23)
 
 The extra instrumented build passed a Linux-hosted compiler check for
