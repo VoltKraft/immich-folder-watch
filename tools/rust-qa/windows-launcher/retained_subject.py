@@ -7,9 +7,9 @@ HERE = Path(__file__).resolve().parent
 WARM = HERE.parent / "windows-warm-window"
 
 
-def select(target, canonical_exe, canonical, graph_path, sha):
+def select(target, canonical_exe, canonical, graph_path, sha, *, isolated_vm=False):
     subjects = runpy.run_path(str(WARM / "inputs.py"), run_name="ifw_launcher_retained_inputs")["subjects"]
-    api, cold, warm, directory, paired = subjects(target)
+    api, cold, warm, directory, paired = subjects(target, isolated_vm=isolated_vm)
     report = directory / "build.json"
     record = json.loads(report.read_bytes())
     pins = json.loads((WARM / "eframe-source.json").read_bytes())

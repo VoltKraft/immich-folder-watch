@@ -5,8 +5,14 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
+
+
+def isolated_windows_vm(selected):
+    """Allow the explicitly selected native VM mode outside an Actions job."""
+    return selected and sys.platform == "win32" and os.getenv("GITHUB_ACTIONS") != "true"
 
 
 @contextmanager

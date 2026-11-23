@@ -127,8 +127,9 @@ class DisplayTests(unittest.TestCase):
         assess = DRIVER["assess"]
         records = []
 
-        def observe(_target, build_dir, output, profile, report, *, require_interactive):
+        def observe(_target, build_dir, output, profile, report, *, require_interactive, retained):
             self.assertTrue(require_interactive)
+            self.assertFalse(retained)
             self.assertTrue(profile.is_dir())
             self.assertEqual(output.parent.parent, build_dir)
             report.update(inventoryPassed=True, sourceFrameObserved=True, rdpRenderingObserved=len(records) == 1)

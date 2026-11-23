@@ -3,6 +3,14 @@ import hashlib
 from pathlib import Path
 
 
+VARIANT_INPUTS = (
+    "candidate.patch", "presentation.patch", "dispatch.patch", "retained-hidden-input.patch",
+    "eframe-hidden-input.patch", "eframe-source.json", "eframe_source.py", "loop_wake.rs",
+    "winit-retained-visibility.patch", "winit-source.json", "compiler_units.py",
+    "windows_present.rs", "ui_trace.rs", "win32_clock.rs", "build.py",
+)
+
+
 def compiled_library(messages, gui, build, package, features):
     name = package.name
     manifest = package / "Cargo.toml"

@@ -1,5 +1,20 @@
 # Project Status
 
+## Retained display selection for an interactive Windows VM (2026-11-23)
+
+The existing mixed-DPI and RDP observer now accepts the paired retained
+Windows executable. Its local VM mode records the native compiler, exact
+PE and all 15 variant sources. It keeps the original hide and object-lifetime
+events even if the display observation fails. Independent review closed two
+findings concerning omitted build inputs and lost failure evidence.
+Replay of the original Windows x64 and ARM64 logs at `1b95ba0` reproduced
+generation 1, Mailbox with a requested maximum of one frame, and Wait.
+Five focused suites ran 84 Python tests with one Windows-only bitmap skip.
+Four nested Rust tests and actionlint passed. Both new commands refused
+execution on the Fedora host. The new display path awaits a native run.
+The active mixed-DPI and RDP desktops remain required for qualification.
+[Commands and evidence](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
 ## Sixteen native worker restores through Rust SQLite backups (2026-11-23)
 
 At `1904be7` the original C# worker resumed after download, upload, deletion

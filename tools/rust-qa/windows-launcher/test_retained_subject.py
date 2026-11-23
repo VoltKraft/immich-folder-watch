@@ -37,7 +37,8 @@ class NativePairTests(unittest.TestCase):
             archive.write_bytes(b"source")
             compiler.write_bytes(b"compiled")
             build = dict(target=target, revision="revision", baselineReceipt=sha(canonical), binary=sha(warm), baseline=sha(cold),
-                         eframeSource={"archive": archive.name, "archiveSha256": sha(archive)}, variantInputs={},
+                         eframeSource={"archive": archive.name, "archiveSha256": sha(archive)},
+                         variantInputs={name: sha(retained_subject.WARM / name) for name in subjects.__globals__["VARIANT_INPUTS"]},
                          compilerEvidence={"file": compiler.name, "sha256": sha(compiler),
                                            "application": {"target": "native-gui-assessment", "crateRoot": "src/main.rs",
                                                            "output": warm.name, "sha256": sha(warm)}})
@@ -46,6 +47,12 @@ class NativePairTests(unittest.TestCase):
                   patch.object(subprocess, "check_output", return_value="revision"), patch.object(observe.recorder, "Win32") as api):
                 api.return_value.machine.return_value = (0xaa64, 0xaa64)
                 self.assertEqual(subjects(target)[1:3], (cold, warm))
+                missing_patch = dict(build["variantInputs"])
+                del missing_patch["candidate.patch"]
+                receipt.write_text(json.dumps(build | {"variantInputs": missing_patch}))
+                with self.assertRaisesRegex(ValueError, "build inputs"):
+                    subjects(target)
+                receipt.write_text(json.dumps(build))
                 for path in (archive, compiler, canonical, warm, cold):
                     saved = path.read_bytes()
                     path.write_bytes(saved + b"altered")
@@ -107,7 +114,7 @@ class SubjectTests(unittest.TestCase):
                           compilerEvidence={"sha256": sha(self.compiler_log)}, baseFonts=fonts, fallbackFonts={"qa.ttf": "font"})
         self.canonical = dict(source="revision", binarySha256=sha(self.cold), graphSha256=sha(self.graph),
                               lockSha256="original-lock", fallbackFonts={"qa.ttf": {"sha256": "font"}})
-        def subjects(_target):
+        def subjects(_target, *, isolated_vm=False):
             paired = dict(target=target, revision="revision", buildReceipt=sha(self.record), baselineReceipt="canonical-receipt",
                           binary=sha(self.warm), baseline=sha(self.cold))
             return "verified native observer", self.cold, self.warm, self.area, paired

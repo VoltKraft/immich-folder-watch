@@ -22,8 +22,9 @@ ORIGINALS = {
 }
 sys.path.insert(0, str(QA))
 from gui import source_profile
+from windows_observer import isolated_windows_vm
 import eframe_source
-from compiler_units import compiled_library
+from compiler_units import VARIANT_INPUTS, compiled_library
 
 
 def sha(path):
@@ -129,9 +130,10 @@ def application_artifact(messages, gui, executable):
     return {"target": target["name"], "crateRoot": "src/main.rs", "output": executable.name, "sha256": sha(output)}
 
 
-def main(target):
-    if os.name != "nt" or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted" or os.getenv("GITHUB_ACTIONS") != "true":
-        raise ValueError("Build this native comparison on a disposable Windows rewrite runner")
+def main(target, *, isolated_vm=False):
+    hosted = os.name == "nt" and os.getenv("RUNNER_ENVIRONMENT") == "github-hosted" and os.getenv("GITHUB_ACTIONS") == "true"
+    if not (hosted or isolated_windows_vm(isolated_vm)):
+        raise ValueError("Build on a native hosted Windows runner or an explicitly selected disposable Windows VM")
     output = AREA / target
     output.mkdir(parents=True, exist_ok=False)
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -147,7 +149,8 @@ def main(target):
     gui = stage(output / "project")
     env = dict(os.environ, CARGO_HOME=str(cache), CARGO_TARGET_DIR=str(output / "build"),
                IFW_QA_FONT_DIR=str(ROOT / "rust/assets/fonts"), IFW_QA_FALLBACK_DIR=str(source_profile.FONTS))
-    subprocess.run([sys.executable, str(QA / "check-toolchain.py"), target], check=True)
+    compiler_version = subprocess.check_output([sys.executable, str(QA / "check-toolchain.py"), target], text=True)
+    print(compiler_version, end="")
     manifest = str(gui / "Cargo.toml")
     lock, graph = source_profile.verify_native_graph(target, env)
     selected = feature_rows(gui / "Cargo.toml", target, env)
@@ -171,7 +174,9 @@ def main(target):
     log.write_bytes(compiled)
     compiler.update(file=log.name, sha256=sha(log))
     sources = eframe_source.source_bundle(gui, output / "eframe-source.zip")
-    record = dict(target=target, revision=revision, baselineReceipt=sha(ordinary_path), baseline=sha(canonical),
+    record = dict(target=target, revision=revision, nativeCompiler=compiler_version.strip(),
+                  buildHost="github-hosted" if hosted else "isolated-vm",
+                  baselineReceipt=sha(ordinary_path), baseline=sha(canonical),
                   binary=compiler["application"]["sha256"],
                   canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
                   selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=ORIGINALS,
@@ -179,11 +184,7 @@ def main(target):
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
-                  variantInputs={name: sha(HERE / name) for name in
-                                 ("candidate.patch", "presentation.patch", "dispatch.patch", "retained-hidden-input.patch",
-                                  "eframe-hidden-input.patch", "eframe-source.json", "eframe_source.py", "loop_wake.rs",
-                                  "winit-retained-visibility.patch", "winit-source.json", "compiler_units.py",
-                                  "windows_present.rs", "ui_trace.rs", "win32_clock.rs", "build.py")})
+                  variantInputs={name: sha(HERE / name) for name in VARIANT_INPUTS})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")
 
@@ -191,4 +192,6 @@ def main(target):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
-    main(parser.parse_args().target)
+    parser.add_argument("--isolated-vm", action="store_true", help="build in an explicitly selected disposable Windows VM")
+    args = parser.parse_args()
+    main(args.target, isolated_vm=args.isolated_vm)

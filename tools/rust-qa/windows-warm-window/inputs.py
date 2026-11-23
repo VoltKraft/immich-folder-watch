@@ -11,8 +11,10 @@ QA, ROOT = HERE.parent, HERE.parents[2]
 TARGETS = ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")
 DX12_WAIT_OPTION = "WGPU_DX12_USE_FRAME_LATENCY_WAITABLE_OBJECT"
 TWO_FRAME_EDIT = "mailbox-two-retained-edit"
-sys.path.insert(0, str(QA / "windows-performance"))
+sys.path[:0] = [str(QA / "windows-performance"), str(HERE), str(QA)]
 import run as recorder
+from compiler_units import VARIANT_INPUTS
+from windows_observer import isolated_windows_vm
 
 
 def sha(path):
@@ -20,9 +22,10 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def subjects(target):
-    if not recorder.hosted() or target not in TARGETS:
-        raise ValueError("Use a disposable native Windows runner")
+def subjects(target, *, isolated_vm=False):
+    hosted = recorder.hosted()
+    if target not in TARGETS or not (hosted or isolated_windows_vm(isolated_vm)):
+        raise ValueError("Use a native hosted Windows runner or an explicitly selected disposable Windows VM")
     art = ROOT / "artifacts/rust"
     output = art / "windows-warm-window" / target
     warm = output / "build/release/native-gui-assessment.exe"
@@ -39,13 +42,14 @@ def subjects(target):
             or sha(output / "compiler.jsonl") != record["compilerEvidence"]["sha256"]
             or record["compilerEvidence"]["application"] != {"target": "native-gui-assessment", "crateRoot": "src/main.rs",
                                                             "output": warm.name, "sha256": record["binary"]}
-            or any(sha(HERE / name) != digest for name, digest in record["variantInputs"].items())):
+            or record["variantInputs"] != {name: sha(HERE / name) for name in VARIANT_INPUTS}):
         raise ValueError("Unexpected warm-window native build inputs")
     api = recorder.Win32()
     machine = 0xaa64 if target.startswith("aarch64-") else 0x8664
     if api.machine(-1) != (machine, machine) or any(recorder.pe_machine(path) != machine for path in (warm, cold)):
         raise ValueError("The observer and subjects must run natively on the same architecture")
-    evidence = dict(target=target, run=os.getenv("GITHUB_RUN_ID"), attempt=os.getenv("GITHUB_RUN_ATTEMPT"),
+    evidence = dict(target=target, run=os.getenv("GITHUB_RUN_ID") if hosted else None,
+                    attempt=os.getenv("GITHUB_RUN_ATTEMPT") if hosted else None,
                     revision=revision, buildReceipt=sha(receipt_path), baselineReceipt=record["baselineReceipt"],
                     baseline=record["baseline"], binary=record["binary"])
     return api, cold, warm, output, evidence

@@ -77,6 +77,7 @@ target=x86_64-pc-windows-msvc
 bash tools/rust-qa/install-toolchain.sh "$target"
 export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
 python3 tools/rust-qa/build-gui-probe.py "$target"
+python3 tools/rust-qa/windows-warm-window/build.py "$target" --isolated-vm
 ```
 
 Run the observer from a terminal in the active, unlocked Default input
@@ -92,19 +93,30 @@ supply both trials in one session when Windows actually reports two DPI values.
 
 ```powershell
 $target = 'x86_64-pc-windows-msvc'
-python tools/rust-qa/windows-display/run.py $target --isolated-vm --require mixed-dpi
-python tools/rust-qa/windows-display/run.py $target --isolated-vm --require rdp
+python tools/rust-qa/windows-display/run.py $target --isolated-vm --retained --require mixed-dpi
+python tools/rust-qa/windows-display/run.py $target --isolated-vm --retained --require rdp
 ```
 
 Run each command in its corresponding desktop. Repeating `--require` on
 one command requires both results from that session. Each required run prints
-a fresh result path under `artifacts/rust/gui-native/<target>/windows-display-runs/`.
-Keep that full run directory together with the target's `build.json` and
-`graph.json`. The receipt identifies the source, binary and original build
-digest. An unmet requested observation returns a nonzero exit and lists the
-missing qualification, including when the ordinary inventory succeeded.
-The hosted workflow continues to collect the available topology in
-`windows-display/`.
+a fresh result path under `artifacts/rust/gui-native/<target>/windows-display-retained-runs/`.
+For comparison, omit `--retained` to use the canonical teardown build and its
+`windows-display-runs/` directory. Preserve the full run, the canonical
+`build.json` and `graph.json`, and the retained build's `build.json`,
+`compiler.jsonl` and `eframe-source.zip`. A requested observation that
+could not run returns a nonzero exit and lists the missing qualification.
+
+The retained observer selects the paired executable from the native compiler
+output, verifies its first-party sources and keeps the image pinned while the
+test runs. On a DX12 CPU adapter advertising Mailbox it verifies the requested
+maximum of one queued frame and the Wait policy from the device log. Hardware adapters use their
+normal presentation policy. The report records the actual adapter and leaves
+unobserved mode and queue depth empty. After closing, the native hide event,
+HWND owner and object lifetime must show the original hidden window, with its
+original device still alive. Quit must then drain the process. Each hosted
+Windows runner collects the available topology for both builds. A positive
+mixed-DPI or RDP result requires the corresponding real display or session.
+[Retained build and observer](../../tools/rust-qa/windows-display/retained.py).
 
 | Field in `result.json` | Observation |
 | --- | --- |

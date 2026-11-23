@@ -473,6 +473,11 @@ jobs:
         shell: bash
         run: python3 -B tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" retained-text
 
+      - name: Measure the retained Windows GUI on the available monitors and session
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/windows-display/run.py "$NATIVE_TARGET" --retained
+
       - name: Reopen the retained Windows HWND through an ordinary second launch
         id: retained_launcher
         if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}

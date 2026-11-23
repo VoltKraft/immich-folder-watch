@@ -180,7 +180,9 @@ to reconcile project decisions, defaults, and recorded state.
   compiler stream and source archive together. Exercise ordinary second-launch
   and actual Shell activation for the same retained executable. Verify its
   [ordinary filename after reopening](docs/rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd)
-  with the native glyph and editing observer.
+  with the native glyph and editing observer. Use the same executable for
+  [mixed-DPI and RDP observations](docs/rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop)
+  on a disposable Windows test desktop.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).

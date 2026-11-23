@@ -324,7 +324,9 @@ records missing components and verifies the disposable account's cleanup.
 The [ordinary Windows filename checks](rust/rw02-windows-text.md) run against
 the same native GUI and verify glyph coverage, cursor movement and selection.
 The [native Windows display check](rust/rw02-windows-display.md) records the
-current WTS transport and monitor DPI. The [Ubuntu Orca check](rust/rw02-ubuntu-reader.md)
+current WTS transport and monitor DPI. On a disposable VM use `--retained`
+to measure the paired Windows executable and require actual mixed-DPI or RDP
+rendering. The [Ubuntu Orca check](rust/rw02-ubuntu-reader.md)
 uses a private audio sink and verifies announcements on X11 and Wayland.
 
 The [activation fixture](rust/rw02-instance.md) links the actual shipping coordinator
