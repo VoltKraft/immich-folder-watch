@@ -61,6 +61,8 @@ fn select_exchange(path: &Path) -> Result<()> {
 enum Transfer {
     Download,
     Upload,
+    Deletion,
+    Repair,
 }
 
 fn read_request() -> Result<(Value, Transfer)> {
@@ -72,6 +74,8 @@ fn read_request() -> Result<(Value, Transfer)> {
     let transfer = match field(&request, "format")? {
         "ifw-worker-backup-request-v1" => Transfer::Download,
         "ifw-worker-upload-backup-request-v1" => Transfer::Upload,
+        "ifw-worker-deletion-backup-request-v1" => Transfer::Deletion,
+        "ifw-worker-repair-backup-request-v1" => Transfer::Repair,
         _ => return Err("invalid worker backup request format".into()),
     };
     if !lower_hex(field(&request, "token")?, 32)
@@ -129,6 +133,7 @@ struct Activity {
     entries: Vec<SqlValue>,
     account_status: Vec<SqlValue>,
     counts: [i64; 4],
+    repair: Option<Vec<SqlValue>>,
 }
 
 fn read_activity(
@@ -151,9 +156,34 @@ fn read_activity(
         [],
         |r| Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?]),
     )?;
-    if counts == [0; 4] {
+    let ready = match transfer {
+        Transfer::Download | Transfer::Upload if counts == [0; 4] => false,
+        Transfer::Download | Transfer::Upload => {
+            check_transfer(db, counts, transfer)?;
+            true
+        }
+        Transfer::Deletion | Transfer::Repair => rollback::ready(db, counts, transfer)?,
+    };
+    if !ready {
         return Ok(None);
     }
+    Ok(Some(Activity {
+        schema,
+        counts,
+        entries: single_row(db, "SELECT * FROM sync_entries")?,
+        account_status: single_row(db, "SELECT * FROM sync_account_status")?,
+        repair: if counts[3] == 1 {
+            Some(single_row(db, "SELECT * FROM sync_timestamp_repairs")?)
+        } else {
+            None
+        },
+    }))
+}
+
+#[path = "worker_activity_backup/rollback.rs"]
+mod rollback;
+
+fn check_transfer(db: &Connection, counts: [i64; 4], transfer: Transfer) -> Result<()> {
     if counts != [0, 1, 1, 0] {
         return Err("unexpected worker activity counts".into());
     }
@@ -179,6 +209,7 @@ fn read_activity(
             "2011-08-06T04:02:00.0000000+00:00",
             0,
         ),
+        Transfer::Deletion | Transfer::Repair => return Err("expected a file transfer".into()),
     };
     let key = if cfg!(windows) {
         filename.to_ascii_uppercase()
@@ -194,7 +225,15 @@ fn read_activity(
         params![digest(b"https://immich.example/api\ntest-key"), filename, key, asset, size, modified, direction],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
     ).optional()?.ok_or("mapping or account history differs from the requested synthetic transfer")?;
-    let source = Path::new(&source);
+    check_source(&source)?;
+    if UtcTicks::parse_sql(&history)? < UtcTicks::parse_sql(&synchronized)? {
+        return Err("unexpected last successful sync".into());
+    }
+    Ok(())
+}
+
+fn check_source(source: &str) -> Result<()> {
+    let source = Path::new(source);
     let temp_id = source
         .parent()
         .and_then(Path::file_name)
@@ -203,16 +242,10 @@ fn read_activity(
     if !source.is_absolute()
         || source.file_name() != Some(OsStr::new("watch"))
         || !temp_id.is_some_and(|id| lower_hex(id, 32))
-        || UtcTicks::parse_sql(&history)? < UtcTicks::parse_sql(&synchronized)?
     {
-        return Err("unexpected synthetic source or last successful sync".into());
+        return Err("unexpected synthetic source".into());
     }
-    Ok(Some(Activity {
-        schema,
-        counts,
-        entries: single_row(db, "SELECT * FROM sync_entries")?,
-        account_status: single_row(db, "SELECT * FROM sync_account_status")?,
-    }))
+    Ok(())
 }
 
 fn require_fresh_destination() -> Result<()> {
@@ -295,6 +328,11 @@ fn main() -> Result<()> {
                 "ifw-worker-upload-backup-stale-v1",
                 "no completed worker upload",
             ),
+            Transfer::Deletion => ("ifw-worker-deletion-backup-stale-v1", "no worker tombstone"),
+            Transfer::Repair => (
+                "ifw-worker-repair-backup-stale-v1",
+                "no pending worker timestamp repair",
+            ),
         };
         eprintln!(
             "IFW_WORKER_STALE={}",
@@ -304,6 +342,17 @@ fn main() -> Result<()> {
         );
         return Err(reason.into());
     };
+    if matches!(transfer, Transfer::Deletion | Transfer::Repair) {
+        let before_hash = field(&request, "beforeSha256")?;
+        verify_backup(Path::new("before.db"), before_hash)?;
+        let before = immutable("before.db")?;
+        if read_activity(&before, &golden, transfer)?.is_some() {
+            return Err("expected the original pre-activity database".into());
+        }
+        rollback::check_transition(&before, &donor, transfer)?;
+        before.close().map_err(|(_, error)| error)?;
+        verify_backup(Path::new("before.db"), before_hash)?;
+    }
     reserve_destination()?;
     let mut destination = Connection::open_with_flags(
         RETURNED,
@@ -329,6 +378,8 @@ fn main() -> Result<()> {
     let format = match transfer {
         Transfer::Download => "ifw-rust-worker-activity-backup-v1",
         Transfer::Upload => "ifw-rust-worker-upload-backup-v1",
+        Transfer::Deletion => "ifw-rust-worker-deletion-backup-v1",
+        Transfer::Repair => "ifw-rust-worker-repair-backup-v1",
     };
     serde_json::to_writer(
         std::io::stdout().lock(),

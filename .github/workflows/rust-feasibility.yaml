@@ -8,6 +8,7 @@ on:
       - 'rust/**'
       - 'tools/rust-qa/**'
       - 'tools/RustCompatibilityOracle/verify_activity.py'
+      - 'tools/RustCompatibilityOracle/verify_rollback.py'
       - 'src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests*.cs'
   workflow_dispatch:
 
@@ -129,7 +130,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Restore native Rust backups into the shipping worker after a download and an upload
+      - name: Restore native Rust backups after download, upload, deletion and interrupted repair
         id: activity
         if: ${{ !cancelled() && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
         shell: bash

@@ -115,8 +115,13 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         var staleExternal = ObserveAfterDeletion();
 
         var restoredPath = Path.Combine(directory.Path, "restored.db");
-        File.Copy(afterPath, restoredPath);
-        Assert.Equal(afterHash, ActivitySha256(restoredPath));
+        var output = Environment.GetEnvironmentVariable("IFW_QA_DELETION_ACTIVITY_OUTPUT");
+        var exchange = Environment.GetEnvironmentVariable("IFW_QA_DELETION_ACTIVITY_EXCHANGE");
+        var rustBackupHash = await RestoreActivityDatabaseAsync(output, exchange, "ifw-worker-deletion-backup-request-v1",
+            beforePath, beforeHash, afterPath, afterHash, restoredPath);
+        var received = ReadActivityState(restoredPath);
+        Assert.Equal(tombstone, Assert.Single(received.Mappings));
+        Assert.Equal(history, Assert.Single(received.Accounts));
         peer.Requests.Clear();
         var second = await RunDeletionWorkerAsync(config, new SqliteSyncStateStore(restoredPath), peer);
         Assert.Equal(history.LastSuccessfulSyncUtc, ActivityTimestamp(second));
@@ -134,7 +139,6 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         Assert.Equal(afterHash, ActivitySha256(afterPath));
         testOutput.WriteLine($"IFW_DELETE_TRASH_SHA256={restartExternal.TrashFile.Sha256}");
 
-        var output = Environment.GetEnvironmentVariable("IFW_QA_DELETION_ACTIVITY_OUTPUT");
         if (output is null) return;
         Assert.True(Path.IsPathFullyQualified(output), "The deletion activity output path must be absolute.");
         Directory.CreateDirectory(output);
@@ -161,7 +165,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests
             after = new { databaseSha256 = afterHash, mapping = tombstone, history.LastSuccessfulSyncUtc, external = deleted, requests = firstRequests },
             staleRead = new { mapping = stale.Mappings.Single(), history.LastSuccessfulSyncUtc, external = staleExternal },
             restart = new { mapping = restart.Mappings.Single(), history.LastSuccessfulSyncUtc, external = restartExternal, requests = restartRequests },
-        }, null);
+        }, rustBackupHash);
     }
 
     private static DateTimeOffset ParseDeletionTimestamp(string value) =>

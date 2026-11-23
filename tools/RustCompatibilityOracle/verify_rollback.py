@@ -161,7 +161,7 @@ def check_deletion(directory, case, files, schema, windows, revision):
             "lastSuccessfulSyncUtc": history, "trashRequests": [1, 0]}
 
 
-def verify(kind, directory, trx, assemblies, platform, arch, revision):
+def verify(kind, directory, trx, assemblies, platform, arch, revision, *, rust_backup_hash=None):
     require(re.fullmatch(r"[0-9a-f]{40}", revision) is not None, "supply the executing commit")
     git("diff", "--exit-code", "--quiet", BASE, revision, "--", *LEGACY_INPUTS)
     original_directory(directory)
@@ -185,6 +185,9 @@ def verify(kind, directory, trx, assemblies, platform, arch, revision):
     trx_bytes = original_bytes(trx, 32 << 20)
     execution, output = passed_activity(trx_bytes, method, hashes["activity.json"])
     markers = ["IFW_ACTIVITY_SHA256=" + hashes["activity.json"]]
+    if rust_backup_hash is not None:
+        require(re.fullmatch(r"[0-9a-f]{64}", rust_backup_hash) is not None, "invalid returned database digest")
+        markers.append("IFW_RUST_BACKUP_SHA256=" + rust_backup_hash)
     if kind == "deletion":
         markers.append("IFW_DELETE_TRASH_SHA256=" + hashes["peer-trash.jpg"])
     equal(sorted(line.strip() for line in output.strip().splitlines()), sorted(markers), "unexpected xUnit markers")

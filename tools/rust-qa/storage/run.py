@@ -58,6 +58,36 @@ def archive_first_party(output: Path, fixtures: Path, extra_inputs: list[Path]) 
     return hashes
 
 
+def run_worker_activities(output, result, probe, test_assembly, dotnet, env, target):
+    from worker_activity import SCENARIOS, run as run_activity
+
+    def executable_hashes():
+        if shutil.which(dotnet, path=env.get("PATH")) is None:
+            raise FileNotFoundError(f"Worker test launcher is unavailable: {dotnet}")
+        return {"rustExecutable": sha256(probe), "testAssembly": sha256(test_assembly)}
+
+    originals = executable_hashes()
+    activity = result["workerActivity"] = originals.copy()
+    for kind in SCENARIOS:
+        name = "worker-activity" if kind == "download" else "worker-" + kind + "-activity"
+        field = "readback" if kind == "download" else kind + "Readback"
+        try:
+            activity[field] = run_activity(output / name, probe, test_assembly, dotnet, env,
+                                           target, result["source"], kind=kind)
+        except Exception as error:
+            # Leave the original case directory, worker log, databases and xUnit result intact.
+            log = output / (name + "-failure.log")
+            log.write_text(traceback.format_exc(), encoding="utf-8")
+            activity.setdefault("failures", {})[kind] = {"error": str(error), "log": log.name, "directory": name}
+            print(f"Worker {kind} failed: {error}. See {log}", flush=True)
+        finally:
+            write_json(output / "result.json", result)
+        if executable_hashes() != originals:
+            raise ValueError("an executable changed during the worker activity trial")
+    if "failures" in activity:
+        raise RuntimeError("Worker activity failed for " + ", ".join(activity["failures"]))
+
+
 def main() -> int:
     toolchain = json.loads((ROOT / "rust/toolchain-inputs.json").read_text(encoding="utf-8"))
     parser = argparse.ArgumentParser(description=__doc__)
@@ -69,7 +99,7 @@ def main() -> int:
     parser.add_argument("--stored-keys", action="store_true",
                         help="Inspect existing path identities in two additional synthetic C# backups")
     parser.add_argument("--worker-activity", action="store_true",
-                        help="Return native Rust backups to the shipping worker after a synthetic download and upload")
+                        help="Return native Rust backups to the shipping worker after a synthetic download, upload, deletion and interrupted timestamp repair")
     args = parser.parse_args()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
@@ -91,6 +121,7 @@ def main() -> int:
     activity_project = ROOT / "src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj"
     if args.worker_activity:
         extra_inputs.extend([activity_project, ROOT / "tools/RustCompatibilityOracle/verify_activity.py",
+                             ROOT / "tools/RustCompatibilityOracle/verify_rollback.py",
                              ROOT / "Directory.Build.targets", HERE.parent / "windows-performance/native.py",
                              HERE.parent / "legacy/casing/unicode-15.1.0.tsv",
                              *sorted((activity_project.parent / "Services").glob("FolderWatchWorkerPersistenceTests*.cs"))])
@@ -247,8 +278,6 @@ def main() -> int:
                                     "observations": sha256(observation / "result.json"),
                                     "rustExecutable": sha256(example)}
         if args.worker_activity:
-            from worker_activity import run as run_activity
-
             command("worker-exchange-tests", [sys.executable, "-B", "-m", "unittest", "discover",
                                               "-s", str(HERE), "-p", "test_worker*.py"])
             command("worker-backup-tests", ["cargo", "test", "--manifest-path", str(MANIFEST), "--frozen",
@@ -266,15 +295,12 @@ def main() -> int:
             command("activity-reference-restore", restore)
             command("activity-reference-build", [dotnet, "build", *common, "--no-restore", "--configuration", "Release"])
             test_assembly = activity_build / "bin/ImmichFolderWatch.Tests.Core/release/ImmichFolderWatch.Tests.Core.dll"
-            build_hashes = {"rustExecutable": sha256(example), "testAssembly": sha256(test_assembly)}
-            result["workerActivity"] = build_hashes
-            for name, field, upload in (("worker-activity", "readback", False), ("worker-upload-activity", "uploadReadback", True)):
-                result["workerActivity"][field] = run_activity(output / name, example, test_assembly, dotnet, env,
-                                                               args.target, result["source"], upload=upload)
-            if sha256(example) != build_hashes["rustExecutable"] or sha256(test_assembly) != build_hashes["testAssembly"]:
-                raise ValueError("an executable changed during the worker activity trial")
+            run_worker_activities(output, result, example, test_assembly, dotnet, env, args.target)
         result["status"] = "passed"
         print(f"Storage assessment passed; evidence: {output}", flush=True)
+    except (KeyboardInterrupt, SystemExit):
+        result["status"] = "cancelled"
+        raise
     except Exception as error:
         result["status"] = "failed"
         result["error"] = str(error)

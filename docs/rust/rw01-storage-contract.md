@@ -261,3 +261,20 @@ the eight reports, the original DLLs identified by the tests and every
 one of the 49 archive entries on each target. The four-host receipt
 SHA-256 is `9735ccd5af42688df6328bdfabc5a4527260b3e0a20725dac136e5768756e17f`.
 [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14840960347) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14841840102) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14839659957) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14839378878).
+
+The cross-language repair trial gives Rust the pending journal. SQLite's
+backup API must preserve the exact journal string, its matching original
+entry, and the separate account history. The deletion trial gives Rust the
+post-deletion tombstone. Both reject an earlier database before producing
+an output. The second shipping worker identifies the returned digest in
+its xUnit result. The detached reader compares all four tables and checks
+the photo or peer trash contents across both workers.
+[Replay commands](../../tools/rust-qa/storage/README.md#restore-after-a-deletion-or-interrupted-repair).
+
+On Fedora x64 the independently reviewed working tree passed these two
+exchanges alongside the download and upload. The two pure C# controls
+also passed. Thirteen changed donors were rejected. A valid journal with
+different JSON whitespace survived byte-for-byte. The detached reader
+rejected four inconsistent receipts and reproduced 24 earlier native
+upload and download reports. The reviewed four-exchange receipt has
+SHA-256 `c2975117c3966efa6db6f27afe9bbfe78151cef5d38c4e68b1b3cbad784a3900`.

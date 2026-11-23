@@ -70,12 +70,13 @@ The checkout needs that commit and the 3.0.4 reference commit. The reader uses
 immutable SQLite connections and prints a JSON receipt with the original hashes.
 The test uses an in-process synthetic Immich peer. [Activity and source checks](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
 
-The native Rust backup trials cover the shipping worker's download and upload.
-Each worker restarts from bytes produced by Rust. The upload peer independently
-retains the remote asset and records unexpected album and file operations.
-[Download and upload replay](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download).
-`rust-feasibility.yaml` retains the source, build and per-test evidence from
-each native target in its `rust-worker-backup` archive.
+The native Rust backup trials cover a download, an upload, a propagated
+deletion and an interrupted timestamp repair. Each restarted C# worker
+opens bytes returned by Rust. Separate synthetic peers retain the uploaded
+asset or trashed contents. The repair fixture keeps the same physical file
+across the database restore. Each `rust-worker-backup` archive contains the
+source, build records and original data for detached replay.
+[Download and upload](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download) · [Deletion and repair](../tools/rust-qa/storage/README.md#restore-after-a-deletion-or-interrupted-repair).
 
 ### Repair and deletion after restoring the worker database
 

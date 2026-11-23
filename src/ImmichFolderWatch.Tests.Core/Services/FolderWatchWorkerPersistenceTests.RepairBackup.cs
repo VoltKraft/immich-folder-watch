@@ -67,10 +67,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         Assert.NotEqual(beforeHash, pendingHash);
 
         // Restore the older database while preserving the independently changed watch root.
-        var restoredPath = Path.Combine(directory.Path, "restored.db");
-        File.Copy(beforePath, restoredPath);
-        Assert.Equal(beforeHash, ActivitySha256(restoredPath));
-        var stale = ReadActivityState(restoredPath);
+        var stalePath = Path.Combine(directory.Path, "stale.db");
+        File.Copy(beforePath, stalePath);
+        Assert.Equal(beforeHash, ActivitySha256(stalePath));
+        var stale = ReadActivityState(stalePath);
         var staleMapping = Assert.Single(stale.Mappings);
         Assert.Equal(beforeFile.LastWriteTimeUtc, staleMapping.LastWriteTimeUtc);
         Assert.Equal(ActivityTimestamp(entry.LastSynchronizedAtUtc), staleMapping.LastSynchronizedAtUtc);
@@ -79,8 +79,11 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         var fileAfterStaleRestore = ReadActivityFile(seed.Path);
         Assert.Equal(changedFile, fileAfterStaleRestore);
 
-        File.Copy(pendingPath, restoredPath, overwrite: true);
-        Assert.Equal(pendingHash, ActivitySha256(restoredPath));
+        var restoredPath = Path.Combine(directory.Path, "restored.db");
+        var output = Environment.GetEnvironmentVariable("IFW_QA_REPAIR_ACTIVITY_OUTPUT");
+        var exchange = Environment.GetEnvironmentVariable("IFW_QA_REPAIR_ACTIVITY_EXCHANGE");
+        var rustBackupHash = await RestoreActivityDatabaseAsync(output, exchange, "ifw-worker-repair-backup-request-v1",
+            beforePath, beforeHash, pendingPath, pendingHash, restoredPath);
         var restored = new SqliteSyncStateStore(restoredPath);
         var pending = Assert.Single(await restored.GetTimestampRepairsAsync(entry.AccountScope, entry.SourcePath));
         Assert.Equal(new SyncTimestampRepair(entry, OriginalCreated, desiredWrite, beforeFile.Sha256.ToUpperInvariant()), pending);
@@ -106,7 +109,6 @@ public sealed partial class FolderWatchWorkerPersistenceTests
         Assert.Equal(beforeHash, ActivitySha256(beforePath));
         Assert.Equal(pendingHash, ActivitySha256(pendingPath));
 
-        var output = Environment.GetEnvironmentVariable("IFW_QA_REPAIR_ACTIVITY_OUTPUT");
         if (output is null) return;
         Assert.True(Path.IsPathFullyQualified(output), "The repair activity output path must be absolute.");
         Directory.CreateDirectory(output);
@@ -134,6 +136,6 @@ public sealed partial class FolderWatchWorkerPersistenceTests
             staleRestore = new { file = fileAfterStaleRestore },
             restart = new { databaseSha256 = ActivitySha256(completedPath), mapping = completedMapping,
                 history.LastSuccessfulSyncUtc, file = restartedFile, restart.AlbumLists, restart.Downloads, restart.Uploads },
-        }, rustBackupHash: null);
+        }, rustBackupHash);
     }
 }

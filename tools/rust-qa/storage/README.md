@@ -66,15 +66,28 @@ account history. The second worker opens that returned backup and reconciles
 the same files. The peer records every unexpected download, membership change,
 album mutation and trash request through worker shutdown.
 
-To replay the cross-language trial, retain the `worker-activity/` directory
-and the separate `worker-upload-activity/` directory from the native archive.
-Supply the original target triple and full source revision. These commands
-print the independent SQL, original media and TRX
-readback. It runs on a different host as well.
+### Restore after a deletion or interrupted repair
+
+The other two exchanges use the same shipping worker. For deletion, the
+first worker removes the exact remote asset from its album. Rust accepts
+the backup containing the tombstone. The restarted worker reconciles the
+empty album and the peer retains the same nine bytes in trash. For repair,
+Rust accepts the backup with the pending journal entry, after the file's
+timestamp has already changed. The restarted worker completes the repair
+with the original transfer and account history. Each case has its own
+directory, peer or watch root and xUnit result.
+
+To replay one exchange on another host, retain its directory from the
+native archive. Pass the original target triple and full commit ID. The
+reader checks the SQLite state, media and xUnit execution. The deletion
+and repair directories also contain the compiled C# assemblies used by
+their respective workers.
 
 ```sh
 python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-activity TARGET FULL_COMMIT
 python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-upload-activity TARGET FULL_COMMIT --upload
+python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-deletion-activity TARGET FULL_COMMIT --kind deletion
+python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-repair-activity TARGET FULL_COMMIT --kind repair
 ```
 
 The parent `result.json` identifies the compiled Rust executable, C# test

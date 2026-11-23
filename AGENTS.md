@@ -165,7 +165,8 @@ to reconcile project decisions, defaults, and recorded state.
   cross-build. Independently review filesystem, migration and final integration.
   Use the [worker activity reference](docs/development.md#download-activity-backups-and-restart)
   and [native Rust backup trials](tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
-  for synthetic uploads, downloads and restarts across the C# and Rust codecs.
+  for synthetic downloads, uploads, deletions and interrupted timestamp repairs.
+  Each restarted C# worker consumes the backup returned by Rust.
   The [RW-02 stack decision](docs/rust/rw02-stack-decision.md) records the
   qualified components, native resource limits and remaining desktop checks.
   Follow the [Windows import-library reconstruction](docs/rust/rw02-windows-imports.md)

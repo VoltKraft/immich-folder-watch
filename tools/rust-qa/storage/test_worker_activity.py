@@ -3,9 +3,12 @@
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
+from run import run_worker_activities
 from worker_activity import original_bytes, stale_control
 from verify_activity import check_peer_requests
 
@@ -47,6 +50,18 @@ class WorkerActivityTests(unittest.TestCase):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 check_peer_requests({**valid, key: value}, 0, asset)
 
+    def test_earlier_repair_and_deletion_donors_need_their_own_refusal(self):
+        request = {"token": "1" * 32, "beforeSha256": "2" * 64}
+        for kind, reason in (("repair", "no pending worker timestamp repair"), ("deletion", "no worker tombstone")):
+            marker = {"format": f"ifw-worker-{kind}-backup-stale-v1", "token": request["token"],
+                      "sourceSha256": request["beforeSha256"]}
+            lines = b"IFW_WORKER_STALE=" + json.dumps(marker).encode() + f'\nError: "{reason}"\n'.encode()
+            with self.subTest(kind=kind):
+                stale_control(lines, request, 1, kind=kind)
+                other = "deletion" if kind == "repair" else "repair"
+                with self.assertRaises(ValueError):
+                    stale_control(lines, request, 1, kind=other)
+
     def test_oversized_backup_is_rejected_before_readback(self):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root, "returned.db")
@@ -65,3 +80,69 @@ class WorkerActivityTests(unittest.TestCase):
             for path in (fifo, link):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     original_bytes(path, 16 << 20)
+
+
+class WorkerActivityRunnerTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.output = Path(directory.name)
+        self.probe = self.output / "probe"
+        self.assembly = self.output / "assembly"
+        self.probe.write_bytes(b"Rust fixture")
+        self.assembly.write_bytes(b"C# fixture")
+        self.result = {"source": "test-source"}
+
+    def run_cases(self, trial):
+        with patch("worker_activity.run", side_effect=trial):
+            run_worker_activities(self.output, self.result, self.probe, self.assembly,
+                                  sys.executable, os.environ, "synthetic-target")
+
+    def test_independent_cases_retain_their_original_results_and_failures(self):
+        def trial(directory, *args, kind):
+            directory.mkdir()
+            (directory / "worker.log").write_text(kind)
+            if kind in ("upload", "deletion"):
+                raise ValueError(kind + " fixture failed")
+            return {"case": kind}
+
+        with self.assertRaisesRegex(RuntimeError, "upload, deletion"):
+            self.run_cases(trial)
+        activity = json.loads((self.output / "result.json").read_bytes())["workerActivity"]
+        self.assertEqual(activity["readback"], {"case": "download"})
+        self.assertEqual(activity["repairReadback"], {"case": "repair"})
+        self.assertEqual(set(activity["failures"]), {"upload", "deletion"})
+        for kind, failure in activity["failures"].items():
+            self.assertIn("ValueError: " + kind + " fixture failed", (self.output / failure["log"]).read_text())
+            self.assertEqual((self.output / failure["directory"] / "worker.log").read_text(), kind)
+
+    def test_success_keeps_the_existing_readback_names(self):
+        self.run_cases(lambda *args, kind: kind)
+        self.assertEqual(set(self.result["workerActivity"]),
+                         {"rustExecutable", "testAssembly", "readback", "uploadReadback", "deletionReadback", "repairReadback"})
+
+    def test_failed_case_with_a_changed_executable_stops_the_remaining_cases(self):
+        for changed in (self.probe, self.assembly):
+            attempted = []
+
+            def change_and_fail(*args, kind):
+                attempted.append(kind)
+                changed.write_bytes(changed.read_bytes() + b" changed")
+                raise ValueError("fixture failed")
+
+            with self.subTest(changed=changed.name), self.assertRaisesRegex(ValueError, "executable changed"):
+                self.run_cases(change_and_fail)
+            self.assertEqual(attempted, ["download"])
+            self.assertEqual(self.result["workerActivity"]["failures"]["download"]["error"], "fixture failed")
+
+    def test_cancellation_stops_before_the_next_case(self):
+        attempted = []
+
+        def cancel(*args, kind):
+            attempted.append(kind)
+            raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_cases(cancel)
+        self.assertEqual(attempted, ["download"])
+        self.assertNotIn("failures", self.result["workerActivity"])

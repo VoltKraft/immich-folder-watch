@@ -1,5 +1,19 @@
 # Project Status
 
+## Rust backups after propagated deletion and pending repair (2026-11-23)
+
+On Fedora x64 four shipping workers restarted after download, upload,
+deletion or interrupted repair from the bytes returned by Rust. Independent
+review matched the eight changed sources, the four xUnit executions and
+the before/after SQLite tables. The deletion peer retained the same nine
+bytes. Restart completed the pending repair and preserved account history.
+Two review findings were resolved. A failed case now retains its original
+evidence while the independent cases continue. Executable regression
+tests reject donors from different worker profiles and a journal that
+contradicts its original entry. The four-target rerun from a clean source
+revision and rollback after the installed Rust candidate's own activity
+remain open. [Inputs, controls and replay](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
 ## Native repair and deletion references (2026-11-23)
 
 At `e558b42` both new C# worker cases passed on all four native targets
