@@ -124,7 +124,7 @@ class RetainedWindowTests(unittest.TestCase):
                                                  ("secondaryShow", 98, 100, 101), ("secondaryShow", 99, 103, 104),
                                                  ("callbackShow", (1 << 32) + 100, None, (1 << 32) + 101)):
             with self.subTest(field=field, earliest=earliest):
-                self.trial.sample_after_trigger(field, {"source": field})
+                self.trial.sample_after_trigger(field, {"source": field}, lambda: earliest)
                 self.assertFalse(self.trial.activated_show(1, earliest, observed, field, released_by=resume))
                 self.assertEqual(self.record["afterTrigger"]["state"], "visible")
                 row = self.record[field]
@@ -137,7 +137,7 @@ class RetainedWindowTests(unittest.TestCase):
         self.trial.close_window()
         self.assertTrue(self.trial.hidden(FIRST_RENDER + "WINDOW_HIDDEN\n"))
         start = len(self.gui.events)
-        self.trial.sample_after_trigger("secondaryShow", {"secondaryPid": 34})
+        self.trial.sample_after_trigger("secondaryShow", {"secondaryPid": 34}, lambda: 100)
         self.assertEqual(self.record["afterTrigger"]["state"], "retainedRootHidden")
         self.gui.show(100)
         self.trial.opened(99, lambda: FIRST_RENDER + "WINDOW_HIDDEN\n", self.wait)
@@ -163,10 +163,75 @@ class RetainedWindowTests(unittest.TestCase):
                 if early_create:
                     gui.life.append((99, "create", 90))
                 with patch.object(retained, "desktop_windows", return_value=scan):
-                    trial.sample_after_trigger("callbackShow", {"pid": 12, "ordinal": 1})
+                    trial.sample_after_trigger("callbackShow", {"pid": 12, "ordinal": 1, "observedMs": 100}, lambda: 100)
                 gui.show(100, create=not early_create)
                 trial.hwnd = 99
                 self.assertEqual(trial.activated_show(0, 100, 101, "callbackShow"), expected)
+
+    def test_delayed_show_must_be_generated_after_the_hidden_query_even_when_the_activation_ticks_differ(self):
+        # The first two traces reproduce a SHOW generated during resume or before the acknowledged Shell delivery.
+        cases = (("secondaryShow", 98, 104, None, 104, 100, False),
+                 ("callbackShow", 100, None, 108, 108, 100, False),
+                 ("callbackShow", 100, None, 115, 115, 106, False),
+                 ("callbackShow", 100, None, 108, 114, 110, False),
+                 ("callbackShow", 100, None, 108, 104, 110, False),
+                 ("callbackShow", 100, None, 100, 100, 100, True),
+                 ("secondaryShow", 98, 104, None, 104, 104, True))
+        for field, earliest, returned, ack, query, generated, expected in cases:
+            with self.subTest(field=field, ack=ack, query=query, generated=generated):
+                gui = OwnedRoot(12)
+                trial = retained.RetainedWindow(self.desk, gui, TITLE, "Default", {})
+                trial.lifetime = Mock(events=gui.life)
+                gui.show(3, create=True)
+                trial.first(99, lambda: FIRST_RENDER, self.wait)
+                trial.close_window()
+                self.assertTrue(trial.hidden(FIRST_RENDER + "WINDOW_HIDDEN\n"))
+                start = len(gui.events)
+                trigger = {"secondaryPid": 34} if ack is None else {"pid": 12, "ordinal": 1, "observedMs": ack}
+                calls = []
+                def clock():
+                    calls.append("clock")
+                    return query
+                def hidden(hwnd):
+                    calls.append("IsWindowVisible")
+                    return gui.visible() == hwnd
+                with patch.object(gui, "is_visible", side_effect=hidden):
+                    trial.sample_after_trigger(field, trigger, clock)
+                self.assertEqual(calls, ["clock", "IsWindowVisible"])
+                gui.show(generated)
+                trial.opened(99, lambda: FIRST_RENDER + "WINDOW_HIDDEN\n", self.wait)
+                self.assertEqual(trial.activated_show(start, earliest, 120, field, released_by=returned), expected)
+                self.assertEqual(trial.record["afterTrigger"]["queryBeganMs"], query)
+                self.assertEqual(trial.record[field]["showMs"], generated)
+                self.assertEqual(trial.record[field]["status"], "ordered" if expected else "inconclusive")
+
+    def test_windowless_query_requires_a_compatible_create_generation_tick_before_the_same_root_show_across_wrap(self):
+        wrap = 1 << 32
+        for created, expected in ((0, False), (1, True), (2, True), (3, False)):
+            with self.subTest(created=created):
+                gui = OwnedRoot(12)
+                gui.desktop = 4
+                trial = retained.RetainedWindow(self.desk, gui, TITLE, "Default", {})
+                trial.lifetime = Mock(events=gui.life)
+                calls = []
+                def clock():
+                    calls.append("clock")
+                    return wrap + 1
+                def scan(*args):
+                    calls.append("EnumDesktopWindows")
+                    return dict(desktop="Default", ownedCount=0, windows=[])
+                with patch.object(retained, "desktop_windows", side_effect=scan):
+                    trial.sample_after_trigger("callbackShow", {"pid": 12, "observedMs": wrap}, clock)
+                self.assertEqual(calls, ["clock", "EnumDesktopWindows"])
+                gui.life.append((99, "create", created))
+                gui.show(2)
+                trial.first(99, lambda: FIRST_RENDER, self.wait)
+                self.assertEqual(trial.activated_show(0, wrap - 2, wrap + 3, "callbackShow"), expected)
+                self.assertTrue(trial.record["callbackShow"]["distinctTicks"])
+                if expected:
+                    self.assertEqual(trial.record["callbackShow"]["createMs"], wrap + created)
+                else:
+                    self.assertIn("CREATE", trial.record["callbackShow"]["reason"])
 
     def test_unavailable_launcher_timing_yields_to_an_independent_functional_failure(self):
         for failure_at in (None, "shellLess", "foreground"):

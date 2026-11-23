@@ -318,7 +318,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                     def pump_secondary():
                         windows.pump()
                         if "afterTrigger" not in evidence and f"LAUNCHER_OPEN client={second.pid}\n" in log().splitlines(keepends=True):
-                            retained.sample_after_trigger("secondaryShow", dict(secondaryPid=second.pid))
+                            retained.sample_after_trigger("secondaryShow", dict(secondaryPid=second.pid), clock)
                 result.update(secondaryArguments=[], secondaryPid=second.pid,
                               secondaryCreation100ns=api.process_identity(int(second._handle)))
                 result["secondaryExit"] = wait_for_exit(second, pump_secondary, 12)

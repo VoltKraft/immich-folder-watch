@@ -650,7 +650,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                     raise ValueError("The observed Shell callback did not reach the original GUI queue") from exc
                 raise Unavailable("The exact provider returned without a matching Shell callback") from exc
             if retained is not None:
-                retained.sample_after_trigger("callbackShow", result["delivery"])
+                retained.sample_after_trigger("callbackShow", result["delivery"], clock)
             result["stage"] = "visible-primary"
             hwnd = wait(windows.visible, "The opened primary had no independently visible window")
             wait(lambda: "ADAPTER Dx12 " in log(), "The activated GUI did not initialize its renderer")

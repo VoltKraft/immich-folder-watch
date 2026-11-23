@@ -17,6 +17,14 @@ class ShowOrderUnavailable(Exception):
     """The two Windows uptime samples do not establish the order of activation and SHOW."""
 
 
+def event_uptime(tick, near):
+    # The observation is bounded to 35 seconds. Use the closest DWORD epoch, including a preceding tick.
+    if not 0 <= tick <= 0xffffffff:
+        return None
+    delta = ((tick - near + 0x80000000) & 0xffffffff) - 0x80000000
+    return near + delta
+
+
 class GuiThreadInfo(c.Structure):
     _fields_ = [("size", w.DWORD), ("flags", w.DWORD), ("active", w.HWND), ("focus", w.HWND),
                 ("capture", w.HWND), ("menu", w.HWND), ("moveSize", w.HWND), ("caret", w.HWND), ("rect", w.RECT)]
@@ -144,7 +152,7 @@ class RetainedWindow:
             raise ValueError("The retained GUI reported another close during activation")
         graphics(text, row)
 
-    def sample_after_trigger(self, field, trigger):
+    def sample_after_trigger(self, field, trigger, clock):
         """Query the owned GUI state only after its exact launcher or Shell Open was acknowledged."""
         row = self.record["afterTrigger"] = dict(field=field, trigger=trigger, pid=self.windows.pid, state="unconfirmed")
         if self.windows.visible() is not None:
@@ -152,6 +160,7 @@ class RetainedWindow:
             return
         if self.hwnd is not None:
             row["root"] = self.identity()
+            row["queryBeganMs"] = clock()
             if self.windows.is_visible(self.hwnd):
                 row["state"] = "visible"
                 return
@@ -159,6 +168,7 @@ class RetainedWindow:
         else:
             # Background startup has no known root yet. Verify the complete set of owned top-level windows.
             try:
+                row["queryBeganMs"] = clock()
                 scan = desktop_windows(self.desk, self.windows, self.windows.desktop, None)
             except OSError as exc:
                 row["readError"] = str(exc)
@@ -172,6 +182,29 @@ class RetainedWindow:
             row["lifetimeCursor"] = len(self.lifetime.events)
         row["eventCursor"] = len(self.windows.events)
 
+    def confirm_probe(self, probe, row, start):
+        """An out-of-context hook may deliver an old event after a newer native window query."""
+        trigger_observed = (probe["trigger"].get("observedMs") if probe["field"] == "callbackShow"
+                            else row["releasedByMs"])
+        query = probe.get("queryBeganMs")
+        cursor = probe["eventCursor"]
+        if (not isinstance(query, int) or not isinstance(trigger_observed, int)
+                or not row["releasedByMs"] <= trigger_observed <= query <= row["observedMs"]):
+            return "The native window query was outside the confirmed trigger interval"
+        if row["showMs"] < query:
+            return "The native SHOW was generated before the post-trigger window query"
+        if cursor < start or [e for e in self.events(cursor) if e["event"] == "show"] != [row["showEvent"]]:
+            return "The expected native SHOW was not delivered after the post-trigger window query"
+        if probe["state"] == "noGuiRoot":
+            life = [(kind, tick) for hwnd, kind, tick in self.lifetime.events[probe["lifetimeCursor"]:] if hwnd == self.hwnd]
+            row["lifetimeAfterQuery"] = life
+            if len(life) != 1 or life[0][0] != "create":
+                return "The expected native CREATE was not delivered after the root-free window query"
+            created = row["createMs"] = event_uptime(life[0][1], query)
+            if created is None or not query <= created <= row["showMs"]:
+                return "The native CREATE was not generated between the root-free query and SHOW"
+        return None
+
     def activated_show(self, start, earliest, observed, field, *, released_by=None):
         """Return False when the native observations cannot establish strict causal order."""
         shows = [e for e in self.events(start) if e["event"] == "show"]
@@ -184,23 +217,26 @@ class RetainedWindow:
                                         showEvent=event, status="outsideInterval")
         # The event was already received when the observer sampled the upper endpoint.
         # A 32-bit event tick equal to a GetTickCount64 lower endpoint cannot establish which came first.
-        elapsed = (tick - earliest) & 0xffffffff
-        if not (0 <= tick <= 0xffffffff and 0 <= earliest <= latest <= observed
-                and observed - earliest <= 35_000 and elapsed <= observed - earliest):
+        show = row["showMs"] = event_uptime(tick, earliest)
+        if (show is None or show > observed or not 0 <= earliest <= latest <= observed
+                or observed - earliest > 35_000):
             raise ValueError("The retained window show was outside its native activation interval")
-        row["showMs"] = earliest + elapsed
-        if row["showMs"] > latest:
-            row.update(status="ordered", basis="distinctTicks")
-            return True
+        row["distinctTicks"] = show > latest
         probe = self.record.get("afterTrigger", {})
         own_root = probe.get("state") == "retainedRootHidden" and probe["root"]["hwnd"] == self.hwnd
         if probe.get("state") == "noGuiRoot":
-            life = [kind for hwnd, kind, _ in self.lifetime.events[probe["lifetimeCursor"]:] if hwnd == self.hwnd]
-            own_root = life == ["create"] and all(w["hwnd"] != self.hwnd for w in probe["desktopWindows"]["windows"])
-        cursor = probe.get("eventCursor")
-        if (own_root and probe["field"] == field and probe["pid"] == self.windows.pid and cursor is not None
-                and cursor >= start and [e for e in self.events(cursor) if e["event"] == "show"] == shows):
+            own_root = all(w["hwnd"] != self.hwnd for w in probe["desktopWindows"]["windows"])
+        if own_root and probe["field"] == field and probe["pid"] == self.windows.pid:
+            contradiction = self.confirm_probe(probe, row, start)
+            if contradiction is not None:
+                row.update(status="inconclusive", reason=contradiction)
+                return False
             row.update(status="ordered", basis="observedHiddenAfterTrigger")
+            return True
+        if show < earliest:
+            raise ValueError("The retained window show was outside its native activation interval")
+        if row["distinctTicks"]:
+            row.update(status="ordered", basis="distinctTicks")
             return True
         row.update(status="inconclusive", reason="The SHOW and activation could not be ordered within the Windows timer tick")
         return False
