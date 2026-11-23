@@ -101,32 +101,81 @@ def named_fds(peer, paths, evidence):
         if (row.get("link") != role or row.get("fileType") != "directory" or flags & required != required
                 or flags & os.O_ACCMODE != os.O_RDONLY):
             raise ValueError("The retained directory descriptor is missing or has unexpected flags")
-        found[str(paths[role])] = {key: row[key] for key in ("fd", "device", "inode", "flags")}
+        identity = {key: row[key] for key in ("fd", "device", "inode", "flags")}
+        if "mountId" in row:
+            identity["mountId"] = row["mountId"]
+        found[str(paths[role])] = identity
     return found
 
 
-def retained_fds(peer, paths, evidence, before=None):
-    if before is not None:
-        # These numbered slots remain diagnosable if a pathname no longer matches.
-        evidence["originals"] = original_fds(peer, paths, before)
-    current = named_fds(peer, paths, evidence)
-    if before is not None and current != before:
-        raise ValueError("The retry peer's original directory descriptors changed")
-    return current
+def document_info(lookup):
+    try:
+        backing, applications = lookup()
+        permissions = applications.get(APP, ())
+        return dict(expectedBacking=bytes(backing).removesuffix(b"\0") == os.fsencode(BACKING),
+                    read="read" in permissions, write="write" in permissions)
+    except Exception as error:
+        return dict(errorType=type(error).__name__, code=getattr(error, "code", None))
 
 
-def request_attempt(pipe, number, peer, paths, before, result, file):
-    trace = result["retryObservation"]
-    trace["phase"] = f"verify directories before attempt {number}"
-    current = original_fds(peer, paths, before)
-    trace["beforeAttempts"].append(dict(attempt=number, phase=trace["phase"], lastVerified=trace["lastVerified"],
-                                        originals=current))
-    save(file, result)
+def check_slots(current, paths, before, initial=False):
+    detached = False
     for role, path in paths.items():
         row, original = current[role], before[str(path)]
-        if (row.get("link") != role or row.get("fileType") != "directory"
-                or any(row.get(key) != original[key] for key in ("fd", "device", "inode", "flags"))):
-            raise ValueError("The original authorized directory descriptor changed before a retry")
+        named = row.get("link") == role
+        retired_name = row.get("link") == role + "-deleted"
+        if (not (named or (initial and retired_name)) or row.get("fileType") != "directory"
+                or any(row.get(key) != value for key, value in original.items())):
+            raise ValueError("The original authorized directory descriptor changed before a retry or final check")
+        detached = detached or retired_name
+    return detached
+
+
+def retained_fds(peer, paths, evidence, before=None, lookup=None):
+    if before is not None:
+        initial = evidence["originals"] = original_fds(peer, paths, before)
+        if check_slots(initial, paths, before, initial=True):
+            permission = evidence["documentInfo"] = document_info(lookup)
+            if permission != {"expectedBacking": True, "read": True, "write": True}:
+                raise ValueError("Could not confirm the original document and test application's grant")
+
+    # Keep both currently named directories open while checking the reader's own descriptors.
+    flags = os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    opened = evidence["namedDirectories"] = {}
+    with ExitStack() as holders:
+        root_fd = os.open(paths["grant"], flags)
+        holders.callback(os.close, root_fd)
+        album_fd = os.open("album", flags, dir_fd=root_fd)
+        holders.callback(os.close, album_fd)
+        for role, fd in (("grant", root_fd), ("album", album_fd)):
+            item = os.fstat(fd)
+            opened[role] = dict(typeBits=stat.S_IFMT(item.st_mode), device=item.st_dev, inode=item.st_ino)
+        if before is not None:
+            confirmed = evidence["confirmedOriginals"] = original_fds(peer, paths, before)
+            check_slots(confirmed, paths, before)
+        current = named_fds(peer, paths, evidence)
+        for role, path in paths.items():
+            visible, retained = opened[role], current[str(path)]
+            if visible["typeBits"] != stat.S_IFDIR or any(visible[k] != retained[k] for k in ("device", "inode")):
+                raise ValueError("The named grant or album differs from the retained directory")
+        if before is not None and current != before:
+            raise ValueError("The retry peer's original directory descriptors changed")
+        return current
+
+
+def request_attempt(pipe, number, peer, paths, before, result, file, lookup=None):
+    trace = result["retryObservation"]
+    trace["phase"] = f"verify directories before attempt {number}"
+    sample = dict(attempt=number, phase=trace["phase"], lastVerified=trace["lastVerified"])
+    trace["beforeAttempts"].append(sample)
+    try:
+        retained_fds(peer, paths, sample, before, lookup)
+    except (OSError, ValueError) as primary:
+        try:
+            save(file, result)
+        except OSError as error:
+            primary.add_note(f"Could not save pre-attempt evidence (errno {error.errno})")
+        raise
     trace.update(lastVerified=trace["phase"], phase=f"attempt {number}")
     save(file, result)
     pipe.write("attempt\n")
@@ -170,13 +219,7 @@ def record_grant_at_refusal(grant, lookup, result, file):
                     os.close(fd)
                 except OSError as error:
                     state["closeErrno"] = error.errno
-        try:
-            backing, applications = lookup()
-            permissions = applications.get(APP, ())
-            state["documentInfo"] = dict(expectedBacking=bytes(backing).removesuffix(b"\0") == os.fsencode(BACKING),
-                                         read="read" in permissions, write="write" in permissions)
-        except Exception as error:
-            state["documentInfo"] = dict(errorType=type(error).__name__, code=getattr(error, "code", None))
+        state["documentInfo"] = document_info(lookup)
         try:
             save(file, result)
         except OSError as error:
@@ -427,9 +470,10 @@ def observe(expected):
         trace = result["retryObservation"] = dict(lastVerified="ordinary lock matrix", beforeAttempts=[])
         paths = {"grant": grant, "album": grant / "album"}
         peer = before_fds = None
+        def lookup():
+            return call("Info", GLib.Variant("(s)", (token,)))
         def diagnosed():
-            return record_grant_at_refusal(grant, lambda: call("Info", GLib.Variant("(s)", (token,))),
-                                           result, evidence / "observation.json")
+            return record_grant_at_refusal(grant, lookup, result, evidence / "observation.json")
         def phase(name):
             trace["phase"] = name
             save(evidence / "observation.json", result)
@@ -476,7 +520,7 @@ def observe(expected):
             def attempt(reason):
                 number = len(attempts) + 1
                 with diagnosed():
-                    request_attempt(proc.stdin, number, peer, paths, before_fds, result, evidence / "observation.json")
+                    request_attempt(proc.stdin, number, peer, paths, before_fds, result, evidence / "observation.json", lookup)
                 line = response()
                 attempts.append(line)
                 observed(dict(view="grant", operation="rust", mode="retained-retry", attempt=len(attempts),
@@ -495,8 +539,8 @@ def observe(expected):
             phase("verify directories after attempts")
             after = trace["after"] = {}
             with diagnosed():
+                after_fds = retained_fds(peer, paths, after, before_fds, lookup)
                 after_ids = identities(after)
-                after_fds = retained_fds(peer, paths, after, before_fds)
                 if (before_ids != after_ids or before_fds != after_fds or backing_file.read_bytes() != FIXTURE
                         or attempts[0] != attempts[2]):
                     raise ValueError("Retry changed the grant, held directories, file identity, contents or final outcome")

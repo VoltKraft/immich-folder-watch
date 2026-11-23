@@ -1,5 +1,20 @@
 # Project Status
 
+## Matching live portal names to the Rust reader's original handles (2026-11-23)
+
+The private Noble x64 comparison completed all 110 operations and revoked
+all three grants. At the start of six observations both original descriptor
+links carried the kernel's detached label. Each time the private exporter
+confirmed the same test origin and permissions. With both named directories
+open, the Rust reader's original slots showed the exact canonical labels
+and matched the original identities. Independent readback verified all
+24 slot measurements. A subsequent working-tree run also checked the kernel
+mount IDs. Its result SHA-256 is
+`9821340dbd834d76125c323ee7c60980eff81afa6609ebb4f28594a289f8c190`.
+Twenty focused controls passed. A corrected hosted ARM64 comparison and a
+supported distribution portal with upload-lock support are still required.
+[Observer and results](rust/rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open).
+
 ## Noble portal directory names during a held writer (2026-11-23)
 
 Both hosted Ubuntu desktops at `653f255` passed all eleven X11 resource

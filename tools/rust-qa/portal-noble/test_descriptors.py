@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from observe import (APP, BACKING, FIXTURE, original_fds, record_grant_at_refusal, request_attempt, retained_fds,
+from observe import (APP, BACKING, FIXTURE, named_fds, original_fds, record_grant_at_refusal, request_attempt, retained_fds,
                      retry_failed, retry_peer, revoke_grant, save)
 
 
@@ -236,8 +236,11 @@ class Descriptors(unittest.TestCase):
             with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
                 before = retained_fds(peer, paths, {})
                 slots = original_fds(peer, paths, before)
-                for key, wrong in (("fd", -1), ("device", -1), ("inode", -1), ("flags", "0"),
-                                   ("fileType", "regular"), ("link", "album")):
+                checks = [("fd", -1), ("device", -1), ("inode", -1), ("flags", "0"),
+                          ("fileType", "regular"), ("link", "album")]
+                if "mountId" in slots["grant"]:
+                    checks.append(("mountId", -1))
+                for key, wrong in checks:
                     bad = {**slots, "grant": {**slots["grant"], key: wrong}}
                     trace = {"lastVerified": "attempt 1", "beforeAttempts": []}
                     pipe = Mock()
@@ -247,6 +250,73 @@ class Descriptors(unittest.TestCase):
                     checked, = json.loads(file.read_bytes())["retryObservation"]["beforeAttempts"]
                     self.assertEqual(checked["originals"]["grant"][key], wrong)
                     pipe.write.assert_not_called()
+
+    def test_detached_label_requires_the_current_grant_and_exact_original_slots_in_one_observation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = root / "observation.json"
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                before = retained_fds(peer, paths, {})
+                canonical = original_fds(peer, paths, before)
+                detached = {role: {**row, "link": role + "-deleted"} for role, row in canonical.items()}
+                expected = (os.fsencode(BACKING), {APP: ["read", "write"]})
+                for description, reply, final, success in (
+                    ("original grant and final exact names", expected, canonical, True),
+                    ("names still detached", expected, detached, False),
+                    ("read permission withdrawn", (expected[0], {APP: ["write"]}), canonical, False),
+                    ("wrong app", (expected[0], {"other-app": ["read", "write"]}), canonical, False),
+                    ("wrong source", (b"/different-origin", expected[1]), canonical, False),
+                ):
+                    with self.subTest(description=description):
+                        result = {"retryObservation": {"lastVerified": "attempt 1", "beforeAttempts": []}}
+                        lookup = Mock(return_value=reply)
+                        pipe = Mock()
+                        with (patch("observe.original_fds", side_effect=[detached, final]) as sample,
+                              patch("observe.named_fds", wraps=named_fds) as names):
+                            if success:
+                                request_attempt(pipe, 2, peer, paths, before, result, file, lookup)
+                                pipe.write.assert_called_once_with("attempt\n")
+                            else:
+                                with self.assertRaises(ValueError):
+                                    request_attempt(pipe, 2, peer, paths, before, result, file, lookup)
+                                pipe.write.assert_not_called()
+                        lookup.assert_called_once_with()
+                        self.assertEqual(sample.call_count, 2 if reply == expected else 1)
+                        self.assertEqual(names.call_count, int(success))
+                        observation, = json.loads(file.read_bytes())["retryObservation"]["beforeAttempts"]
+                        self.assertEqual(observation["originals"], detached)
+                        if reply == expected:
+                            self.assertEqual(observation["confirmedOriginals"], final)
+                            for role, path in paths.items():
+                                item = path.stat()
+                                self.assertEqual(observation["namedDirectories"][role],
+                                                 dict(typeBits=stat.S_IFDIR, device=item.st_dev, inode=item.st_ino))
+
+    def test_another_named_directory_cannot_supply_a_retained_slot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = root / "observation.json"
+            paths = {"grant": root, "album": root / "album"}
+            with child(root) as proc, retry_peer(proc.pid, proc, self.sha) as peer:
+                before = retained_fds(peer, paths, {})
+                canonical = original_fds(peer, paths, before)
+                first = {**canonical, "album": {**canonical["album"], "link": "album-deleted"}}
+                def lookup():
+                    paths["album"].rename(root / "original")
+                    paths["album"].mkdir()
+                    return os.fsencode(BACKING), {APP: ["read", "write"]}
+                result = {"retryObservation": {"lastVerified": "attempt 1", "beforeAttempts": []}}
+                pipe = Mock()
+                # Report the original peer names to isolate the independent fstat comparison.
+                with (patch("observe.original_fds", side_effect=[first, canonical]),
+                      patch("observe.named_fds", return_value=before),
+                      self.assertRaisesRegex(ValueError, "named grant or album differs")):
+                    request_attempt(pipe, 2, peer, paths, before, result, file, lookup)
+                pipe.write.assert_not_called()
+                row, = json.loads(file.read_bytes())["retryObservation"]["beforeAttempts"]
+                self.assertNotEqual(row["namedDirectories"]["album"]["inode"], first["album"]["inode"])
+                self.assertEqual(row["namedDirectories"]["album"]["inode"], paths["album"].stat().st_ino)
 
     def test_explicit_revocation_records_cleanup_after_a_failed_observation(self):
         with tempfile.TemporaryDirectory() as temporary:

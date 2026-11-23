@@ -167,6 +167,34 @@ Noble's implementation schedules cache invalidation after a successful
 lookup of a physical entry. The precise kernel event in the failed ARM64
 run remains unknown. [Ubuntu source inputs](../../tools/rust-qa/portal-noble/inputs.py).
 
+### Checking the reader while both named directories are open
+
+The observer takes a raw sample of the two original Rust descriptor slots.
+It verifies their numbers, directory types, devices, inodes and open flags.
+It also compares the original kernel mount ID when present. If the kernel
+reports exactly the original name followed by ` (deleted)`, the private
+exporter must confirm the original token, synthetic backing path and
+the test app's read and write permissions. Any other changed link fails.
+
+For the same observation, the observer holds the named grant open and
+opens the album relative to that directory descriptor. Both opens require
+`O_DIRECTORY | O_NOFOLLOW`. While the two observation handles are live,
+the reader's original numbered slots must once again have the exact
+canonical names and all their original properties. Both named directory
+identities and the unique matching descriptors must agree. The observer
+performs this comparison once before each attempt and at the end. Only
+the Rust reader's original handles are used for the synthetic reads.
+
+The first implementation ran offline in `amd64-p5elg3re` on the working
+tree based on `6bfcdbc`. All three services displayed the detached
+labels before attempts two and three. Six independent grant lookups
+returned the expected origin and permissions. All 24 final slot samples
+across the twelve observations matched the original directories. The
+stock services returned errno 38 and the backport recovered after the
+writer released its lock. All three revocations and final content checks
+passed. Its native result SHA-256 is
+`75d508ea97533bff6d807db5b4f7a7569883407ed5f66a218213834480e0bc99`.
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).
