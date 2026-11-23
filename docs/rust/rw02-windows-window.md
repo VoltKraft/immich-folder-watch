@@ -593,3 +593,21 @@ locates the delay before Present and during ShowWindow. Separating frame
 acquisition, rendering and scheduling requires further native observations.
 The x64 dispatch report SHA-256 is
 `e8f2cc88e2d1e933aa7145e5a2fb53d8f2b477a937fe26a861d558b74f8973fd`.
+
+### Separating visible frame and window timing
+
+The x64 assessment runs an additional, instrumented executable after the
+ordinary timings. It uses the same inventory and captures the actual DX12
+frame-latency wait, egui update and tessellation, command preparation and
+submission, DXGI presentation and Win32 visibility transitions. Each sample
+is tied to its thread and native clock. The reader compares the span with
+independent window, file and presentation events. The ordinary executable
+supplies the eleven WPF comparisons. [Native command and required originals](../../tools/rust-qa/windows-frame-cost/README.md).
+
+The pinned compiler checked the instrumented sources for the x64 Windows
+target. Two offline reconstructions produced identical source archives
+with SHA-256 `1b9dd1bfbdc59fde4329542925d36968a0b159928d99720aa3e1cfdeae5de536`.
+The external package and feature selections matched the ordinary build.
+Replaying the older native trace reproduced 1,167 qualifying presents and
+566 hidden intervals. It lacked the new stage samples. A native run of the
+instrumented executable is required to attribute the earlier delays.

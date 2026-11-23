@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows x64 visible frame and visibility observer (2026-11-23)
+
+The extra instrumented build passed a Linux-hosted compiler check for
+Windows x64 and two offline source reconstructions. Eight analysis controls
+passed locally. Independent review found that the DX12 backend can
+present a frame after its wait times out. The reader now retains that
+frame's wait result and DXGI timestamps. The ordinary GUI supplies the
+eleven same-host comparisons. No new native timing has been collected.
+[Command and evidence](rust/rw02-windows-window.md#separating-visible-frame-and-window-timing).
+
 ## Installed Ubuntu original and private build verification (2026-11-23)
 
 On a fresh Noble x64 VM the installed Flatpak received its directory grant.

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import uuid
 
 from inputs import DX12_WAIT_OPTION, HERE, QA, ROOT, TARGETS, recorder, sha, subjects
@@ -67,6 +68,7 @@ def main(target, variant="mailbox"):
         "mailbox": ("measured", "Mailbox", 1),
         "fifo": ("measured-fifo", "Fifo", 1),
         "dispatch": ("dispatch", "Mailbox", 1),
+        "frame-cost": ("frame-cost", "Mailbox", 1),
         "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
     }[variant]
     out = base / folder
@@ -77,11 +79,15 @@ def main(target, variant="mailbox"):
     try:
         if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
                                          "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE",
-                                         "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL")):
+                                         "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL", "IFW_QA_WINDOWS_FRAME_COST")):
             raise ValueError("Select the requested diagnosis using the recorder option")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
+        if variant == "frame-cost":
+            sys.path.insert(0, str(QA / "windows-frame-cost"))
+            import frame_case
+            binary = frame_case.prepare_subject(base, out, budget, record)
         with ExitStack() as scope:
             if DX12_WAIT_OPTION in os.environ and os.environ[DX12_WAIT_OPTION].casefold() != "wait":
                 raise ValueError("The native DX12 frame latency comparison requires Wait mode")
@@ -134,6 +140,12 @@ def main(target, variant="mailbox"):
                 offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 offline.bind(("127.0.0.1", 0))
                 endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
+                if variant == "frame-cost":
+                    frame_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record)
+                    if sha(budget) != before:
+                        raise ValueError("The WPF budget changed during the frame diagnosis")
+                    record["status"] = "frame-cost-observed"
+                    return 0
                 if variant == "dispatch":
                     if not files:
                         raise ValueError("The dispatch comparison requires the native inventory observer")
@@ -192,5 +204,7 @@ if __name__ == "__main__":
     mode.add_argument("--fifo-control", dest="variant", action="store_const", const="fifo", help="measure the previous DXGI interval on this same executable")
     mode.add_argument("--mailbox-two", dest="variant", action="store_const", const="mailbox-two", help="compare one and two queued DX12 Mailbox frames on this executable")
     mode.add_argument("--dispatch", dest="variant", action="store_const", const="dispatch", help="trace Mailbox activation and compare hidden-root paint policies")
+    mode.add_argument("--frame-cost", dest="variant", action="store_const", const="frame-cost",
+                      help="build and trace the additional x64 root-repaint diagnostic after ordinary dispatch")
     args = parser.parse_args()
     raise SystemExit(main(args.target, args.variant))

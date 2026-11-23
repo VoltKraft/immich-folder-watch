@@ -1,0 +1,82 @@
+{
+  "patchSources": {
+    "artifacts/retained/eframe/src/native/wgpu_integration.rs": {
+      "before": "80ffc51f9cff75de744b3e8d5a8a8b3a35485def9d7bc462790466f83d71f492",
+      "after": "3ee72a452d08260907351f95532c9da34c4204c9f37de9508436c6fcc536f03d"
+    },
+    "artifacts/retained/winit/src/platform_impl/windows/window_state.rs": {
+      "before": "7b9e0df5ff94495ea1b506018272de797323964827585768531c2dd44ff699b6",
+      "after": "7a7d00a3f2c04f0f276a1b489fe407623a6502c1e6016e86d9d5de17cf317a55"
+    },
+    "artifacts/cost/egui-wgpu/src/winit.rs": {
+      "before": "3f9f39150119a4ef071ab9e0ed9384edbebad36cc72bc35a90ac1639d165be51",
+      "after": "9f18a68875268389ad72a49a93f4d63868c2156926bb0cc190f90fe0ecc6bd1b"
+    },
+    "artifacts/cost/wgpu-hal/src/dx12/mod.rs": {
+      "before": "aea978a714e2427df87458bcb36d66f9195cff6ad521c5bab2ca2806a56d94dc",
+      "after": "5dd9b96124304086595a0e9c21fa294a28dc56f7e973e14a1e18a3445f91d5c5"
+    },
+    "src/ui_trace.rs": {
+      "before": "2bd6f731d8a28b5db98b1d35ddfd0a94e319fb26476afb24ec3a4ef23f56b92a",
+      "after": "94b40a601df8cf9f37ad57a25c171754a16bbfc82d335baa9511a34c71a16dae"
+    }
+  },
+  "packages": {
+    "egui-wgpu": {
+      "version": "0.37.0",
+      "archiveSha256": "0309cbe1febed48af5b974e4bcc424b35e9664863a4d402697147b57a488c864",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/egui-wgpu",
+      "noticeSha256": {},
+      "vcs": {
+        "git": {
+          "sha1": "7c0b40402271e8d40cda69f87cf3c2617c2e4382"
+        },
+        "path_in_vcs": "crates/egui-wgpu"
+      }
+    },
+    "wgpu-hal": {
+      "version": "30.0.2",
+      "archiveSha256": "a57452fe453658e141aafdb09de1028afa498805fab518238ddf372a518813ff",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/gfx-rs/wgpu",
+      "noticeSha256": {
+        "LICENSE.APACHE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+        "LICENSE.MIT": "dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21"
+      },
+      "vcs": null
+    }
+  },
+  "sourcePatchSha256": "dd3b02e50c38f1ab9f01bbc310c5b73848659c589ed77637a156962bab442f73",
+  "compilerFiles": {
+    "Cargo.lock": "e72bf0d9be5cddb3fbf03beb62cc2d259e8cf24669a51fd77d38925f9929d6eb",
+    "manifests/eframe/Cargo.toml": "abb311c397e9f337e367b7ce56f4716c39e1837eda37235e4e2adb73feb1ff12",
+    "manifests/egui-wgpu/Cargo.toml": "b803773d7a7ef6bf504ac5a00457679f83383ba9930381b32652e291314bb549",
+    "manifests/ifw-frame-timing/Cargo.toml": "ce03e66832d6d571ebf420999c9ba4d597f9dc2259c5aea161b683bd918b0fd2",
+    "manifests/native-gui-assessment/Cargo.toml": "9fb3d6396ebfed062a01f0161ecd3e60db843c301a698fb2f712fcb4cc0a40e5",
+    "manifests/wgpu-hal/Cargo.toml": "54e74a9d1812ebcd9e327252287f0ff04ea0ea12892f72e48ad554823fe4d8c2",
+    "manifests/winit/Cargo.toml": "3d9047764f71eab9d12c69510c149dea6731a6c820b22d2a1ad9dd577fe5a865"
+  },
+  "compilerTrees": {
+    "eframe": {
+      "files": 36,
+      "sha256": "f17d500c94db61e783768e2039298ba6a270c5faafb5abdf36530ce7ed3c7759"
+    },
+    "winit": {
+      "files": 217,
+      "sha256": "b39f8203203851beb5ceced66ebc306316bb54e57032ed93569b21a83e08b6ae"
+    },
+    "egui-wgpu": {
+      "files": 12,
+      "sha256": "da632e491f937fd68eaf9101915e83d6ae222bda574574e3edfe523733b4770b"
+    },
+    "wgpu-hal": {
+      "files": 85,
+      "sha256": "a37c03b0d8300116b38cba691cf22d7e191227ea340217d3f29aeb7f54459a68"
+    },
+    "ifw-frame-timing": {
+      "files": 2,
+      "sha256": "284f311b05d670971fa7a70bd5a5fa585fafdebc74d5be5557b9660cdca3e01f"
+    }
+  }
+}

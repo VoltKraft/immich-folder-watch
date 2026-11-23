@@ -222,6 +222,8 @@ to reconcile project decisions, defaults, and recorded state.
   Compare Windows renderer timings with the same host's WPF reference and
   qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)
   with observed screen pixels and independent file activity.
+  Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)
+  to diagnose scan response delays. Compare the ordinary GUI with the same-host WPF limits.
   Keep the integrated Linux and Windows inventory subjects bound to the
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls

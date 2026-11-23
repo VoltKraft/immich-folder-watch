@@ -581,6 +581,18 @@ jobs:
           python -B tools/rust-qa/windows-gdi-control/assess.py $env:NATIVE_TARGET
           exit $LASTEXITCODE
 
+      - name: Measure visible frame stages on the Windows x64 software adapter
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.warm.outcome == 'success' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/dispatch/result.json') != '' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B -m unittest discover -s tools/rust-qa/windows-frame-cost -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --frame-cost
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-frame-cost/readback.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-cost
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -827,6 +839,11 @@ jobs:
             artifacts/rust/windows-warm-window/*/measured-fifo/*.log
             artifacts/rust/windows-warm-window/*/dispatch/*.json
             artifacts/rust/windows-warm-window/*/dispatch/*.log
+            artifacts/rust/windows-warm-window/*/frame-cost/*.log
+            artifacts/rust/windows-warm-window/*/frame-cost/*.json
+            artifacts/rust/windows-warm-window/*/frame-cost/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/frame-cost/source.zip
+            artifacts/rust/windows-warm-window/*/frame-cost/diagnostic.exe
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json
