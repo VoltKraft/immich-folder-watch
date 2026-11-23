@@ -5,7 +5,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import Mock, patch
 from zipfile import ZipFile
@@ -129,6 +131,7 @@ class WarmTests(unittest.TestCase):
             self.skipTest("requires the reconstructed canonical GUI inputs")
         source = builder.eframe_source
         pins = json.loads(source.PINS.read_bytes())
+        winit = json.loads(source.WINIT_PINS.read_bytes())
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             archives = []
@@ -136,22 +139,31 @@ class WarmTests(unittest.TestCase):
                 gui = builder.stage(root / name / "project")
                 archive = root / name / "eframe-source.zip"
                 receipt = source.source_bundle(gui, archive)
-                self.assertEqual(receipt, {"pins": pins, "archive": archive.name, "archiveSha256": builder.sha(archive)})
+                self.assertEqual(receipt, {"pins": pins, "winitPins": winit, "archive": archive.name,
+                                           "archiveSha256": builder.sha(archive)})
                 archives.append(archive)
             self.assertEqual(archives[0].read_bytes(), archives[1].read_bytes())
             expected = {"pins.json": source.PINS, source.PATCH.name: source.PATCH,
-                        source.APPLICATION_PATCH.name: source.APPLICATION_PATCH}
+                        source.APPLICATION_PATCH.name: source.APPLICATION_PATCH, "winit-pins.json": source.WINIT_PINS,
+                        source.WINIT_PATCH.name: source.WINIT_PATCH, "notices/winit/LICENSE": gui / source.WINIT_PACKAGE / "LICENSE"}
             for family, folder in (("canonical", builder.GUI), ("retained", gui)):
                 for filename in ("Cargo.lock", "Cargo.toml"):
                     expected[family + "/" + filename] = folder / filename
             for filename, evidence in pins["notices"].items():
                 expected["notices/" + filename] = builder.ROOT / evidence["path"]
-            package = pins["crate"] + ".crate"
+            packages = {review["crate"] + ".crate": review["archiveSha256"] for review in (pins, winit)}
             with ZipFile(archives[0]) as bundle:
-                self.assertEqual(bundle.namelist(), sorted([package, *expected]))
-                self.assertEqual(hashlib.sha256(bundle.read(package)).hexdigest(), pins["archiveSha256"])
+                self.assertEqual(bundle.namelist(), sorted([*packages, *expected]))
+                for package, digest in packages.items():
+                    self.assertEqual(hashlib.sha256(bundle.read(package)).hexdigest(), digest)
                 for member, original in expected.items():
                     self.assertEqual(bundle.read(member), original.read_bytes(), member)
+            window_state = gui / source.WINIT_PACKAGE / "src/platform_impl/windows/window_state.rs"
+            reviewed = window_state.read_bytes()
+            window_state.write_bytes(reviewed + b"// Unreviewed native source change\n")
+            with self.assertRaisesRegex(ValueError, "winit source changed during compilation"):
+                source.source_bundle(gui, root / "wrong.zip")
+            window_state.write_bytes(reviewed)
             changed_notice = root / "changed-notice"
             changed_notice.write_text("Changed license text", encoding="utf-8")
             pins["notices"]["eframe/LICENSE-MIT"]["path"] = str(changed_notice)
@@ -187,28 +199,77 @@ class WarmTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Unexpected modified eframe compiler sources"):
                 source.reconstruct(dest, pins, archive, patch)
 
-    def test_compiler_receipt_requires_the_staged_eframe_sources_features_and_outputs(self):
+    def test_reconstructed_winit_policy_uses_real_flag_definitions_and_updates_its_cache(self):
+        source = builder.eframe_source
+        pins = json.loads(source.WINIT_PINS.read_bytes())
+        try:
+            archive = source.original_archive(pins)
+        except FileNotFoundError:
+            self.skipTest("requires the original native GUI crate cache")
+        with tempfile.TemporaryDirectory() as temp:
+            work = Path(temp)
+            winit = work / "winit"
+            source.reconstruct(winit, pins, archive, source.WINIT_PATCH.read_bytes())
+            code = (winit / "src/platform_impl/windows/window_state.rs").read_text(encoding="utf-8")
+            self.assertEqual(builder.sha(winit / pins["licenseFile"]), pins["licenseSha256"])
+            # Compile the actual flags, state mutation and visibility decision against a recording User32 stand-in.
+            start = code.rindex("bitflags!", 0, code.index("pub struct WindowFlags"))
+            flags = code[start:code.index("\n}", start) + 2]
+
+            def method(signature):
+                begin = code.index(signature)
+                return code[begin:code.index("\n    }\n", begin) + 6]
+
+            state = method("    pub fn set_window_flags<F>")
+            command = method("    fn retained_visibility(")
+            src = work / "src"
+            src.mkdir()
+            (src / "winit_policy.rs").write_text(
+                f"{flags}\nimpl WindowState {{\n{state}\n}}\nimpl WindowFlags {{\n{command}\n}}\n", encoding="utf-8")
+            (src / "lib.rs").write_bytes((inputs.HERE / "visibility_controls.rs").read_bytes())
+            packages = tomllib.loads((builder.GUI / "Cargo.lock").read_text(encoding="utf-8"))["package"]
+            native_winit, = [p for p in packages if p["name"] == "winit" and p["version"] == "0.30.13"]
+            name, = [dep for dep in native_winit["dependencies"] if dep.startswith("bitflags ")]
+            bitflags, = [p for p in packages if (p["name"], p["version"]) == tuple(name.split())]
+            (work / "Cargo.toml").write_text(
+                '[package]\nname="retained-visibility-controls"\nversion="0.0.0"\nedition="2024"\n'
+                f'[workspace]\n[dependencies]\nbitflags="={bitflags["version"]}"\n', encoding="utf-8")
+            toolchain = builder.ROOT / "artifacts/rust/toolchain/bin"
+            cargo = str(toolchain / ("cargo.exe" if os.name == "nt" else "cargo"))
+            env = dict(os.environ, PATH=str(toolchain) + os.pathsep + os.environ["PATH"],
+                       CARGO_HOME=str(builder.ROOT / "artifacts/rust/assessment-cache"), CARGO_TARGET_DIR=str(work / "target"))
+            subprocess.run([cargo, "generate-lockfile", "--offline"], cwd=work, env=env, check=True)
+            selected = tomllib.loads((work / "Cargo.lock").read_text(encoding="utf-8"))["package"]
+            self.assertEqual([p for p in selected if p["name"] != "retained-visibility-controls"],
+                             [{key: bitflags[key] for key in ("name", "version", "source", "checksum")}])
+            subprocess.run([cargo, "test", "--lib", "--frozen", "--quiet"], cwd=work, env=env, check=True)
+
+    def test_compiler_receipt_requires_the_staged_library_sources_features_and_outputs(self):
         source = builder.eframe_source
         with tempfile.TemporaryDirectory() as temp:
             gui = Path(temp) / "gui"
             build = Path(temp) / "build"
             build.mkdir()
-            rlib = build / "libeframe.rlib"
-            rlib.write_bytes(b"compiler test fixture")
-            features = ["accesskit", "clipboard", "wgpu_no_default_features"]
-            unit = {"reason": "compiler-artifact", "manifest_path": str(gui / source.PACKAGE / "Cargo.toml"),
-                    "target": {"name": "eframe", "src_path": str(gui / source.PACKAGE / "src/lib.rs")},
-                    "features": features, "filenames": [str(rlib)]}
             finished = {"reason": "build-finished", "success": True}
-            result = source.compiled_eframe([unit, finished], gui, build, features)
-            self.assertEqual(result["outputs"], {"libeframe.rlib": builder.sha(rlib)})
-            for messages in ([finished], [unit, unit, finished], [unit, dict(finished, success=False)],
-                             [dict(unit, manifest_path=str(gui / "Cargo.toml")), finished],
-                             [dict(unit, target=dict(unit["target"], src_path=str(gui / "registry/src/lib.rs"))), finished],
-                             [dict(unit, features=[*features, "persistence"]), finished],
-                             [dict(unit, filenames=[str(gui / "elsewhere.rlib")]), finished]):
-                with self.assertRaises(ValueError):
-                    source.compiled_eframe(messages, gui, build, features)
+            for package, features in ((source.PACKAGE, ["accesskit", "clipboard", "wgpu_no_default_features"]),
+                                      (source.WINIT_PACKAGE, ["rwh_06"])):
+                rlib = build / ("lib" + package.name + ".rlib")
+                rlib.write_bytes(b"compiler test fixture")
+                unit = {"reason": "compiler-artifact", "manifest_path": str(gui / package / "Cargo.toml"),
+                        "target": {"name": package.name, "kind": ["lib"], "src_path": str(gui / package / "src/lib.rs")},
+                        "features": features, "filenames": [str(rlib)]}
+                result = builder.compiled_library([unit, finished], gui, build, package, features)
+                self.assertEqual(result["outputs"], {rlib.name: builder.sha(rlib)})
+                for messages in ([finished], [unit, unit, finished], [unit, dict(finished, success=False)],
+                                 [dict(unit, manifest_path=str(gui / "Cargo.toml")), finished],
+                                 [dict(unit, target=dict(unit["target"], kind=["custom-build"])), finished],
+                                 [dict(unit, target=dict(unit["target"], src_path=str(gui / "registry/src/lib.rs"))), finished],
+                                 [dict(unit, features=[*features, "unexpected"]), finished],
+                                 [dict(unit, filenames=[str(rlib), str(rlib)]), finished],
+                                 [dict(unit, filenames=[str(build / "libother.rlib")]), finished],
+                                 [dict(unit, filenames=[str(gui / "elsewhere.rlib")]), finished]):
+                    with self.assertRaises(ValueError):
+                        builder.compiled_library(messages, gui, build, package, features)
 
     def test_resident_pages_are_counted_once_with_image_ownership(self):
         api = Mock()

@@ -1,6 +1,7 @@
 {
   "crate": "eframe-0.37.0",
   "upstreamRevision": "3c6eb8261c3293ad9c7ea1ed58487e038860ebef",
+  "pathInVcs": "crates/eframe",
   "archiveUrl": "https://static.crates.io/crates/eframe/eframe-0.37.0.crate",
   "archiveSha256": "9c5642501a65ca657d05f00c643a5c14ff2346cb3818032bfe23d58e1f8e5f84",
   "originalTree": {"files": 36, "sha256": "d6cdf843c50663ae0945bb5bac6587208c3e21fe0225bab605dcf91c54dc337c"},
@@ -18,9 +19,9 @@
     }
   },
   "canonicalLockSha256": "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25",
-  "retainedLockSha256": "e061bcf25558fe72f388a615d64691a4fae7e594d712fa6c1191cfc51494ef0e",
+  "retainedLockSha256": "caa1a5ca07a6f3fa1f7749918a64d828ae8fd8c57b59d43c408676e56a24c304",
   "canonicalManifestSha256": "aa1d480aebc839c4c5a742be3a547af19273739bcd6634c36afd556a353139ed",
-  "retainedManifestSha256": "79cb690c71d6dcd5a9593dd6a03a490af83a9b9d38096a232ae6b9b48d8141f6",
+  "retainedManifestSha256": "c5af87a7ea2c7625cef470132003f3d569c6410aac59fe8547af3f03b88855e6",
   "license": "MIT OR Apache-2.0",
   "selectedLicense": "MIT",
   "adaptedSource": {

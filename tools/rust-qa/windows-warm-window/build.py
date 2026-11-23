@@ -23,6 +23,7 @@ ORIGINALS = {
 sys.path.insert(0, str(QA))
 from gui import source_profile
 import eframe_source
+from compiler_units import compiled_library
 
 
 def sha(path):
@@ -86,7 +87,7 @@ def compiler_graph(messages, gui, selected):
     lock = tomllib.loads((gui / "Cargo.lock").read_text(encoding="utf-8"))
     locked = {(row["name"], row["version"]): row.get("source") for row in lock["package"]}
     local = {"native-gui-assessment": gui, "desktop-lifecycle": gui.parents[2] / "rust/crates/desktop-lifecycle",
-             "eframe": gui / eframe_source.PACKAGE,
+             "eframe": gui / eframe_source.PACKAGE, "winit": gui / eframe_source.WINIT_PACKAGE,
              **{name: gui / "artifacts/text" / name for name in ("egui", "epaint", "unicode-bidi")}}
     observed = set()
     units = [item for item in messages if item["reason"] == "compiler-artifact"]
@@ -158,9 +159,11 @@ def main(target):
                    cwd=gui, env=env, check=True)
     compiled = subprocess.check_output(["cargo", "build", "--manifest-path", manifest, "--frozen", "--release",
                                         "--message-format=json-render-diagnostics"], cwd=gui, env=env)
-    features, = [flags for name, version, flags in selected if (name, version) == ("eframe", "0.37.0")]
     messages = [json.loads(line) for line in compiled.splitlines()]
-    eframe_unit = eframe_source.compiled_eframe(messages, gui, output / "build", features)
+    libraries = {}
+    for package, version in ((eframe_source.PACKAGE, "0.37.0"), (eframe_source.WINIT_PACKAGE, "0.30.13")):
+        features, = [flags for name, v, flags in selected if (name, v) == (package.name, version)]
+        libraries[package.name] = compiled_library(messages, gui, output / "build", package, features)
     compiler = compiler_graph(messages, gui, selected)
     exe = output / "build/release/native-gui-assessment.exe"
     compiler["application"] = application_artifact(messages, gui, exe)
@@ -172,13 +175,14 @@ def main(target):
                   binary=compiler["application"]["sha256"],
                   canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
                   selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=ORIGINALS,
-                  eframeSource=sources, eframeUnit=eframe_unit,
+                  eframeSource=sources, eframeUnit=libraries["eframe"], winitUnit=libraries["winit"],
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},
                   compilerInputs={p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]},
                   variantInputs={name: sha(HERE / name) for name in
                                  ("candidate.patch", "presentation.patch", "dispatch.patch", "retained-hidden-input.patch",
                                   "eframe-hidden-input.patch", "eframe-source.json", "eframe_source.py", "loop_wake.rs",
+                                  "winit-retained-visibility.patch", "winit-source.json", "compiler_units.py",
                                   "windows_present.rs", "ui_trace.rs", "win32_clock.rs", "build.py")})
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"{target} {record['binary']} {exe}")

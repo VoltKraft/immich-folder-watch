@@ -1,0 +1,103 @@
+--- a/src/platform_impl/windows/window_state.rs
++++ b/src/platform_impl/windows/window_state.rs
+@@ -1,3 +1,4 @@
++// Modified by Immich Folder Watch for the retained Windows visibility assessment.
+ use crate::dpi::{PhysicalPosition, PhysicalSize, Size};
+ use crate::icon::Icon;
+ use crate::keyboard::ModifiersState;
+@@ -11,7 +12,7 @@
+ use windows_sys::Win32::UI::WindowsAndMessaging::{
+     AdjustWindowRectEx, EnableMenuItem, GetMenu, GetSystemMenu, GetWindowLongW, SendMessageW,
+     SetWindowLongW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST,
+-    HWND_TOPMOST, MF_BYCOMMAND, MF_DISABLED, MF_ENABLED, SC_CLOSE, SWP_ASYNCWINDOWPOS,
++    HWND_TOPMOST, IsWindowVisible, MF_BYCOMMAND, MF_DISABLED, MF_ENABLED, SC_CLOSE, SWP_ASYNCWINDOWPOS,
+     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOREPOSITION, SWP_NOSIZE, SWP_NOZORDER,
+     SW_HIDE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SW_SHOWNOACTIVATE, WINDOWPLACEMENT,
+     WINDOW_EX_STYLE, WINDOW_STYLE, WS_BORDER, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
+@@ -56,6 +57,7 @@
+     pub dragging: bool,
+
+     pub skip_taskbar: bool,
++    retained_visibility_started: bool,
+ }
+
+ #[derive(Clone)]
+@@ -177,6 +179,7 @@
+             dragging: false,
+
+             skip_taskbar: false,
++            retained_visibility_started: false,
+         }
+     }
+
+@@ -191,6 +194,27 @@
+         let old_flags = this.window_flags;
+         f(&mut this.window_flags);
+         let new_flags = this.window_flags;
++
++        if !this.skip_taskbar && this.fullscreen.is_none() && !this.dragging {
++            let first = !this.retained_visibility_started;
++            let command = old_flags.retained_visibility(
++                new_flags,
++                &mut this.retained_visibility_started,
++                || unsafe { IsWindowVisible(window) != 0 },
++            );
++            if let Some(command) = command {
++                // ShowWindow can synchronously dispatch window messages.
++                drop(this);
++                unsafe { ShowWindow(window, command) };
++                if first
++                    && std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").as_deref()
++                        == Some(std::ffi::OsStr::new("1"))
++                {
++                    eprintln!("RETAINED_VISIBILITY first=hide hwnd={window}");
++                }
++                return;
++            }
++        }
+
+         drop(this);
+         old_flags.apply_diff(window, new_flags);
+@@ -246,6 +270,42 @@
+ }
+
+ impl WindowFlags {
++    // A visible decorated application window can change WS_VISIBLE via ShowWindow alone.
++    // Retain the original initial-placement and style paths for every other transition.
++    fn retained_visibility(
++        self,
++        new: Self,
++        started: &mut bool,
++        is_visible: impl FnOnce() -> bool,
++    ) -> Option<i32> {
++        let required = Self::ON_TASKBAR | Self::MARKER_DECORATIONS;
++        let ordinary = required
++            | Self::RESIZABLE
++            | Self::MINIMIZABLE
++            | Self::MAXIMIZABLE
++            | Self::CLOSABLE
++            | Self::MARKER_ACTIVATE
++            | Self::CLIP_CHILDREN
++            | Self::VISIBLE;
++        if (self ^ new) != Self::VISIBLE || !new.contains(required) || !(new - ordinary).is_empty() {
++            return None;
++        }
++        let showing = new.contains(Self::VISIBLE);
++        if !*started {
++            if showing || !is_visible() {
++                return None;
++            }
++            *started = true;
++        }
++        Some(if !showing {
++            SW_HIDE
++        } else if self.contains(Self::MARKER_ACTIVATE) {
++            SW_SHOW
++        } else {
++            SW_SHOWNOACTIVATE
++        })
++    }
++
+     fn mask(mut self) -> WindowFlags {
+         if self.contains(WindowFlags::MARKER_EXCLUSIVE_FULLSCREEN) {
+             self |= WindowFlags::EXCLUSIVE_FULLSCREEN_OR_MASK;
