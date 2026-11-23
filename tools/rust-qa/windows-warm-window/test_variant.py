@@ -212,7 +212,7 @@ class WarmTests(unittest.TestCase):
             source.reconstruct(winit, pins, archive, source.WINIT_PATCH.read_bytes())
             code = (winit / "src/platform_impl/windows/window_state.rs").read_text(encoding="utf-8")
             self.assertEqual(builder.sha(winit / pins["licenseFile"]), pins["licenseSha256"])
-            # Compile the actual flags, state mutation and visibility decision against a recording User32 stand-in.
+            # Compile the real flags, style mapping and state changes against a recording User32 stand-in.
             start = code.rindex("bitflags!", 0, code.index("pub struct WindowFlags"))
             flags = code[start:code.index("\n}", start) + 2]
 
@@ -222,26 +222,33 @@ class WarmTests(unittest.TestCase):
 
             state = method("    pub fn set_window_flags<F>")
             command = method("    fn retained_visibility(")
+            styles = method("    pub fn to_window_styles(")
             src = work / "src"
             src.mkdir()
             (src / "winit_policy.rs").write_text(
-                f"{flags}\nimpl WindowState {{\n{state}\n}}\nimpl WindowFlags {{\n{command}\n}}\n", encoding="utf-8")
+                f"{flags}\nimpl WindowState {{\n{state}\n}}\nimpl WindowFlags {{\n{command}\n{styles}\n}}\n", encoding="utf-8")
             (src / "lib.rs").write_bytes((inputs.HERE / "visibility_controls.rs").read_bytes())
             packages = tomllib.loads((builder.GUI / "Cargo.lock").read_text(encoding="utf-8"))["package"]
             native_winit, = [p for p in packages if p["name"] == "winit" and p["version"] == "0.30.13"]
-            name, = [dep for dep in native_winit["dependencies"] if dep.startswith("bitflags ")]
-            bitflags, = [p for p in packages if (p["name"], p["version"]) == tuple(name.split())]
+            def winit_version(name):
+                dependency, = [dep for dep in native_winit["dependencies"] if dep.startswith(name + " ")]
+                return dependency.split()[1]
+
             (work / "Cargo.toml").write_text(
                 '[package]\nname="retained-visibility-controls"\nversion="0.0.0"\nedition="2024"\n'
-                f'[workspace]\n[dependencies]\nbitflags="={bitflags["version"]}"\n', encoding="utf-8")
+                f'[workspace]\n[dependencies]\nbitflags="={winit_version("bitflags")}"\n'
+                f'[dependencies.windows-sys]\nversion="={winit_version("windows-sys")}"\n'
+                'features=["Win32_UI_WindowsAndMessaging"]\n', encoding="utf-8")
             toolchain = builder.ROOT / "artifacts/rust/toolchain/bin"
             cargo = str(toolchain / ("cargo.exe" if os.name == "nt" else "cargo"))
             env = dict(os.environ, PATH=str(toolchain) + os.pathsep + os.environ["PATH"],
                        CARGO_HOME=str(builder.ROOT / "artifacts/rust/assessment-cache"), CARGO_TARGET_DIR=str(work / "target"))
             subprocess.run([cargo, "generate-lockfile", "--offline"], cwd=work, env=env, check=True)
             selected = tomllib.loads((work / "Cargo.lock").read_text(encoding="utf-8"))["package"]
-            self.assertEqual([p for p in selected if p["name"] != "retained-visibility-controls"],
-                             [{key: bitflags[key] for key in ("name", "version", "source", "checksum")}])
+            registry = {(p["name"], p["version"]): (p["source"], p["checksum"]) for p in packages if "source" in p}
+            for dep in selected:
+                if dep["name"] != "retained-visibility-controls":
+                    self.assertEqual((dep["source"], dep["checksum"]), registry[dep["name"], dep["version"]])
             subprocess.run([cargo, "test", "--lib", "--frozen", "--quiet"], cwd=work, env=env, check=True)
 
     def test_compiler_receipt_requires_the_staged_library_sources_features_and_outputs(self):

@@ -10,13 +10,13 @@
   },
   "compilerTree": {
     "files": 217,
-    "sha256": "504efa2a32eb4b0cc1293ca4ef117ea92d7c302c4e7ba4fa9c090187d0c5de2a"
+    "sha256": "8cc2eec803bc6d84ce02e58e8942dfc8a924c8aced2510bd6788dedc8ec98102"
   },
-  "patchSha256": "eede7e90e8a9fa79e1a67d348c76f24319cab27de209e7e1ed13de03e30e3361",
+  "patchSha256": "56c272c865b4829d2a4f483e2d7fe35fbde9ed514fda1f9adb80612ea22f4d95",
   "modified": {
     "src/platform_impl/windows/window_state.rs": {
       "original": "505e7ea90e1fa75500cb296cf6ec4cf3f04407c44731ffc9ae1f48e78d8d0f34",
-      "compiled": "cbad16c26a6b0b35e575f0b19d4574ba2df7b8270b59291b06184d24afda8b2d"
+      "compiled": "7b9e0df5ff94495ea1b506018272de797323964827585768531c2dd44ff699b6"
     }
   },
   "license": "Apache-2.0",

@@ -5,52 +5,53 @@
  use crate::dpi::{PhysicalPosition, PhysicalSize, Size};
  use crate::icon::Icon;
  use crate::keyboard::ModifiersState;
-@@ -11,7 +12,7 @@
- use windows_sys::Win32::UI::WindowsAndMessaging::{
-     AdjustWindowRectEx, EnableMenuItem, GetMenu, GetSystemMenu, GetWindowLongW, SendMessageW,
-     SetWindowLongW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST,
--    HWND_TOPMOST, MF_BYCOMMAND, MF_DISABLED, MF_ENABLED, SC_CLOSE, SWP_ASYNCWINDOWPOS,
-+    HWND_TOPMOST, IsWindowVisible, MF_BYCOMMAND, MF_DISABLED, MF_ENABLED, SC_CLOSE, SWP_ASYNCWINDOWPOS,
-     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOREPOSITION, SWP_NOSIZE, SWP_NOZORDER,
-     SW_HIDE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SW_SHOWNOACTIVATE, WINDOWPLACEMENT,
-     WINDOW_EX_STYLE, WINDOW_STYLE, WS_BORDER, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
-@@ -56,6 +57,7 @@
+@@ -56,6 +57,8 @@
      pub dragging: bool,
 
      pub skip_taskbar: bool,
 +    retained_visibility_started: bool,
++    trace_retained_visibility: bool,
  }
 
  #[derive(Clone)]
-@@ -177,6 +179,7 @@
+@@ -177,6 +180,9 @@
              dragging: false,
 
              skip_taskbar: false,
 +            retained_visibility_started: false,
++            trace_retained_visibility: std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").as_deref()
++                == Some(std::ffi::OsStr::new("1")),
          }
      }
 
-@@ -191,6 +194,27 @@
+@@ -191,6 +197,34 @@
          let old_flags = this.window_flags;
          f(&mut this.window_flags);
          let new_flags = this.window_flags;
 +
 +        if !this.skip_taskbar && this.fullscreen.is_none() && !this.dragging {
-+            let first = !this.retained_visibility_started;
++            let first_hide = !this.retained_visibility_started;
 +            let command = old_flags.retained_visibility(
 +                new_flags,
 +                &mut this.retained_visibility_started,
-+                || unsafe { IsWindowVisible(window) != 0 },
++                window,
 +            );
 +            if let Some(command) = command {
++                let marker = if !this.trace_retained_visibility {
++                    None
++                } else if first_hide {
++                    Some("hide")
++                } else if command != SW_HIDE {
++                    this.trace_retained_visibility = false;
++                    Some("show")
++                } else {
++                    None
++                };
 +                // ShowWindow can synchronously dispatch window messages.
 +                drop(this);
 +                unsafe { ShowWindow(window, command) };
-+                if first
-+                    && std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").as_deref()
-+                        == Some(std::ffi::OsStr::new("1"))
-+                {
-+                    eprintln!("RETAINED_VISIBILITY first=hide hwnd={window}");
++                if let Some(marker) = marker {
++                    eprintln!("RETAINED_VISIBILITY first={marker} hwnd={window}");
 +                }
 +                return;
 +            }
@@ -58,7 +59,7 @@
 
          drop(this);
          old_flags.apply_diff(window, new_flags);
-@@ -246,6 +270,42 @@
+@@ -246,6 +280,50 @@
  }
 
  impl WindowFlags {
@@ -68,7 +69,7 @@
 +        self,
 +        new: Self,
 +        started: &mut bool,
-+        is_visible: impl FnOnce() -> bool,
++        window: HWND,
 +    ) -> Option<i32> {
 +        let required = Self::ON_TASKBAR | Self::MARKER_DECORATIONS;
 +        let ordinary = required
@@ -83,12 +84,20 @@
 +            return None;
 +        }
 +        let showing = new.contains(Self::VISIBLE);
-+        if !*started {
-+            if showing || !is_visible() {
++        if showing && !*started {
++            return None;
++        }
++        // Win32 can change the window's state without updating winit's cached flags.
++        // Both expected styles are nonzero for a decorated taskbar window.
++        let (style, style_ex) = self.to_window_styles();
++        unsafe {
++            if GetWindowLongW(window, GWL_STYLE) as u32 != style
++                || GetWindowLongW(window, GWL_EXSTYLE) as u32 != style_ex
++            {
 +                return None;
 +            }
-+            *started = true;
 +        }
++        *started = true;
 +        Some(if !showing {
 +            SW_HIDE
 +        } else if self.contains(Self::MARKER_ACTIVATE) {
