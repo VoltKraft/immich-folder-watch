@@ -15,7 +15,7 @@ from worker import HERE, QA, hosted, named_desktop, write
 
 
 # Bounds include the subprocess's normal shutdown. Language servicing runs outside this job.
-TIMEOUTS = {"keyboard": 220, "recovery": 320, "mixed": 600, "text": 260,
+TIMEOUTS = {"keyboard": 220, "recovery": 320, "mixed": 600, "text": 260, "retained-text": 320,
             "reader": 720, "ime-installed": 245, "ime-japanese": 245, "warm": 900}
 
 
@@ -34,6 +34,8 @@ def command(target, case):
         return [QA / "font-coverage/observe.py", target, "--bidi-candidate", "--require-bidi"]
     if case == "text":
         return [QA / "windows-text/run.py", target]
+    if case == "retained-text":
+        return [QA / "windows-warm-window/filename.py", target]
     if case == "warm":
         return [QA / "windows-warm-window/observe.py", target]
     if case == "reader":
@@ -134,6 +136,8 @@ def main():
             raise RuntimeError("The native executable differs from this job's build receipt")
         api = Desktop()
         report.update(source=build["source"], binarySha256=build["binarySha256"], controller=api.context())
+        if args.case == "retained-text":
+            report["placementReferenceSha256"] = report.pop("binarySha256")
         obstruction_record = placement(folder, build, report["controller"], report)
         if obstruction_record:
             report.update(selected="private", obstruction=obstruction_record)

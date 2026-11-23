@@ -178,7 +178,9 @@ to reconcile project decisions, defaults, and recorded state.
   reconstructs its eframe and winit sources and measures against the same
   host's WPF references. Preserve the native results, both library receipts,
   compiler stream and source archive together. Exercise ordinary second-launch
-  and actual Shell activation for the same retained executable.
+  and actual Shell activation for the same retained executable. Verify its
+  [ordinary filename after reopening](docs/rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd)
+  with the native glyph and editing observer.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).

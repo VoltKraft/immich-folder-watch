@@ -82,11 +82,34 @@ def evaluate(record, output, pid, hwnd, report):
         raise RuntimeError(record.get("error") or "Incomplete native text or raster evidence")
 
 
+def exercise_window(api, context, pid, hwnd, env, ps, output, report):
+    """Run the ordinary field observer against this exact process and already visible HWND."""
+    name = context["threadDesktop"]
+    eligible = isinstance(name, str) and ordinary_console(context, name)
+    report["window"] = api.observed(hwnd, pid)["subject"]
+    window = report["window"]
+    if window["session"] != context["session"] or not same_name(window["threadDesktop"], name):
+        raise ValueError("The observed HWND is on a different session or desktop")
+    args = ["-SubjectId", pid, "-WindowHandle", hwnd, "-PlanFile", output / "plan.json",
+            "-OutputFile", output / "observations.json"]
+    if not eligible:
+        args += ["-ReadOnly"]
+    try:
+        report["observerExit"] = powershell(ps, HERE / "observe.ps1", args, env, output, output / "observer.log", 140)
+    finally:
+        try:
+            report["endingDesktop"] = api.context()
+        except OSError as error:
+            report["endingDesktopError"] = str(error)
+    evaluate(read(output / "observations.json"), output, pid, hwnd, report)
+    if (report["observerExit"] or not eligible or not report.get("endingDesktop")
+            or not ordinary_console(report["endingDesktop"], name)):
+        raise RuntimeError("The native observer failed or its active desktop changed")
+
+
 def observe(binary, output, env, ps, report):
     api = Desktop()
     context = report["desktop"] = api.context()
-    name = context["threadDesktop"]
-    eligible = isinstance(name, str) and ordinary_console(context, name)
     log = output / "subject.log"
     observer_type = shared_windows()
     with log.open("wb") as stream, subprocess.Popen([binary], cwd=output, env=env, stdin=subprocess.PIPE,
@@ -107,18 +130,7 @@ def observe(binary, output, env, ps, report):
             else:
                 raise RuntimeError("The owned normal GUI did not present a native DX12 window")
             report["adapter"] = adapter
-            report["window"] = api.observed(hwnd, child.pid)["subject"]
-            window = report["window"]
-            if window["session"] != context["session"] or not same_name(window["threadDesktop"], name):
-                raise ValueError("The observed HWND is on a different session or desktop")
-            args = ["-SubjectId", child.pid, "-WindowHandle", hwnd, "-PlanFile", output / "plan.json",
-                    "-OutputFile", output / "observations.json"]
-            if not eligible:
-                args += ["-ReadOnly"]
-            report["observerExit"] = powershell(ps, HERE / "observe.ps1", args, env, output, output / "observer.log", 140)
-            evaluate(read(output / "observations.json"), output, child.pid, hwnd, report)
-            if report["observerExit"] or not eligible or not ordinary_console(api.context(), name):
-                raise RuntimeError("The native observer failed or its active desktop changed")
+            exercise_window(api, context, child.pid, hwnd, env, ps, output, report)
         finally:
             try:
                 if child.poll() is None:
@@ -138,6 +150,15 @@ def observe(binary, output, env, ps, report):
         raise RuntimeError("The synthetic subject did not drain cleanly")
 
 
+def observer_paths():
+    return [*[HERE / n for n in ("evidence.py", "run.py", "test_text.py", "observe.ps1", "Pointer.cs")], QA / "gui/profile_text.py",
+               QA / "windows_observer.py", QA / "observe-windows-gui.py", QA / "font-coverage/text_observations.py",
+               QA / "observe-windows-input.ps1", QA / "check-toolchain.py", QA / "storage/evidence.py",
+               QA / "gui/source_profile.py", QA / "build-gui-probe.py", ROOT / "rust/audit/gui-profile.json",
+               QA / "verify-gui-inputs.py", ROOT / "rust/audit/gui-inputs.json", source_profile.REVIEW,
+               *[QA / "windows-desktop" / f for f in ("run.py","job.py","worker.py","win32.py")]]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(TARGETS))
@@ -150,15 +171,9 @@ def main():
     folder = ROOT / "artifacts/rust/gui-native" / args.target
     output = folder / "windows-text"
     output.mkdir(exist_ok=False)
-    sources = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "Pointer.cs", QA / "gui/profile_text.py",
-               QA / "windows_observer.py", QA / "observe-windows-gui.py", QA / "font-coverage/text_observations.py",
-               QA / "observe-windows-input.ps1", QA / "check-toolchain.py", QA / "storage/evidence.py",
-               QA / "gui/source_profile.py", QA / "build-gui-probe.py", ROOT / "rust/audit/gui-profile.json",
-               QA / "verify-gui-inputs.py", ROOT / "rust/audit/gui-inputs.json", source_profile.REVIEW,
-               *[QA / "windows-desktop" / f for f in ("run.py","job.py","worker.py","win32.py")]]
     report = {"status": "failed", "host": platform.platform(), "run": os.getenv("GITHUB_RUN_ID"),
               "attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
-              "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in sources}}
+              "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in observer_paths()}}
     try:
         binary = DESKTOP["GUI_BINARY"]
         report["build"] = check_build(args.target, binary, folder)

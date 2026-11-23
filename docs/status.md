@@ -1,5 +1,20 @@
 # Project Status
 
+## Complete filename check on the reopened Windows executable (2026-11-23)
+
+The new native step runs the ordinary eight-glyph and three-edit
+observer against the same retained executable, HWND and renderer used
+after the first hide and reopen. Detached replay verifies the original
+Git sources, build inputs, native session and input desktop. A failed
+observation retains the original window events and available field
+results. Independent review closed three findings concerning desktop
+identity, source binding and partial failure evidence. The four focused
+local suites ran 68 tests, with one Windows-only bitmap test skipped.
+Both changed workflow files passed actionlint. The general tooling suite
+at `e278fbf` passed all 181 tests. Actual glyphs and full editing on
+the reopened retained HWND still require the new native run.
+[Native entry point and readback](rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd).
+
 ## One- and two-frame Windows measurements (2026-11-23)
 
 At `1b95ba0` the retained egui window passed all eleven same-host WPF

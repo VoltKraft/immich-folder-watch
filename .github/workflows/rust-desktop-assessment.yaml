@@ -468,6 +468,11 @@ jobs:
         shell: bash
         run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" warm
 
+      - name: Observe filename glyphs and editing after reopening the retained Windows GUI
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" retained-text
+
       - name: Reopen the retained Windows HWND through an ordinary second launch
         id: retained_launcher
         if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
@@ -799,6 +804,7 @@ jobs:
             artifacts/rust/windows-warm-window/*/build.json
             artifacts/rust/windows-warm-window/*/compiler.jsonl
             artifacts/rust/windows-warm-window/*/observed/
+            artifacts/rust/windows-warm-window/*/windows-text/
             artifacts/rust/windows-warm-window/*/eframe-source.zip
             artifacts/rust/windows-warm-window/*/measured/
             artifacts/rust/windows-warm-window/*/measured-mailbox-two/

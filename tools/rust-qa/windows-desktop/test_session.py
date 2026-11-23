@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from session import TIMEOUTS, command, digest, obstruction, placement, write
+from session import TIMEOUTS, command, digest, obstruction, paths, placement, write
 from test_desktop import active
 
 
@@ -60,6 +60,14 @@ class SessionTests(unittest.TestCase):
             changed["raised"]["fieldPoint"]["root"]["pid"] = 100
             write(root / "original/observation.json", changed)
             self.assertIsNone(placement(folder, build, active(), {}))
+
+    def test_retained_filename_has_a_separate_placement_and_driver(self):
+        target = "x86_64-pc-windows-msvc"
+        canonical, retained = (command(target, case) for case in ("text", "retained-text"))
+        self.assertEqual([p[-1] for p in (canonical, retained)], [target, target])
+        self.assertEqual((canonical[0].parent.name, canonical[0].name), ("windows-text", "run.py"))
+        self.assertEqual((retained[0].parent.name, retained[0].name), ("windows-warm-window", "filename.py"))
+        self.assertNotEqual(paths(target, "text")[1], paths(target, "retained-text")[1])
 
     def test_only_the_reviewed_commands_are_available(self):
         for case in TIMEOUTS:

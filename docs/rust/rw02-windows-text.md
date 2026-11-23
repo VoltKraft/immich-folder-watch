@@ -90,3 +90,16 @@ position or dimensions. A new native run must supply the rendered glyphs.
 ```sh
 python3 -m unittest discover -s tools/rust-qa/windows-text -p 'test_*.py' -v
 ```
+
+## Ordinary filename on the reopened retained HWND
+
+The disposable Windows desktop job also runs the same eight glyph crops and three editing sequences on the retained executable. Its separate process starts with the original filename, hides through WM_CLOSE and reopens through the existing supervisor. The native observer verifies the loaded executable path and hash, the process creation time and the original HWND. The GUI must retain generation one in DX12 CPU Mailbox/Wait mode. A create/destroy hook and root hide/show events cover the field observation.
+
+```sh
+python3 -B tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" retained-text
+python3 -B tools/rust-qa/windows-warm-window/filename.py "$NATIVE_TARGET" --replay path/to/windows-warm-window/"$NATIVE_TARGET"/windows-text
+```
+
+The first command uses the existing desktop placement decision after the retained build. Run the second from a Git checkout of the originating revision with the extracted artifact's sibling compiler stream, original source archive, canonical graph and build receipts in place. It verifies the observer files against that revision with Windows checkout filters. The field's HWND, PID, thread desktop and session must agree with the unlocked input desktop before and after the PowerShell observation.
+
+The retained case writes under `artifacts/rust/windows-warm-window/<target>/windows-text/`. Failures preserve the native hook observations, current phase, subject log and available glyph or editing results. The normal teardown GUI continues to write its own results under `gui-native/<target>/windows-text/`.

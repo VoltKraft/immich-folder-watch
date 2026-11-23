@@ -17,12 +17,14 @@ from residency import sample
 from window_lifetime import WindowLifetime
 
 
-def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=False):
+def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=False, after_reopen=None,
+          desktop=None, evidence=None):
     background = name.startswith("background") or name == "absent-tray"
     warm = name != "cold-residency"
     has_tray = name != "absent-tray"
     recovery = name in ("visible-loss", "edited-loss", "hidden-loss")
-    result = dict(case=name, transitions=[], samples={})
+    result = {} if evidence is None else evidence
+    result.update(case=name, transitions=[], samples={})
     log = output / "subject.log"
     output.mkdir()
     with ExitStack() as stack:
@@ -46,13 +48,32 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
         stream = stack.enter_context(log.open("wb"))
         proc = subprocess.Popen([binary, *(["--background"] if background else [])], cwd=root, env=env,
                                 stdin=subprocess.PIPE, stdout=stream, stderr=subprocess.STDOUT)
+        if evidence is not None:
+            result.update(phase="install native observers", pid=proc.pid)
+            # ExitStack runs this after stop_subject and before closing the native log.
+            def exited():
+                result.update(exitCode=proc.returncode, subjectLog=sha(log))
+            stack.callback(exited)
         stack.callback(recorder.stop_subject, proc, True)
-        observer = fixture.Windows(proc.pid)
+        observer = fixture.Windows(proc.pid, desktop)
         stack.callback(observer.close)
+        if evidence is not None:
+            result["windowEvents"] = observer.events
         lifetime = WindowLifetime(proc.pid)
         stack.callback(lifetime.close)
+        if evidence is not None:
+            result["objectLifetimes"] = lifetime.events
+            def failed(_kind, error, _tb):
+                if error is not None:
+                    result["failure"] = f"{type(error).__name__}: {error}"
+                    try:
+                        observer.pump()
+                    except OSError as exc:
+                        result["hookReadError"] = str(exc)
         handle = recorder.checked(api.open(0x0410, False, proc.pid))
         stack.callback(api.close, handle)
+        if evidence is not None:
+            stack.push(failed)
         result.update(pid=proc.pid, creation100ns=api.process_identity(handle))
 
         def send(data):
@@ -63,6 +84,8 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             return log.read_text(encoding="utf-8", errors="replace").splitlines()
 
         def wait(check, label):
+            if evidence is not None:
+                result["phase"] = label
             def poll():
                 recorder.wait_running(proc)
                 observer.pump()
@@ -112,7 +135,7 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
 
         def cycle(hwnd, *, quit_hidden=False):
             observer.pump()
-            start = len(observer.events)
+            first_event = start = len(observer.events)
             lifetime_start = len(lifetime.events)
             generations = [s for s in logs() if s.startswith("GRAPHICS_READY ")]
             observer.close_window(hwnd)
@@ -139,6 +162,9 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             if not warm and len(now) != len(generations) + 1:
                 raise ValueError("Cold control did not replace its DX12 generation")
             result["transitions"][-1].update(reopened=actual, generationAfter=now)
+            if after_reopen is not None:
+                result["transitions"][-1].update(windowEventRange=[first_event, len(observer.events)],
+                                                  lifetimeStart=lifetime_start)
             return actual
 
         def field(hwnd, phase):
@@ -201,12 +227,24 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
                     field(new, "after")
                 hwnd = new
             normal = cycle(hwnd)
+            if after_reopen is not None:
+                result["phase"] = "observe reopened filename"
+                after_reopen(proc, normal, env)
+                result["phase"] = "validate reopened HWND"
+                observer.pump()
+                lifetime_start = result["transitions"][-1]["lifetimeStart"]
+                result["transitions"][-1]["lifetimeEnd"] = len(lifetime.events)
+                if (observer.visible() != normal or not still_owned(normal)
+                        or any(item[0] == normal for item in lifetime.events[lifetime_start:])):
+                    raise ValueError("The reopened HWND changed during the filename observation")
             if name == "retained-edit":
                 field(normal, "after")
             if name.endswith("residency"):
                 residency_at("reopened")
             if name == "background-open":
                 cycle(normal, quit_hidden=True)
+        if evidence is not None:
+            result["phase"] = "drain and release"
         send(b"Q")
         proc.wait(timeout=20)
         observer.pump()
@@ -227,6 +265,8 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
                 raise ValueError(f"Unexpected actual native device descriptor: {hints}")
             result["actualDeviceDescriptors"] = hints
         result.update(exitCode=proc.returncode, windowEvents=observer.events, objectLifetimes=lifetime.events, subjectLog=sha(log))
+    if evidence is not None:
+        result["phase"] = "complete"
     return result
 
 
