@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from worker_activity import original_bytes, stale_control
+from verify_activity import check_peer_requests
 
 
 class WorkerActivityTests(unittest.TestCase):
@@ -22,6 +23,29 @@ class WorkerActivityTests(unittest.TestCase):
                            (line.replace(b"2" * 64, b"4" * 64) + reason, 1)):
             with self.subTest(data=data, code=code), self.assertRaises(ValueError):
                 stale_control(data, request, code)
+
+    def test_stale_upload_and_download_refusals_cannot_be_exchanged(self):
+        request = {"token": "1" * 32, "beforeSha256": "2" * 64}
+        marker = json.dumps({"format": "ifw-worker-upload-backup-stale-v1", "token": request["token"],
+                             "sourceSha256": request["beforeSha256"]}).encode()
+        refusal = b"IFW_WORKER_STALE=" + marker + b'\nError: "no completed worker upload"\n'
+        stale_control(refusal, request, 1, upload=True)
+        with self.assertRaises(ValueError):
+            stale_control(refusal, request, 1)
+        with self.assertRaises(ValueError):
+            stale_control(refusal.replace(b"worker-upload-backup", b"worker-backup"), request, 1, upload=True)
+        with self.assertRaises(ValueError):
+            stale_control(refusal.replace(b"completed worker upload", b"completed worker download"), request, 1, upload=True)
+
+    def test_restarted_peer_requires_its_original_asset_without_new_requests(self):
+        asset = {"id": "asset-original", "originalFileName": "capture.jpg"}
+        valid = {"uploads": 0, "downloads": 0, "rejectedRequests": [], "listings": [asset]}
+        check_peer_requests(valid, 0, asset)
+        for key, value in (("uploads", 1), ("downloads", 1), ("rejectedRequests", [{"method": "AddAssetsToAlbumAsync",
+                           "arguments": ["Camera", "asset-original"]}]), ("listings", []), ("listings", [None]),
+                           ("listings", [dict(asset, id="asset-other")])):
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                check_peer_requests({**valid, key: value}, 0, asset)
 
     def test_oversized_backup_is_rejected_before_readback(self):
         with tempfile.TemporaryDirectory() as root:

@@ -70,8 +70,10 @@ The checkout needs that commit and the 3.0.4 reference commit. The reader uses
 immutable SQLite connections and prints a JSON receipt with the original hashes.
 The test uses an in-process synthetic Immich peer. [Activity and source checks](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
 
-The [native Rust backup trial](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
-adds a separate data exchange between these two worker starts.
+The native Rust backup trials cover the shipping worker's download and upload.
+Each worker restarts from bytes produced by Rust. The upload peer independently
+retains the remote asset and records unexpected album and file operations.
+[Download and upload replay](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download).
 `rust-feasibility.yaml` retains the source, build and per-test evidence from
 each native target in its `rust-worker-backup` archive.
 

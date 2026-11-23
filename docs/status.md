@@ -17,6 +17,17 @@ after uninstall. The four-host readback SHA-256 is
 `ccf92ed76a89e2ce5aeafaeec38b2fa0c0ce48c2e8ea94095b93d03ad17b31d9`.
 [Original run and receipts](rust/rw01-installed-packages.md#first-native-package-run).
 
+The Fedora x64 upload exchange returned a Rust-generated SQLite backup to
+the shipping worker. The peer retained all eight uploaded bytes through the
+second reconciliation. The reference formerly missed some album mutation
+methods. Independent review verified the corrected peer covers all 17 asset
+client signatures and rejects unexpected writes even if the caller catches
+the error. Ten native negative trials failed at the intended check. The
+working-tree receipt has SHA-256
+`85dfb12e8cae044794260191290fd62857a27ebd681709622435f8179ba12af0`.
+Clean revision-bound tests on the four targets are next.
+[Reference and replay](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
 ## Four native upload references and package migration baseline (2026-11-23)
 
 At `9efe6f4` all four shipping upload references passed. Ubuntu passed

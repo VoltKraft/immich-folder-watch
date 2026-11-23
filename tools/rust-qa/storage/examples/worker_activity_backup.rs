@@ -57,20 +57,30 @@ fn select_exchange(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn read_request() -> Result<Value> {
+#[derive(Clone, Copy, PartialEq)]
+enum Transfer {
+    Download,
+    Upload,
+}
+
+fn read_request() -> Result<(Value, Transfer)> {
     let path = Path::new("request.json");
     if !fs::symlink_metadata(path)?.is_file() {
         return Err("expected a regular worker request".into());
     }
     let request: Value = serde_json::from_slice(&limited(File::open(path)?, 4096)?)?;
-    if request["format"] != "ifw-worker-backup-request-v1"
-        || !lower_hex(field(&request, "token")?, 32)
+    let transfer = match field(&request, "format")? {
+        "ifw-worker-backup-request-v1" => Transfer::Download,
+        "ifw-worker-upload-backup-request-v1" => Transfer::Upload,
+        _ => return Err("invalid worker backup request format".into()),
+    };
+    if !lower_hex(field(&request, "token")?, 32)
         || !lower_hex(field(&request, "beforeSha256")?, 64)
         || !lower_hex(field(&request, "afterSha256")?, 64)
     {
         return Err("invalid worker backup request".into());
     }
-    Ok(request)
+    Ok((request, transfer))
 }
 
 fn immutable(name: &str) -> Result<Connection> {
@@ -114,14 +124,18 @@ fn single_row(db: &Connection, sql: &str) -> rusqlite::Result<Vec<SqlValue>> {
 }
 
 #[derive(PartialEq)]
-struct Download {
+struct Activity {
     schema: Catalog,
     entries: Vec<SqlValue>,
     account_status: Vec<SqlValue>,
     counts: [i64; 4],
 }
 
-fn read_download(db: &Connection, golden: &Catalog) -> Result<Option<Download>> {
+fn read_activity(
+    db: &Connection,
+    golden: &Catalog,
+    transfer: Transfer,
+) -> Result<Option<Activity>> {
     let schema = catalog(db)?;
     if db.query_one::<i64, _, _>("PRAGMA user_version", [], |r| r.get(0))? != 1
         || db.query_one::<String, _, _>("PRAGMA integrity_check", [], |r| r.get(0))? != "ok"
@@ -143,25 +157,43 @@ fn read_download(db: &Connection, golden: &Catalog) -> Result<Option<Download>> 
     if counts != [0, 1, 1, 0] {
         return Err("unexpected worker activity counts".into());
     }
-    let key = if cfg!(windows) {
-        "PHOTO.JPG"
-    } else {
-        "photo.jpg"
+    let (filename, asset, size, modified, direction) = match transfer {
+        Transfer::Download => (
+            "photo.jpg",
+            "remote".to_owned(),
+            6,
+            if cfg!(windows) {
+                "2004-02-06T06:08:10.0000000+00:00"
+            } else {
+                "2004-02-04T06:08:10.0000000+00:00"
+            },
+            1,
+        ),
+        Transfer::Upload => (
+            "capture.jpg",
+            format!(
+                "asset-{}",
+                digest(&[0xff, 0xd8, 0, 1, 0x7f, 0x80, 0xff, 0xd9])
+            ),
+            8,
+            "2011-08-06T04:02:00.0000000+00:00",
+            0,
+        ),
     };
-    let modified = if cfg!(windows) {
-        "2004-02-06T06:08:10.0000000+00:00"
+    let key = if cfg!(windows) {
+        filename.to_ascii_uppercase()
     } else {
-        "2004-02-04T06:08:10.0000000+00:00"
+        filename.to_owned()
     };
     let (source, synchronized, history): (String, String, String) = db.query_one(
         "SELECT e.source_path, e.last_synchronized_at_utc, a.last_successful_sync_utc
          FROM sync_entries AS e JOIN sync_account_status AS a USING(account_scope)
-         WHERE e.account_scope=?1 AND e.relative_path='photo.jpg' AND e.relative_path_key=?2
-           AND e.asset_id='remote' AND e.album_name='Camera' AND e.file_size=6 AND e.last_write_time_utc=?3
-           AND e.direction=1 AND e.status=0 AND e.tombstone_expires_at_utc IS NULL",
-        params![digest(b"https://immich.example/api\ntest-key"), key, modified],
+         WHERE e.account_scope=?1 AND e.relative_path=?2 AND e.relative_path_key=?3
+           AND e.asset_id=?4 AND e.album_name='Camera' AND e.file_size=?5 AND e.last_write_time_utc=?6
+           AND e.direction=?7 AND e.status=0 AND e.tombstone_expires_at_utc IS NULL",
+        params![digest(b"https://immich.example/api\ntest-key"), filename, key, asset, size, modified, direction],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-    ).optional()?.ok_or("mapping or account history differs from the synthetic download")?;
+    ).optional()?.ok_or("mapping or account history differs from the requested synthetic transfer")?;
     let source = Path::new(&source);
     let temp_id = source
         .parent()
@@ -175,7 +207,7 @@ fn read_download(db: &Connection, golden: &Catalog) -> Result<Option<Download>> 
     {
         return Err("unexpected synthetic source or last successful sync".into());
     }
-    Ok(Some(Download {
+    Ok(Some(Activity {
         schema,
         counts,
         entries: single_row(db, "SELECT * FROM sync_entries")?,
@@ -224,7 +256,7 @@ fn main() -> Result<()> {
         _ => return Err("expected before or after".into()),
     };
     select_exchange(Path::new(directory))?;
-    let request = read_request()?;
+    let (request, transfer) = read_request()?;
     let expected = field(&request, hash_field)?;
     if hash.to_str() != Some(expected) {
         return Err("requested donor digest differs from the worker observation".into());
@@ -252,18 +284,25 @@ fn main() -> Result<()> {
     let golden = Connection::open_in_memory()?;
     golden.execute_batch(GOLDEN)?;
     let golden = canonical_catalog(catalog(&golden)?);
-    let observed = read_download(&donor, &golden)?;
+    let observed = read_activity(&donor, &golden, transfer)?;
     require_fresh_destination()?;
     let Some(original) = observed else {
         donor.close().map_err(|(_, error)| error)?;
         verify_backup(Path::new(name), expected)?;
+        let (format, reason) = match transfer {
+            Transfer::Download => ("ifw-worker-backup-stale-v1", "no completed worker download"),
+            Transfer::Upload => (
+                "ifw-worker-upload-backup-stale-v1",
+                "no completed worker upload",
+            ),
+        };
         eprintln!(
             "IFW_WORKER_STALE={}",
             json!({
-                "format":"ifw-worker-backup-stale-v1", "token":request["token"], "sourceSha256":expected
+                "format": format, "token":request["token"], "sourceSha256":expected
             })
         );
-        return Err("no completed worker download".into());
+        return Err(reason.into());
     };
     reserve_destination()?;
     let mut destination = Connection::open_with_flags(
@@ -281,16 +320,20 @@ fn main() -> Result<()> {
     donor.close().map_err(|(_, error)| error)?;
     let restored_hash = digest(&limited(File::open(RETURNED)?, MAX_DB_BYTES)?);
     verify_backup(Path::new(RETURNED), &restored_hash)?;
-    if read_download(&immutable(RETURNED)?, &golden)?.as_ref() != Some(&original) {
+    if read_activity(&immutable(RETURNED)?, &golden, transfer)?.as_ref() != Some(&original) {
         return Err("reopened Rust backup differs from the finalized worker state".into());
     }
     verify_backup(Path::new(RETURNED), &restored_hash)?;
     verify_backup(Path::new(name), expected)?;
     let [owned, status, entries, repairs] = original.counts;
+    let format = match transfer {
+        Transfer::Download => "ifw-rust-worker-activity-backup-v1",
+        Transfer::Upload => "ifw-rust-worker-upload-backup-v1",
+    };
     serde_json::to_writer(
         std::io::stdout().lock(),
         &json!({
-            "format":"ifw-rust-worker-activity-backup-v1", "token":request["token"],
+            "format":format, "token":request["token"],
             "sourceSha256":expected, "restoredSha256":restored_hash, "sqliteSourceId":sqlite_source,
             "sqliteVersion":rusqlite::version(), "compileOptions":options,
             "os":std::env::consts::OS, "arch":std::env::consts::ARCH,
@@ -310,11 +353,13 @@ mod tests {
         db.execute_batch(GOLDEN)?;
         let golden = canonical_catalog(catalog(&db)?);
         db.execute_batch("DELETE FROM owned_albums; DELETE FROM sync_entries; DELETE FROM sync_timestamp_repairs;")?;
-        assert!(read_download(&db, &golden).is_err()); // Inconsistent account history survives.
+        assert!(read_activity(&db, &golden, Transfer::Download).is_err()); // Inconsistent account history survives.
         db.execute_batch("DELETE FROM sync_account_status;")?;
-        assert!(read_download(&db, &golden)?.is_none());
+        assert!(read_activity(&db, &golden, Transfer::Download)?.is_none());
+        assert!(read_activity(&db, &golden, Transfer::Upload)?.is_none());
         db.execute_batch("PRAGMA user_version=2;")?;
-        assert!(read_download(&db, &golden).is_err());
+        assert!(read_activity(&db, &golden, Transfer::Download).is_err());
+        assert!(read_activity(&db, &golden, Transfer::Upload).is_err());
         Ok(())
     }
 }

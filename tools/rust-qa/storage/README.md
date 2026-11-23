@@ -56,13 +56,25 @@ disposable copy and reconciles the original watch directory. Its
 xUnit output identifies both the JSON observations and the backup it consumed.
 The default C# reference continues to run its own restore on all four targets.
 
+### Restore after a synthetic upload
+
+The same command runs a second exchange in a fresh profile. The shipping
+worker uploads eight bytes to a synthetic peer, which stores its own copy
+and derives the asset ID from the received bytes. Rust refuses the earlier
+database and uses SQLite's online backup API on the post-upload mapping and
+account history. The second worker opens that returned backup and reconciles
+the same files. The peer records every unexpected download, membership change,
+album mutation and trash request through worker shutdown.
+
 To replay the cross-language trial, retain the `worker-activity/` directory
-from the native archive. Supply the original target triple and full source
-revision. This command prints the independent SQL, original media and TRX
+and the separate `worker-upload-activity/` directory from the native archive.
+Supply the original target triple and full source revision. These commands
+print the independent SQL, original media and TRX
 readback. It runs on a different host as well.
 
 ```sh
 python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-activity TARGET FULL_COMMIT
+python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-upload-activity TARGET FULL_COMMIT --upload
 ```
 
 The parent `result.json` identifies the compiled Rust executable, C# test

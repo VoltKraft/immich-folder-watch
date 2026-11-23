@@ -69,7 +69,7 @@ def main() -> int:
     parser.add_argument("--stored-keys", action="store_true",
                         help="Inspect existing path identities in two additional synthetic C# backups")
     parser.add_argument("--worker-activity", action="store_true",
-                        help="Return a native Rust backup to the shipping worker after a real synthetic download")
+                        help="Return native Rust backups to the shipping worker after a synthetic download and upload")
     args = parser.parse_args()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
@@ -268,11 +268,11 @@ def main() -> int:
             test_assembly = activity_build / "bin/ImmichFolderWatch.Tests.Core/release/ImmichFolderWatch.Tests.Core.dll"
             build_hashes = {"rustExecutable": sha256(example), "testAssembly": sha256(test_assembly)}
             result["workerActivity"] = build_hashes
-            answer = run_activity(output / "worker-activity", example, test_assembly, dotnet, env,
-                                  args.target, result["source"])
+            for name, field, upload in (("worker-activity", "readback", False), ("worker-upload-activity", "uploadReadback", True)):
+                result["workerActivity"][field] = run_activity(output / name, example, test_assembly, dotnet, env,
+                                                               args.target, result["source"], upload=upload)
             if sha256(example) != build_hashes["rustExecutable"] or sha256(test_assembly) != build_hashes["testAssembly"]:
                 raise ValueError("an executable changed during the worker activity trial")
-            result["workerActivity"]["readback"] = answer
         result["status"] = "passed"
         print(f"Storage assessment passed; evidence: {output}", flush=True)
     except Exception as error:

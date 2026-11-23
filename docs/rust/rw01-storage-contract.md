@@ -190,8 +190,21 @@ removes its temporary upload databases and media after the test.
 At `9efe6f4`, the test passed on all four native hosts. Each independently
 replayed TRX identifies the eight uploaded bytes retained by the separate
 peer. Reconciliation after restoring SQLite preserved the local file and
-remote asset, with zero repeat transfers, trash requests or album mutations.
+remote asset, with zero repeat transfers, trash requests or recorded ID-based
+album changes. That peer did not record membership writes or name-based
+album changes.
 Ubuntu passed 568 tests on each architecture. Windows passed 559 on each
 and skipped the nine Linux-only tests. The four-archive readback SHA-256
 is `9368522d6c4834f6b5d16c8d3c67372f40b315b43d4e0412723681709ecb2921`.
 [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14819601003) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14819470624) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14818820858) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252132/artifacts/14818925892).
+
+The cross-language upload fixture supplies the original and post-upload
+snapshots to Rust and restarts the shipping worker from Rust's returned
+bytes. The synthetic peer implements every shipping asset-client call and
+records unexpected mutations before returning an error. On Fedora x64 the
+first worker uploaded once, the second made zero transfers, and the peer
+retained the eight bytes and the same asset ID. Both workers stopped with
+an empty rejected-request record. Ten deliberately injected mutations were
+detected even when their caller caught the peer error. The local run used
+working-tree sources. Eight earlier native download archives reproduced
+their original reports byte-for-byte. [Native reproduction and replay](../../tools/rust-qa/storage/README.md#restore-after-a-synthetic-upload).

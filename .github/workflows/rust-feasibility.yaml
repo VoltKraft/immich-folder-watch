@@ -129,7 +129,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Restore a native Rust backup into the shipping worker after a download
+      - name: Restore native Rust backups into the shipping worker after a download and an upload
         id: activity
         if: ${{ !cancelled() && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
         shell: bash

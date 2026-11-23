@@ -63,19 +63,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         var output = Environment.GetEnvironmentVariable("IFW_QA_ACTIVITY_OUTPUT");
         var exchange = Environment.GetEnvironmentVariable("IFW_QA_ACTIVITY_EXCHANGE");
         var restoredPath = Path.Combine(directory.Path, "restored.db");
-        string? rustBackupHash = null;
-        if (exchange is null)
+        var rustBackupHash = await RestoreActivityDatabaseAsync(output, exchange, "ifw-worker-backup-request-v1",
+            beforePath, beforeHash, afterPath, afterHash, restoredPath);
+        if (rustBackupHash is not null)
         {
-            File.Copy(afterPath, restoredPath);
-            Assert.Equal(afterHash, ActivitySha256(restoredPath));
-        }
-        else
-        {
-            Assert.NotNull(output);
-            Assert.True(Path.IsPathFullyQualified(output), "The exchange requires an absolute activity output path.");
-            Assert.True(Path.IsPathFullyQualified(exchange), "The exchange directory must be absolute.");
-            Assert.NotEqual(".", Path.GetRelativePath(output, exchange));
-            rustBackupHash = await ReceiveActivityBackupAsync(exchange, beforePath, beforeHash, afterPath, afterHash, restoredPath);
             var received = ReadActivityState(restoredPath);
             Assert.Equal(mapping, Assert.Single(received.Mappings));
             Assert.Equal(lastSuccess, Assert.Single(received.Accounts));
@@ -148,6 +139,11 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
                 totalUploads = first.Uploads + second.Uploads,
             },
         };
+        await RecordActivityResultAsync(output, evidence, rustBackupHash);
+    }
+
+    private async Task RecordActivityResultAsync(string output, object evidence, string? rustBackupHash)
+    {
         var manifestPath = Path.Combine(output, "activity.json");
         await using (var manifest = new FileStream(manifestPath, FileMode.CreateNew, FileAccess.Write))
         {
@@ -157,9 +153,19 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         if (rustBackupHash is not null) testOutput.WriteLine($"IFW_RUST_BACKUP_SHA256={rustBackupHash}");
     }
 
-    private static async Task<string> ReceiveActivityBackupAsync(
-        string exchangePath, string beforePath, string beforeHash, string afterPath, string afterHash, string restoredPath)
+    private static async Task<string?> RestoreActivityDatabaseAsync(string? output, string? exchangePath, string requestFormat,
+        string beforePath, string beforeHash, string afterPath, string afterHash, string restoredPath)
     {
+        if (exchangePath is null)
+        {
+            File.Copy(afterPath, restoredPath);
+            Assert.Equal(afterHash, ActivitySha256(restoredPath));
+            return null;
+        }
+        Assert.NotNull(output);
+        Assert.True(Path.IsPathFullyQualified(output), "The exchange requires an absolute activity output path.");
+        Assert.True(Path.IsPathFullyQualified(exchangePath), "The exchange directory must be absolute.");
+        Assert.NotEqual(".", Path.GetRelativePath(output, exchangePath));
         var directory = new DirectoryInfo(exchangePath);
         Assert.True(directory.Exists, "The coordinator must create the private exchange directory.");
         Assert.False(directory.Attributes.HasFlag(FileAttributes.ReparsePoint));
@@ -174,7 +180,7 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         File.Copy(beforePath, Path.Combine(directory.FullName, "before.db"));
         File.Copy(afterPath, Path.Combine(directory.FullName, "after.db"));
         var token = Guid.NewGuid().ToString("N");
-        var request = new { format = "ifw-worker-backup-request-v1", token, beforeSha256 = beforeHash, afterSha256 = afterHash };
+        var request = new { format = requestFormat, token, beforeSha256 = beforeHash, afterSha256 = afterHash };
         var temporary = Path.Combine(directory.FullName, "request.tmp");
         await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
@@ -327,10 +333,10 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
 
     private sealed record ActivityFile(string Name, long Size, string Sha256, string LastWriteTimeUtc, string? CreationTimeUtc);
 
-    private static ActivityFile ReadActivityFile(string path)
+    private static ActivityFile ReadActivityFile(string path, byte[]? expected = null)
     {
         var bytes = File.ReadAllBytes(path);
-        Assert.Equal("remote"u8.ToArray(), bytes);
+        Assert.Equal(expected ?? "remote"u8.ToArray(), bytes);
         return new(Path.GetFileName(path), bytes.LongLength, Convert.ToHexStringLower(SHA256.HashData(bytes)),
             ActivityTimestamp(File.GetLastWriteTimeUtc(path)),
             OperatingSystem.IsWindows() ? ActivityTimestamp(File.GetCreationTimeUtc(path)) : null);
