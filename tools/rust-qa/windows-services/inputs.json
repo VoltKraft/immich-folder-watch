@@ -155,7 +155,7 @@
     }
   ],
   "targetGraphs": {
-    "aarch64-pc-windows-msvc": "e28a1b095840dcd10fa475db321c61b6f432cab52ab549e284aba742826d165d",
-    "x86_64-pc-windows-msvc": "2b74da604843b5aa434793f4fab28388f360533ff52ea391924ebc8ec9b57f3b"
+    "aarch64-pc-windows-msvc": "57b2d0a951755a10c937f4f266409b095efa0b7545d47ca0e6892140562e8690",
+    "x86_64-pc-windows-msvc": "d11f685b24bb317fd565ebb94b4259107d9bce0916e3394a0be9e0f63086e345"
   }
 }

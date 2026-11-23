@@ -208,3 +208,12 @@ an empty rejected-request record. Ten deliberately injected mutations were
 detected even when their caller caught the peer error. The local run used
 working-tree sources. Eight earlier native download archives reproduced
 their original reports byte-for-byte. [Native reproduction and replay](../../tools/rust-qa/storage/README.md#restore-after-a-synthetic-upload).
+
+The clean Fedora x64 run at `c4b876c` repeated both worker exchanges
+offline. The second worker opened the Rust backup, retained the mapping
+and Last Sync, and observed the original peer bytes. Replay verified both
+complete reports, 318 indexed files and 154 exact project sources. The
+upload backup SHA-256 was
+`0a570ff0f671119d060c0cfe14e245d3f9a1658fc5f9f2c4562c4915a8009d2f`.
+The original records and detached readback are in
+`artifacts/rust/worker-backup-native-c4b876c/`.

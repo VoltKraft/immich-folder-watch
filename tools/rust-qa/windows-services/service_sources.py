@@ -14,7 +14,8 @@ def service_files():
     local.extend(p for p in (HERE / "src").rglob("*") if p.is_file())
     return local + [QA / name for name in (
         "gui/src/tray-icon.argb", "gui/src/windows_tray_shell.rs", "audit-graph.py", "check-toolchain.py",
-        "storage/evidence.py", "windows-desktop/job.py", "windows-desktop/win32.py", "windows-launcher/named_process.py",
+        "storage/evidence.py", "windows-desktop/job.py", "windows-desktop/win32.py", "windows-imports/formats.py",
+        "windows-launcher/named_process.py",
         "windows-performance/native.py", "windows-performance/build.py", "windows_observer.py")] + [
             ROOT / "rust/toolchain-inputs.json", ROOT / ".gitattributes"]
 

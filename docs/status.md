@@ -1,5 +1,25 @@
 # Project Status
 
+## Worker backup replay and Windows notification history (2026-11-23)
+
+At `c4b876c`, the offline Fedora x64 storage trial restored both a download
+and an upload through Rust's SQLite backup API. Each restarted C# worker
+reconciled the same file and album without another transfer. Replay matched
+both original reports byte-for-byte, all 318 indexed files and 154 archived
+sources from Git. The peer retained the eight uploaded bytes and the same
+asset ID. The readback SHA-256 is
+`a9f0a6c8f030a4a9daf3a4662d5593106c26343588b4a46573205eca24b09565`.
+[Activity evidence](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+The new Windows trial observes normal and suppressed notifications through a
+test shortcut's own WinRT history. It verifies each entry's content and
+removal in separate processes. Both MSVC targets passed cross-Clippy and
+the service tests passed 51 portable checks. The independent review
+verified that detached replay requires the original PE import table,
+native build report and input desktop. Native delivery, banner visibility
+and user activation still require Windows observations. RW-02 remains open.
+[Windows trial](rust/rw02-windows-services.md#windows-notification-history).
+
 ## Released installer behavior on the four hosted targets (2026-11-23)
 
 At `1b95ba0`, both original Windows MSI files installed and uninstalled
@@ -25,7 +45,7 @@ client signatures and rejects unexpected writes even if the caller catches
 the error. Ten native negative trials failed at the intended check. The
 working-tree receipt has SHA-256
 `85dfb12e8cae044794260191290fd62857a27ebd681709622435f8179ba12af0`.
-Clean revision-bound tests on the four targets are next.
+The subsequent clean Fedora result is recorded above.
 [Reference and replay](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
 
 ## Four native upload references and package migration baseline (2026-11-23)

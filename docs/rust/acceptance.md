@@ -121,10 +121,13 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 The reference column includes the completed upload and restart at
 `9efe6f4` and the download at `ba02f8b`. After the synthetic upload,
 the peer retained the original eight bytes and reconciliation issued zero
-additional transfers, trash requests or recorded ID-based album changes. On all four hosts the shipping worker also
-restarted from the backup produced by Rust. Each run retained the original
-file and durable history, and made zero further transfers. All four native
-readbacks passed independently. The installed candidate still needs to
+additional transfers, trash requests or recorded ID-based album changes.
+After a download on all four hosts the shipping worker restarted from
+the backup produced by Rust, retained the original file and durable
+history, and made zero further transfers. All four readbacks passed
+independently. At `c4b876c` Fedora x64 also passed the Rust backup
+exchange after an upload, including the peer's complete mutation record.
+The installed candidate still needs to
 perform and recover its own sync activity.
 [Native upload references](rw01-storage-contract.md#peer-content-after-a-synthetic-upload) · [Two-language worker results](rw01-storage-contract.md#download-activity-and-the-latest-backup).
 

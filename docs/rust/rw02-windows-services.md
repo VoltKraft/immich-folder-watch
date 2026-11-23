@@ -393,6 +393,30 @@ per target and the small archives to their copies in the full desktop
 archives. Windows notification presentation remains open.
 [First x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14822014126) · [First ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14822831355) · [Second x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14826514476) · [Second ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14828277542).
 
+## Windows notification history
+
+The separate inbox WinRT trial registers a per-run shortcut under a disposable
+runner's Programs folder and sends two uniquely tagged notifications under its
+own app identity. One requests ordinary delivery and the other suppresses the
+popup. Each independent reader checks the original title and body in Windows
+notification history. The trial removes one entry, checks that the other
+survived, then removes it and verifies the empty history. The shortcut uses
+Microsoft's stub CLSID convention. A visible banner and user activation
+still need their own interactive observations.
+[Trial, native commands and archive replay](../../tools/rust-qa/windows-services/toast-history.md).
+
+The pinned 0.62.2 Windows bindings supply the additional WinRT and Shell
+interfaces. Archive and license review covered the same 15 registry packages
+and 31 notices on each Windows target. The combined development dependency
+profile retained its four previously qualified graphs. Both Windows targets
+passed the frozen cross-Clippy check. Fifty-one portable controls passed,
+including refusals for incomplete import evidence, an incorrect input desktop
+and a missing native history read. Independent review cleared the corrected
+archive replay. The local receipt under
+`artifacts/rust/windows-toast-history/reviewed-cross-check/` has SHA-256
+`2a4540e190a94f3a6024c72695cc1e43ca7808cc320c1e7227020da41d912d72`.
+Native x64 and ARM64 delivery remains to be observed.
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

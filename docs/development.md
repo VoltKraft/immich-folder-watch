@@ -335,6 +335,11 @@ the request status, the matching balloon callback, and independent
 on-screen evidence of the synthetic title and body. The per-target output
 is in `rust-notification-<target>-<commit>`.
 [Notification observation](rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+After those measurements, the same native Windows service binary sends two
+WinRT notifications under a unique test shortcut. The history recorder reads
+both from separate processes and verifies removal by tag and group. The
+`rust-toast-history-<target>-<commit>` archive records Windows' response.
+[Command and replay](../tools/rust-qa/windows-services/toast-history.md).
 The integrated graphics and Windows scan fixtures use the same
 [reviewed worker sources](../tools/rust-qa/performance/worker-inputs.json).
 Update these hashes after reviewing changes to the inventory or its filesystem

@@ -207,6 +207,8 @@ to reconcile project decisions, defaults, and recorded state.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+  The separate [WinRT history trial](tools/rust-qa/windows-services/toast-history.md)
+  scopes posting, readback and removal to the test shortcut's app identity.
   Compare Windows renderer timings with the same host's WPF reference and
   qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)
   with observed screen pixels and independent file activity.

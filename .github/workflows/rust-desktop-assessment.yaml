@@ -659,6 +659,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Read back ordinary and suppressed notifications under a test-owned Windows identity
+        id: toast_history
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.windows_services.outcome == 'success' || steps.windows_services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_history.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the original Windows notification history records
+        if: ${{ !cancelled() && (steps.toast_history.outcome == 'success' || steps.toast_history.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-toast-history-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/toast-history-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Record the reviewed components of the native development build
         id: components
         if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
@@ -735,6 +752,7 @@ jobs:
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
             artifacts/rust/windows-services/notification-${{ matrix.target }}/
+            artifacts/rust/windows-services/toast-history-${{ matrix.target }}/
             artifacts/rust/windows-launcher/${{ matrix.target }}/
             artifacts/rust/windows-gui-tray/${{ matrix.target }}/
             artifacts/rust/windows-launcher-retained/${{ matrix.target }}/

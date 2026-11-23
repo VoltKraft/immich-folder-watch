@@ -241,6 +241,7 @@ def main():
             raise ValueError("The embedded first-party tray image differs from the reviewed input")
         step("compiler", [sys.executable, QA / "check-toolchain.py", args.target])
         step("recovery", [sys.executable, "-m", "unittest", "test_recovery", "test_activation", "test_notification"])
+        step("toast-controls", [sys.executable, "-B", "-m", "unittest", "-v", "test_toast_history"])
         step("tray-cleanup", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                               "-File", HERE / "test_tray_state.ps1"])
         step("notification-points", ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -265,6 +266,12 @@ def main():
             result["checkoutVerified"] = True
         exe = build / "release/ifw-windows-services-probe.exe"
         result["probeSha256"] = sha(exe)
+        from activation import TARGET, module
+        from toast_history import validate_imports
+        machine = next(machine for target, machine in TARGET.values() if target == args.target)
+        imports = module("service_pe", QA / "windows-imports/formats.py").pe_imports(exe, machine)
+        validate_imports(imports)
+        write(output / "pe-imports.json", imports)
         tick = ctypes.WinDLL("kernel32").GetTickCount64
         tick.restype = ctypes.c_uint64
         tick.argtypes = []

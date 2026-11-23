@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::*;
 use windows::Win32::UI::Shell::*;
-use windows::core::{Interface, PCWSTR, Result, w};
+use windows::core::{GUID, Interface, PCWSTR, Result, w};
 
 use crate::{invalid, wide};
 
@@ -40,18 +40,18 @@ impl Drop for OwnedLink {
     }
 }
 
-fn known_startup() -> Result<PathBuf> {
+pub(super) fn known_folder(id: &GUID) -> Result<PathBuf> {
     // The operating system owns the choice of per-user directory. The returned
     // allocation belongs to the caller and is released with its matching allocator.
     unsafe {
-        let path = SHGetKnownFolderPath(&FOLDERID_Startup, KF_FLAG_DEFAULT, None)?;
+        let path = SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None)?;
         let owned = OsString::from_wide(path.as_wide());
         CoTaskMemFree(Some(path.as_ptr().cast()));
         Ok(owned.into())
     }
 }
 
-fn read_string(buffer: &[u16]) -> OsString {
+pub(super) fn read_string(buffer: &[u16]) -> OsString {
     OsString::from_wide(&buffer[..buffer.iter().position(|&v| v == 0).unwrap_or(buffer.len())])
 }
 
@@ -156,7 +156,7 @@ pub(super) fn assess(area: &Path, id: &str, known: bool) -> Result<()> {
     fs::create_dir(&private)?;
     roundtrip(area, &private, id, "private", &exe)?;
     if known {
-        roundtrip(area, &known_startup()?, id, "startup", &exe)?;
+        roundtrip(area, &known_folder(&FOLDERID_Startup)?, id, "startup", &exe)?;
     }
     Ok(())
 }

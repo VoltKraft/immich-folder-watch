@@ -3,6 +3,8 @@
 #[cfg(windows)]
 mod shortcuts;
 #[cfg(windows)]
+mod toast;
+#[cfg(windows)]
 mod tray;
 
 #[cfg(windows)]
@@ -30,8 +32,10 @@ fn hosted() -> bool {
 #[cfg(windows)]
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
-    // The temporary shortcut always targets this harmless startup invocation.
-    if args.as_slice() == [OsStr::new("--autostart")] {
+    // Both temporary shortcut targets exit without opening or changing a profile.
+    if args.as_slice() == [OsStr::new("--autostart")]
+        || args.as_slice() == [OsStr::new("--toast-shortcut")]
+    {
         return Ok(());
     }
     let [mode, directory, id, known] = args.as_slice() else {
@@ -52,6 +56,14 @@ fn run() -> Result<()> {
     }
     if mode == "--hosted-private-tray" && hosted() && known == "private" {
         return tray::activation::assess(area, id);
+    }
+    if mode == "--hosted-toast-history"
+        && hosted()
+        && std::env::var("IFW_QA_TOAST_HISTORY").as_deref() == Ok("1")
+        && std::env::var("GITHUB_REF").as_deref() == Ok("refs/heads/rewrite/rust")
+        && std::env::var("GITHUB_REPOSITORY").as_deref() == Ok("VoltKraft/immich-folder-watch")
+    {
+        return toast::run(area, id, known.to_str().ok_or_else(invalid)?);
     }
     if mode == "--hosted-notification"
         && hosted()
