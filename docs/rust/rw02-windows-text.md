@@ -57,6 +57,26 @@ The x64 test used its original desktop.
 [Native archives](rw02-native-gui.md#native-follow-up-at-a66e045) and
 [separate font probe](rw02-font-coverage.md#windows-x64-input-timeout-at-a66e045).
 
+### Focus when capturing the caret-free field
+
+The glyph specimen needs the caret outside `Dateiname`. The native Tab
+places focus in the same window's `Kennwort` edit. At `549066f` and
+`ba02f8b`, both architectures produced the same 276 × 18 filename image,
+SHA-256 `94941c7babf5dc81e363d64cf9e4ba4ab52c8e1ccf98371a2cac093d2c0371ab`.
+All three edits also returned the expected text through both UI Automation
+patterns. The shared capture change at `a44848d` required the captured
+element itself to have keyboard focus, which conflicted with the preceding
+Tab. [Native run at 549066f](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471) · [Native run at ba02f8b](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405).
+
+The glyph observer now resolves the exact owned password field by name,
+role and process, then verifies that it holds focus on both sides of the
+capture. The bitmap comes from the non-password filename field. Its
+screen coordinates and dimensions must match the full region verified by
+the outer observer. The retained-editor and display trials still require
+keyboard focus in the filename field they capture. Local PowerShell checks
+accepted the expected rectangle and rejected four one-pixel changes in
+position or dimensions. A new native run must supply the rendered glyphs.
+
 ```sh
 python3 -m unittest discover -s tools/rust-qa/windows-text -p 'test_*.py' -v
 ```

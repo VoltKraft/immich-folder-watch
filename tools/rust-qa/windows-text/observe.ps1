@@ -137,7 +137,14 @@ function Record-Pixels($Sample) {
         [pscustomobject]@{ scalar=$cp; rect=$r }
     }
     Press-Key Tab
-    [void](Wait-Observation { (Get-SubjectFocus) -ceq 'Kennwort' } 'caret-free filename')
+    $passwordField = Wait-Observation {
+        $password = Get-Field 'Kennwort' ([Windows.Automation.ControlType]::Edit)
+        $focused = [Windows.Automation.AutomationElement]::FocusedElement
+        if ($null -ne $password -and $password.Current.ProcessId -eq $SubjectId -and $password.Current.IsPassword -and
+                $null -ne $focused -and [Windows.Automation.Automation]::Compare($focused, $password)) {
+            return $password
+        }
+    } 'keyboard focus in the password field for the caret-free filename'
     Start-Sleep -Milliseconds 180
     $r = $field.Current.BoundingRectangle
     if (-not $r.Equals($before) -or $textPattern.DocumentRange.GetText(-1) -cne $plan.sample) {
@@ -147,8 +154,12 @@ function Record-Pixels($Sample) {
     $x = [int][Math]::Ceiling($r.Left+2); $y = [int][Math]::Ceiling($r.Top+2)
     $w = [int][Math]::Floor($r.Right)-$x-2; $h = [int][Math]::Floor($r.Bottom)-$y-2
     [IfwQaText.Input]::RequireRegion($handle,$SubjectId,$x,$y,$w,$h)
-    $Sample.capture = Capture-SubjectField $field 'glyphs'
+    $Sample.capture = Capture-SubjectField $field 'glyphs' $passwordField
     [IfwQaText.Input]::RequireRegion($handle,$SubjectId,$x,$y,$w,$h)
+    if ($Sample.capture.x -ne $x -or $Sample.capture.y -ne $y -or
+            $Sample.capture.width -ne $w -or $Sample.capture.height -ne $h) {
+        throw 'The captured field moved outside the verified glyph coordinates.'
+    }
     $bitmap = [Drawing.Bitmap]::new("$OutputFile.glyphs.png")
     try {
         if ($bitmap.Width -ne $w -or $bitmap.Height -ne $h) { throw 'Inconsistent physical field crop.' }
@@ -186,7 +197,7 @@ try {
         $a.StringConstantType -eq 'SingleQuotedHereString' -and $a.Value.Contains('public static class IfwObservedWindow {') },$true))
     if ($errors -or $bridge.Count -ne 1) { throw 'Could not locate the shared HWND and hit-test bridge.' }
     Add-Type -TypeDefinition ($bridge[0].Value + [Environment]::NewLine + [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Pointer.cs')))
-    foreach ($name in @('Get-AccessibleName','Get-Field','Get-SubjectFocus','Get-UiaReadFailure','Wait-Observation','Capture-SubjectField')) {
+    foreach ($name in @('Get-AccessibleName','Get-Field','Get-UiaReadFailure','Wait-Observation','Capture-SubjectField')) {
         $definitions = @($ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -ceq $name },$true))
         if ($definitions.Count -ne 1) { throw "Missing shared observer function $name." }
         . ([scriptblock]::Create($definitions[0].Extent.Text))

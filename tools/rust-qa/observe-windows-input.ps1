@@ -131,7 +131,7 @@ function Wait-ReaderCue([string]$Name) {
     throw "Missing NVDA speech observation for $Name."
 }
 
-function Capture-SubjectField($Element, [string]$Suffix) {
+function Capture-SubjectField($Element, [string]$Suffix, $ExpectedFocus = $Element) {
     $r = $Element.Current.BoundingRectangle
     $x = [int][Math]::Ceiling($r.Left + 2)
     $y = [int][Math]::Ceiling($r.Top + 2)
@@ -143,9 +143,11 @@ function Capture-SubjectField($Element, [string]$Suffix) {
     $checkOwnership = {
         $focused = [Windows.Automation.AutomationElement]::FocusedElement
         if ([IfwObservedWindow]::GetForegroundWindow() -ne $handle -or -not [IfwObservedWindow]::OnInputDesktop() -or
-            $null -eq $focused -or $focused.Current.ProcessId -ne $SubjectId -or $Element.Current.IsPassword -or
-            -not [Windows.Automation.Automation]::Compare($focused, $Element) -or -not $r.Equals($Element.Current.BoundingRectangle)) {
-            throw 'The synthetic field lost focus, ownership or its original bounds.'
+            $null -eq $focused -or $focused.Current.ProcessId -ne $SubjectId -or
+            $Element.Current.ProcessId -ne $SubjectId -or $Element.Current.IsPassword -or
+            -not [Windows.Automation.Automation]::Compare($focused, $ExpectedFocus) -or
+            -not $r.Equals($Element.Current.BoundingRectangle)) {
+            throw 'The synthetic window lost the expected focus, field ownership or original bounds.'
         }
         foreach ($px in @($x, ($x + $width - 1))) {
             foreach ($py in @($y, ($y + $height - 1))) {

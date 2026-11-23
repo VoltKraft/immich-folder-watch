@@ -1,5 +1,22 @@
 # Project Status
 
+## Windows glyph capture and fixed-revision worker restore (2026-11-23)
+
+The Fedora x64 run at `e728e86` exercised all four shipping worker
+restarts through Rust's SQLite backup API. Detached replay verified 364
+indexed files, 158 exact Git sources, the Rust executable, the C# test
+assembly and all four consumed database hashes. The readback SHA-256 is
+`0aa46b58ac93a6a911de7580ddec3c16cb5d85947fb1db10df25ae5e589c2cff`.
+[Worker restore contract](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+The Windows glyph observer now verifies the intentionally focused control
+and the exact geometry of the filename it captures. Independent review
+identified a possible one-pixel shift and verified that the corrected
+guard detects it. The seven portable text tests and PowerShell checks
+passed locally. The working change still requires a native repeat on
+both Windows desktops.
+[Caret-free capture](rust/rw02-windows-text.md#focus-when-capturing-the-caret-free-field).
+
 ## Rust backups after propagated deletion and pending repair (2026-11-23)
 
 On Fedora x64 four shipping workers restarted after download, upload,
