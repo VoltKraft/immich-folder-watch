@@ -431,3 +431,39 @@ icon marker for an actual activation. The additional diagnostic has passed
 its isolated PowerShell selection and point checks. A native result with
 an actual provider remains open. Commit `00db89c` also records when the
 element at that point changes owner during the query. [Original Explorer selection](../../tools/rust-qa/windows-launcher/tray_provider.ps1) · [Selection controls](../../tools/rust-qa/windows-launcher/test_chevron.ps1).
+
+### Original and private Explorer at 6af7100
+
+In run `45144662858`, the separate pointer fixture started an Explorer on
+each owned input desktop. Both private taskbars were visible in session 2.
+The x64 Explorer (PID 9016, taskbar thread 6932) and the ARM64 Explorer
+(PID 9996, taskbar thread 1292) both declined the initial `NIM_ADD` and
+one retry. The pre-retry waits were 3,036 ms on x64 and 3,168 ms on ARM64.
+Both receivers logged raw last-error `0x80004005`, and both independent rectangle
+queries returned that HRESULT with empty bounds.
+The fixtures issued no pointer input. Both confirmed an empty Explorer job,
+removed the temporary directory and restored the original `Default` desktop.
+[x64 private Shell receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804447428)
+· [ARM64 private Shell receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14803804924).
+
+On the original x64 desktop, Explorer PID 6152 owned taskbar HWND 393238,
+thread 7816. It acknowledged the canonical GUI's version-4 icon at receiver
+HWND 328188, ID 23. The GUI reported its marker as `39cc65` in screen
+rectangle `[790,720,822,768]`. At the center, `[806,744]`, the observer
+read `eeeeee` on child HWND 131208. Each of the four exact overflow-button
+name queries returned zero matches. A separate UI Automation hit at that
+point returned the taskbar root itself. The helper opened no flyout and
+issued no invocation. The cursor remained at `[512,384]`. The GUI deleted
+the icon at Quit, and the observer confirmed that the receiver and icon
+rectangle were gone and the job was empty.
+[x64 integrated GUI receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14803949483).
+
+On the original ARM64 desktop, Explorer PID 7652 retained taskbar HWND
+65846, thread 2240. The canonical GUI's initial add and two automatic retries
+all returned false with raw last-error `0x80004005`. The independent observer
+still held the same live Explorer at 3,124 and 9,170 ms and obtained no icon
+rectangle. The GUI drained and its process job emptied. The separate GUI
+scenarios on private desktops without a Shell passed on both architectures.
+All 19 observer input hashes in each canonical archive matched the source
+revision with Windows checkout line endings.
+[ARM64 integrated GUI receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804324249).
