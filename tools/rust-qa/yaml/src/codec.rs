@@ -10,6 +10,7 @@ pub const MAX_BYTES: usize = 65_536;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Failure {
     InputBytes,
+    InputIo(std::io::ErrorKind),
     Budget,
     InvalidYaml,
     InvalidDocument,
