@@ -1,5 +1,20 @@
 # Project Status
 
+## Four native feasibility runs at 6084b23 (2026-11-23)
+
+Both Ubuntu hosts passed 37 Rust workspace tests and 15 watch scenarios.
+Both Windows hosts passed 34 Rust workspace tests, 14 watch scenarios and
+208 C# recovery assertions. Across the four hosts, all sixteen C# worker
+restarts from Rust-created SQLite backups passed after download, upload,
+deletion or pending timestamp repair. Readback matched the four original
+worker archives, their 1,454 indexed files and the external effects.
+The core and worker readbacks have SHA-256 digests
+`785183acefe5ed50eb5d50dce3d2a1a9e0e006b07dc824c3c07f1e950f6caaf1` and
+`6c740f07d3cc8b7bbb4cc9a0f458510051fde94b64e28448c8187073cb4a4309`.
+CI and CodeQL passed. The desktop run for the revised WinRT launcher,
+retained Windows display observer and Noble portal fixture is pending.
+[Feasibility and original archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083169) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242097717) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242097731) · [Desktop](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236).
+
 ## Windows launch, editing and notification evidence at 653f255 (2026-11-23)
 
 Both native Windows targets met all eleven same-host WPF limits for the
@@ -36,12 +51,15 @@ commit repeated all 110 operations. The independent readback matched
 sixteen Git source files, the built executables, six permission lookups and
 all three revocations. A corrected hosted ARM64 comparison and a
 supported distribution portal with upload-lock support are still required.
-[Observer and results](rust/rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open).
+Alpine, Gentoo and NixOS package sources also retained the upstream
+`ENOSYS` handler. [Observer and results](rust/rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open) · [Distribution sources](rust/rw02-portal-upstream.md#further-host-package-sources-checked-on-2026-11-23).
 
 The local x64 host also started a diskless QEMU instance with KVM enabled
 and stayed in prelaunch until it quit. The project contains a synthetic
-storage-fault VHD. A Windows guest image for the interactive display and
-RDP tests is still needed. [Disposable VM test procedure](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+storage-fault VHD. On November 23 the user reported having no dedicated
+Windows installation ISO for these tests. The hosted native runs continue.
+A suitable Windows desktop for the interactive display and RDP tests
+remains outstanding. [Disposable VM test procedure](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
 
 ## Noble portal directory names during a held writer (2026-11-23)
 

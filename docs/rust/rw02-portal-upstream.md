@@ -232,3 +232,22 @@ the four Fedora signature checks and the inspected handler revisions. The
 review read the original packages in memory. Its manifest is retained at
 `artifacts/rust/portal-provider-availability-20261122/sources.json`, SHA-256
 `c3c2cc70462556fa40dd9cff2a27e02fee5c163b196facf37f7a6f70d2f52e05`.
+
+### Further host package sources checked on 2026-11-23
+
+The package recipes for three further distributions selected upstream
+1.20.4, 1.21.2 or 1.22.1. In each exact source the FUSE `flock` handler
+returns `ENOSYS`. None of the selected packaging patches changes this handler.
+
+| Distribution channel | Selected version and packaging |
+| --- | --- |
+| Alpine 3.24 and Edge | 1.21.2-r0 and 1.22.1-r0. Both build the release archive and add OpenRC scripts. [3.24 recipe](https://github.com/alpinelinux/aports/blob/255718024a4147fa290200f1a9553227775c0b81/community/xdg-desktop-portal/APKBUILD) · [Edge recipe](https://github.com/alpinelinux/aports/blob/06471599904835737e652e4fec73336ce91e3e55/community/xdg-desktop-portal/APKBUILD) |
+| Gentoo | 1.20.4-r1 and 1.22.1-r1. The patches cover optional GStreamer, sandbox tests and D-Bus service startup. [Both ebuilds and their patches](https://github.com/gentoo/gentoo/tree/aa0eca2421ec52a9fcf84ac2a77347266089373e/sys-apps/xdg-desktop-portal) |
+| NixOS 26.05 and Unstable | 1.20.4 and 1.22.1. The patches cover validators, installed tests and, on 26.05, a data path and a trash test. [26.05 recipe and patches](https://github.com/NixOS/nixpkgs/tree/8c61236de36e1dbd81fa53535ed28455dd46ae81/pkgs/by-name/xd/xdg-desktop-portal) · [Unstable recipe and patches](https://github.com/NixOS/nixpkgs/tree/c62712e183ef3134fb5281f3757d2bfa7ef8f0e0/pkgs/by-name/xd/xdg-desktop-portal) |
+
+The 17 recipe and patch files are indexed in
+`artifacts/rust/portal-provider-availability-20261123/recipes.json`, SHA-256
+`36f191a3c89c50a0db68d93dd791718bd188db9344eb6a62c43542639244db52`.
+The three upstream functions are identified in `release-handlers.json`,
+SHA-256 `9503d898f0b96298b3792c46c6211ec77858f3798849661362a83361667da7cb`.
+This source review identified no additional host package for a positive native trial.
