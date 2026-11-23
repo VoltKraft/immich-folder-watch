@@ -1,5 +1,16 @@
 # Project Status
 
+## Native panel, portal and activation at 1904be7 (2026-11-23)
+
+Both Ubuntu desktops passed all eleven X11 limits. Two real panel clicks
+on each host reopened the original window. Both stock Documents services
+and their unmodified source rebuilds refused the upload lock. The private
+backport on each architecture handled a held writer and reacquired the
+original file after release. On Windows the ordinary second launch kept
+the same HWND and worker on both architectures. The x64 window received
+keyboard focus on the first sample. The ARM64 window remained in the
+background for all 41 samples. [Ubuntu desktop archives](rust/rw02-native-gui.md#ubuntu-native-results-at-1904be7) · [Documents comparisons](rust/rw02-portal-noble.md#native-ubuntu-repeats-with-the-earlier-observer-at-1904be7) · [Windows launch receipts](rust/rw02-instance.md#ordinary-second-launch-at-1904be7).
+
 ## Four native feasibility runs at 6084b23 (2026-11-23)
 
 Both Ubuntu hosts passed 37 Rust workspace tests and 15 watch scenarios.

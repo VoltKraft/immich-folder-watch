@@ -658,6 +658,24 @@ on ARM64. All other x64 steps passed. The ARM64 job failed the final
 descriptor observation for the private Documents backport.
 [Portal evidence](rw02-portal-noble.md#incomplete-arm64-retry-at-653f255).
 
+## Ubuntu native results at 1904be7
+
+The original Ubuntu archives each contained 1,414 members. The x64 archive
+SHA-256 is `e095ebc1986a82b6063a00f82a7ba5b30ffd853b996b4aefcf2c24ad6cb30a8c`.
+The ARM64 archive SHA-256 is `cfaaa551a30c6b944df6660ff1720242596ba221134a8e65c6098fd0fffdbd3b`.
+Both hosted jobs passed. The Plasma panel reopened the original Rust window
+twice on each host. The observed icon centers had 277 and 259 gold pixels,
+respectively. The adjacent crops contained none.
+
+| Target | Startup ms, Rust / limit | Scan show p95 ms, Rust / limit | Scan close p95 ms, Rust / limit | X11 limits met |
+| --- | ---: | ---: | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14856775741) | 168.66 / 1045.86 | 0.89 / 15.82 | 0.49 / 15.56 | 11/11 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854477018) | 212.82 / 1454.148 | 0.90 / 16.08 | 0.40 / 15.58 | 11/11 |
+
+The packaged and source-rebuilt Documents service each returned `ENOSYS` for
+all 17 attempts on the granted file. The private backport observed both a held
+writer and the original file after release. [Native Documents results](rw02-portal-noble.md#native-ubuntu-repeats-with-the-earlier-observer-at-1904be7).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

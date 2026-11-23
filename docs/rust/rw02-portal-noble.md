@@ -209,6 +209,23 @@ filesystem sources against Git and the locally rebuilt binaries against
 the receipts. Its SHA-256 is
 `bcf4ae99aa66bb965af3e821072a20238339976a197c005b805107602fe775e7`.
 
+### Native Ubuntu repeats with the earlier observer at 1904be7
+
+Both native Ubuntu runners completed 32, 32 and 46 operations with the
+package, unmodified rebuild and private backport respectively. The first two returned
+`ENOSYS` for all 17 requests to lock the granted file. With the backport,
+13 grant operations acquired the lock and 11 reported a busy file. The
+reader reacquired the original file after the exclusive writer released
+it on each architecture. The three daemon logs from each host showed the
+test application's permissions being revoked and the backing contents survived. Independent readback
+matched the root and album descriptor slots 3 and 4 at both endpoints.
+This revision predates the intermediate permission and mount-ID samples.
+
+| Original archive | Private run | Portal result SHA-256 |
+| --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14856775741) | `amd64-yzfn66wj` | `07e387feed94108cf0f4a0714648577ece315abf7469a837807a25a0f0f95235` |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854477018) | `arm64-i_4c226j` | `398a0ddc2a96ef754188685be9ac03afb5ee316d20011d040473f0191b3a12c9` |
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).

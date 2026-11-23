@@ -399,3 +399,22 @@ The seven launcher logs per host and the corresponding eight x64 and six
 ARM64 tray logs matched their original receipts. The build and observer
 sources matched the exact Git revision.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14847493064) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14847852603).
+
+### Ordinary second launch at 1904be7
+
+On x64 the ordinary second launch returned HWND 2621908 to the foreground
+with keyboard focus on the first sample. PID 5000 retained worker 8952.
+On ARM64, PID 3540 retained HWND 1966220 and worker 2556. Windows refused
+the primary's foreground request despite the secondary's successful grant.
+All 41 samples over 2,020 ms showed the same visible HWND in the background.
+Both hosts kept DX12 generation 1 and drained their primary and secondary
+jobs. Both separate private restart cases passed.
+
+In both x64 tray trials Explorer acknowledged the version 4 icon. Its
+reported center showed `eeeeee` and the four overflow-button queries had
+zero matches. In both ARM64 trials Explorer refused the initial add and the
+two scheduled retries. No trial produced a Shell Open callback. On each
+host the native launcher and tray logs matched the archived receipts and
+34 source files matched the Git revision. The combined readback SHA-256 is
+`1ec9fd1fa5f2bba87b45b983bdc8ff2ca110202e1cf66d312654a418f148bb1f`.
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854302616) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854152253).
