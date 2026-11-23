@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compare Windows visibility timings across the shipping WPF application, retained eframe window and a Rust GDI control during a 100,000-file scan.
 - Capture the shipping worker’s SQLite backups and downloaded bytes around a synthetic transfer, then check its restart and account history on the native reference runners.
 - Exercise the native Rust SQLite backup with a completed worker download and verify that the shipping worker reconciles the same file after restoring the returned bytes.
+- Verify that the shipping worker's synthetic peer retains the bytes it received before a database restart and that the worker reconciles the same asset without another upload.
 
 ## [3.0.4] - 2026-11-13
 

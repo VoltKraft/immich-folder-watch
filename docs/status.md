@@ -24,8 +24,23 @@ the pinned compiler and bundled SQLite. The two complete donors passed,
 including one with a different fixture label. Nine controls refused their
 inputs. The stale refusal carries the actual request token and database SHA.
 The C# exchange at `738e1d6` refused an oversized response before restarting
-the worker. The combined test runs both processes against the original
-synthetic watch root. [Native backup procedure](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download).
+the worker. At `ba02f8b` the combined offline run passed on Fedora x64.
+The real second C# worker opened the Rust backup and retained the original
+mapping, history, six-byte photo and native file times after reconciling
+the same album. Independent replay reproduced all 1,278 readback bytes and
+matched all 153 archived project sources. The same trial then passed on
+Windows and Ubuntu x64 and ARM64. The four original worker reports
+reproduced byte-for-byte. On each host Rust refused the pre-download
+backup and the restarted C# worker made zero transfers from the newer
+one. Each of the four separate C#-only reference jobs also passed.
+[Native backup procedure](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download) · [Four-host worker run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585) · [C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804686).
+
+The shipping upload reference at `c0abae3` also passed on Fedora x64.
+The peer received the opened stream once and retained its bytes after
+the worker restarted from SQLite. Independent review identified unobserved
+trash and album mutation requests. Two test-only mutations then confirmed
+the corrected assertions fail on either request.
+[Upload reference and limits](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
 
 At `8566f81`, the original Linux archives verified all eleven X11 budgets
 and the SQLite and realtime results on both architectures. ARM64 observed
@@ -35,6 +50,14 @@ downloader tests and a private HTTP replay. Its hosted desktop run also
 exercises the Windows GDI, tray, notification and profile-cleanup changes.
 RW-02 remains open.
 [Ubuntu results](rust/rw02-native-gui.md#ubuntu-native-results-at-8566f81) · [Native run at 549066f](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471).
+
+Independent readback of the completed Windows archives at `8566f81` found
+that the retained Mailbox window met eleven of eleven limits on ARM64 and
+eight on x64. Windows x64 exceeded the limits for idle close, scan close
+and scan reopen. The independent observer found no matching notification title and body
+on either host. All four native archives passed the
+detached YAML and SQLite checks, and their development notices and SPDX
+documents reproduced byte-for-byte. [Windows timings](rust/rw02-windows-window.md#retained-window-at-8566f81) · [Shell observations](rust/rw02-windows-services.md#original-desktop-at-8566f81) · [YAML checks](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes) · [Storage matrix](rust/acceptance.md#native-evidence-matrix).
 
 ## Four-target checks and the Windows renderer comparison (2026-11-23)
 

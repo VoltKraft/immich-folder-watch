@@ -406,6 +406,33 @@ The corrected root and single-wake modes recorded zero presentations in
 The diagnostic timings and the uninstrumented budget measurements came
 from separate trials of the same retained binary on each host.
 
+## Retained window at 8566f81
+
+The same-machine WPF controls again set the limits below. Each cell shows
+the median of the three trial p95 values in milliseconds and its limit.
+
+| Retained Mailbox target | Idle close | Idle reopen | Scan close | Scan reopen | Limits met |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Windows x64 | 24.989 / 14.327 | 6.598 / 16.845 | 38.986 / 29.888 | 25.888 / 21.996 | 8/11 |
+| Windows ARM64 | 2.842 / 13.332 | 3.619 / 13.758 | 4.809 / 14.422 | 4.607 / 15.530 | 11/11 |
+
+Independent replay on each target recovered 12 window controls, 15 two-pass
+inventories of 100,000 files and nine DXGI traces. The canonical build met
+six limits on each target. FIFO met eight on x64 and ten on ARM64. In the
+separate x64 dispatch trace, all 54 slow closes overlapped a visible redraw
+with a successful DXGI Present on the GUI thread. In 48 cases drawing had
+already begun when the observer recorded its request time. The median time
+inside the callback before Present was 32.985 ms, with 0.060 ms inside
+Present. The trace does not subdivide the earlier work. The observer
+checked window visibility before posting the close message, so the exact
+time it spent queued is unknown. The synchronous `set_visible` span
+accounted for at least half the response in 171 of 172 slow reopens. The
+corrected root recorded zero presentation starts across 600 verified hidden
+intervals. Its single-wake variant recorded zero across 467. The original
+drawing control recorded 486 starts in 243 intervals. The follow-up at
+`549066f` includes a same-host GDI renderer control.
+[x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14818067206) · [ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14817086899) · [GDI comparison](../../tools/rust-qa/windows-gdi-control/README.md).
+
 ## Renderer comparison with iced 0.14.0
 
 At iced revision `3997291f318a8bc06fa522f5579836fb3feb94df`, the

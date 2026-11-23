@@ -149,3 +149,40 @@ The four-archive readback SHA-256 is
 The [native Rust backup trial](../../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
 uses the same two worker reconciliations with a private file exchange.
 The earlier C#-only reference can still be replayed from its original archive.
+
+At `ba02f8b` the two-language trial passed on Fedora x64 with both
+real processes. Rust rejected the empty pre-download backup and returned
+a new SQLite backup of the post-download donor. C# reopened those exact
+bytes, reconciled the original album and retained the original file without
+another transfer. Detached review reproduced the saved readback byte-for-byte
+(SHA-256 `24f53c85e496171601ea4e7e3b2b257ab4c142a12f4b59884bedbdf2f5b5f7c9`),
+compared the complete schemas and rows, and checked all 300 evidence hashes.
+The result is under `artifacts/rust/worker-backup-native-ba02f8b/`.
+[Native trial on Windows and Ubuntu](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585).
+
+The same trial passed natively on Windows and Ubuntu, x64 and ARM64, at
+`ba02f8b`. Each Rust process refused the stale donor with exit code 1.
+Each second C# worker listed the album, completed zero transfers and
+retained its original mapping, account history and photo. Independent
+readback reproduced the four original reports byte-for-byte and checked
+all 1,198 indexed files. The local four-host summary under
+`artifacts/rust/hosted-worker-backup/45172804585/source-bound-readback.json`
+has SHA-256 `d43cd9d15a1c482739f252998adf33b75afd931ab7a43346defe897ab9583cdf`.
+The hosted archives retain executable digests, source and build logs. The
+independent hosted check covered the archived databases, media, sources
+and test reports. The executable bytes were available for the Fedora check.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585/artifacts/14817207902) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585/artifacts/14818635061) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585/artifacts/14817853842) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585/artifacts/14818133568).
+
+## Peer content after a synthetic upload
+
+The C# worker at `c0abae3` uploaded eight binary bytes from its opened
+watch-root stream. A synthetic peer stored them under a separate directory
+and derived the asset ID from their SHA-256. The restarted worker opened
+a copy of the latest SQLite backup, reconciled the peer's retained asset
+and preserved the mapping, Last Sync and local photo. Both cycles
+completed without a trash request or recorded album mutation. Test-only
+controls submitted a trash request before the first stop and an ID-based
+album rename during restart. Each failed the corresponding assertion.
+The clean Fedora x64 TRX contains the peer digest and asset ID. The fixture
+removes its temporary upload databases and media after the test.
+[Upload reference](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.UploadActivity.cs).

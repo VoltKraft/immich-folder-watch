@@ -218,6 +218,12 @@ each Linux target. These results describe the combined development builds.
 | Windows x64 | [14810355463](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14810355463) | [14808782930](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14808782930) | 1,517 | 258 / 615 | `dfb6004d948f6698395143dfb276739ac352610f40f116eb6cb004aaa1254cf9` |
 | Windows ARM64 | [14809111619](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809111619) | [14809321300](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809321300) | 1,514 | 257 / 614 | `2d170d9f3fce7f17741ad811b0bb9ac2408597eeb185764568e2a4b4e719bb22` |
 
+At `8566f81`, offline reconstruction again reproduced the four native
+input ZIPs, four notice ZIPs and four SPDX 2.3 documents byte-for-byte.
+The notice member, package and relationship counts matched the preceding
+table for each target. Each notice ZIP contains the five pinned fonts.
+[Linux x64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14814744324) · [Linux ARM64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14812533509) · [Windows x64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14816294766) · [Windows ARM64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14817436358).
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native

@@ -351,3 +351,10 @@ cleanup. The independent review and portable controls passed. The new
 native control holds a synthetic child across the first real disposition
 attempt, then releases it through the original handle.
 [Cleanup implementation](../../tools/rust-qa/windows-performance/native.py) · [Native control](../../tools/rust-qa/windows-performance/test_owned_subject.py).
+
+The ordinary retained launcher gave the window foreground on the first x64
+sample. On ARM64 the reopened window remained in the background throughout
+41 samples. Both separate private retained-launcher restarts passed. In
+the retained tray fixture, the x64 private cleanup also encountered error
+145, so neither original-desktop tray attempt ran.
+[x64 retained tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14814786519) · [Windows Shell observations](rw02-windows-services.md#original-desktop-at-8566f81).

@@ -339,6 +339,25 @@ repeated sampling after the synchronous Shell request returned. A
 presentation during the call remains unobserved.
 [x64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14808178866) · [ARM64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14807909745).
 
+### Original desktop at 8566f81
+
+On x64 the original Explorer accepted the notification, then reported one
+show and one timeout callback. The independent observer made 80 UIA queries
+on one Shell root and found no matching title and body. ARM64 Explorer
+refused icon registration with `0x80004005`. The Rust sender issued no
+notification. Ninety queries on two Shell roots found no matching pair.
+Both observers reported zero provider errors. Sampling during the synchronous
+request starts with the later change described below.
+[x64 notification](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14817856976) · [ARM64 notification](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14817356380).
+
+The canonical x64 tray icon had a Shell rectangle, but its center pixel was
+`eeeeee` instead of the icon marker `2ec140`. The independent observer
+found no overflow button and did not click. The separate x64 retained tray
+test stopped during private profile cleanup with error 145 before either
+original-desktop attempt. ARM64 Explorer refused all nine initial and retry
+registrations across the canonical and two retained cases.
+[x64 tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14810414710) · [x64 retained tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14814786519) · [ARM64 retained tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14815025387).
+
 ### Sampling across the Shell request
 
 At `effae21` the observer begins reading the notification surface before

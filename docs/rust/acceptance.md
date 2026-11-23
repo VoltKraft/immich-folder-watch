@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native desktop](rw02-native-gui.md#native-follow-up-at-6af7100) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#retained-window-at-8566f81), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-8566f81) and [realtime transport](rw02-realtime-transport.md). The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -119,15 +119,19 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 ## Native evidence matrix
 
 The reference column includes the completed download and restart at
-`cf38f1a`. Its four native archives and all eight original SQLite files
-passed detached readback. [Worker activity on each host](rw01-storage-contract.md#download-activity-and-the-latest-backup).
+`ba02f8b`. On each of the four native hosts, the shipping worker also
+restarted from the backup produced by Rust. Each run retained the original
+file and durable history, and made zero further transfers. All four native
+readbacks passed independently. The installed candidate still needs to
+perform and recover its own sync activity.
+[C# references](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804686) · [Two-language worker results](rw01-storage-contract.md#download-activity-and-the-latest-backup).
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Core and worker reference passed (558 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 lifecycle and recovery, Startup readback, ordinary editor, NVDA, clipboard, masking, font and Japanese IME checks passed. At `6af7100` both ordinary launchers opened the GUI. The retained window obtained keyboard focus and met 8/11 limits. Explorer registered the icons and returned a notification show callback. Shell activation and independent notification presentation remain open. | Pending |
-| Windows ARM64 | Core and worker reference passed (558 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 lifecycle and recovery, Startup readback, ordinary editor, NVDA, clipboard, masking, font and Japanese IME checks passed. At `6af7100` the retained window met 11/11 limits. Both ordinary launchers reopened the GUI. Windows denied foreground and Explorer refused icon registration. Both private restart and cleanup passed. | Pending |
+| Windows x64 | Core and worker reference passed (558 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 lifecycle and recovery, Startup readback, ordinary editor, NVDA, clipboard, masking, font and Japanese IME checks passed. At `8566f81` both ordinary launchers opened the GUI. The retained window obtained keyboard focus and met 8/11 limits. Explorer registered the icons and returned a notification show callback. Shell activation and independent notification presentation remain open. | Pending |
+| Windows ARM64 | Core and worker reference passed (558 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 lifecycle and recovery, Startup readback, ordinary editor, NVDA, clipboard, masking, font and Japanese IME checks passed. At `8566f81` the retained window met 11/11 limits. Both ordinary launchers reopened the GUI. Windows denied foreground and Explorer refused icon registration. The private retained restart passed. The canonical launcher reported error 145 during cleanup. | Pending |
 | Linux x64 | Core and worker reference passed (567 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
-| Linux ARM64 | Core and worker reference passed (567 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. At `6af7100` X11 passed all eleven resource limits and two clicks on the Plasma panel reopened the GUI. | Pending |
+| Linux ARM64 | Core and worker reference passed (567 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. At `8566f81` X11 passed all eleven resource limits and two clicks on the Plasma panel reopened the GUI. | Pending |
 
 At `6af7100` all four feasibility jobs passed and both Ubuntu desktops met
 all eleven limits during independent readback. The original Windows x64
@@ -143,7 +147,11 @@ native storage jobs, 32 database files and 296 rows. The 160 shipping
 C# assertions, eight committed-WAL backups, eight untouched version-99
 controls and 120 stored-key lookups passed. Each OS's two architectures
 produced byte-identical files for all eight database comparisons. The
-four-host readback SHA-256 is `40c83d49c55b62d1c2068546c62a8ce5a3a6be1a1590d40175663b3f9e10e68e`.
+four-host readback SHA-256 at `6af7100` is `40c83d49c55b62d1c2068546c62a8ce5a3a6be1a1590d40175663b3f9e10e68e`.
+At `8566f81`, independent replay of all 32 databases again verified the
+296 rows, eight online WAL backups and 160 C# assertions. The four-host
+readback SHA-256 is `1e5fa911c03d013b6ddb035da86ddfbcc8f48eb520668415c6d6404248b11683`.
+[Originals at 8566f81](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037).
 [Native storage archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858) · [Storage checks and schema](rw02-legacy.md#native-desktop-storage-at-93ecc35).
 
 At `93ecc35`, both Ubuntu targets repeated all eleven X11 budgets and the

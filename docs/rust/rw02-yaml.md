@@ -49,8 +49,17 @@ after relocation and passed all 116 comparisons. A wrong architecture was
 rejected. A separate Linux x64 comparison against the actual .NET file
 reader matched text, code page and fallback flags for 8,762 byte sequences,
 including truncated preambles and split scalars near buffer boundaries.
-The previously recorded four-target v1 results below cover the decoded-text
-corpus. The native v2 results for the other three targets are still required.
+The four-target v1 results below cover the decoded-text corpus.
+
+At `8566f81`, both Windows and both Ubuntu hosts completed all 13 steps
+with Rust 1.100.0 and .NET 10.0.15. Detached readback checked the original
+54 files, the 70 Rust outputs and their 140 C# comparisons on each host.
+All ten malformed but readable inputs kept their original bytes. The
+124 archived source files matched the checkout for each platform, including
+Windows line endings. All 270 indexed files per host matched their hashes.
+The four-host readback SHA-256 is
+`aec2180ad6ffd36b2feaea15f11e5022a8af8991e2b38259a898f4dd0553a8a0`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14813839731) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14812923204) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14818067206) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14817086899).
 
 ## Reviewed inputs and corresponding sources
 
