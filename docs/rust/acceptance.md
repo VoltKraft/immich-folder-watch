@@ -118,6 +118,14 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 
 ## Native evidence matrix
 
+On November 23, one offline Ubuntu x64 guest passed the installed
+Documents package upgrade and downgrade with the same ordinary Flatpak
+user. The original package refused the lock, the backport enforced it in
+both directions, and restoring the original package restored its refusal.
+The user selected feasibility only. Distribution and the four installed
+Rust candidate packages remain open.
+[Installed portal evidence](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest).
+
 At `1904be7` both Windows targets passed all three mixed-direction edits
 in the ordinary window and after reopening the retained window. All four
 glyph images matched. The default retained x64 GUI passed nine of eleven

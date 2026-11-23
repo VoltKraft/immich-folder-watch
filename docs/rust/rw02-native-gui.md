@@ -676,6 +676,20 @@ The packaged and source-rebuilt Documents service each returned `ENOSYS` for
 all 17 attempts on the granted file. The private backport observed both a held
 writer and the original file after release. [Native Documents results](rw02-portal-noble.md#native-ubuntu-repeats-with-the-earlier-observer-at-1904be7).
 
+## Ubuntu native results at 6084b23
+
+On ARM64 the original archive had 1,414 members and SHA-256
+`83d45a4dcbad7cca685a0d919c932fbbbacff1d92e28fb0bffe397df341680b6`.
+Two native Plasma clicks reopened the original window. The icon crops
+contained 277 and 259 gold pixels, and both adjacent controls contained
+zero. Three two-pass inventories of 100,000 files completed with all 177
+Rust requests resolved during their scans. Detached replay met all eleven
+X11 limits. Startup was 202.38 ms against 1,468.728 ms. Scan show and close
+p95 were 0.86/0.31 ms against 16.13/15.49 ms. The corrected Documents
+trial completed all three grant revocations.
+[Native ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14861975652)
+· [Original Documents handles](rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

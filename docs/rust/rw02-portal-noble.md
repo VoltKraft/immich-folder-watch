@@ -68,6 +68,43 @@ The separate readback SHA-256 is
 `eaac90b94f55c15b159df5641abc5a7c764dcbe67c0ca386203d850c0a7d0596`.
 [Debian package checks](../../tools/rust-qa/portal-noble/installed/package/README.md).
 
+#### Installed patch and rollback on the same native guest
+
+In `lease-k28ki_zl`, APT installed the verified private package
+`1.18.4-1ubuntu2.24.04.3+ifwqa1` and subsequently downgraded it to the
+exact original Ubuntu package. A single ordinary user ran the same installed
+Flatpak against both D-Bus services at each phase.
+
+| Installed package | Direct shared-lock call in the Flatpak | Workspace Rust reader and competing backing writer | Phase result SHA-256 |
+| --- | --- | --- | --- |
+| Ubuntu original | errno 38 | The reader returned errno 38 before, during and after the writer | `78b7aecbb334e768858df7dffc30245414347ef13ef5a5d76fccbda942f660cc` |
+| Installed backport | Acquired | A held Rust reader excluded the writer with errno 11. A held writer excluded the reader. After release the same reader code reacquired the original file identity and 25 bytes | `68f1a6eb7da19364d5ea2e1d20c94b8a5341ce240e4dcb2990fad30eb24af8f1` |
+| Restored Ubuntu original | errno 38 | The reader again returned errno 38 in all three observations | `09df3794bc8e72978fe6307a6f2180ef0d42d5bb4c5cc7e52e06b18725c48760` |
+
+Both restored processes loaded executables byte-identical to the original
+Ubuntu DEB. Each grant was revoked and deleted. The sandbox then received
+ENOENT. At the end all three synthetic backing files matched their original
+device, inode, length and SHA-256. The final dpkg state was
+`install ok installed 1.18.4-1ubuntu2.24.04.3`. The lease result has SHA-256
+`be67c26b916f9dc0756e5458305f36ec4673d7be189d53d19678ce0400b6d02f` and
+the VM receipt `71e32ce3a688b1364699e72d40b26c2106efc7e84f724e199b0f9e05d367655d`.
+The fresh package VM `package-ay2dj2as` exited successfully. Its complete
+source packages and all five binaries matched the original build. It ran
+all 29 Meson suites. The upstream suite skipped three subcases concerning
+an inhibit monitor, a headless directory handler and a trash directory.
+All five Documents interface subcases passed. Its package and VM receipt
+SHA-256 values are `6cd3c14cb7250845f01eef33e64903fc08e8d670606c0e4880910e9724c8abee`
+and `cf7f0f89622ee58057e4a9806950d56fc62b2fd4a54bef54d7f8b78d7bfe81ed`.
+Independent readback extracted both original DEBs from the verified input
+ISO and compared the six running service images with the appropriate
+archive members. It checked the installed Flatpak reader and runtime
+commit and reread the final dpkg database, original service binaries and
+all three media inodes and contents from the powered-off guest. Its
+`lease-chain-review-26ktytm2/review.json` SHA-256 is
+`7fe26b97c26cc4a08f7979509692d4685b4047bc1bb7a8f839970a9d90554a83`.
+This establishes native x64 package feasibility. Distribution approval
+remains open.
+
 ### Private service comparisons
 
 At `a66e045` each Ubuntu runner recorded 28 checks against the packaged
@@ -291,6 +328,19 @@ This revision predates the intermediate permission and mount-ID samples.
 | --- | --- | --- |
 | [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14856775741) | `amd64-yzfn66wj` | `07e387feed94108cf0f4a0714648577ece315abf7469a837807a25a0f0f95235` |
 | [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854477018) | `arm64-i_4c226j` | `398a0ddc2a96ef754188685be9ac03afb5ee316d20011d040473f0191b3a12c9` |
+
+### Native descriptor replay at 6084b23
+
+On Ubuntu ARM64 the corrected observer completed all 110 operations and
+revoked the three independent grants. Detached replay matched eleven
+fixture and five filesystem sources with Git, all 24 original descriptor
+slots and their mount IDs, and six lookups while the original names carried
+the kernel's detached label. The distro and its pristine rebuild returned
+errno 38 on all seventeen grant attempts each. With the backport, the Rust
+reader acquired the same original file after the writer released its lock.
+The `arm64-k2icsihg` result SHA-256 is
+`0dc0dcdbd9f60e8e06e139f2eee9686ac556c1e573f71f4606cfd690eaa6c191`.
+[Original native ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14861975652).
 
 ## Meson on the Ubuntu runners
 

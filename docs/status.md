@@ -10,6 +10,17 @@ frame's wait result and DXGI timestamps. The ordinary GUI supplies the
 eleven same-host comparisons. No new native timing has been collected.
 [Command and evidence](rust/rw02-windows-window.md#separating-visible-frame-and-window-timing).
 
+## Installed and restored the Ubuntu portal on native x64 (2026-11-23)
+
+The same installed Flatpak and ordinary user exercised all three APT
+states in one offline Noble guest. Only the installed private backport
+supported cooperative read/write exclusion. After APT restored the Ubuntu
+package both running service executables matched their original bytes,
+and the grant again returned errno 38. All three backing files retained
+their individual identities and contents. The trial establishes x64
+feasibility. Ubuntu distribution approval and maintenance remain open.
+[Phase results and native receipts](rust/rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest).
+
 ## Installed Ubuntu original and private build verification (2026-11-23)
 
 On a fresh Noble x64 VM the installed Flatpak received its directory grant.
