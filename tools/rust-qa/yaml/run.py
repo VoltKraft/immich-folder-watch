@@ -8,6 +8,7 @@ archives, including the base64 archive that carries the excluded promotional log
 from __future__ import annotations
 
 import argparse
+import codecs
 from datetime import datetime, timezone
 import json
 import os
@@ -46,6 +47,72 @@ def record_sources(output: Path, fixtures: Path) -> None:
         shutil.copyfile(path, destination)
         hashes[relative.as_posix()] = file_digest(path)
     write_json(output / "first-party-source-hashes.json", hashes)
+
+
+def verify_encodings(profile: Path, cases: dict) -> None:
+    encodings = {
+        "utf8": ("utf-8", b"", 65001), "utf8-bom": ("utf-8", codecs.BOM_UTF8, 65001),
+        "utf16le": ("utf-16-le", codecs.BOM_UTF16_LE, 1200), "utf16be": ("utf-16-be", codecs.BOM_UTF16_BE, 1201),
+        "utf32le": ("utf-32-le", codecs.BOM_UTF32_LE, 12000), "utf32be": ("utf-32-be", codecs.BOM_UTF32_BE, 12001),
+    }
+    for label, (codec, bom, page) in encodings.items():
+        name = "encoding-" + label
+        case = cases[name]
+        if (case["sourceCodePage"] != page or case["sourceHadDecodingErrors"] or not case["accepted"]
+                or "\uFFFD" not in case["yaml"] or (profile / (name + ".yaml")).read_bytes() != bom + case["yaml"].encode(codec)):
+            raise ValueError(f"Unexpected original bytes or decoder for {name}")
+
+    # .NET replaces a trailing UTF-16 high surrogate and an odd byte separately.
+    damaged = {
+        "utf8-short": ("utf8", "e282", 1), "utf8-continuation": ("utf8-bom", "80", 1),
+        "utf16le-high": ("utf16le", "00d8", 1), "utf16be-low": ("utf16be", "dc00", 1),
+        "utf16le-odd": ("utf16le", "61", 1), "utf16be-high-odd": ("utf16be", "d80061", 2),
+        "utf32le-invalid": ("utf32le", "00001100", 1), "utf32be-surrogate": ("utf32be", "0000d800", 1),
+        "utf32le-short": ("utf32le", "610000", 1), "utf32be-short": ("utf32be", "0000", 1),
+    }
+    if {name for name, case in cases.items() if case["sourceHadDecodingErrors"]} != {"encoding-" + label for label in damaged}:
+        raise ValueError("Incomplete malformed byte controls")
+    for label, (encoding, suffix, replacements) in damaged.items():
+        name = "encoding-" + label
+        case = cases[name]
+        codec, bom, page = encodings[encoding]
+        prefix = case["yaml"][:-replacements]
+        if (case["sourceCodePage"] != page or not case["accepted"] or not case["yaml"].endswith("Archive" + "\uFFFD" * replacements)
+                or (profile / (name + ".yaml")).read_bytes() != bom + prefix.encode(codec) + bytes.fromhex(suffix)):
+            raise ValueError(f"Unexpected original bytes or fallback for {name}")
+
+
+def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust: dict, csharp: dict) -> None:
+    if (exported["format"] != "ifw-rw02-yaml-reference-v2" or rust["format"] != "ifw-rw02-yaml-result-v2"
+            or csharp["format"] != "ifw-rw02-yaml-readback-v2"):
+        raise ValueError("Expected the raw-file YAML comparison")
+    inputs = {row["name"]: row for row in exported["cases"]}
+    results = {row["name"]: row for row in rust["cases"]}
+    if (len(inputs) != len(exported["cases"]) or len(results) != len(rust["cases"]) or inputs.keys() != results.keys()
+            or csharp["preservedInputs"] != len(inputs) or rust["byteAssertions"] != 3 * len(inputs)):
+        raise ValueError("Incomplete YAML input evidence")
+    profile = reference / "profile"
+    if {path.name for path in profile.iterdir()} != {name + ".yaml" for name in inputs}:
+        raise ValueError("Original profile files differ from the exported cases")
+    verify_encodings(profile, inputs)
+    writable = {name for name, row in inputs.items() if row["accepted"] and not row["sourceHadDecodingErrors"]}
+    expected_files = {name + suffix for name in writable for suffix in (".roundtrip.yaml", ".changed.yaml")}
+    if {path.name for path in rust_output.iterdir()} != expected_files | {"result.json", "csharp-readback.json"}:
+        raise ValueError("Unexpected or missing Rust output files")
+    accepted = sum(row["accepted"] for row in inputs.values())
+    if (rust["assertions"] != len(inputs) + 3 * accepted + 2 * len(writable) or csharp["assertions"] != 4 * len(writable)
+            or csharp["readOnlyInputs"] != sum(row["sourceHadDecodingErrors"] for row in inputs.values())):
+        raise ValueError("Incomplete Rust or C# YAML comparisons")
+    for name, case in inputs.items():
+        if not name or not all(char.isascii() and (char.isalnum() or char in ".-") for char in name):
+            raise ValueError("Invalid raw YAML case name")
+        path = profile / (name + ".yaml")
+        row = results[name]
+        if (file_digest(path) != case["sourceSha256"] or row["sourceBytes"] != path.stat().st_size
+                or row["sourceCodePage"] != case["sourceCodePage"] or row["sourceHadDecodingErrors"] != case["sourceHadDecodingErrors"]
+                or row["readOnlyOnDecodeError"] != case["sourceHadDecodingErrors"] or row["accepted"] != case["accepted"]
+                or any((row.get(key) is True) != case["accepted"] for key in ("editingMatched", "runtimeMatched", "csharpWriterMatched"))):
+            raise ValueError(f"Raw YAML file and reader observations differ: {name}")
 
 
 def main() -> int:
@@ -159,7 +226,10 @@ def main() -> int:
         assembly = work / "dotnet/bin/YamlOracle/release/YamlOracle.dll"
         result["csharpAssemblySha256"] = file_digest(assembly)
         reference = output / "reference"
-        command("csharp-reference", [dotnet, str(assembly), "export", str(fixtures), str(reference)])
+        original = work / "reference"
+        command("csharp-reference", [dotnet, str(assembly), "export", str(fixtures), str(original)])
+        # Replay the archived files after the producer's absolute directory has ceased to exist.
+        shutil.move(original, reference)
         exported = json.loads((reference / "reference.json").read_text(encoding="utf-8"))
         if file_digest(reference / "casing.json") != exported["casingSha256"]:
             raise ValueError("native string reference checksum mismatch")
@@ -167,9 +237,9 @@ def main() -> int:
         command("csharp-readback", [dotnet, str(assembly), "verify", str(reference), str(output / "rust-output")])
         result["rust"] = json.loads((output / "rust-output/result.json").read_text(encoding="utf-8"))
         result["csharp"] = json.loads((output / "rust-output/csharp-readback.json").read_text(encoding="utf-8"))
-        expected_readback = 4 * sum(case["accepted"] for case in exported["cases"])
+        verify_file_inputs(reference, output / "rust-output", exported, result["rust"], result["csharp"])
         if (result["rust"]["platform"] != native or result["rust"]["architecture"] != args.target.split("-")[0]
-                or result["csharp"]["assertions"] != expected_readback or exported["corpusAssertions"] != 10):
+                or exported["corpusAssertions"] != 10):
             raise ValueError("incomplete native YAML results")
         result["status"] = "passed"
         print(f"YAML assessment passed; upload only: {output}", flush=True)

@@ -56,10 +56,10 @@ internal static class Program
         Directory.CreateDirectory(output);
         var profile = Path.Combine(output, "profile");
         Directory.CreateDirectory(profile);
-        var cases = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var cases = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
         foreach (var file in Directory.GetFiles(Path.Combine(fixtures, "config"), "*.yaml"))
         {
-            cases.Add(Path.GetFileName(file).Replace(".yaml", "", StringComparison.Ordinal), File.ReadAllText(file));
+            cases.Add(Path.GetFileNameWithoutExtension(file), File.ReadAllBytes(file));
         }
         var additional = new Dictionary<string, string>
         {
@@ -92,14 +92,21 @@ internal static class Program
             ["trailing-path-separator"] = "watch: {sources: [{path: 'media/'}]}\nlogging: {logDirectory: 'logs/'}\n",
             ["unknown-property-casing"] = "Immich: {apiKey: ignored}\nimmich: {ApiKey: ignored-too}\n",
         };
-        foreach (var entry in additional) cases.Add(entry.Key, entry.Value);
+        foreach (var entry in additional) cases.Add(entry.Key, Encoding.UTF8.GetBytes(entry.Value));
+        var encodingSamples = YamlFileEncodings.Samples().ToDictionary(sample => sample.Name, StringComparer.Ordinal);
+        foreach (var sample in encodingSamples.Values) cases.Add(sample.Name, sample.Bytes);
         var loader = new AppConfigLoader();
         var rows = new List<object>();
         var corpusAssertions = 0;
-        foreach (var (name, yaml) in cases)
+        foreach (var (name, sourceBytes) in cases)
         {
-            var path = Path.Combine(profile, "config.yaml");
-            File.WriteAllText(path, yaml, new UTF8Encoding(false));
+            var path = Path.Combine(profile, name + ".yaml");
+            File.WriteAllBytes(path, sourceBytes);
+            var (yaml, sourceCodePage, sourceHadDecodingErrors) = YamlFileEncodings.Observe(path, sourceBytes);
+            var sourceSha256 = Convert.ToHexStringLower(SHA256.HashData(sourceBytes));
+            if (encodingSamples.TryGetValue(name, out var sample) &&
+                (sample.CodePage != sourceCodePage || sample.HasDecodingErrors != sourceHadDecodingErrors))
+                throw new InvalidDataException($"Unexpected native decoder selection or fallback: {name}.");
             try
             {
                 var editable = loader.LoadForEditing(path);
@@ -116,20 +123,23 @@ internal static class Program
                         throw new InvalidOperationException("The accepted native runtime corpus changed.");
                     corpusAssertions += 2;
                 }
-                rows.Add(new { Name = name, Yaml = yaml, Accepted = true, Editable = editable, Runtime = runtime,
+                rows.Add(new { Name = name, Yaml = yaml, SourceCodePage = sourceCodePage, SourceHadDecodingErrors = sourceHadDecodingErrors,
+                    SourceSha256 = sourceSha256, Accepted = true, Editable = editable, Runtime = runtime,
                     Written = new AppConfigWriter().Serialize(editable) });
             }
             catch (Exception exception) when (exception is not InvalidOperationException || !exception.Message.StartsWith("The accepted", StringComparison.Ordinal))
             {
-                if (name.EndsWith(".input", StringComparison.Ordinal) || name.EndsWith(".written", StringComparison.Ordinal)) throw;
-                rows.Add(new { Name = name, Yaml = yaml, Accepted = false, ErrorType = exception.GetType().FullName });
+                if (name.EndsWith(".input", StringComparison.Ordinal) || name.EndsWith(".written", StringComparison.Ordinal)
+                    || encodingSamples.ContainsKey(name)) throw;
+                rows.Add(new { Name = name, Yaml = yaml, SourceCodePage = sourceCodePage, SourceHadDecodingErrors = sourceHadDecodingErrors,
+                    SourceSha256 = sourceSha256, Accepted = false, ErrorType = exception.GetType().FullName });
             }
         }
         var casing = ExportCasing();
         Write(Path.Combine(output, "casing.json"), casing);
         Write(Path.Combine(output, "reference.json"), new
         {
-            Format = "ifw-rw02-yaml-reference-v1", Platform = OperatingSystem.IsWindows() ? "windows" : "linux",
+            Format = "ifw-rw02-yaml-reference-v2", Platform = OperatingSystem.IsWindows() ? "windows" : "linux",
             Architecture = RuntimeInformation.ProcessArchitecture.ToString(), OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
             Runtime = Environment.Version.ToString(), Profile = profile, CorpusAssertions = corpusAssertions,
             CasingSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "casing.json")))), Cases = rows
@@ -185,14 +195,40 @@ internal static class Program
     private static void Verify(string referenceDirectory, string output)
     {
         var reference = JsonNode.Parse(File.ReadAllText(Path.Combine(referenceDirectory, "reference.json")))!;
-        if (reference["format"]!.GetValue<string>() != "ifw-rw02-yaml-reference-v1")
+        var format = reference["format"]!.GetValue<string>();
+        if (format is not ("ifw-rw02-yaml-reference-v1" or "ifw-rw02-yaml-reference-v2"))
             throw new InvalidDataException("Unknown synthetic reference format.");
-        var profile = Isolated(reference["profile"]!.GetValue<string>());
+        if (reference["platform"]!.GetValue<string>() != (OperatingSystem.IsWindows() ? "windows" : "linux") ||
+            reference["architecture"]!.GetValue<string>() != RuntimeInformation.ProcessArchitecture.ToString() ||
+            reference["osArchitecture"]!.GetValue<string>() != RuntimeInformation.OSArchitecture.ToString())
+            throw new InvalidDataException("The reference requires its original native platform and architecture.");
+        var verifyBytes = format == "ifw-rw02-yaml-reference-v2";
+        var originals = verifyBytes ? YamlFiles(Path.Combine(referenceDirectory, "profile")) : null;
+        var rustFiles = YamlFiles(output);
         var loader = new AppConfigLoader();
         var assertions = 0;
-        foreach (var row in reference["cases"]!.AsArray().Where(value => value!["accepted"]!.GetValue<bool>()))
+        var preservedInputs = 0;
+        var readOnlyInputs = 0;
+        foreach (var row in reference["cases"]!.AsArray())
         {
             var name = row!["name"]!.GetValue<string>();
+            if (name.Length == 0 || name.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '.')))
+                throw new InvalidDataException("Invalid synthetic case name.");
+            if (verifyBytes)
+            {
+                var bytes = File.ReadAllBytes(originals![name + ".yaml"]);
+                if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != row["sourceSha256"]!.GetValue<string>())
+                    throw new InvalidDataException($"Original YAML bytes changed: {name}.");
+                preservedInputs++;
+                if (row["sourceHadDecodingErrors"]!.GetValue<bool>())
+                {
+                    if (rustFiles.ContainsKey(name + ".roundtrip.yaml") || rustFiles.ContainsKey(name + ".changed.yaml"))
+                        throw new InvalidDataException($"A rewritten YAML exists for a lossy decode: {name}.");
+                    readOnlyInputs++;
+                    continue;
+                }
+            }
+            if (!row["accepted"]!.GetValue<bool>()) continue;
             foreach (var mutation in new[] { false, true })
             {
                 var expected = row["editable"]!.Deserialize<AppConfig>(Json)!;
@@ -203,22 +239,30 @@ internal static class Program
                     expected.Watch.Sources.Add(new WatchSourceSettings { Path = "Neu/../Fotos 日本語", AlbumName = ChangedAlbum,
                         Extensions = new List<string> { ".heic" }, IncludeSubdirectories = true, SyncMode = "sync" });
                 }
-                var yaml = File.ReadAllText(Path.Combine(output, name + (mutation ? ".changed" : ".roundtrip") + ".yaml"));
-                var path = Path.Combine(profile, "rust-written.yaml");
-                File.WriteAllText(path, yaml, new UTF8Encoding(false));
+                var path = rustFiles[name + (mutation ? ".changed" : ".roundtrip") + ".yaml"];
                 if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(expected, Json), JsonSerializer.SerializeToNode(loader.LoadForEditing(path), Json)))
                     throw new InvalidOperationException($"Rust YAML editable readback differs: {name} ({mutation}).");
                 assertions++;
-                if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(AppConfigLoader.NormalizeForRuntime(expected, profile), Json),
+                if (!JsonNode.DeepEquals(JsonSerializer.SerializeToNode(AppConfigLoader.NormalizeForRuntime(expected, output), Json),
                     JsonSerializer.SerializeToNode(loader.Load(path), Json)))
                     throw new InvalidOperationException($"Rust YAML runtime readback differs: {name} ({mutation}).");
                 assertions++;
             }
         }
-        Write(Path.Combine(output, "csharp-readback.json"), new { Format = "ifw-rw02-yaml-readback-v1", Assertions = assertions,
-            Runtime = Environment.Version.ToString(), Architecture = RuntimeInformation.ProcessArchitecture.ToString(), OSArchitecture = RuntimeInformation.OSArchitecture.ToString() });
+        var readback = JsonSerializer.SerializeToNode(new { Format = verifyBytes ? "ifw-rw02-yaml-readback-v2" : "ifw-rw02-yaml-readback-v1",
+            Assertions = assertions, Runtime = Environment.Version.ToString(), Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
+            OSArchitecture = RuntimeInformation.OSArchitecture.ToString() }, Json)!.AsObject();
+        if (verifyBytes)
+        {
+            readback["preservedInputs"] = preservedInputs;
+            readback["readOnlyInputs"] = readOnlyInputs;
+        }
+        Write(Path.Combine(output, "csharp-readback.json"), readback);
         Console.WriteLine($"C# YAML readback passed: {assertions} editable/runtime assertions on original and changed Rust YAML.");
     }
+
+    private static Dictionary<string, string> YamlFiles(string directory) =>
+        Directory.EnumerateFiles(directory, "*.yaml").ToDictionary(path => Path.GetFileName(path), StringComparer.Ordinal);
 
     private static void Write(string path, object value) => File.WriteAllText(path, JsonSerializer.Serialize(value, Json) + "\n", new UTF8Encoding(false));
 }
