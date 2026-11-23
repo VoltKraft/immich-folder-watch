@@ -273,6 +273,29 @@ The private trial result hashes are
 (x64) and `686cd35dcbc7b31881668db6a6e70cb3cabad7559f2e770cc154eec25789da94`
 (ARM64). [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
 
+## Late notification on the original desktop
+
+The Windows desktop assessment reuses the native service executable after
+the GUI measurements. The observer verifies its PE architecture, the early
+build receipt, compiler, dependency graph and source digests. Before Rust
+sends the single silent notification, a separate UI Automation observer
+starts on the original input desktop. The result records the Windows
+notification policy, Shell registration and version, request result, and
+callbacks for the fixture's own icon. Independent presentation requires
+separate physical hits for the unique title and body on the notification
+surface. The armed observer reads the baseline before the request. Native
+and independent observers check the same original Explorer window, process,
+thread and creation time. The Rust observer tests that process with a
+zero-timeout wait on its held handle. The exit-time field is undefined
+while a process is running. [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)
+· [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
+
+The probe also records cleanup and preserves the original desktop settings.
+The early and late receipts can show how the same host behaved at the two
+times. [Native observer](../../tools/rust-qa/windows-services/notification.py)
+· [On-screen checks](../../tools/rust-qa/windows-services/notification.ps1)
+· [Native invocation](../development.md#rust-feasibility-workspace).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
@@ -317,6 +340,47 @@ to be signalled, no Shell or taskbar before and after the icon rectangle
 query, and the exact icon to be absent. The receipt preserves the failed
 delete. That host change prevents a stable activation pass. Independent
 review reproduced 35 portable tests and 77 source-reachable operation
-sequences. Native execution of the combined observer is pending.
+sequences. The first combined native observations are recorded below.
 [Shell lifetime and cleanup](../../tools/rust-qa/windows-launcher/native_tray.py)
 · [Observer regression cases](../../tools/rust-qa/windows-launcher/test_native_tray_lifetime.py).
+
+### Original Explorer and the primary GUI at 93ecc35
+
+On Windows x64 the integrated primary registered its own icon with the
+original Explorer, set version 4 and remained hidden with the worker alive.
+The GUI and the independent observer both obtained the rectangle
+`[790, 720, 822, 768]`. At its center `[806, 744]` the screen showed RGB
+`eeeeee`. The GUI's first marker was `33c76b`. The observer stopped before
+the color challenge or provider invocation. The primary then deleted the
+icon, exited normally and drained its job. The exact receiver and icon were
+absent after Quit. [Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275435).
+
+On Windows ARM64 the original Shell refused the first add. The integrated
+primary reported raw error `0x80004005`, opened its visible DX12 fallback,
+ran the worker and quit. The independent observer confirmed the receiver
+and icon were absent after exit. In the separate named-desktop test the
+private Explorer declined the initial add and the retry on both
+architectures. Both restored the original input desktop. The integrated
+activation remains open on both architectures.
+[Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275454).
+
+The integrated GUI artifacts are `14778803163` for x64 and `14780060057`
+for ARM64. The separate Shell artifacts are `14778862212` and
+`14779213755` respectively. The private GUI receiver additionally reported
+Win32 error 5 for the thread desktop name on both hosts.
+[Source-bound archive readback](rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35).
+
+For an acknowledged icon whose first marker is hidden, the observer can
+temporarily expand the original Explorer's verified *Show hidden icons*
+button on the disposable runner. It queries the application's current icon
+rectangle again after opening the flyout. Both color samples and the exact
+tooltip provider must agree with that visible rectangle through invocation.
+The helper records the exact original provider before requesting the change
+and confirms closure of a flyout that it opened. A flyout already open at
+startup retains its previous state. [Original Explorer observer](../../tools/rust-qa/windows-launcher/tray_provider.ps1).
+
+After an initially refused add, the observer leaves the live application
+running for its own first two scheduled retries, up to 15 seconds. It
+records the receiver, Shell return values and independent icon rectangles
+while holding the original Explorer process. The initial registration and
+activation results retain their original outcome. [Passive retry observation](../../tools/rust-qa/windows-launcher/tray_retry.py).

@@ -172,7 +172,9 @@ to reconcile project decisions, defaults, and recorded state.
   lists the other native feasibility entry points.
   The [retained Windows window comparison](docs/rust/rw02-windows-window.md)
   reconstructs its eframe source separately and measures against the same
-  host's WPF references. Preserve the native results and source archive together.
+  host's WPF references. Preserve the native results, compiler stream and
+  source archive together. Exercise ordinary second-launch and actual Shell
+  activation for the same retained executable.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).
@@ -195,7 +197,8 @@ to reconcile project decisions, defaults, and recorded state.
   The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
   owned desktop, a visible synthetic icon and a matching native Shell callback.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
-  when changing the shared receiver or launcher.
+  when changing the shared receiver or launcher. Verify visible Windows
+  notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
   Keep the integrated Linux and Windows inventory subjects bound to the
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls

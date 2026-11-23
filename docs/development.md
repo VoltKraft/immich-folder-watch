@@ -152,6 +152,21 @@ and worker across activation and quit. It writes its result and raw logs to
 `artifacts/rust/windows-gui-tray/<native-target>/`.
 [Primary GUI and Shell callback](rust/rw02-windows-services.md#primary-gui-and-shell-callback).
 
+After building the retained window, run both ordinary Windows observers
+with the same native target and `--subject retained`.
+
+```powershell
+python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET --subject retained
+python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained
+```
+
+The first command observes the ordinary second launch. The second also
+closes a visible window, invokes the original Shell icon and checks the
+return of the same HWND, focused editor, worker and DX12 generation.
+Read the per-case results in `rust-retained-activation-<target>-<commit>`.
+The complete desktop archive includes the paired build receipts, raw Cargo
+compiler stream, reviewed eframe source and window-event evidence.
+
 The native feasibility workflow runs the Windows storage recovery trial after
 the watch tests. Its `rust-recovery-<target>-<commit>` artifact contains the
 complete evidence inventory for both path comparison modes, including VHD
@@ -246,6 +261,13 @@ shortcut registration, Shell notifications and independent UI Automation.
 After the native Shell build on a disposable target, run
 `python3 -B tools/rust-qa/windows-services/activation.py "$NATIVE_TARGET"`
 to exercise the private Explorer taskbar and retain its activation receipt.
+The same job later runs
+`python -B tools/rust-qa/windows-services/notification.py <native-target>`
+using its earlier native service build. The readback records Shell policy,
+the request status, the matching balloon callback, and independent
+on-screen evidence of the synthetic title and body. The per-target output
+is in `rust-notification-<target>-<commit>`.
+[Notification observation](rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
 The integrated graphics and Windows scan fixtures use the same
 [reviewed worker sources](../tools/rust-qa/performance/worker-inputs.json).
 Update these hashes after reviewing changes to the inventory or its filesystem

@@ -457,6 +457,46 @@ recorded none in any of its three traces. Both canonical Windows subjects
 met six of eleven limits and both retained FIFO subjects met ten.
 [Windows budgets, interval counts and source archives](rw02-windows-window.md#native-retained-window-results-at-0a2b5ca).
 
+The two Windows archives also passed the three ordinary field edits, all
+seven ordered NVDA cues and Japanese IME preedit and commit of U+3042. Both
+restored the original input layout and removed the private profile. Each
+host passed 16 transport sessions, 183 Rust YAML assertions, 116 C# YAML
+assertions and the combined build. All 74 combined build source hashes
+matched the revision. The display inventory again showed one 1024 × 768
+console monitor at 96 DPI. Only x64 observed a changed field frame on that
+original desktop. Both mixed-DPI and RDP observations remain open. The
+separate Windows service and GUI readback has SHA-256
+`7a2f50ec7d168baacfc557c0499011448be81f71abe1c71c1f54e7b7ef40ad83`.
+
+## Native follow-up at 93ecc35
+
+Both Ubuntu desktop jobs passed. Recomputing the metrics from three
+100,000-file scans per executable and architecture reproduced all eleven
+limits on X11. Each Rust run recorded zero visible and hidden idle render
+passes and damage events. The original Orca audio and focus receipts passed
+on X11 and Wayland. Both hosts exercised Wayland scale changes of 100%,
+200%, 125% and 100%. The packaged and unmodified Documents portal continued
+to refuse the upload lock. The isolated backport passed the lease test.
+[Ubuntu x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275439)
+· [Ubuntu ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275167).
+
+| Native target | Rust startup median | Reopen during scan, p95 | Close during scan, p95 | Full archive |
+| --- | ---: | ---: | ---: | ---: |
+| Ubuntu x64 | 170.80 ms | 1.08 ms | 5.37 ms | `14780360288` |
+| Ubuntu ARM64 | 207.72 ms | 0.92 ms | 0.38 ms | `14779783396` |
+
+The independent desktop, transport and storage readback has SHA-256
+`ddf93d395c4e0ceeb68bccca88d45a1ea5e1d34b4928c634825c87a3dcdd73e9`.
+All 22 native compiler receipt files per host reproduced the GitHub digest
+of the published input ZIP. Offline notice generation reproduced the
+published x64 and ARM64 ZIPs with 1,799 and 1,796 members. The regenerated
+SPDX documents matched the original bytes in the full archives and passed
+schema validation. They contain 446 and 445 packages respectively, each
+with 1,063 relationships.
+[Direct SQLite comparison](rw02-legacy.md#native-desktop-storage-at-93ecc35)
+· [Windows ordinary launcher](rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35)
+· [Windows integrated Shell](rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

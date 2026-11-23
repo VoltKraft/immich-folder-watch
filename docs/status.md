@@ -1,5 +1,52 @@
 # Project Status
 
+## Windows ordinary launch, Shell registration and writer authority (2026-11-23)
+
+At `93ecc35` a second launch on each original Windows desktop reopened the
+canonical GUI, retained its worker and exited as the only member of its job.
+The x64 window was foreground immediately. The ARM64 window was visible
+throughout 41 samples over 2,042 ms and stayed in the background. On both
+private desktops native enumeration found the titled visible GUI and its
+hidden witness. The additional name query failed with Win32 error 5 before
+the private restart. On the original x64 desktop the first physical icon
+pixel differed from the requested marker. ARM64 refused the initial add.
+Readback verified six archives and 31 Git source files per architecture.
+[Original console and private desktop](rust/rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35)
+· [Shell observations](rust/rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
+
+The cross-session writer guard excluded each competing writer in two
+elevated sessions of the same account on both Windows architectures. Both
+hosts identified the ordinary-user trust level on a private console. The
+subsequent launch exited before a standard-user writer could be measured.
+The x64 scheduler had already stopped an instance during cleanup. Commit
+`c4ba904` checks that race against a fresh empty instance collection.
+[Writer results and original archives](rust/rw02-cross-session.md#hosted-private-console-and-lock-results-at-93ecc35).
+
+Local integration now schedules the retained-window launcher, real Explorer
+activation and late notification assessment on both Windows targets. The
+native compiler evidence binds the GUI binary to its Cargo executable
+target. The retained observer requires a native ordering witness for
+same-tick visibility events. The notification observer requires separate
+physical hits for title and body and corroborates the original Explorer
+throughout the attempt. Commit `974bf45` checks process liveness on the
+open handle. Both MSVC cross-Clippy runs, 34 service controls and all
+178 repository tests passed locally. Commit `7fd8706` verifies private
+window membership directly on the held desktop. The corrected observers
+and retained activation still require their native runs. RW-02 remains
+open under the original seven-package goal.
+[Windows measurement](rust/rw02-windows-window.md)
+· [Late notification](rust/rw02-windows-services.md#late-notification-on-the-original-desktop)
+· [Stack decision](rust/rw02-stack-decision.md).
+
+Both Ubuntu jobs at `93ecc35` subsequently passed. All eleven X11 limits
+held, including scan reopen p95 of 1.08 ms on x64 and 0.92 ms on ARM64.
+Both original compiler and notice ZIPs reproduced on each architecture.
+The direct SQL replay checked all nine rows of both WAL backups, all 30
+stored-key lookups and the ten controls per host. The new Windows storage
+build steps also passed. Readback of their full archives follows upload.
+[Ubuntu desktop, transport and notices](rust/rw02-native-gui.md#native-follow-up-at-93ecc35)
+· [Storage and SQL](rust/rw02-legacy.md#native-desktop-storage-at-93ecc35).
+
 ## Four native compatibility runs at 93ecc35 (2026-11-23)
 
 RW-01 is accepted and RW-02 is active. All four targets passed the complete

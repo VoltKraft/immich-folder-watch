@@ -102,6 +102,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/rust-qa/instance/cross-session/test_hosted_service.ps1
+          ./tools/rust-qa/instance/cross-session/test_scheduler_cleanup.ps1
           ./tools/rust-qa/instance/cross-session/hosted.ps1 -Target $env:NATIVE_TARGET
 
       - name: Retain the completed cross-session observation before the desktop trials
@@ -467,6 +468,39 @@ jobs:
         shell: bash
         run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" warm
 
+      - name: Reopen the retained Windows HWND through an ordinary second launch
+        id: retained_launcher
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET --subject retained
+          exit $LASTEXITCODE
+
+      - name: Activate the retained Windows GUI through its actual Shell icon
+        id: retained_gui_tray
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained
+          exit $LASTEXITCODE
+
+      - name: Retain the ordinary-launch and tray observations for the retained HWND
+        if: ${{ !cancelled() && (steps.retained_launcher.outcome == 'success' || steps.retained_launcher.outcome == 'failure' || steps.retained_gui_tray.outcome == 'success' || steps.retained_gui_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-retained-activation-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/windows-launcher-retained/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray-retained/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Measure the shipping WPF host and native Rust GUI on the same Windows desktop
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
         shell: pwsh
@@ -582,6 +616,23 @@ jobs:
           python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
+      - name: Observe a policy-respecting Windows notification after the GUI measurements
+        id: late_notification
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.windows_services.outcome == 'success' || steps.windows_services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/notification.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the late native notification evidence
+        if: ${{ !cancelled() && (steps.late_notification.outcome == 'success' || steps.late_notification.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-notification-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/notification-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Record the reviewed components of the native development build
         id: components
         if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
@@ -657,8 +708,11 @@ jobs:
             artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
             artifacts/rust/realtime-native/
             artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-services/notification-${{ matrix.target }}/
             artifacts/rust/windows-launcher/${{ matrix.target }}/
             artifacts/rust/windows-gui-tray/${{ matrix.target }}/
+            artifacts/rust/windows-launcher-retained/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray-retained/${{ matrix.target }}/
             artifacts/rust/windows-reader/native-*/result.json
             artifacts/rust/windows-reader/native-*/gui/*.json
             artifacts/rust/windows-imports/runs/*/result.json
@@ -697,6 +751,7 @@ jobs:
             artifacts/rust/performance/hosted-*.json
             artifacts/rust/windows-performance/native-*/*
             artifacts/rust/windows-warm-window/*/build.json
+            artifacts/rust/windows-warm-window/*/compiler.jsonl
             artifacts/rust/windows-warm-window/*/observed/
             artifacts/rust/windows-warm-window/*/eframe-source.zip
             artifacts/rust/windows-warm-window/*/measured/

@@ -226,3 +226,35 @@ observer sources to that checkout, accounting for the Windows checkout's
 line endings. The compact readback SHA-256 is
 `108ea8d33d6a09035b1e77958abf6c38ee0d6ae97bd7b4b230b7300922f74c41`.
 [Native workflow](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45077818235).
+
+### Ordinary second launch and private desktop at 93ecc35
+
+On both original console desktops a normal second invocation reopened the
+canonical GUI. The first window closed, the authenticated pipe delivered
+one Open, and the same primary and inventory worker survived the round trip.
+Each secondary job contained exactly one process and drained with exit zero.
+The primary and worker then quit. The foreground observations differed.
+[Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275435)
+· [Windows ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/job/137401275454).
+
+| Target | Primary / worker / secondary PID | Foreground on reopened HWND | Launcher artifact |
+| --- | --- | --- | --- |
+| Windows x64 | 5356 / 5300 / 8436 | Yes at the first sample | `14778744916` |
+| Windows ARM64 | 4520 / 5468 / 10472 | Visible throughout 41 samples in 2,042 ms. None showed foreground. | `14778984921` |
+
+The private non-input desktop on both hosts enumerated its hidden witness,
+a native show event and the visible `Desktop input probe` window in class
+`Window Class`. The observed HWND/PID/TID triples were 524582/8292/2644 on
+x64 and 197104/4312/2436 on ARM64. The additional foreign-thread desktop
+name query returned Win32 error 5. Both private trials stopped at that
+check before the second launch. The observer restored its original desktop,
+closed its handle and drained the GUI. The complete private restart and
+retained-window activation still need native receipts.
+
+Readback checked all six launcher, integrated tray and separate Shell ZIPs
+against GitHub's digests. On each architecture it compared 31 distinct
+observer and worker input files with the exact Git checkout and reconciled
+the raw process logs with the visibility, worker and cleanup records.
+The readback SHA-256 is
+`c1f17ca8f95defa38ed4639f5d90746da72ced35a564e33605d2d8b573e626d0`.
+[Integrated Shell results](rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
