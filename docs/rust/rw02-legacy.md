@@ -518,5 +518,29 @@ host. The independent reports in
 `16d040918b307649a0b4125d224bf4e3e83b5a4b8754a02bd7b389d98c4a3262` (x64) and
 `24c41015ced128438a27420fe0a1989c5397544136dd2f5ea900743735737228` (ARM64).
 
-The same Actions storage step passed on Windows x64 and ARM64. Independent
-SQL readback on Windows still awaits the two complete desktop archives.
+Windows x64 and ARM64 each passed all 15 storage steps. Native Clippy
+checked the corrected file-size example with warnings denied on both hosts.
+Both ZIPs matched their Actions digests. All 305 storage hashes, 31 pinned
+crate archives and 141 first-party files matched per host, accounting for
+Windows checkout line endings in 81 source files. The shipping C# reader
+passed all 40 assertions on each host with .NET 10.0.15 and SQLite 3.53.4.
+[Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782395756)
+· [Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14782220563).
+
+All four hosts produced the same complete casing table. For the Windows
+source `C:\IfwSynthetic\Case-ƛ`, direct SQL reproduced all 30 lookups on
+each architecture, including both ambiguous names and the two possible
+aliases in insensitive mode. Within each operating system, x64 and ARM64
+produced byte-identical main databases, WAL backups, version-99 controls
+and C# casing backups. The Windows x64 and ARM64 independent reports have
+SHA-256 `bb2217c71c092dbc425e974e980a4573cfffd4d9effa24c3e259984d7b4a7095`
+and `b754cd0b93f9eafb6512b2eca9fa2715086ae8b7449a3f54d642cc0d282bc7a1`.
+
+The four-host comparison opened 32 synthetic database files read-only and
+checked 296 rows, including eight online WAL backups and eight version-99
+controls. It reproduced 120 stored-key lookups. The native probes passed
+40 casing controls and 160 C# assertions across the four hosts.
+`four-host-storage-sql.json` records the archive and report digests under
+the same evidence directory. Its SHA-256 is
+`f5f1071c20d2d624190d24fe52e073536fe11b27a42716fcb6ca28ff7327b7c7`.
+Installed migration and rollback after application activity remain open.
