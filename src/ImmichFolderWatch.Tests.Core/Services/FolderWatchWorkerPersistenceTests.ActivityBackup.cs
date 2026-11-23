@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -60,9 +61,27 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         var fileAfterStaleRead = ReadActivityFile(photo);
         Assert.Equal(installed, fileAfterStaleRead);
 
+        var output = Environment.GetEnvironmentVariable("IFW_QA_ACTIVITY_OUTPUT");
+        var exchange = Environment.GetEnvironmentVariable("IFW_QA_ACTIVITY_EXCHANGE");
         var restoredPath = Path.Combine(directory.Path, "restored.db");
-        File.Copy(afterPath, restoredPath);
-        Assert.Equal(afterHash, ActivitySha256(restoredPath));
+        string? rustBackupHash = null;
+        if (exchange is null)
+        {
+            File.Copy(afterPath, restoredPath);
+            Assert.Equal(afterHash, ActivitySha256(restoredPath));
+        }
+        else
+        {
+            Assert.NotNull(output);
+            Assert.True(Path.IsPathFullyQualified(output), "The exchange requires an absolute activity output path.");
+            Assert.True(Path.IsPathFullyQualified(exchange), "The exchange directory must be absolute.");
+            Assert.NotEqual(".", Path.GetRelativePath(output, exchange));
+            rustBackupHash = await ReceiveActivityBackupAsync(exchange, beforePath, beforeHash, afterPath, afterHash, restoredPath);
+            var received = ReadActivityState(restoredPath);
+            Assert.Equal(mapping, Assert.Single(received.Mappings));
+            Assert.Equal(lastSuccess, Assert.Single(received.Accounts));
+            Assert.Equal(installed, ReadActivityFile(photo));
+        }
         var restoredStore = new SqliteSyncStateStore(restoredPath);
         var second = await RunActivityWorkerAsync(config, restoredStore, account);
         Assert.Equal(first.Entry, second.Entry);
@@ -85,7 +104,6 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
         Assert.Equal(afterHash, ActivitySha256(afterPath));
         Assert.NotEqual(beforeHash, afterHash);
 
-        var output = Environment.GetEnvironmentVariable("IFW_QA_ACTIVITY_OUTPUT");
         if (output is null) return;
         Assert.True(Path.IsPathFullyQualified(output), "The activity output path must be absolute.");
         Assert.True(windows || OperatingSystem.IsLinux(), "The activity reference requires Windows or Linux.");
@@ -137,6 +155,62 @@ public sealed partial class FolderWatchWorkerPersistenceTests(ITestOutputHelper 
             await JsonSerializer.SerializeAsync(manifest, evidence, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
         }
         testOutput.WriteLine($"IFW_ACTIVITY_SHA256={ActivitySha256(manifestPath)}");
+        if (rustBackupHash is not null) testOutput.WriteLine($"IFW_RUST_BACKUP_SHA256={rustBackupHash}");
+    }
+
+    private static async Task<string> ReceiveActivityBackupAsync(
+        string exchangePath, string beforePath, string beforeHash, string afterPath, string afterHash, string restoredPath)
+    {
+        var directory = new DirectoryInfo(exchangePath);
+        Assert.True(directory.Exists, "The coordinator must create the private exchange directory.");
+        Assert.False(directory.Attributes.HasFlag(FileAttributes.ReparsePoint));
+        if (!OperatingSystem.IsWindows())
+        {
+            const UnixFileMode others = UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+            Assert.Equal((UnixFileMode)0, File.GetUnixFileMode(directory.FullName) & others);
+        }
+        Assert.Empty(directory.EnumerateFileSystemInfos());
+        using var exchange = SecureWatchRoot.Open(directory.FullName);
+        File.Copy(beforePath, Path.Combine(directory.FullName, "before.db"));
+        File.Copy(afterPath, Path.Combine(directory.FullName, "after.db"));
+        var token = Guid.NewGuid().ToString("N");
+        var request = new { format = "ifw-worker-backup-request-v1", token, beforeSha256 = beforeHash, afterSha256 = afterHash };
+        var temporary = Path.Combine(directory.FullName, "request.tmp");
+        await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            await JsonSerializer.SerializeAsync(file, request);
+        }
+        File.Move(temporary, Path.Combine(directory.FullName, "request.json"));
+
+        var wait = Stopwatch.StartNew();
+        while (!exchange.FileExists("ready.json"))
+        {
+            if (wait.Elapsed >= TimeSpan.FromSeconds(60)) throw new TimeoutException("The Rust backup did not publish ready.json within 60 seconds.");
+            await Task.Delay(50);
+        }
+        using var ready = exchange.OpenRead("ready.json");
+        Assert.InRange(ready.Length, 1, 4096);
+        var payload = new byte[(int)ready.Length];
+        await ready.Stream.ReadExactlyAsync(payload);
+        using var response = JsonDocument.Parse(payload);
+        var fields = response.RootElement;
+        Assert.Equal(["afterSha256", "format", "restoredSha256", "token"],
+            fields.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal("ifw-rust-worker-backup-ready-v1", fields.GetProperty("format").GetString());
+        Assert.Equal(token, fields.GetProperty("token").GetString());
+        Assert.Equal(afterHash, fields.GetProperty("afterSha256").GetString());
+        var reported = fields.GetProperty("restoredSha256").GetString();
+        Assert.Matches(@"\A[0-9a-f]{64}\z", reported);
+
+        using var returned = exchange.OpenRead("returned.db");
+        await using (var restored = new FileStream(restoredPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            await returned.Stream.CopyToAsync(restored);
+        }
+        var consumed = ActivitySha256(restoredPath);
+        Assert.Equal(reported, consumed);
+        return consumed;
     }
 
     private sealed record ActivityWorkerRun(SyncStateEntry Entry, DateTimeOffset LastSuccess, int AlbumLists, int Downloads, int Uploads);
