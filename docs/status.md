@@ -1,5 +1,31 @@
 # Project Status
 
+## Native candidate assessment at 6af7100 (2026-11-23)
+
+All four native feasibility jobs passed at `6af7100`. Readback of the ten
+Actions archives confirmed 37 Rust workspace tests and 15 watch-event cases
+on each Linux target, and 34 tests and 14 cases on each Windows target.
+All four matched 5,844 requests in each casing profile. Both Windows hosts
+observed encrypted SMB 3.1.1, and their eight storage recovery cases each
+passed a total of 208 C# assertions. The independent four-host readback
+SHA-256 is `af82995f54e10d8bb266808535aa56f2dcb9338ad33a73ad7f75b57528655784`.
+The local repository suite passed all 178 tests. Draft PR CI passed.
+GitHub's default CodeQL jobs analyzed Actions, C#, JavaScript/TypeScript
+and Python. The four native desktop jobs run separately.
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662890) · [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144674806) · [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858).
+
+The canonical Windows launcher reopened on both original desktops. x64
+obtained foreground immediately. On ARM64, Windows declined the granted
+handoff and the window remained visible in the background for 2,044 ms.
+Both private restart and cleanup cases passed. The original x64 Explorer
+registered the integrated icon, but none of the four button queries found
+an overflow provider. ARM64 Explorer rejected the initial add and both
+retries. Both hosts again excluded an elevated writer across two sessions.
+Standard-user exclusion still requires two eligible sessions.
+[Ordinary launches](rust/rw02-instance.md#native-windows-launcher-at-6af7100)
+· [Explorer observations](rust/rw02-windows-services.md#original-and-private-explorer-at-6af7100)
+· [Cross-session writer evidence](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541).
+
 ## Windows activation and resource results (2026-11-23)
 
 The retained Windows candidate at `4975c45` changes only visibility on a

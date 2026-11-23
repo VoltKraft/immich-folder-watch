@@ -307,3 +307,25 @@ no-argument launch by the native observer. An interactive launch through
 Explorer still needs direct observation.
 [Canonical ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796192246)
 · [Retained ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796579708).
+
+### Native Windows launcher at 6af7100
+
+Both canonical launchers completed the original input desktop, the private
+desktop and the private restart. Each no-argument secondary sent one Open to
+the original primary and exited. On both original desktops the primary
+recreated its DX12 window, retained the worker and drained normally at Quit.
+Each secondary granted foreground access to the original primary.
+
+| Original desktop | Primary / worker / secondary PID | Recreated HWND | Observed foreground |
+| --- | --- | --- | --- |
+| Windows x64 | 3276 / 8756 / 2828 | 1704040 | Windows accepted the request. The HWND owned the foreground on the first sample. |
+| Windows ARM64 | 1272 / 1556 / 6896 | 590404 | Windows declined the request. The HWND was visible during all 41 samples over 2,044 ms and stayed in the background. |
+
+The canonical fixture's overall pass covers IPC, visible reopening and
+cleanup. Foreground ownership has its own measurement. These secondary
+launches came from the observer's `CreateProcessW` call. An ordinary
+interactive Explorer launch still needs its own observation. Independent
+readback matched seven archived file hashes and 30 source hashes on each
+target, including the native grant, primary request and process identities.
+[Canonical x64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805400187)
+· [Canonical ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805481046).

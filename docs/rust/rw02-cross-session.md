@@ -220,3 +220,14 @@ files per host, 23 source inputs and the private-console bytes. The combined
 `writer-raw-readback.json` has SHA-256
 `aaa7b803f2f6024bea9f5b79b8900ca607d3ecc04161865d752d2b760eeac4a1`.
 [Two-session procedure](#native-reproduction).
+
+At `6af7100` both hosts again excluded a competing writer and reacquired
+the original guard in elevated sessions 2 and 0 of one account. Each
+original console advertised Basic User. The launch returned 1 and the
+scheduled peer stopped before its own trust-level query. Both hosts
+confirmed task and profile cleanup. The independent readback of all 37
+indexed files and 23 source inputs per host has SHA-256
+`1257850dc5935a1a061c8aecca59e5e0648d355d56d2dd584525c7c297f5610d`.
+The two-session standard-user case remains open.
+[x64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14802979009)
+· [ARM64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804440869).
