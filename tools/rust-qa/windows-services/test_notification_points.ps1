@@ -27,3 +27,55 @@ if (-not (Contains-Point $same $p) -or $null -ne [IfwNoticeDesktop]::LabelPoint(
     throw 'An inseparable or subpixel rectangle was not identified'
 }
 Write-Output 'Notification pixel selection passed.'
+
+# Run the same polling loop against a temporary sender and a title/body match that exists for only one sweep.
+$watch = $ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Watch-Notice'},$true)
+. ([scriptblock]::Create($watch.Extent.Text))
+$token = [Guid]::NewGuid().ToString('N')
+$area = Join-Path ([IO.Path]::GetTempPath()) "ifw-notice-control-$token"
+[void](New-Item -ItemType Directory -Path $area -ErrorAction Stop)
+$goFile = Join-Path $area 'notice.go'
+$sentFile = Join-Path $area 'notice.sent'
+$finishFile = Join-Path $area 'notice.finish'
+$receipts = [Collections.Generic.List[hashtable]]::new()
+function Emit([hashtable]$Record) { $receipts.Add($Record) }
+try {
+    $state = @{calls=0}
+    $reader = {
+        $state.calls++
+        $result = @{roots=2; match=$null; errors=0; lastHresult=$null}
+        if ($state.calls -eq 1) { [IO.File]::WriteAllText($goFile,$token) }
+        if ($state.calls -eq 2) { $result.match = @{qpc=[Diagnostics.Stopwatch]::GetTimestamp()} }
+        if ($state.calls -eq 3) { [IO.File]::WriteAllText($sentFile,$token) }
+        return $result
+    }
+    $status = Watch-Notice $area $token $reader
+    $during = $receipts[1]
+    $last = $receipts[$receipts.Count-2]
+    $done = $receipts[$receipts.Count-1]
+    if ($status -ne 0 -or $receipts[0].released -or $receipts[0].sent -or
+        -not $during.released -or $during.sent -or $null -eq $during.match -or
+        $during.match.qpc -lt $during.startQpc -or $during.match.qpc -gt $during.endQpc -or
+        $receipts[2].sent -or -not $receipts[3].sent -or -not $done.complete -or $done.stage -cne 'visible' -or
+        $done.samples -ne $state.calls -or $last.startQpc - $done.sentObservedQpc -lt 10L * [Diagnostics.Stopwatch]::Frequency) {
+        throw 'The observer missed the in-flight match or stopped before ten full seconds of post-request sampling'
+    }
+    [IO.File]::Delete($goFile)
+    [IO.File]::Delete($sentFile)
+    $receipts.Clear()
+    $status = Watch-Notice $area $token { @{roots=2; match=@{qpc=[Diagnostics.Stopwatch]::GetTimestamp()}; errors=0} }
+    if ($status -ne 2 -or $receipts.Count -ne 2 -or $receipts[1].stage -cne 'unavailable' -or $receipts[1].complete) {
+        throw 'A pair seen before release armed the observer'
+    }
+    [IO.File]::WriteAllText($finishFile,$token)
+    $receipts.Clear()
+    $status = Watch-Notice $area $token { throw 'A cancelled trial started a query' }
+    if ($status -ne 2 -or $receipts.Count -ne 1 -or $receipts[0].complete) {
+        throw 'An early sender exit was recorded as a full sampling interval'
+    }
+    Write-Output 'Notification timing controls passed.'
+} finally {
+    foreach ($file in @($goFile,$sentFile,$finishFile)) { [IO.File]::Delete($file) }
+    [IO.Directory]::Delete($area)
+}

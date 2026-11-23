@@ -35,6 +35,10 @@ STATES = {1: "NOT_PRESENT", 2: "BUSY", 3: "RUNNING_D3D_FULL_SCREEN", 4: "PRESENT
           5: "ACCEPTS_NOTIFICATIONS", 6: "QUIET_TIME", 7: "APP"}
 
 
+class ObserverUnavailable(Exception):
+    """The observer could not establish its sampling baseline before the sender was released."""
+
+
 def bind_build(target, exe, original, record):
     file = original / "result.json"
     early = json.loads(file.read_bytes())
@@ -66,6 +70,9 @@ def bind_build(target, exe, original, record):
     control = (original / "balloon-id.txt").read_text(encoding="utf-8")
     if not re.search(r"^test [\w:]+::balloon_callbacks_belong_to_the_registered_v4_icon \.\.\. ok$", control, re.M):
         raise ValueError("The early native test did not execute the version-4 callback identity control")
+    points = (original / "notification-points.txt").read_text(encoding="utf-8").splitlines()
+    if any(points.count(line) != 1 for line in ("Notification pixel selection passed.", "Notification timing controls passed.")):
+        raise ValueError("The early observer did not execute the pixel and sampling controls")
     record.update(earlyResultSha256=sha(file), binarySha256=early["probeSha256"], compiler=version,
                   earlyEvidence=verified, earlyProbeCompleted=early["probeCompleted"],
                   earlyMeasureUptimeMs=early["measureUptimeMs"], graphSha256=canonical)
@@ -196,28 +203,133 @@ def check_match(match, token, session, winroot):
 
 
 def arm_event(items):
-    if len(items) == 1:
-        event = items[0]
-        if (event.get("stage") == "armed" and event.get("preexistingMatch") is False
-                and type(event.get("tick")) is int and event["tick"] >= 0):
-            return event
-    return None
+    if len(items) < 2:
+        return None
+    baseline = items[0]
+    if (baseline.get("stage") != "armed" or baseline.get("preexistingMatch") is not False
+            or not all(type(baseline.get(k)) is int and baseline[k] > 0 for k in ("qpc", "frequency", "nativeBeforeQpc", "nativeAfterQpc"))
+            or not baseline["nativeBeforeQpc"] <= baseline["qpc"] <= baseline["nativeAfterQpc"]
+            or type(baseline.get("tick")) is not int or baseline["tick"] < 0):
+        return None
+    last = baseline["nativeAfterQpc"]
+    for number, row in enumerate(items[1:], 1):
+        if (row.get("stage") != "sample" or row.get("number") != number or row.get("released") is not False
+                or row.get("sent") is not False or "match" in row or type(row.get("startQpc")) is not int
+                or type(row.get("endQpc")) is not int or not last <= row["startQpc"] <= row["endQpc"]):
+            return None
+        last = row["endQpc"]
+    if items[-1].get("providerErrors") != 0:
+        return None
+    return baseline | {"completedSamples": len(items) - 1, "lastSampleEndQpc": last}
 
 
-def observed_presentation(items, token, session, winroot, armed_before_request, release, finish):
+def wait_for_observer(path, provider):
+    def prepared():
+        items = events(path)
+        return arm_event(items) or provider.poll() is not None or any(e["stage"] == "unavailable" for e in items)
+    ready = wait(prepared, "The notification observer did not complete its first baseline sweep", 20)
+    return isinstance(ready, dict) and provider.poll() is None
+
+
+def observed_presentation(items, token, session, winroot, record, native):
     final = [e for e in items if e["stage"] in ("visible", "unavailable")]
-    if len(final) > 1:
+    if not final:
+        return None
+    if len(final) != 1 or final[0] != items[-1]:
         raise ValueError("Ambiguous notification presentation outcome")
-    event = final[0] if final else None
-    if event is not None and event["stage"] == "visible":
-        if armed_before_request is None:
-            return dict(stage="unavailable", providerStage="visible",
-                        reason="The observer had not confirmed its baseline before the request was released")
-        if (items != [armed_before_request, event]
-                or arm_event([armed_before_request]) is None or release is None
-                or not armed_before_request["tick"] <= release <= event["match"]["tick"] <= finish):
-            raise ValueError("The visible match was outside the original request and observer interval")
-        check_match(event["match"], token, session, winroot)
+    event = final[0]
+    if event.get("complete") is not True:
+        raise ValueError("The released notification trial lacks the complete sampling interval")
+    if "match" in event:
+        raise ValueError("A terminal presentation report cannot supply an untimed match")
+    armed = record.get("armBeforeRequest")
+    if (not armed or type(armed.get("completedSamples")) is not int or armed["completedSamples"] < 1
+            or armed != arm_event(items[:1 + armed["completedSamples"]])):
+        raise ValueError("The notification observer was not sampling before release")
+    frequency, release, acknowledged, finish = (record[k] for k in
+                                                 ("qpcFrequency", "releaseQpc", "acknowledgedQpc", "finishQpc"))
+    sent = event["sentObservedQpc"]
+    if (not all(type(n) is int for n in (frequency, release, acknowledged, finish, sent))
+            or frequency != armed["frequency"] or native.get("notice.qpc_frequency") != frequency
+            or not armed["lastSampleEndQpc"] <= release <= acknowledged <= finish or not release <= sent <= finish):
+        raise ValueError("The notification clocks or sender acknowledgement do not match")
+    called = native.get("notice.initial.add") is True and native.get("notice.initial.version4") is True
+    begin, end = native.get("notice.request_begin_qpc"), native.get("notice.request_end_qpc")
+    if called:
+        if type(begin) is not int or type(end) is not int or not release <= begin <= end <= min(sent, acknowledged):
+            raise ValueError("The native Shell call lacks its original synchronous interval")
+    elif begin is not None or end is not None or any(k.startswith("notice.notification_request") for k in native):
+        raise ValueError("An unregistered notification recorded a Shell request")
+
+    rows = items[1:-1]
+    previous = armed["qpc"]
+    gap = overlapping = matches = errors = peak = 0
+    # Bound both successive scan starts and individual scan durations at ten times the requested 100 ms cadence.
+    post_start = end if called else min(sent, acknowledged)
+    previous_post_start = post_start
+    max_post_interval = 0
+    seen_go = seen_sent = False
+    first_returned = None
+    chosen = None
+    for number, row in enumerate(rows, 1):
+        start, stopped, go, returned = (row[k] for k in ("startQpc", "endQpc", "released", "sent"))
+        if (row["stage"] != "sample" or row["number"] != number or type(start) is not int or type(stopped) is not int
+                or not previous <= start <= stopped <= finish or type(go) is not bool or type(returned) is not bool
+                or seen_go and not go or seen_sent and not returned or go and start < release
+                or returned and (not go or start < sent) or not returned and start > sent
+                or any(type(row[k]) is not int or row[k] < 0 for k in ("roots", "providerErrors"))):
+            raise ValueError("Incomplete or out-of-order notification sampling")
+        gap = max(gap, start - previous)
+        previous, seen_go, seen_sent = stopped, go, returned
+        if returned and first_returned is None:
+            first_returned = start
+        if start >= post_start:
+            max_post_interval = max(max_post_interval, start - previous_post_start, stopped - start)
+            previous_post_start = start
+        errors += row["providerErrors"]
+        peak = max(peak, row["roots"])
+        if called and max(start, begin) < min(stopped, end):
+            overlapping += 1
+        if "match" not in row:
+            continue
+        matches += 1
+        match = row["match"]
+        check_match(match, token, session, winroot)
+        if type(match.get("qpc")) is not int or not start <= match["qpc"] <= stopped:
+            raise ValueError("The physical title/body match occurred outside its sweep")
+        if not called or match["qpc"] < begin:
+            raise ValueError("The fresh notification was already visible before its Shell request")
+        # A query started before release can complete later with a cached UIA node.
+        if chosen is None and go and start > begin:
+            chosen = (number, start, match)
+    if (not seen_sent or first_returned - sent >= 10 * frequency or rows[-1]["startQpc"] - sent < 10 * frequency
+            or event["samples"] != len(rows) or event["providerErrors"] != errors or event["peakKnownRoots"] != peak
+            or (event["stage"] == "visible") != bool(matches)):
+        raise ValueError("The observer did not cover the full post-request interval")
+    record["samplingWindow"] = dict(firstQpc=rows[0]["startQpc"], lastQpc=previous, maxGapQpc=gap,
+                                    nativeOverlapSamples=overlapping, postStartQpc=post_start, maxPostIntervalQpc=max_post_interval,
+                                    maxPostIntervalLimitQpc=frequency, fullPostRequest=max_post_interval <= frequency)
+    provider_stage = event["stage"]
+    if chosen:
+        number, start, match = chosen
+        record["samplingWindow"]["acceptedSample"] = number
+        if match["qpc"] < end:
+            phase = "during-shell-call"
+        elif start > end:
+            phase = "after-shell-call"
+        else:
+            phase = "spans-shell-return"
+        record["samplingWindow"]["matchPhase"] = phase
+        event = event | {"match": match}
+    elif called and not overlapping:
+        event = event | dict(stage="unavailable", providerStage=provider_stage,
+                             reason="The synchronous Shell request fell between two independent UIA sweeps")
+    elif matches:
+        event = event | dict(stage="unavailable", providerStage=provider_stage,
+                             reason="The matching UIA sweep began before the native Shell request")
+    if max_post_interval > frequency:
+        return event | dict(stage="incomplete", providerStage=provider_stage,
+                            reason="A post-request scan or the interval between scan starts exceeded one second")
     return event
 
 
@@ -229,7 +341,7 @@ def outcome(native, event, token, session, winroot, result):
                         requested=native.get("notice.requested"), show=native.get("notice.balloon_show"),
                         hide=native.get("notice.balloon_hide"), timeout=native.get("notice.balloon_timeout"),
                         click=native.get("notice.balloon_click"), independentlyVisible=False)
-    if event is not None and event["stage"] == "visible":
+    if event is not None and (event["stage"] == "visible" or event["stage"] == "incomplete" and "match" in event):
         check_match(event["match"], token, session, winroot)
         observations["independentlyVisible"] = True
     samples = result.get("registrationHost", {})
@@ -262,6 +374,8 @@ def outcome(native, event, token, session, winroot, result):
             or not observations["add"] and "notice.remove" in native or result["subject"].get("exit") != 0
             or result["subject"].get("jobEmpty") is not True):
         raise CleanupUnconfirmed("The original icon, receiver or native process did not confirm normal cleanup")
+    if event is not None and event["stage"] == "incomplete":
+        raise ValueError(event["reason"])
     if (observations["stableRegistrationHost"] and observations["rendererBound"] and observations["independentlyVisible"]
             and observations["show"] > 0 and type(state) is int
             and native.get("notice.taskbar_created") == 0):
@@ -298,18 +412,19 @@ def measure(target, exe, original, out, result):
         program, result["uiaHosts"] = select_powershell(area, "accessibility", env)
         witness = ShellWitness(api, desk, before["session"], os.environ["SystemRoot"], pins)
         samples = result["registrationHost"] = {"beforeLaunch": witness.sample()}
-        provider, result["observer"], result["subject"] = None, {}, {}
+        result.update(qpcFrequency=api.frequency, observer={}, subject={})
+        if not program:
+            result["reason"] = "No native UI Automation observer is available for this runner"
+            result["contextAfter"] = desk.context()
+            return "unavailable"
         finish = area / "notice.finish"
         with ExitStack() as children:
             try:
-                if program:
-                    args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
-                            "-File", str(HERE / "notification.ps1"), "-Token", token, "-Fixture", str(area)]
-                    provider = children.enter_context(child(api, Path(program), args, area, env, path, result["observer"]))
-                    try:
-                        wait(lambda: events(path) or provider.poll() is not None, "The notification observer did not arm", 20)
-                    except TimeoutError as exc:
-                        result["observer"]["armError"] = str(exc)
+                args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
+                        "-File", str(HERE / "notification.ps1"), "-Token", token, "-Fixture", str(area)]
+                provider = children.enter_context(child(api, Path(program), args, area, env, path, result["observer"]))
+                if not wait_for_observer(path, provider):
+                    raise ObserverUnavailable("The independent observer did not establish its sampling baseline")
                 if not ordinary_console(desk.context(), "Default"):
                     raise RuntimeError("The active console changed before the notification launch")
                 args = ["--hosted-notification", str(area), token, "private"]
@@ -327,39 +442,47 @@ def measure(target, exe, original, out, result):
                         or desk.name(desk.thread_desktop(owner["tid"])) != "Default" or not ordinary_console(desk.context(), "Default")):
                     raise ValueError("The registered receiver did not belong to the retained subject on the original desktop")
                 samples["beforeRequest"] = witness.sample()
-                result["armBeforeRequest"] = arm_event(events(path)) if path.is_file() else None
+                result["armBeforeRequest"] = arm_event(events(path))
+                if not result["armBeforeRequest"] or provider.poll() is not None:
+                    raise ObserverUnavailable("The independent observer lost its sampling baseline before release")
                 result["releaseTick"] = tick()
+                result["releaseQpc"] = api.clock()
                 (area / "notice.go").touch(exist_ok=False)
                 sent = area / "notice.sent"
                 wait(lambda: sent.exists() or proc.poll() is not None, "The Shell request did not return", 10)
                 if not sent.is_file() or sent.read_bytes() != token.encode("ascii"):
                     raise ValueError("The single Shell request did not complete on the retained subject")
-                if provider is not None:
-                    wait(lambda: proc.poll() is not None or provider.poll() is not None or
-                         any(e["stage"] in ("visible", "unavailable") for e in events(path)), "Notification observer exceeded its deadline", 18)
+                result["acknowledgedQpc"] = api.clock()
+                wait(lambda: proc.poll() is not None or provider.poll() is not None or
+                     any(e["stage"] in ("visible", "unavailable") for e in events(path)), "Notification observer exceeded its deadline", 18)
+            except ObserverUnavailable as exc:
+                result["reason"] = str(exc)
             finally:
                 try:
                     samples["afterRequest"] = witness.sample()
                 finally:
                     finish.touch(exist_ok=True)
+                    result["finishQpc"] = api.clock()
                     result["finishTick"] = tick()
-                    # Preserve the visible evidence before any receiver, icon or job teardown.
-                    items = result["observerEvents"] = events(path) if path.is_file() else []
-                    result["presentation"] = observed_presentation(items, token, before["session"], os.environ["SystemRoot"],
-                                                                  result.get("armBeforeRequest"), result.get("releaseTick"),
-                                                                  result["finishTick"])
+                    # Preserve independent evidence even when the icon, receiver or job later fails to drain.
+                    result["observerEvents"] = events(path) if path.is_file() else []
+                    if "acknowledgedQpc" in result:
+                        result["presentation"] = observed_presentation(result["observerEvents"], token, before["session"],
+                                                                      os.environ["SystemRoot"], result, READ(native_log))
         samples["afterQuit"] = witness.sample()
     result["contextAfter"] = desk.context()
-    items = events(path) if path.is_file() else []
-    result["observerEvents"] = items
-    event = observed_presentation(items, token, before["session"], os.environ["SystemRoot"], result.get("armBeforeRequest"),
-                                  result["releaseTick"], result["finishTick"])
-    status = outcome(READ(native_log), event, token, before["session"], os.environ["SystemRoot"], result)
-    if provider is not None:
-        if event is None or result["observer"]["exit"] != (0 if event.get("providerStage", event["stage"]) == "visible" else 2):
-            raise RuntimeError("The independent observer failed to complete")
+    items = result["observerEvents"] = events(path)
     if not result["profileRemoved"]:
         raise CleanupUnconfirmed("The notification profile could not be removed")
+    if "releaseQpc" not in result:
+        if result["observer"]["exit"] != 2 or not items or items[-1]["stage"] != "unavailable":
+            raise RuntimeError("The independent observer exited without a baseline or an unavailability report")
+        return "unavailable"
+    native = READ(native_log)
+    event = result["presentation"] = observed_presentation(items, token, before["session"], os.environ["SystemRoot"], result, native)
+    if event is None or result["observer"]["exit"] != (0 if event.get("providerStage", event["stage"]) == "visible" else 2):
+        raise RuntimeError("The independent observer failed to complete the notification trial")
+    status = outcome(native, event, token, before["session"], os.environ["SystemRoot"], result)
     if not ordinary_console(result["contextAfter"], "Default"):
         result["reason"] = "The original input desktop could not be confirmed at the end of the observation"
         return "unavailable"

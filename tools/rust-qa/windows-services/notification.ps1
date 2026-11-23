@@ -30,6 +30,7 @@ public static class IfwNoticeDesktop {
     [DllImport("kernel32")] static extern uint WTSGetActiveConsoleSessionId();
     [DllImport("kernel32")] static extern bool ProcessIdToSessionId(uint pid, out uint id);
     [DllImport("kernel32")] public static extern ulong GetTickCount64();
+    [DllImport("kernel32")] public static extern bool QueryPerformanceCounter(out long value);
     [DllImport("kernel32")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
     [DllImport("kernel32",SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
     [DllImport("kernel32")] static extern bool GetExitCodeProcess(IntPtr h, out uint exit);
@@ -226,7 +227,8 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
                     $lastA = [IfwNoticeDesktop]::Hit($HostWindow,$tp[0],$tp[1]); $lastB = [IfwNoticeDesktop]::Hit($HostWindow,$bp[0],$bp[1])
                     if ($null -eq $lastA -or $null -eq $lastB -or $lastA.hwnd -ne $a.nativeHit.hwnd -or $lastB.hwnd -ne $b.nativeHit.hwnd) { return }
                     return @{title=$a; body=$b; host=$HostWindow; container=($container.GetRuntimeId() -join ',')
-                             rootId=($uia.GetRuntimeId() -join ','); tick=[IfwNoticeDesktop]::GetTickCount64(); desktop='Default'}
+                             rootId=($uia.GetRuntimeId() -join ','); tick=[IfwNoticeDesktop]::GetTickCount64()
+                             qpc=[Diagnostics.Stopwatch]::GetTimestamp(); desktop='Default'}
                 }
                 return
             }
@@ -238,6 +240,66 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
     }
 }
 
+function Read-NoticeScan {
+    $roots = [IfwNoticeDesktop]::Roots()
+    $errorsSeen = 0; $lastHresult = $null; $found = $null
+    foreach ($candidate in $roots) {
+        try { $found = Match-Notice $candidate $titleCondition $bodyCondition }
+        catch [System.Windows.Automation.ElementNotAvailableException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
+        catch [Runtime.InteropServices.COMException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
+        if ($null -ne $found) { break }
+    }
+    return @{roots=$roots.Count; match=$found; errors=$errorsSeen; lastHresult=$lastHresult}
+}
+
+function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) {
+    $frequency = [Diagnostics.Stopwatch]::Frequency
+    $first = [Diagnostics.Stopwatch]::GetTimestamp()
+    $go = Join-Path $Fixture 'notice.go'; $sent = Join-Path $Fixture 'notice.sent'; $finish = Join-Path $Fixture 'notice.finish'
+    $sentQpc = $null; $count = 0; $peak = 0; $errorsSeen = 0; $lastHresult = $null; $sawMatch = $false
+    while ($true) {
+        if ([IO.File]::Exists($finish)) {
+            Emit @{stage='unavailable'; complete=$false; reason='Observer stopped before the post-request interval completed'}
+            return 2
+        }
+        if ($null -eq $sentQpc -and [IO.File]::Exists($sent)) {
+            if ([IO.File]::ReadAllText($sent) -cne $Token) { throw 'Notification marker did not match' }
+            $sentQpc = [Diagnostics.Stopwatch]::GetTimestamp()
+        }
+        $released = [IO.File]::Exists($go)
+        $start = [Diagnostics.Stopwatch]::GetTimestamp()
+        if ($null -eq $sentQpc -and $start - $first -ge 25L * $frequency) {
+            Emit @{stage='unavailable'; complete=$false; reason='No completed native request arrived before the observer deadline'}
+            return 2
+        }
+        $scan = & $ReadScan
+        $end = [Diagnostics.Stopwatch]::GetTimestamp()
+        $count++; $peak = [Math]::Max($peak,$scan.roots); $errorsSeen += $scan.errors
+        if ($null -ne $scan.lastHresult) { $lastHresult = $scan.lastHresult }
+        $sample = @{stage='sample'; number=$count; startQpc=$start; endQpc=$end; released=$released; sent=($null -ne $sentQpc)
+                    roots=$scan.roots; providerErrors=$scan.errors}
+        if ($null -ne $scan.match) { $sample.match=$scan.match; $sawMatch=$true }
+        Emit $sample
+        if ($null -ne $scan.match -and -not [IO.File]::Exists($go)) {
+            Emit @{stage='unavailable'; complete=$false; reason='The fresh title and body were visible before the request was released'}
+            return 2
+        }
+        if ($null -ne $sentQpc -and $start - $sentQpc -ge 10L * $frequency) {
+            $summary = @{complete=$true; samples=$count; peakKnownRoots=$peak; providerErrors=$errorsSeen
+                         lastHresult=$lastHresult; sentObservedQpc=$sentQpc}
+            if ($sawMatch) {
+                $summary.stage='visible'; Emit $summary
+                return 0
+            }
+            $summary.stage='unavailable'; $summary.reason='No exact visible title and body on the observed native Shell hosts'
+            Emit $summary
+            return 2
+        }
+        # The synchronous Shell call can return between polls. Re-scan immediately until its marker arrives.
+        if ($null -ne $sentQpc) { Start-Sleep -Milliseconds 100 }
+    }
+}
+
 $title = "IFW notice $Token"; $body = "Synthetic IFW notification $Token"
 $name = [Windows.Automation.AutomationElement]::NameProperty
 $titleCondition = [Windows.Automation.PropertyCondition]::new($name,$title)
@@ -245,41 +307,21 @@ $bodyCondition = [Windows.Automation.PropertyCondition]::new($name,$body)
 $oldDpi = [IfwNoticeDesktop]::SetThreadDpiAwarenessContext([IntPtr](-4))
 if ($oldDpi -eq [IntPtr]::Zero) { Emit @{stage='unavailable'; reason='Physical coordinate context unavailable'}; exit 2 }
 try {
-    $roots = [IfwNoticeDesktop]::Roots()
-    foreach ($candidate in $roots) {
-        try { $existing = Match-Notice $candidate $titleCondition $bodyCondition }
-        catch [System.Windows.Automation.ElementNotAvailableException] { continue }
-        catch [Runtime.InteropServices.COMException] { continue }
-        if ($null -ne $existing) { throw 'The fresh notification was visible before the sender started' }
+    if (-not [Diagnostics.Stopwatch]::IsHighResolution) { throw 'The native performance counter is unavailable' }
+    $baseline = Read-NoticeScan
+    if ($null -ne $baseline.match -or $baseline.errors -ne 0) {
+        Emit @{stage='unavailable'; complete=$false; reason='Could not confirm an empty original notification baseline'
+               preexistingMatch=($null -ne $baseline.match); providerErrors=$baseline.errors}
+        exit 2
     }
-    Emit @{stage='armed'; tick=[IfwNoticeDesktop]::GetTickCount64(); initialRoots=$roots.Count; preexistingMatch=$false}
-    $wait = [Diagnostics.Stopwatch]::StartNew()
-    while (-not [IO.File]::Exists((Join-Path $Fixture 'notice.sent'))) {
-        if ([IO.File]::Exists((Join-Path $Fixture 'notice.finish'))) { return }
-        if ($wait.Elapsed.TotalSeconds -ge 25) { throw 'The notification sender did not announce its single request' }
-        Start-Sleep -Milliseconds 25
-    }
-    if ([IO.File]::ReadAllText((Join-Path $Fixture 'notice.sent')) -cne $Token) { throw 'Notification marker did not match' }
-    $scan = [Diagnostics.Stopwatch]::StartNew()
-    $samples = 0; $peak = 0; $providerErrors = 0; $lastHresult = $null
-    do {
-        $liveRoots = [IfwNoticeDesktop]::Roots()
-        $samples++; $peak = [Math]::Max($peak,$liveRoots.Count)
-        foreach ($candidate in $liveRoots) {
-            try { $match = Match-Notice $candidate $titleCondition $bodyCondition }
-            catch [System.Windows.Automation.ElementNotAvailableException] { $providerErrors++; $lastHresult=$_.Exception.HResult; continue }
-            catch [Runtime.InteropServices.COMException] { $providerErrors++; $lastHresult=$_.Exception.HResult; continue }
-            if ($null -ne $match) {
-                Emit @{stage='visible'; match=$match; samples=$samples; peakKnownRoots=$peak; providerErrors=$providerErrors}
-                return
-            }
-        }
-        if ([IO.File]::Exists((Join-Path $Fixture 'notice.finish'))) { break }
-        Start-Sleep -Milliseconds 100
-    } while ($scan.Elapsed.TotalSeconds -lt 10)
-    Emit @{stage='unavailable'; reason='No exact visible title and body on the observed native Shell hosts'; samples=$samples
-           peakKnownRoots=$peak; providerErrors=$providerErrors; lastHresult=$lastHresult}
-    exit 2
+    [long]$nativeBefore = 0; [long]$nativeAfter = 0
+    if (-not [IfwNoticeDesktop]::QueryPerformanceCounter([ref]$nativeBefore)) { throw 'The original QPC is unavailable' }
+    $baselineQpc = [Diagnostics.Stopwatch]::GetTimestamp()
+    if (-not [IfwNoticeDesktop]::QueryPerformanceCounter([ref]$nativeAfter) -or
+        $baselineQpc -lt $nativeBefore -or $baselineQpc -gt $nativeAfter) { throw 'Stopwatch did not read the original QPC epoch' }
+    Emit @{stage='armed'; tick=[IfwNoticeDesktop]::GetTickCount64(); qpc=$baselineQpc; nativeBeforeQpc=$nativeBefore; nativeAfterQpc=$nativeAfter
+           frequency=[Diagnostics.Stopwatch]::Frequency; initialRoots=$baseline.roots; preexistingMatch=$false}
+    exit (Watch-Notice $Fixture $Token { Read-NoticeScan })
 } catch {
     $cause = $_.Exception.GetBaseException()
     if ($cause -is [InvalidOperationException] -or $cause -is [Runtime.InteropServices.COMException]) {

@@ -143,13 +143,45 @@ fn notification_state(prefix: &str) {
     }
 }
 
-fn request_notification(icon: &Icon<'_>, id: &str, body: &str) -> bool {
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn QueryPerformanceCounter(counter: *mut i64) -> i32;
+    fn QueryPerformanceFrequency(frequency: *mut i64) -> i32;
+}
+
+fn performance_value(read: unsafe extern "system" fn(*mut i64) -> i32) -> Result<i64> {
+    let mut value = 0;
+    // Both APIs write one native LARGE_INTEGER into this aligned, live i64.
+    if unsafe { read(&mut value) } == 0 || value <= 0 {
+        return Err(invalid());
+    }
+    Ok(value)
+}
+
+fn notification_data(icon: &Icon<'_>, id: &str, body: &str) -> NOTIFYICONDATAW {
     let mut notice = icon.base();
     notice.uFlags = NIF_INFO | NIF_REALTIME;
     notice.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME | NIIF_NOSOUND;
     copy_text(&mut notice.szInfoTitle, &format!("IFW notice {id}"));
     copy_text(&mut notice.szInfo, body);
-    icon.call("notification_request", NIM_MODIFY, &notice)
+    notice
+}
+
+fn timed_notification(icon: &Icon<'_>, id: &str) -> Result<bool> {
+    let notice = notification_data(icon, id, &format!("Synthetic IFW notification {id}"));
+    let begin = performance_value(QueryPerformanceCounter)?;
+    // Keep formatting and log I/O outside the two observations of the synchronous Shell call.
+    let (accepted, raw) = unsafe {
+        SetLastError(WIN32_ERROR(0));
+        let accepted = Shell_NotifyIconW(NIM_MODIFY, &notice).as_bool();
+        (accepted, GetLastError().0)
+    };
+    let end = performance_value(QueryPerformanceCounter)?;
+    println!("notice.request_begin_qpc={begin}\nnotice.request_end_qpc={end}");
+    println!(
+        "notice.notification_request={accepted}\nnotice.notification_request.raw_last_error={raw}"
+    );
+    Ok(accepted)
 }
 
 fn signal_observer(area: &Path, name: &str, id: &str) -> Result<()> {
@@ -189,9 +221,11 @@ pub(super) fn notification_only(area: &Path, id: &str) -> Result<()> {
         pump(0);
         let before = EVENTS.get();
         notification_state("notice");
-        let requested = added
-            && v4
-            && request_notification(&icon, id, &format!("Synthetic IFW notification {id}"));
+        println!(
+            "notice.qpc_frequency={}",
+            performance_value(QueryPerformanceFrequency)?
+        );
+        let requested = added && v4 && timed_notification(&icon, id)?;
         println!("notice.requested={requested}");
         signal_observer(area, "notice.sent", id)?;
         let issued = Instant::now();
@@ -268,7 +302,8 @@ pub(super) fn assess(area: &Path, id: &str) -> Result<()> {
         Err(e) => println!("tray.icon_rect_hresult={}", e.code().0),
     }
     notification_state("tray");
-    request_notification(&icon, id, "Synthetic Windows notification assessment");
+    let notice = notification_data(&icon, id, "Synthetic Windows notification assessment");
+    icon.call("notification_request", NIM_MODIFY, &notice);
     std::fs::write(
         area.join("tray.ready"),
         if first { "registered" } else { "unavailable" },

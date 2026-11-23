@@ -43,6 +43,31 @@ def subject():
                                   ("beforeLaunch", "beforeRequest", "afterRequest", "afterQuit")})
 
 
+def trace(match_sample=None):
+    """A 1 kHz synthetic clock with a Shell request from 186 to 202 and ten seconds of post-request sweeps."""
+    baseline = dict(stage="armed", tick=160, qpc=160, nativeBeforeQpc=159, nativeAfterQpc=161,
+                    frequency=1000, initialRoots=3, preexistingMatch=False)
+    rows = []
+    for start, stop, released, sent in [(170, 175, False, False), (188, 198, True, False)] + [
+            (start, start + 5, True, True) for start in range(210, 10211, 100)]:
+        number = len(rows) + 1
+        row = dict(stage="sample", number=number, startQpc=start, endQpc=stop, released=released, sent=sent,
+                   roots=3, providerErrors=0)
+        if number == match_sample:
+            row["match"] = MATCH | {"qpc": start + 4}
+        rows.append(row)
+    terminal = dict(stage="visible" if match_sample else "unavailable", complete=True, samples=len(rows),
+                    sentObservedQpc=208, peakKnownRoots=3, providerErrors=0)
+    record = dict(armBeforeRequest=n.arm_event([baseline, rows[0]]), qpcFrequency=1000,
+                  releaseQpc=182, acknowledgedQpc=210, finishQpc=10230)
+    native = BASE | {"notice.qpc_frequency": 1000, "notice.request_begin_qpc": 186, "notice.request_end_qpc": 202}
+    return [baseline, *rows, terminal], record, native
+
+
+def observed(events, record, native):
+    return n.observed_presentation(events, TOKEN, 2, WIN, record, native)
+
+
 class NotificationTests(unittest.TestCase):
     def test_raw_shell_callback_during_quiet_time_does_not_substitute_for_visible_title_and_body(self):
         absent = dict(stage="unavailable", reason="missing title/body")
@@ -84,19 +109,136 @@ class NotificationTests(unittest.TestCase):
             with self.subTest(key=key, subkey=subkey), self.assertRaises(ValueError):
                 n.check_match(sample, TOKEN, 2, WIN)
 
-    def test_only_armed_current_request_can_account_for_the_visible_sample(self):
-        seen = dict(stage="visible", match=MATCH)
-        armed = dict(stage="armed", tick=160, preexistingMatch=False)
-        self.assertEqual(n.observed_presentation([armed, seen], TOKEN, 2, WIN, armed, 182, 210), seen)
-        for sequence, release, finish in (([seen], 182, 210), ([armed, seen, seen], 182, 210),
-                                          ([armed | {"preexistingMatch": True}, seen], 182, 210),
-                                          ([armed, seen], 193, 210), ([armed, seen], 182, 190)):
-            with self.assertRaises(ValueError):
-                n.observed_presentation(sequence, TOKEN, 2, WIN, armed, release, finish)
-        late_arm = dict(armed, tick=182)
-        missed = n.observed_presentation([late_arm, seen], TOKEN, 2, WIN, n.arm_event([]), 182, 210)
-        self.assertEqual(missed["stage"], "unavailable")
-        self.assertIsNone(n.arm_event([late_arm, late_arm]))
+    def test_transient_match_during_synchronous_call_is_retained_through_the_full_post_request_interval(self):
+        for number, phase in ((2, "during-shell-call"), (3, "after-shell-call")):
+            events, record, native = trace(number)
+            event = observed(events, record, native)
+            self.assertEqual(event["match"], events[number]["match"])
+            self.assertEqual(record["samplingWindow"]["acceptedSample"], number)
+            self.assertEqual(record["samplingWindow"]["matchPhase"], phase)
+            self.assertEqual(record["samplingWindow"]["nativeOverlapSamples"], 1)
+            self.assertTrue(record["samplingWindow"]["fullPostRequest"])
+            self.assertEqual(n.outcome(native, event, TOKEN, 2, WIN, subject()), "passed")
+
+    def test_a_post_request_match_survives_a_short_call_between_sweeps_and_a_sweep_can_span_the_return(self):
+        events, record, native = trace(3)
+        for begin, end in ((201, 204), (198, 202), (182, 188), (193, 193)):
+            native.update({"notice.request_begin_qpc": begin, "notice.request_end_qpc": end})
+            with self.subTest(begin=begin, end=end):
+                event = observed(events, record, native)
+                self.assertEqual(n.outcome(native, event, TOKEN, 2, WIN, subject()), "passed")
+                self.assertEqual(record["samplingWindow"]["nativeOverlapSamples"], 0)
+                self.assertEqual(record["samplingWindow"]["matchPhase"], "after-shell-call")
+        events, record, native = trace(2)
+        events[2]["endQpc"] = 206
+        events[2]["match"]["qpc"] = 204
+        self.assertEqual(observed(events, record, native)["stage"], "visible")
+        self.assertEqual(record["samplingWindow"]["matchPhase"], "spans-shell-return")
+
+    def test_sparse_delayed_or_blocked_post_request_scans_preserve_a_real_match_but_fail_the_trial(self):
+        for case in ("two-distant-sweeps", "late-return-marker", "blocked-last-sweep"):
+            events, record, native = trace(2)
+            if case == "two-distant-sweeps":
+                events = events[:4] + events[-2:]
+                events[-2]["number"] = events[-1]["samples"] = 4
+            elif case == "late-return-marker":
+                for row in events[3:-1]:
+                    row["startQpc"] += 1200
+                    row["endQpc"] += 1200
+                events[-1]["sentObservedQpc"] += 1200
+                record["finishQpc"] += 1200
+            else:
+                events[-2]["endQpc"] += 1200
+                record["finishQpc"] += 1200
+            event = observed(events, record, native)
+            window = record["samplingWindow"]
+            with self.subTest(case=case):
+                self.assertFalse(window["fullPostRequest"])
+                self.assertGreater(window["maxPostIntervalQpc"], window["maxPostIntervalLimitQpc"])
+                self.assertEqual(window["postStartQpc"], native["notice.request_end_qpc"])
+                self.assertEqual(event["stage"], "incomplete")
+                self.assertEqual(event["match"], events[2]["match"])
+                report = subject()
+                with self.assertRaisesRegex(ValueError, "exceeded one second"):
+                    n.outcome(native, event, TOKEN, 2, WIN, report)
+                self.assertTrue(report["observations"]["independentlyVisible"])
+
+    def test_pending_or_pre_request_ui_read_cannot_prove_the_notification_was_shown(self):
+        events, record, native = trace(2)
+        for start, released in ((180, False), (184, True), (186, True)):
+            events[2].update(startQpc=start, released=released)
+            with self.subTest(start=start):
+                self.assertEqual(observed(events, record, native)["stage"], "unavailable")
+                self.assertNotIn("acceptedSample", record["samplingWindow"])
+        events[3]["match"] = MATCH | {"qpc": 214}
+        self.assertEqual(observed(events, record, native)["match"], events[3]["match"])
+        events[2]["startQpc"] = 184
+        events[2]["match"]["qpc"] = 185
+        with self.assertRaisesRegex(ValueError, "before its Shell request"):
+            observed(events, record, native)
+
+    def test_only_an_active_negative_sweep_can_release_the_sender(self):
+        events, record, _ = trace()
+        self.assertIsNotNone(n.arm_event(events[:2]))
+        for items in ([], events[:1], [events[0] | {"preexistingMatch": True}, events[1]],
+                      [events[0] | {"nativeBeforeQpc": 162}, events[1]],
+                      [events[0], events[1] | {"match": MATCH}], [events[0], events[1] | {"providerErrors": 1}],
+                      [events[0], events[1] | {"released": True}], [events[0], events[1] | {"startQpc": 159}],
+                      [events[0], dict(stage="unavailable")]):
+            self.assertIsNone(n.arm_event(items))
+        self.assertEqual(record["armBeforeRequest"]["lastSampleEndQpc"], 175)
+        with patch.object(n, "events", side_effect=[events[:1], events[:2]]), patch.object(n.time, "sleep"):
+            self.assertTrue(n.wait_for_observer(None, Mock(poll=Mock(return_value=None))))
+        with patch.object(n, "events", return_value=events[:2]):
+            self.assertFalse(n.wait_for_observer(None, Mock(poll=Mock(return_value=2))))
+
+    def test_missing_or_disordered_receipts_and_incomplete_post_request_sampling_are_rejected(self):
+        for description, edit in (
+                ("missed arm", lambda e, r, m: r.update(armBeforeRequest=None)),
+                ("preexisting title", lambda e, r, m: e[0].update(preexistingMatch=True)),
+                ("frequency", lambda e, r, m: m.update({"notice.qpc_frequency": 1001})),
+                ("release after call", lambda e, r, m: r.update(releaseQpc=187)),
+                ("native return after observer acknowledgement", lambda e, r, m: m.update({"notice.request_end_qpc": 209})),
+                ("no native timing", lambda e, r, m: m.pop("notice.request_end_qpc")),
+                ("missing sweep", lambda e, r, m: e.pop(2)),
+                ("reversed sweep", lambda e, r, m: e[2].update(endQpc=180)),
+                ("lost sent marker", lambda e, r, m: e[4].update(sent=False)),
+                ("sampled after finish", lambda e, r, m: r.update(finishQpc=10212)),
+                ("no ten-second window", lambda e, r, m: e.pop(-2)),
+                ("false complete", lambda e, r, m: e[-1].update(complete=False)),
+                ("missing root evidence", lambda e, r, m: e[-1].update(peakKnownRoots=4)),
+                ("sampled physical hit after query", lambda e, r, m: e[2]["match"].update(qpc=199)),
+                ("untimed terminal match", lambda e, r, m: e[-1].update(match=MATCH)),
+                ("duplicate outcome", lambda e, r, m: e.append(e[-1]))):
+            events, record, native = trace(2)
+            edit(events, record, native)
+            with self.subTest(description=description), self.assertRaises(ValueError):
+                observed(events, record, native)
+        events, record, native = trace()
+        native.update({"notice.request_begin_qpc": 201, "notice.request_end_qpc": 204})
+        self.assertIn("between two", observed(events, record, native)["reason"])
+        self.assertEqual(record["samplingWindow"]["nativeOverlapSamples"], 0)
+
+    def test_declined_icon_still_requires_a_complete_observer_receipt_and_cannot_have_call_timestamps(self):
+        events, record, native = trace()
+        native.update({"notice.initial.add": False, "notice.requested": False, "notice.balloon_show": 0})
+        for key in ("notice.initial.version4", "notice.notification_request", "notice.remove",
+                    "notice.request_begin_qpc", "notice.request_end_qpc"):
+            native.pop(key)
+        absent = observed(events, record, native)
+        self.assertEqual(n.outcome(native, absent, TOKEN, 2, WIN, subject()), "unavailable")
+        self.assertTrue(record["samplingWindow"]["fullPostRequest"])
+        self.assertEqual(record["samplingWindow"]["nativeOverlapSamples"], 0)
+        for key in ("notice.request_begin_qpc", "notice.request_end_qpc", "notice.notification_request.raw_last_error"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unregistered"):
+                observed(events, record, native | {key: 192})
+        with self.assertRaisesRegex(ValueError, "complete sampling interval"):
+            observed(events[:-1] + [dict(stage="unavailable", complete=False)], record, native)
+        with self.assertRaises(ValueError):
+            observed(events[:3] + events[-1:], record, native)
+        events, record, _ = trace(2)
+        with self.assertRaises(ValueError):
+            observed(events, record, native)
 
     def test_shared_parent_requires_separately_hittable_pixels_and_immediate_parent_in_both_labels(self):
         sample = deepcopy(MATCH)
@@ -314,7 +456,7 @@ class NotificationTests(unittest.TestCase):
             (original / "graph.json").write_text(json.dumps(graph))
             (original / "build.txt").write_text("built")
             (original / "balloon-id.txt").write_text("test tray::shell::notification_tests::balloon_callbacks_belong_to_the_registered_v4_icon ... ok\n")
-            (original / "notification-points.txt").write_text("Notification pixel selection passed.\n")
+            (original / "notification-points.txt").write_text("Notification pixel selection passed.\nNotification timing controls passed.\n")
             (original / "native.txt").write_text("tray.taskbar_present=true\ntray.taskbar_creation=19\ntray.taskbar_pid=34\n")
             inputs = dict(checkoutVerified=True, hosted=True, target=target, head="revision", runner="host", workflowRun="7", workflowAttempt="2",
                           probeCompleted=False, probeSha256=n.sha(binary), locked="lock", canonicalGraphSha256=digest,
@@ -338,6 +480,15 @@ class NotificationTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         n.bind_build(target, binary, original, {"observerInputs": {"service.rs": n.sha(source)}})
                     path.write_bytes(data)
+                points = original / "notification-points.txt"
+                restored = points.read_bytes()
+                points.write_text("Notification pixel selection passed.\n")
+                inputs["evidenceFiles"][points.name] = n.sha(points)
+                (original / "result.json").write_text(json.dumps(inputs))
+                with self.assertRaisesRegex(ValueError, "sampling controls"):
+                    n.bind_build(target, binary, original, {"observerInputs": {source.name: n.sha(source)}})
+                points.write_bytes(restored)
+                inputs["evidenceFiles"][points.name] = n.sha(points)
                 inputs["workflowAttempt"] = "1"
                 (original / "result.json").write_text(json.dumps(inputs))
                 with self.assertRaises(ValueError):
