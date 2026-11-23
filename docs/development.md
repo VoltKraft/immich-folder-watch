@@ -191,7 +191,10 @@ and FIFO trials. Its subsequent `--dispatch` trace compares both retained
 window wake paths and the original hidden-paint policy with the same executable,
 host and budget. Results and per-trial logs appear under
 `windows-warm-window/<target>/dispatch/`. Preserve the adjacent
-`eframe-source.zip` with the native build receipt for offline reproduction.
+`eframe-source.zip` with the native build receipt and `compiler.jsonl` for
+offline reproduction. The archive contains the original eframe and winit
+crates, licenses and changes. The retained launcher verifies both local
+library outputs against the actual native Cargo stream before starting the GUI.
 See the [window measurements](rust/rw02-windows-window.md).
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).

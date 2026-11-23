@@ -177,8 +177,9 @@ the observer also enumerates that desktop for windows owned by the primary.
 [Desktop handle lifetime](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-closedesktop) ·
 [Thread desktop assignment](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop).
 
-After verified cleanup, a second isolated profile exercises an ordinary
-foreground-first launch on the runner's existing unlocked Default desktop.
+The ordinary foreground-first launch uses an isolated profile on the
+runner's existing unlocked Default desktop. Commit `68f68c0` runs it
+first, then starts the private desktop case after verified cleanup.
 Both invocations use the canonical GUI executable without arguments. The
 first launch must show its own titled window, close it, accept the second
 process's request, show its window again and retain the same inventory worker
@@ -282,3 +283,27 @@ timeout leaves both process logs available for diagnosis. Independent source
 review reproduced the retained patch and checked the first synchronous eframe
 paint and the ordinary reopen. Native Windows results for this change belong
 to the [assessment at `1e58541`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708).
+
+### Native Windows launcher at 1e58541
+
+Windows x64 completed the ordinary second launch and restart on the private
+desktop and the ordinary launch on the original input desktop in both
+variants. The retained build reopened the same HWND with the original worker.
+The observer confirmed both foreground and keyboard focus.
+[Canonical x64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14795074825)
+· [Retained x64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14795414801).
+
+On ARM64 the canonical private launch and restart both drained their jobs.
+When cleanup opened a fixture entry for deletion, Windows returned sharing
+violation 32. The original log identifies the operation but omits the name.
+The canonical Default-desktop trial therefore did not start in that run.
+Commit `68f68c0` records the failing relative path and preserves the busy
+entry. The retained private trial passed. On Default, secondary PID 2128
+granted foreground access to PID 5780. The same HWND 1376862 became visible
+with worker PID 1780. Its UI thread's `SetForegroundWindow` returned false.
+All 41 foreground samples over 2,022 ms and all 41 keyboard-focus samples
+were negative. The primary and secondary jobs drained normally. This was a
+no-argument launch by the native observer. An interactive launch through
+Explorer still needs direct observation.
+[Canonical ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796192246)
+· [Retained ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796579708).

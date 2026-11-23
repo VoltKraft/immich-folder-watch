@@ -1,5 +1,49 @@
 # Project Status
 
+## Windows activation and resource results (2026-11-23)
+
+The retained Windows candidate at `4975c45` changes only visibility on a
+normal owned HWND when both native style words match its cached state.
+Commit `9de3ded` checks the actual hide and reopen paths separately.
+Independent review reproduced the 217-file winit tree, the paired source
+archive and the native Fedora compiler outputs. Four Rust controls and 18
+portable fixture tests passed, as did cross-Clippy for Windows x64 and
+ARM64. Both native Windows performance runs are required to evaluate
+the change. [Candidate and evidence requirements](rust/rw02-windows-window.md#testing-visibility-changes-without-resetting-the-window-frame).
+
+At `1e58541` both Ubuntu desktop jobs, all four native feasibility jobs,
+the draft PR's CI and CodeQL passed. Both Windows desktop jobs failed.
+The original x64 Desktop confirmed ordinary second-launch foreground and
+retained keyboard focus. On ARM64 the retained window reopened with its
+worker. Windows refused its foreground request. The canonical ARM64 private
+restart drained, then cleanup received Win32 error 32 before the independent
+Default-desktop test. Commit `68f68c0` preserves the original-desktop result
+first and identifies any busy entry during cleanup.
+[Launcher evidence](rust/rw02-instance.md#native-windows-launcher-at-1e58541)
+· [Native assessments](rust/rw02-native-gui.md#native-follow-up-at-1e58541)
+· [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124503587).
+
+ARM64 again met all eleven retained-window limits. The x64 candidate
+exceeded three. Every over-budget x64 close in the regular dispatch trial
+waited through visible redraw. On 78 of 81 slow reopens the native show
+call overlapped at least half of the response time. The original x64 Shell
+registered the integrated icon but no provider activation was observed.
+The ARM64 Shell refused all nine adds. Both late notification trials
+stopped before sending a notification. Commit `5321181` fixes the
+fixture-directory mismatch and its portable regression passes.
+[Window measurements](rust/rw02-windows-window.md#retained-measurements-with-explicit-foreground-requests-at-1e58541)
+· [Notifications](rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+
+The native writer guard again performed eight ordered ownership operations
+in two elevated sessions of the same account per Windows host. Both
+scheduled-task cleanups returned zero. Neither standard-user launcher reached
+its writer. On November 23 the repository reported no registered self-hosted
+runners. Existing standard-user sessions and an actual mixed-DPI/RDP desktop
+remain necessary for those trials. RW-01 is accepted and RW-02 remains open.
+[Writer results and scheduler cleanup](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541)
+· [Display requirements](rust/rw02-windows-display.md)
+· [Full acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
 ## Four-host storage and the Windows desktop rerun (2026-11-23)
 
 RW-01 is accepted and RW-02 is active under the original RW-01–07 goal.

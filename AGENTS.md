@@ -171,10 +171,10 @@ to reconcile project decisions, defaults, and recorded state.
   the [development guide](docs/development.md#rust-feasibility-workspace)
   lists the other native feasibility entry points.
   The [retained Windows window comparison](docs/rust/rw02-windows-window.md)
-  reconstructs its eframe source separately and measures against the same
-  host's WPF references. Preserve the native results, compiler stream and
-  source archive together. Exercise ordinary second-launch and actual Shell
-  activation for the same retained executable.
+  reconstructs its eframe and winit sources and measures against the same
+  host's WPF references. Preserve the native results, both library receipts,
+  compiler stream and source archive together. Exercise ordinary second-launch
+  and actual Shell activation for the same retained executable.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).

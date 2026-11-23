@@ -518,6 +518,26 @@ with SHA-256 `241946cc32b0750c5b907b7c5d09fcece10533e74549b4128e57b767f061c09d`.
 [Isolated native observer](../../tools/rust-qa/gui/native.py)
 · [Windows foreground mechanism](rw02-instance.md#explicit-windows-foreground-requests).
 
+## Native follow-up at 1e58541
+
+Both Ubuntu desktop jobs and all four native feasibility jobs passed. Direct
+replay of the Ubuntu archives verified each host's three 100,000-file scans
+per executable and all eleven X11 resource and response limits. Scan reopen
+p95 was 1.06 ms on x64 and 0.91 ms on ARM64. The corresponding close times
+were 0.40 and 0.36 ms. The offline compiler, notice and SPDX reconstruction
+also reproduced the originals for all four targets. The Ubuntu desktop
+readback has SHA-256 `8e90b3a4d688145c2ad9bcc650ae163347b5fc32fab4057f8456c7bdd65d4b07`.
+[Four native feasibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494628)
+· [Native desktop archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708).
+
+Both Windows desktop jobs failed. ARM64 met all eleven retained-window
+performance limits. x64 met eight, exceeding idle-close, scan-close and
+scan-reopen limits in all three trials. The native launcher, original
+Explorer notification area and late notification have separate observations.
+[Resource and dispatch traces](rw02-windows-window.md#retained-measurements-with-explicit-foreground-requests-at-1e58541)
+· [Launcher and worker lifetime](rw02-instance.md#native-windows-launcher-at-1e58541)
+· [Shell and notification](rw02-windows-services.md#late-notification-on-the-original-desktop).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

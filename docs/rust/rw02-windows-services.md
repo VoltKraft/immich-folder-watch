@@ -409,3 +409,25 @@ on a different thread. A popup already hidden by Explorer and an effective
 invocation followed by a COM error each caused zero additional invocations.
 Seven PowerShell controls also passed. The corrected path is included in the
 [native Windows run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708).
+
+At `1e58541` all four integrated shell-less cases passed. On the original
+x64 desktop all three GUI trials registered version 4 and removed their
+icons at exit. Each rectangle pointed at the same screen pixel, RGB
+`eeeeee`. The observer could not identify an eligible overflow provider
+and issued no invocation. On ARM64 the original Explorer remained in place
+and returned `E_FAIL` on all nine adds, including the application's two
+scheduled retries per trial. It returned no icon rectangle. Neither host
+produced an integrated Open callback. On the separate private x64 desktop,
+registration succeeded after 49 ms, with the marker still unobserved.
+[x64 integrated tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796080786)
+· [ARM64 integrated tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14796372328)
+· [Original and retained launcher observations](rw02-instance.md#native-windows-launcher-at-1e58541).
+
+Commit `1f26816` records each of the four named UI Automation queries
+when the original Explorer has no eligible overflow button. It flushes the
+query results before collecting a bounded, read-only sample at the hint
+point. The observer still requires an identified button and the private
+icon marker for an actual activation. The additional diagnostic has passed
+its isolated PowerShell selection and point checks. A native result with
+an actual provider remains open. Commit `00db89c` also records when the
+element at that point changes owner during the query. [Original Explorer selection](../../tools/rust-qa/windows-launcher/tray_provider.ps1) · [Selection controls](../../tools/rust-qa/windows-launcher/test_chevron.ps1).

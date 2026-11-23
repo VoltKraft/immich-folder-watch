@@ -120,8 +120,8 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. Three ordinary editor and four font cases passed, including NVDA, masking and clipboard. Japanese IME preedit, commit and cleanup passed again at `0a2b5ca`. Retained Mailbox passed 11/11 limits at `0a2b5ca` and 8/11 at `93ecc35`. At `93ecc35` the foreground HWND reopened and the single-process secondary drained. The private desktop name query returned error 5. The integrated icon registered, but its first visible marker differed. | Pending |
-| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. Three ordinary edits, four font cases, NVDA speech, masking and clipboard passed. Japanese IME preedit, commit and cleanup passed again at `0a2b5ca`. Retained Mailbox passed 11/11 limits at both `0a2b5ca` and `93ecc35`. At `93ecc35` the single-process secondary drained and a visible HWND reopened. No foreground in 41 samples. The private desktop name query returned error 5. The integrated icon registration was refused. | Pending |
+| Windows x64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases, Startup readback, original Shell registration and balloon callback. Three ordinary editor and four font cases passed, including NVDA, masking and clipboard. Japanese IME preedit, commit and cleanup passed. At `1e58541` the canonical and retained ordinary second launches passed on the private and original desktops. Retained keyboard focus was confirmed. Mailbox passed 8/11 limits. All three integrated icon registrations succeeded. The marker was not seen and no Shell activation occurred. | Pending |
+| Windows ARM64 | Hosted oracle and Core passed (557 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB passed at `93ecc35`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | Four DX12 lifecycle cases and Startup readback. Three ordinary edits, four font cases, NVDA speech, masking and clipboard passed. Japanese IME preedit, commit and cleanup passed. At `1e58541` retained Mailbox met all eleven limits. The private retained launch passed. On Default the same HWND reopened and Windows denied foreground after a granted handoff. The canonical private restart drained before a sharing violation prevented its Default trial. The original Shell refused all nine integrated adds. | Pending |
 | Linux x64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Pending |
 | Linux ARM64 | Hosted oracle and Core passed (566 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. | Pending |
 
@@ -129,8 +129,13 @@ At `93ecc35`, both Ubuntu targets repeated all eleven X11 budgets and the
 sixteen transport scenarios. All four native targets passed direct SQL
 readback of both WAL backups, 30 stored-key lookups and ten controls per
 host. All four native input ZIPs, notice ZIPs and SPDX documents reproduced
-byte-for-byte from the archived build evidence.
-[Ubuntu native results](rw02-native-gui.md#native-follow-up-at-93ecc35)
+byte-for-byte from the archived build evidence. Both Ubuntu jobs repeated
+the resource and desktop checks at `1e58541`. All four native feasibility
+archives at that revision recorded 5,844 checks against each of the two
+casing profiles. The two Windows hosts again observed an encrypted SMB 3.1.1
+connection on the synthetic share.
+[Ubuntu native results](rw02-native-gui.md#native-follow-up-at-1e58541)
+· [Native filesystem and compatibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494628)
 · [Notice and SPDX receipts](rw02-combined-notices.md#native-notices-at-93ecc35)
 · [Four-host SQL matrix](rw02-legacy.md#native-desktop-storage-at-93ecc35).
 
@@ -149,9 +154,9 @@ initial icon registration. Their FAT volumes reached zero free bytes and the
 storage worker rejected the supervisor's line ending before recovery. Both
 Windows targets then restored the database in both path comparison modes at
 `7517e3b` and detached their full private volumes. Both Windows hosts also
-passed the [IME with profile cleanup](rw02-windows-ime.md). At `93ecc35` Windows x64 again exceeded three window-response limits. Windows tray
+passed the [IME with profile cleanup](rw02-windows-ime.md). At `1e58541` Windows x64 again exceeded three window-response limits. Windows tray
 activation, mixed-DPI/RDP, installed migration and ordinary-user writer
-exclusion still need native evidence. [Native launcher and Shell observations](rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35).
+exclusion still need native evidence. [Native launcher and Shell observations](rw02-instance.md#native-windows-launcher-at-1e58541).
 
 The [four verified archives at `8a8adaa`](rw02-native-gui.md#native-follow-up-at-8a8adaa) record both Ubuntu jobs passing. Each Windows host met six of nine measured idle/startup budgets. Visible memory and idle close/reopen exceeded their limits on both. The new [paired workload](rw02-windows-performance.md) adds real Windows scan observations.
 

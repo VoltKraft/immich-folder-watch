@@ -87,7 +87,7 @@ python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-co
 python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dispatch
 ```
 
-Preserve `build.json`, `eframe-source.zip`, `observed/**`, `measured/**` and `measured-fifo/**` under `artifacts/rust/windows-warm-window/<target>/`. The first timed command enforces all eleven WPF-derived maximums. The second records the earlier FIFO policy and binds both complete three-trial comparisons to the same revision, binary, host run, budget and workload. An over-budget control remains visible in its result. Build receipts identify the canonical and retained executables, their sources, the reviewed features and the fonts. The source archive supplies the inputs for rebuilding the retained eframe derivative. [Build](../../tools/rust-qa/windows-warm-window/build.py) · [Timed comparison](../../tools/rust-qa/windows-warm-window/measure.py).
+Preserve `build.json`, `compiler.jsonl`, `eframe-source.zip`, `observed/**`, `measured/**` and `measured-fifo/**` under `artifacts/rust/windows-warm-window/<target>/`. The first timed command enforces all eleven WPF-derived maximums. The second records the earlier FIFO policy and binds both complete three-trial comparisons to the same revision, binary, host run, budget and workload. An over-budget control remains visible in its result. Build receipts identify the canonical and retained executables, their sources, the reviewed features and the fonts. The source archive supplies the inputs for rebuilding the retained eframe and winit libraries. [Build](../../tools/rust-qa/windows-warm-window/build.py) · [Timed comparison](../../tools/rust-qa/windows-warm-window/measure.py).
 
 Keep `dispatch/*.json` and `dispatch/*.log` from the third command. The same retained executable exercises the root repaint wake, a single wake and the original hidden-window painting policy in three instrumented inventories. Each uses the first-party worker, 100,000 files and the same native references. The recorder counts successful DXGI calls starting between a confirmed hide and the next show of that HWND. Qualification also requires the ordinary three-trial budget comparison and native behavior checks.
 
@@ -337,3 +337,41 @@ the executable digest. The replay and reports are in
 | --- | --- | --- |
 | [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14797058450) | `85eaf2cbf71148aa4f4052345ea214ab904c9a5237872cb364c3304c9273fabb` | `1600feda6b48d8d2ca25ca0eb7ed95627179a6448197a68acfc2af2003d12324` |
 | [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14798644285) | `09ba75b8bb7d0fc3efc338f184c4f6f24b5e694a9464c4ffab7042132ff8920f` | `8d7ede78aa041bb50cd5b27ac2e966e1b39413bbc1e093309d7968dc16493a1b` |
+
+## Testing visibility changes without resetting the window frame
+
+At `1e58541` the Win32 show call overlapped most slow x64 reopens. The
+original winit 0.30.13 implementation updates both style words and requests
+a frame recalculation even when visibility is the only changed flag. The
+retained candidate now uses the existing Win32 show or hide command alone
+for that transition on an ordinary decorated, taskbar-visible top-level
+window. Before every eligible hide or show, the actual style and extended
+style must match the previous cached flags. This also detects a window
+minimized or maximized externally. The candidate commits the new cached
+flags and releases winit's mutex before calling Windows, which can
+synchronously deliver window messages. Initial placement and transitions
+involving minimization, maximization, fullscreen or a drag use the upstream
+code. [Source change](../../tools/rust-qa/windows-warm-window/winit-retained-visibility.patch) · [ShowWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow) · [SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos).
+
+The source bundle rebuilds the 217-file winit tree from its published crate
+and one changed file. The crate and the pinned upstream revision supply the
+same Apache-2.0 license bytes. Two offline reconstructions produced the same
+16-member `eframe-source.zip`, SHA-256
+`9881edc6683df62a5d804ac6a1062e000c7f348a28193f10eb92d07fbacf7ec7`.
+The frozen Windows and Linux target graphs retained 135 and 240 package and
+feature combinations respectively. Both Windows MSVC targets passed
+cross-Clippy. A native Fedora release build recorded both local libraries
+and the final executable in 289 Cargo compiler entries.
+[Published source and checksum](../../tools/rust-qa/windows-warm-window/winit-source.json) · [Original license](https://github.com/rust-windowing/winit/blob/e9809ef54b18499bb4f2cac945719ecc2a61061b/LICENSE) · [Offline reconstruction and controls](../../tools/rust-qa/windows-warm-window/test_variant.py).
+
+On each Windows host the retained launcher checks the compiled eframe and
+winit library outputs against the original Cargo stream. In an ordinary
+launcher trial the first eligible hide and show each identify the actual
+HWND. The observer records `hidden.winitVisibilityShortcut` and
+`reopened.winitVisibilityShortcut` against the independently observed
+window and its native events. The completed primary log distinguishes a show
+that returns after the external observer first sees the HWND. Attribution
+requires a positive match for the relevant transition. The separate three-trial comparison
+uses the same binary, WPF budget calculation and 100,000-file workload with
+launcher diagnostics disabled. Native Windows results for this change are
+pending. [Launcher source binding](../../tools/rust-qa/windows-launcher/retained_subject.py) · [Window and focus observations](../../tools/rust-qa/windows-launcher/retained_window.py).

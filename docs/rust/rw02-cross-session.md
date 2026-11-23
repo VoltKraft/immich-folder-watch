@@ -199,3 +199,24 @@ has SHA-256 `b249389c3c275697ba7ecca565c05c59acd362b6baf66d8bd1d511225035994d`.
 | --- | --- | --- |
 | [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14778841782) | `dbdc6535df3775f20d3bba300a3ce8f90a85bf18b3bcfecd4ee7679e8cac19c2` | `72df5c7d667641e0138e4aab0b858f176003c9ff0e70948dca189a14d1854baf` |
 | [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235/artifacts/14778658716) | `5d414bc903795abd7508802e0a912decc1d579e872e0c1e849d641665709a5ab` | `71311eb3abae34999bf62be7d976585e258e673f7e69b3a953fe6b58ee16cfe4` |
+
+## Native writer and scheduler cleanup at 1e58541
+
+On each Windows architecture the original and scheduled participants again
+demonstrated all eight guard events in elevated sessions 2 and 0 of the same
+account. The controller observed five distinct writers and verified seven
+process exits. Both hosts removed the disposable profiles and tasks. The x64
+instance exited during the scheduler's stop operation. The updated cleanup
+confirmed its absence and returned zero. ARM64 found the task already
+finished. [x64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14794934085) · [ARM64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14795496216).
+
+The separate ordinary-user prerequisites produced three private consoles
+advertising `0x20000 (Basic User)`, both x64 participants and the original
+ARM64 participant. Each fixed launch returned 1. The scheduled ARM64 query
+stopped after its peer's refusal. No standard-user writer started on either
+host. The checked run in two existing, ordinary sessions is still needed.
+Independent replay matched each archive to the Actions digest, all 37 indexed
+files per host, 23 source inputs and the private-console bytes. The combined
+`writer-raw-readback.json` has SHA-256
+`aaa7b803f2f6024bea9f5b79b8900ca607d3ecc04161865d752d2b760eeac4a1`.
+[Two-session procedure](#native-reproduction).
