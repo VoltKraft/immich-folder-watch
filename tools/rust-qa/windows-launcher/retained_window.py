@@ -68,6 +68,23 @@ def graphics(log, record, *, before_quit=True):
         if (len(releases) != 1 or not re.fullmatch(r"WINDOW_RELEASED passes=[1-9]\d*", releases[0])
                 or drained != [releases[0].replace("WINDOW_RELEASED ", "DRAINED ", 1)]):
             raise ValueError("The single retained renderer must complete real UI passes and drain during quit")
+        if "reopened" in record:
+            # The observer can see a shown HWND while ShowWindow is still returning.
+            # Use the complete primary log for the path that actually finished the reopen.
+            lifetime = rows[:rows.index(releases[0])]
+            if lifetime.count("WINDOW_HIDDEN") != 1:
+                raise ValueError("Expected a single observed close before the retained root reopened")
+            hidden = record["hidden"]
+            reopened = record["reopened"]
+            close = lifetime.index("WINDOW_HIDDEN")
+            before = [line for line in lifetime[:close] if line.startswith("RETAINED_VISIBILITY ")]
+            after = [line for line in lifetime[close + 1:] if line.startswith("RETAINED_VISIBILITY ")]
+            hide = f"RETAINED_VISIBILITY first=hide hwnd={hidden['hwnd']}"
+            show = f"RETAINED_VISIBILITY first=show hwnd={reopened['hwnd']}"
+            if (hidden["hwnd"] != reopened["hwnd"] or before != ([hide] if hidden["winitVisibilityShortcut"] else [])
+                    or after and (after != [show] or not before)):
+                raise ValueError("The retained visibility markers do not match the observed close and reopen")
+            reopened["winitVisibilityShortcut"] = bool(after)
 
 
 class RetainedWindow:

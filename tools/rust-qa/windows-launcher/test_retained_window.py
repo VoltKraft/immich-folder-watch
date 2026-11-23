@@ -110,6 +110,23 @@ class RetainedWindowTests(unittest.TestCase):
             with self.subTest(marker=invalid), self.assertRaisesRegex(ValueError, "visibility marker"):
                 self.trial.hidden(invalid + log)
 
+    def test_reopen_requires_its_own_marker_in_the_completed_native_log(self):
+        hide = "RETAINED_VISIBILITY first=hide hwnd=99\n"
+        show = "RETAINED_VISIBILITY first=show hwnd=99\n"
+        early = FIRST_RENDER + hide + "WINDOW_HIDDEN\n"
+        drained = "WINDOW_RELEASED passes=4\nDRAINED passes=4\n"
+        self.trial.close_window()
+        self.assertTrue(self.trial.hidden(early))
+        self.gui.show(24)
+        self.trial.opened(99, lambda: early, self.wait)
+        for actual in ("", show):
+            retained.graphics(early + actual + drained, self.record, before_quit=False)
+            self.assertEqual(self.record["reopened"]["winitVisibilityShortcut"], bool(actual))
+        for mistaken in (early + show + show, early + show.replace("99", "31"),
+                         early.replace(hide, show) + hide, early.replace(hide, "") + show):
+            with self.subTest(log=mistaken), self.assertRaisesRegex(ValueError, "visibility markers"):
+                retained.graphics(mistaken + drained, self.record, before_quit=False)
+
     def test_renderer_rejects_diagnostic_measurements_altered_generations_or_early_release(self):
         for row in ("GRAPHICS_ATTEMPT generation=2 policy=preferred", "GRAPHICS_READY generation=2", "WINDOW_RELEASED passes=5",
                     "WINDOW_WAKE mode=single", "GRAPHICS_MEMORY generation=1 hint=Performance", "ADAPTER Dx12 Cpu Other"):
