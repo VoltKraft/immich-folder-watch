@@ -380,3 +380,22 @@ sample across two seconds. The canonical process recreated its HWND. The
 retained process recovered its original HWND. Ordinary foreground keyboard
 handover on ARM64 remains open.
 [First ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471/artifacts/14819371268) · [Second ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804405/artifacts/14824351734).
+
+### Ordinary second launch at 653f255
+
+Both parameterless second processes exited successfully. Each reopened
+the original HWND with the same worker, DX12 device and renderer
+generation. On x64, HWND 2031726 received foreground and keyboard focus
+on the first sample. On ARM64, HWND 1835364 became visible and all 41
+samples over 2,023 ms showed it without foreground or keyboard focus.
+Each separate shell-less control restarted with a new primary and worker
+and exited with an empty job.
+
+The integrated x64 Shell registered the version 4 icon. Its observer
+could not identify the overflow button and recorded zero activation
+markers. The ARM64 Shell refused the initial registration and both
+automatic retries. Neither job established an actual Shell click.
+The seven launcher logs per host and the corresponding eight x64 and six
+ARM64 tray logs matched their original receipts. The build and observer
+sources matched the exact Git revision.
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14847493064) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14847852603).

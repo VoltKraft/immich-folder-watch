@@ -1,5 +1,25 @@
 # Project Status
 
+## Windows launch, editing and notification evidence at 653f255 (2026-11-23)
+
+Both native Windows targets met all eleven same-host WPF limits for the
+retained GUI at both DX12 frame depths. The twelve trials completed two
+100,000-file inventories each. The normal second launch on x64 gave the
+original window keyboard focus. On ARM64 it reopened the same window
+without foreground or keyboard focus. Both ordinary text tests completed
+the three edits and stopped at the older caret-free capture check.
+The follow-up desktop run with the corrected check and the additional
+reopened filename case started on all four native targets at `1904be7`.
+[Measurements](rust/rw02-windows-window.md#native-results-at-653f255) · [Follow-up run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156).
+
+The first WinRT history trial stopped before creating a Windows process
+on either host. The corrected caller supplies its pinned private profile
+token and isolation flag to the existing launcher. The regression test
+reproduced the original refusal and verified the corrected launch path
+through the native API boundary. Native delivery and history cleanup
+remain open. The independent general tooling suite at `dc339e4` passed
+all 181 tests with an isolated GPG keyring. [Native originals and regression](rust/rw02-windows-services.md#native-winrt-startup-at-653f255).
+
 ## Matching live portal names to the Rust reader's original handles (2026-11-23)
 
 The private Noble x64 comparison completed all 110 operations and revoked
@@ -11,9 +31,17 @@ and matched the original identities. Independent readback verified all
 24 slot measurements. A subsequent working-tree run also checked the kernel
 mount IDs. Its result SHA-256 is
 `9821340dbd834d76125c323ee7c60980eff81afa6609ebb4f28594a289f8c190`.
-Twenty focused controls passed. A corrected hosted ARM64 comparison and a
+Twenty focused controls passed. The offline run from the clean `dc339e4`
+commit repeated all 110 operations. The independent readback matched
+sixteen Git source files, the built executables, six permission lookups and
+all three revocations. A corrected hosted ARM64 comparison and a
 supported distribution portal with upload-lock support are still required.
 [Observer and results](rust/rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open).
+
+The local x64 host also started a diskless QEMU instance with KVM enabled
+and stayed in prelaunch until it quit. The project contains a synthetic
+storage-fault VHD. A Windows guest image for the interactive display and
+RDP tests is still needed. [Disposable VM test procedure](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
 
 ## Noble portal directory names during a held writer (2026-11-23)
 

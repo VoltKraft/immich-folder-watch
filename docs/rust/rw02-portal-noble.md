@@ -195,6 +195,20 @@ writer released its lock. All three revocations and final content checks
 passed. Its native result SHA-256 is
 `75d508ea97533bff6d807db5b4f7a7569883407ed5f66a218213834480e0bc99`.
 
+At the clean revision `dc339e48517eeb28fbd7b7f8a536cccf61c0a70c`,
+`amd64-e03cc583` repeated all three comparisons offline in 30.99 seconds.
+The two stock services each completed 32 observations, including the three
+errno 38 refusals. The backport completed 46, including the busy reader
+and acquisition of the original file after writer release. The twelve
+directory comparisons bound all 24 confirmed Rust descriptor slots to
+the original mount IDs. Every service recorded two independent lookups
+for detached names and one verified revocation. The result hashes to
+`d1e56368fb2bfb15e1fada54838fe836996d31c07376c13edf03e11db7de329b`.
+The detached readback verified the eleven fixture files and five Rust
+filesystem sources against Git and the locally rebuilt binaries against
+the receipts. Its SHA-256 is
+`bcf4ae99aa66bb965af3e821072a20238339976a197c005b805107602fe775e7`.
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).

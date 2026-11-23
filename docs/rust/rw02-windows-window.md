@@ -542,3 +542,26 @@ both hosts. Prior x64 runs exceeded their own WPF limits. The small GDI
 control met the four window-response limits on x64. On ARM64 neither
 observed sample point belonged to the GDI window on the final attempt
 before its first close. That control collected no ARM64 scan timing.
+
+### Native results at 653f255
+
+Both retained frame depths again met all eleven same-host WPF limits on
+both targets. All twelve timed trials made two complete 100,000-file
+inventory passes and recorded zero visible and hidden idle presents.
+The canonical GUI that releases its window met six limits per target.
+The original exported images at both retained depths showed 209 changed
+pixels in 29 columns after editing the reopened field on both systems.
+
+| Host | Scan close / reopen at depth 1, ms | Scan close / reopen at depth 2, ms | Same-host WPF maximums, ms |
+| --- | ---: | ---: | ---: |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14849309986) | 12.971 / 11.700 | 8.416 / 10.019 | 24.445 / 20.065 |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14849584396) | 5.412 / 4.176 | 6.417 / 4.266 | 14.103 / 15.333 |
+
+The detached reports bind the 153 compiler units per target, the PE
+hashes, the original window and file events, the WPF budgets and the
+decoded field images. Their SHA-256 values are
+`b9078631c4b8c5db0d0c7613668a6e8a9fd9389cce74492090e788b6f228f7c7`
+on x64 and `9761aba2ce38f58571d56744e61991b1ac280fdfd34f2b4fe3b2960b8379f0e7`
+on ARM64. The separate ordinary-filename tests completed all three edits
+on each host and failed at the caret-free capture with the older focus
+check. [Corrected focus check](rw02-windows-text.md#focus-when-capturing-the-caret-free-field).
