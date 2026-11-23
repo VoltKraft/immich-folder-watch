@@ -9,7 +9,12 @@ jobs imported the original OSTree commit and failed to reach a system bus at
 deployment. The revised Linux fixture completed the entire offline installation,
 repair and removal in Noble and Fedora x64 userspace on the local Fedora kernel.
 The Windows fixture now checks the actual compiled actions and sole desktop
-shortcut. Native hosted repair and post-removal profile checks are due next.
+shortcut. At `0f29659`, all four jobs then completed actual install, repair
+and uninstall. Both native Linux payloads matched all 785 entries. Windows
+x64 verified 439 files and ARM64 verified 438. Direct replay of the four
+original archives recovered the complete SQL fixture and original YAML
+after uninstall. The four-host readback SHA-256 is
+`ccf92ed76a89e2ce5aeafaeec38b2fa0c0ce48c2e8ea94095b93d03ad17b31d9`.
 [Original run and receipts](rust/rw01-installed-packages.md#first-native-package-run).
 
 ## Four native upload references and package migration baseline (2026-11-23)

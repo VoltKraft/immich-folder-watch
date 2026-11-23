@@ -85,6 +85,34 @@ matched. The local evidence indexes in
 `8a5d3d06713d6cf4b229acfc8a3320287f07a3a264d18e0dc885d08ac1ab24e2`
 and `d1485b18398fe3792a778af0eea2cd439fc377ba3810b5b6021c18c943071884`.
 
+## Installed reference on all four hosts
+
+At `0f29659`, all four native jobs installed the original shipping package,
+repaired one removed file, verified the complete installed payload again and
+performed an ordinary uninstall. Direct archive readback matched all 54 indexed
+files and ten fixture sources per host. The retained YAML matched the platform
+fixture byte-for-byte. Reopening the seed and retained databases independently
+reproduced the entire SQL fixture, including both account histories, both owned
+albums, all four mappings and the repair journal.
+
+| Native host | Repaired and verified | Uninstall observation |
+| --- | --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45212974336/artifacts/14838170053) | All 439 files matched the release cabinet. The restored SQLite DLL had SHA-256 prefix `6ad8e149`. | The registered product, files and desktop link were removed. The seeded profile survived. |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45212974336/artifacts/14836698072) | All 438 files matched the release cabinet. The restored SQLite DLL had SHA-256 prefix `a59c1697`. | The registered product, files and desktop link were removed. The seeded profile survived. |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45212974336/artifacts/14837585968) | Flatpak 1.14.6 restored the metainfo and all 785 original entries of OSTree commit `abeebe13`. | Both ref and deployment disappeared. The seeded profile survived. |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45212974336/artifacts/14837665317) | Flatpak 1.14.6 restored the same metainfo and all 785 original entries of commit `762ff33e`. | Both ref and deployment disappeared. The seeded profile survived. |
+
+Each Linux job recorded three GLib/OSTree diagnostics while importing the
+bundle. The command exited successfully, and the independently expected commit,
+installed files and repair bytes matched. Each Windows host recorded all three
+completed Installer transactions and the continued absence of a Startup link.
+Independent Windows review decompressed the original cabinets and verified all
+877 installed and repaired files. The verbose repair logs identified only the
+missing SQLite DLL for replacement and retained the other 438 and 437 files.
+Both removed their synthetic profiles after retaining the two evidence files.
+The four-host readback under `artifacts/rust/hosted-shipping-install/45212974336/`
+has SHA-256 `ccf92ed76a89e2ce5aeafaeec38b2fa0c0ce48c2e8ea94095b93d03ad17b31d9`.
+
 RI-AC08 still requires the four Rust packages, native old-to-new upgrades,
 repair, removal and rollback after activity in the installed Rust application.
 [Acceptance matrix](acceptance.md#overall-acceptance).
