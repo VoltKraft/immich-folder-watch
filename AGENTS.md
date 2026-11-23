@@ -193,6 +193,8 @@ to reconcile project decisions, defaults, and recorded state.
   Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [Linux appearance](docs/rust/rw02-appearance.md) and
   [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
+  The Plasma fixture uses separate audited Ubuntu package sets for x64 and
+  ARM64. Run its native GUI and panel on the matching architecture.
   Use the dedicated native service fixtures with disposable profiles.
   The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
   owned desktop, a visible synthetic icon and a matching native Shell callback.

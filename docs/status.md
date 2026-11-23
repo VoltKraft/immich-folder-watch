@@ -11,6 +11,12 @@ portable fixture tests passed, as did cross-Clippy for Windows x64 and
 ARM64. Both native Windows performance runs are required to evaluate
 the change. [Candidate and evidence requirements](rust/rw02-windows-window.md#testing-visibility-changes-without-resetting-the-window-frame).
 
+The Linux ARM64 Plasma panel fixture at `725f1cd` has its own signed Ubuntu package
+inventory. Its 691 archives include 598 ARM64 builds and 93
+architecture-independent packages. Their payload and copyright hashes were
+verified. The previously observed physical panel activations were on x64.
+The ARM64 panel requires its own native run. [KDE panel fixture](rust/rw02-plasma.md).
+
 At `1e58541` both Ubuntu desktop jobs, all four native feasibility jobs,
 the draft PR's CI and CodeQL passed. Both Windows desktop jobs failed.
 The original x64 Desktop confirmed ordinary second-launch foreground and

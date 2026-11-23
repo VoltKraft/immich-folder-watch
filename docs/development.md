@@ -222,8 +222,9 @@ retains `rust-notices-<target>-<commit>.zip` for that development executable.
 cache offline. `cache --fetch-missing` acquires a missing pinned input.
 The [appearance observer](rust/rw02-appearance.md) reads actual pixels after
 portal changes and the [Plasma fixture](rust/rw02-plasma.md) activates the
-visible branded panel icon. Use the individual guides for their native
-prerequisites and fresh output directories.
+visible branded panel icon on a native x64 or ARM64 Ubuntu guest. Each
+architecture has a package inventory verified against Ubuntu's signed
+indexes. The individual guides list native prerequisites and output directories.
 
 The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
 Shell and separate compositor/client traces. Fedora uses IBus Anthy by
