@@ -185,7 +185,7 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
-  Preserve [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
+  Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md),
   its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md), the
@@ -204,6 +204,9 @@ to reconcile project decisions, defaults, and recorded state.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+  Compare Windows renderer timings with the same host's WPF reference and
+  qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)
+  with observed screen pixels and independent file activity.
   Keep the integrated Linux and Windows inventory subjects bound to the
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls

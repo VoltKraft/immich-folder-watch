@@ -212,7 +212,7 @@ def coverage(text, requests, first_complete, second_complete, frequency, target,
 
 
 def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, output, await_value, stop_subject, p95, owner_token,
-            *, presentation_trace=None):
+            *, presentation_trace=None, visibility_witness=None):
     from native import CleanupUnconfirmed, finish_owned_trace, start_owned_subject
     rust = subject == "rust"
     area.mkdir()
@@ -304,6 +304,9 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
         while not completed(1):
             if time.monotonic() > deadline or len(requests) >= 16000:
                 raise TimeoutError("The first real inventory exceeded the observation budget")
+            action = "reopen" if closed else "close"
+            if visibility_witness is not None:
+                visibility_witness("before", action, int(window), proc.pid)
             issued = api.clock()
             if closed:
                 if rust:
@@ -315,8 +318,9 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
             else:
                 windows.close_window(window)
                 visible(False)
-            requests.append(dict(action="reopen" if closed else "close", issuedQpc=issued,
-                                 responseQpc=api.clock(), hwnd=int(window)))
+            requests.append(dict(action=action, issuedQpc=issued, responseQpc=api.clock(), hwnd=int(window)))
+            if visibility_witness is not None:
+                visibility_witness("after", action, int(window), proc.pid)
             closed = not closed
             time.sleep(INTERVAL)
         first_complete = api.clock()

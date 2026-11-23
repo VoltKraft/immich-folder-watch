@@ -196,6 +196,17 @@ offline reproduction. The archive contains the original eframe and winit
 crates, licenses and changes. The retained launcher verifies both local
 library outputs against the actual native Cargo stream before starting the GUI.
 See the [window measurements](rust/rw02-windows-window.md).
+The WPF recorder queries the shipping tray icon after each idle trial and
+retains the HRESULT and rectangle with the receiver identity.
+[Shipping tray lookup](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).
+
+After the regular retained-window trials have produced their report, use
+`python -B tools/rust-qa/windows-gdi-control/assess.py $env:NATIVE_TARGET`
+from the native MSVC environment on that runner to compare GDI with WPF
+and eframe. The result includes four visibility timings, verified changes
+to two screen pixels and matching kernel file events during the
+100,000-file scan. [GDI recorder and artifacts](../tools/rust-qa/windows-gdi-control/README.md).
+
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).
 

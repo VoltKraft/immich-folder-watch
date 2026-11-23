@@ -1,5 +1,26 @@
 # Project Status
 
+## Four-target checks and the Windows renderer comparison (2026-11-23)
+
+At `8566f81`, the raw YAML round trip passed its native step on Windows
+and Ubuntu, on both x64 and ARM64. All four native feasibility jobs also
+passed. Independent readback of their ten archives verified 37 workspace
+tests and 15 file-watch cases per Linux target, 34 and 14 per Windows
+target, and 208 C# recovery assertions per Windows target. The readback
+SHA-256 is `3a5a827726dea94d3e3f7fabdb63cccd25e777b0ee374562facc0e8b3ba92b54`.
+The draft PR CI passed. Both hosted Rust CodeQL configurations again ran
+40 queries on the recorded foundation tree and reported zero alerts.
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516267) · [Desktop and YAML run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037) · [Draft PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159526233) · [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159525936).
+
+The GDI diagnostic at `763048a` passed six portable tests, Rustfmt and
+strict Clippy for both Windows targets. Independent review verified that
+the idle timings use the WPF warm-up sequence, and that qualifying scan
+samples bind the visible pixels, frame and HWND to real file activity.
+Commit `89883ea` also reads the shipping WPF tray icon after each idle
+trial. Its lookup passed the independent receiver and error-path review.
+Both comparisons await native Windows results. RW-02 remains open.
+[Renderer procedure](../tools/rust-qa/windows-gdi-control/README.md) · [Shipping tray control](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).
+
 ## Legacy YAML byte compatibility (2026-11-23)
 
 At `a7a62fa`, a clean Fedora x64 build passed all 13 offline assessment
@@ -7,8 +28,7 @@ steps. Rust read 54 archived original files. The shipping C# loader reopened
 70 Rust-written files and passed 140 comparisons. Ten damaged files were
 readable with the same replacement characters in both languages and retained
 their original bytes. Independent review verified the relocated archive and
-22 rejection controls. The extended native corpus needs results from the
-other three targets. [Raw file evidence](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes).
+22 rejection controls. [Raw file evidence](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes).
 
 ## Rust foundation CodeQL (2026-11-23)
 

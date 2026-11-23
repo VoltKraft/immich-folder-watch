@@ -64,3 +64,10 @@ renderer presents through GDI, making the cost of visible drawing a distinct
 path to measure. Its native accessibility support and the rights for an
 embedded icon font need qualification before adoption.
 [Windows source and renderer comparison](rw02-windows-window.md#renderer-comparison-with-iced-0140).
+
+A first-party Win32 control now draws changed pixels through GDI while the
+same Rust inventory worker scans the synthetic tree. Running it after the
+retained eframe measurement on each Windows host will compare hide/reopen
+latency under both drawing paths against the frozen WPF timings. The native
+GUI decision still depends on the candidate application's own results.
+[GDI comparison](../../tools/rust-qa/windows-gdi-control/README.md).

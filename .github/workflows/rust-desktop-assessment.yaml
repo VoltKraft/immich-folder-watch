@@ -542,6 +542,18 @@ jobs:
           python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dispatch
           exit $LASTEXITCODE
 
+      - name: Compare visible GDI frames and native window timing with the same-host WPF reference
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.warm.outcome == 'success' && hashFiles(format('artifacts/rust/windows-warm-window/{0}/measured/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-gdi-control -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-gdi-control/assess.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -750,6 +762,8 @@ jobs:
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
             artifacts/rust/windows-performance/native-*/*
+            artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.json
+            artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.log
             artifacts/rust/windows-warm-window/*/build.json
             artifacts/rust/windows-warm-window/*/compiler.jsonl
             artifacts/rust/windows-warm-window/*/observed/

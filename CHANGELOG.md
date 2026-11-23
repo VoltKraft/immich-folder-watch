@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add an offline combined Rust dependency build, native SQLite crash and full-disk recovery checks, and Linux desktop assessments for system colors and activation through the visible Plasma tray icon.
 - Add Rust CodeQL checks for the Linux and Windows configurations of the foundation workspace on the rewrite draft PR.
 - Compare original UTF-8, UTF-16 and UTF-32 configuration files against the shipping reader and preserve damaged inputs during the rewrite assessment.
+- Compare Windows visibility timings across the shipping WPF application, retained eframe window and a Rust GDI control during a 100,000-file scan.
 
 ## [3.0.4] - 2026-11-13
 
