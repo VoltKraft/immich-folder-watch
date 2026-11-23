@@ -183,7 +183,37 @@ def native_image(image, arch):
     return ids[0]
 
 
-def check_runtime(out, tree, payload, arch):
+def allocated_sections(image):
+    """Capture loadable section bytes and layout across Debian's debug split."""
+    data = image.read_bytes()
+    table = subprocess.check_output(["readelf", "-SW", image], text=True)
+    sections = {}
+    for line in table.splitlines():
+        row = re.match(r"\s*\[\s*[1-9][0-9]*\]\s+(\S+)\s+(.+)", line)
+        if not row:
+            continue
+        name, raw = row.groups()
+        fields = raw.split()
+        if len(fields) != 9 or "A" not in fields[5]:
+            continue
+        kind, address, offset, size, entry_size, flags, link, info, alignment = fields
+        start, length = int(offset, 16), int(size, 16)
+        content = b"" if kind == "NOBITS" else data[start:start + length]
+        if (kind != "NOBITS" and len(content) != length) or name in sections:
+            raise ValueError(f"Invalid allocated ELF section {name}")
+        if name == ".note.gnu.build-id":
+            # Ubuntu debugedit rewrites the SHA-1 build ID in the GNU note.
+            if kind != "NOTE" or length != 36 or content[:16] != bytes.fromhex("040000001400000003000000474e5500"):
+                raise ValueError("Expected the ELF64 GNU SHA-1 build-id note")
+            content = content[:16]
+        sections[name] = [kind, address, offset, size, entry_size, flags, link, info, alignment,
+                          hashlib.sha256(content).hexdigest()]
+    if not {".text", ".rodata", ".dynamic", ".dynsym", ".note.gnu.build-id"} <= sections.keys():
+        raise ValueError("Missing the native ELF code, data or linker metadata")
+    return sections
+
+
+def check_runtime(out, tree, payload, arch, debug_package):
     staged = tree / "debian" / SOURCE
     expected = {p: v for p, v in sources(staged, runtime=True).items() if p.split("/")[0] != "DEBIAN"}
     packaged = sources(payload, runtime=True)
@@ -197,13 +227,20 @@ def check_runtime(out, tree, payload, arch):
     installed = payload / "usr/libexec/xdg-document-portal"
     builds = list(tree.glob("obj-*/document-portal/xdg-document-portal"))
     build_id = native_image(installed, arch)
-    if len(builds) != 1 or native_image(builds[0], arch) != build_id:
-        raise ValueError("The installed Documents daemon differs from the linked native build")
+    sections = allocated_sections(installed)
+    if len(builds) != 1 or allocated_sections(builds[0]) != sections:
+        raise ValueError("The installed Documents daemon differs from the linked code, data or layout")
+    debug_root = out / "runtime-debug"
+    run(out / "read-debug.log", ["dpkg-deb", "-x", debug_package, debug_root], out)
+    debug_image = debug_root / "usr/lib/debug/.build-id" / build_id[:2] / (build_id[2:] + ".debug")
+    if not debug_image.is_file() or native_image(debug_image, arch) != build_id:
+        raise ValueError("The packaged Documents executable and its debug symbols have different identities")
     syms = subprocess.check_output(["readelf", "--dyn-syms", "--wide", installed], text=True)
     if not re.search(r"\bUND\s+flock@GLIBC_[0-9.]+\b", syms):
         raise ValueError("The packaged Documents daemon does not import flock from libc")
     return {"runtimeEntries": len(packaged), "runtimeManifestSha256": sha(manifest),
-            "activationFiles": services, "documentDaemonBuildId": build_id}
+            "activationFiles": services, "documentDaemonBuildId": build_id, "linkedBuildId": native_image(builds[0], arch),
+            "allocatedSections": sections, "debugImageSha256": sha(debug_image)}
 
 
 def package_checksums(path, required):
@@ -233,6 +270,11 @@ def binary_packages(out, tree, arch, skip_tests):
     if any(sha(Path("/usr") / p) != digest for p, digest in FUSE.items()):
         raise ValueError("The native FUSE development headers or notices differ from the reviewed build")
     run(out / "build-binary.log", ["dpkg-buildpackage", "--build=binary", "--no-sign", "-j4"], tree, env)
+    return {**inspect_packages(out, tree, arch, out), "fuseInputs": FUSE,
+            "buildOptions": env["DEB_BUILD_OPTIONS"], "distributionBuildTestsRequested": not skip_tests}
+
+
+def inspect_packages(out, tree, arch, evidence):
     packages = {}
     runtime = None
     for p in sorted([*out.glob("*.deb"), *out.glob("*.ddeb")]):
@@ -245,11 +287,11 @@ def binary_packages(out, tree, arch, skip_tests):
         packages[name] = {"file": p.name, "sha256": sha(p), "version": version, "architecture": machine}
         if name == SOURCE:
             runtime = p
-    if not {SOURCE, SOURCE + "-dev", SOURCE + "-tests"} <= packages.keys():
-        raise ValueError("Missing Ubuntu runtime, development or installed-tests package")
-    payload = out / "runtime-payload"
-    run(out / "read-package.log", ["dpkg-deb", "-x", runtime, payload], out)
-    runtime_evidence = check_runtime(out, tree, payload, arch)
+    if not {SOURCE, SOURCE + "-dev", SOURCE + "-tests", SOURCE + "-dbgsym"} <= packages.keys():
+        raise ValueError("Missing Ubuntu runtime, development, installed-tests or native debug package")
+    payload = evidence / "runtime-payload"
+    run(evidence / "read-package.log", ["dpkg-deb", "-x", runtime, payload], evidence)
+    runtime_evidence = check_runtime(evidence, tree, payload, arch, out / packages[SOURCE + "-dbgsym"]["file"])
     required = {p["file"] for p in packages.values()}
     logs = {}
     for ext in ("buildinfo", "changes"):
@@ -257,8 +299,7 @@ def binary_packages(out, tree, arch, skip_tests):
         package_checksums(path, required)
         logs[path.name] = sha(path)
         required.add(path.name)
-    return {"packages": packages, **runtime_evidence, "fuseInputs": FUSE, "buildRecords": logs,
-            "buildOptions": env["DEB_BUILD_OPTIONS"], "distributionBuildTestsRequested": not skip_tests}
+    return {"packages": packages, **runtime_evidence, "buildRecords": logs}
 
 
 def main(args):

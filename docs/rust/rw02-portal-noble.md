@@ -46,6 +46,28 @@ and verifies the identity before passing it to AddFull. The failed observation
 hash is `9f527b263b8358569f5f3290d9c1caf8e2bae0a53dac469a69b3135bf22dde18`.
 [Original source and guest commands](../../tools/rust-qa/portal-noble/installed/README.md).
 
+In `lease-stock-g8_tjhbs` the installed app ran as UID 1000. The stock
+portal granted the synthetic directory. The app verified its own identity
+and FUSE mount and observed `ENOENT` on the direct backing pathname.
+A separate shared-lock call in the sandbox returned errno 38. The workspace
+Rust reader also returned errno 38 before, during and after an exclusive
+backing writer. After revocation it could no longer open the grant.
+The service listing confirmed deletion and the original 25 bytes survived
+with the same device and inode. The stock and outer result SHA-256 values
+are `7f6b80f025ef33bfd285b2118c38487a5a2afbee7e6b599c0c2bf9d462a8f2e8`
+and `2f5c627a087f9bc9bc9c931a6a029165ef74b0da4e74c4fb8035ac1dfdf80c95`.
+
+Offline readback of the unmodified `package-0eeh793w` build disk verified
+all five packages, both dpkg records and the installed daemon's split debug
+file. Ubuntu's debhelper invokes debugedit with a build-ID seed. All 27
+allocated ELF sections matched the linked executable after accounting for
+the 20 build-ID bytes in the GNU note. The final debug file shared the
+packaged build ID `17772f7047be161dbdd206f233c15a10418612ab`. The package
+SHA-256 is `1e5f691467d7d6ada852983b875419410a42ef2c525f95e2f70c44ca5c937e50`.
+The separate readback SHA-256 is
+`eaac90b94f55c15b159df5641abc5a7c764dcbe67c0ca386203d850c0a7d0596`.
+[Debian package checks](../../tools/rust-qa/portal-noble/installed/package/README.md).
+
 ### Private service comparisons
 
 At `a66e045` each Ubuntu runner recorded 28 checks against the packaged

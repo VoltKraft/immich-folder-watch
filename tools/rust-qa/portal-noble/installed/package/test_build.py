@@ -107,6 +107,29 @@ class BuildTests(unittest.TestCase):
         ):
             check(Path("daemon"), "arm64")
 
+    def test_debug_split_can_rewrite_the_build_id_only(self):
+        check = fixture["allocated_sections"]
+        sections = [(".text", "PROGBITS", 0, 4, "AX"), (".rodata", "PROGBITS", 4, 4, "A"),
+                    (".dynamic", "DYNAMIC", 8, 4, "WA"), (".dynsym", "DYNSYM", 12, 4, "A"),
+                    (".note.gnu.build-id", "NOTE", 16, 36, "A")]
+        listing = "\n".join(f" [{i}] {name} {kind} 1000 {offset:x} {size:x} 00 {flags} 0 0 4"
+                            for i, (name, kind, offset, size, flags) in enumerate(sections, 1))
+        b = bytearray(b"data" * 4 + bytes.fromhex("040000001400000003000000474e5500") + bytes(20))
+        with tempfile.TemporaryDirectory() as temp, patch("subprocess.check_output", return_value=listing):
+            image = Path(temp) / "daemon"
+            image.write_bytes(b)
+            original = check(image)
+            b[-1] ^= 0xff
+            image.write_bytes(b)
+            self.assertEqual(check(image), original)
+            b[0] ^= 0xff
+            image.write_bytes(b)
+            self.assertNotEqual(check(image), original)
+            b[16] ^= 0xff
+            image.write_bytes(b)
+            with self.assertRaises(ValueError):
+                check(image)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,16 @@
 # Project Status
 
+## Installed Ubuntu original and private build verification (2026-11-23)
+
+On a fresh Noble x64 VM the installed Flatpak received its directory grant.
+The normal Rust reader and an independent call to the actual shared-lock
+operation both returned errno 38. Revocation denied subsequent access.
+The original file retained its identity and contents. Offline verification
+bound the five rebuilt Debian packages to their source, binary and debug
+records, including all 27 loaded sections of the Documents executable.
+The genuine package installation and rollback trial is running in a separate
+guest. [Native evidence and hashes](rust/rw02-portal-noble.md#installing-the-portal-package-on-an-offline-noble-guest).
+
 ## Offline Ubuntu package trial and four native backup replays (2026-11-23)
 
 The user selected Ubuntu package feasibility and deferred distribution

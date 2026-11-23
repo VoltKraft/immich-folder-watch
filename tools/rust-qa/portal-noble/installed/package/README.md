@@ -24,8 +24,11 @@ Ubuntu Debian tarball, the pinned Noble Updates InRelease and its Sources.xz
 index. The [source input contract](../../inputs.py) provides their identities.
 The guest needs the pinned Ubuntu archive keyring, `gpgv`, `dpkg-dev`,
 `build-essential` and the build dependencies declared by the authenticated DSC.
-The [parent source experiment](../../../../../docs/rust/rw02-portal-noble.md) pins the FUSE headers, notices
-and original upstream change.
+The [parent source experiment](../../../../../docs/rust/rw02-portal-noble.md)
+pins the FUSE headers, notices and original upstream change. The disposable VM
+starts Noble's GeoClue agent for the build user and supplies a static synthetic
+position so the distribution's Location tests can use the real system service
+offline.
 
 The builder adds `+ifwqa1` to the Ubuntu revision and appends the single reviewed
 backport to its quilt series. It reconstructs the source package before invoking
@@ -39,7 +42,11 @@ Keep the unsigned source and binary packages, build logs, `.changes`,
 `.buildinfo`, `runtime-files.json` and `result.json` together in the private
 trial output. The runtime manifest binds the unpacked paths, types, modes and
 bytes to the native staging tree. The result binds both activation declarations
-and checks the Documents ELF build ID and libc lock import. Package
+and the libc lock import. Ubuntu's debug splitting rewrites the 20-byte GNU
+build ID. The verifier compares the layout and bytes of all allocated ELF
+sections between the linked and packaged Documents executables, excluding only
+those ID bytes. It checks that the final ID matches the native debug package.
+Package
 installation, actual service activation, lock behavior and rollback are separate
 observations on the disposable guest.
 
