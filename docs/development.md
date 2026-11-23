@@ -311,6 +311,10 @@ visible branded panel icon on a native x64 or ARM64 Ubuntu guest. Each
 architecture has a package inventory verified against Ubuntu's signed
 indexes. The individual guides list native prerequisites and output directories.
 
+On the disposable Windows rewrite runner, `python3 -B tools/rust-qa/appearance/windows.py "$NATIVE_TARGET"`
+measures the ordinary Rust window before, during and after a temporary change
+of the session's [high contrast mode](rust/rw02-appearance.md#windows-contrast-theme-observation).
+
 The [GNOME input and scale fixture](rust/rw02-wayland-input.md) uses a private
 Shell and separate compositor/client traces. Fedora uses IBus Anthy by
 default. Ubuntu Noble uses `--ibus-engine mozc`. The [graphics recovery

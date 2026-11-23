@@ -3,6 +3,7 @@
 
 mod launcher_delivery;
 mod win32_instance;
+pub mod windows_appearance;
 mod windows_launcher;
 pub use windows_launcher::{Launch, start_launcher};
 mod windows_tray;

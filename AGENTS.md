@@ -202,8 +202,10 @@ to reconcile project decisions, defaults, and recorded state.
   Bind hosted notices to the Actions digest of the native compiler receipt.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
   Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
-  The [Linux appearance](docs/rust/rw02-appearance.md) and
+  The [system appearance](docs/rust/rw02-appearance.md) and
   [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
+  The Windows contrast supervisor owns the temporary setting and verifies its
+  restoration even if the bounded native capture worker exits.
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
   ARM64. Run its native GUI and panel on the matching architecture.
   Use the dedicated native service fixtures with disposable profiles.

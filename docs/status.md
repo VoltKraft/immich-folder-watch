@@ -1,5 +1,16 @@
 # Project Status
 
+## Windows system colors in the Rust feasibility window (2026-11-23)
+
+The canonical and retained Windows sources passed frozen compiler checks
+for x64 and ARM64 using the existing dependency graphs. Five portable Rust
+tests exercised the palette and glyph colors. Eighteen observer tests
+covered the bitmap comparison, setting restoration and process ownership.
+Independent review checked the native window callback and the supervisor's
+rollback when the capture process exits. The native comparison of original,
+high-contrast and restored pixels on both Windows hosts is pending.
+[Implementation, evidence and native command](rust/rw02-appearance.md#windows-contrast-theme-observation).
+
 ## Native panel, portal and activation at 1904be7 (2026-11-23)
 
 Both Ubuntu desktops passed all eleven X11 limits. Two real panel clicks

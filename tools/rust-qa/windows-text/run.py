@@ -107,7 +107,7 @@ def exercise_window(api, context, pid, hwnd, env, ps, output, report):
         raise RuntimeError("The native observer failed or its active desktop changed")
 
 
-def observe(binary, output, env, ps, report):
+def observe(binary, output, env, ps, report, *, exercise=exercise_window):
     api = Desktop()
     context = report["desktop"] = api.context()
     log = output / "subject.log"
@@ -130,7 +130,7 @@ def observe(binary, output, env, ps, report):
             else:
                 raise RuntimeError("The owned normal GUI did not present a native DX12 window")
             report["adapter"] = adapter
-            exercise_window(api, context, child.pid, hwnd, env, ps, output, report)
+            exercise(api, context, child.pid, hwnd, env, ps, output, report)
         finally:
             try:
                 if child.poll() is None:

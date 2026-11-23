@@ -43,12 +43,22 @@ def main():
         subprocess.run(["cargo", "build", "--manifest-path", str(MANIFEST), "--release", "--frozen"],
                        env=env, check=True)
         binary = build / "release/native-gui-assessment.exe"
+        tests = ["cargo", "test", "--manifest-path", str(MANIFEST), "--release", "--frozen",
+                 "--lib", "--bin", "native-gui-assessment"]
     else:
-        subprocess.run([sys.executable, str(QA / "gui/build.py"), "--registry", str(cargo_home / "registry")],
-                       env=env, check=True)
+        builder = [sys.executable, str(QA / "gui/build.py"), "--registry", str(cargo_home / "registry")]
+        subprocess.run(builder, env=env, check=True)
         binary = build / "release/native-gui-assessment"
+        tests = [*builder, "--test"]
+    test_log = output / "gui-unit-tests.log"
+    with test_log.open("wb") as log:
+        outcome = subprocess.run(tests, env=env, stdout=log, stderr=subprocess.STDOUT)
+    if outcome.returncode:
+        print(test_log.read_text(encoding="utf-8", errors="replace")[-8000:], file=sys.stderr)
+        outcome.check_returncode()
     record = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "target": args.target, "graphSha256": graph_hash, "lockSha256": lock_hash,
+              "unitTestLogSha256": source_profile.sha(test_log),
               "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "sourceTrees": profile["trees"], "fallbackFonts": profile["fonts"],
               "textNotices": profile["noticeFiles"], "sourceProfileSha256": source_profile.sha(source_profile.REVIEW),

@@ -23,7 +23,7 @@ from native import Win32, pin_path, start_owned_subject
 from storage.evidence import sha256, write_json
 from win32 import Desktop, check, rect_values
 from worker import hosted, powershell, shared_windows
-from windows_observer import select_powershell
+from windows_observer import private_gui_environment as environment, select_powershell
 from topology import Topology, active_input, contains, physical_coordinates, protocol
 
 TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
@@ -39,19 +39,6 @@ def wait_for(read, label, timeout=35):
             return value
         time.sleep(.075)
     raise TimeoutError("Waiting for " + label)
-
-
-def environment(profile):
-    keys = {"SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "PATH", "PATHEXT", "PROGRAMFILES",
-            "PROGRAMFILES(X86)", "PROGRAMW6432", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)",
-            "COMMONPROGRAMW6432", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS"}
-    env = {k: v for k, v in os.environ.items() if k.upper() in keys}
-    env.update(USERPROFILE=str(profile), HOME=str(profile), TEMP=str(profile), TMP=str(profile),
-               IFW_QA_ISOLATED="1", WGPU_DX12_COMPILER="Fxc", POWERSHELL_TELEMETRY_OPTOUT="1", POWERSHELL_UPDATECHECK="Off")
-    for key in ("APPDATA", "LOCALAPPDATA"):
-        (profile / key).mkdir()
-        env[key] = str(profile / key)
-    return env
 
 
 def owned_layout(api, display, hwnd, pid):

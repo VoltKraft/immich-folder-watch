@@ -1,6 +1,13 @@
 //! Development fixture. An isolated supervisor owns the model across native window lifetimes.
 #![forbid(unsafe_code)]
 
+#[cfg(windows)]
+use native_gui_assessment::windows_appearance;
+#[cfg(all(test, not(windows)))]
+mod windows_appearance;
+#[cfg(any(windows, test))]
+mod windows_style;
+
 #[cfg(target_os = "linux")]
 mod appearance_style;
 #[cfg(target_os = "linux")]
@@ -141,6 +148,11 @@ impl Window {
                 .winit_window()
                 .map(Arc::downgrade)
                 .unwrap_or_default();
+            if let Some(root) = creation.winit_window()
+                && let Err(error) = windows_appearance::attach(root)
+            {
+                eprintln!("Windows contrast observation unavailable: {error}");
+            }
         }
         let mut fonts = egui::FontDefinitions::empty();
         for (family, name, data) in [
@@ -271,6 +283,10 @@ impl eframe::App for Window {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        #[cfg(windows)]
+        let palette = windows_appearance::current();
+        #[cfg(windows)]
+        windows_style::apply(ui, palette);
         let mut model = self.model.borrow_mut();
         model.passes += 1;
         ui.ctx()
@@ -283,9 +299,10 @@ impl eframe::App for Window {
                 ui.label(notice);
             }
             let label = ui.label(if de { "Dateiname" } else { "Filename" });
-            let filename = ui
-                .text_edit_singleline(&mut model.filename)
-                .labelled_by(label.id);
+            let field = egui::TextEdit::singleline(&mut model.filename);
+            #[cfg(windows)]
+            let field = windows_style::control(palette, windows_style::TextRole::Window, field);
+            let filename = ui.add(field).labelled_by(label.id);
             #[cfg(target_os = "windows")]
             if let Some(sample) = model.ime_sample.take() {
                 native_gui_assessment::report_filename_mode(
@@ -296,13 +313,17 @@ impl eframe::App for Window {
                 );
             }
             let label = ui.label(if de { "Kennwort" } else { "Password" });
-            let password = ui
-                .add(egui::TextEdit::singleline(&mut model.password).password(true))
-                .labelled_by(label.id);
+            let field = egui::TextEdit::singleline(&mut model.password).password(true);
+            #[cfg(windows)]
+            let field = windows_style::control(palette, windows_style::TextRole::Window, field);
+            let password = ui.add(field).labelled_by(label.id);
             if password.changed() {
                 println!("EDIT masked chars={}", model.password.chars().count());
             }
-            let language = ui.button(if de { "English" } else { "Deutsch" });
+            let button = egui::Button::new(if de { "English" } else { "Deutsch" });
+            #[cfg(windows)]
+            let button = windows_style::control(palette, windows_style::TextRole::Button, button);
+            let language = ui.add(button);
             if language.clicked() {
                 model.german = !de;
             }

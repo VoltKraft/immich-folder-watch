@@ -687,6 +687,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Compare the rendered Windows label with the system contrast palette and restore it
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 -B -m unittest discover -s tools/rust-qa/appearance -p 'test_windows*.py'
+          python3 -B tools/rust-qa/appearance/windows.py "$NATIVE_TARGET"
+
       - name: Record the reviewed components of the native development build
         id: components
         if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}

@@ -15,6 +15,20 @@ def isolated_windows_vm(selected):
     return selected and sys.platform == "win32" and os.getenv("GITHUB_ACTIONS") != "true"
 
 
+def private_gui_environment(profile):
+    """Give a desktop subject synthetic user directories and only its required Windows environment."""
+    keys = {"SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "PATH", "PATHEXT", "PROGRAMFILES",
+            "PROGRAMFILES(X86)", "PROGRAMW6432", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)",
+            "COMMONPROGRAMW6432", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS"}
+    env = {k: v for k, v in os.environ.items() if k.upper() in keys}
+    env.update(USERPROFILE=str(profile), HOME=str(profile), TEMP=str(profile), TMP=str(profile),
+               IFW_QA_ISOLATED="1", WGPU_DX12_COMPILER="Fxc", POWERSHELL_TELEMETRY_OPTOUT="1", POWERSHELL_UPDATECHECK="Off")
+    for key in ("APPDATA", "LOCALAPPDATA"):
+        (profile / key).mkdir()
+        env[key] = str(profile / key)
+    return env
+
+
 @contextmanager
 def private_profile(parent, prefix, report):
     directory = tempfile.TemporaryDirectory(dir=parent, prefix=prefix)

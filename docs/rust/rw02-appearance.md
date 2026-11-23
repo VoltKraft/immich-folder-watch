@@ -1,4 +1,4 @@
-# Linux system appearance
+# Desktop system appearance
 
 The shipping Avalonia host requests the desktop's default theme. In pinned
 winit 0.30.13, the Linux event loop's `system_theme()` returns `None`. The
@@ -71,3 +71,48 @@ a fresh directory in `artifacts/rust/appearance/runs`. The
 `45dc03bc05d71766b19f4d0b56f37dbc92951ef9` alongside its original
 build receipt. Contrast is measured when the running portal exports it.
 [Native observer](../../tools/rust-qa/appearance/linux.py).
+
+## Windows contrast theme observation
+
+The shipping WPF `ThemeWatcher` reads the app light/dark preference and
+accent color. Pinned winit 0.30.13 reports a light or dark theme to egui.
+Its Windows dark-mode calculation returns light when high contrast is on.
+Windows also supplies user-selected colors for window backgrounds, text,
+buttons and selections. The contrast trial compares the ordinary Rust
+window with these native values. [Shipping theme watcher](../../src/ImmichFolderWatch.App/Services/ThemeWatcher.cs) · [Pinned winit implementation](https://docs.rs/winit/0.30.13/src/winit/platform_impl/windows/dark_mode.rs.html) · [Microsoft contrast themes](https://learn.microsoft.com/en-us/windows/apps/design/accessibility/high-contrast-themes).
+
+The Rust feasibility window reads the current mode at startup and on
+`WM_SYSCOLORCHANGE`, `WM_SETTINGCHANGE` and `WM_THEMECHANGED`.
+When the system palette changes, the owning thread invalidates a visible,
+unminimized window once. It caches changes while hidden for the next frame.
+egui paints text, buttons, disabled controls and selections with their
+respective system colors. Turning contrast off makes the next root UI
+inherit the current system theme. Five portable controls checked these
+transitions, including the actual glyph meshes of a selected edit and
+enabled and disabled buttons. Both canonical and retained sources passed
+frozen compiler checks for Windows x64 and ARM64. The Windows feature
+graphs and Cargo lock stayed byte-identical. [Native setting reader](../../tools/rust-qa/gui/src/windows_appearance.rs) · [egui colors and checks](../../tools/rust-qa/gui/src/windows_style.rs) · [Win32 high contrast messages](https://learn.microsoft.com/en-us/windows/win32/winauto/high-contrast-parameter).
+
+The hosted Windows desktop assessment runs the observer after notification
+and resource measurements. It verifies the native executable and Git inputs,
+opens a synthetic profile and resolves the German filename label through
+UI Automation. The recorder checks the HWND and PID at every point in the
+label's physical crop before and after each capture. Two stable bitmap
+samples from that label are retained in each mode.
+
+The supervisor records the original flags, scheme name and eight system
+colors. A separate bounded worker opens the window, reads the session
+palette and captures its label. The supervisor owns both setting changes
+and any temporary desktop switch. It broadcasts from the subject's input
+desktop and opens the native executable and process by handle.
+It requests an in-session contrast change and broadcast, then restores the
+original mode even if the capture worker fails. It verifies the original
+flags, scheme and colors through Win32. For a successful observation,
+the high-contrast crop must show the actual system window background and
+visible ink matching the system text color. The restored crop must match
+the original dimensions and pixels. The receipts bind each original BMP
+by its file digest. A separate digest covers only its dimensions and
+ordered pixels so a header or row-padding change cannot count as a visible
+change. Native results belong to
+`artifacts/rust/gui-native/<target>/windows-contrast/` in the desktop archive.
+[Observer and measurements](../../tools/rust-qa/appearance/windows.py) · [Win32 setting and rollback](../../tools/rust-qa/appearance/windows_colors.py) · [HIGHCONTRASTW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-highcontrastw) · [SystemParametersInfoW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow).
