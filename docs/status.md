@@ -1,5 +1,17 @@
 # Project Status
 
+## Rust foundation CodeQL (2026-11-23)
+
+The extended CodeQL suite analyzed the five-crate foundation locally with
+both target configurations. It ran 40 queries, including 20 security rules,
+and reported zero alerts and zero extraction errors on each. The source
+archive matched all 19 Rust files in Git. The Linux configuration activated
+17 files and the Windows configuration activated 18. Their combined
+coverage includes the platform-specific filesystem and logging modules.
+The Rust tree was `51b7bff74a760b6f888b6c06b551303dc0a50be7`.
+Commit `3b08278` adds the read-only draft-PR workflow. Native runtime and
+the standalone GUI have separate assessments. [Reproduction and scope](development.md#rust-foundation-codeql).
+
 ## Native candidate assessment at 6af7100 (2026-11-23)
 
 All four native feasibility jobs passed at `6af7100`. Readback of the ten

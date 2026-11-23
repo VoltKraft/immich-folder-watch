@@ -178,6 +178,9 @@ to reconcile project decisions, defaults, and recorded state.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).
+  The [Rust CodeQL workflow](docs/development.md#rust-foundation-codeql)
+  checks semantic coverage of the workspace under the Linux and Windows
+  configurations on the rewrite draft PR.
   Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
