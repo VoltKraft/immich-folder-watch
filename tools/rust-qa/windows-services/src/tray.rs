@@ -6,7 +6,7 @@ use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::StationsAndDesktops::*;
 use windows::Win32::System::Threading::{
     GetCurrentProcessId, GetCurrentThreadId, GetProcessTimes, OpenProcess,
-    PROCESS_QUERY_LIMITED_INFORMATION,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
 };
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -31,16 +31,17 @@ impl Icon<'_> {
 
 fn taskbar_creation(hwnd: HWND, pid: u32, tid: u32) -> Option<u64> {
     unsafe {
-        let process = Owned::new(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?);
+        let access = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE;
+        let process = Owned::new(OpenProcess(access, false, pid).ok()?);
         let mut times = [FILETIME::default(); 4];
         let [created, exit, kernel, user] = &mut times;
         GetProcessTimes(*process, created, exit, kernel, user).ok()?;
         let mut owner = 0;
-        (exit.dwLowDateTime == 0
-            && exit.dwHighDateTime == 0
-            && FindWindowW(w!("Shell_TrayWnd"), None).ok() == Some(hwnd)
+        // GetProcessTimes leaves exit time undefined while Explorer is running.
+        (FindWindowW(w!("Shell_TrayWnd"), None).ok() == Some(hwnd)
             && GetWindowThreadProcessId(hwnd, Some(&mut owner)) == tid
-            && owner == pid)
+            && owner == pid
+            && WaitForSingleObject(*process, 0) == WAIT_TIMEOUT)
             .then_some((u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
     }
 }
