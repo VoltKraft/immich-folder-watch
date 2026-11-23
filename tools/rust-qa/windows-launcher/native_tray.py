@@ -10,6 +10,7 @@ import re
 import sys
 
 import observe as launcher
+import tray_retry
 from observe import CleanupUnconfirmed, bind, check, ordinary_console, recorder
 from window_readback import RECEIVER_CLASS, monitor_work_area, visible_surface
 
@@ -660,7 +661,14 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
         try:
             native.watch_original(stack, result)
             command(proc, b"B")
-            key = native.registration(proc, log, wait, result, no_host=False)
+            try:
+                key = native.registration(proc, log, wait, result, no_host=False)
+            except Unavailable:
+                registration = result.get("registration", {})
+                if (registration.get("added") is False and registration.get("version4") is False
+                        and registration.get("shellReadback", {}).get("hresult", 0) < 0):
+                    tray_retry.observe(native, proc, windows, log, result, records=records, read_rect=shell_rect)
+                raise
             expected = "READY Visible Available" if reopen else "READY BackgroundStartup Available"
             wait(lambda: expected in log().splitlines(), "The supervisor did not select its expected window intent")
             result["startupIntent"] = expected
@@ -799,7 +807,8 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
 
 
 def assess(target, out, result, *, subject="canonical"):
-    files = (Path(__file__).resolve(), PROVIDER, launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
+    files = (Path(__file__).resolve(), PROVIDER, launcher.HERE / "tray_retry.py",
+             launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
     cases = ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
     with launcher.native_subject(target, out, result, files, subject=subject) as (api, desk, built_gui, inventory, _revision):
