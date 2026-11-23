@@ -1,5 +1,19 @@
 # Project Status
 
+## Four desktop jobs at 6084b23 (2026-11-23)
+
+Native Ubuntu x64/ARM64 and the retained Windows ARM64 Mailbox GUI met
+all eleven same-host limits. Both Windows x64 Mailbox depths met eight.
+With one frame, scan close/reopen took 22.70/42.59 ms against limits of
+15.79/18.82 ms. Each Windows display inventory found one 96-DPI console
+monitor. Neither could qualify mixed DPI or RDP. Both WinRT trials
+verified their shortcut, read empty history and removed their resources.
+The quiet and ordinary senders stopped before `Show` on both hosts.
+The follow-up desktop run at `a1011bf` is running.
+[Window measurements](rust/rw02-windows-window.md#native-results-at-6084b23)
+· [Display evidence](rust/rw02-windows-display.md#both-retained-windows-display-inventories-at-6084b23)
+· [Current contrast run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212).
+
 ## Windows notification lookup at 6084b23 (2026-11-23)
 
 Windows x64 verified the installed shortcut and independently read its

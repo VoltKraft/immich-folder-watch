@@ -594,6 +594,35 @@ acquisition, rendering and scheduling requires further native observations.
 The x64 dispatch report SHA-256 is
 `e8f2cc88e2d1e933aa7145e5a2fb53d8f2b477a937fe26a861d558b74f8973fd`.
 
+### Native results at 6084b23
+
+The uninstrumented retained x64 GUI met eight of the eleven same-host
+WPF limits with either Mailbox depth. Independent replay matched the
+original 10 MHz counter timestamps to the ETW file work during each
+pair of 100,000-file inventories. It recovered 1,474 eligible requests
+at one frame and 1,150 at two frames. The following values are the median
+of the three trial p95s in milliseconds.
+
+| Windows x64 | Idle close | Scan close | Scan reopen |
+| --- | ---: | ---: | ---: |
+| WPF-derived limit | 14.058 | 15.793 | 18.823 |
+| Retained Mailbox, one frame | 17.7725 | 22.6957 | 42.5934 |
+| Retained Mailbox, two frames | 15.8489 | 30.5098 | 42.7237 |
+| Visible GDI control | 3.4028 | 3.7782 | 8.4865 |
+
+The x64 dispatch control recorded zero presentations in 277 hidden
+intervals. Its single-wake variant recorded zero in 234. The older
+drawing policy recorded 190 in 95. The ordinary second launch returned
+the original visible window and worker with keyboard focus. The panel
+icon click remained unobserved. Both ordinary and reopened filename
+images matched the earlier originals. The x64 readback SHA-256 is
+`c4262e92348ce80241a4dba00d2805ab5a340eebcbd6c67b909fddc6c02ffd0e`.
+[Native Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864735127).
+
+The native ARM64 retained GUI met all eleven limits with either Mailbox
+depth. FIFO met ten. Its scan close p95 was 17.0024 ms against a
+14.022 ms limit. [Native Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864132829).
+
 ### Separating visible frame and window timing
 
 The x64 assessment runs an additional, instrumented executable after the

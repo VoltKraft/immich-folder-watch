@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-1904be7), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-6084b23) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-descriptor-replay-at-6084b23) include the x64 stock-observer stop. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-6084b23), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-6084b23) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-descriptor-replay-at-6084b23) include the x64 stock-observer stop. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -125,6 +125,15 @@ both directions, and restoring the original package restored its refusal.
 The user selected feasibility only. Distribution and the four installed
 Rust candidate packages remain open.
 [Installed portal evidence](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest).
+
+At `6084b23` both Ubuntu desktops and the retained Windows ARM64 Mailbox
+GUI met all eleven resource limits. Both x64 Mailbox depths met eight.
+The two Windows display observers recorded one 96-DPI console monitor
+each. Mixed DPI and RDP remain open. Both WinRT history trials verified
+their installed shortcut and cleanup. Each sender stopped before showing
+a notification. [Windows timing](rw02-windows-window.md#native-results-at-6084b23)
+· [Display and session](rw02-windows-display.md#both-retained-windows-display-inventories-at-6084b23)
+· [Notification history](rw02-windows-services.md#native-winrt-senders-at-6084b23).
 
 At `1904be7` both Windows targets passed all three mixed-direction edits
 in the ordinary window and after reopening the retained window. All four

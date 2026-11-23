@@ -462,6 +462,17 @@ phase. A final reader found zero entries. The shortcut, its owned folder
 and the temporary profile were removed.
 [Original Windows x64 history archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864372145).
 
+Windows ARM64 also verified the shortcut, read an empty history and
+launched both native senders in session 2. They started 166 and 264 ms
+after the registrar and both returned `0x80070490` before `Show`.
+The final history was empty and cleanup removed both the shortcut folder
+and the synthetic profile. Detached readback checked 42 source inputs
+for each architecture, both original PE import receipts and all twelve
+native process records. Its SHA-256 is
+`6da0d8f9dc1ff8c6a4cac532d92c61c97795c465e06a13e1152490fa8cfe55ce`.
+Both native runs leave delivery unobserved.
+[Original Windows ARM64 history archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864247676).
+
 The revised sender records the separate HRESULTs from the two read-only
 calls and waits only for a newly registered app identity that Windows
 reports as missing. Policy and permission outcomes end the lookup. The

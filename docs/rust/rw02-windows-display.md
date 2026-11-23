@@ -62,6 +62,23 @@ python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
 python3 tools/rust-qa/windows-display/run.py "$NATIVE_TARGET"
 ```
 
+### Both retained Windows display inventories at 6084b23
+
+Both hosts supplied one 1024 × 768 monitor with a 1024 × 720 work area at
+96 DPI in a console session. Each retained Rust process presented through
+the DX12 Microsoft Basic Render Driver with Mailbox, one queued frame and
+the Wait policy. A close hid the original HWND. Quit drained the worker
+and the host removed the private profile.
+
+| Host | Retained display observation | Retained result SHA-256 |
+| --- | --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864735127) | Process 7676 retained HWND `0x240174` and one device generation. The filename edit changed 681 screen pixels on the source monitor. | `8c160b7131304f4ff429cf0e6e1e2310e8392cc09585923e715c412304b69e5a` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864132829) | Process 10576 retained HWND `0x14016e` and one device generation. The source-monitor field did not receive focus during the UI Automation step, so the capture recorded no edited frame. | `e966cb0b664091ae850c9fe47d6c694ab66989ab64d1cd78c333532d7149a0b3` |
+
+The hosted displays could not exercise a move to a monitor with different
+DPI or a connected RDP session. The [separate filename test](rw02-windows-text.md)
+has its own keyboard and glyph evidence.
+
 ### Required observations on a disposable native desktop
 
 Use a dedicated Windows x64 or ARM64 test VM with the matching MSVC build
