@@ -17,3 +17,24 @@ The result and raw per-process logs are under `artifacts/rust/windows-services/t
 ```sh
 python3 -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msvc --replay /path/to/evidence
 ```
+
+Each sender checks its installed shortcut and records the HRESULT from
+`CreateToastNotifierWithId` and, when creation succeeds, the HRESULT from
+`ToastNotifier.Setting`. Each pair appears in order in the original log
+and in the process record's `notifierReadiness` list. A newly registered
+app can return `0x80070490` during either read-only call. Only that result
+permits another query. Queries are spaced 500 ms apart and bounded by
+eight seconds and seventeen starts. Each child retains its 25-second
+process limit. An enabled setting permits one `Show` per sender. A disabled
+setting ends that sender's trial. Earlier reports preserve their original
+combined `notifier` phase.
+
+For a newly installed test shortcut each sender logs the HRESULT for
+`CreateToastNotifierWithId` and for the notifier's `Setting` query.
+Only `ERROR_NOT_FOUND` from either lookup can trigger another read for
+the same app identity. The sender spaces the reads by 500 ms, with an
+eight-second budget and a maximum of 17 attempts. The process supervisor
+enforces its 25-second limit on a stalled native call. An enabled
+notifier can call `Show` once for its tag. A disabled setting ends the
+send. An access refusal, a presentation error and a cleanup error each
+retain their own native outcomes.

@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows notification lookup at 6084b23 (2026-11-23)
+
+Windows x64 verified the installed shortcut and independently read its
+empty history. Both senders reported `ERROR_NOT_FOUND` before a notification
+was sent. Cleanup removed the synthetic shortcut and profile. The updated
+observer records separate native results for creating a notifier and
+reading its setting. Two Rust wait controls, 55 service tests and both
+frozen Windows Clippy checks passed. Native delivery remains open.
+[Native archive and revised trial](rust/rw02-windows-services.md#native-winrt-senders-at-6084b23).
+
 ## Windows foreground keyboard launch (2026-11-23)
 
 The new retained-window trial launches the ordinary secondary from a real

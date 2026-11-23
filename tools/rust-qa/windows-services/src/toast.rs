@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use windows::Data::Xml::Dom::XmlDocument;
 use windows::Foundation::{DateTime, IReference, PropertyValue};
@@ -31,9 +31,10 @@ use windows::Win32::UI::Shell::{
     FOLDERID_Programs, IShellLinkW, SHCNE_CREATE, SHCNF_FLUSHNOWAIT, SHCNF_PATHW, SHChangeNotify,
     SLGP_RAWPATH, SetCurrentProcessExplicitAppUserModelID, ShellLink,
 };
-use windows::core::{BSTR, GUID, HSTRING, Interface, Owned, PCWSTR, Result, w};
+use windows::core::{BSTR, Error, GUID, HRESULT, HSTRING, Interface, Owned, PCWSTR, Result, w};
 
 use crate::shortcuts::{known_folder, read_string};
+use crate::toast_readiness;
 use crate::{invalid, wide};
 
 const LINK: &str = "IFW synthetic notification.lnk";
@@ -175,9 +176,28 @@ fn verify_link(path: &Path, id: &Identity<'_>) -> Result<()> {
 
 fn post(id: &Identity<'_>, quiet: bool) -> Result<()> {
     let mode = if quiet { "quiet" } else { "normal" };
-    println!("phase=notifier");
-    let notifier = ToastNotificationManager::CreateToastNotifierWithId(&id.aumid)?;
-    let setting = notifier.Setting()?;
+    let started = Instant::now();
+    let (notifier, setting) = toast_readiness::wait(
+        |attempt| {
+            println!("phase=notifier-create");
+            let created = ToastNotificationManager::CreateToastNotifierWithId(&id.aumid);
+            println!(
+                "ready.{attempt}.create={}",
+                created.as_ref().err().map_or(0, |e| e.code().0)
+            );
+            let notifier = created.map_err(|e| e.code().0)?;
+            println!("phase=notifier-setting");
+            let setting = notifier.Setting();
+            println!(
+                "ready.{attempt}.setting={}",
+                setting.as_ref().err().map_or(0, |e| e.code().0)
+            );
+            Ok((notifier, setting.map_err(|e| e.code().0)?))
+        },
+        || started.elapsed(),
+        std::thread::sleep,
+    )
+    .map_err(|hr| Error::from_hresult(HRESULT(hr)))?;
     println!("setting={}", setting.0);
     if setting != NotificationSetting::Enabled {
         return Ok(());

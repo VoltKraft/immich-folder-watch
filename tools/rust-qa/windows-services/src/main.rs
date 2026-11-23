@@ -4,6 +4,8 @@
 mod shortcuts;
 #[cfg(windows)]
 mod toast;
+#[cfg(any(windows, test))]
+mod toast_readiness;
 #[cfg(windows)]
 mod tray;
 

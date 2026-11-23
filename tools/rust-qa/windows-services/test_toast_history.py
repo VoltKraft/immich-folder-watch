@@ -289,6 +289,71 @@ class ToastHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             h.parse_log(raw + b"count=0\n", "inspect", TOKEN, 12, 3, 0)
 
+    def test_native_notifier_errors_identify_the_exact_pre_show_call(self):
+        prefix = (f"operation=post-quiet\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid=12\n"
+                  "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n")
+        def parse(log, hr):
+            raw = (prefix + log + f"Probe HRESULT {hr}\n").encode()
+            return h.parse_log(raw, "post-quiet", TOKEN, 12, 2, 1, require_readiness=True)
+        denied = -(1 << 31) + 0x70005
+        for stage in ("create", "setting"):
+            first = "phase=notifier-create\nready.1.create="
+            log = first + ("" if stage == "create" else "0\nphase=notifier-setting\nready.1.setting=")
+            record = parse(log + str(denied) + "\n", denied)
+            self.assertEqual(record["notifierReadiness"][-1][stage], denied)
+            with self.assertRaises(ValueError):
+                parse(log + str(denied) + "\nphase=notifier-create\nready.2.create=" + str(h.NOT_FOUND) + "\n", h.NOT_FOUND)
+        absent = "".join(f"phase=notifier-create\nready.{n}.create={h.NOT_FOUND}\n"
+                         for n in range(1, h.MAX_NOTIFIER_ATTEMPTS + 1))
+        self.assertEqual(len(parse(absent, h.NOT_FOUND)["notifierReadiness"]), h.MAX_NOTIFIER_ATTEMPTS)
+        with self.assertRaises(ValueError):
+            parse(absent + f"phase=notifier-create\nready.{h.MAX_NOTIFIER_ATTEMPTS+1}.create={h.NOT_FOUND}\n", h.NOT_FOUND)
+        with self.assertRaisesRegex(ValueError, "immediate notifier"):
+            parse(f"phase=notifier-create\nphase=notifier-create\nready.1.create={h.NOT_FOUND}\nready.2.create={h.NOT_FOUND}\n", h.NOT_FOUND)
+        for invalid in ("Probe HRESULT -6441991024\n", "Probe HRESULT -2147023728\nextra=after-error\n"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "HRESULT"):
+                h.parse_log((prefix + "phase=show\n" + invalid).encode(), "post-quiet", TOKEN, 12, 2, 1)
+
+    def test_modern_native_receipts_replay_retry_and_one_show_per_sender(self):
+        with TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            run, report = trial(directory=d)
+            run()
+            build_path = d / "native-build.json"
+            build = json.loads(build_path.read_bytes())
+            build["sourceFiles"][h.READINESS_SOURCE] = "3" * 64
+            build["steps"]["notifier-readiness"] = 0
+            h.write(build_path, build)
+            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(build_path))
+            create_failed = f"phase=notifier-create\nready.1.create={h.NOT_FOUND}\n"
+            setting_failed = f"phase=notifier-create\nready.2.create=0\nphase=notifier-setting\nready.2.setting={h.NOT_FOUND}\n"
+            resolved = "phase=notifier-create\nready.3.create=0\nphase=notifier-setting\nready.3.setting=0\n"
+            for proc in report["processes"]:
+                if proc["operation"].startswith("post-"):
+                    path = d / proc["log"]
+                    path.write_bytes(path.read_bytes().replace(b"phase=notifier\n",
+                                     (create_failed + setting_failed + resolved).encode()))
+                    proc["logSha256"] = h.sha(path)
+                    proc["notifierReadiness"] = [{"create": h.NOT_FOUND}, {"create": 0, "setting": h.NOT_FOUND},
+                                                 {"create": 0, "setting": 0}]
+            report["evidenceFiles"] = h.evidence_files(d)
+            self.assertTrue(h.replay(d, report)["finallyEmpty"])
+            proc = next(p for p in report["processes"] if p["operation"] == "post-normal")
+            path = d / proc["log"]
+            original = path.read_bytes()
+            for replacement in (b"phase=show\nphase=show\n", b""):
+                path.write_bytes(original.replace(b"phase=show\n", replacement))
+                proc["logSha256"] = h.sha(path)
+                report["evidenceFiles"] = h.evidence_files(d)
+                with self.assertRaisesRegex((RuntimeError, ValueError), "readiness|cleanup"):
+                    h.replay(d, report)
+            path.write_bytes(original)
+            proc["logSha256"] = h.sha(path)
+            report["evidenceFiles"] = h.evidence_files(d)
+            proc["notifierReadiness"].pop(0)
+            with self.assertRaisesRegex((RuntimeError, ValueError), "readiness|cleanup"):
+                h.replay(d, report)
+
     def test_recognizes_group_tag_and_both_exact_title_fields(self):
         clean = item("inspect", {"normal"}, {})["fields"]
         self.assertEqual(h.observed_rows(clean, TOKEN), {"normal"})

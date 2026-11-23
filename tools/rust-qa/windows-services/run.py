@@ -258,6 +258,7 @@ def main():
         step("format", ["cargo", "fmt", "--all", "--check"])
         step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
         step("balloon-id", ["cargo", "test", "--frozen", "balloon_callbacks_belong_to_the_registered_v4_icon"])
+        step("notifier-readiness", ["cargo", "test", "--frozen", "toast_readiness::tests"])
         step("build", ["cargo", "build", "--frozen", "--release"])
         if hosted:
             result["checkoutVerified"] = False

@@ -18,6 +18,9 @@ LINK = "IFW synthetic notification.lnk"
 PROGRAMS = "a77f5d77-2e2b-44c3-a6a2-aba601054a51"
 OPERATIONS = {"prepare", "register", "inspect", "post-quiet", "post-normal", "remove-quiet", "remove-normal"}
 HISTORY_PHASES = ["identity", "shortcut", "history"]
+READINESS_SOURCE = "tools/rust-qa/windows-services/src/toast_readiness.rs"
+NOT_FOUND = 0x80070490 - (1 << 32)
+MAX_NOTIFIER_ATTEMPTS = 17
 REQUIRED_IMPORTS = {"RoInitialize", "RoUninitialize", "InitPropVariantFromCLSID", "SetCurrentProcessExplicitAppUserModelID",
                     "PropVariantChangeType", "GetTokenInformation"}
 # Failure of one of these Windows services/capabilities is recorded as unavailable.
@@ -31,23 +34,71 @@ def request_identity(target):
         raise ValueError("Use the corresponding disposable Windows runner on the rewrite branch")
 
 
-def parse_log(data, operation, token, expected_pid, session, exit_code):
+def notifier_attempts(fields, phases, hresult):
+    """Check the complete bounded Create/Setting sequence before content or Show."""
+    raw = [key for key in fields if key.startswith("ready.")]
+    observed = []
+    expected_phases = ["identity", "shortcut"]
+    expected_keys = []
+    for number in range(1, MAX_NOTIFIER_ATTEMPTS + 1):
+        calls = {}
+        for stage in ("create", "setting"):
+            key = f"ready.{number}.{stage}"
+            value = fields.get(key, "")
+            if not re.fullmatch(r"0|-[1-9][0-9]{0,9}", value) or int(value) < -(1 << 31):
+                raise ValueError("Missing or invalid notifier readiness HRESULT")
+            code = calls[stage] = int(value)
+            expected_keys.append(key)
+            expected_phases.append("notifier-" + stage)
+            if code:
+                break
+        observed.append(calls)
+        if code != NOT_FOUND or f"ready.{number + 1}.create" not in fields:
+            break
+    if code:
+        if hresult != code or "setting" in fields or "showReturned" in fields:
+            raise ValueError("Notifier readiness refusal differs from the sender result")
+    elif fields.get("setting") == "0":
+        expected_phases.append("content")
+        if hresult is None or "show" in phases:
+            expected_phases.append("show")
+    elif fields.get("setting") not in ("1", "2", "3", "4") or hresult is not None:
+        raise ValueError("Missing or invalid notification setting after readiness")
+    if expected_keys != raw or expected_phases != phases:
+        raise ValueError("Notifier readiness calls or phases differ from the native result")
+    return observed
+
+
+def parse_log(data, operation, token, expected_pid, session, exit_code, *, require_readiness=False):
     if not re.fullmatch(r"[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}", token):
         raise ValueError("Expected the trial's version 4 UUID")
     if len(data) > 8192:
         raise ValueError("Unexpected native toast log size")
     fields, phases, hresult = {}, [], None
+    pending_call = None
     for line in data.decode("utf-8").splitlines():
+        if hresult is not None:
+            raise ValueError("The native HRESULT must terminate the native log")
         if line.startswith("Probe HRESULT "):
-            if hresult is not None or not re.fullmatch(r"Probe HRESULT -[1-9][0-9]*", line):
+            if not re.fullmatch(r"Probe HRESULT -[1-9][0-9]{0,9}", line) or pending_call is not None:
                 raise ValueError("Invalid native HRESULT")
             hresult = int(line.split()[-1])
+            if hresult < -(1 << 31):
+                raise ValueError("Invalid native HRESULT")
             continue
         key, separator, value = line.partition("=")
         if not separator or key in fields:
             raise ValueError("Malformed or duplicate native toast evidence")
+        if pending_call is not None:
+            if not re.fullmatch(r"ready\.[1-9][0-9]?\." + pending_call, key):
+                raise ValueError("Missing immediate notifier readiness result")
+            pending_call = None
+        elif key.startswith("ready."):
+            raise ValueError("Notifier readiness result is outside its native call phase")
         if key == "phase":
             phases.append(value)
+            if value in ("notifier-create", "notifier-setting"):
+                pending_call = value.removeprefix("notifier-")
         else:
             if operation == "inspect" and exit_code == 0 and key == "count" and phases != HISTORY_PHASES:
                 raise ValueError("The native row count appeared outside the exact history-read phase")
@@ -59,7 +110,11 @@ def parse_log(data, operation, token, expected_pid, session, exit_code):
         raise ValueError("Missing native process, synthetic app identity or result")
     if operation == "inspect" and exit_code == 0 and (phases != HISTORY_PHASES or "count" not in fields):
         raise ValueError("A successful inspection did not complete the native history-read phase")
-    return dict(fields=fields, phases=phases, hresult=hresult)
+    item = dict(fields=fields, phases=phases, hresult=hresult)
+    if operation in ("post-quiet", "post-normal") and (exit_code == 0 or len(phases) > 2) and (
+            require_readiness or any(phase.startswith("notifier-") for phase in phases)):
+        item["notifierReadiness"] = notifier_attempts(fields, phases, hresult)
+    return item
 
 
 def observed_rows(fields, token):
@@ -104,8 +159,9 @@ def exchange(call, token, record, *, delay=time.sleep, clock=time.monotonic):
         item = call(operation)
         if item["hresult"] is not None:
             code = item["hresult"] & 0xffffffff
-            if code in UNAVAILABLE and item["phases"][-1] in ("history", "notifier", "show"):
-                raise Unavailable(f"{operation} returned HRESULT 0x{code:08x}",
+            phase = item["phases"][-1]
+            if code in UNAVAILABLE and phase in ("history", "notifier", "notifier-create", "notifier-setting", "show"):
+                raise Unavailable(f"{operation} returned HRESULT 0x{code:08x} during {phase}",
                                   show_attempted="show" in item["phases"])
             raise RuntimeError(f"{operation} failed during {item['phases'][-1]} with HRESULT 0x{code:08x}")
         return item
@@ -231,6 +287,9 @@ def replay(directory, result):
         raise ValueError("Missing, changed or unexpected raw native evidence")
     native_report = directory / "native-build.json"
     build = json.loads(native_report.read_bytes())
+    required_checks = ["compiler", "inventory", "clippy", "build", "toast-controls"]
+    if READINESS_SOURCE in build["sourceFiles"]:
+        required_checks.append("notifier-readiness")
     if (sha(native_report) != result["earlyResultSha256"] or build["hosted"] is not True
             or not re.fullmatch("[0-9a-f]{64}", result["binarySha256"])
             or (build["head"], build["target"], build["workflowRun"], build["workflowAttempt"], build["probeSha256"])
@@ -238,7 +297,7 @@ def replay(directory, result):
             or not result["observerInputs"] or build["sourceFiles"] != result["observerInputs"]
             or build["checkoutVerified"] is not True or build["canonicalGraphSha256"] != result["graphSha256"]
             or any(type(build["steps"].get(k)) is not int or build["steps"][k] != 0
-                   for k in ("compiler", "inventory", "clippy", "build", "toast-controls"))
+                   for k in required_checks)
             or sha(directory / "pe-imports.json") != build["evidenceFiles"]["pe-imports.json"]):
         raise ValueError("The captured import table or executable identity differs from the original native build")
     validate_imports(json.loads((directory / "pe-imports.json").read_bytes()))
@@ -271,7 +330,9 @@ def replay(directory, result):
             raise ValueError("A sender or observer process identity was reused")
         identities.add(identity)
         row = parse_log((directory / filename).read_bytes(), operation, token, proc["pid"],
-                        result["desktop"]["session"], proc["exit"])
+                        result["desktop"]["session"], proc["exit"], require_readiness=READINESS_SOURCE in build["sourceFiles"])
+        if row.get("notifierReadiness") != proc.get("notifierReadiness"):
+            raise ValueError("The reported notifier readiness differs from the original native calls")
         if operation != "prepare" and row["fields"].get("installedLinkVerified") != "true":
             raise ValueError("Missing identity readback from the installed Start Menu shortcut")
         return row
@@ -317,7 +378,9 @@ def measure(target, exe, out, record):
             record["processes"].append(info)
             with child(api, exe, ["--hosted-toast-history", str(area), token, operation], area, env, log, info) as proc:
                 proc.wait(timeout=25)
-            item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"])
+            item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"], require_readiness=True)
+            if "notifierReadiness" in item:
+                info["notifierReadiness"] = item["notifierReadiness"]
             info["logSha256"] = sha(log)
             if operation != "prepare" and item["fields"].get("installedLinkVerified") != "true":
                 raise ValueError("The native subject could not verify the installed shortcut")
@@ -385,6 +448,12 @@ def main():
                 or not controls.read_text(encoding="utf-8").rstrip().endswith("OK")):
             raise ValueError("The native build did not complete the history and cleanup controls")
         result["earlyEvidence"][controls.name] = sha(controls)
+        readiness = original / "notifier-readiness.txt"
+        if (type(build["steps"].get("notifier-readiness")) is not int or build["steps"]["notifier-readiness"] != 0
+                or sha(readiness) != build["evidenceFiles"].get(readiness.name)
+                or "test result: ok. 2 passed; 0 failed;" not in readiness.read_text(encoding="utf-8")):
+            raise ValueError("The native build did not complete the notifier readiness controls")
+        result["earlyEvidence"][readiness.name] = sha(readiness)
         pe = module("toast_pe", QA / "windows-imports/formats.py")
         imports = pe.pe_imports(exe, TARGET[os.environ["RUNNER_ARCH"]][1])
         validate_imports(imports)

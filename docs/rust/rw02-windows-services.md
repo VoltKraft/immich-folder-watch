@@ -449,6 +449,30 @@ boundary. The 53 Windows service tests passed locally. A native sender,
 independent history reader and verified cleanup are still required on
 each Windows target. [Fixture](../../tools/rust-qa/windows-services/toast_history.py) · [Regression control](../../tools/rust-qa/windows-services/test_toast_history.py).
 
+### Native WinRT senders at 6084b23
+
+On Windows x64 six separate native processes ran on the original Default
+desktop in session 2. The installed shortcut had the expected target,
+arguments, app ID and stub CLSID. A fresh reader found zero entries for
+that ID. The quiet and ordinary senders started 77 and 130 ms after the
+registration process started. Both reported `0x80070490` during notifier
+setup, before either called `Show`. The original log grouped
+`CreateToastNotifierWithId` and the subsequent `Setting` query in that
+phase. A final reader found zero entries. The shortcut, its owned folder
+and the temporary profile were removed.
+[Original Windows x64 history archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14864372145).
+
+The revised sender records the separate HRESULTs from the two read-only
+calls and waits only for a newly registered app identity that Windows
+reports as missing. Policy and permission outcomes end the lookup. The
+normal and quiet sends still each issue at most one `Show`. The source
+passed frozen Clippy checks for both Windows targets. Two Rust tests
+exercised the wait and 55 service tests passed locally. The source-bound
+local readback SHA-256 was
+`554c54d034acaafc8ade7280a49cfa5b53599e89e10cc7396da2eb47422e4531`.
+The effect on native delivery requires a new Windows run.
+[Native trial and archive replay](../../tools/rust-qa/windows-services/toast-history.md).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
