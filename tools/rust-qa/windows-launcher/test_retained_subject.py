@@ -71,62 +71,87 @@ class SubjectTests(unittest.TestCase):
         self.cold = self.root / "canonical/gui.exe"
         self.graph = self.cold.with_name("graph.json")
         self.record = self.area / "build.json"
-        self.unit = self.area / "build/release/deps/libeframe-123.rlib"
-        for path in (self.warm, self.cold, self.unit, self.staged / "Cargo.lock", self.staged / "Cargo.toml",
+        for path in (self.warm, self.cold, self.staged / "Cargo.lock", self.staged / "Cargo.toml",
                      self.staged / "src/main.rs", self.staged / "src/tray-icon.argb"):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(str(path))
         sha = observe.recorder.sha
         target = "x86_64-pc-windows-msvc"
-        package = dict(name="eframe", version="0.37.0", archiveSha256="published-source", featureSets=[["accesskit"]])
-        self.graph.write_text(json.dumps(dict(target=target, lockSha256="original-lock", packages=[package])))
+        packages, libraries, self.messages = [], {}, []
+        for name, version, features in (("eframe", "0.37.0", ["accesskit"]), ("winit", "0.30.13", ["rwh_06"])):
+            crate = "artifacts/retained/" + name
+            unit = self.area / f"build/release/deps/lib{name}-123.rlib"
+            unit.parent.mkdir(parents=True, exist_ok=True)
+            unit.write_text("compiled " + name)
+            manifest, source = crate + "/Cargo.toml", crate + "/src/lib.rs"
+            packages.append(dict(name=name, version=version, archiveSha256=name + "-source", featureSets=[features]))
+            libraries[name + "Unit"] = dict(manifest=manifest, crateRoot=source, features=features,
+                                             outputs={unit.relative_to(self.area / "build").as_posix(): sha(unit)})
+            self.messages.append(dict(reason="compiler-artifact", manifest_path=str(self.staged / manifest), features=features,
+                                      target=dict(name=name, kind=["lib"], crate_types=["lib"], src_path=str(self.staged / source)),
+                                      filenames=[str(unit)], executable=None))
+        self.messages.append(dict(reason="build-finished", success=True))
+        self.compiler_log = self.area / "compiler.jsonl"
+        self.compiler_log.write_text("".join(json.dumps(row) + "\n" for row in self.messages))
+        self.graph.write_text(json.dumps(dict(target=target, lockSha256="original-lock", packages=packages)))
         pins = dict(canonicalLockSha256="original-lock", retainedLockSha256=sha(self.staged / "Cargo.lock"),
-                    retainedManifestSha256=sha(self.staged / "Cargo.toml"), archiveSha256="published-source")
+                    retainedManifestSha256=sha(self.staged / "Cargo.toml"), archiveSha256="eframe-source")
         (self.area / "eframe-source.json").write_text(json.dumps(pins))
-        compiler = dict(manifest="artifacts/retained/eframe/Cargo.toml", crateRoot="artifacts/retained/eframe/src/lib.rs",
-                        features=["accesskit"], outputs={self.unit.relative_to(self.area / "build").as_posix(): sha(self.unit)})
+        winit_pins = dict(archiveSha256="winit-source")
+        (self.area / "winit-source.json").write_text(json.dumps(winit_pins))
         fonts = {p.name: sha(p) for p in (observe.ROOT / "rust/assets/fonts").glob("*.ttf")}
         self.build = dict(baseline=sha(self.cold), binary=sha(self.warm), canonicalGraph=sha(self.graph),
-                          canonicalLock="original-lock", lock=sha(self.staged / "Cargo.lock"), selectedFeatureRows=1,
+                          canonicalLock="original-lock", lock=sha(self.staged / "Cargo.lock"), selectedFeatureRows=2,
                           variantInputs={"build.py": "paired"}, compilerInputs={p.name: sha(p) for p in (self.staged / "src").iterdir()},
-                          eframeSource=dict(pins=pins, archiveSha256="verified-archive"), eframeUnit=compiler,
-                          compilerEvidence={"sha256": "paired-compiler-log"}, baseFonts=fonts, fallbackFonts={"qa.ttf": "font"})
+                          eframeSource=dict(pins=pins, winitPins=winit_pins, archiveSha256="verified-archive"), **libraries,
+                          compilerEvidence={"sha256": sha(self.compiler_log)}, baseFonts=fonts, fallbackFonts={"qa.ttf": "font"})
         self.canonical = dict(source="revision", binarySha256=sha(self.cold), graphSha256=sha(self.graph),
                               lockSha256="original-lock", fallbackFonts={"qa.ttf": {"sha256": "font"}})
         def subjects(_target):
             paired = dict(target=target, revision="revision", buildReceipt=sha(self.record), baselineReceipt="canonical-receipt",
                           binary=sha(self.warm), baseline=sha(self.cold))
             return "verified native observer", self.cold, self.warm, self.area, paired
+        loader = runpy.run_path
+        (self.area / "compiler_units.py").write_bytes((retained_subject.WARM / "compiler_units.py").read_bytes())
+        def load_module(path, run_name):
+            return {"subjects": subjects} if Path(path) == self.area / "inputs.py" else loader(path, run_name=run_name)
         self.enterContext(patch.object(retained_subject, "WARM", self.area))
-        self.loader = self.enterContext(patch.object(retained_subject.runpy, "run_path", return_value={"subjects": subjects}))
+        self.enterContext(patch.object(retained_subject.runpy, "run_path", side_effect=load_module))
         self.target = target
 
     def select(self, record):
         self.record.write_text(json.dumps(record))
         return retained_subject.select(self.target, self.cold, self.canonical, self.graph, observe.recorder.sha)
 
-    def test_exact_selected_image_local_eframe_and_compiler_evidence_survive_staging(self):
+    def test_selected_image_and_both_local_compiler_units_survive_staging(self):
         api, exe, evidence = self.select(self.build)
-        self.loader.assert_called_once_with(str(self.area / "inputs.py"), run_name="ifw_launcher_retained_inputs")
         self.assertEqual((api, exe), ("verified native observer", self.warm))
         self.assertEqual(evidence["eframeUnit"], self.build["eframeUnit"])
+        self.assertEqual(evidence["winitUnit"], self.build["winitUnit"])
         self.assertEqual(evidence["compilerEvidence"], self.build["compilerEvidence"])
         self.assertEqual(evidence["baselineReceipt"], "canonical-receipt")
         self.assertNotEqual(evidence["binary"], evidence["baseline"])
 
     def test_crossed_locks_graph_sources_feature_sets_library_and_baseline_are_rejected(self):
-        for key, new in (("lock", "other"), ("canonicalGraph", "other"), ("selectedFeatureRows", 2), ("fallbackFonts", {}),
+        for key, new in (("lock", "other"), ("canonicalGraph", "other"), ("selectedFeatureRows", 3), ("fallbackFonts", {}),
                          ("compilerInputs", {}), ("binary", self.build["baseline"])):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.select(self.build | {key: new})
-        for key, new in (("manifest", "not-the-local-override"), ("features", ["other"]), ("outputs", {}),
-                         ("outputs", {"../foreign.rlib": "other"})):
-            record = copy.deepcopy(self.build)
-            record["eframeUnit"][key] = new
-            with self.subTest(key=key), self.assertRaises(ValueError):
-                self.select(record)
-        self.unit.write_text("replaced compiler output")
+        for library in ("eframeUnit", "winitUnit"):
+            for key, new in (("manifest", "not-the-local-override"), ("features", ["other"]), ("outputs", {}),
+                             ("outputs", {"../foreign.rlib": "other"})):
+                record = copy.deepcopy(self.build)
+                record[library][key] = new
+                with self.subTest(library=library, key=key), self.assertRaises(ValueError):
+                    self.select(record)
+        (self.area / "build/release/deps/libwinit-123.rlib").write_text("replaced compiler output")
         with self.assertRaisesRegex(ValueError, "compiler output"):
+            self.select(self.build)
+
+    def test_registry_winit_in_compiler_log_fails_even_with_matching_local_receipt(self):
+        self.messages[1]["manifest_path"] = str(self.root / "registry/winit/Cargo.toml")
+        self.compiler_log.write_text("".join(json.dumps(row) + "\n" for row in self.messages))
+        with self.assertRaisesRegex(ValueError, "winit"):
             self.select(self.build)
 
 

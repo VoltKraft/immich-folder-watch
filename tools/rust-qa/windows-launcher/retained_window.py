@@ -135,6 +135,12 @@ class RetainedWindow:
             raise ValueError("The retained HWND did not remain hidden after its genuine close")
         row = self.record["hidden"] = self.identity("hidden", False)
         row["hideEvent"] = self.events(self.start)[0]
+        # An ordinary HWND can legitimately use winit's original path. Attribute the
+        # shortcut only when the compiled library identifies this same externally observed HWND.
+        markers = [line for line in log.splitlines() if line.startswith("RETAINED_VISIBILITY ")]
+        row["winitVisibilityShortcut"] = markers == [f"RETAINED_VISIBILITY first=hide hwnd={self.hwnd}"]
+        if markers and not row["winitVisibilityShortcut"]:
+            raise ValueError("The retained visibility marker does not identify this single observed root")
         graphics(log, row)
         return True
 

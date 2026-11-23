@@ -98,6 +98,18 @@ class RetainedWindowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "visibility events"):
             self.trial.opened(99, lambda: FIRST_RENDER, self.wait)
 
+    def test_only_a_single_shortcut_marker_for_the_observed_hidden_root_counts(self):
+        self.trial.close_window()
+        log = FIRST_RENDER + "WINDOW_HIDDEN\n"
+        marker = "RETAINED_VISIBILITY first=hide hwnd=99\n"
+        self.assertTrue(self.trial.hidden(log))
+        self.assertFalse(self.record["hidden"]["winitVisibilityShortcut"])
+        self.assertTrue(self.trial.hidden(marker + log))
+        self.assertTrue(self.record["hidden"]["winitVisibilityShortcut"])
+        for invalid in (marker.replace("99", "91"), marker + marker):
+            with self.subTest(marker=invalid), self.assertRaisesRegex(ValueError, "visibility marker"):
+                self.trial.hidden(invalid + log)
+
     def test_renderer_rejects_diagnostic_measurements_altered_generations_or_early_release(self):
         for row in ("GRAPHICS_ATTEMPT generation=2 policy=preferred", "GRAPHICS_READY generation=2", "WINDOW_RELEASED passes=5",
                     "WINDOW_WAKE mode=single", "GRAPHICS_MEMORY generation=1 hint=Performance", "ADAPTER Dx12 Cpu Other"):
