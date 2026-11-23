@@ -25,6 +25,7 @@ LEGACY_INPUTS = (
     "src/ImmichFolderWatch.Core", "src/ImmichFolderWatch.Immich", "src/ImmichFolderWatch.App.Shared",
     "src/ImmichFolderWatch.App.Linux/Platform", TEST_PROJECT + "/ImmichFolderWatch.Tests.Core.csproj",
     TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests*.cs", ":!" + TEST_FILE,
+    ":!" + TEST_PROJECT + "/Services/FolderWatchWorkerPersistenceTests.UploadActivity.cs",
     "Directory.Build.props", "Directory.Build.targets", "global.json", "NuGet.Config",
 )
 FILES = {"before.db", "after.db", "activity.json", "photo.jpg"}
