@@ -216,6 +216,8 @@ to reconcile project decisions, defaults, and recorded state.
   a private desktop and installs only into its disposable test repository.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
+  The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses
+  original release packages, disposable installs and the synthetic legacy corpus.
   The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only
   after the eight recovery cases on the owned Windows test volume. Preserve
   the separate provider outcome, volume readback and cleanup evidence.

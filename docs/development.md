@@ -75,6 +75,25 @@ adds a separate data exchange between these two worker starts.
 `rust-feasibility.yaml` retains the source, build and per-test evidence from
 each native target in its `rust-worker-backup` archive.
 
+### Original package install and repair
+
+Use the common runner on a native Linux x64 or ARM64 machine with Flatpak,
+OSTree and Bubblewrap. It creates a new private installation and evidence
+directory. From the repository root, a local x64 run with a previously
+downloaded release bundle is:
+
+```bash
+python3 -B tools/RustCompatibilityOracle/installed/run.py linux-x64 \
+  artifacts/rust/shipping-install-linux-x64 \
+  --package artifacts/rust/legacy-installer-inputs/v3.0.4/immich-folder-watch-3.0.4-linux-x64.flatpak
+```
+
+Supply a fresh output directory each time. Omitting `--package` downloads
+the exact published asset. The Windows executor requires the matching
+disposable GitHub-hosted Windows runner on `rewrite/rust`. The four-target
+workflow uploads the native logs, retained synthetic profile and evidence
+hashes. [Original packages and results](rust/rw01-installed-packages.md) · [Installer workflow](../.github/workflows/rust-legacy-install.yaml).
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished
