@@ -531,10 +531,11 @@ def foreground_case(api, desk, gui, trial, env, out, target, revision, result, *
 def profile_resources(api, parent, token, result):
     name = "ifw-rw02-" + token
     root = parent / name
+    waits = result["directoryDispositionWaits"] = []
     result["cleanupConfirmed"] = False
     observation = None
     try:
-        with recorder.owned_directory(api, parent, name) as owned, ExitStack() as stack:
+        with recorder.owned_directory(api, parent, name, directory_waits=waits) as owned, ExitStack() as stack:
             try:
                 yield owned, stack
             except Exception as exc:

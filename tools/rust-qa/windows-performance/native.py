@@ -216,7 +216,43 @@ def pin_new_marker(stack, api, path, token):
         return original
 
 
-def remove_owned_contents(api, path, *, root=None):
+def dispose_empty_directory(api, handle, relative, identity, directory_waits):
+    try:
+        api.delete_handle(handle)
+    except OSError as first:
+        location = f"FileDispositionInfoEx on owned directory {relative!r} (volume {identity[0]}, file ID {identity[1]})"
+        first.add_note(location)
+        if directory_waits is None or getattr(first, "winerror", None) != 145:
+            raise
+        # A child marked for deletion can outlive our handle. Windows still requires
+        # an empty directory on every attempt. Never reopen or remove a new entry.
+        record = dict(relativeDirectory=relative, volume=identity[0], fileId=identity[1],
+                      initialWin32Error=145, initialMessage=str(first), retries=0, dispositionAccepted=False)
+        directory_waits.append(record)
+        deadline = time.monotonic() + 5
+        while (remaining := deadline - time.monotonic()) > 0:
+            time.sleep(min(.05, remaining))
+            if time.monotonic() >= deadline:
+                break
+            attributes, found = api.file_info(handle)
+            if found != identity or not attributes & 0x10 or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                raise CleanupUnconfirmed(f"The held fixture directory changed before retry at {relative!r}")
+            if time.monotonic() >= deadline:
+                break
+            record["retries"] += 1
+            try:
+                api.delete_handle(handle)
+            except OSError as error:
+                if getattr(error, "winerror", None) != 145:
+                    error.add_note(location)
+                    raise
+            else:
+                record["dispositionAccepted"] = True
+                return
+        raise
+
+
+def remove_owned_contents(api, path, *, root=None, directory_waits=None):
     if root is None:
         root = path
     for entry in path.iterdir():
@@ -228,16 +264,18 @@ def remove_owned_contents(api, path, *, root=None):
             exc.add_note(f"CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on owned fixture entry {relative!r}")
             raise
         try:
-            attributes, _ = api.file_info(handle)
+            attributes, identity = api.file_info(handle)
             if attributes & 0x10 and not attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
-                remove_owned_contents(api, entry, root=root)
-            api.delete_handle(handle)
+                remove_owned_contents(api, entry, root=root, directory_waits=directory_waits)
+                dispose_empty_directory(api, handle, entry.relative_to(root).as_posix(), identity, directory_waits)
+            else:
+                api.delete_handle(handle)
         finally:
             checked(api.close(handle))
 
 
 @contextlib.contextmanager
-def owned_directory(api, parent, name):
+def owned_directory(api, parent, name, *, directory_waits=None):
     path = parent / name
     with pin_path(api, parent, True) as (parent_handle, _):
         handle = api.create_child_directory(parent_handle, name)
@@ -253,7 +291,7 @@ def owned_directory(api, parent, name):
                 raise
             finally:
                 if cleanup:
-                    remove_owned_contents(api, path)
+                    remove_owned_contents(api, path, directory_waits=directory_waits)
                     emptied = True
         finally:
             checked(api.close(handle))
@@ -263,9 +301,9 @@ def owned_directory(api, parent, name):
                 final = api.path_handle(path, True, delete=True)
                 try:
                     attributes, found = api.file_info(final)
-                    if found != expected or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                    if found != expected or not attributes & 0x10 or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
                         raise ValueError("The disposable directory identity changed before removal")
-                    api.delete_handle(final)
+                    dispose_empty_directory(api, final, ".", expected, directory_waits)
                 finally:
                     checked(api.close(final))
 

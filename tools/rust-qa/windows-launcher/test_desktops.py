@@ -154,7 +154,7 @@ class DesktopCleanupTests(unittest.TestCase):
             parent = Path(parent)
 
             @contextmanager
-            def owned(_api, directory, name):
+            def owned(_api, directory, name, *, directory_waits):
                 root = directory / name
                 root.mkdir()
                 try:
@@ -183,7 +183,7 @@ class DesktopCleanupTests(unittest.TestCase):
             cases = {}
 
             @contextmanager
-            def owned(_api, directory, name):
+            def owned(_api, directory, name, *, directory_waits):
                 root = directory / name
                 root.mkdir()
                 try:
@@ -239,6 +239,107 @@ class DesktopCleanupTests(unittest.TestCase):
         error, = cases["shellLess"]["failures"]
         self.assertEqual(error["win32Error"], 32)
         self.assertEqual(error["notes"], ["CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on owned fixture entry 'subject/gui.exe'"])
+
+    def test_root_wait_retains_native_refusal_and_reuses_only_the_original_verified_handle(self):
+        api, history = Mock(), []
+        first = OSError("directory not empty")
+        first.winerror = 145
+        api.create_child_directory.return_value = 60
+        api.path_handle.return_value = 61
+        api.file_info.return_value = (0x10, (7, 83))
+        api.delete_handle.side_effect = [first, None]
+        with (patch.object(native, "pin_path") as pinned, patch.object(native, "remove_owned_contents") as empty,
+              patch.object(native.time, "sleep")):
+            pinned.return_value.__enter__.return_value = (59, (7, 82))
+            with native.owned_directory(api, Path("parent"), "fixture", directory_waits=history):
+                pass
+        empty.assert_called_once_with(api, Path("parent/fixture"), directory_waits=history)
+        api.path_handle.assert_called_once_with(Path("parent/fixture"), True, delete=True)
+        self.assertEqual(api.delete_handle.call_args_list, [call(61), call(61)])
+        self.assertEqual(history, [dict(relativeDirectory=".", volume=7, fileId=83, initialWin32Error=145,
+                                       initialMessage=str(first), retries=1, dispositionAccepted=True)])
+
+    def test_persistent_nonempty_private_directory_preserves_late_entry_and_initial_failure(self):
+        api, cases = Mock(), {}
+        first, repeated = OSError("directory not empty"), OSError("still not empty")
+        first.winerror = repeated.winerror = 145
+        with TemporaryDirectory() as parent:
+            root = Path(parent)
+            nested = root / "subject"
+            nested.mkdir()
+            late = nested / "late"
+            api.path_handle.return_value = 74
+            api.file_info.return_value = (0x10, (9, 33))
+            def refuse(handle):
+                self.assertEqual(handle, 74)
+                if not late.exists():
+                    late.write_bytes(b"survives")
+                    raise first
+                raise repeated
+            api.delete_handle.side_effect = refuse
+            def visit(name, state):
+                if name == "foreground":
+                    state["cleanupConfirmed"] = True
+                    return
+                state["directoryDispositionWaits"] = []
+                native.remove_owned_contents(api, root, directory_waits=state["directoryDispositionWaits"])
+            with (patch.object(native.time, "monotonic", side_effect=[10, 10, 10.05, 10.06, 16]), patch.object(native.time, "sleep"),
+                  self.assertRaises(observe.CleanupUnconfirmed) as caught):
+                observe.run_cases(visit, cases)
+            self.assertIs(caught.exception.__cause__, first)
+            self.assertEqual(late.read_bytes(), b"survives")
+            api.path_handle.assert_called_once_with(nested, True, delete=True)
+            self.assertEqual(api.delete_handle.call_args_list, [call(74), call(74)])
+            api.close.assert_called_once_with(74)
+        failure, = cases["shellLess"]["failures"]
+        self.assertEqual(failure["win32Error"], 145)
+        self.assertIn("owned directory 'subject' (volume 9, file ID 33)", failure["notes"][0])
+        self.assertFalse(cases["shellLess"]["cleanupConfirmed"])
+        self.assertFalse(cases["shellLess"]["directoryDispositionWaits"][0]["dispositionAccepted"])
+
+    def test_another_disposition_error_stops_the_wait_and_preserves_both_native_errors(self):
+        api, history = Mock(), []
+        first, last = OSError("directory not empty"), PermissionError("access denied")
+        first.winerror, last.winerror = 145, 5
+        api.file_info.return_value = (0x10, (8, 32))
+        api.delete_handle.side_effect = [first, last]
+        with patch.object(native.time, "sleep"), self.assertRaises(PermissionError) as caught:
+            native.dispose_empty_directory(api, 81, "subject", (8, 32), history)
+        self.assertIs(caught.exception, last)
+        self.assertEqual([e["win32Error"] for e in observe.failures(last)], [145, 5])
+        self.assertEqual(history[0]["retries"], 1)
+        self.assertFalse(history[0]["dispositionAccepted"])
+
+    def test_timeout_during_sleep_or_identity_read_prevents_a_late_disposition(self):
+        for ticks, identity_reads in [([10, 14.99, 16], 0), ([10, 14.99, 14.995, 16], 1)]:
+            api, history = Mock(), []
+            first = OSError("directory not empty")
+            first.winerror = 145
+            api.delete_handle.side_effect = [first, None]
+            api.file_info.return_value = (0x10, (8, 32))
+            with (patch.object(native.time, "monotonic", side_effect=ticks), patch.object(native.time, "sleep") as sleep,
+                  self.assertRaises(OSError) as caught):
+                native.dispose_empty_directory(api, 81, "subject", (8, 32), history)
+            self.assertIs(caught.exception, first)
+            self.assertAlmostEqual(sleep.call_args.args[0], .01)
+            self.assertEqual(api.file_info.call_count, identity_reads)
+            api.delete_handle.assert_called_once_with(81)
+            self.assertFalse(history[0]["dispositionAccepted"])
+
+    def test_changed_directory_identity_or_reparse_attribute_refuses_a_second_disposition(self):
+        for state in [(0x10, (8, 99)), (0x410, (8, 32)), (0x80, (8, 32))]:
+            with self.subTest(state=state):
+                api, history = Mock(), []
+                first = OSError("directory not empty")
+                first.winerror = 145
+                api.delete_handle.side_effect = first
+                api.file_info.return_value = state
+                with patch.object(native.time, "sleep"), self.assertRaises(native.CleanupUnconfirmed) as caught:
+                    native.dispose_empty_directory(api, 81, "subject", (8, 32), history)
+                api.delete_handle.assert_called_once_with(81)
+                self.assertIs(caught.exception.__context__, first)
+                self.assertFalse(history[0]["dispositionAccepted"])
+                self.assertEqual(history[0]["retries"], 0)
 
     def test_failure_drain_records_only_an_unambiguous_native_ui_pass_count(self):
         for status, log, passes in [(0, "DRAINED passes=3\n", 3), (1, "DRAINED passes=8\n", None),

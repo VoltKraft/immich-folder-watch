@@ -114,7 +114,7 @@ class FixtureTests(unittest.TestCase):
             pinned.return_value.__enter__.return_value = (99, (1, 99))
             with self.assertRaisesRegex(ValueError, "identity changed"), native.owned_directory(api, Path("a"), "fixture"):
                 pass
-        empty.assert_called_once_with(api, Path("a/fixture"))
+        empty.assert_called_once_with(api, Path("a/fixture"), directory_waits=None)
         api.delete_handle.assert_not_called()
 
     def test_unknown_job_state_preserves_the_marked_directory(self):
@@ -188,6 +188,46 @@ class FixtureTests(unittest.TestCase):
                 worker.write_bytes(b"other")
                 with self.assertRaisesRegex(ValueError, "build receipt"):
                     pin_images(stack, None, path, wpf, gui, None, None, facts)
+
+    @unittest.skipUnless(native.hosted(), "requires a disposable native GitHub Windows runner")
+    def test_native_directory_disposition_retries_the_same_handle_after_a_real_nonempty_result(self):
+        api, waits, attempts, errors = native.Win32(), [], [], []
+        delete = api.delete_handle
+        directory_id = None
+        parent = Path(os.environ["RUNNER_TEMP"])
+
+        def inject_late_child(handle):
+            if api.file_info(handle)[1] == directory_id:
+                attempts.append(handle)
+                if len(attempts) == 1:
+                    # The creator holds its own CREATE_NEW file through the first directory disposition.
+                    child = api.create_file(str(nested / "late-owned"), 0x10080, 7, None, 1, 0x00200080, None)
+                    if child == c.c_void_p(-1).value:
+                        raise c.WinError(c.get_last_error())
+                    try:
+                        return delete(handle)
+                    except OSError as exc:
+                        errors.append(exc.winerror)
+                        raise
+                    finally:
+                        try:
+                            delete(child)
+                        finally:
+                            native.checked(api.close(child))
+            return delete(handle)
+
+        with (patch.object(api, "delete_handle", side_effect=inject_late_child),
+              native.owned_directory(api, parent, "ifw-rw02-" + uuid.uuid4().hex, directory_waits=waits) as area):
+            nested = area / "subject"
+            nested.mkdir()
+            with native.pin_path(api, nested, True) as (_, identity):
+                directory_id = identity
+        self.assertEqual(errors, [145])
+        self.assertGreaterEqual(len(attempts), 2)
+        self.assertEqual(len(set(attempts)), 1)
+        self.assertEqual([(r["relativeDirectory"], r["volume"], r["fileId"], r["initialWin32Error"],
+                           r["dispositionAccepted"]) for r in waits], [("subject", *directory_id, 145, True)])
+        self.assertFalse(os.path.lexists(area))
 
     @unittest.skipUnless(native.hosted(), "requires a disposable native GitHub Windows runner")
     def test_native_job_and_handle_based_fixture_lifecycle(self):
