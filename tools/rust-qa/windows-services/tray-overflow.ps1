@@ -58,7 +58,7 @@ function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scri
     }
 }
 
-function Restore-IfwTrayOverflow($State, $Record, [scriptblock]$BeforeChange = $null) {
+function Restore-IfwTrayOverflow($State, $Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeClose = $null) {
     if ($null -eq $State) { return }
     $action = $State.action
     if ((Get-IfwShellOwner $State.bar) -ne $State.explorer -or $State.button.Current.ProcessId -ne $State.explorer) {
@@ -68,15 +68,19 @@ function Restore-IfwTrayOverflow($State, $Record, [scriptblock]$BeforeChange = $
         throw 'The private desktop or its pinned shell changed before flyout cleanup'
     }
     $open = (Get-IfwOverflowWindow $State.explorer) -ne [IntPtr]::Zero
-    if ($action.method -eq 'Expand') {
-        if ($action.provider.Current.ExpandCollapseState -eq [Windows.Automation.ExpandCollapseState]::Expanded) {
-            $action.provider.Collapse()
+    $shouldClose = switch ($action.method) {
+        'Expand' { $action.provider.Current.ExpandCollapseState -eq [Windows.Automation.ExpandCollapseState]::Expanded }
+        'Toggle' { $action.provider.Current.ToggleState -eq [Windows.Automation.ToggleState]::On }
+        'Invoke' { $open }
+    }
+    if ($shouldClose) {
+        # The icon action may have dismissed its flyout since the compatibility visibility lookup.
+        if ($null -ne $BeforeClose -and -not (& $BeforeClose $State.bar $State.explorer)) { return }
+        switch ($action.method) {
+            'Expand' { $action.provider.Collapse() }
+            'Toggle' { $action.provider.Toggle() }
+            'Invoke' { $action.provider.Invoke() }
         }
-    } elseif ($action.method -eq 'Toggle') {
-        if ($action.provider.Current.ToggleState -eq [Windows.Automation.ToggleState]::On) { $action.provider.Toggle() }
-    } elseif ($open) {
-        # The same Explorer provider closes the flyout. The icon action may already have closed it.
-        $action.provider.Invoke()
     }
     $until = [DateTime]::UtcNow.AddSeconds(3)
     do {

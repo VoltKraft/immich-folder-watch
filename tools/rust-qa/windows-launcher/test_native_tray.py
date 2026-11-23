@@ -14,7 +14,7 @@ KEY = "18", "43", "23"
 RGB, COMPLEMENT = tray.marker_colors(TOKEN)
 RECT = [-4, 10, 28, 42]
 SURFACE = dict(pid=18, hwnd=43, id=23, creation=101, rect=RECT, point=[12, 26], bar=51, hit=52,
-               root=51, rootClass="Shell_TrayWnd", overflow=0, monitor=2, cursor=[4, 3],
+               root=51, rootClass="Shell_TrayWnd", overflow=0, pane=None, monitor=2, cursor=[4, 3],
                shellPid=81, shellCreation=102, desktop="Default", rgb=RGB)
 ELEMENT = dict(runtimeId="42,99", matchCount=1, matchedLabel="IFW tray " + TOKEN, pid=81, hitDepth=2,
                root=51, hitRuntimeId="42,199",
@@ -169,7 +169,8 @@ class ResidentTests(unittest.TestCase):
         state, commands, requests = {}, [], []
         visible_rect = [310, 410, 342, 442] if flyout else RECT
         visible_surface = (dict(SURFACE, rect=visible_rect, point=[326, 426], hit=62, root=61, overflow=61,
-                                rootClass="TopLevelWindowForOverflowXamlIsland") if flyout else SURFACE)
+                                rootClass="TopLevelWindowForOverflowXamlIsland",
+                                pane=dict(hwnd=61, pid=81, tid=82, windowClass="TopLevelWindowForOverflowXamlIsland")) if flyout else SURFACE)
         visible_element = dict(ELEMENT, root=visible_surface["root"], bounds=visible_rect)
         with TemporaryDirectory() as directory:
             out = Path(directory)
@@ -226,7 +227,10 @@ class ResidentTests(unittest.TestCase):
                     if refusal == "different-window":
                         windows.hwnd = 100
                     windows.show(16 if refusal == "premature-show" else 24, create=not reopen)
-                    return {"startTick": 21, "returnedTick": 25}
+                    invoked = dict(visible_surface, rgb=COMPLEMENT)
+                    if refusal == "recycled-at-invoke":
+                        invoked["pane"] = invoked["pane"] | {"tid": 777}
+                    return dict(startTick=21, returnedTick=25, surface=invoked, provider=visible_element)
                 self.fail("Unexpected provider stage")
             helper.stdin.write.side_effect = requests.append
 
@@ -296,6 +300,8 @@ class ResidentTests(unittest.TestCase):
             _, requests, state = self.exercise(wrong, flyout=True)
             self.assertNotIn(b"invoke\n", requests)
             self.assertNotIn("delivery", state)
+        _, _, rejected = self.exercise("recycled-at-invoke", flyout=True)
+        self.assertNotIn("delivery", rejected)
 
     def test_real_callback_covers_first_activation_and_reopening_the_previously_closed_retained_hwnd(self):
         for reopen in (False, True):

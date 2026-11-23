@@ -465,6 +465,19 @@ def provider_event(events, stage):
     return one(found, stage) if found else None
 
 
+def original_pane(pane, pid):
+    return (isinstance(pane, dict) and all(type(pane.get(k)) is int and pane[k] > 0 for k in ("hwnd", "pid", "tid"))
+            and pane["pid"] == pid and pane.get("windowClass") in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland"))
+
+
+def verify_marker_route(surface, baseline, opened):
+    pane = opened["pane"] if opened else None
+    if (not baseline or baseline["pane"] is not None or surface["cursor"] != baseline["cursor"]
+            or surface["pane"] != pane or surface["overflow"] != (pane["hwnd"] if pane else 0)
+            or pane and (surface["root"], surface["rootClass"]) != (pane["hwnd"], pane["windowClass"])):
+        raise Unavailable("The physical marker did not identify the observed original Explorer surface")
+
+
 def provider_route(events, original, result, *, final=False):
     names = ("baseline", "hint", "opening", "opened", "cleanup", "cleanup-failed")
     history = [e for e in events if e["stage"] in names]
@@ -490,19 +503,20 @@ def provider_route(events, original, result, *, final=False):
             raise CleanupUnconfirmed("The hidden-icons action did not identify the initially closed original Explorer surface")
     if opened:
         pane = opened["pane"]
-        if (not opening or pane["pid"] != pid or pane["hwnd"] <= 0 or pane["tid"] <= 0
-                or pane["windowClass"] not in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")):
+        if not opening or not original_pane(pane, pid):
             raise CleanupUnconfirmed("The opened panel did not identify the pinned Explorer hidden-icons surface")
     if final:
         cleanup = entries.get("cleanup")
+        attempts = sum(e["stage"] == "attempt" for e in events)
+        invoked = sum(e["stage"] == "invoked" for e in events)
         if (not cleanup or cleanup["attempted"] is not bool(opening) or cleanup["baselineRead"] is not bool(baseline)
+                or type(cleanup.get("iconAttempted")) is not bool or attempts > 1 or invoked > 1
+                or cleanup["iconAttempted"] and attempts != 1 or invoked and not cleanup["iconAttempted"]
                 or cleanup["restored"] is not bool(opening) or not opening and cleanup["observedOpen"] is not None
                 or baseline and (cleanup["original"] != baseline["pane"] or cleanup["final"] != baseline["pane"]
                                  or cleanup["cursor"] != baseline["cursor"])
-                or opening and (not cleanup["observedOpen"]
-                                or cleanup["observedOpen"]["pid"] != pid or cleanup["observedOpen"]["tid"] <= 0
-                                or cleanup["observedOpen"]["hwnd"] <= 0 or cleanup["observedOpen"]["windowClass"]
-                                not in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
+                or opening and (not original_pane(cleanup["observedOpen"], pid) or type(cleanup.get("absentSamples")) is not int
+                                or cleanup["absentSamples"] < 2 or type(cleanup.get("absentMs")) is not int or cleanup["absentMs"] < 750
                                 or opened and cleanup["observedOpen"] != opened["pane"])):
             raise CleanupUnconfirmed("The UI Automation helper did not confirm original Explorer flyout restoration")
     return baseline, opened
@@ -535,11 +549,7 @@ def provider(api, desk, trial, env, out, key, creation, result, original):
                     raise RuntimeError(f"The provider exited before {stage} with {status}")
             baseline, opened = provider_route(events, original, result)
             if item and "surface" in item:
-                surface = item["surface"]
-                if (not baseline or baseline["pane"] is not None or surface["cursor"] != baseline["cursor"]
-                        or surface["overflow"] != (opened["pane"]["hwnd"] if opened else 0)
-                        or opened and (surface["root"], surface["rootClass"]) != (opened["pane"]["hwnd"], opened["pane"]["windowClass"])):
-                    raise Unavailable("The physical marker did not identify the observed original Explorer surface")
+                verify_marker_route(item["surface"], baseline, opened)
             return item
         try:
             machine = result["machine"] = api.machine(int(proc._handle))
@@ -575,9 +585,11 @@ def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
             or surface["bar"] <= 0 or surface["hit"] <= 0 or surface["shellPid"] <= 0
             or surface["shellCreation"] <= 0 or surface["desktop"] != "Default"
             or surface["monitor"] <= 0 or len(surface["cursor"]) != 2
-            or not ((surface["rootClass"] == "Shell_TrayWnd" and surface["root"] == surface["bar"] and surface["overflow"] == 0)
+            or not ((surface["rootClass"] == "Shell_TrayWnd" and surface["root"] == surface["bar"] and surface["overflow"] == 0
+                     and surface["pane"] is None)
                     or (surface["rootClass"] in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
-                        and surface["root"] == surface["overflow"] > 0 and surface["root"] != surface["bar"]))
+                        and original_pane(surface["pane"], surface["shellPid"]) and surface["rootClass"] == surface["pane"]["windowClass"]
+                        and surface["root"] == surface["pane"]["hwnd"] == surface["overflow"] and surface["root"] != surface["bar"]))
             or "provider" in event and (event["provider"].get("root") != surface["root"] or not event["provider"].get("hitRuntimeId")
                                        or (event["provider"]["hitDepth"] == 0) !=
                                        (event["provider"]["hitRuntimeId"] == event["provider"]["runtimeId"]))
@@ -585,7 +597,7 @@ def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
         raise ValueError("Incomplete pixel, input desktop or Explorer hit evidence")
     if any(abs(a - b) > 8 for a, b in zip(bytes.fromhex(surface["rgb"]), bytes.fromhex(expected_rgb))):
         raise ValueError("The independent pixel did not match the current marker")
-    if first and any(surface[k] != first[k] for k in ("rect", "point", "hit", "root", "rootClass", "overflow", "monitor",
+    if first and any(surface[k] != first[k] for k in ("rect", "point", "hit", "root", "rootClass", "overflow", "pane", "monitor",
                                                       "cursor", "bar", "shellPid", "shellCreation")):
         raise Unavailable("Explorer's original hit window, process or rectangle changed")
     return surface
@@ -745,7 +757,11 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 if confirm_provider(attempted, result["second"], native.token) != result["providerIdentity"]:
                     raise ValueError("The accessibility provider changed before invocation")
                 invoked = wait(lambda: get("invoked"), "The accessibility provider did not return")
-                native.require_original("afterInvoke", target)
+                at_invoke = confirm_surface(invoked, key, creation, current, colors[1], first)
+                if at_invoke != target or confirm_provider(invoked, at_invoke, native.token) != result["providerIdentity"]:
+                    raise Unavailable("The actual invocation did not retain the original physical surface and provider")
+                state["atInvoke"] = at_invoke
+                native.require_original("afterInvoke", at_invoke)
                 state.update(attemptTick=attempted["tick"], startTick=invoked["startTick"], returnedTick=invoked["returnedTick"])
                 if not 0 <= state["attemptTick"] <= state["startTick"] <= state["returnedTick"]:
                     raise ValueError("The provider's monotonic interval was invalid")
