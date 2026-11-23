@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add native Linux and Windows file-watch probes with overflow recovery. Exercise real screen readers, platform logs, document-portal file locking, and Windows display and resource behavior in the rewrite assessment.
 - Add an offline combined Rust dependency build, native SQLite crash and full-disk recovery checks, and Linux desktop assessments for system colors and activation through the visible Plasma tray icon.
 - Add Rust CodeQL checks for the Linux and Windows configurations of the foundation workspace on the rewrite draft PR.
+- Compare original UTF-8, UTF-16 and UTF-32 configuration files against the shipping reader and preserve damaged inputs during the rewrite assessment.
 
 ## [3.0.4] - 2026-11-13
 

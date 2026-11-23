@@ -7,6 +7,51 @@ application workspace and the storage assessment. No shipping dependency,
 configuration profile, migration routine or publication was changed. The C#
 component is an oracle, not a required Rust runtime.
 
+## Reading the original YAML file bytes
+
+The shipping loader calls `File.ReadAllText`. Its byte-order mark selects
+UTF-8, UTF-16LE/BE or UTF-32LE/BE. In reference format v2, C# preserves the
+original file for each case and records its SHA-256, selected code page and
+whether decoding needed replacement characters. The Rust reader opens those
+files after the reference directory has moved. It bounds both the source
+read and the decoded UTF-8 before parsing. The shipping C# loader then opens
+each new Rust file directly in editing and runtime modes.
+[Shipping reader](../../src/ImmichFolderWatch.Core/Configuration/AppConfigLoader.cs) · [C# byte fixtures](../../tools/rust-qa/yaml/dotnet/YamlFileEncodings.cs) · [Rust reader](../../tools/rust-qa/yaml/src/encoding.rs).
+
+Six valid examples include a literal U+FFFD, a surrogate-pair character,
+combining text, German and Japanese. The two UTF-8 files exercise the
+presence and absence of a BOM. Ten other examples have deliberately incomplete
+or invalid units. The shipping reader accepted all ten with replacements.
+For the UTF-16BE high surrogate followed by an odd byte, it emitted two
+replacements. Rust matched the legacy settings in all ten and kept the
+damaged inputs read-only. The trial writes normalized UTF-8 to new files
+for the 35 accepted inputs which decoded cleanly. Every original retains
+its bytes. Production editing, backup and atomic replacement require their
+own migration evidence.
+
+On Fedora x64 at clean source `a7a62fa`, the offline 13-step run passed
+with Rust 1.100.0 and .NET 10.0.12. The 54 files produced 162 decoding
+comparisons, 259 semantic comparisons and 140 C# readbacks of 70 new files.
+Eight Rust tests passed. All 124 source bodies matched Git and all 270
+indexed artifacts matched their digests. The producer's original directory
+was absent during readback. The report under
+`artifacts/rust/yaml-assessment/runs/a7a62fa-linux-x64/` has SHA-256
+`fc233032edee7999c8afbbbcd7fac850bf9921f304ee2f333870746d1d750053`.
+Its evidence index has SHA-256
+`25794b5002a869e821f450271b786cca7d22d6bf27dd2473424251ee040d5fa0`.
+
+An independent fixture review reproduced and then verified fixes for an
+absolute producer path and incomplete rejection of altered encoding controls.
+All 22 negative controls were rejected, including a missing BOM, a different
+malformed sequence with an updated digest, incomplete comparisons and extra
+or missing files. The new C# verifier also opened 58 archived v1 Rust files
+after relocation and passed all 116 comparisons. A wrong architecture was
+rejected. A separate Linux x64 comparison against the actual .NET file
+reader matched text, code page and fallback flags for 8,762 byte sequences,
+including truncated preambles and split scalars near buffer boundaries.
+The previously recorded four-target v1 results below cover the decoded-text
+corpus. The native v2 results for the other three targets are still required.
+
 ## Reviewed inputs and corresponding sources
 
 At `11e4e6f7f385e8b69f1404a18fae82c02780c7d4` all four native hosts
@@ -197,8 +242,8 @@ codec use a small fixed category and do not render parser snippets/scalar values
 a synthetic-secret diagnostic control passes.
 
 These are new resource policy choices for a feasibility tool. Production limits,
-wall-clock/RSS measurement, bounded application file acquisition, supported path
-namespaces, UTF-16 edge cases and application-level validation remain separate
+wall-clock/RSS measurement, production file acquisition, supported path
+namespaces and application-level validation remain separate
 work. Negative numeric values accepted by the legacy loader are not thereby
 approved by the application's configuration validator.
 

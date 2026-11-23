@@ -185,7 +185,7 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
-  Keep [YAML source filtering](docs/rust/rw02-yaml.md) and the
+  Preserve [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md),
   its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md), the

@@ -1,5 +1,15 @@
 # Project Status
 
+## Legacy YAML byte compatibility (2026-11-23)
+
+At `a7a62fa`, a clean Fedora x64 build passed all 13 offline assessment
+steps. Rust read 54 archived original files. The shipping C# loader reopened
+70 Rust-written files and passed 140 comparisons. Ten damaged files were
+readable with the same replacement characters in both languages and retained
+their original bytes. Independent review verified the relocated archive and
+22 rejection controls. The extended native corpus needs results from the
+other three targets. [Raw file evidence](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes).
+
 ## Rust foundation CodeQL (2026-11-23)
 
 The extended CodeQL suite analyzed the five-crate foundation locally with
@@ -11,6 +21,12 @@ coverage includes the platform-specific filesystem and logging modules.
 The Rust tree was `51b7bff74a760b6f888b6c06b551303dc0a50be7`.
 Commit `3b08278` adds the read-only draft-PR workflow. Native runtime and
 the standalone GUI have separate assessments. [Reproduction and scope](development.md#rust-foundation-codeql).
+
+The first hosted run on `267c217` passed both configurations. The downloaded
+SARIF documents and coverage tables matched the Git sources and independent
+local analyses. They report 2,914 Linux and 2,906 Windows lines of user code,
+with zero alerts, extraction errors or warning-level diagnostics per target.
+[Linux report](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45152719796/artifacts/14807885505) · [Windows report](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45152719796/artifacts/14806698523).
 
 ## Native candidate assessment at 6af7100 (2026-11-23)
 
