@@ -241,3 +241,15 @@ specific reason for the refusal. The observer now records the byte count
 and SHA-256 of the same launch's combined output, plus its first 4 KiB in
 Base64. An empty pipe and a truncated message have distinct receipts.
 [x64 writer](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14809952468) · [ARM64 writer](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14810906705).
+
+At `1b95ba0` the original launch again returned 1 on both architectures.
+The new recorder captured zero output bytes on each host. Both digests
+matched the empty byte string and neither capture was truncated. The
+original records therefore supply no more specific failure reason. No
+standard-session writer started. The elevated control recorded all eight
+events and removed its synthetic resources on both hosts. Replay verified
+37 evidence files and 23 source inputs per target. Its SHA-256 is
+`66188c5cb5311983f19d80ec18b7d4d4e67f62f4af6155bad020dd66277bb50c`.
+The ordinary-user handover still requires two existing sessions of the
+same account on a disposable Windows host.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14836851751) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14836122324).

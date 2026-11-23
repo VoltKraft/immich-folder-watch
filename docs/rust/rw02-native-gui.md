@@ -599,6 +599,45 @@ HTTP server reproduced the disconnect, recovery on the third request and
 terminal refusal. The existing size, redirect and digest checks still apply.
 [Original x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/job/137640979079) · [Downloader and regression checks](../../tools/rust-qa/portal-noble/test_control.py).
 
+## Ubuntu native results at 1b95ba0
+
+The two hosted Noble jobs rebuilt their private Plasma guests from the
+dated Ubuntu snapshots. Independent replay checked all 696 x64 and 691
+ARM64 package archives, their copyright files and the six signed release
+indexes. On both architectures, the original bus trace recorded two
+activations from the real Plasma panel to the Rust GUI. Both clicks
+reopened the same observed application window. The two button images
+contained 277 and 259 gold pixels. The adjacent tray control contained
+zero. The GUI drained and its registration disappeared at Quit.
+
+| Target | Startup ms, Rust / limit | Scan show p95 ms, Rust / limit | Scan close p95 ms, Rust / limit | X11 limits met |
+| --- | ---: | ---: | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14839078756) | 171.26 / 1097.304 | 1.07 / 16.02 | 0.45 / 15.72 | 11/11 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14839596409) | 207.87 / 1517.784 | 0.95 / 16.29 | 0.44 / 15.57 | 11/11 |
+
+The limits came from Avalonia on the same host. Each subject ran three
+trials with two complete 100,000-file inventory passes per trial. Every
+Rust window request finished inside a measured inventory interval. One
+ARM64 Avalonia request finished 3.23 ms after its interval ended.
+Excluding that request left the reference show and close p95 at 6.29
+and 5.57 ms. The
+original visible and hidden idle observations recorded zero XDamage
+rectangles and the separate presentation controls counted zero idle
+frames. Reopening produced an actual damage and presentation signal in
+each Rust trial. Both original 1,412-entry archives matched the Actions
+digests. The local summary identifying the eight original reports has
+SHA-256 `8b6903a7d403fe93059f9e988902422eeb018c680e7d140f52e7bab105ffb4ba`.
+
+Each official portal package matched its signed Ubuntu index entry.
+Its daemon, permission store and copyright file matched the copies
+used in the guest.
+The released and source-rebuilt Noble Documents daemons each returned
+`ENOSYS` on all three attempts to acquire the required upload lock on
+each architecture. Only the private build with the reviewed upstream
+patch observed acquisition, a competing writer and successful
+reacquisition. The respective fixtures recorded 32, 32 and 46
+operations per target. [Portal comparison](rw02-portal-noble.md).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

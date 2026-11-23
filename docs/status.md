@@ -1,5 +1,38 @@
 # Project Status
 
+## Native repair and deletion references (2026-11-23)
+
+At `e558b42` both new C# worker cases passed on all four native targets
+and on Fedora x64. After restoring the pending backup, each worker
+completed its timestamp repair with the original transfer and account
+history. After restoring the latest deletion backup, the peer retained
+the same nine bytes in trash and received zero additional writes.
+Detached replay matched all eight reports from their SQLite backups,
+media and xUnit results and verified the three compiled DLL hashes
+on each target. The full Ubuntu suites passed
+571 cases per host. Both Windows suites passed 562 with nine Linux-only
+skips. The tooling suite ran 181 tests with five platform skips using a
+temporary GPG test keyring. The installed Rust candidate's own activity
+and rollback remain pending.
+[Native originals and four-host readback](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+The same revision passed the four native feasibility jobs, CI and CodeQL.
+Ubuntu passed 37 workspace tests and 15 watch scenarios per architecture.
+Windows passed 34 and 14, and separately passed 208 C# recovery assertions
+per architecture. Detached replay matched all eight Rust backup exchanges
+for uploads and downloads. Its SHA-256 is
+`90c72fdcac81b3bd74bfc85d1a6e2fc214f61138fa707839789783d60729e43f`.
+[Native results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220170042) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220184362) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220184524).
+
+Both Noble desktops at `1b95ba0` completed the pinned package rebuild,
+reopened the Rust GUI from two Plasma panel clicks and met all eleven
+native X11 resource limits. The stock Documents portal still refused
+the required lock on both hosts. On Windows the ordinary-user launch
+exited with no diagnostic bytes on either architecture. The elevated
+control again completed its eight ownership events. Interactive Windows
+evidence and the two frame-depth measurements remain under review.
+[Ubuntu desktops](rust/rw02-native-gui.md#ubuntu-native-results-at-1b95ba0) · [Windows writer](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541).
+
 ## Eight native worker restores and two external side effects (2026-11-23)
 
 All four targets at `653f255` passed the shipping worker upload and

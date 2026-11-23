@@ -73,3 +73,8 @@ first independent screen observation. The results support testing bounded
 frame queue depth on the qualified DX12 software adapter with the complete
 egui view and its existing accessibility implementation.
 [Two native comparisons](rw02-windows-window.md#visible-gdi-and-retained-egui-under-the-same-inventory).
+
+At `1b95ba0` the Ubuntu x64 and ARM64 X11 guests both passed the eleven
+same-host limits and the Plasma panel reopened the retained GUI twice on
+each. The standard Noble Documents daemon continued to refuse the upload
+lock. [Pinned native rehearsals](rw02-native-gui.md#ubuntu-native-results-at-1b95ba0).

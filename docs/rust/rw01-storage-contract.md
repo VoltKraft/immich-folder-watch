@@ -248,3 +248,16 @@ directories empty. Restart from the post-deletion backup retains the
 tombstone and reconciles the empty album without a second trash request.
 The installed Rust candidate's own repair and deletion remain to be
 exercised. [Deletion fixture](../../src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests.DeletionBackup.cs) · [Independent database and media reader](../../tools/RustCompatibilityOracle/verify_rollback.py).
+
+At `e558b42`, both cases passed on Fedora x64 and all four hosted targets.
+The native repair journal contained zero, one and zero rows in the three
+successive backups. The transfer date stayed February 4, 2014, and the
+account Last Sync stayed February 5. The photo's modification time was
+February 4, 2004 on Ubuntu and February 6, 2004 on Windows. Windows also
+preserved the February 4 creation time. Each deletion case retained a
+single tombstone and the same nine peer-trash bytes, with one trash
+request before restart and zero afterward. Detached replay matched
+the eight reports, the original DLLs identified by the tests and every
+one of the 49 archive entries on each target. The four-host receipt
+SHA-256 is `9735ccd5af42688df6328bdfabc5a4527260b3e0a20725dac136e5768756e17f`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14840960347) · [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14841840102) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14839659957) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220169874/artifacts/14839378878).
