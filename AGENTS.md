@@ -195,6 +195,9 @@ to reconcile project decisions, defaults, and recorded state.
   when changing the candidate desktop profile.
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)
+  for host-package installation and rollback feasibility. Archive the stock,
+  patched and restored service observations from the same guest.
   Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md),
   its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md), the
   [original native notices](docs/rust/rw02-combined-notices.md) and the

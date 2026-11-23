@@ -351,7 +351,9 @@ The
 fix on exact release sources in an offline SDK. It writes the executable to
 the ignored test area for the private namespace. The [Noble comparison](rust/rw02-portal-noble.md)
 exercises the packaged Ubuntu daemon, a pristine Ubuntu rebuild and the
-backport with both the C# and Rust readers in the same run. The
+backport with both the C# and Rust readers in the same run. The separate
+[Noble package installation and rollback](../tools/rust-qa/portal-noble/installed/README.md)
+uses offline KVM guests and a regular user's installed Flatpak. The
 [Windows service tests](rust/rw02-windows-services.md) exercise per-user
 shortcut registration, Shell notifications and independent UI Automation.
 After the native Shell build on a disposable target, run

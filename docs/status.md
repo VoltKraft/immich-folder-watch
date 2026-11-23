@@ -1,5 +1,29 @@
 # Project Status
 
+## Offline Ubuntu package trial and four native backup replays (2026-11-23)
+
+The user selected Ubuntu package feasibility and deferred distribution
+approval. A signed Noble image booted on KVM. Independent checks matched
+all 204 build packages, 23 runtime packages and four Ubuntu source objects.
+The first native build passed 28 of 29 distro suites before a
+GeoClue timeout. With the packaged agent and a synthetic location, all
+29 suites passed and dpkg produced five archives. The build-ID comparison
+then rejected the Debian postprocessing of the linked executable. The first installed Flatpak trial matched both live stock
+services and found an incompatible export descriptor before the file lock.
+With the pinned descriptor reopened, the stock service granted both rights
+and revoked them again. The observer now resolves the application mount to its canonical sandbox
+path, as seen in the existing installed chooser trial. The corrected stock
+check and comparison of the final ELF with the build inputs are in progress.
+[Guest observations](rust/rw02-portal-noble.md#installing-the-portal-package-on-an-offline-noble-guest).
+
+At `a1011bf`, native feasibility on all four targets, CI and CodeQL passed.
+Detached replay verified all four worker archive digests and the sixteen
+shipping-worker restarts from Rust-created SQLite backups. The replay
+result SHA-256 is `6daa4c654403949df520b17e6e34a733709737003e86f9480866f207affd7273`.
+[Native run and archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863767)
+· [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257882511)
+· [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257882346).
+
 ## Windows text and scan response at 1904be7 (2026-11-23)
 
 Both native Windows targets passed the ordinary and reopened filename

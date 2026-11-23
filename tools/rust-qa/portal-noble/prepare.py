@@ -33,16 +33,16 @@ def guest(osroot, root, *, extra=()):
     return args + list(extra)
 
 
-def package_plan(aptroot, runner):
+def package_plan(aptroot, runner, packages=DEVELOPMENT, *, guest_status=None):
     command = guest(aptroot, aptroot / "usr", extra=[
         "--ro-bind", str(aptroot / "etc/apt"), "/etc/apt",
         "--ro-bind", str(aptroot / "var/lib/apt/lists"), "/var/lib/apt/lists",
-        "--ro-bind", str(aptroot / "var/lib/dpkg/status"), "/var/lib/dpkg/status",
+        "--ro-bind", str(guest_status or aptroot / "var/lib/dpkg/status"), "/var/lib/dpkg/status",
         "--dir", "/var/cache/apt/archives", "--"])
     options = ["-o", "Debug::NoLocking=1", "-o", "Dir::Cache::pkgcache=/tmp/packages",
                "-o", "Dir::Cache::srcpkgcache=/tmp/sources", "-o", "APT::Get::AllowUnauthenticated=false"]
     plan = subprocess.check_output(command + ["apt-get", *options, "--yes", "--no-install-recommends",
-                                               "--print-uris", "install", *DEVELOPMENT], text=True)
+                                               "--print-uris", "install", *packages], text=True)
     (runner / "apt-plan.log").write_text(plan)
     entries = []
     for line in plan.splitlines():

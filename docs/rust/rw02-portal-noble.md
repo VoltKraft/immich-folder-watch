@@ -2,7 +2,51 @@
 
 The released Ubuntu 24.04 package `xdg-desktop-portal 1.18.4-1ubuntu2.24.04.3` refused cooperative file locking on a private Documents grant. Both the shipping C# reader and the Rust filesystem reader received `ENOSYS`. Building the exact Ubuntu sources produced the same result. Applying upstream's single `xdp_fuse_flock` function let both readers acquire shared leases and excluded a consenting exclusive writer across the backing and FUSE views. The local execution used native x86-64 Ubuntu 24.04.5 userspace on Fedora kernel `7.3.4-300.fc45.x86_64`. Native Ubuntu x64 and ARM64 subsequently reproduced all three outcomes on their own kernels. Availability of a supported Ubuntu package that implements this capability remains open. [Ubuntu package and source](https://packages.ubuntu.com/noble-updates/xdg-desktop-portal) · [Upstream change](https://github.com/flatpak/xdg-desktop-portal/commit/caa5ae9e21e44c70c0cf3e7fa78de557acd3ea57).
 
+The [installed Noble VM experiment](../../tools/rust-qa/portal-noble/installed/README.md)
+tests package installation and rollback with the distro services and a real
+Flatpak application identity. Its scope is feasibility. Distribution approval
+and any commitment to maintaining an Ubuntu host package remain open.
+
 ## Native observations
+
+### Installing the portal package on an offline Noble guest
+
+Canonical's signed October 17 Ubuntu 24.04.5 image booted on native x64
+KVM with kernel `6.8.0-147-generic`. Its original package database has
+SHA-256 `451a1e0514c959eb18ee94501a025f7728fea601502274ab6a86a67870305cf6`.
+Independent readback matched the image signature, all four Ubuntu source
+objects and every archive in the 204-package build plan and the separate
+23-package runtime plan. Two source reconstructions yielded the same
+private DSC and complete patched tree. The build keeps its source and
+binary packages in the private test directory. [Canonical image](https://cloud-images.ubuntu.com/noble/20261017/)
+· [Reconstruction recipe](../../tools/rust-qa/portal-noble/installed/package/README.md).
+
+In build `package-gvrofrns`, native compilation completed. The distribution
+test runner passed 28 of 29 suites. Its location test timed out waiting for
+GeoClue to return a client after 25 seconds. Debian packaging stopped at
+that test. The original `package-result.json` has SHA-256
+`cbedc88a7830c27781179e5253c945edbc6cac1584fe0fa39c97c7b58e72efc6`.
+
+In build `package-0eeh793w` the Ubuntu GeoClue agent used a synthetic static
+location on the offline guest. All 29 distribution suites passed and dpkg
+built the native runtime, development and installed-test packages and
+the two debug packages. The verifier then rejected a different GNU build
+ID after Debian debug processing. The original failed report SHA-256 is
+`cbe001f5ebdc5ea4753201b9ecb86261452fbcc22f09c62d7c7f1adbd0926032`.
+The complete package and test archive SHA-256 is
+`81d6a03f131c28a410b6219ef2a9476222476ee1d2db799fd067e88f4a5b7c67`.
+
+In the first stock guest, `lease-stock-t02f_zvn`, the regular user installed
+Flathub's signed x64 Platform and the synthetic app. Both live D-Bus services
+matched the stock package. Documents refused the export descriptor before
+the app could request a lease. Noble's descriptor validation rejects
+`O_PATH | O_NOFOLLOW`. The corrected exporter pins the original directory
+with those flags, reopens its own pinned descriptor with `O_PATH | O_DIRECTORY`
+and verifies the identity before passing it to AddFull. The failed observation
+hash is `9f527b263b8358569f5f3290d9c1caf8e2bae0a53dac469a69b3135bf22dde18`.
+[Original source and guest commands](../../tools/rust-qa/portal-noble/installed/README.md).
+
+### Private service comparisons
 
 At `a66e045` each Ubuntu runner recorded 28 checks against the packaged
 daemon, 28 against its pristine rebuild and 42 against the private backport.
