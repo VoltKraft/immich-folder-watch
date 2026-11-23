@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 import observe
+import native
 import window_readback
 
 
@@ -164,18 +165,18 @@ class DesktopCleanupTests(unittest.TestCase):
 
             cases = {}
             def visit(name, state):
-                self.assertEqual(name, "shellLess")
+                self.assertEqual(name, "foreground")
                 with observe.profile_resources(None, parent, "test", state):
                     raise TimeoutError("missing primary")
 
             with patch.object(observe.recorder, "owned_directory", owned), self.assertRaises(observe.CleanupUnconfirmed):
                 observe.run_cases(visit, cases)
-        self.assertFalse(cases["shellLess"]["cleanupConfirmed"])
-        self.assertEqual([row["message"] for row in cases["shellLess"]["failures"]],
+        self.assertFalse(cases["foreground"]["cleanupConfirmed"])
+        self.assertEqual([row["message"] for row in cases["foreground"]["failures"]],
                          ["missing primary", "owned directory close failed"])
-        self.assertEqual(cases["foreground"]["status"], "not-run")
+        self.assertEqual(cases["shellLess"]["status"], "not-run")
 
-    def test_confirmed_cleanup_permits_the_independent_trial_and_keeps_private_failure(self):
+    def test_confirmed_cleanup_permits_the_private_trial_and_keeps_the_uncertain_foreground_result(self):
         with TemporaryDirectory() as parent:
             parent = Path(parent)
             profiles = []
@@ -193,16 +194,51 @@ class DesktopCleanupTests(unittest.TestCase):
             def visit(name, record):
                 with observe.profile_resources(None, parent, name, record) as (root, _):
                     profiles.append(root)
-                    if name == "shellLess":
-                        raise TimeoutError("missing private primary")
+                    if name == "foreground":
+                        raise TimeoutError("no foreground observation")
                     self.assertFalse(profiles[0].exists())
 
             with patch.object(observe.recorder, "owned_directory", owned):
                 error = observe.run_cases(visit, cases)
         self.assertIsInstance(error, TimeoutError)
+        self.assertEqual(list(cases), ["foreground", "shellLess"])
         self.assertEqual(len(set(profiles)), 2)
         self.assertEqual([value["status"] for value in cases.values()], ["failed", "passed"])
         self.assertTrue(all(value["cleanupConfirmed"] for value in cases.values()))
+
+    def test_busy_private_descendant_preserves_the_default_observation_and_original_sharing_error(self):
+        failure = PermissionError("sharing violation")
+        failure.winerror = 32
+        api = Mock()
+        cases = {}
+        with TemporaryDirectory() as parent:
+            root = Path(parent) / "profile"
+            nested = root / "subject"
+            nested.mkdir(parents=True)
+            busy = nested / "gui.exe"
+            busy.write_bytes(b"owned")
+            api.path_handle.side_effect = [23, failure]
+            api.file_info.return_value = (0x10, (1, 2))
+            def visit(name, state):
+                if name == "foreground":
+                    state.update(cleanupConfirmed=True, activation={"observed": True})
+                    return
+                native.remove_owned_contents(api, root)
+
+            with self.assertRaises(observe.CleanupUnconfirmed) as caught:
+                observe.run_cases(visit, cases)
+            self.assertIs(caught.exception.__cause__, failure)
+            self.assertEqual(busy.read_bytes(), b"owned")
+            self.assertEqual(api.path_handle.call_args_list, [call(nested, True, delete=True), call(busy, True, delete=True)])
+            api.delete_handle.assert_not_called()
+            api.close.assert_called_once_with(23)
+        self.assertEqual(cases["foreground"]["status"], "passed")
+        self.assertTrue(cases["foreground"]["activation"]["observed"])
+        self.assertEqual(cases["shellLess"]["status"], "failed")
+        self.assertFalse(cases["shellLess"]["cleanupConfirmed"])
+        error, = cases["shellLess"]["failures"]
+        self.assertEqual(error["win32Error"], 32)
+        self.assertEqual(error["notes"], ["CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on owned fixture entry 'subject/gui.exe'"])
 
     def test_failure_drain_records_only_an_unambiguous_native_ui_pass_count(self):
         for status, log, passes in [(0, "DRAINED passes=3\n", 3), (1, "DRAINED passes=8\n", None),

@@ -208,6 +208,12 @@ class FixtureTests(unittest.TestCase):
             with native.pin_path(api, sample, False):
                 with self.assertRaises(PermissionError):
                     sample.rename(nested / "newname")
+                with self.assertRaises(PermissionError) as busy:
+                    native.remove_owned_contents(api, nested)
+                self.assertEqual(busy.exception.winerror, 32)
+                self.assertEqual(busy.exception.__notes__,
+                                 ["CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on owned fixture entry 'sample'"])
+                self.assertEqual(sample.read_text(encoding="ascii"), "owned")
             env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PYTHON")}
             env.update(PYTHONNOUSERSITE="1", PYTHONSAFEPATH="1")
             cleanup = lambda proc, rust: proc.wait(timeout=5)

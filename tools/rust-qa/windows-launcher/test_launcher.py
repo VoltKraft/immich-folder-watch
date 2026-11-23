@@ -1,5 +1,5 @@
 """Exercise the ordinary secondary invocation and the evidence required to attribute its window."""
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import ctypes as c
 import json
 import os
@@ -143,7 +143,7 @@ class LauncherTests(unittest.TestCase):
     def test_foreground_cycle_requires_close_second_process_worker_identity_and_quit(self):
         self.exercise_cycle()
 
-    def exercise_cycle(self, subject="canonical", *, private=False, restart=False):
+    def exercise_cycle(self, subject="canonical", *, private=False, restart=False, keyboard_focus=True):
         api, desk = Mock(), Mock()
         windows = OwnedRoot(12)
         primary, second = Mock(pid=12, _handle=2), Mock(pid=15, _handle=5)
@@ -172,7 +172,7 @@ class LauncherTests(unittest.TestCase):
             desk.name.side_effect = lambda desktop: name if desktop == 9 else {"win32Error": 5}
             desk.receiving_input.return_value = False
             desk.iconic.return_value = False
-        desk.foreground.side_effect = lambda: windows.hwnd
+        desk.foreground.side_effect = lambda: windows.hwnd if keyboard_focus else None
         api.process_identity.side_effect = lambda handle: handle * 10
         api.wait_job_empty.return_value = True
         launches = []
@@ -210,7 +210,8 @@ class LauncherTests(unittest.TestCase):
                 self.assertIsNone(windows.visible())
                 if before_resume:
                     before_resume(second)
-                stream.write(b"LAUNCHER_FOREGROUND_GRANT server=12 state=denied hresult=-2147024891\nLAUNCHER_SECONDARY server=12\n")
+                grant = "denied hresult=-2147024891" if keyboard_focus else "granted"
+                stream.write(f"LAUNCHER_FOREGROUND_GRANT server=12 state={grant}\nLAUNCHER_SECONDARY server=12\n".encode())
                 emit("LAUNCHER_OPEN client=15\n")
                 if subject == "canonical":
                     windows.hwnd = 22
@@ -234,10 +235,11 @@ class LauncherTests(unittest.TestCase):
                   patch.object(observe, "bind", return_value=Mock(side_effect=[14, 16, 23])),
                   patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
                   patch.object(retained_window, "visible_surface"), patch.object(retained_window, "focus_sample",
-                               return_value=dict(foreground=True, active=True, focused=True)),
+                               return_value=dict(foreground=keyboard_focus, active=True, focused=keyboard_focus)),
                   patch.object(observe.recorder, "idle_complete", return_value=True),
                   patch.object(observe.recorder, "owned_worker", return_value=13),
-                  patch.object(observe, "primary_job_members", side_effect=[[13, 1300], [13, 1300]])):
+                  patch.object(observe, "primary_job_members", side_effect=[[13, 1300], [13, 1300]]),
+                  nullcontext() if keyboard_focus else self.assertRaisesRegex(ValueError, "foreground and keyboard focus")):
                 observe.cycle(api, desk, name, 9, 2 if private else None, fixture, GUI, CONSOLE, out, {}, out,
                               label, result, tray=not private, subject=subject)
         self.assertEqual(result["stage"], "drained")
@@ -249,6 +251,7 @@ class LauncherTests(unittest.TestCase):
             return result
         self.assertEqual(launches, [(name, GUI, ["--autostart"] if private else [], True, private),
                                     (name, GUI, [], False, private)])
+        self.assertEqual(result["secondaryLaunch"], dict(api="CreateProcessW", source="observer", callerPid=os.getpid()))
         self.assertEqual((result["initialWindow"], result["reopenedWindow"], result["workerAfter"]),
                          (21, 21 if subject == "retained" else 22, [13, 1300]))
         self.assertEqual(list(result["windowReadbacks"]), ["startup-intent", "first-dx12-adapter", "first-visible-window",
@@ -272,6 +275,17 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(result["retainedWindow"]["lifetimeBeforeQuit"], [[21, "create", 3]])
                 self.assertEqual(result["secondaryTotalProcesses"], 1)
                 self.assertEqual(result["keyboardFocus"]["applicable"], not private)
+
+    def test_negative_keyboard_readback_retains_the_grant_request_and_confirmed_normal_quit(self):
+        clock = Mock()
+        clock.monotonic.side_effect = range(100)
+        with patch.object(observe, "time", clock), patch.object(retained_window, "time", clock):
+            result = self.exercise_cycle("retained", keyboard_focus=False)
+        self.assertEqual(result["foregroundHandoff"],
+                         dict(server=12, grant="granted", hwnd=21, hresult=None, unavailableReason=None, requestAccepted=False))
+        self.assertFalse(result["foregroundObservation"]["observed"])
+        self.assertFalse(result["keyboardFocus"]["observed"])
+        self.assertEqual((result["primaryExit"], result["primaryUiPassesAtQuit"]), (0, 5))
 
     def test_receipt_requires_the_original_primary_and_its_worker(self):
         secondary = ["LAUNCHER_FOREGROUND_GRANT server=12 state=denied hresult=-2147024891", "LAUNCHER_SECONDARY server=12"]

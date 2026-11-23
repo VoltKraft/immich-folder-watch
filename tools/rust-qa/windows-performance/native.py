@@ -168,14 +168,21 @@ def pin_new_marker(stack, api, path, token):
         return original
 
 
-def remove_owned_contents(api, path):
+def remove_owned_contents(api, path, *, root=None):
+    if root is None:
+        root = path
     for entry in path.iterdir():
         # The parent stays pinned. OPEN_REPARSE_POINT makes deletion of any link operate on the link itself.
-        handle = api.path_handle(entry, True, delete=True)
+        try:
+            handle = api.path_handle(entry, True, delete=True)
+        except OSError as exc:
+            relative = entry.relative_to(root).as_posix()
+            exc.add_note(f"CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on owned fixture entry {relative!r}")
+            raise
         try:
             attributes, _ = api.file_info(handle)
             if attributes & 0x10 and not attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
-                remove_owned_contents(api, entry)
+                remove_owned_contents(api, entry, root=root)
             api.delete_handle(handle)
         finally:
             checked(api.close(handle))

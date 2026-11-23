@@ -277,7 +277,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 read_windows(stage)
 
         def failure_drain(exc_type, _value, _traceback):
-            if exc_type is not None:
+            if exc_type is not None and result["stage"] != "drained":
                 drain_after_failure(proc, log, result, windows.pump)
                 if native_tray is not None:
                     native_tray.check_drain(proc, job, log(), result)
@@ -344,6 +344,7 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                         if "afterTrigger" not in evidence and f"LAUNCHER_OPEN client={second.pid}\n" in log().splitlines(keepends=True):
                             retained.sample_after_trigger("secondaryShow", dict(secondaryPid=second.pid), clock)
                 result.update(secondaryArguments=[], secondaryPid=second.pid,
+                              secondaryLaunch=dict(api="CreateProcessW", source="observer", callerPid=os.getpid()),
                               secondaryCreation100ns=api.process_identity(int(second._handle)))
                 result["secondaryExit"] = wait_for_exit(second, pump_secondary, 12)
                 result["secondaryJobEmpty"] = api.wait_job_empty(second_job, 3)
@@ -373,27 +374,31 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
             result["primaryJobAfter"] = {}
             result["workerAfter"] = primary_job_members(api, desk, job, proc.pid, worker, exe, console,
                                                         result["primaryJobAfter"])
-            if retained is not None:
+        try:
+            if retained is not None and label != "restart":
                 result["keyboardFocus"] = {}
                 retained.focus(result["keyboardFocus"])
-        if retained is not None:
-            retained.check_visible(log, "beforeQuit")
-        result["stage"] = "quit"
-        command(b"Q")
-        result.update(primaryExit=wait_for_exit(proc, windows.pump, 15), primaryJobEmpty=api.wait_job_empty(job, 4))
-        final_log = log()
-        if label != "restart":
-            qualify(second_log.read_text(encoding="utf-8").splitlines(), final_log.splitlines(), result)
-        drained = re.findall(r"^DRAINED passes=(\d+)$", final_log, re.MULTILINE)
-        if (result["primaryExit"] or not result["primaryJobEmpty"] or len(drained) != 1
-                or final_log.splitlines().count(f"LAUNCHER_PRIMARY pid={proc.pid}") != 1):
-            raise ValueError("The primary and its owned inventory did not drain normally")
-        result.update(stage="drained", primaryUiPassesAtQuit=int(drained[0]))
-        if native_tray is not None:
-            native_tray.check_drain(proc, job, final_log, result)
-            native_tray.qualify_quiet_shell(final_log, result, no_host=True)
-        if retained is not None:
-            retained_graphics(final_log, evidence, before_quit=False)
+        finally:
+            # A negative keyboard observation still permits normal Quit and the independent
+            # grant, HWND and job checks. The focus failure propagates with those observations.
+            if retained is not None:
+                retained.check_visible(log, "beforeQuit")
+            result["stage"] = "quit"
+            command(b"Q")
+            result.update(primaryExit=wait_for_exit(proc, windows.pump, 15), primaryJobEmpty=api.wait_job_empty(job, 4))
+            final_log = log()
+            if label != "restart":
+                qualify(second_log.read_text(encoding="utf-8").splitlines(), final_log.splitlines(), result)
+            drained = re.findall(r"^DRAINED passes=(\d+)$", final_log, re.MULTILINE)
+            if (result["primaryExit"] or not result["primaryJobEmpty"] or len(drained) != 1
+                    or final_log.splitlines().count(f"LAUNCHER_PRIMARY pid={proc.pid}") != 1):
+                raise ValueError("The primary and its owned inventory did not drain normally")
+            result.update(stage="drained", primaryUiPassesAtQuit=int(drained[0]))
+            if native_tray is not None:
+                native_tray.check_drain(proc, job, final_log, result)
+                native_tray.qualify_quiet_shell(final_log, result, no_host=True)
+            if retained is not None:
+                retained_graphics(final_log, evidence, before_quit=False)
     if not show_ordered:
         raise ShowOrderUnavailable(evidence["secondaryShow"]["reason"])
 
@@ -479,7 +484,12 @@ def failures(error):
     seen = set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
-        rows.append(dict(type=type(error).__name__, message=str(error)))
+        row = dict(type=type(error).__name__, message=str(error))
+        if (winerror := getattr(error, "winerror", None)) is not None:
+            row["win32Error"] = winerror
+        if notes := getattr(error, "__notes__", None):
+            row["notes"] = notes
+        rows.append(row)
         error = error.__cause__ or error.__context__
     return list(reversed(rows))
 
@@ -592,7 +602,8 @@ def run_profile(case, result, api, desk, built_gui, inventory, out, target, revi
 
 def run_cases(visit, result):
     first = None
-    for name in ("shellLess", "foreground"):
+    # Observe the original input desktop before creating any private desktop or its processes.
+    for name in ("foreground", "shellLess"):
         record = result[name] = {"status": "running", "cleanupConfirmed": False}
         try:
             visit(name, record)
@@ -602,8 +613,9 @@ def run_cases(visit, result):
             chain = failures(exc)
             record.update(status="failed", error=chain[0]["message"], failures=chain)
             if not record["cleanupConfirmed"] or CleanupUnconfirmed.in_chain(exc):
-                if name == "shellLess":
-                    result["foreground"] = dict(status="not-run", reason="Private launcher cleanup was not confirmed")
+                if name == "foreground":
+                    result["shellLess"] = dict(status="not-run",
+                                               reason="Original input desktop launcher cleanup was not confirmed")
                 if CleanupUnconfirmed.in_chain(exc):
                     raise
                 raise CleanupUnconfirmed(f"Cleanup of the {name} launcher trial was not confirmed") from exc
