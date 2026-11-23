@@ -1,6 +1,7 @@
 """Regression controls for the original Explorer flyout and the two-color marker."""
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 import unittest
@@ -67,8 +68,26 @@ class OriginalFlyoutTests(unittest.TestCase):
             with self.assertRaises(tray.CleanupUnconfirmed):
                 tray.provider_route(invalid, (81, 51), {}, final=True)
 
+    def test_chevron_capabilities_cannot_qualify_an_icon_or_flyout(self):
+        baseline, hint, _, _, cleanup = self.history()
+        events = [baseline, hint, dict(stage="chevron-diagnostic", selection={"gate": "known-name-selection"}),
+                  dict(stage="chevron-hint", afterRejectionAtHint={"status": "bound-taskbar-point",
+                       "elements": [{"Name": "Hidden icon menu", "invoke": True}]}),
+                  cleanup | {"attempted": False, "restored": False, "observedOpen": None}]
+        self.assertEqual(tray.provider_route(events, (81, 51), {}, final=True), (baseline, None))
+        for stage in ("first", "ready", "attempt", "invoked"):
+            self.assertIsNone(tray.provider_event(events, stage))
+
     @unittest.skipUnless(sys.platform == "win32", "Uses the native Windows PowerShell installation")
     def test_original_provider_restores_a_realized_action_after_a_com_error(self):
         host = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
         subprocess.run([host, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
                         Path(__file__).with_name("test_tray_flyout.ps1")], check=True, timeout=30)
+
+    def test_chevron_selection_and_passive_diagnostics(self):
+        host = (Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                if sys.platform == "win32" else shutil.which("pwsh"))
+        if host is None:
+            self.skipTest("PowerShell is unavailable")
+        subprocess.run([host, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+                        Path(__file__).with_name("test_chevron.ps1")], check=True, timeout=30)

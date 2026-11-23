@@ -18,37 +18,67 @@ function Get-IfwOverflowWindow([uint32]$ExplorerId) {
     return [IntPtr]::Zero
 }
 
-function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeAction = $null) {
+function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeAction = $null, [hashtable]$Selection = $null) {
+    # An interested caller retains only the checks made during this lookup of the four known names.
+    if ($null -eq $Selection) { $Selection = @{} }
+    $Selection.gate = 'taskbar-owner'
+    $Selection.names = @()
     $bar = [IfwSyntheticShellObserver]::FindWindow('Shell_TrayWnd', $null)
     $explorer = Get-IfwShellOwner $bar
-    if (-not $explorer -or -not [IfwSyntheticShellObserver]::IsWindowVisible($bar)) { return }
+    $Selection.bar = $bar.ToInt64()
+    $Selection.pid = $explorer
+    if (-not $explorer) { return }
+    if ($Selection.ContainsKey('expectedBar') -and
+        ($Selection.bar -ne $Selection.expectedBar -or $explorer -ne $Selection.expectedPid)) {
+        $Selection.gate = 'different-original-taskbar'
+        return
+    }
+    $Selection.gate = 'taskbar-visible'
+    if (-not [IfwSyntheticShellObserver]::IsWindowVisible($bar)) { return }
+    $Selection.gate = 'overflow-already-visible'
     if ((Get-IfwOverflowWindow $explorer) -ne [IntPtr]::Zero) {
         $Record.overflow = 'already visible'
         return
     }
+    $Selection.gate = 'known-name-selection'
     $root = [Windows.Automation.AutomationElement]::FromHandle($bar)
     $names = @('Show hidden icons', 'Show hidden icons.', 'Ausgeblendete Symbole einblenden', 'Ausgeblendete Symbole anzeigen')
     foreach ($name in $names) {
         $named = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $name)
         $elements = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $named)
+        $check = @{ name = $name; count = $elements.Count }
+        $Selection.names += $check
         if ($elements.Count -ne 1) { continue }
         $button = $elements[0]
-        if ($button.Current.ProcessId -ne $explorer -or $button.Current.IsOffscreen -or
-            -not $button.Current.IsEnabled -or $button.Current.ControlType -ne [Windows.Automation.ControlType]::Button) { continue }
+        $current = $button.Current
+        if ($current.ProcessId -ne $explorer) { $check.rejected = 'foreign-process'; continue }
+        if ($current.IsOffscreen) { $check.rejected = 'offscreen'; continue }
+        if (-not $current.IsEnabled) { $check.rejected = 'disabled'; continue }
+        $type = $current.ControlType
+        if ($type -ne [Windows.Automation.ControlType]::Button) { $check.rejected = 'not-button'; $check.controlType = $type.Id; continue }
         $provider = $null
         if ($button.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$provider)) {
-            if ($provider.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Collapsed) { return }
+            $state = $provider.Current.ExpandCollapseState
+            if ($state -ne [Windows.Automation.ExpandCollapseState]::Collapsed) { $check.rejected = 'expand-state'; $check.state = [string]$state; return }
             $action = @{ method = 'Expand'; provider = $provider }
         } elseif ($button.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$provider)) {
-            if ($provider.Current.ToggleState -ne [Windows.Automation.ToggleState]::Off) { return }
+            $state = $provider.Current.ToggleState
+            if ($state -ne [Windows.Automation.ToggleState]::Off) { $check.rejected = 'toggle-state'; $check.state = [string]$state; return }
             $action = @{ method = 'Toggle'; provider = $provider }
         } elseif ($button.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$provider)) {
             $action = @{ method = 'Invoke'; provider = $provider }
-        } else { continue }
-        if ((Get-IfwShellOwner $bar) -ne $explorer -or (Get-IfwOverflowWindow $explorer) -ne [IntPtr]::Zero) { return }
+        } else { $check.rejected = 'no-supported-pattern'; continue }
+        $check.method = $action.method
+        $Selection.gate = 'taskbar-owner-recheck'
+        if ((Get-IfwShellOwner $bar) -ne $explorer) { return }
+        $Selection.gate = 'overflow-visible-at-recheck'
+        if ((Get-IfwOverflowWindow $explorer) -ne [IntPtr]::Zero) { return }
+        $Selection.gate = 'before-change'
         if ($null -ne $BeforeChange -and -not (& $BeforeChange $bar $explorer)) { return }
         $state = @{ bar = $bar; explorer = $explorer; button = $button; action = $action; names = $names }
+        $Selection.gate = 'before-action'
         if ($null -ne $BeforeAction -and -not (& $BeforeAction $state)) { return }
+        $Selection.gate = 'requested'
         $Record.overflow = 'requested'
         $Record.overflowProvider = $action.method
         if ($action.method -eq 'Expand') { $action.provider.Expand() }

@@ -330,6 +330,51 @@ function Test-ProviderPoint($Item,$Root,$Point,[uint32]$Owner) {
     return $false
 }
 
+function Get-ChevronHintReadback($Guard,$Surface,$KnownNames) {
+    if ($null -eq $Surface -or $Surface.root -ne $script:Bar -or $Surface.shellPid -ne $script:ShellPid) {
+        return @{status='no-original-taskbar-hint'}
+    }
+    try {
+        $point = [Windows.Point]::new($Surface.point[0],$Surface.point[1])
+        if ($Guard.ButtonHit($point.X,$point.Y) -ne $Surface.hit) { return @{status='changed-native-hit'} }
+        $root = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$script:Bar)
+        $hit = [Windows.Automation.AutomationElement]::FromPoint($point)
+        $node = $hit; $path = @(); $bound = $false
+        for ($i=0; $i -lt 12 -and $null -ne $node -and $node.Current.ProcessId -eq $script:ShellPid; $i++) {
+            if ([Windows.Automation.Automation]::Compare($node,$root)) { $bound=$true; break }
+            if ($path.Count -lt 3) { $path += $node }
+            $node = [Windows.Automation.TreeWalker]::RawViewWalker.GetParent($node)
+        }
+        if (-not $bound) { return @{status='unbound-uia-hit'} }
+        # Exact predicates disclose only these public system labels, including the Windows settings term.
+        $terms = @($KnownNames) + 'Hidden icon menu'
+        $items = @(foreach ($element in $path) {
+            $current = $element.Current
+            if ($current.ProcessId -ne $script:ShellPid) { return @{status='changed-uia-hit'} }
+            $item = @{type=$current.ControlType.Id; enabled=$current.IsEnabled; offscreen=$current.IsOffscreen
+                      containsPoint=$current.BoundingRectangle.Contains($point)}
+            $pattern = $null
+            $item.expand = $element.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$pattern)
+            $item.toggle = $element.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern,[ref]$pattern)
+            $item.invoke = $element.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)
+            foreach ($field in @('Name','HelpText')) {
+                $property = if ($field -eq 'Name') { [Windows.Automation.AutomationElement]::NameProperty }
+                            else { [Windows.Automation.AutomationElement]::HelpTextProperty }
+                foreach ($term in $terms) {
+                    $filter = [Windows.Automation.PropertyCondition]::new($property,$term)
+                    if ($null -ne $element.FindFirst([Windows.Automation.TreeScope]::Element,$filter)) { $item[$field]=$term; break }
+                }
+            }
+            $item
+        })
+        if ($Guard.ButtonHit($point.X,$point.Y) -ne $Surface.hit -or
+            -not [Windows.Automation.Automation]::Compare($hit,[Windows.Automation.AutomationElement]::FromPoint($point))) {
+            return @{status='changed-hit'}
+        }
+        return @{status='bound-taskbar-point'; nativeHit=$Surface.hit; point=$Surface.point; elements=$items}
+    } catch { return @{status='readback-unavailable'} }
+}
+
 function Get-OverflowButton($State) {
     $guard.CheckOriginal()
     $button = $State.button; $current = $button.Current; $bounds = $current.BoundingRectangle
@@ -474,11 +519,14 @@ try {
         if ($reason -is [IfwIconSurface+PaneChanged] -or $reason -isnot [InvalidOperationException]) { throw }
         $guard.CheckOriginal()
         Write-Event 'hint' @{surface=$script:lastSurface; reason=$reason.Message; markerObserved=$false; expectedRgb=($orig | ForEach-Object {$_.ToString('x2')}) -join ''}
+        $selection = @{expectedBar=$script:Bar; expectedPid=$script:ShellPid}
         $beforeChange = {
             param($Candidate,$Owner)
             $guard.CheckOriginal()
-            return $Candidate.ToInt64() -eq $script:Bar -and $Owner -eq $script:ShellPid -and
-                ($guard.Cursor() -join ',') -ceq ($script:originalCursor -join ',') -and $null -eq $guard.Overflow()
+            if ($Candidate.ToInt64() -ne $script:Bar -or $Owner -ne $script:ShellPid) { $selection.detail='different-taskbar'; return $false }
+            if (($guard.Cursor() -join ',') -cne ($script:originalCursor -join ',')) { $selection.detail='cursor-changed'; return $false }
+            if ($null -ne $guard.Overflow()) { $selection.detail='overflow-visible'; return $false }
+            return $true
         }
         $beforeAction = {
             param($State)
@@ -490,7 +538,9 @@ try {
                     if (-not $item.Current.IsOffscreen -and $item.Current.IsEnabled -and $item.Current.ControlType -eq [Windows.Automation.ControlType]::Button) { $count++ }
                 }
             }
-            if ($count -ne 1 -or -not ($State.names -ccontains $State.button.Current.Name) -or -not (& $beforeChange $State.bar $State.explorer)) { return $false }
+            if ($count -ne 1) { $selection.detail='visible-enabled-button-count'; $selection.count=$count; return $false }
+            if (-not ($State.names -ccontains $State.button.Current.Name)) { $selection.detail='name-changed'; return $false }
+            if (-not (& $beforeChange $State.bar $State.explorer)) { return $false }
             $hintHit=$false
             if ($null -ne $script:lastSurface) {
                 $p=[Windows.Point]::new($script:lastSurface.point[0],$script:lastSurface.point[1])
@@ -500,8 +550,15 @@ try {
             $lease.button=$button; $lease.state=$State
             return $true
         }
-        $null=Open-IfwTrayOverflow $flyout $beforeChange $beforeAction
-        if ($null -eq $lease.state) { throw [InvalidOperationException]::new('The pinned taskbar had no verified Show hidden icons provider') }
+        try { $null=Open-IfwTrayOverflow $flyout $beforeChange $beforeAction $selection }
+        finally {
+            if ($null -eq $lease.state) {
+                Write-Event 'chevron-diagnostic' @{selection=$selection; observerUICulture=[Globalization.CultureInfo]::CurrentUICulture.Name}
+                $names = @($selection.names | ForEach-Object { $_.name })
+                Write-Event 'chevron-hint' @{afterRejectionAtHint=(Get-ChevronHintReadback $guard $script:lastSurface $names)}
+            }
+        }
+        if ($null -eq $lease.state) { throw [InvalidOperationException]::new("The pinned taskbar had no verified Show hidden icons provider ($($selection.gate))") }
         $lease.pane=Wait-OpenedPane $guard
         if ($null -eq $lease.pane) { throw [InvalidOperationException]::new('Explorer did not expose the requested native hidden-icons surface') }
         Write-Event 'opened' @{pane=$lease.pane}
