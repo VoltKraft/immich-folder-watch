@@ -296,6 +296,23 @@ times. [Native observer](../../tools/rust-qa/windows-services/notification.py)
 · [On-screen checks](../../tools/rust-qa/windows-services/notification.ps1)
 · [Native invocation](../development.md#rust-feasibility-workspace).
 
+At `1e58541`, both late probes reached the original unlocked Default desktop.
+The shared directory creator then rejected the notification fixture's
+`ifw-shell-<token>` name before either process started. That prefix was
+already required by the Rust service and the PowerShell observer. The
+directory creator now accepts it with exactly 32 lowercase hex digits.
+The regression follows the actual notification entry into the native create
+call with its pinned parent and rejects truncated, uppercase and nested names.
+The late presentation still requires a native rerun.
+[x64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14797293565)
+· [ARM64 receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708/artifacts/14798618399).
+
+The two receipts match their copies in the full desktop archives, their
+37 source inputs per host and their original early measurements. Both hosts
+reported quiet time early. x64 registered and received one balloon-show
+callback. ARM64 refused registration. The independent readback has SHA-256
+`959a289ba23d6ffb08ec0340037e54e663ed5429bd221206bdaa82c1e2c66f01`.
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

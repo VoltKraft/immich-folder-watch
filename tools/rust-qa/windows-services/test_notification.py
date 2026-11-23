@@ -252,6 +252,26 @@ class NotificationTests(unittest.TestCase):
                 cleanup.assert_not_called()
                 proc.close.assert_called_once()
 
+    def test_notification_profile_reaches_native_creation_under_its_pinned_parent(self):
+        import native
+        api = object.__new__(n.Win32)
+        # Stop at the OS boundary after exercising the real name and parent checks.
+        api.nt_create = Mock(side_effect=OSError("controlled native creation failure"))
+        with TemporaryDirectory() as temp, patch.object(native, "pin_path", return_value=nullcontext((42, "parent"))):
+            with self.assertRaisesRegex(OSError, "controlled native creation failure"):
+                with n.fixture_profile(api, Path(temp), TOKEN, {}):
+                    self.fail("The operating system rejected creation")
+            api.nt_create.assert_called_once()
+            attributes = api.nt_create.call_args.args[2]._obj
+            self.assertEqual(attributes.root, 42)
+            counted = attributes.name.contents
+            self.assertEqual(n.c.wstring_at(counted.buffer), "ifw-shell-" + TOKEN)
+            for invalid_token in (TOKEN[:-1], TOKEN.upper(), TOKEN + "/extra"):
+                with self.subTest(token=invalid_token), self.assertRaises(ValueError):
+                    with n.fixture_profile(api, Path(temp), invalid_token, {}):
+                        self.fail("Expected a single lowercase-token fixture name")
+            api.nt_create.assert_called_once()
+
     def test_checkout_proof_refuses_untracked_inputs_and_shared_dirty_inputs_even_when_early_and_late_agree(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

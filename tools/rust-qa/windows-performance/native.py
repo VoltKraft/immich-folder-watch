@@ -394,8 +394,8 @@ class Win32:
         return info.attributes, (info.volume, (info.index_high << 32) | info.index_low)
 
     def create_child_directory(self, parent, name):
-        if not re.fullmatch(r"ifw-rw02-[0-9a-f]{32}|Immich Folder Watch", name):
-            raise ValueError("Unexpected benchmark directory")
+        if not re.fullmatch(r"ifw-(?:rw02|shell)-[0-9a-f]{32}|Immich Folder Watch", name):
+            raise ValueError("Unexpected Windows fixture directory name")
         wide = c.create_unicode_buffer(name)
         size = len(name.encode("utf-16-le"))
         counted = UnicodeString(size, size, c.cast(wide, c.c_void_p))
