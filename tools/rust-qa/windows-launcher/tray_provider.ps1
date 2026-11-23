@@ -1,7 +1,8 @@
-# Observe one integrated icon and invoke only its uniquely identified, already visible Explorer item.
+# Observe one integrated icon on the pinned Explorer taskbar or its temporary hidden-icons flyout.
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$Token,
       [Parameter(Mandatory)][uint32]$PrimaryId, [Parameter(Mandatory)][int64]$Receiver,
-      [Parameter(Mandatory)][int64]$Creation)
+      [Parameter(Mandatory)][int64]$Creation, [Parameter(Mandatory)][uint32]$ShellPid,
+      [Parameter(Mandatory)][int64]$Bar)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
@@ -20,7 +21,6 @@ function Write-Event([string]$Stage, [hashtable]$Values) {
     [Console]::Out.WriteLine('IFW_PROVIDER ' + ($Values | ConvertTo-Json -Depth 6 -Compress))
     [Console]::Out.Flush()
 }
-# The observer never changes a desktop, a cursor, a taskbar item, or the overflow surface.
 Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -28,18 +28,26 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-public sealed class IfwIconSurface : IDisposable {
+public abstract class IfwSyntheticShellObserver {
+    [DllImport("user32", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32")] public static extern bool IsWindowVisible(IntPtr hwnd);
+}
+
+public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
     [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] struct Identifier { public uint Size; public IntPtr Owner; public uint Id; public Guid Guid; }
     [DllImport("shell32")] static extern int Shell_NotifyIconGetRect(ref Identifier id, out Rect bounds);
-    [DllImport("user32", CharSet=CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32", CharSet=CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
     [DllImport("user32", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder name, int max);
     [DllImport("user32")] static extern IntPtr GetShellWindow();
     [DllImport("user32")] static extern IntPtr WindowFromPoint(Point p);
     [DllImport("user32")] static extern IntPtr GetAncestor(IntPtr hwnd, uint kind);
-    [DllImport("user32")] static extern bool IsWindowVisible(IntPtr hwnd);
-    [DllImport("user32")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32")] static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
+    [DllImport("user32")] static extern bool GetCursorPos(out Point point);
+    [DllImport("dwmapi")] static extern int DwmGetWindowAttribute(IntPtr hwnd, uint attr, out uint value, int size);
     [DllImport("user32")] static extern IntPtr GetThreadDesktop(uint tid);
     [DllImport("user32")] static extern IntPtr GetProcessWindowStation();
     [DllImport("user32")] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
@@ -66,10 +74,11 @@ public sealed class IfwIconSurface : IDisposable {
 
     public sealed class Sample {
         public uint pid, shellPid, id = 23;
-        public long hwnd, creation, hit, bar, shellCreation;
-        public int[] rect, point;
-        public string rgb, desktop = "Default";
+        public long hwnd, creation, hit, bar, shellCreation, root, overflow, monitor;
+        public int[] rect, point, cursor;
+        public string rgb, rootClass, desktop = "Default";
     }
+    public sealed class Pane { public long hwnd; public string windowClass; public uint pid, tid; }
 
     static void Require(bool ok, string reason) { if (!ok) throw new InvalidOperationException(reason); }
     static string ObjectName(IntPtr handle) {
@@ -103,7 +112,7 @@ public sealed class IfwIconSurface : IDisposable {
         if (!GetProcessTimes(handle, out created, out exited, out kernel, out user)) throw new InvalidOperationException("Missing process creation time");
         return created;
     }
-    public IfwIconSurface(uint processId, long ownerHwnd, long expectedCreation, string expectedImage) {
+    public IfwIconSurface(uint processId, long ownerHwnd, long expectedCreation, string expectedImage, uint expectedShell, long expectedBar) {
         pid = processId; receiver = new IntPtr(ownerHwnd);
         try {
             DefaultInput();
@@ -115,11 +124,12 @@ public sealed class IfwIconSurface : IDisposable {
             shellHandle = OpenProcess(0x1000, false, shellPid);
             creation = Identity(primaryHandle, expectedImage, pid);
             shellCreation = Identity(shellHandle, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), shellPid);
-            Require(creation == expectedCreation && WindowOwner(GetShellWindow()) == shellPid && Marshal.SizeOf(typeof(Identifier)) == 40,
+            Require(creation == expectedCreation && bar.ToInt64() == expectedBar && shellPid == expectedShell &&
+                    WindowOwner(GetShellWindow()) == shellPid && Marshal.SizeOf(typeof(Identifier)) == 40,
                     "Expected the original primary and native Explorer of the disposable console");
         } catch { Dispose(); throw; }
     }
-    public Sample Read() {
+    public void CheckOriginal() {
         DefaultInput();
         uint status;
         Require(GetExitCodeProcess(primaryHandle, out status) && status == 259 && GetExitCodeProcess(shellHandle, out status) && status == 259,
@@ -129,13 +139,58 @@ public sealed class IfwIconSurface : IDisposable {
                 "The integrated callback window changed");
         Require(FindWindow("Shell_TrayWnd", null) == bar && IsWindowVisible(bar) && WindowOwner(bar) == shellPid && WindowOwner(GetShellWindow()) == shellPid,
                 "The original visible Explorer taskbar changed");
+    }
+    static bool Present(IntPtr hwnd) {
+        uint cloaked;
+        Require(DwmGetWindowAttribute(hwnd,14,out cloaked,4) == 0, "Could not read compositor visibility");
+        return IsWindowVisible(hwnd) && !IsIconic(hwnd) && cloaked == 0;
+    }
+    public Pane Overflow() {
+        CheckOriginal();
+        Pane found = null;
+        foreach (var cls in new string[]{"NotifyIconOverflowWindow","TopLevelWindowForOverflowXamlIsland"}) {
+            IntPtr hwnd = IntPtr.Zero;
+            for (int i=0; ; i++) {
+                Require(i < 64, "Ambiguous hidden-icons surfaces");
+                hwnd = FindWindowEx(IntPtr.Zero,hwnd,cls,null);
+                if (hwnd == IntPtr.Zero) break;
+                if (!IsWindowVisible(hwnd) || !Present(hwnd)) continue;
+                uint owner; uint tid = GetWindowThreadProcessId(hwnd,out owner);
+                Require(found == null && tid != 0 && GetAncestor(hwnd,2) == hwnd && WindowOwner(hwnd) == shellPid,
+                        "A visible hidden-icons surface did not uniquely identify the pinned Explorer");
+                found = new Pane{hwnd=hwnd.ToInt64(),windowClass=cls,pid=owner,tid=tid};
+            }
+        }
+        return found;
+    }
+    public int[] Cursor() {
+        Point p; Require(GetCursorPos(out p), "Could not observe the original cursor position");
+        return new int[]{p.X,p.Y};
+    }
+    public long ButtonHit(int x, int y) {
+        CheckOriginal();
+        var p = new Point{X=x,Y=y};
+        var hit = WindowFromPoint(p);
+        Require(MonitorFromPoint(p,0) != IntPtr.Zero && GetAncestor(hit,2) == bar && Present(bar) &&
+                IsWindowVisible(hit) && WindowOwner(hit) == shellPid, "The hidden-icons button did not hit the original taskbar");
+        return hit.ToInt64();
+    }
+    public Sample Read(long openedOverflow) {
+        CheckOriginal();
         var identifier = new Identifier { Size = (uint)Marshal.SizeOf(typeof(Identifier)), Owner = receiver, Id = 23 };
         Rect r; int hr = Shell_NotifyIconGetRect(ref identifier, out r);
         Require(hr == 0, "Independent Shell_NotifyIconGetRect returned " + hr.ToString("x8"));
         Require(r.Right-r.Left >= 2 && r.Right-r.Left <= 256 && r.Bottom-r.Top >= 2 && r.Bottom-r.Top <= 256, "Invalid native notification icon rectangle");
         var pt = new Point { X = r.Left + (r.Right-r.Left)/2, Y = r.Top + (r.Bottom-r.Top)/2 };
         IntPtr hit = WindowFromPoint(pt);
-        Require(GetAncestor(hit, 2) == bar && IsWindowVisible(hit) && WindowOwner(hit) == shellPid, "Icon center did not hit the original visible Explorer taskbar");
+        var root = GetAncestor(hit,2);
+        var current = Overflow();
+        long pane = current == null ? 0 : current.hwnd;
+        Require(pane == openedOverflow, "The independently observed hidden-icons surface changed");
+        Require(root == bar || (pane != 0 && root.ToInt64() == pane), "The icon center did not hit the original taskbar or its verified flyout");
+        var monitor = MonitorFromPoint(pt,0);
+        Require(monitor != IntPtr.Zero && Present(root) && IsWindowVisible(hit) && WindowOwner(hit) == shellPid,
+                "The physical marker point did not hit a visible window of the original Explorer");
         IntPtr dc = GetDC(IntPtr.Zero);
         Require(dc != IntPtr.Zero, "Could not read the visible icon pixel");
         uint pixel;
@@ -143,7 +198,8 @@ public sealed class IfwIconSurface : IDisposable {
         finally { if (ReleaseDC(IntPtr.Zero, dc) == 0) throw new Win32Exception(Marshal.GetLastWin32Error()); }
         Require(pixel != 0xffffffff, "The compositor returned an invalid marker pixel");
         return new Sample { pid=pid, hwnd=receiver.ToInt64(), creation=creation, rect=new int[]{r.Left,r.Top,r.Right,r.Bottom}, point=new int[]{pt.X,pt.Y},
-            hit=hit.ToInt64(), bar=bar.ToInt64(), shellPid=shellPid, shellCreation=shellCreation,
+            hit=hit.ToInt64(), bar=bar.ToInt64(), shellPid=shellPid, shellCreation=shellCreation, root=root.ToInt64(),
+            rootClass=root == bar ? "Shell_TrayWnd" : current.windowClass, overflow=pane, monitor=monitor.ToInt64(), cursor=Cursor(),
             rgb=String.Format("{0:x2}{1:x2}{2:x2}",pixel & 255,(pixel >> 8) & 255,(pixel >> 16) & 255) };
     }
     public void Dispose() {
@@ -156,14 +212,16 @@ public sealed class IfwIconSurface : IDisposable {
     }
 }
 '@
+. (Join-Path $PSScriptRoot '../windows-services/tray-overflow.ps1')
 
 function Get-Marker($Guard, [int[]]$Expected, $First) {
     $until = [Diagnostics.Stopwatch]::StartNew()
     do {
         try {
-            $live = $Guard.Read()
+            $live = $Guard.Read($script:openedHwnd)
             $script:lastSurface = $live
-            if ($null -ne $First -and ($live.hit -ne $First.hit -or ($live.rect -join ',') -ne ($First.rect -join ','))) {
+            if (($live.cursor -join ',') -ne ($script:originalCursor -join ',') -or ($null -ne $First -and
+                ($live.hit -ne $First.hit -or $live.root -ne $First.root -or ($live.rect -join ',') -ne ($First.rect -join ',')))) {
                 throw [InvalidOperationException]::new('The original physical marker point or hit window changed')
             }
             $ok = $true
@@ -172,7 +230,7 @@ function Get-Marker($Guard, [int[]]$Expected, $First) {
                 if ([Math]::Abs($channel - $Expected[$i]) -gt 8) { $ok = $false }
             }
             if ($ok) { return $live }
-            $reason = "Marker pixel on the original taskbar is $($live.rgb)"
+            $reason = "The native icon rectangle yielded pixel $($live.rgb)"
         } catch {
             $underlying = $_.Exception.GetBaseException()
             if ($underlying -isnot [InvalidOperationException]) { throw }
@@ -184,13 +242,22 @@ function Get-Marker($Guard, [int[]]$Expected, $First) {
 }
 
 function Get-ExactProvider($Surface, [string]$Label) {
-    $root = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Surface.bar)
     $byName = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $Label)
     $byHelp = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::HelpTextProperty, $Label)
     $condition = [Windows.Automation.OrCondition]::new($byName, $byHelp)
-    $found = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)
-    if ($found.Count -ne 1) { throw [InvalidOperationException]::new("Expected one exact visible tray provider, found $($found.Count)") }
-    $item = $found.Item(0)
+    $root = $null; $item = $null; $visible = 0
+    foreach ($hwnd in @($Surface.bar, $Surface.overflow)) {
+        if ($hwnd -eq 0) { continue }
+        $candidateRoot = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$hwnd)
+        if ($candidateRoot.Current.ProcessId -ne $Surface.shellPid) { throw [InvalidOperationException]::new('The provider root changed process') }
+        $found = $candidateRoot.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)
+        foreach ($candidate in $found) {
+            if ($candidate.Current.IsOffscreen -or $candidate.Current.BoundingRectangle.IsEmpty) { continue }
+            $visible++
+            if ($hwnd -eq $Surface.root) { $item=$candidate; $root=$candidateRoot }
+        }
+    }
+    if ($visible -ne 1 -or $null -eq $item) { throw [InvalidOperationException]::new("Expected one exact visible provider under the physical hit root, found $visible") }
     $current = $item.Current
     $point = [Windows.Point]::new($Surface.point[0], $Surface.point[1])
     $bounds = $current.BoundingRectangle
@@ -205,6 +272,7 @@ function Get-ExactProvider($Surface, [string]$Label) {
     }
     $runtime = $item.GetRuntimeId() -join ','
     $hit = [Windows.Automation.AutomationElement]::FromPoint($point)
+    $hitId = if ($null -ne $hit) { $hit.GetRuntimeId() -join ',' }
     $depth = 0
     while ($null -ne $hit -and $depth -lt 12 -and $hit.Current.ProcessId -eq $Surface.shellPid) {
         if ([Windows.Automation.Automation]::Compare($item, $hit)) { break }
@@ -218,27 +286,177 @@ function Get-ExactProvider($Surface, [string]$Label) {
         throw [InvalidOperationException]::new('The visible point did not belong to an exact invokable item')
     }
     return @{ pattern = $pattern; descriptor = [ordered]@{
-        runtimeId = $runtime; pid = $current.ProcessId; matchCount = $found.Count; matchedLabel = $Label
+        runtimeId = $runtime; hitRuntimeId = $hitId; root=$Surface.root; pid = $current.ProcessId; matchCount = $visible; matchedLabel = $Label
         nameMatches = $nameMatches; helpMatches = $helpMatches
         enabled = $current.IsEnabled; offscreen = $current.IsOffscreen; hitDepth = $depth
         bounds = @($bounds.Left, $bounds.Top, $bounds.Right, $bounds.Bottom)
     } }
 }
 
+function Test-ProviderPoint($Item,$Root,$Point,[uint32]$Owner) {
+    $node = [Windows.Automation.AutomationElement]::FromPoint($Point)
+    for ($i=0; $i -lt 12 -and $null -ne $node -and $node.Current.ProcessId -eq $Owner; $i++) {
+        if ([Windows.Automation.Automation]::Compare($node,$Item)) { return $true }
+        if ([Windows.Automation.Automation]::Compare($node,$Root)) { break }
+        $node = [Windows.Automation.TreeWalker]::RawViewWalker.GetParent($node)
+    }
+    return $false
+}
+
+function Get-OverflowButton($State) {
+    $guard.CheckOriginal()
+    $button = $State.button; $current = $button.Current; $bounds = $current.BoundingRectangle
+    $root = [Windows.Automation.AutomationElement]::FromHandle($State.bar)
+    if ($State.bar.ToInt64() -ne $script:Bar -or $State.explorer -ne $script:ShellPid -or $root.Current.ProcessId -ne $script:ShellPid -or
+        $current.ProcessId -ne $ShellPid -or -not $current.IsEnabled -or $current.IsOffscreen -or
+        $current.ControlType -ne [Windows.Automation.ControlType]::Button -or $bounds.IsEmpty -or $bounds.Width -lt 2 -or $bounds.Height -lt 2) {
+        throw [InvalidOperationException]::new('The original Show hidden icons button did not identify a visible Explorer provider')
+    }
+    $point = [Windows.Point]::new([Math]::Floor($bounds.Left+$bounds.Width/2), [Math]::Floor($bounds.Top+$bounds.Height/2))
+    $hit = $guard.ButtonHit($point.X,$point.Y)
+    if (-not (Test-ProviderPoint $button $root $point $ShellPid)) { throw [InvalidOperationException]::new('The physical chevron did not hit its provider') }
+    $runtime = $button.GetRuntimeId() -join ','
+    if (-not $runtime) { throw [InvalidOperationException]::new('The original chevron lacked a runtime identity') }
+    return @{runtimeId=$runtime; nativeHit=$hit; bar=$script:Bar; pid=$script:ShellPid; bounds=@($bounds.Left,$bounds.Top,$bounds.Right,$bounds.Bottom)
+             point=@([int]$point.X,[int]$point.Y)}
+}
+
+function Wait-OpenedPane($Guard) {
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $pane = $Guard.Overflow()
+        if ($null -ne $pane) { return $pane }
+        Start-Sleep -Milliseconds 80
+    } while ($timer.Elapsed.TotalSeconds -lt 3)
+}
+
+function Restore-OpenedPane($Guard,$Lease,$Record) {
+    if ($null -eq $Lease.pane) {
+        # COM may throw after Explorer accepted the change. Look for its actual resulting surface.
+        $Lease.pane = Wait-OpenedPane $Guard
+        if ($null -eq $Lease.pane) { throw 'The attempted flyout change never exposed an attributable native surface' }
+    }
+    $restoreGuard = {
+        param($Candidate,$Owner)
+        try {
+            $Guard.CheckOriginal()
+            $currentPane = $Guard.Overflow()
+            $button = $Lease.state.button
+            $signed = $Candidate.ToInt64() -eq $script:Bar -and $Owner -eq $script:ShellPid -and
+                ($null -eq $currentPane -or ($currentPane.hwnd -eq $Lease.pane.hwnd -and
+                $currentPane.tid -eq $Lease.pane.tid -and $currentPane.windowClass -ceq $Lease.pane.windowClass)) -and
+                $button.Current.ProcessId -eq $script:ShellPid -and ($button.GetRuntimeId() -join ',') -ceq $Lease.button.runtimeId
+            if (-not $signed) { $Lease.identityLost=$true }
+            return $signed
+        } catch { $Lease.identityLost=$true; throw }
+    }
+    $Guard.CheckOriginal()
+    $visible = $Guard.Overflow()
+    if ($null -ne $visible -and $Lease.iconInvoked) {
+        # Explorer may dismiss its flyout when the selected icon opens its GUI.
+        $pause = [Diagnostics.Stopwatch]::StartNew()
+        while ($null -ne $visible -and $pause.ElapsedMilliseconds -lt 750) {
+            if ($visible.hwnd -ne $Lease.pane.hwnd -or $visible.tid -ne $Lease.pane.tid) { throw 'The opened flyout was replaced' }
+            Start-Sleep -Milliseconds 50
+            $visible = $Guard.Overflow()
+        }
+    }
+    if ($null -ne $visible) {
+        $live = Get-OverflowButton $Lease.state
+        if ($live.runtimeId -cne $Lease.button.runtimeId -or -not (& $restoreGuard $Lease.state.bar $Lease.state.explorer)) {
+            throw 'The original flyout or its bound restoration provider changed'
+        }
+        try { Restore-IfwTrayOverflow $Lease.state $Record $restoreGuard }
+        catch {
+            if ($Lease.identityLost) { throw }
+            $Record.restoreProviderError=$_.Exception.GetBaseException().Message
+        }
+    }
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $Guard.CheckOriginal()
+        $pane = $Guard.Overflow()
+        if ($null -eq $pane) {
+            $action=$Lease.state.action
+            $closed = switch ($action.method) {
+                'Expand' { $action.provider.Current.ExpandCollapseState -eq [Windows.Automation.ExpandCollapseState]::Collapsed }
+                'Toggle' { $action.provider.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off }
+                'Invoke' { $true }
+            }
+            if ($closed) { $Record.restored=$true; return }
+        } elseif ($pane.hwnd -ne $Lease.pane.hwnd -or $pane.tid -ne $Lease.pane.tid) {
+            throw 'The original hidden-icons surface was replaced during restoration'
+        }
+        Start-Sleep -Milliseconds 80
+    } while ($timer.Elapsed.TotalSeconds -lt 3)
+    throw 'The original closed hidden-icons state was not observed after restoration'
+}
+
 $guard = $null
 $invoking = $false
 $script:lastSurface = $null
+$script:openedHwnd = 0
+$baselineRead = $false; $baseline = $null
+$lease = @{state=$null; pane=$null; button=$null}
+$flyout = @{overflow='untouched'; restored=$false}
+$exitCode = 0
 try {
     try { Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase }
     catch { throw [InvalidOperationException]::new('The native UI Automation client assemblies are unavailable') }
-    $guard = [IfwIconSurface]::new($PrimaryId, $Receiver, $Creation, (Join-Path $area 'subject\native-gui-assessment.exe'))
+    $guard = [IfwIconSurface]::new($PrimaryId, $Receiver, $Creation, (Join-Path $area 'subject\native-gui-assessment.exe'),$ShellPid,$Bar)
+    $script:originalCursor=$guard.Cursor()
+    $baseline=$guard.Overflow(); $baselineRead=$true
+    Write-Event 'baseline' @{pane=$baseline; bar=$Bar; pid=$ShellPid; cursor=$script:originalCursor}
+    if ($null -ne $baseline) {
+        throw [InvalidOperationException]::new('A hidden-icons flyout was already open; activating an icon could dismiss its original surface')
+    }
     $orig = @(24 + ([Convert]::ToInt32($Token.Substring(0, 2), 16) -band 63)
               164 + ([Convert]::ToInt32($Token.Substring(2, 2), 16) -band 63)
               48 + ([Convert]::ToInt32($Token.Substring(4, 2), 16) -band 63))
     $contrast = @($orig | ForEach-Object { 255 - $_ })
-    $first = Get-Marker $guard $orig $null
+    try { $first = Get-Marker $guard $orig $null }
+    catch {
+        $reason = $_.Exception.GetBaseException()
+        if ($reason -isnot [InvalidOperationException]) { throw }
+        $guard.CheckOriginal()
+        Write-Event 'hint' @{surface=$script:lastSurface; reason=$reason.Message; markerObserved=$false; expectedRgb=($orig | ForEach-Object {$_.ToString('x2')}) -join ''}
+        $beforeChange = {
+            param($Candidate,$Owner)
+            $guard.CheckOriginal()
+            return $Candidate.ToInt64() -eq $script:Bar -and $Owner -eq $script:ShellPid -and
+                ($guard.Cursor() -join ',') -ceq ($script:originalCursor -join ',') -and $null -eq $guard.Overflow()
+        }
+        $beforeAction = {
+            param($State)
+            $button = Get-OverflowButton $State
+            $root=[Windows.Automation.AutomationElement]::FromHandle($State.bar); $count=0
+            foreach ($name in $State.names) {
+                $named=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$name)
+                foreach ($item in $root.FindAll([Windows.Automation.TreeScope]::Descendants,$named)) {
+                    if (-not $item.Current.IsOffscreen -and $item.Current.IsEnabled -and $item.Current.ControlType -eq [Windows.Automation.ControlType]::Button) { $count++ }
+                }
+            }
+            if ($count -ne 1 -or -not ($State.names -ccontains $State.button.Current.Name) -or -not (& $beforeChange $State.bar $State.explorer)) { return $false }
+            $hintHit=$false
+            if ($null -ne $script:lastSurface) {
+                $p=[Windows.Point]::new($script:lastSurface.point[0],$script:lastSurface.point[1])
+                $hintHit=$State.button.Current.BoundingRectangle.Contains($p) -and (Test-ProviderPoint $State.button $root $p $ShellPid)
+            }
+            Write-Event 'opening' @{button=$button; name=$State.button.Current.Name; method=$State.action.method; hintHitButton=$hintHit}
+            $lease.button=$button; $lease.state=$State
+            return $true
+        }
+        $null=Open-IfwTrayOverflow $flyout $beforeChange $beforeAction
+        if ($null -eq $lease.state) { throw [InvalidOperationException]::new('The pinned taskbar had no verified Show hidden icons provider') }
+        $lease.pane=Wait-OpenedPane $guard
+        if ($null -eq $lease.pane) { throw [InvalidOperationException]::new('Explorer did not expose the requested native hidden-icons surface') }
+        $script:openedHwnd=$lease.pane.hwnd
+        Write-Event 'opened' @{pane=$lease.pane}
+        $first=Get-Marker $guard $orig $null
+        if ($first.root -ne $script:openedHwnd) { throw [InvalidOperationException]::new('The first marker was outside the opened hidden-icons surface') }
+    }
     Write-Event 'first' @{surface = $first}
-    if ([Console]::In.ReadLine() -cne 'second') { exit 0 }
+    if ([Console]::In.ReadLine() -cne 'second') { return }
     $second = Get-Marker $guard $contrast $first
     $label = "IFW tray $Token"
     $arrival = [Diagnostics.Stopwatch]::StartNew()
@@ -254,13 +472,13 @@ try {
         }
     } while ($true)
     Write-Event 'ready' @{surface = $second; provider = $provider.descriptor}
-    if ([Console]::In.ReadLine() -cne 'invoke') { exit 0 }
+    if ([Console]::In.ReadLine() -cne 'invoke') { return }
     $fresh = Get-Marker $guard $contrast $first
     $current = Get-ExactProvider $fresh $label
     if (($current.descriptor | ConvertTo-Json -Compress) -cne ($provider.descriptor | ConvertTo-Json -Compress)) {
         throw [InvalidOperationException]::new('The resolved accessibility provider changed')
     }
-    $script:lastSurface = $guard.Read()
+    $script:lastSurface = $guard.Read($script:openedHwnd)
     if (($fresh | ConvertTo-Json -Compress) -cne ($script:lastSurface | ConvertTo-Json -Compress)) {
         throw [InvalidOperationException]::new('The physical Shell hit or pixel changed before invocation')
     }
@@ -269,16 +487,31 @@ try {
     $startTick = [IfwIconSurface]::GetTickCount64()
     $current.pattern.Invoke()
     $returnedTick = [IfwIconSurface]::GetTickCount64()
+    $lease.iconInvoked=$true
     Write-Event 'invoked' @{startTick = $startTick; returnedTick = $returnedTick}
 } catch {
     $cause = $_.Exception.GetBaseException()
     if (-not $invoking -and ($cause -is [InvalidOperationException] -or $cause -is [Runtime.InteropServices.COMException] -or
                               $cause.GetType().FullName -eq 'System.Windows.Automation.ElementNotAvailableException')) {
         Write-Event 'unavailable' @{reason = $cause.Message; lastSurface = $script:lastSurface}
-        exit 2
+        $exitCode=2
+    } else {
+        Write-Event 'failed' @{reason = $cause.Message}
+        $exitCode=1
     }
-    Write-Event 'failed' @{reason = $cause.Message}
-    exit 1
 } finally {
-    if ($null -ne $guard) { $guard.Dispose() }
+    try {
+        if ($null -ne $lease.state) { Restore-OpenedPane $guard $lease $flyout }
+        $finalPane=if ($baselineRead) { $guard.Overflow() }
+        $cursor=if ($baselineRead) { $guard.Cursor() }
+        if ($baselineRead -and (($null -eq $finalPane) -ne ($null -eq $baseline) -or
+            ($null -ne $baseline -and ($baseline.hwnd -ne $finalPane.hwnd -or $baseline.tid -ne $finalPane.tid)))) { throw 'The original flyout state changed' }
+        Write-Event 'cleanup' @{attempted=($null -ne $lease.state); baselineRead=$baselineRead; original=$baseline; final=$finalPane
+                                observedOpen=$lease.pane; restored=$flyout.restored; cursor=$cursor; providerError=$flyout.restoreProviderError}
+        if ($baselineRead -and ($cursor -join ',') -cne ($script:originalCursor -join ',')) { throw 'The original cursor position changed' }
+    } catch {
+        Write-Event 'cleanup-failed' @{reason=$_.Exception.GetBaseException().Message; observedOpen=$lease.pane}
+        throw
+    } finally { if ($null -ne $guard) { $guard.Dispose() } }
 }
+exit $exitCode

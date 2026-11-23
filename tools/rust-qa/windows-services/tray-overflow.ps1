@@ -18,7 +18,7 @@ function Get-IfwOverflowWindow([uint32]$ExplorerId) {
     return [IntPtr]::Zero
 }
 
-function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null) {
+function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeAction = $null) {
     $bar = [IfwSyntheticShellObserver]::FindWindow('Shell_TrayWnd', $null)
     $explorer = Get-IfwShellOwner $bar
     if (-not $explorer -or -not [IfwSyntheticShellObserver]::IsWindowVisible($bar)) { return }
@@ -27,8 +27,8 @@ function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null) {
         return
     }
     $root = [Windows.Automation.AutomationElement]::FromHandle($bar)
-    foreach ($name in @('Show hidden icons', 'Show hidden icons.', 'Ausgeblendete Symbole einblenden',
-                        'Ausgeblendete Symbole anzeigen')) {
+    $names = @('Show hidden icons', 'Show hidden icons.', 'Ausgeblendete Symbole einblenden', 'Ausgeblendete Symbole anzeigen')
+    foreach ($name in $names) {
         $named = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $name)
         $elements = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $named)
         if ($elements.Count -ne 1) { continue }
@@ -47,9 +47,10 @@ function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null) {
         } else { continue }
         if ((Get-IfwShellOwner $bar) -ne $explorer -or (Get-IfwOverflowWindow $explorer) -ne [IntPtr]::Zero) { return }
         if ($null -ne $BeforeChange -and -not (& $BeforeChange $bar $explorer)) { return }
+        $state = @{ bar = $bar; explorer = $explorer; button = $button; action = $action; names = $names }
+        if ($null -ne $BeforeAction -and -not (& $BeforeAction $state)) { return }
         $Record.overflow = 'requested'
         $Record.overflowProvider = $action.method
-        $state = @{ bar = $bar; explorer = $explorer; button = $button; action = $action }
         if ($action.method -eq 'Expand') { $action.provider.Expand() }
         elseif ($action.method -eq 'Toggle') { $action.provider.Toggle() }
         else { $action.provider.Invoke() }

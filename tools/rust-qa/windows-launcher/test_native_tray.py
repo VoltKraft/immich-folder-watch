@@ -14,8 +14,10 @@ KEY = "18", "43", "23"
 RGB, COMPLEMENT = tray.marker_colors(TOKEN)
 RECT = [-4, 10, 28, 42]
 SURFACE = dict(pid=18, hwnd=43, id=23, creation=101, rect=RECT, point=[12, 26], bar=51, hit=52,
+               root=51, rootClass="Shell_TrayWnd", overflow=0, monitor=2, cursor=[4, 3],
                shellPid=81, shellCreation=102, desktop="Default", rgb=RGB)
 ELEMENT = dict(runtimeId="42,99", matchCount=1, matchedLabel="IFW tray " + TOKEN, pid=81, hitDepth=2,
+               root=51, hitRuntimeId="42,199",
                nameMatches=True, helpMatches=False, enabled=True, offscreen=False, bounds=[-4, 10, 28, 42])
 
 
@@ -152,7 +154,7 @@ class TrayProofTests(unittest.TestCase):
 
 
 class ResidentTests(unittest.TestCase):
-    def exercise(self, refusal, *, subject="canonical", reopen=False):
+    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False):
         api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
         proc.poll.return_value = None
@@ -165,6 +167,10 @@ class ResidentTests(unittest.TestCase):
         desk.iconic.return_value = False
         desk.attribute.return_value = 0
         state, commands, requests = {}, [], []
+        visible_rect = [310, 410, 342, 442] if flyout else RECT
+        visible_surface = (dict(SURFACE, rect=visible_rect, point=[326, 426], hit=62, root=61, overflow=61,
+                                rootClass="TopLevelWindowForOverflowXamlIsland") if flyout else SURFACE)
+        visible_element = dict(ELEMENT, root=visible_surface["root"], bounds=visible_rect)
         with TemporaryDirectory() as directory:
             out = Path(directory)
             logfile = out / "resident-primary.log"
@@ -172,7 +178,10 @@ class ResidentTests(unittest.TestCase):
                 with logfile.open("a", encoding="utf-8") as stream:
                     stream.write(msg)
             def report_icon(phase, color):
-                append(f"TRAY_ICON phase={phase} pid=18 hwnd=43 id=23 rgb={color} rect=-4,10,28,42 ok=1\n")
+                coords = RECT if phase == "initial" or refusal == "stale-flyout" else visible_rect
+                if refusal == "moved-before-invoke" and commands.count(b"P") >= 3:
+                    coords = RECT
+                append(f"TRAY_ICON phase={phase} pid=18 hwnd=43 id=23 rgb={color} rect={','.join(map(str,coords))} ok=1\n")
             windows.on_close = lambda: append("WINDOW_HIDDEN\n")
             def send(data):
                 commands.append(data)
@@ -191,7 +200,7 @@ class ResidentTests(unittest.TestCase):
                             append("gui_tray.change=true\n")
                         if refusal == "superseded":
                             append("TRAY_HOST pid=18 previous=81 current=82 previous_hwnd=51 current_hwnd=53\n")
-                    report_icon("changed" if data == b"M" else "sample", COMPLEMENT)
+                    report_icon("changed" if data == b"M" else "sample", COMPLEMENT if b"M" in commands else RGB)
                 elif data == b"Q":
                     if subject == "retained" and windows.visible():
                         append("WINDOW_RELEASED passes=2\n")
@@ -203,11 +212,11 @@ class ResidentTests(unittest.TestCase):
             proc.stdin.write.side_effect = send
             def receive(stage):
                 if stage == "first":
-                    return {"surface": SURFACE | {"shellPid": 87} if refusal == "foreign-provider" else SURFACE}
+                    return {"surface": visible_surface | {"shellPid": 87} if refusal == "foreign-provider" else visible_surface}
                 if stage == "ready" and refusal == "provider":
                     raise tray.Unavailable("No exact accessible icon")
                 if stage in ("ready", "attempt"):
-                    return dict(surface=dict(SURFACE, rgb=COMPLEMENT), provider=ELEMENT, tick=19)
+                    return dict(surface=dict(visible_surface, rgb=COMPLEMENT), provider=visible_element, tick=19)
                 if stage == "invoked":
                     append(callback("20", 20) if refusal == "early" else callback())
                     if not reopen:
@@ -270,16 +279,29 @@ class ResidentTests(unittest.TestCase):
 
     def test_resident_uses_only_the_native_color_challenge_and_provider_then_joins_both_original_processes(self):
         commands, requests, state = self.exercise(None)
-        self.assertEqual(commands, [b"B", b"M", b"P", b"Q"])
+        self.assertEqual(commands, [b"B", b"M", b"P", b"P", b"Q"])
         self.assertEqual(requests, [b"second\n", b"invoke\n"])
         self.assertEqual(state["workerBefore"], state["workerAfter"])
         self.assertEqual(state["openedWindow"]["pid"], state["primaryPid"])
+
+    def test_relocated_first_icon_requires_fresh_gui_rect_for_each_color_and_immediately_before_invocation(self):
+        commands, requests, state = self.exercise(None, flyout=True)
+        self.assertEqual(commands, [b"B", b"P", b"M", b"P", b"P", b"Q"])
+        self.assertEqual(requests, [b"second\n", b"invoke\n"])
+        self.assertNotEqual(state["initialGuiRect"], state["firstVisibleGuiRect"])
+        for target in (state["first"], state["second"]):
+            self.assertEqual(target["rect"], state["firstVisibleGuiRect"])
+        self.assertEqual(state["beforeInvokeGuiRect"], state["secondGuiRect"])
+        for wrong in ("stale-flyout", "moved-before-invoke"):
+            _, requests, state = self.exercise(wrong, flyout=True)
+            self.assertNotIn(b"invoke\n", requests)
+            self.assertNotIn("delivery", state)
 
     def test_real_callback_covers_first_activation_and_reopening_the_previously_closed_retained_hwnd(self):
         for reopen in (False, True):
             with self.subTest(reopen=reopen):
                 commands, requests, state = self.exercise(None, subject="retained", reopen=reopen)
-                self.assertEqual(commands, [b"B", b"M", b"P", b"Q"])
+                self.assertEqual(commands, [b"B", b"M", b"P", b"P", b"Q"])
                 self.assertEqual(requests, [b"second\n", b"invoke\n"])
                 self.assertEqual(state["primaryArguments"], [] if reopen else ["--autostart"])
                 window = state["retainedWindow"]

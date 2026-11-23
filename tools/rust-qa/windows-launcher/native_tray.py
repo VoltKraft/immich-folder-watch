@@ -444,22 +444,71 @@ def shell_changed(log):
             or len(records(log, "TRAY_BIND")) > 1 or len(records(log, "TRAY_REGISTER")) > 1)
 
 
-def provider_event(path, stage):
-    found = []
+def provider_events(path):
+    events = []
     for line in path.read_bytes().splitlines(keepends=True):
         if line.startswith(b"IFW_PROVIDER ") and line.endswith(b"\n"):
-            event = json.loads(line[len(b"IFW_PROVIDER "):])
-            if event["stage"] == "unavailable":
-                raise Unavailable(event["reason"])
-            if event["stage"] == "failed":
-                raise RuntimeError(event["reason"])
-            if event["stage"] == stage:
-                found.append(event)
+            events.append(json.loads(line[len(b"IFW_PROVIDER "):]))
+    return events
+
+
+def provider_event(events, stage):
+    found = []
+    for event in events:
+        if event["stage"] == "unavailable":
+            raise Unavailable(event["reason"])
+        if event["stage"] == "failed":
+            raise RuntimeError(event["reason"])
+        if event["stage"] == stage:
+            found.append(event)
     return one(found, stage) if found else None
 
 
+def provider_route(events, original, result, *, final=False):
+    names = ("baseline", "hint", "opening", "opened", "cleanup", "cleanup-failed")
+    history = [e for e in events if e["stage"] in names]
+    result["flyoutHistory"] = history
+    entries = {e["stage"]: e for e in history}
+    if (len(entries) != len(history) or "cleanup-failed" in entries
+            or [e["stage"] for e in history] != [name for name in names if name in entries]):
+        raise CleanupUnconfirmed("The native provider could not establish the original flyout state")
+    baseline, opened, opening = (entries.get(k) for k in ("baseline", "opened", "opening"))
+    pid, bar = original
+    if baseline and ((baseline["pid"], baseline["bar"]) != (pid, bar) or len(baseline["cursor"]) != 2):
+        raise ValueError("The flyout baseline did not identify the pinned Explorer")
+    if opening:
+        button = opening["button"]
+        if (not baseline or baseline["pane"] is not None or "hint" not in entries or entries["hint"]["markerObserved"] is not False
+                or (button["pid"], button["bar"]) != (pid, bar) or not button["runtimeId"] or button["nativeHit"] <= 0
+                or opening["name"] not in ("Show hidden icons", "Show hidden icons.", "Ausgeblendete Symbole einblenden",
+                                            "Ausgeblendete Symbole anzeigen")
+                or len(button["point"]) != 2 or len(button["bounds"]) != 4 or not all(math.isfinite(v) for v in button["bounds"])
+                or not (button["bounds"][0] <= button["point"][0] < button["bounds"][2]
+                        and button["bounds"][1] <= button["point"][1] < button["bounds"][3])
+                or opening["method"] not in ("Expand", "Toggle", "Invoke")):
+            raise CleanupUnconfirmed("The hidden-icons action did not identify the initially closed original Explorer surface")
+    if opened:
+        pane = opened["pane"]
+        if (not opening or pane["pid"] != pid or pane["hwnd"] <= 0 or pane["tid"] <= 0
+                or pane["windowClass"] not in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")):
+            raise CleanupUnconfirmed("The opened panel did not identify the pinned Explorer hidden-icons surface")
+    if final:
+        cleanup = entries.get("cleanup")
+        if (not cleanup or cleanup["attempted"] is not bool(opening) or cleanup["baselineRead"] is not bool(baseline)
+                or cleanup["restored"] is not bool(opening) or not opening and cleanup["observedOpen"] is not None
+                or baseline and (cleanup["original"] != baseline["pane"] or cleanup["final"] != baseline["pane"]
+                                 or cleanup["cursor"] != baseline["cursor"])
+                or opening and (not cleanup["observedOpen"]
+                                or cleanup["observedOpen"]["pid"] != pid or cleanup["observedOpen"]["tid"] <= 0
+                                or cleanup["observedOpen"]["hwnd"] <= 0 or cleanup["observedOpen"]["windowClass"]
+                                not in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
+                                or opened and cleanup["observedOpen"] != opened["pane"])):
+            raise CleanupUnconfirmed("The UI Automation helper did not confirm original Explorer flyout restoration")
+    return baseline, opened
+
+
 @contextmanager
-def provider(api, desk, trial, env, out, key, creation, result):
+def provider(api, desk, trial, env, out, key, creation, result, original):
     # The native Windows PowerShell installation supplies the .NET Framework UIA client.
     host = Path(launcher.system_console_path(api.kernel)).parent / "WindowsPowerShell/v1.0/powershell.exe"
     if not host.is_file():
@@ -467,19 +516,29 @@ def provider(api, desk, trial, env, out, key, creation, result):
     log = out / "provider.log"
     args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
             "-File", str(PROVIDER), "-Token", env["IFW_QA_INVENTORY_TOKEN"],
-            "-PrimaryId", key[0], "-Receiver", key[1], "-Creation", str(creation)]
+            "-PrimaryId", key[0], "-Receiver", key[1], "-Creation", str(creation),
+            "-ShellPid", str(original[0]), "-Bar", str(original[1])]
     with log.open("xb") as stream, launcher.child(api, desk, "Default", host, args, trial, env, stream, True,
                                                   private=False) as (proc, job, _):
         result.update(pid=proc.pid, creation100ns=api.process_identity(int(proc._handle)), host=str(host))
 
         def get(stage):
-            item = provider_event(log, stage)
+            events = provider_events(log)
+            item = provider_event(events, stage)
             status = proc.poll()
             if item is None and status is not None:
                 # The process may have exited between reading the file and polling the handle.
-                item = provider_event(log, stage)
+                events = provider_events(log)
+                item = provider_event(events, stage)
                 if item is None:
                     raise RuntimeError(f"The provider exited before {stage} with {status}")
+            baseline, opened = provider_route(events, original, result)
+            if item and "surface" in item:
+                surface = item["surface"]
+                if (not baseline or baseline["pane"] is not None or surface["cursor"] != baseline["cursor"]
+                        or surface["overflow"] != (opened["pane"]["hwnd"] if opened else 0)
+                        or opened and (surface["root"], surface["rootClass"]) != (opened["pane"]["hwnd"], opened["pane"]["windowClass"])):
+                    raise Unavailable("The physical marker did not identify the observed original Explorer surface")
             return item
         try:
             machine = result["machine"] = api.machine(int(proc._handle))
@@ -490,11 +549,17 @@ def provider(api, desk, trial, env, out, key, creation, result):
             if proc.poll() is None:
                 try:
                     command(proc, b"cancel\n")
-                except BrokenPipeError:
-                    pass
-            result["exit"] = launcher.wait_for_exit(proc, lambda: None, 10)
-            result["jobEmpty"] = api.wait_job_empty(job, 5)
-            if not result["jobEmpty"] or result["exit"] not in (0, 2):
+                except OSError as exc:
+                    result["cancelWriteError"] = str(exc)
+            try:
+                result["exit"] = launcher.wait_for_exit(proc, lambda: None, 25)
+                result["jobEmpty"] = api.wait_job_empty(job, 5)
+                if not result["jobEmpty"]:
+                    raise CleanupUnconfirmed("The native UI Automation observer job was still active")
+                provider_route(provider_events(log), original, result, final=True)
+            except Exception as exc:
+                raise CleanupUnconfirmed("The original Explorer flyout and helper cleanup could not be confirmed") from exc
+            if result["exit"] not in (0, 2):
                 raise RuntimeError("The native UI Automation observer failed to finish")
 
 
@@ -508,11 +573,19 @@ def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
             or surface["point"] != [(left + right) // 2, (top + bottom) // 2]
             or surface["bar"] <= 0 or surface["hit"] <= 0 or surface["shellPid"] <= 0
             or surface["shellCreation"] <= 0 or surface["desktop"] != "Default"
+            or surface["monitor"] <= 0 or len(surface["cursor"]) != 2
+            or not ((surface["rootClass"] == "Shell_TrayWnd" and surface["root"] == surface["bar"] and surface["overflow"] == 0)
+                    or (surface["rootClass"] in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
+                        and surface["root"] == surface["overflow"] > 0 and surface["root"] != surface["bar"]))
+            or "provider" in event and (event["provider"].get("root") != surface["root"] or not event["provider"].get("hitRuntimeId")
+                                       or (event["provider"]["hitDepth"] == 0) !=
+                                       (event["provider"]["hitRuntimeId"] == event["provider"]["runtimeId"]))
             or not re.fullmatch("[0-9a-f]{6}", surface["rgb"])):
         raise ValueError("Incomplete pixel, input desktop or Explorer hit evidence")
     if any(abs(a - b) > 8 for a, b in zip(bytes.fromhex(surface["rgb"]), bytes.fromhex(expected_rgb))):
         raise ValueError("The independent pixel did not match the current marker")
-    if first and any(surface[k] != first[k] for k in ("rect", "point", "hit", "bar", "shellPid", "shellCreation")):
+    if first and any(surface[k] != first[k] for k in ("rect", "point", "hit", "root", "rootClass", "overflow", "monitor",
+                                                      "cursor", "bar", "shellPid", "shellCreation")):
         raise Unavailable("Explorer's original hit window, process or rectangle changed")
     return surface
 
@@ -611,11 +684,26 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
             hidden()
             result["residentWindows"] = launcher.snapshot(desk, windows, desktop, None, tid, creation)
             colors = marker_colors(native.token)
-            first_rect = wait(lambda: icon(log(), "initial", key, colors[0]), "Missing initial GUI icon")
+            initial_rows = wait(lambda: [r for r in records(log(), "TRAY_ICON") if r[0] == "initial"], "Missing initial GUI icon")
+            initial_icon = one(initial_rows, "initial GUI icon")
+            if initial_icon[1:4] != key or initial_icon[4] != colors[0] or initial_icon[6] != "1":
+                raise Unavailable("The original v4 registration did not supply its initial marker")
+            initial_rect = result["initialGuiRect"] = None if initial_icon[5] == "none" else icon(log(), "initial", key, colors[0])
             state = result["provider"] = {}
             result["stage"] = "first-marker"
-            with provider(api, desk, trial, env, out, key, creation, state) as (helper, get):
+            def fresh_gui_rect(rgb):
+                offset = len(log())
+                command(proc, b"P")
+                return wait(lambda: icon(log()[offset:], "sample", key, rgb), "Missing fresh GUI rectangle for the original tray icon")
+
+            with provider(api, desk, trial, env, out, key, creation, state, native.witness.original) as (helper, get):
                 initial = wait(lambda: get("first"), "The native marker observer did not start")
+                first_rect = initial_rect
+                if initial["surface"]["overflow"] or first_rect is None:
+                    native.require_original("visibleMarkerHost", initial["surface"])
+                    first_rect = result["firstVisibleGuiRect"] = fresh_gui_rect(colors[0])
+                    if first_rect != initial["surface"]["rect"]:
+                        raise Unavailable("The GUI and the physical marker did not agree on the visible Shell rectangle")
                 first = result["first"] = confirm_surface(initial, key, creation, first_rect, colors[0])
                 hidden()
                 result["stage"] = "second-marker"
@@ -626,8 +714,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 if [line for line in log().splitlines() if line.startswith("gui_tray.change=")] != ["gui_tray.change=true"]:
                     raise ValueError("The GUI marker was not backed by exactly one acknowledged Shell modification")
                 native.witness.markers += 1
-                command(proc, b"P")
-                current = wait(lambda: icon(log(), "sample", key, colors[1]), "Missing fresh GUI rectangle")
+                current = result["secondGuiRect"] = fresh_gui_rect(colors[1])
                 if first_rect != changed or changed != current:
                     raise Unavailable("The notification icon moved during the marker challenge")
                 command(helper, b"second\n")
@@ -636,6 +723,9 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 result["providerIdentity"] = confirm_provider(ready, result["second"], native.token)
                 hidden()
                 result["stage"] = "provider-invoke"
+                if fresh_gui_rect(colors[1]) != current:
+                    raise Unavailable("The GUI icon rectangle moved immediately before the provider invocation")
+                result["beforeInvokeGuiRect"] = current
                 native.require_original("beforeInvoke", result["second"])
                 if retained is not None:
                     windows.pump()
@@ -709,7 +799,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
 
 
 def assess(target, out, result, *, subject="canonical"):
-    files = (Path(__file__).resolve(), PROVIDER, launcher.QA / "windows-inventory/scan.py",
+    files = (Path(__file__).resolve(), PROVIDER, launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
     cases = ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
     with launcher.native_subject(target, out, result, files, subject=subject) as (api, desk, built_gui, inventory, _revision):
