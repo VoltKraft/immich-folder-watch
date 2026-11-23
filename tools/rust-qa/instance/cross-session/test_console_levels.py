@@ -2,6 +2,7 @@
 
 import base64
 import ctypes as c
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -19,6 +20,16 @@ def completed(status, raw):
 
 
 class LevelQueryTests(unittest.TestCase):
+    def test_launch_output_preserves_empty_binary_and_truncated_native_messages(self):
+        prefix = bytes(range(256)) * 16
+        for raw, truncated in ((b"", False), (b"\xff\x00\r\n", False), (prefix, False), (prefix + b"x", True)):
+            with self.subTest(size=len(raw)):
+                report = worker.launch_output(raw)
+                self.assertEqual(report["bytes"], len(raw))
+                self.assertEqual(report["sha256"], hashlib.sha256(raw).hexdigest())
+                self.assertEqual(base64.b64decode(report["prefixBase64"], validate=True), raw[:4096])
+                self.assertIs(report["truncated"], truncated)
+
     def test_redirected_results_keep_positive_negative_and_error_authority(self):
         for status, raw, passed in ((0, b"0x20000", True), (0, b"0x40000", False), (1, b"", False),
                                     (1, b"0x20000", False)):

@@ -30,6 +30,13 @@ def level_inventory(returncode, output):
             "levelListed": returncode == 0 and 0x20000 in codes}
 
 
+def launch_output(output):
+    """Preserve what the fixed launcher wrote to its combined output pipe."""
+    prefix = output[:4096]
+    return {"bytes": len(output), "sha256": hashlib.sha256(output).hexdigest(),
+            "prefixBase64": base64.b64encode(prefix).decode("ascii"), "truncated": len(prefix) < len(output)}
+
+
 def observe_levels(report, redirected, console_probe):
     """Keep both native observations. Retry only a successful, empty pipe."""
     report.update(level_inventory(redirected.returncode, redirected.stdout))
@@ -152,6 +159,7 @@ def basic_user(area, role, config):
             raise RuntimeError("The fixed participant changed before Basic User launch")
         launch = subprocess.run([runas, "/noprofile", "/trustlevel:0x20000", command], **options)
         report["launchExit"] = launch.returncode
+        report["launchOutput"] = launch_output(launch.stdout)
         report["launched"] = launch.returncode == 0
         if not report["launched"]:
             raise RuntimeError("Windows refused the fixed Basic User action")

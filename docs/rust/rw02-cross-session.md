@@ -231,3 +231,13 @@ indexed files and 23 source inputs per host has SHA-256
 The two-session standard-user case remains open.
 [x64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14802979009)
 · [ARM64 writer archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804440869).
+
+At `8566f81` each original session again saw Basic User in the 280-byte
+listing. Its single fixed launch returned exit code 1. In both scheduled
+sessions the controller stopped the trial before the launch. All 39 files
+in each early archive matched the full desktop archive. Only the earlier
+list command's output was preserved. The utility's exit code gives no
+specific reason for the refusal. The observer now records the byte count
+and SHA-256 of the same launch's combined output, plus its first 4 KiB in
+Base64. An empty pipe and a truncated message have distinct receipts.
+[x64 writer](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14809952468) · [ARM64 writer](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037/artifacts/14810906705).
