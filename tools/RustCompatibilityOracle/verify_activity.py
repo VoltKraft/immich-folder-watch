@@ -5,10 +5,13 @@ from contextlib import closing
 from datetime import datetime
 from hashlib import sha256
 import json
+import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import sqlite3
+import stat
 import subprocess
+from tempfile import TemporaryDirectory
 from xml.etree import ElementTree
 
 
@@ -49,14 +52,34 @@ def equal(actual, expected, label):
     require(json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True), label)
 
 
+def original_directory(path):
+    info = path.lstat()
+    require(stat.S_ISDIR(info.st_mode) and not getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,
+            f"expected an original directory: {path.name}")
+
+
+def original_bytes(path, limit):
+    before = path.lstat()
+    require(stat.S_ISREG(before.st_mode) and not getattr(before, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            and 0 < before.st_size <= limit, f"expected a bounded regular file: {path.name}")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        opened = os.fstat(stream.fileno())
+        require(stat.S_ISREG(opened.st_mode) and opened.st_size == before.st_size, f"changed input: {path.name}")
+        data = stream.read(limit + 1)
+    require(len(data) == before.st_size, f"input length changed while reading: {path.name}")
+    return data
+
+
 def artifact_hashes(root):
+    original_directory(root)
     require({p.name for p in root.iterdir()} == FILES, "activity directory must contain exactly four original files")
-    require(all((root / name).is_file() and not (root / name).is_symlink() for name in FILES), "regular files required")
-    return {name: sha256((root / name).read_bytes()).hexdigest() for name in sorted(FILES)}
+    limits = {"before.db": 16 << 20, "after.db": 16 << 20, "photo.jpg": 6, "activity.json": 65536}
+    return {name: sha256(original_bytes(root / name, limits[name])).hexdigest() for name in sorted(FILES)}
 
 
-def verify_trx(trx, manifest_hash):
-    run = ElementTree.parse(trx)
+def verify_trx(trx, manifest_hash, rust_backup_hash=None):
+    run = ElementTree.fromstring(original_bytes(trx, 32 << 20))
     name = TEST_CLASS + "." + TEST_METHOD
     definition, = (e for e in run.findall("./{*}TestDefinitions/{*}UnitTest") if e.get("name") == name)
     method = definition.find("{*}TestMethod")
@@ -68,6 +91,9 @@ def verify_trx(trx, manifest_hash):
     stdout = result.findtext("./{*}Output/{*}StdOut", "")
     markers = [line.strip() for line in stdout.splitlines() if line.strip().startswith("IFW_ACTIVITY_SHA256=")]
     equal(markers, ["IFW_ACTIVITY_SHA256=" + manifest_hash], "test result does not identify the original activity file")
+    consumed = [line.strip() for line in stdout.splitlines() if line.strip().startswith("IFW_RUST_BACKUP_SHA256=")]
+    equal(consumed, ["IFW_RUST_BACKUP_SHA256=" + rust_backup_hash] if rust_backup_hash else [],
+          "test result does not identify the expected restore path and bytes")
     return execution_id
 
 
@@ -76,15 +102,29 @@ def schema(db):
             db.execute("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")]
 
 
-def read_backup(path, expected_schema):
-    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
-        require(db.execute("PRAGMA integrity_check").fetchall() == [("ok",)], f"damaged {path.name}")
-        require(db.execute("PRAGMA user_version").fetchone() == (1,), f"unexpected schema version in {path.name}")
-        require(schema(db) == expected_schema, f"schema differs from the reviewed legacy corpus in {path.name}")
-        for table in ("owned_albums", "sync_timestamp_repairs"):
-            require(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,), f"unexpected {table} row")
-        entries = [dict(zip(MAPPING_FIELDS, row, strict=True)) for row in db.execute("SELECT * FROM sync_entries")]
-        return entries, db.execute("SELECT account_scope, last_successful_sync_utc FROM sync_account_status").fetchall()
+def reviewed_schema(revision, platform):
+    with closing(sqlite3.connect(":memory:")) as golden:
+        golden.executescript(git("show", f"{revision}:rust/tests/fixtures/legacy/{platform}/sqlite/sensitive.sql").decode())
+        return schema(golden)
+
+
+def read_backup(path, expected_schema, expected_digest):
+    data = original_bytes(path, 16 << 20)
+    require(sha256(data).hexdigest() == expected_digest and data.startswith(b"SQLite format 3\0") and data[18:20] == b"\1\1",
+            f"expected the identified, standalone rollback-mode database: {path.name}")
+    # SQLite must query the same bytes we hashed, including on builds without sqlite3_deserialize.
+    with TemporaryDirectory(prefix="ifw-worker-backup-read-") as scratch:
+        verified = Path(scratch) / "verified.db"
+        verified.write_bytes(data)
+        with closing(sqlite3.connect(verified.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+            db.execute("PRAGMA trusted_schema=OFF")
+            require(db.execute("PRAGMA integrity_check").fetchall() == [("ok",)], f"damaged {path.name}")
+            require(db.execute("PRAGMA user_version").fetchone() == (1,), f"unexpected schema version in {path.name}")
+            require(schema(db) == expected_schema, f"schema differs from the reviewed legacy corpus in {path.name}")
+            for table in ("owned_albums", "sync_timestamp_repairs"):
+                require(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,), f"unexpected {table} row")
+            entries = [dict(zip(MAPPING_FIELDS, row, strict=True)) for row in db.execute("SELECT * FROM sync_entries")]
+            return entries, db.execute("SELECT account_scope, last_successful_sync_utc FROM sync_account_status").fetchall()
 
 
 def check_transfer(observed, downloads):
@@ -92,13 +132,13 @@ def check_transfer(observed, downloads):
     require(type(observed["albumLists"]) is int and observed["albumLists"] > 0, "missing successful album observation")
 
 
-def verify(root, trx, platform, arch, revision):
+def verify(root, trx, platform, arch, revision, *, rust_backup_hash=None):
     require(re.fullmatch(r"[0-9a-f]{40}", revision), "supply the full Git revision that executed the test")
     git("diff", "--exit-code", "--quiet", BASE, revision, "--", *LEGACY_INPUTS)
     test_blob = git("rev-parse", "--verify", revision + ":" + TEST_FILE).decode().strip()
     hashes = artifact_hashes(root)
-    execution_id = verify_trx(trx, hashes["activity.json"])
-    case = json.loads((root / "activity.json").read_bytes())
+    execution_id = verify_trx(trx, hashes["activity.json"], rust_backup_hash)
+    case = json.loads(original_bytes(root / "activity.json", 65536))
     equal([case["format"], case["caseId"], case["platform"], case["osArchitecture"], case["processArchitecture"]],
           ["ifw-csharp-worker-download-activity-v1", "restored-latest-download", platform, arch, arch], "wrong case or native target")
     equal([case["testAssemblyVersion"], case["workerAssemblyVersion"]], ["3.0.4+" + revision] * 2,
@@ -116,16 +156,14 @@ def verify(root, trx, platform, arch, revision):
         table = git("show", revision + ":tools/rust-qa/legacy/casing/unicode-15.1.0.tsv").decode().splitlines()
         source_key = source.translate({int(a, 16): int(b, 16) for a, b in (line.split() for line in table[1:])})
 
-    with closing(sqlite3.connect(":memory:")) as golden:
-        golden.executescript(git("show", f"{revision}:rust/tests/fixtures/legacy/{platform}/sqlite/sensitive.sql").decode())
-        expected_schema = schema(golden)
-    equal(read_backup(root / "before.db", expected_schema), [[], []], "before backup already contains activity")
+    expected_schema = reviewed_schema(revision, platform)
+    equal(read_backup(root / "before.db", expected_schema, hashes["before.db"]), [[], []], "before backup already contains activity")
     equal(case["before"], {"databaseSha256": hashes["before.db"], "mappingCount": 0, "accountStatusCount": 0,
                            "fileExisted": False}, "incorrect before state")
     require(hashes["after.db"] != hashes["before.db"], "identical before and after backups")
     after = case["after"]
     require(after["databaseSha256"] == hashes["after.db"], "after backup hash differs")
-    entries, accounts = read_backup(root / "after.db", expected_schema)
+    entries, accounts = read_backup(root / "after.db", expected_schema, hashes["after.db"])
     entry, = entries
     (account, history), = accounts
     synchronized = entry["lastSynchronizedAtUtc"]
@@ -137,7 +175,7 @@ def verify(root, trx, platform, arch, revision):
     expected = [ACCOUNT, source, source_key, "photo.jpg", "PHOTO.JPG" if windows else "photo.jpg",
                 "remote", "Camera", 6, written, 1, 0, synchronized, None]
     equal(entry, dict(zip(MAPPING_FIELDS, expected, strict=True)), "unexpected stored mapping")
-    require((root / "photo.jpg").read_bytes() == b"remote", "downloaded media bytes differ")
+    require(original_bytes(root / "photo.jpg", 6) == b"remote", "downloaded media bytes differ")
     file_state = {"name": "photo.jpg", "size": 6, "sha256": hashes["photo.jpg"],
                   "lastWriteTimeUtc": written, "creationTimeUtc": CREATED if windows else None}
     restart = case["restart"]
@@ -149,7 +187,7 @@ def verify(root, trx, platform, arch, revision):
     equal([restart["totalDownloads"], restart["totalUploads"]], [1, 0], "incorrect cumulative transfer counts")
     equal(artifact_hashes(root), hashes, "originals changed during readback")
     return {"revision": revision, "reference": BASE, "activityTestBlob": test_blob, "platform": platform,
-            "architecture": arch, "testExecutionId": execution_id, "trxSha256": sha256(trx.read_bytes()).hexdigest(),
+            "architecture": arch, "testExecutionId": execution_id, "trxSha256": sha256(original_bytes(trx, 32 << 20)).hexdigest(),
             "fileSha256": hashes, "lastSynchronizedAtUtc": synchronized, "lastSuccessfulSyncUtc": history}
 
 

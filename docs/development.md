@@ -70,6 +70,11 @@ The checkout needs that commit and the 3.0.4 reference commit. The reader uses
 immutable SQLite connections and prints a JSON receipt with the original hashes.
 The test uses an in-process synthetic Immich peer. [Activity and source checks](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
 
+The [native Rust backup trial](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
+adds a separate data exchange between these two worker starts.
+`rust-feasibility.yaml` retains the source, build and per-test evidence from
+each native target in its `rust-worker-backup` archive.
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

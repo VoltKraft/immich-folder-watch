@@ -7,6 +7,8 @@ on:
       - '.github/workflows/rust-feasibility.yaml'
       - 'rust/**'
       - 'tools/rust-qa/**'
+      - 'tools/RustCompatibilityOracle/verify_activity.py'
+      - 'src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests*.cs'
   workflow_dispatch:
 
 permissions:
@@ -124,5 +126,25 @@ jobs:
           path: |
             artifacts/rust/storage-faults/${{ matrix.target }}/
             !artifacts/rust/storage-faults/${{ matrix.target }}/build/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore a native Rust backup into the shipping worker after a download
+        id: activity
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/storage/run.py "$NATIVE_TARGET" --worker-activity \
+            --output "artifacts/rust/worker-backup-native/$NATIVE_TARGET"
+
+      - name: Retain the worker, Rust backup and original recovery evidence
+        if: ${{ !cancelled() && (steps.activity.outcome == 'success' || steps.activity.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-worker-backup-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/worker-backup-native/${{ matrix.target }}/
           if-no-files-found: error
           retention-days: 14

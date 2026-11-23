@@ -35,12 +35,12 @@ def isolated_path(value: Path) -> Path:
     return path
 
 
-def archive_first_party(output: Path, fixtures: Path, casing_inputs: list[Path]) -> dict:
+def archive_first_party(output: Path, fixtures: Path, extra_inputs: list[Path]) -> dict:
     paths = [ROOT / name for name in
              ("global.json", "NuGet.Config", "Directory.Build.props", "rust/Cargo.toml",
               "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py",
               "tools/rust-qa/legacy/InvariantUppercaseProfile.cs")]
-    paths.extend(casing_inputs)
+    paths.extend(extra_inputs)
     for directory in (HERE, ROOT / "rust/crates/ifw-legacy", ROOT / "src/ImmichFolderWatch.Core", fixtures):
         paths += [path for path in directory.rglob("*") if path.is_file()
                   and not {"obj", "target", "__pycache__"}.intersection(path.relative_to(directory).parts)
@@ -68,6 +68,8 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--stored-keys", action="store_true",
                         help="Inspect existing path identities in two additional synthetic C# backups")
+    parser.add_argument("--worker-activity", action="store_true",
+                        help="Return a native Rust backup to the shipping worker after a real synthetic download")
     args = parser.parse_args()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
@@ -85,6 +87,13 @@ def main() -> int:
         casing_inputs = [HERE.parent / "legacy" / path for path in
                          ("casing/unicode-15.1.0.tsv", "casing/unicode-17.0.0.tsv",
                           "casing_profiles.py", "licenses/Unicode-LICENSE.txt")]
+    extra_inputs = list(casing_inputs)
+    activity_project = ROOT / "src/ImmichFolderWatch.Tests.Core/ImmichFolderWatch.Tests.Core.csproj"
+    if args.worker_activity:
+        extra_inputs.extend([activity_project, ROOT / "tools/RustCompatibilityOracle/verify_activity.py",
+                             ROOT / "Directory.Build.targets", HERE.parent / "windows-performance/native.py",
+                             HERE.parent / "legacy/casing/unicode-15.1.0.tsv",
+                             *sorted((activity_project.parent / "Services").glob("FolderWatchWorkerPersistenceTests*.cs"))])
     env = os.environ.copy()
     # Build flag overrides must not silently change the reviewed native input.
     removed = []
@@ -110,7 +119,9 @@ def main() -> int:
             "src/ImmichFolderWatch.Core", "Directory.Build.props", "global.json", "NuGet.Config",
             "rust/tests/fixtures/legacy", "tools/rust-qa/check-toolchain.py",
             "tools/rust-qa/legacy/InvariantUppercaseProfile.cs",
-            *map(str, casing_inputs)], cwd=ROOT, text=True).splitlines(),
+            *map(str, extra_inputs), *(["src/ImmichFolderWatch.Immich", "src/ImmichFolderWatch.App.Shared",
+                                       "src/ImmichFolderWatch.App.Linux/Platform", str(activity_project.parent)]
+                                      if args.worker_activity else [])], cwd=ROOT, text=True).splitlines(),
         "workflowRun": os.getenv("GITHUB_RUN_ID"), "operatingSystem": platform.platform(),
         "offline": args.offline, "removedBuildOverrideNames": sorted(removed),
         "nativeBuild": {"LIBSQLITE3_FLAGS": inputs["sqlite"]["flags"], "LIBSQLITE3_SYS_USE_PKG_CONFIG": "0"},
@@ -140,6 +151,8 @@ def main() -> int:
         return data
 
     try:
+        if args.worker_activity and result["modifiedSources"]:
+            raise ValueError("the worker handoff requires committed test, compiler and worker sources")
         command("native-compiler", [sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"), args.target])
         command("evidence-tests", [sys.executable, str(HERE / "test_evidence.py")])
         expected_lock = {(entry["name"], entry["version"]): entry["archive_sha256"] for entry in inputs["packages"]}
@@ -148,7 +161,7 @@ def main() -> int:
         result["lockSha256"] = sha256(HERE / "Cargo.lock")
         verify_fixture(fixtures, native_os)
         result["fixtureManifestSha256"] = sha256(fixtures / "manifest.json")
-        result["firstPartySourceCount"] = len(archive_first_party(output, fixtures, casing_inputs))
+        result["firstPartySourceCount"] = len(archive_first_party(output, fixtures, extra_inputs))
         cargo = ["cargo", "metadata", "--manifest-path", str(MANIFEST), "--locked", "--format-version", "1"]
         if args.offline:
             cargo.append("--offline")
@@ -233,6 +246,33 @@ def main() -> int:
             result["storedKeys"] = {"inputs": sha256(corpus / "manifest.json"),
                                     "observations": sha256(observation / "result.json"),
                                     "rustExecutable": sha256(example)}
+        if args.worker_activity:
+            from worker_activity import run as run_activity
+
+            command("worker-exchange-tests", [sys.executable, "-B", "-m", "unittest", "discover",
+                                              "-s", str(HERE), "-p", "test_worker*.py"])
+            command("worker-backup-tests", ["cargo", "test", "--manifest-path", str(MANIFEST), "--frozen",
+                                            "--target", args.target, "--example", "worker_activity_backup"])
+            command("worker-backup-build", ["cargo", "build", "--manifest-path", str(MANIFEST), "--frozen",
+                                            "--release", "--target", args.target, "--example", "worker_activity_backup"])
+            example = executable.parent / "examples" / ("worker_activity_backup" + executable.suffix)
+            activity_build = work / "activity-dotnet"
+            common = [str(activity_project), "--artifacts-path", str(activity_build), "--disable-build-servers"]
+            restore = [dotnet, "restore", *common]
+            if args.offline:
+                empty_feed = work / "empty-feed"
+                empty_feed.mkdir()
+                restore += ["--source", str(empty_feed), "-p:NuGetAudit=false"]
+            command("activity-reference-restore", restore)
+            command("activity-reference-build", [dotnet, "build", *common, "--no-restore", "--configuration", "Release"])
+            test_assembly = activity_build / "bin/ImmichFolderWatch.Tests.Core/release/ImmichFolderWatch.Tests.Core.dll"
+            build_hashes = {"rustExecutable": sha256(example), "testAssembly": sha256(test_assembly)}
+            result["workerActivity"] = build_hashes
+            answer = run_activity(output / "worker-activity", example, test_assembly, dotnet, env,
+                                  args.target, result["source"])
+            if sha256(example) != build_hashes["rustExecutable"] or sha256(test_assembly) != build_hashes["testAssembly"]:
+                raise ValueError("an executable changed during the worker activity trial")
+            result["workerActivity"]["readback"] = answer
         result["status"] = "passed"
         print(f"Storage assessment passed; evidence: {output}", flush=True)
     except Exception as error:

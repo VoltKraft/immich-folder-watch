@@ -8,9 +8,24 @@ contained the downloaded asset and its account Last Sync. Restart from that
 backup reconciled the same album and watch root with zero additional
 transfers. Independent review added a positive album-list observation on
 both runs and bound the two loaded assemblies and the original evidence
-to their xUnit result. The new four-target reference workflow captures
-the database and file evidence for detached readback.
+to their xUnit result. At `cf38f1a`, all four native reference jobs passed.
+Each Ubuntu target passed 567 tests. Each Windows target passed 558 with
+nine Linux-specific skips. Independent readback verified all eight original
+backups and all four media files. The local focused case passed from the
+same commit. An earlier local repeat of the full persistence class passed
+34 of 66 tests. Six cases explicitly reported the shared inotify limit,
+and a single native descriptor also failed at that time. The other failures
+were timing, transfer and ordering assertions. The earlier local full-class
+run passed 66 of 66. Both full hosted Ubuntu runs passed with the new case.
 [Download activity reference](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
+
+The Rust backup example at `2353424` ran eleven cases on Fedora x64 with
+the pinned compiler and bundled SQLite. The two complete donors passed,
+including one with a different fixture label. Nine controls refused their
+inputs. The stale refusal carries the actual request token and database SHA.
+The C# exchange at `738e1d6` refused an oversized response before restarting
+the worker. The combined test runs both processes against the original
+synthetic watch root. [Native backup procedure](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download).
 
 At `8566f81`, the original Linux archives verified all eleven X11 budgets
 and the SQLite and realtime results on both architectures. ARM64 observed

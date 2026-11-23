@@ -135,3 +135,17 @@ native file times before export. ZIP extraction can change filesystem metadata.
 This reference establishes the legacy result for a completed synthetic
 download. The installed candidate still needs to preserve external effects
 and history across its own uploads, downloads, deletions and repairs.
+
+At `cf38f1a` each of the four native reference jobs ran the case on .NET
+10.0.15. The two Ubuntu targets passed 567 tests each. Each Windows target
+passed 558 and skipped the same nine Linux-specific tests. All four original
+TRX files bind the activity digest to the passing test. Independent SQL
+readback verified all eight original backups. Each worker requested one album
+listing on each start, with transfer counts of one download followed by zero.
+The four-archive readback SHA-256 is
+`4bf1149068f1cfd01393ced5c0a015d2f8aaff2af9169512511dc7da4072b55d`.
+[Linux x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45168670336/artifacts/14815617605) · [Linux ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45168670336/artifacts/14816356054) · [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45168670336/artifacts/14815577866) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45168670336/artifacts/14816211257).
+
+The [native Rust backup trial](../../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
+uses the same two worker reconciliations with a private file exchange.
+The earlier C#-only reference can still be replayed from its original archive.

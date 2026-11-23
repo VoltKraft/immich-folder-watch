@@ -2,7 +2,7 @@
 
 This is a development-only Cargo workspace for RW-02. It is separate from
 `rust/Cargo.toml`; its dependencies are not application dependencies. It reads
-only the reviewed synthetic RW-01 corpus and creates fresh databases below
+the reviewed synthetic RW-01 corpus and creates fresh databases below
 `artifacts/rust`. The C# tool calls existing Core readers after Rust writes and
 backs up those databases. It never opens an installed application profile.
 
@@ -36,6 +36,40 @@ derived controls in their own directory. The completed report is
 `stored-keys/result.json`. The two-generation Fedora experiment also covers
 cross-library reads with the same C# runtime.
 [Stored SQLite identity results](../../../docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+
+### Restore after a synthetic download
+
+`--worker-activity` adds the shipping worker to the same native SQLite
+assessment. Run from a clean committed checkout with both SDKs on PATH.
+
+```sh
+python3 -B tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu --worker-activity \
+  --output artifacts/rust/worker-backup-native/linux-x64
+```
+
+The first worker downloads `photo.jpg`, records its mapping and account Last
+Sync, and stops. Its private watch directory remains alive. Rust inspects
+both finalized backups. It must reject the earlier backup before creating
+an output. It uses SQLite's backup API on the later one and rereads all
+four tables. The second worker receives those exact returned bytes in a
+disposable copy and reconciles the original watch directory. Its
+xUnit output identifies both the JSON observations and the backup it consumed.
+The default C# reference continues to run its own restore on all four targets.
+
+To replay the cross-language trial, retain the `worker-activity/` directory
+from the native archive. Supply the original target triple and full source
+revision. This command prints the independent SQL, original media and TRX
+readback. It runs on a different host as well.
+
+```sh
+python3 -B tools/rust-qa/storage/worker_activity.py path/to/worker-activity TARGET FULL_COMMIT
+```
+
+The parent `result.json` identifies the compiled Rust executable, C# test
+assembly and original build inputs. The peer supplies synthetic Immich metadata
+and bytes in process. Candidate installations and sync-engine rollback have
+separate acceptance rows.
+[Legacy case](../../../docs/rust/rw01-storage-contract.md#download-activity-and-the-latest-backup) · [Feasibility workflow](../../../.github/workflows/rust-feasibility.yaml).
 
 Each output contains `result.json`, `evidence-hashes.json`, step logs, first-party
 source copies, untouched `.crate` archives, supplied notices, feature graphs and
