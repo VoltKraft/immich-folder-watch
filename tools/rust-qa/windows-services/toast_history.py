@@ -304,11 +304,12 @@ def measure(target, exe, out, record):
     token = uuid.uuid4().hex
     record.update(token=token, processes=[], presentationObserved=None, activationObserved=None)
     temp = Path(os.environ["RUNNER_TEMP"])
-    env = dict(os.environ, IFW_QA_TOAST_HISTORY="1")
     with ExitStack() as outer:
         outer.enter_context(pin_path(api, exe, False))
         area = outer.enter_context(fixture_profile(api, temp, token, record))
         pin_new_marker(outer, api, area / "synthetic.fixture", token)
+        env = dict(os.environ, TEMP=str(area), TMP=str(area), IFW_QA_TOAST_HISTORY="1",
+                   IFW_QA_ISOLATED="1", IFW_QA_INVENTORY_TOKEN=token)
 
         def call(operation):
             log = out / f"{len(record['processes']):03}-{operation}.txt"

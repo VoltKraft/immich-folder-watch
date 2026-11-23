@@ -427,6 +427,28 @@ archive replay. The local receipt under
 `2a4540e190a94f3a6024c72695cc1e43ca7808cc320c1e7227020da41d912d72`.
 Native x64 and ARM64 delivery remains to be observed.
 
+### Native WinRT startup at 653f255
+
+Both original Windows jobs verified an active, unlocked Default desktop
+in session 2. The first ordinary launcher call stopped before
+`CreateProcessW`. The observer had pinned its new synthetic profile
+marker, but passed only the toast-specific flag in the child environment.
+The shared launcher also requires that marker's token and the isolation
+flag. Each archive records one planned `prepare` operation with an empty
+Windows job and no child PID. Shortcut registration and history delivery
+remain unobserved.
+[Windows x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14849784690) · [Windows ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514/artifacts/14851117029).
+
+The corrected observer passes the two required values from the same
+newly pinned test profile and points the child's temporary directories
+there. It keeps the original user profile and Default input desktop.
+Running the added test against the original sources reached the same
+refusal on both target configurations. The corrected test crosses the
+shared launcher's validation and stops at the native process-creation
+boundary. The 53 Windows service tests passed locally. A native sender,
+independent history reader and verified cleanup are still required on
+each Windows target. [Fixture](../../tools/rust-qa/windows-services/toast_history.py) · [Regression control](../../tools/rust-qa/windows-services/test_toast_history.py).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

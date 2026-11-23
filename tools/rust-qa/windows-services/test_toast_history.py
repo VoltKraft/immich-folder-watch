@@ -1,9 +1,14 @@
 """Regression controls for inbox notification history, selective removal and archived readback."""
+from contextlib import nullcontext
 from copy import deepcopy
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
+import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import Mock, patch
+from uuid import UUID
 
 import toast_history as h
 
@@ -106,6 +111,66 @@ def trial(flags=None, directory=None):
 
 
 class ToastHistoryTests(unittest.TestCase):
+    def test_prepare_uses_its_own_profile_marker_and_the_original_default_desktop_launcher(self):
+        for arch, (target, machine) in h.TARGET.items():
+            with self.subTest(target=target):
+                self.check_prepare_launch(arch, target, machine)
+
+    def check_prepare_launch(self, arch, target, machine):
+        import notification_probe as probe
+        import named_process
+        import build
+
+        class ReachedNativeLaunch(Exception):
+            """The unmodified launcher's checks completed before constructing the Win32 kernel wrapper."""
+
+        root = PureWindowsPath(r"C:\fixture\runner-temp")
+        area = root / ("ifw-shell-" + TOKEN)
+        exe = root.parent / "ifw-windows-services-probe.exe"
+        parent = dict(RUNNER_TEMP=str(root), RUNNER_ARCH=arch, USERPROFILE=r"C:\Users\runneradmin",
+                      APPDATA=r"C:\Users\runneradmin\AppData\Roaming", LOCALAPPDATA=r"C:\Users\runneradmin\AppData\Local",
+                      TEMP=r"C:\old-temp", TMP=r"C:\old-tmp", IFW_QA_INVENTORY_TOKEN="f"*32,
+                      IFW_QA_ISOLATED="0", IFW_QA_TOAST_HISTORY="0")
+        api = Mock()
+        api.wait_job_empty.return_value = True
+        api.close.return_value = True
+        record = {}
+        with (TemporaryDirectory() as temporary, patch.dict(os.environ, parent, clear=True),
+              patch.object(h.uuid, "uuid4", return_value=UUID(hex=TOKEN)), patch.object(probe, "Win32", return_value=api),
+              patch.object(probe, "Desktop", return_value=Mock(context=Mock(return_value=DESKTOP))),
+              patch.object(build, "pe_machine", return_value=machine),
+              patch.object(probe, "pin_path", return_value=nullcontext()) as image_pin,
+              patch.object(probe, "fixture_profile", return_value=nullcontext(area)) as profile,
+              patch.object(probe, "pin_new_marker") as marker, patch.dict(sys.modules, msvcrt=Mock()),
+              patch.object(probe, "start", wraps=named_process.start) as start,
+              patch.object(named_process, "Kernel", side_effect=ReachedNativeLaunch) as kernel):
+            with self.assertRaises(ReachedNativeLaunch):
+                h.measure(target, exe, Path(temporary), record)
+        profile.assert_called_once_with(api, Path(str(root)), TOKEN, record)
+        image_pin.assert_called_once_with(api, exe, False)
+        self.assertEqual(marker.call_args.args[1:], (api, area / "synthetic.fixture", TOKEN))
+        kernel.assert_called_once()
+        start.assert_called_once()
+        self.assertEqual(start.call_args.args, (exe, ["--hosted-toast-history", str(area), TOKEN, "prepare"]))
+        launch = start.call_args.kwargs
+        self.assertEqual((launch["desktop"], launch["cwd"], launch["primary"]), ("Default", area, True))
+        self.assertEqual(launch["env"], {**parent, "TEMP": str(area), "TMP": str(area), "IFW_QA_TOAST_HISTORY": "1",
+                                        "IFW_QA_INVENTORY_TOKEN": TOKEN, "IFW_QA_ISOLATED": "1"})
+
+    def test_pre_fix_environment_and_foreign_desktop_are_refused_before_any_native_launch(self):
+        import notification_probe
+        import named_process
+
+        old = {"IFW_QA_TOAST_HISTORY": "1"}
+        valid = {**old, "IFW_QA_INVENTORY_TOKEN": TOKEN, "IFW_QA_ISOLATED": "1"}
+        with patch.dict(sys.modules, msvcrt=Mock()), patch.object(named_process, "Kernel") as kernel:
+            for env, desktop in ((old, "Default"), ({**valid, "IFW_QA_ISOLATED": "0"}, "Default"),
+                                 ({**valid, "IFW_QA_INVENTORY_TOKEN": "invalid"}, "Default"), (valid, "Winlogon")):
+                with self.subTest(env=env, desktop=desktop), self.assertRaisesRegex(ValueError, "verified fixture desktop"):
+                    notification_probe.start(r"C:\fixture\probe.exe", [], cwd=r"C:\fixture", env=env, stream=None,
+                                             desktop=desktop, primary=True)
+            kernel.assert_not_called()
+
     def test_independent_rows_and_selective_removal_replay(self):
         with TemporaryDirectory() as tmp:
             directory = Path(tmp)
