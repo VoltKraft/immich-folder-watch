@@ -51,6 +51,41 @@ def remove_ledger_image(api, exe, original, timeout=10):
 
 
 class RecorderTests(unittest.TestCase):
+    def test_failed_search_for_a_second_receiver_cannot_identify_a_unique_window(self):
+        find, owner = Mock(side_effect=[73, None]), Mock()
+        with patch.object(native.c, "WinDLL", create=True), patch.object(native, "bind", side_effect=[find, owner]), \
+             patch.object(native.c, "set_last_error", create=True) as clear, \
+             patch.object(native.c, "get_last_error", return_value=1400, create=True), self.assertRaises(OSError) as exc:
+            native.wpf_tray_receiver(27)
+        self.assertEqual(exc.exception.errno, 1400)
+        clear.assert_called_once_with(0)
+        self.assertEqual([args.args[1] for args in find.call_args_list], [None, 73])
+        owner.assert_not_called()
+
+    def test_wpf_tray_lookup_requires_same_live_receiver_and_nonempty_shell_rect(self):
+        api, proc = Mock(), Mock(pid=27)
+        api.process_identity.return_value = 789
+        receiver = (73, 8)
+        for after, exit_code, raw, expected in (
+                (receiver, None, {"hresult": 0, "rect": [1, 2, 3, 4]}, "rectangle-returned"),
+                (receiver, None, {"hresult": -2147467259, "rect": None}, "no-rectangle"),
+                (receiver, None, {"hresult": 0, "rect": [2, 2, 2, 8]}, "no-rectangle"),
+                ((73, 9), None, {"hresult": 0, "rect": [1, 2, 3, 4]}, "receiver-changed"),
+                (receiver, 0, {"hresult": 0, "rect": [1, 2, 3, 4]}, "receiver-changed")):
+            with self.subTest(expected=expected, raw=raw, exit_code=exit_code):
+                api.clock.side_effect = [36, 41]
+                proc.poll.side_effect = [None, exit_code]
+                with patch.object(native, "wpf_tray_receiver", side_effect=[receiver, after]), \
+                     patch.object(native, "shell_icon_rect", return_value=raw) as query:
+                    result = native.observe_wpf_tray(api, proc, 6)
+                query.assert_called_once_with(73, 1)
+                self.assertEqual((result["status"], result["query"], result["queryStartQpc"], result["queryEndQpc"]),
+                                 (expected, raw, 36, 41))
+        proc.poll.side_effect = [None]
+        with patch.object(native, "wpf_tray_receiver", return_value=None), patch.object(native, "shell_icon_rect") as query:
+            self.assertEqual(native.observe_wpf_tray(api, proc, 6)["status"], "receiver-unavailable")
+            query.assert_not_called()
+
     def test_three_trials_and_fixed_budgets(self):
         rows = [{"metrics": {"startup_ms": v, "visible_cpu_one_core_pct": 2.0, "hidden_present_per_second": 0.0,
                              "visible_working_set_mib": 130}} for v in (80, 100, 1000)]

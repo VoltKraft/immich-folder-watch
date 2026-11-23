@@ -12,6 +12,7 @@ import sys
 import observe as launcher
 import tray_retry
 from observe import CleanupUnconfirmed, bind, check, ordinary_console, recorder
+from native import shell_icon_rect
 from window_readback import RECEIVER_CLASS, monitor_work_area, visible_surface
 
 PROVIDER = launcher.HERE / "tray_provider.ps1"
@@ -30,17 +31,8 @@ class Unavailable(Exception):
     """The desktop or Shell could not expose the requested native observation."""
 
 
-class IconIdentifier(c.Structure):
-    _fields_ = [("size", w.DWORD), ("owner", w.HWND), ("id", w.UINT), ("guid", c.c_uint32 * 4)]
-
-
 def shell_rect(hwnd):
-    if c.sizeof(IconIdentifier) != 40:
-        raise ValueError("Expected the native 64-bit NOTIFYICONIDENTIFIER layout")
-    get_rect = bind(c.WinDLL("shell32"), "Shell_NotifyIconGetRect", w.LONG, c.POINTER(IconIdentifier), c.POINTER(w.RECT))
-    key, bounds = IconIdentifier(size=40, owner=hwnd, id=23), w.RECT()
-    hr = get_rect(c.byref(key), c.byref(bounds))
-    return dict(hresult=hr, rect=None if hr != 0 else [bounds.left, bounds.top, bounds.right, bounds.bottom])
+    return shell_icon_rect(hwnd, 23)
 
 
 def records(log, name):

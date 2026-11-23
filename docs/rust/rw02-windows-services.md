@@ -505,3 +505,23 @@ per architecture matched during independent readback. The combined launcher
 and Shell readback SHA-256 is
 `711da3aa0f4dd89519a34f3cb9de8c98f6600ab8e54b99ee97adb73807cbdf85`.
 [x64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806170882) · [ARM64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805618878).
+
+## Shipping WPF tray lookup
+
+The shipping WPF application creates a message-only window named
+`ImmichFolderWatchTrayReceiver` and registers numeric icon ID 1. Its registration
+uses the window and ID. After each WPF idle trial has finished timing and
+stopped its ETW trace, the observer searches only the message-only windows
+with that name. It requires a unique receiver owned by the original live WPF
+process, queries its Shell rectangle with a zero GUID and checks the receiver,
+thread and process again. The raw HRESULT, rectangle and both QPC ticks appear
+in `trials.wpf[].controls.shippingTrayLookup` in the Windows performance report.
+[Shipping receiver](../../src/ImmichFolderWatch.App/Services/TrayIconHost.cs) · [Observer](../../tools/rust-qa/windows-performance/native.py) · [Window lookup](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-findwindowexw) · [Shell identifier](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-notifyiconidentifier).
+
+This comparison asks whether the Shell on the original desktop of the same
+hosted runner can locate the shipping application's icon. A stable receiver,
+`S_OK` and a positive-area
+rectangle establish that result. The Shell add return value belongs to the
+WPF process and the source records no return receipt. Visible presentation,
+pointer activation and focus each require their own observations.
+[Rectangle result](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyicongetrect).

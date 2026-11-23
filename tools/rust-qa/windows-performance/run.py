@@ -17,7 +17,7 @@ import uuid
 
 from build import HERE, ROOT, build, pe_machine, sha, write
 from metrics import IDLE_SECONDS, SETTLE_SECONDS, SWITCHES, TRIALS, budgets, comparison, p95, summarize
-from native import (CleanupUnconfirmed, Win32, checked, finish_owned_trace, hosted, owned_directory,
+from native import (CleanupUnconfirmed, Win32, checked, finish_owned_trace, hosted, observe_wpf_tray, owned_directory,
                     pin_path, sid, start_owned_subject, wpf_profile)
 
 sys.path.insert(0, str(HERE.parent / "windows-inventory"))
@@ -239,6 +239,11 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                                                for name in ("show", "hide")}
         result["controls"]["successfulVisibilityCycles"] = SWITCHES
         result["controls"]["wholeProcessTree"] = tree.records
+        if not rust:
+            try:
+                result["controls"]["shippingTrayLookup"] = observe_wpf_tray(api, proc, handle)
+            except (OSError, ValueError) as exc:
+                result["controls"]["shippingTrayLookup"] = dict(status="unavailable", reason=str(exc))
         stop_subject(proc, rust)
         result["termination"] = {"method": "control-Q" if rust else "owned process terminated after sampling",
                                  "exitCode": proc.returncode}

@@ -23,6 +23,54 @@ def checked(value):
     return value
 
 
+class IconIdentifier(c.Structure):
+    _fields_ = [("size", w.DWORD), ("owner", w.HWND), ("id", w.UINT), ("guid", c.c_uint32 * 4)]
+
+
+def shell_icon_rect(hwnd, icon_id):
+    size = c.sizeof(IconIdentifier)
+    if size != 40:
+        raise ValueError("Expected the native 64-bit NOTIFYICONIDENTIFIER layout")
+    get_rect = bind(c.WinDLL("shell32"), "Shell_NotifyIconGetRect", w.LONG, c.POINTER(IconIdentifier), c.POINTER(w.RECT))
+    key, bounds = IconIdentifier(size=size, owner=hwnd, id=icon_id), w.RECT()
+    hr = get_rect(c.byref(key), c.byref(bounds))
+    return dict(hresult=hr, rect=[bounds.left, bounds.top, bounds.right, bounds.bottom] if hr == 0 else None)
+
+
+def wpf_tray_receiver(pid):
+    user = c.WinDLL("user32", use_last_error=True)
+    find = bind(user, "FindWindowExW", w.HWND, w.HWND, w.HWND, w.LPCWSTR, w.LPCWSTR)
+    owner = bind(user, "GetWindowThreadProcessId", w.DWORD, w.HWND, c.POINTER(w.DWORD))
+    parent, title = c.c_void_p(-3), "ImmichFolderWatchTrayReceiver"
+    hwnd = find(parent, None, None, title)
+    if not hwnd:
+        return None
+    c.set_last_error(0)
+    if find(parent, hwnd, None, title):
+        return None
+    if error := c.get_last_error():
+        raise OSError(error, "FindWindowExW could not complete the WPF receiver lookup")
+    actual = w.DWORD()
+    tid = owner(hwnd, c.byref(actual))
+    return (hwnd, tid) if tid and actual.value == pid else None
+
+
+def observe_wpf_tray(api, proc, handle):
+    # The WPF executable and original process handle are pinned throughout the trial.
+    record = dict(pid=proc.pid, processCreation=api.process_identity(handle), iconId=1)
+    if proc.poll() is not None or not (receiver := wpf_tray_receiver(proc.pid)):
+        return dict(record, status="receiver-unavailable")
+    hwnd, tid = receiver
+    start = api.clock()
+    result = shell_icon_rect(hwnd, record["iconId"])
+    record.update(hwnd=hex(hwnd), tid=tid, queryStartQpc=start, queryEndQpc=api.clock(), query=result)
+    if proc.poll() is not None or wpf_tray_receiver(proc.pid) != receiver:
+        return dict(record, status="receiver-changed")
+    bounds = result["rect"]
+    returned = bounds is not None and bounds[0] < bounds[2] and bounds[1] < bounds[3]
+    return dict(record, status="rectangle-returned" if returned else "no-rectangle")
+
+
 def known_folder(guid):
     shell = c.OleDLL("shell32")
     get = bind(shell, "SHGetKnownFolderPath", w.LONG, c.c_void_p, w.DWORD, w.HANDLE, c.POINTER(c.c_void_p))
