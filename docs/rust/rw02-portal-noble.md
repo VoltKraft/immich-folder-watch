@@ -359,6 +359,37 @@ The `amd64-w9i6r7vr` result SHA-256 is
 `7f7be799c7cf3163fc2634ff17d0350715a706fe7fd64d143318da30a5af59dd`.
 [Original native x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14863376245).
 
+### Walking the album through the reader's original grant
+
+Noble's Documents implementation queues invalidation of a physical
+directory entry after a successful lookup. An open descriptor can retain
+the same directory while procfs displays its former name with
+` (deleted)` appended. The x64 trace above shows the label changing
+between two observations. Linux resolves an open through a numeric procfs
+descriptor using the file's held mount and directory entry.
+[Ubuntu source package and patch inputs](../../tools/rust-qa/portal-noble/inputs.py)
+· [Linux procfs descriptor lookup](https://github.com/torvalds/linux/blob/v7.0/fs/proc/fd.c#L165-L184).
+
+The observer first identifies one uniquely named, open directory for
+each role in the waiting Rust process. Before each read and after the
+last read it opens the named grant in that process's mount namespace and
+opens `album` relative to it with `O_NOFOLLOW`. It compares the directory
+types, devices, inode numbers and mount IDs to the reader's original
+descriptors. It checks descriptor numbers, flags and names again in the
+original slots and the process's descriptor list.
+
+If an original slot shows its exact former name and the kernel suffix,
+the observer looks up the original document ID and verifies the backing
+directory and both permissions of the test app. It then opens the
+reader's original grant through the bound numeric procfs descriptor and
+walks to `album` from there. Both directories must match the independently
+opened named pair including their mount IDs. The receipt retains the
+observed labels, permissions and both walks. A mismatched or ambiguous
+descriptor, denied grant or different child stops the request. The actual
+Rust read still runs through the two handles it opened at startup.
+[Observer](../../tools/rust-qa/portal-noble/observe.py)
+· [Regression checks](../../tools/rust-qa/portal-noble/test_descriptors.py).
+
 ## Meson on the Ubuntu runners
 
 Both Ubuntu architectures in workflow run `44950398558` authenticated the Documents package and stopped at the first Meson invocation. The x64 build added 32 signed development packages and ARM64 added 31. Both installed Meson `1.3.2-1ubuntu1` into the private development layer and used the runner's existing Python. Their error logs have the same SHA-256, `9b2f75b0451e1d2ae46a0fb887ef10734a2343943284bd5a6f22f86e59405a17`. Neither job reached the lock measurements. [Hosted assessment](https://github.com/voltkraft/immich-folder-watch/actions/runs/44950398558).

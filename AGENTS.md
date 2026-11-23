@@ -195,6 +195,8 @@ to reconcile project decisions, defaults, and recorded state.
   when changing the candidate desktop profile.
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  For a detached FUSE name, check the current grant and follow the
+  [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
   Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)
   for host-package installation and rollback feasibility. Archive the stock,
   patched and restored service observations from the same guest.

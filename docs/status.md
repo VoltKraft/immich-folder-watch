@@ -12,6 +12,14 @@ survived. The x64 guest's independent installed-package comparison passed.
 [Desktop times and original archives](rust/rw02-native-gui.md#ubuntu-native-results-at-6084b23)
 · [Descriptor observations](rust/rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
 
+The revised observer opened the relative album through the Rust reader's
+original grant whenever procfs showed a detached name. A local native x64
+run with Noble userspace on the Fedora kernel completed all 110 operations
+and all three revocations. Independent readback verified the six
+grant-permission replies and original-parent lookups. All 22 fixture tests
+passed, including a change at final enumeration and a replaced album.
+[Handle checks](rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
+
 ## Windows x64 visible frame and visibility observer (2026-11-23)
 
 The extra instrumented build passed a Linux-hosted compiler check for

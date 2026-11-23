@@ -46,16 +46,22 @@ def retry_peer(pid, proc, expected_image):
         os.close(handle)
 
 
-def fd_sample(peer, number, paths):
+def link_label(fd, paths):
+    target = os.readlink(fd)
+    for role, path in paths.items():
+        if target == str(path):
+            return role
+        if target == str(path) + " (deleted)":
+            return role + "-deleted"
+    return "other"
+
+
+def fd_sample(peer, number, paths, label=None):
     """Read metadata for a selected descriptor. Never persist an unknown link target."""
     fd = peer / "fd" / str(number)
     row = {"fd": number}
     try:
-        target = os.readlink(fd)
-        row["link"] = next((role for role, path in paths.items() if target == str(path)), "other")
-        if row["link"] == "other":
-            row["link"] = next((role + "-deleted" for role, path in paths.items()
-                                if target == str(path) + " (deleted)"), "other")
+        row["link"] = link_label(fd, paths) if label is None else label
     except OSError as error:
         row["linkErrno"] = error.errno
     try:
@@ -84,21 +90,24 @@ def original_fds(peer, paths, before):
     return {role: fd_sample(peer, before[str(path)]["fd"], paths) for role, path in paths.items()}
 
 
-def named_fds(peer, paths, evidence):
-    """Preserve the original exact link, flags and uniqueness checks for both directories."""
-    known = {str(path): role for role, path in paths.items()}
+def named_fds(peer, paths, evidence, before=None):
+    """Find both unique directories, including previously identified slots whose dentries were dropped."""
+    slots = {} if before is None else {before[str(path)]["fd"]: role for role, path in paths.items()}
     rows = evidence["named"] = {role: [] for role in paths}
     for fd in (peer / "fd").iterdir():
-        role = known.get(os.readlink(fd))
-        if role:
-            rows[role].append(fd_sample(peer, int(fd.name), paths))
+        number = int(fd.name)
+        label = link_label(fd, paths)
+        role = slots.get(number, label.removesuffix("-deleted"))
+        if role in paths:
+            rows[role].append(fd_sample(peer, number, paths, label))
     if any(len(items) != 1 for items in rows.values()):
         raise ValueError("The Rust reader did not retain both authorized directories unambiguously")
     required = os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     found = {}
     for role, (row,) in rows.items():
         flags = int(row.get("flags", "0"), 8)
-        if (row.get("link") != role or row.get("fileType") != "directory" or flags & required != required
+        allowed_labels = (role,) if before is None else (role, role + "-deleted")
+        if (row.get("link") not in allowed_labels or row.get("fileType") != "directory" or flags & required != required
                 or flags & os.O_ACCMODE != os.O_RDONLY):
             raise ValueError("The retained directory descriptor is missing or has unexpected flags")
         identity = {key: row[key] for key in ("fd", "device", "inode", "flags")}
@@ -118,48 +127,79 @@ def document_info(lookup):
         return dict(errorType=type(error).__name__, code=getattr(error, "code", None))
 
 
-def check_slots(current, paths, before, initial=False):
-    detached = False
+def check_slots(current, paths, before, lookup, evidence, phase):
+    detached = []
     for role, path in paths.items():
         row, original = current[role], before[str(path)]
-        named = row.get("link") == role
-        retired_name = row.get("link") == role + "-deleted"
-        if (not (named or (initial and retired_name)) or row.get("fileType") != "directory"
-                or any(row.get(key) != value for key, value in original.items())):
+        if row.get("link") == role + "-deleted":
+            detached.append(role)
+        elif row.get("link") != role:
             raise ValueError("The original authorized directory descriptor changed before a retry or final check")
-        detached = detached or retired_name
-    return detached
+        if row.get("fileType") != "directory" or any(row.get(key) != value for key, value in original.items()):
+            raise ValueError("The original authorized directory descriptor changed before a retry or final check")
+    if detached:
+        if any(not original.get("mountId") for original in before.values()):
+            raise ValueError("Detached grant observations require both original mount IDs")
+        permission = evidence["documentInfo"] = document_info(lookup)
+        evidence.setdefault("detachedGrantChecks", {})[phase] = dict(roles=detached, permission=permission)
+        if permission != {"expectedBacking": True, "read": True, "write": True}:
+            raise ValueError("Could not confirm the original document and test application's grant")
+
+
+def directory_pair(holders, root, root_flags, evidence, paths, expected=None):
+    """Hold the root and its relative child. Record identities in the mount namespace of the opened path."""
+    child_flags = os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    parent = None
+    for role, name, flags in (("grant", root, root_flags), ("album", "album", child_flags)):
+        fd = os.open(name, flags, dir_fd=parent)
+        holders.callback(os.close, fd)
+        item = os.fstat(fd)
+        row = evidence[role] = dict(typeBits=stat.S_IFMT(item.st_mode), device=item.st_dev, inode=item.st_ino)
+        mount = re.search(r"^mnt_id:\s+([0-9]+)$", Path(f"/proc/self/fdinfo/{fd}").read_text(), re.M)
+        if mount:
+            row["mountId"] = int(mount[1])
+        if expected is not None:
+            check_directory(row, expected[str(paths[role])])
+        parent = fd
+
+
+def check_directory(opened, original):
+    keys = ("device", "inode", "mountId") if "mountId" in original else ("device", "inode")
+    if opened["typeBits"] != stat.S_IFDIR or any(opened.get(k) != original[k] for k in keys):
+        raise ValueError("The named grant or album differs from the retained directory")
 
 
 def retained_fds(peer, paths, evidence, before=None, lookup=None):
     if before is not None:
         initial = evidence["originals"] = original_fds(peer, paths, before)
-        if check_slots(initial, paths, before, initial=True):
-            permission = evidence["documentInfo"] = document_info(lookup)
-            if permission != {"expectedBacking": True, "read": True, "write": True}:
-                raise ValueError("Could not confirm the original document and test application's grant")
+        check_slots(initial, paths, before, lookup, evidence, "initial")
 
-    # Keep both currently named directories open while checking the reader's own descriptors.
-    flags = os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
-    opened = evidence["namedDirectories"] = {}
     with ExitStack() as holders:
-        root_fd = os.open(paths["grant"], flags)
-        holders.callback(os.close, root_fd)
-        album_fd = os.open("album", flags, dir_fd=root_fd)
-        holders.callback(os.close, album_fd)
-        for role, fd in (("grant", root_fd), ("album", album_fd)):
-            item = os.fstat(fd)
-            opened[role] = dict(typeBits=stat.S_IFMT(item.st_mode), device=item.st_dev, inode=item.st_ino)
+        # The reader is in its own mount namespace. Its root magic link resolves the
+        # same authorized path there, so the mount IDs can be compared directly.
+        named = evidence["namedDirectories"] = {}
+        root = peer / "root" / paths["grant"].relative_to("/")
+        directory_pair(holders, root, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                       named, paths, before)
         if before is not None:
             confirmed = evidence["confirmedOriginals"] = original_fds(peer, paths, before)
-            check_slots(confirmed, paths, before)
-        current = named_fds(peer, paths, evidence)
-        for role, path in paths.items():
-            visible, retained = opened[role], current[str(path)]
-            if visible["typeBits"] != stat.S_IFDIR or any(visible[k] != retained[k] for k in ("device", "inode")):
-                raise ValueError("The named grant or album differs from the retained directory")
-        if before is not None and current != before:
-            raise ValueError("The retry peer's original directory descriptors changed")
+            check_slots(confirmed, paths, before, lookup, evidence, "confirmed")
+        current = named_fds(peer, paths, evidence, before)
+        if before is None:
+            for role, path in paths.items():
+                check_directory(named[role], current[str(path)])
+        else:
+            enumerated = {role: rows[0] for role, rows in evidence["named"].items()}
+            check_slots(enumerated, paths, before, lookup, evidence, "enumerated")
+            if current != before:
+                raise ValueError("The retry peer's original directory descriptors changed")
+        if "detachedGrantChecks" in evidence:
+            # Follow only the bound process's original numeric FD via procfs.
+            # Resolve the album again through that held object even if FUSE has
+            # invalidated its name. The Rust child continues using its own FDs.
+            original_root = peer / "fd" / str(before[str(paths["grant"])]["fd"])
+            directory_pair(holders, original_root, os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC,
+                           evidence.setdefault("throughOriginalGrant", {}), paths, before)
         return current
 
 
