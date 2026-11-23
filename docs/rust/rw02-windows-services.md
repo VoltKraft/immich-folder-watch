@@ -313,6 +313,32 @@ reported quiet time early. x64 registered and received one balloon-show
 callback. ARM64 refused registration. The independent readback has SHA-256
 `959a289ba23d6ffb08ec0340037e54e663ed5429bd221206bdaa82c1e2c66f01`.
 
+### Late notification at 6af7100
+
+The corrected fixture reached the single notification trial on both original
+desktops in unlocked session 2. On x64 the early state was quiet time (6)
+and the late state was accepts notifications (5). Explorer accepted the
+version-4 icon and the silent request. The receiver counted one show and
+two timeout callbacks. The independent observer sampled one known Shell root
+80 times with zero provider errors. It never identified the unique title
+and body together. On ARM64 the late state was app (7). Explorer declined
+the icon registration with `0x80004005`, so the fixture issued no request.
+Its 90 samples covered two known roots and recorded zero provider errors.
+The reported policy state does not identify the cause of the registration
+failure. [State definitions](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state).
+
+Both subjects exited with zero, the observers exited with their unavailable
+status, all process jobs drained and the profiles were removed. The two
+small archives matched their copies inside the full desktop ZIPs, the early
+receipts, and 37 source files per target after Windows checkout conversion.
+The x64 and ARM64 result SHA-256 values are
+`95e394f6e6c2e325580d6ec157f098cc12c29e9390b71f18c5cea6ad32c7cea2` and
+`d8966b54f09d475a924ebe2a542bea041bf2b56e7952782a23fd6e1cc11c1305`.
+At this revision the observer checked its baseline before release and began
+repeated sampling after the synchronous Shell request returned. A
+presentation during the call remains unobserved.
+[x64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14808178866) · [ARM64 notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14807909745).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
@@ -467,3 +493,15 @@ scenarios on private desktops without a Shell passed on both architectures.
 All 19 observer input hashes in each canonical archive matched the source
 revision with Windows checkout line endings.
 [ARM64 integrated GUI receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804324249).
+
+The retained GUI also tested hidden startup and reopening after a close.
+On x64 both version-4 registrations returned the same taskbar rectangle.
+Both independent observers read `eeeeee`, found zero matches for all four
+overflow-button names and recorded no icon invocation. The GUI deleted
+both registrations at Quit. On ARM64, both initial registrations and their
+four retries failed. All four GUI processes drained, and both private
+shell-less scenarios passed. The archived logs and 34 distinct source hashes
+per architecture matched during independent readback. The combined launcher
+and Shell readback SHA-256 is
+`711da3aa0f4dd89519a34f3cb9de8c98f6600ab8e54b99ee97adb73807cbdf85`.
+[x64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806170882) · [ARM64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805618878).

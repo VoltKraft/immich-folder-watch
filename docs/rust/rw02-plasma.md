@@ -45,6 +45,15 @@ and the independent readback `24a65cb2bea2f7ad609d5d226067973f77e8f4058f7220baf2
 The 21 original panel files are under `plasma/runs/plasma-yb6be126/` in
 that archive.
 
+Ubuntu x64 repeated the two panel clicks in the same run. D-Bus serials
+248 and 250 carried the click at (163, 878). KWin mapped the same
+`0x1a00002` window each time. Two native closes hid the window, Quit drained
+after 11 UI passes, and the watcher removed the item. The original panel
+result SHA-256 is `2f5821b945108573fe5467a5c0215b192b9c13778b3ffe1389c421c797e5c673`.
+Independent image, executable and library readback produced SHA-256
+`7ed39ec64ce3eee3a4b3be11bc98ffa8a4b405c1678b4a7ebd731e54569d715a`.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806677718).
+
 ## The visible tray entry
 
 The original Rust GUI registered `org.example.IfwGuiProbe/StatusNotifierItem`.

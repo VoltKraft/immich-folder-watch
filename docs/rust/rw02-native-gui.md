@@ -538,6 +538,44 @@ Explorer notification area and late notification have separate observations.
 · [Launcher and worker lifetime](rw02-instance.md#native-windows-launcher-at-1e58541)
 · [Shell and notification](rw02-windows-services.md#late-notification-on-the-original-desktop).
 
+## Native follow-up at 6af7100
+
+Both Ubuntu desktop jobs passed. Each ran three scans of 100,000 files per
+executable and stayed within all eleven same-host X11 resource limits.
+The x64 Rust GUI reopened at 0.96 ms p95 during the scan and closed at
+10.47 ms, against limits of 16.05 and 15.51 ms. On ARM64 the corresponding
+values were 0.91 and 0.39 ms, against 16.61 and 15.56 ms. Both observed
+zero idle CPU use and zero render passes in the shown and hidden intervals.
+Each Plasma panel delivered two pointer activations to the Rust item and
+reopened the same window. The X11 and Wayland reader, IME and rendering
+receipts and the sixteen loopback transport cases also passed per host.
+The combined independent Ubuntu readback SHA-256 is
+`bd4288561321d8778f205ce104210dbfa01cb5394f5fc63854b1e18d0ac2fefb`.
+[x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806677718) · [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805991978) · [Plasma clicks](rw02-plasma.md#native-ubuntu-arm64-panel-at-6af7100).
+
+Both Ubuntu compiler-input and notice archives reproduced byte-for-byte from
+their respective hosted Cargo streams. The x64 notice contains 1,799 members
+and the SPDX file lists 446 packages. ARM64 has 1,796 members and 445
+packages. Both SPDX documents have 1,063 relationships. Their SHA-256 values
+are `4a9edf1b0ec7ef8acfcf79131e062967252331da0cf2a86f62fc2ac263364907`
+and `19e32179cbc72cc75e9eb46c3b4db3ac9b2e0acd30b64cf66d658c341a22c260`
+respectively. The inventories cover development builds.
+[x64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806961907) · [ARM64 notices](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804823806).
+
+The ordinary Windows second launch reopened the GUI on both hosts. The x64
+host confirmed foreground and keyboard focus. On ARM64 the window stayed in
+the background after the secondary granted foreground permission. Original
+and private Explorer observations describe each Shell operation separately.
+[Native launcher](rw02-instance.md#native-windows-launcher-at-6af7100) · [Explorer](rw02-windows-services.md#original-and-private-explorer-at-6af7100).
+
+Both Windows desktop jobs failed. The retained ARM64 GUI met all eleven
+WPF-derived performance limits. x64 exceeded idle close, scan close and
+scan reopen in all three trials. Windows x64 accepted a notification and
+delivered a show callback. Its independent observer never saw the unique
+title and body. The ARM64 Shell declined the initial icon registration.
+Both Windows notice archives and SPDX documents reproduced offline.
+[Retained measurements](rw02-windows-window.md#native-retained-window-results-at-6af7100) · [Four native notice results](rw02-combined-notices.md#native-notices-at-6af7100).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

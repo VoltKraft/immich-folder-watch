@@ -373,5 +373,59 @@ window and its native events. The completed primary log distinguishes a show
 that returns after the external observer first sees the HWND. Attribution
 requires a positive match for the relevant transition. The separate three-trial comparison
 uses the same binary, WPF budget calculation and 100,000-file workload with
-launcher diagnostics disabled. Native Windows results for this change are
-pending. [Launcher source binding](../../tools/rust-qa/windows-launcher/retained_subject.py) · [Window and focus observations](../../tools/rust-qa/windows-launcher/retained_window.py).
+launcher diagnostics disabled. At `6af7100` the ordinary launcher on each
+architecture observed the shortcut on both hide and show, on its original
+and private desktops. Each pair retained its worker and first DX12 renderer.
+The x64 original desktop confirmed foreground and keyboard focus on the
+first sample. On ARM64 all 41 samples over 2,020 ms found the retained
+window visible in the background.
+[x64 activation](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806170882) · [ARM64 activation](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805618878) · [Window and focus observations](../../tools/rust-qa/windows-launcher/retained_window.py).
+
+## Native retained-window results at 6af7100
+
+The uninstrumented Mailbox executable met eight of eleven WPF-derived
+limits on x64 and all eleven on ARM64. The three x64 misses occurred in
+each of the three trials. The table gives the median of trial p95 values
+in milliseconds, followed by the maximum set by that host's WPF trials.
+
+| Target | Idle close | Scan close | Scan reopen | Raw readback SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809775806) | 26.561 / 14.571 | 35.398 / 30.582 | 35.614 / 22.003 | `618ac826060e28f30a5922c3a7afc7d136d61bbc97a652bbf8eaa468b9999c2a` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809461061) | 2.813 / 13.262 | 4.755 / 14.178 | 4.735 / 15.208 | `26d6633456696f2cd8cc4a760be054b53c49dc2a9f46c40146dcafc0b7b8585c` |
+
+Independent replay verified 12 window controls, 15 complete two-pass
+inventories over 100,000 files, nine DXGI traces and the native Cargo
+stream on each host. In the regular x64 dispatch trace, visible redraw
+occupied at least half the time to the close callback in 82 of 83 slow
+closes. The native show call occupied at least half the external response
+in 130 of 131 slow reopens. The response preceded the focus call in 540
+of 585 reopens. The focus call overlapped slow reopens by at most 0.199 ms.
+The corrected root and single-wake modes recorded zero presentations in
+585 and 532 hidden intervals on x64. The original-paint control recorded
+451 presentations in 225 intervals. ARM64 recorded zero in all three modes.
+The diagnostic timings and the uninstrumented budget measurements came
+from separate trials of the same retained binary on each host.
+
+## Renderer comparison with iced 0.14.0
+
+At iced revision `3997291f318a8bc06fa522f5579836fb3feb94df`, the
+application can keep a window alive on close and change its mode between
+hidden and windowed. The backend calls winit's `set_visible`. Its locked
+winit 0.30.12 has byte-identical Win32 `window.rs` and `window_state.rs`
+to the published 0.30.13 used by the eframe control. The software rendering
+paths do differ. iced's tiny-skia 0.11.4 uses softbuffer 0.4.6 to present
+a DIB through GDI `BitBlt`. The existing Windows recorder measures DXGI
+and D3D9. A software-path timing comparison requires independent evidence
+of changing visible pixels and live inventory work on the same host.
+[iced window dispatch](https://github.com/iced-rs/iced/blob/3997291f318a8bc06fa522f5579836fb3feb94df/winit/src/lib.rs#L1562-L1570) · [Pinned graph](https://github.com/iced-rs/iced/blob/3997291f318a8bc06fa522f5579836fb3feb94df/Cargo.lock) · [GDI presentation](https://github.com/rust-windowing/softbuffer/blob/ad3bd6d2f930391e5840752a0f4514874821d5ea/src/backends/win32.rs#L174-L201).
+
+The comparison inspected 274 application, shell, widget and renderer
+sources and manifests and found no native accessibility provider for
+the tested NVDA and Orca flows. Upstream tracks AccessKit integration.
+The graphics crate always embeds the 5,700-byte `Iced-Icons.ttf`
+(SHA-256 `2289860dbd2201295bf451deb155561abf4b1fb06899d6f1f81eb294bfebb7ec`).
+The font names the original Fontello authors and lacks a license statement
+in its name table. Its glyph provenance needs resolution before adoption.
+Seven published source archives matched the Cargo index. Native iced
+performance and reader behavior remain unmeasured.
+[Accessibility issue](https://github.com/iced-rs/iced/issues/552) · [Embedded fonts](https://github.com/iced-rs/iced/blob/3997291f318a8bc06fa522f5579836fb3feb94df/graphics/src/text.rs#L110-L129) · [First icon font revision](https://github.com/iced-rs/iced/commit/2c8ba652a7929ac6c2af28ac60a8bd4b8e8e2f10).

@@ -42,6 +42,22 @@ GitHub's default CodeQL jobs analyzed Actions, C#, JavaScript/TypeScript
 and Python. The four native desktop jobs run separately.
 [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662890) · [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144674806) · [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858).
 
+Both Ubuntu desktops passed all eleven same-host budgets and two pointer
+activations through the running Plasma panel. Their offline compiler
+receipts, notices and SPDX reports reproduced exactly. The retained Windows
+x64 launcher obtained keyboard focus. The ARM64 HWND remained in the
+background for 41 samples despite a successful handoff grant.
+[Desktop measurements and archives](rust/rw02-native-gui.md#native-follow-up-at-6af7100) · [Windows visibility](rust/rw02-windows-window.md#testing-visibility-changes-without-resetting-the-window-frame).
+
+Both Windows desktop jobs finished with failures. ARM64 met all eleven
+retained-window resource limits. On x64 the p95 values for idle close,
+scan close and scan reopen were 26.561, 35.398 and 35.614 ms against
+14.571, 30.582 and 22.003 ms. The original x64 Shell accepted a late
+notification and returned a show callback. Independent title/body
+presentation is still unconfirmed on either host. All four compiler
+receipts, notice archives and SPDX documents reproduced offline.
+[Windows timings](rust/rw02-windows-window.md#native-retained-window-results-at-6af7100) · [Four-target notices](rust/rw02-combined-notices.md#native-notices-at-6af7100).
+
 The canonical Windows launcher reopened on both original desktops. x64
 obtained foreground immediately. On ARM64, Windows declined the granted
 handoff and the window remained visible in the background for 2,044 ms.

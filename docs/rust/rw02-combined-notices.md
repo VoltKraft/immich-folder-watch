@@ -203,6 +203,21 @@ Per-target `notice-rebuild/<target>/result.json` under the local
 `artifacts/rust/hosted-desktop-storage/45083264235/` directory binds all
 three published artifact IDs and digests to the reconstructed SPDX bytes.
 
+## Native notices at 6af7100
+
+Independent offline reconstruction reproduced each target's native input
+ZIP, notice ZIP and SPDX document byte-for-byte. All four passed seven
+notice controls, six SPDX controls and the SPDX 2.3.1 schema. The notice
+archives include five fonts on each target and 101 protocol XML files on
+each Linux target. These results describe the combined development builds.
+
+| Target | Native input | Notices | Members | SPDX packages / relationships | SPDX SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| Linux x64 | [14806832359](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806832359) | [14806961907](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806961907) | 1,799 | 446 / 1,063 | `4a9edf1b0ec7ef8acfcf79131e062967252331da0cf2a86f62fc2ac263364907` |
+| Linux ARM64 | [14806036721](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806036721) | [14804823806](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14804823806) | 1,796 | 445 / 1,063 | `19e32179cbc72cc75e9eb46c3b4db3ac9b2e0acd30b64cf66d658c341a22c260` |
+| Windows x64 | [14810355463](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14810355463) | [14808782930](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14808782930) | 1,517 | 258 / 615 | `dfb6004d948f6698395143dfb276739ac352610f40f116eb6cb004aaa1254cf9` |
+| Windows ARM64 | [14809111619](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809111619) | [14809321300](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14809321300) | 1,514 | 257 / 614 | `2d170d9f3fce7f17741ad811b0bb9ac2408597eeb185764568e2a4b4e719bb22` |
+
 ## Superseded initial notice ZIPs
 
 The first generator used the named files present in the original native
