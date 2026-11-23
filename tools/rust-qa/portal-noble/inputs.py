@@ -1,9 +1,11 @@
 """Acquire the fixed Ubuntu source package and authenticate the native distro control."""
 import concurrent.futures
 import hashlib
+from http.client import RemoteDisconnected
 import os
 from pathlib import Path
 import tempfile
+import time
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -26,6 +28,7 @@ ORIGINALS = {
 }
 KEYRING = "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31"
 SIGNER = "F6ECB3762474EDA9D21B7022871920D1991BC93C"
+CONNECTION_ATTEMPTS = 3
 
 
 def sha(path):
@@ -38,14 +41,23 @@ def fetch(url, path, digest, download, max_bytes=16_000_000):
         return path
     if path.exists() or path.is_symlink() or not download:
         raise ValueError(f"Missing or changed checked input {path.name}")
-    with tempfile.NamedTemporaryFile(dir=path.parent) as temp:
-        with urllib.request.urlopen(url, timeout=60) as data:
-            if urlsplit(data.geturl()).hostname != urlsplit(url).hostname:
-                raise ValueError("Unexpected Ubuntu archive redirect")
-            while chunk := data.read(262144):
-                if temp.tell() + len(chunk) > max_bytes:
-                    raise ValueError("Oversize archive file")
-                temp.write(chunk)
+    for attempt in range(1, CONNECTION_ATTEMPTS + 1):
+        try:
+            response = urllib.request.urlopen(url, timeout=60)
+            break
+        except RemoteDisconnected as error:
+            if attempt == CONNECTION_ATTEMPTS:
+                raise RemoteDisconnected(
+                    f"Ubuntu closed the connection before sending headers for {path.name} on all {attempt} attempts"
+                ) from error
+            time.sleep(attempt)
+    with response as data, tempfile.NamedTemporaryFile(dir=path.parent) as temp:
+        if urlsplit(data.geturl()).hostname != urlsplit(url).hostname:
+            raise ValueError("Unexpected Ubuntu archive redirect")
+        while chunk := data.read(262144):
+            if temp.tell() + len(chunk) > max_bytes:
+                raise ValueError("Oversize archive file")
+            temp.write(chunk)
         temp.flush()
         if sha(Path(temp.name)) != digest:
             raise ValueError(f"Unexpected Ubuntu input {path.name}")
