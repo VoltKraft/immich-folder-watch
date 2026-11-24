@@ -1,5 +1,20 @@
 # Project Status
 
+## Four native desktop assessments at 21e794f (2026-11-24)
+
+Both Ubuntu desktop jobs passed. The retained Windows ARM64 GUI met all
+eleven WPF limits, and the default Windows x64 GUI met nine. On x64 idle
+close took 33.56 ms against 14.30 ms and scan reopen took 39.38 ms against
+22.26 ms. The recorded frame-latency wait dominated 24 of 25 slow diagnostic
+closes. Synchronous window display dominated 71 of 88 slow diagnostic
+reopens. Both Windows hosts passed the foreground keyboard relaunch. NVDA
+delivered all seven expected cues on x64. ARM64 stopped at the first field.
+The Windows desktop jobs remain failed, including contrast and notification
+presentation. Mixed DPI and RDP still need a suitable test desktop.
+[Original jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661)
+· [Frame and window measurements](rust/rw02-windows-window.md#native-results-at-21e794f)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
 ## Native C# upserts after a Rust insert (2026-11-24)
 
 On Fedora x64 the shipping C# store read and updated the Rust-created

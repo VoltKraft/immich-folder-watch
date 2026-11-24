@@ -538,6 +538,26 @@ removed its shortcut, owned folder and synthetic profile. In the independent
 classic tray trial Explorer declined to add the icon, so the receiver issued
 no balloon request. [WinRT archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963030294) · [Classic notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14961599872).
 
+On x64 the existing per-user namespace allowed both WinRT comparisons.
+The first quiet and ordinary senders used the registered shortcut alone.
+The next pair ran with its separately verified temporary display name.
+Each of the four senders created its notifier 16 times. Every setting
+query returned `0x80070490` before `Show`. Four separate history readers
+found zero entries before and after the two exchanges. All ten process
+jobs emptied. The observer removed the UUID leaf, shortcut, owned folder
+and synthetic profile. The original result SHA-256 is
+`23c1d7d2f64ee14eb6f1a66a4c89192895ad1210e7be83a8f0be07766a72f05e`.
+[Original x64 WinRT archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963453121).
+
+In the separate classic trial the x64 Explorer accepted the icon, version 4
+and balloon request. Receiver HWND 393756 (PID 5520) recorded one show and
+two timeout callbacks. The UI Automation observer sampled 88 times on the
+original Default desktop with zero provider errors and found no exact
+visible title and body. The icon was removed, the receiver closed, both jobs
+emptied and the profile was removed. The result SHA-256 is
+`ef304a5c7d01936a1916d3528f17f5594755adaf0f92bceaeadd466ec0acb412`.
+[Original x64 classic notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963507991).
+
 The revised hosted comparison can create the missing standard container
 in the existing user's Classes hive. The observer records the disposition
 and removes its own temporary identity by handle. Its 63 local service

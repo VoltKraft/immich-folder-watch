@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-6084b23), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-21e794f) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-21e794f), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-21e794f) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -124,6 +124,20 @@ download, upload, deletion and interrupted timestamp repair. Both Windows
 hosts also passed the loopback SMB and FAT recovery checks. All 20 checks
 on the draft PR passed for this revision. The separate desktop assessment
 covers GUI and platform behavior. [Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186668) · [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
+At `21e794f` both Ubuntu desktop jobs passed. Both Windows jobs finished
+with outstanding requirements. A foreground keyboard launch restored the
+existing GUI and its keyboard focus on both Windows hosts. ARM64 met all
+eleven WPF limits in both retained Mailbox profiles. The default x64 profile
+met nine, exceeding idle close and scan reopen. The x64 reader announced
+all seven expected cues. ARM64 timed out at the German filename editor.
+Both contrast supervisors stopped before the first palette change. The
+hosted desktops each supplied one 96-DPI console output. The user currently
+has no Windows evaluation medium or approved VM for mixed-DPI and RDP trials.
+[Windows keyboard](rw02-instance.md#retained-windows-on-the-original-desktop-at-21e794f)
+· [Rendering timings](rw02-windows-window.md#native-results-at-21e794f)
+· [Ubuntu desktops](rw02-native-gui.md#ubuntu-native-results-at-21e794f)
+· [Windows display requirements](rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
 
 At `e796d30` the Ubuntu desktops each met all eleven X11 limits and
 completed all three portal service comparisons. The Windows desktop jobs

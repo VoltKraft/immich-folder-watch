@@ -700,3 +700,23 @@ Rust two-pass inventories, and thirteen retained-window behavior checks.
 The readback SHA-256 is
 `0056ee78d0336735c21a1602d69a68d127d057bb7b03e41b1e2259eca7d3f376`.
 [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675) · [Keyboard and screen-reader observations](rw02-windows-desktop.md#arm64-keyboard-reader-and-input-method-at-21e794f).
+
+On Windows x64, three ordinary one-frame Mailbox trials met nine of eleven
+same-host WPF limits. Idle close took 33.5608 ms against 14.299 ms and
+scan reopen took 39.3771 ms against 22.259 ms. Scan close passed at
+27.4566 ms against 28.449 ms. Both idle intervals had zero presents.
+Two-frame Mailbox also met nine limits and FIFO met eight. The small GDI
+control met all four window-response limits. The independent x64 readback
+SHA-256 is `b88dd1c905ce5044b0be255edbff19c187d1dc675ba3812c1481b852255c9cfd`.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292).
+
+The separate x64 frame diagnostic matched 450 successful DXGI presentations
+to 450 signalled frame-latency waits and observed zero presentations in 298
+hidden intervals. Of 25 over-limit closes, 24 spent at least half their
+response waiting for the DX12 frame-latency handle on the UI thread. Median
+overlap was 30.50 ms in this wait and 0.12 ms in presentation. Of 88
+over-limit reopens, 71 spent at least half their response in the direct
+Win32 `ShowWindow` call and 14 in the frame-latency wait. The median
+overlap with `ShowWindow` was 26.91 ms. The x64 archive SHA-256 is
+`53e2f74827d7653c64b7539c72ceeb67b98d21168d84c53655b456562921df43`.
+[Frame observer and replay](../../tools/rust-qa/windows-frame-cost/README.md).

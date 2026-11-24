@@ -15,8 +15,12 @@ The Japanese Basic Typing trial produced a preedit and committed U+3042
 (`あ`) in the actual filename field. Cleanup restored the original input
 layout and language capabilities. NVDA 2026.3.1 started and remained active
 during its separate trial. The UI Automation driver timed out looking for
-the German filename label and matched none of the seven expected
-announcements. Its process exited normally and its profile was removed.
+the German filename label on the owned HWND 131810 (PID 1556). The driver
+exited 1 before it attempted keyboard input. NVDA matched none of the seven
+expected announcements, quit through its own window, and its profile was
+removed. On a separate private desktop the same ARM64 GUI and input driver
+found the German labels, accepted three masked characters and completed
+the Unicode clipboard round trip without the reader.
 
 The revised input observer records the last number of owned UI Automation
 editors and whether it identified each expected German label. An incomplete
@@ -30,6 +34,25 @@ in a console session. The filename field did not receive focus on that
 display. Mixed DPI and RDP remain unmeasured. The full ARM64 archive SHA-256
 is `70b8bd9527c6f8ac70cb2bfa12fb7a06ba2d429e43a464ecf2304b14738f1698`.
 [Original Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675).
+
+## Windows x64 reader and display at 21e794f
+
+NVDA 2026.3.1 ran with OneCore on the original Default desktop in session 2.
+Across 16 speech-log utterances it announced `Dateiname`, `Kennwort`, one,
+two and three mask characters, `English` and `Filename` in order. The GUI
+held foreground on HWND 1245204 (PID 8936). Ordinary Delete cleared both
+the UI Automation value and document range, and the Unicode filename
+round-tripped through the clipboard. The input driver exited zero, NVDA
+quit through its own window and the temporary profile was removed.
+The reader result SHA-256 is
+`458109939b855e5171e4d2f9e5bc2182a07d2d3624710382ca238db8d3155dcf`.
+
+The canonical and retained GUI each showed the source field frame on
+one 1024 × 768 monitor at 96 DPI. Both native processes drained and
+exited zero. The WTS protocol reported a console. A second monitor with
+different DPI and an RDP session remain unmeasured. The full x64 archive
+SHA-256 is `53e2f74827d7653c64b7539c72ceeb67b98d21168d84c53655b456562921df43`.
+[Original Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292).
 
 ## Native observations
 

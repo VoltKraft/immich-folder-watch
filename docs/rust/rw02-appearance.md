@@ -228,3 +228,16 @@ when a native handle query returns zero. It checks the owner PID before
 querying the window's thread desktop. The 22 portable tests cover these
 failure paths, the successful guard, palette restoration and image readback.
 [Native guard](../../tools/rust-qa/appearance/windows.py) · [Regression checks](../../tools/rust-qa/appearance/test_windows_colors.py).
+
+### Windows x64 before the first capture at 21e794f
+
+The worker reported PID 4132 and HWND 2556372 ready on the selected input
+desktop. The same combined guard as on ARM64 failed before the first
+palette read. The original report leaves the failing predicate unknown.
+While unwinding the publisher also received Win32 error 170 from
+`CloseDesktop` on its own handle. The outer supervisor restored Default
+and closed its own desktop handles. The GUI drained, exited zero and its
+temporary profile was removed. This run produced no theme change or
+rendered contrast samples. Its result SHA-256 is
+`d6b23b36f298715b1e2d4a1b3271283740a3639d3bdbc0ca0e01c6ecfe69fbc0`.
+[Original x64 desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292).
