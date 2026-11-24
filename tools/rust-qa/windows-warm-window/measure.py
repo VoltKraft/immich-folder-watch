@@ -69,6 +69,7 @@ def main(target, variant="mailbox"):
         "fifo": ("measured-fifo", "Fifo", 1),
         "dispatch": ("dispatch", "Mailbox", 1),
         "frame-cost": ("frame-cost", "Mailbox", 1),
+        "deferred-frame": ("deferred-frame", "Mailbox", 1),
         "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
     }[variant]
     out = base / folder
@@ -84,10 +85,17 @@ def main(target, variant="mailbox"):
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
-        if variant == "frame-cost":
+        if variant in ("deferred-frame", "frame-cost"):
             sys.path.insert(0, str(QA / "windows-frame-cost"))
-            import frame_case
-            binary = frame_case.prepare_subject(base, out, budget, record)
+            if variant == "deferred-frame":
+                import deferred_build
+                import deferred_case
+                if target != "x86_64-pc-windows-msvc":
+                    raise ValueError("Deferred frames require a native Windows x64 host")
+                binary = deferred_build.build(out, base, record)
+            else:
+                import frame_case
+                binary = frame_case.prepare_subject(base, out, budget, record)
         with ExitStack() as scope:
             if DX12_WAIT_OPTION in os.environ and os.environ[DX12_WAIT_OPTION].casefold() != "wait":
                 raise ValueError("The native DX12 frame latency comparison requires Wait mode")
@@ -140,6 +148,12 @@ def main(target, variant="mailbox"):
                 offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 offline.bind(("127.0.0.1", 0))
                 endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
+                if variant == "deferred-frame":
+                    deferred_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, budget)
+                    if sha(budget) != before:
+                        raise ValueError("The WPF budget changed during the deferred-frame comparison")
+                    record["status"] = "deferred-frame-observed"
+                    return 0
                 if variant == "frame-cost":
                     frame_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record)
                     if sha(budget) != before:
@@ -206,5 +220,7 @@ if __name__ == "__main__":
     mode.add_argument("--dispatch", dest="variant", action="store_const", const="dispatch", help="trace Mailbox activation and compare hidden-root paint policies")
     mode.add_argument("--frame-cost", dest="variant", action="store_const", const="frame-cost",
                       help="build and trace the additional x64 root-repaint diagnostic after ordinary dispatch")
+    mode.add_argument("--deferred-frame", dest="variant", action="store_const", const="deferred-frame",
+                      help="compare one native x64 trial with timed redraws on an unready DX12 frame")
     args = parser.parse_args()
     raise SystemExit(main(args.target, args.variant))

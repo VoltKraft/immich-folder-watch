@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows x64 frame-readiness comparison (2026-11-24)
+
+The separate diagnostic GUI can return control to the event loop while the
+DX12 software adapter is waiting for a frame. The native test compares its
+single scan with the original WPF limits and ordinary three-trial medians.
+Its readback checks that a deferred frame was presented while the reopened
+window was visible and that an edit changed actual pixels. The native Windows
+result is pending. The qualifying GUI still uses its existing frame policy.
+[Measured delay and comparison](rust/rw02-windows-window.md#native-results-at-21e794f).
+
 ## Windows cross-session writer check at 13e4af8 (2026-11-24)
 
 Five elevated writers on each Windows host produced all eight expected

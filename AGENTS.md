@@ -229,6 +229,8 @@ to reconcile project decisions, defaults, and recorded state.
   with observed screen pixels and independent file activity.
   Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)
   to diagnose scan response delays. Compare the ordinary GUI with the same-host WPF limits.
+  For the separate [deferred-frame trial](tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter),
+  retain the native renderer trace and the changed pixels on the reopened window.
   Keep the integrated Linux and Windows inventory subjects bound to the
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls

@@ -1,0 +1,76 @@
+--- a/src/graphics.rs
++++ b/src/graphics.rs
+@@ -85 +85,5 @@
+-            let dx12 = &setup.instance_descriptor.backend_options.dx12;
++            if std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1") {
++                panic!("The isolated frame-readiness experiment requires an owned fixture");
++            }
++            let dx12 = &mut setup.instance_descriptor.backend_options.dx12;
++            dx12.latency_waitable_object = wgpu::Dx12UseFrameLatencyWaitableObject::DontWait;
+--- a/artifacts/cost/egui-wgpu/src/winit.rs
++++ b/artifacts/cost/egui-wgpu/src/winit.rs
+@@ -28,0 +29 @@
++    ifw_gate: deferred_gate::Gate,
+@@ -43,0 +45,3 @@
++#[path = "deferred_gate.rs"]
++mod deferred_gate;
++
+@@ -44,0 +49,42 @@
++    /// Returns the retry deadline before a full root pass consumes input or texture deltas.
++    pub fn ifw_root_frame_deadline(
++        &mut self,
++        id: ViewportId,
++        visible: bool,
++    ) -> std::io::Result<Option<std::time::Instant>> {
++        if !visible {
++            self.ifw_gate.reset();
++            return Ok(None);
++        }
++        let state = self.surfaces.get(&id).ok_or_else(|| std::io::Error::other("Missing root surface"))?;
++        let render = self.render_state.as_ref().ok_or_else(|| std::io::Error::other("Missing DX12 renderer"))?;
++        let adapter = render.adapter.get_info();
++        if adapter.backend != wgpu::Backend::Dx12 || adapter.device_type != wgpu::DeviceType::Cpu {
++            return Err(std::io::Error::other("The frame experiment requires the Windows DX12 CPU adapter"));
++        }
++        if state.needs_recreate || state.needs_reconfigure ||
++            self.config.surface.present_mode != wgpu::PresentMode::Mailbox {
++            self.ifw_gate.reset();
++            return Ok(None);
++        }
++        if self.config.surface.desired_maximum_frame_latency != Some(1) {
++            return Err(std::io::Error::other("The frame experiment requires Mailbox depth one"));
++        }
++        self.ifw_gate.poll(std::time::Instant::now(), || {
++            // The painter remains exclusively borrowed on the UI thread. Keep the HAL surface
++            // guard alive for the single zero-time query, and never store or close its handle.
++            let surface = unsafe { state.surface.as_hal::<wgpu::hal::api::Dx12>() }
++                .ok_or_else(|| std::io::Error::other("No DX12 root surface"))?;
++            let handle = unsafe { surface.waitable_handle() }
++                .filter(|h| !h.is_invalid()).ok_or_else(|| std::io::Error::other("Missing frame-latency handle"))?;
++            #[link(name = "kernel32")]
++            unsafe extern "system" { fn WaitForSingleObject(handle: *mut std::ffi::c_void, timeout: u32) -> u32; }
++            match unsafe { WaitForSingleObject(handle.0, 0) } {
++                0 => Ok(true),
++                258 => Ok(false),
++                0xffff_ffff => Err(std::io::Error::last_os_error()),
++                _ => Err(std::io::Error::other("Unexpected DX12 frame-latency wait result")),
++            }
++        })
++    }
++
+@@ -65,0 +112 @@
++            ifw_gate: Default::default(),
+@@ -802 +849 @@
+-            render_state.queue.present(output_frame);
++            self.ifw_gate.present(|| render_state.queue.present(output_frame));
+--- a/artifacts/retained/eframe/src/native/wgpu_integration.rs
++++ b/artifacts/retained/eframe/src/native/wgpu_integration.rs
+@@ -714,0 +715,8 @@
++            if viewport_id == ViewportId::ROOT {
++                let paint = mode == PassMode::Full && is_visible && window.is_visible() == Some(true);
++                if let Some(deadline) = painter.ifw_root_frame_deadline(viewport_id, paint)
++                    .map_err(|err| crate::Error::AppCreation(Box::new(err)))?
++                {
++                    return Ok(EventResult::RepaintAt(window.id(), deadline));
++                }
++            }

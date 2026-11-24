@@ -270,15 +270,19 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
     return result
 
 
+def observer_inputs():
+    files = [HERE / s for s in ("observe.py", "inputs.py", "residency.py", "window_lifetime.py")]
+    files.extend(QA / s for s in ("observe-windows-gui.py", "observe-windows-input.ps1", "windows_observer.py",
+                                  "windows-performance/native.py", "windows-performance/run.py"))
+    return {p.relative_to(ROOT).as_posix(): sha(p) for p in files}
+
+
 def main(target):
     api, cold, warm, output, record = subjects(target)
     out = output / "observed"
     out.mkdir()
     record["controls"] = {}
-    files = [HERE / s for s in ("observe.py", "inputs.py", "residency.py", "window_lifetime.py")]
-    files.extend(QA / s for s in ("observe-windows-gui.py", "observe-windows-input.ps1", "windows_observer.py",
-                                  "windows-performance/native.py", "windows-performance/run.py"))
-    record["observerInputs"] = {p.relative_to(ROOT).as_posix(): sha(p) for p in files}
+    record["observerInputs"] = observer_inputs()
     fixture = recorder.load_windows_fixture()
     for name in ("background-quit", "background-open", "absent-tray", "retained-edit", "visible-loss", "edited-loss", "hidden-loss",
                  "cold-residency", "performance-residency", "warm-residency", "single-wake-retained-edit", "single-wake-hidden-loss",

@@ -590,6 +590,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Measure visible frame stages on the Windows x64 software adapter
+        id: frame_cost
         if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.warm.outcome == 'success' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/dispatch/result.json') != '' }}
         shell: pwsh
         run: |
@@ -599,6 +600,19 @@ jobs:
           python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --frame-cost
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B tools/rust-qa/windows-frame-cost/readback.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-cost
+          exit $LASTEXITCODE
+
+      - name: Compare deadline-based redraw on the Windows x64 software adapter
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.frame_cost.outcome == 'success' }}
+        timeout-minutes: 16
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --deferred-frame
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-frame-cost/deferred_case.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/deferred-frame
           exit $LASTEXITCODE
 
       - name: Observe Vulkan loss and redraw on X11
@@ -867,6 +881,12 @@ jobs:
             artifacts/rust/windows-warm-window/*/frame-cost/compiler.jsonl
             artifacts/rust/windows-warm-window/*/frame-cost/source.zip
             artifacts/rust/windows-warm-window/*/frame-cost/diagnostic.exe
+            artifacts/rust/windows-warm-window/*/deferred-frame/*.log
+            artifacts/rust/windows-warm-window/*/deferred-frame/*.json
+            artifacts/rust/windows-warm-window/*/deferred-frame/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/deferred-frame/deferred-source.zip
+            artifacts/rust/windows-warm-window/*/deferred-frame/deferred.exe
+            artifacts/rust/windows-warm-window/*/deferred-frame/retained-edit/
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json

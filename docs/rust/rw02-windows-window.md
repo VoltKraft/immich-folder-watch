@@ -720,3 +720,12 @@ Win32 `ShowWindow` call and 14 in the frame-latency wait. The median
 overlap with `ShowWindow` was 26.91 ms. The x64 archive SHA-256 is
 `53e2f74827d7653c64b7539c72ceeb67b98d21168d84c53655b456562921df43`.
 [Frame observer and replay](../../tools/rust-qa/windows-frame-cost/README.md).
+
+The opt-in x64 comparison builds a separate one-frame Mailbox executable
+that checks swapchain readiness before consuming the next visible root's
+input. A busy frame schedules a bounded retry while the GUI thread can
+handle other events. The recorder requires a successful DXGI present on
+the same thread after an externally observed reopen and verifies the
+reopened editor's screen pixels. It takes one resource and inventory
+trial against the original WPF limits. Native results for this experiment
+are pending. [Commands and replay](../../tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter).

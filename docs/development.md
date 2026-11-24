@@ -293,6 +293,11 @@ library outputs against the actual native Cargo stream before starting the GUI.
 See the [window measurements](rust/rw02-windows-window.md).
 The [Windows x64 frame observer](../tools/rust-qa/windows-frame-cost/README.md)
 pairs an instrumented inventory scan with the ordinary window measurement.
+After that scan, the optional `--deferred-frame` trial measures a separately
+compiled x64 CPU-adapter GUI. Its readback pairs a resumed redraw with
+a successful presentation while the reopened window was visible. The
+ordinary three-trial run still owns the resource decision.
+[Deferred-frame commands and evidence](../tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter).
 The WPF recorder queries the shipping tray icon after each idle trial and
 retains the HRESULT and rectangle with the receiver identity.
 [Shipping tray lookup](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).
