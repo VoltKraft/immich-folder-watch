@@ -1,5 +1,16 @@
 # Project Status
 
+## First shipping database write after rollback (2026-11-24)
+
+The original C# store wrote to 16 fresh copies of Rust-generated Linux x64
+databases. When its Unicode casing table differed, four case-insensitive
+copies gained two rows each. The old and new rows had the same visible
+spelling and asset ID, but the readers returned different file sizes for
+that spelling. A repeated write added no further rows. Independent replay
+confirmed all 204 original rows retained their ROWIDs. The product migration
+must prevent this ambiguity before either implementation resumes writing.
+[Inputs, original receipts and reproduction](rust/rw02-legacy.md#first-c-upsert-after-rollback).
+
 ## Native Ubuntu desktop results at 21e794f (2026-11-24)
 
 Ubuntu x64 and ARM64 both passed all eleven same-host X11 limits.

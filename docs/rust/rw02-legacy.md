@@ -580,3 +580,43 @@ Its raw `evidence.tar` has SHA-256
 `1194dacc81f3abb99625276755bf2f38c9dfe2bf97ae169a2adf5063e12eeca4`.
 Independent extraction compared all 160 raw members with the exported files.
 Choosing a production write policy for profile-dependent keys remains open.
+
+### First C# upsert after rollback
+
+On Fedora x64, the shipping 3.0.4 store wrote the three Rust-inserted
+entries again under their original spellings, changing only the file
+size from 83 to 101. Each of the two .NET 10.0.12 casing profiles wrote
+a fresh copy of all eight databases and repeated the same writes. The
+inputs came from the finalized Rust backups in the preceding study.
+Both profiles then read every final backup through the shipping store.
+
+| Path comparison and casing profile | First C# write | Readback |
+| --- | --- | --- |
+| Sensitive, or insensitive with the same table as Rust | All three entries kept their ROWIDs. | The writing profile found size 101 for all three original spellings. |
+| Insensitive with a different table from Rust | The stable entry kept its ROWID. The changing relative name and changing source name each gained a second physical row with the original spelling and asset ID. | For these two entries the insertion profile still found size 83 and the writing profile found 101. Both source listings under the stable root returned the relative name twice with the same asset ID. |
+
+Across 16 working copies, the first pass updated 40 existing rows and
+added eight. The repeated writes produced byte-identical standalone
+backups in all 16 cases. Independent SQL confirmed preservation of the
+original ROWIDs, schema, repairs, tombstones, album bindings and both
+accounts’ transfer times. It matched all 480 single-entry reads, 320 source lists and
+160 history reads. The source archive came from `13e4af8` and the Core
+assembly SHA-256 matched the preceding study. The original 160 exported
+files and both original C# writer directories were checked before and
+after the offline run.
+
+The [study driver](../../tools/rust-qa/legacy-keys/rollback-upsert/study.py)
+uses the same cached SDK, ICU package and finalized Linux x64 evidence as
+the insertion study. Run from the repository root with a fresh output name.
+
+```bash
+python3 -B tools/rust-qa/legacy-keys/rollback-upsert/study.py \
+  --output artifacts/rust/rollback-upsert-comparison
+```
+
+The result at `artifacts/rust/rollback-upsert-13e4af8-offline-01/result.json`
+has SHA-256 `10f88914879023f006fb8779205fc936da984f568de7ba84e80dcb46751d1f36`.
+The raw archive contains both native writer reports, both reader reports,
+all four in-process casing tables and 32 standalone backups. Its SHA-256
+is `1ca6d3c0072539b4151fd4a5168ee904e3830919c47d0ca406e961ddf6d3fdd2`.
+Production migration policy and installed rollback after synchronization remain open.
