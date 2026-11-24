@@ -1,5 +1,29 @@
 # RW-02 Windows foreground and keyboard observation
 
+## ARM64 keyboard, reader and input method at 21e794f
+
+A genuine F24 key-up in the foreground launcher's message loop started a
+second retained GUI process on the private desktop. Windows brought the
+existing HWND 1442392 (PID 2924) to the foreground. The first independent
+focus sample found it visible, active and keyboard-focused. Inventory worker
+2460 survived the hide/reopen cycle. Quit drained the processes, and the
+supervisor restored the original Default desktop. An ordinary observer-launched
+secondary on Default reopened its original window without obtaining foreground.
+[Ordinary launch](rw02-instance.md#retained-windows-on-the-original-desktop-at-21e794f) · [Foreground keyboard trial](rw02-instance.md#second-launch-from-a-foreground-test-window).
+
+The Japanese Basic Typing trial produced a preedit and committed U+3042
+(`あ`) in the actual filename field. Cleanup restored the original input
+layout and language capabilities. NVDA 2026.3.1 started and remained active
+during its separate trial. The UI Automation driver timed out looking for
+the German filename label and matched none of the seven expected
+announcements. Its process exited normally and its profile was removed.
+
+The retained display inventory found a single 1024 × 768 monitor at 96 DPI
+in a console session. The filename field did not receive focus on that
+display. Mixed DPI and RDP remain unmeasured. The full ARM64 archive SHA-256
+is `70b8bd9527c6f8ac70cb2bfa12fb7a06ba2d429e43a464ecf2304b14738f1698`.
+[Original Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675).
+
 ## Native observations
 
 On Windows ARM64, the German filename and password editors exposed their accessible names and password protection on both recorded runs. Windows declined the foreground request. The guarded observer found a different window or no window at the filename field center, successfully raised its own HWND, and declined the click after its final hit test. It timed out before reaching the keyboard test. On both x64 controls the subject acquired the foreground, accepted three masked keystrokes, switched language and round-tripped the synthetic Unicode filename through the Windows clipboard.

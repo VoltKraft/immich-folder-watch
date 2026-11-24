@@ -351,7 +351,9 @@ class WindowsContrastTests(unittest.TestCase):
         run_worker.assert_called_once_with(HERE / "windows.py", [target, "--capture-worker"],
                                            "Default", observer["ROOT"], receipt, timeout_seconds=300)
 
-    def test_supervisor_rechecks_hwnd_owner_visibility_and_active_desktop_before_the_set(self):
+    def owned_window(self):
+        self.enterContext(patch.object(c, "set_last_error", create=True))
+        self.enterContext(patch.object(c, "get_last_error", return_value=0, create=True))
         api = Mock()
         desk = "IfwQa_" + "a" * 32
         session, pid, hwnd = 2, 123, 789
@@ -365,25 +367,80 @@ class WindowsContrastTests(unittest.TestCase):
             return 72
         api.owner.side_effect = owner
         api.pid_session.return_value = session
+        api.thread_desktop.return_value = 456
         api.name.return_value = desk
         api.visible.return_value, api.iconic.return_value = True, False
         api.ancestor.return_value = hwnd
-        guard = lambda: observer["require_live_window"](api, session, desk, pid, hwnd)
+        def guard():
+            observer["require_live_window"](api, session, desk, pid, hwnd)
+        return api, context, guard
+
+    def test_supervisor_rechecks_hwnd_owner_visibility_and_active_desktop_before_the_set(self):
+        api, context, guard = self.owned_window()
         guard()
-        for method, replacement in (("context", dict(context, inputDesktop="Default")),
-                                    ("context", dict(context, inputObjectReceivesInput=False)),
-                                    ("pid_session", session + 1), ("name", "Default"),
-                                    ("visible", False), ("iconic", True), ("ancestor", hwnd + 1)):
+        api.pid_session.assert_called_once_with(123)
+        api.thread_desktop.assert_called_once_with(72)
+        api.name.assert_called_once_with(456)
+        api.visible.assert_called_once_with(789)
+        api.ancestor.assert_called_once_with(789, observer["GA_ROOT"])
+        for method, replacement, operation, value in (
+                ("context", dict(context, session=3), "observer session", "observed 3"),
+                ("context", dict(context, wts={"win32Error": 5}), "unlocked_console", "'win32Error': 5"),
+                ("context", dict(context, wts=dict(context["wts"], lockFlags=0)), "unlocked_console", "'lockFlags': 0"),
+                ("context", dict(context, inputDesktop="Default"), "input desktop name", "'Default'"),
+                ("context", dict(context, inputObjectReceivesInput=False), "UOI_IO", "observed False"),
+                ("pid_session", 3, "ProcessIdToSessionId", "observed 3"),
+                ("name", {"win32Error": 5}, "GetUserObjectInformationW(UOI_NAME)", "'win32Error': 5"),
+                ("name", "UnrelatedDesktop", "GetUserObjectInformationW(UOI_NAME)", "<different desktop>"),
+                ("visible", False, "IsWindowVisible", "observed False"),
+                ("iconic", True, "IsIconic", "observed True"),
+                ("ancestor", 790, "GetAncestor(GA_ROOT)", "observed 790")):
             system = FakeSystem()
             def closes_after_baseline(phase, state):
                 getattr(api, method).return_value = replacement
                 return {"rasterSha256": "baseline"}
             with self.subTest(method=method), patch.object(api, method, wraps=getattr(api, method)):
-                with self.assertRaisesRegex(ValueError, "original visible Rust root"):
+                with self.assertRaisesRegex(ValueError, "original visible Rust root HWND 789 of PID 123") as raised:
                     run_cycle(system, closes_after_baseline, window_guard=guard)
+                self.assertIn(operation, str(raised.exception))
+                self.assertIn(value, str(raised.exception))
+                self.assertNotIn("UnrelatedDesktop", str(raised.exception))
                 self.assertEqual(system.calls, [])
-        with patch.object(api, "owner", return_value=0), self.assertRaises(ValueError):
+
+    def test_native_failure_reports_the_current_error_and_stops_at_the_failed_operation(self):
+        for method, operation, following, error in (("owner", "GetWindowThreadProcessId", "thread_desktop", 1400),
+                                                   ("thread_desktop", "GetThreadDesktop", "name", 5),
+                                                   ("ancestor", "GetAncestor(GA_ROOT)", None, 0)):
+            api, _, guard = self.owned_window()
+            error_slot = [999]
+            def fail(*_):
+                self.assertEqual(error_slot[0], 0)
+                error_slot[0] = error
+                return 0
+            with self.subTest(operation=operation), patch.object(api, method, side_effect=fail), \
+                    patch.object(c, "set_last_error", side_effect=lambda e: error_slot.__setitem__(0, e)), \
+                    patch.object(c, "get_last_error", side_effect=lambda: error_slot[0]):
+                with self.assertRaises(ValueError) as raised:
+                    guard()
+                self.assertIn(operation, str(raised.exception))
+                self.assertIn(f"'win32LastError': {error}", str(raised.exception))
+                if following:
+                    getattr(api, following).assert_not_called()
+
+    def test_reused_hwnd_stops_before_reading_the_other_process_or_its_desktop(self):
+        api, _, guard = self.owned_window()
+        def new_owner(_, slot):
+            slot._obj.value = 9000
+            return 81
+        api.owner.side_effect = new_owner
+        with self.assertRaisesRegex(ValueError, "owner PID .*observed 9000"):
             guard()
+        api.pid_session.assert_called_once_with(123)
+        api.thread_desktop.assert_not_called()
+        api.name.assert_not_called()
+        api.visible.assert_not_called()
+        api.iconic.assert_not_called()
+        api.ancestor.assert_not_called()
 
     def test_temporary_setting_requires_a_real_disposable_rewrite_job(self):
         guard = observer["job_guard"]

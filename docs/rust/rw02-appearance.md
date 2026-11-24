@@ -210,3 +210,21 @@ Twenty portable observer tests passed, including repeated reads from
 borrowed storage and profile cleanup after an abrupt child exit. Frozen
 Clippy checks with warnings denied passed for the ordinary and retained
 GUI sources under both Windows targets on Linux.
+
+### Windows ARM64 before the first capture at 21e794f
+
+The native ARM64 worker reported its original GUI (PID 3668, HWND 197390)
+ready on the selected input desktop. The supervisor then rejected the
+first window ownership and visibility check. It had not yet read or
+changed the system palette. No label frame was captured. The GUI drained
+and the original Default input desktop was restored. The original
+report grouped the session, input desktop, window owner and visibility
+checks under one error. Its SHA-256 is
+`26fcceda9a2e893fcb74bfbfcff19df7b149bde0efd5ebc4e08a037a67b0e2c4`.
+[Original ARM64 desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675).
+
+The observer now reports which check failed and the immediate Windows error
+when a native handle query returns zero. It checks the owner PID before
+querying the window's thread desktop. The 22 portable tests cover these
+failure paths, the successful guard, palette restoration and image readback.
+[Native guard](../../tools/rust-qa/appearance/windows.py) · [Regression checks](../../tools/rust-qa/appearance/test_windows_colors.py).

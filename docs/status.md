@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows ARM64 native desktop at 21e794f (2026-11-24)
+
+The retained GUI met all eleven WPF resource limits. A second process
+started by a real foreground keyboard handler brought the original window
+back with keyboard focus. Japanese input composed and committed its filename.
+NVDA timed out looking for the German filename label. The contrast observer
+stopped at its first ownership check, before changing any setting. The
+revised guard reports each failing operation and passed 22 portable tests.
+[Timing](rust/rw02-windows-window.md#native-results-at-21e794f) · [Native input](rust/rw02-windows-desktop.md#arm64-keyboard-reader-and-input-method-at-21e794f) · [Contrast](rust/rw02-appearance.md#windows-arm64-before-the-first-capture-at-21e794f).
+
 ## Rust startup beside the installed 3.0.4 Flatpak (2026-11-24)
 
 An ordinary Rust launch and a launch requesting its inventory worker each

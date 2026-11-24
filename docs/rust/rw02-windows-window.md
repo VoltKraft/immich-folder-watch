@@ -687,3 +687,16 @@ SHA-256 values `77a7aef59e702fc0ea76da2c025f71deaee75fa7fe2e32379720e9c6ed5f9aa3
 and `cf52d977dcf56f65ea67544139b426a7ccfedefe3943e2756ab094079b692240`.
 [Second x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632)
 · [Second ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830).
+
+### Native results at 21e794f
+
+The retained Windows ARM64 GUI met all eleven same-host WPF limits at
+both Mailbox frame depths. The default one-frame profile's scan close and
+reopen p95 were 9.1267 ms and 4.0862 ms, against limits of 13.678 ms
+and 14.926 ms. Both idle intervals had zero presents. FIFO met ten limits
+and exceeded scan close at 19.1586 ms. The teardown GUI met six of eleven.
+The independent replay recovered 153 compiler units, three WPF and twelve
+Rust two-pass inventories, and thirteen retained-window behavior checks.
+The readback SHA-256 is
+`0056ee78d0336735c21a1602d69a68d127d057bb7b03e41b1e2259eca7d3f376`.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675) · [Keyboard and screen-reader observations](rw02-windows-desktop.md#arm64-keyboard-reader-and-input-method-at-21e794f).

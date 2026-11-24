@@ -85,14 +85,54 @@ def message(folder, name, token, worker=None, timeout=85):
 
 
 def require_live_window(api, session, name, pid, hwnd):
+    def reject(operation, expected, observed):
+        raise ValueError(f"The original visible Rust root HWND {hwnd} of PID {pid} in session {session} "
+                         f"on {name!r} failed {operation} (expected {expected!r}, observed {observed!r})")
+
+    def desktop_name(value):
+        # Keep the private fixture name, the original Default desktop and native error values.
+        if isinstance(value, str) and not (same_name(value, name) or same_name(value, "Default")):
+            return "<different desktop>"
+        return value
+
+    def nonzero(operation, native, *args):
+        c.set_last_error(0)
+        value = native(*args)
+        if not value:
+            reject(operation, "nonzero", {"returned": value, "win32LastError": c.get_last_error()})
+        return value
+
     context = api.context()
+    if context["session"] != session:
+        reject("observer session", session, context["session"])
+    if not unlocked_console(context):
+        fields = {key: context[key] for key in ("windowStation", "stationVisible", "session", "activeConsoleSession", "wts")}
+        if isinstance(fields["windowStation"], str) and not same_name(fields["windowStation"], "WinSta0"):
+            fields["windowStation"] = "<different window station>"
+        reject("unlocked_console", "visible WinSta0 in its active unlocked console session", fields)
+    if not same_name(context["inputDesktop"], name):
+        reject("input desktop name", name, desktop_name(context["inputDesktop"]))
+    if context["inputObjectReceivesInput"] is not True:
+        reject("UOI_IO on the input desktop", True, context["inputObjectReceivesInput"])
+    subject_session = api.pid_session(pid)
+    if subject_session != session:
+        reject("ProcessIdToSessionId", session, subject_session)
     owner = w.DWORD()
-    thread = api.owner(hwnd, c.byref(owner))
-    if (not unlocked_console(context) or context["session"] != session or not same_name(context["inputDesktop"], name)
-            or context["inputObjectReceivesInput"] is not True or api.pid_session(pid) != session
-            or not thread or owner.value != pid or not same_name(api.name(api.thread_desktop(thread)), name)
-            or not api.visible(hwnd) or api.iconic(hwnd) or api.ancestor(hwnd, GA_ROOT) != hwnd):
-        raise ValueError("The original visible Rust root HWND no longer owns its expected session and input desktop")
+    thread = nonzero("GetWindowThreadProcessId", api.owner, hwnd, c.byref(owner))
+    if owner.value != pid:
+        reject("GetWindowThreadProcessId owner PID", pid, owner.value)
+    handle = nonzero(f"GetThreadDesktop for subject thread {thread}", api.thread_desktop, thread)
+    c.set_last_error(0)
+    thread_name = api.name(handle)
+    if not same_name(thread_name, name):
+        reject("GetUserObjectInformationW(UOI_NAME) on the subject thread desktop", name, desktop_name(thread_name))
+    if not api.visible(hwnd):
+        reject("IsWindowVisible", True, False)
+    if api.iconic(hwnd):
+        reject("IsIconic", False, True)
+    ancestor = nonzero("GetAncestor(GA_ROOT)", api.ancestor, hwnd, GA_ROOT)
+    if ancestor != hwnd:
+        reject("GetAncestor(GA_ROOT)", hwnd, ancestor)
 
 
 def on_subject_desktop(api, name, cycle):
