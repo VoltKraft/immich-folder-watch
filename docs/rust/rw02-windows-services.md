@@ -795,6 +795,41 @@ log. Its SHA-256 is
 [x64 retained archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14966273317) ·
 [ARM64 retained archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14967851248).
 
+### Corrected canonical Windows launcher at 4e3dbc4
+
+On Default and the private desktop, both native architectures started their
+worker. The observer verified the original directory identities and removed
+the staged executables and directories after drain. On x64 the Default
+primary retained worker PID 3572, reopened its window and obtained the
+foreground. On ARM64 the Default primary retained worker PID 2616 and
+reopened a visible window. All 41 foreground samples over 2.037 seconds
+found it in the background. These canonical GUIs recreated their HWND on
+reopen. The retained-window trial uses a separate executable.
+[x64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14975080953) ·
+[ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14975106072).
+
+The x64 primary also registered a v4 notification icon with the original
+Explorer. Its rectangle was `[790,720,822,768]`. On the original taskbar,
+the last read at its center was RGB `eeeeee`. The expected marker was
+`1fc653`. The observer obtained neither the marker nor a visible
+hidden-icons button. It sent no activation. The Shell-less run kept its
+worker and passed. [Original x64 tray archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14973991781).
+
+On ARM64 the Default receiver was created by PID 9436. Explorer declined
+the icon add and v4 registration. The independent rectangle query returned
+`E_FAIL`. The receiver exited, its job drained, and the Shell-less run
+retained its own worker. This host supplied no icon to activate.
+[Original ARM64 tray archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14974376768).
+
+The follow-up observer at `236c852` samples up to 16 by 16 points inside that same
+rectangle when the center misses the first marker. Each eligible point
+must still lie on the original Explorer surface and monitor. The report
+contains counts, the bounds of matching sample points and the number of
+adjacent two-by-two matching squares. Positions on another window or
+without a valid read are counted separately. The raster is a passive
+observation. The original two-color and provider checks still govern
+activation. The native `4e3dbc4` result contains the earlier center observations.
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

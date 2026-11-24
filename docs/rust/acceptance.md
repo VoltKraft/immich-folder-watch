@@ -46,6 +46,13 @@ ROWID and every existing row. Independent readback covered 32 SQLite
 files. This closes the native insertion trial under RI-AC03.
 [Four-target originals and runtime versions](rw02-legacy.md#native-sqlite-insert-and-two-c-upserts-at-4e3dbc4).
 
+On Fedora x64, Rust backed up a configured, signed 3.0.4 process's live
+WAL after an upload. A new signed process opened the returned database
+and successfully uploaded a second image. The peer observed the original
+image once across both lifetimes. This adds installed evidence for a
+shipping worker consuming Rust's backup under RI-AC03.
+[Installed backup, restart and readback](rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
+
 | Criteria | Current result | Evidence needed for completion |
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
@@ -93,9 +100,12 @@ After Quit the row reopened from its SQLite backup.
 
 The `13e4af8` canonical Windows tray and launcher trials stopped before
 worker startup on both architectures. Their harness held DELETE access on
-the directory the worker needed to open. The fixed probes require new
-native results. The earlier successful keyboard trials still refer to
-their original revisions. [Original logs and correction](rw02-windows-services.md#canonical-gui-startup-on-the-staged-windows-desktop-at-13e4af8).
+the directory the worker needed to open. At `4e3dbc4` both canonical
+launchers kept their original workers through reopen and drained on Quit.
+The x64 window obtained foreground. The ARM64 window reopened in the
+background. Neither tray trial demonstrated an actual Shell activation.
+[Original logs and correction](rw02-windows-services.md#canonical-gui-startup-on-the-staged-windows-desktop-at-13e4af8) ·
+[Corrected native runs](rw02-windows-services.md#corrected-canonical-windows-launcher-at-4e3dbc4).
 
 At `3b4854d` the [watch adapter](rw02-watch-events.md) passed fifteen
 filesystem scenarios on each Ubuntu architecture and thirteen on each

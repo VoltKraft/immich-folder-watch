@@ -1,5 +1,33 @@
 # Project Status
 
+## Installed signed worker restart and corrected Windows launcher (2026-11-25)
+
+On Fedora x64 the Rust helper backed up a committed upload from the live
+3.0.4 WAL. A new signed process consumed that database, preserved the first
+mapping and uploaded a second file. The private peer recorded one empty
+permission probe and one successful image POST from each process. Eleven
+fixture tests passed. [Installed restart and native evidence](rust/rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
+
+Both canonical Windows launchers at `4e3dbc4` started and drained their
+workers and cleaned up the staged directories. The x64 primary obtained
+foreground on reopen. The ARM64 primary was visible in the background.
+The x64 Shell registered the tray icon, but its marker was absent at the
+sampled point. The observer did not activate it. The resource, retained
+window and late notification measurements have separate outcomes.
+[Original launcher and tray results](rust/rw02-windows-services.md#corrected-canonical-windows-launcher-at-4e3dbc4).
+
+The x64 timing observer at `86ee4bd` records synchronous messages during
+the retained window's direct show. Independent replay reproduced both
+earlier raw traces (450 and 1,157 presents). The tray observer at
+`236c852` additionally samples the Shell's reported rectangle after a
+center miss. Four raster tests and seven restoration tests passed. Native
+measurements with both new observers are pending.
+
+All 24 checks reported on draft PR 46 passed at `e911883`, including the
+four reference and four original installer jobs. [Compatibility reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506878586) ·
+[Shipping installer matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506878266) ·
+[Regular CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506888371).
+
 ## Cross-language SQLite writes on four native targets (2026-11-25)
 
 At `4e3dbc4`, Windows and Ubuntu on x64 and ARM64 all passed the new

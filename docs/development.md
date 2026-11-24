@@ -125,6 +125,34 @@ launch attempts to take ownership. Its test peer and both installed refs
 run inside the same disposable network namespace.
 [Original packages and results](rust/rw01-installed-packages.md) · [Installer workflow](../.github/workflows/rust-legacy-install.yaml).
 
+### Installed Flatpak worker backup on Fedora x64
+
+Use the existing isolated Cargo home, NuGet cache, native toolchain, signed
+3.0.4 bundle and source-bound GUI and worker from the [configured upload
+trial](rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload).
+Choose a fresh storage output directory. The following paths match the
+local build layout used for the native result.
+
+```bash
+env PATH="$PWD/artifacts/rust/toolchain/bin:$PATH" CC=/usr/bin/gcc \
+  NUGET_PACKAGES="$PWD/artifacts/rust/native-insert-local-cache-01/nuget" \
+  python3 -B tools/rust-qa/storage/run.py x86_64-unknown-linux-gnu \
+  --offline --cargo-home artifacts/rust/storage-assessment/cargo-home \
+  --dotnet artifacts/flatpak-local-2.11.2/sdk/dotnet --installed-upload-backup \
+  --output artifacts/rust/storage-native/installed-upload-repeat
+
+python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py \
+  --gui-build artifacts/rust/gui-dual-election-01 \
+  --inventory-subject artifacts/rust/performance/subjects/linux-dual-election-8e1c5d7 \
+  --shipping-upload --rust-backup artifacts/rust/storage-native/installed-upload-repeat
+```
+
+The native run used the direct system C compiler and pinned Rust 1.100.0
+and SQLite 3.54.1. Preserve the two original HTTP image bodies, both
+permission probes, original main/WAL, source build receipt, returned
+database and the database after the signed application's second Quit.
+[Executed trial and digests](rust/rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

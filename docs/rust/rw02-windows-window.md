@@ -759,3 +759,15 @@ native trace contained 1,157 successful presentations and none in 569
 hidden intervals. The x64 readback has SHA-256
 `62e948cd60ee1cfd41e3f01d7a3e58720f523d3a55003ebcf8ec2973be4deb1f`.
 [Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14972721704).
+
+None of the 166 slow reopens dominated by `ShowWindow` contained a
+recorded egui, eframe or wgpu stage, a forwarded eframe callback or a
+DXGI present on the same thread inside that call. Together, the direct
+calls occupied 97.69% of those external response intervals. The remaining
+slow reopen included a separate DX12 frame wait after `ShowWindow`
+returned. The earlier recorder did not time individual synchronous
+window messages. The follow-up at `86ee4bd` in the same instrumented GUI records the
+message ID and time in the owned window procedure and its default
+processing, limited to the retained root's direct show. The offline reader
+reproduced the two older traces without attributing message times to them.
+[Procedure and raw records](../../tools/rust-qa/windows-frame-cost/README.md).

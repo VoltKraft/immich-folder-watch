@@ -304,3 +304,42 @@ results reproduced the reference readback with SHA-256
 `4120b41b8164540b54ba562f97b1046f9a21e3b663b6869c11720540a4cbe27f`.
 Rollback after the installed Rust sync engine's own activity remains open.
 [Native C# reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230320974).
+
+### Installed Fedora worker resumes from a live Rust backup
+
+On Fedora x64 at `3709869` the original signed 3.0.4 Flatpak uploaded
+a 69-byte PNG to the private peer. A read-only SQLite connection kept the
+pre-upload snapshot open. Before the response, the Rust backup helper
+refused the empty history. After 3.0.4 committed, the main database was
+still 4,096 bytes and lacked the new entry. The 65,952-byte WAL held the
+committed state. Rust opened the live database read-only, used SQLite's
+online backup API and finalized a standalone database. Replaying the
+original main file and WAL reproduced the Rust output's ten schema
+objects, four tables, all columns and ROWIDs.
+
+After the signed app quit, the observer preserved the original database
+and companions, installed a separate copy of the returned bytes at the
+profile's normal database path and held that file open. The next signed
+apphost (PID 1492) opened the same device and inode as the pre-launch
+descriptor. Its first reconciliation queued zero changed files. Adding a
+second PNG produced the next successful upload. Across both processes the
+peer recorded four POSTs to the asset route, including one empty permission
+check and one accepted image per process. The original file was absent
+from the second process's requests. After Quit, the original mapping and
+the new mapping reopened with ROWIDs 1 and 2.
+
+The `same-id-mn3lm5yd/result.json` SHA-256 is
+`b3f150b7abdb021f59f4b15c12f3524a075cc7f0af3a8e6d8091091e4160c9b9`.
+The consumed Rust database has SHA-256
+`4e372933e6aa2c8c691f119d1bf55687f441645c1322823f2e9c09cc026e7f0c`.
+Independent replay verified all sixteen WAL frame checksums and commit
+boundaries. After frame 11 the tables were empty. Frame 14 committed the
+mapping and frame 16 added the account history. The 53 indexed originals
+included all four request bodies and the signed installation evidence.
+The detached `restore-readback-mn3lm5yd/readback.json` SHA-256 is
+`a022e9e6e6624d7482ea83fe70a72b8b782a7ed76921d22927c5fece5ad8e000`.
+The configured writer in this trial was the signed C# application. Installed
+rollback after the Rust synchronization engine's own activity remains open.
+[Reproduction](../development.md#installed-flatpak-worker-backup-on-fedora-x64) ·
+[Installed process and restore observer](../../tools/RustCompatibilityOracle/installed/interop/installed_backup.py) ·
+[Native Rust helper](../../tools/rust-qa/storage/examples/installed_upload_backup.rs).
