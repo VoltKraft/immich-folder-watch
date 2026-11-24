@@ -60,6 +60,15 @@ media `flock`. [Documents capability comparison](rw02-linux-services.md)
 
 ## Notifications and autostart
 
+On Fedora x64 the private notification observer now publishes each complete
+JSON event record by replacing the preceding file. In two earlier runs the
+reader saw a partially written receipt after a successful portal submission.
+The repeated installed Flatpak trial completed cancellation, selection, grant
+revocation, background and autostart requests, notification submission and
+withdrawal. Its `results.json` SHA-256 is
+`35c8f40ad76a238c7ae26f6b66b4b20f95af04cf34c73e4e7e3997dc70c2bcf0`.
+[Notification observer](../../tools/rust-qa/portal-dialog/notifications.py).
+
 The GTK-only sessions recorded the Rust client's Add/Remove acknowledgements.
 The real GTK backend delivered the exact title and body to a synthetic
 freedesktop notification server, then withdrew the returned numeric ID.

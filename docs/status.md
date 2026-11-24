@@ -1,5 +1,24 @@
 # Project Status
 
+## Windows mixed-DPI and RDP test desktop (2026-11-24)
+
+The user currently has neither Windows evaluation media nor an available
+test VM for this observation. The hosted runners exposed one 96-DPI output
+in a console session. Moving the same window between two DPI settings and
+observing its rendering in an actual RDP session remain open in RW-02.
+[Measured topology and required observations](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## Two launches of an installed Linux test Flatpak (2026-11-24)
+
+On native x64 a normal launch and a background launch from the temporary
+Flatpak both reopened the original X11 window through its filtered bus.
+The observer identified the GUI separately from the bus proxy, verified
+both exited on Quit and removed the private installation. A separate
+installed portal run completed grant revocation and notification withdrawal
+after its test observer began publishing complete JSON receipts atomically.
+[Flatpak launch evidence](rust/rw02-instance.md#second-launch-through-the-installed-flatpak) ·
+[Portal rerun](rust/rw02-portal-dialog.md#notifications-and-autostart).
+
 ## Shipping C# lookup of new Rust-written rows (2026-11-24)
 
 The development writer inserted 24 new entries on eight synthetic

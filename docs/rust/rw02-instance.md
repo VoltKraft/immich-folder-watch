@@ -107,6 +107,30 @@ Installed old/new handover and Windows cross-session writer exclusion have
 separate acceptance requirements. [Worker observer](../../tools/rust-qa/performance/worker/second_launch.py) ·
 [Native desktop observers](../../tools/rust-qa/gui/native.py).
 
+### Second launch through the installed Flatpak
+
+A native x64 X11 trial installed the same corrected executable in an offline
+test ref with its own application ID. It used the existing, read-only
+freedesktop 26.08 Platform and Mesa GL extension. The private installation
+granted X11, shared IPC and access to the tray watcher. The fixture mapped
+the application's filtered D-Bus socket to the name expected by the QA
+binary. The bus reported the proxy's PID 52. The GUI itself was PID 56
+in the test desktop and PID 2 inside the Flatpak. Its executable hash,
+process ancestry, instance ID and original X window identified the primary.
+[Installed-app runner](../../tools/rust-qa/gui/flatpak/run.py) ·
+[Native process observation](../../tools/rust-qa/gui/flatpak/observe.py).
+
+A normal secondary and a separate `--background` secondary both exited
+zero and reopened XID 4194306. The original rendered ten passes using
+Vulkan llvmpipe and drained on Quit. The GUI, both original sandbox
+wrappers and the original bus proxy exited. The private installation
+contained no app after uninstall. This run used the GUI only. The
+preceding X11 worker trial covers inventory continuity. The installed
+trial's `result.json` SHA-256 is
+`794b329ef194c1337629212887997b2a2830eb16e60a9aa91902094593405b2b`.
+The SHA-256 of its evidence manifest is
+`c64925dbff10da16381195bca07499c2b4336ed3b164d9dca838953d71c955bb`.
+
 ## Ordinary second launch of the Windows GUI
 
 The shipping desktop shortcut starts the executable without arguments. A second

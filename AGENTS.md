@@ -235,6 +235,8 @@ to reconcile project decisions, defaults, and recorded state.
   a private desktop and installs only into its disposable test repository.
   Verify [ordinary Linux second launches](docs/rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui)
   with the real executable and the original window, bus owner and inventory worker.
+  For the [installed test Flatpak](docs/rust/rw02-instance.md#second-launch-through-the-installed-flatpak),
+  distinguish the D-Bus proxy PID from the GUI's outer and sandbox PIDs.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
   The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses

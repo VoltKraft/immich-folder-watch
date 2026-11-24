@@ -30,7 +30,10 @@ def replied(connection, sender, path, interface, method, args, invocation):
         else:
             invocation.return_dbus_error('org.freedesktop.DBus.Error.UnknownMethod', 'Unknown fixture method')
             return
-        Path('/qa/notification-events.json').write_text(json.dumps(events, indent=2) + '\n')
+        receipt = Path('/qa/notification-events.json')
+        staged = receipt.with_suffix('.writing')
+        staged.write_text(json.dumps(events, indent=2) + '\n')
+        staged.replace(receipt)
     invocation.return_value(result)
 bus.register_object('/org/freedesktop/Notifications', doc.interfaces[0], replied, None, None)
 code, = bus.call_sync(dbus, '/org/freedesktop/DBus', dbus, 'RequestName', GLib.Variant('(su)', (name, 4)), None,

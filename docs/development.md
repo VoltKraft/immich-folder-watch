@@ -226,6 +226,12 @@ window, inventory worker, file rediscovery and shutdown. The separate
 `gui/native.py` lifecycle checks exercise the ordinary launch on X11 and Wayland.
 [Linux second-launch results](rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui).
 
+On local x64, `python3 -B tools/rust-qa/gui/flatpak/run.py STAGED_SUBJECT`
+repeats both launches from an installed synthetic Flatpak using the pinned
+public Platform and graphics extension. The GUI, proxy and window are
+observed separately. The script uses a disposable offline repository.
+[Installed Flatpak trial](rust/rw02-instance.md#second-launch-through-the-installed-flatpak).
+
 The Windows assessment runs the ordinary launcher first, followed by
 `python -B tools/rust-qa/windows-launcher/native_tray.py <native-target>`
 on the disposable x64 and ARM64 runners. The latter starts the elected GUI

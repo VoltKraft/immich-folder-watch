@@ -42,7 +42,14 @@ def start_launch_bus(stack, desktop):
     return {'address': LAUNCH_BUS, 'bus_id': bus_id, 'activatable': activatable}
 
 
-def prepare(commit):
+def setup_command(args):
+    with Path('/qa/flatpak-prepare.log').open('a') as log:
+        log.write('+ ' + ' '.join(str(n) for n in args) + '\n')
+        log.flush()
+        subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, text=True, check=True, timeout=25)
+
+
+def prepare_runtime(commit):
     # This root is private tmpfs. The launcher binds only the public 26.08 platform deployment read-only.
     if any(any(Path(name).iterdir()) for name in SYS_DIRS):
         raise RuntimeError('Expected empty synthetic device directories in the private Flatpak desktop')
@@ -58,16 +65,25 @@ def prepare(commit):
             or Path('/var/lib/flatpak').exists() or not (deployment / 'files').is_dir() or not private_tmp
             or commit != COMMITS.get(arch) or not readonly):
         raise RuntimeError('Missing dedicated Flatpak environment')
-    out = Path('/qa/flatpak-prepare.log')
-
-    def run(args):
-        with out.open('a') as log:
-            log.write('+ ' + ' '.join((str(n) for n in args)) + '\n')
-            log.flush()
-            subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, text=True, check=True, timeout=25)
     # Flatpak requires the checksum-named deployment itself to be a real directory.
     (platform_ref / 'active').symlink_to(commit, target_is_directory=True)
-    run(['ostree', '--repo=/tmp/private-flatpak-system/repo', 'init', '--mode=bare-user-only'])
+    setup_command(['ostree', '--repo=/tmp/private-flatpak-system/repo', 'init', '--mode=bare-user-only'])
+
+
+def export_install(app, app_id, finish_args):
+    arch = platform.machine()
+    setup_command(['flatpak', 'build-finish', *finish_args, str(app)])
+    setup_command(['flatpak', 'build-export', '--arch=' + arch, '/tmp/app-ref', str(app), 'test'])
+    setup_command(['flatpak', '--user', 'remote-add', '--no-gpg-verify', 'fixture', 'file:///tmp/app-ref'])
+    ref = f'app/{app_id}/{arch}/test'
+    setup_command(['flatpak', '--user', 'install', '--noninteractive', '--no-deps', '--no-related', 'fixture', ref])
+    info = subprocess.check_output(['flatpak', '--user', 'info', '--show-commit', ref], text=True, timeout=10).strip()
+    return {'installed_ref': ref, 'commit': info}
+
+
+def prepare(commit):
+    prepare_runtime(commit)
+    arch = platform.machine()
     app = Path('/tmp/app-build')
     (app / 'files/bin').mkdir(parents=True)
     desktop = app / 'files/share/applications'
@@ -76,15 +92,9 @@ def prepare(commit):
     (app / 'metadata').write_text(f'[Application]\nname={APP}\nruntime=org.freedesktop.Platform/{arch}/26.08\nsdk=org.freedesktop.Sdk/{arch}/26.08\n')
     shutil.copy2('/probe/portal-dialog-assessment', app / 'files/bin/portal-dialog-assessment')
     (desktop / (APP + '.desktop')).write_text('[Desktop Entry]\nType=Application\nName=Synthetic Portal Dialog\nExec=portal-dialog-assessment\n')
-    run(['flatpak', 'build-finish', '--command=portal-dialog-assessment', '--socket=x11', '--socket=wayland',
-        str(app)])
-    run(['flatpak', 'build-export', '--arch=' + arch, '/tmp/app-ref', str(app), 'test'])
-    run(['flatpak', '--user', 'remote-add', '--no-gpg-verify', 'fixture', 'file:///tmp/app-ref'])
-    run(['flatpak', '--user', 'install', '--noninteractive', '--no-deps', '--no-related', 'fixture',
-        f'app/{APP}/{arch}/test'])
-    info = subprocess.check_output(['flatpak', '--user', 'info', '--show-commit', APP + '//test'], text=True).strip()
-    runtime = (system / 'runtime/org.freedesktop.Platform' / arch / '26.08/active').readlink()
-    return {'installed_ref': f'app/{APP}/{arch}/test', 'commit': info, 'runtime': str(runtime),
+    installed = export_install(app, APP, ['--command=portal-dialog-assessment', '--socket=x11', '--socket=wayland'])
+    runtime = (Path('/tmp/private-flatpak-system/runtime/org.freedesktop.Platform') / arch / '26.08/active').readlink()
+    return {**installed, 'runtime': str(runtime),
             'empty_device_directories': SYS_DIRS}
 
 
