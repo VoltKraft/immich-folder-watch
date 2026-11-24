@@ -4,6 +4,7 @@ Run python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py --same-
 Use --gui-build artifacts/rust/GUI_BUILD to exercise the actual candidate against the installed old GUI.
 Add --inventory-subject artifacts/rust/performance/subjects/SUBJECT to run its reviewed worker on synthetic read-only inputs.
 Append --shipping-upload to exercise the original signed worker's upload while a worker-enabled Rust launch is refused.
+After --shipping-upload, supply --rust-backup artifacts/rust/storage-native/BUILD to return a live Rust backup to the installed worker.
 Use the published 3.0.4 bundle and detached signature described by ../launch/run.py and its
 pinned x64 Platform and GL runtimes. No previous trial output is required.
 """
@@ -122,7 +123,7 @@ def inventory_inputs(subject, root, revision, gui_hash, release, out):
                         launcher=hashlib.sha256(WORKER_LAUNCH.encode()).hexdigest())
 
 
-def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False):
+def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False, backup_build=None):
     root = HERE.parents[3]
     art = root / 'artifacts/rust'
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
@@ -146,7 +147,7 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
             path.write_bytes(subprocess.check_output(['git', 'show', f'{revision}:{name}'], cwd=root))
             archive.write(path, name)
             snapshot[name] = sha(path)
-        driver_names = ['assess.py', 'hold.sh', 'test_assess.py', 'shipping_upload.py']
+        driver_names = ['assess.py', 'hold.sh', 'test_assess.py', 'shipping_upload.py', 'installed_backup.py']
         if gui_build is not None:
             driver_names.extend(['gui_refusal.py', 'gui-launch.sh'])
         for name in driver_names:
@@ -208,7 +209,11 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
     if inventory_subject is not None:
         require(same_id and gui_hash, 'The installed worker requires the same-ID native GUI trial')
         worker, worker_files = inventory_inputs(inventory_subject, root, revision, gui_hash, release['commit'], out)
-    save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, inventory=worker_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
+    backup = backup_files = None
+    if backup_build:
+        from installed_backup import build_input
+        backup, backup_files = build_input(backup_build, root, revision, out)
+    save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, inventory=worker_files, installedBackup=backup_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
                                    sameId=same_id, shippingUpload=shipping_upload, revision=revision, rustc=sha(compiler), probe=EXPECTED_PROBE,
                                    sources=snapshot, archive=sha(out / 'observer-source.zip')))
     command = namespace(out, frozen / HERE.relative_to(root), None)
@@ -230,6 +235,9 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
         if worker is not None:
             location = command.index('--chdir')
             command[location:location] = ['--ro-bind', str(worker), '/candidate-worker']
+        if backup is not None:
+            location = command.index('--chdir')
+            command[location:location] = ['--ro-bind', str(backup), '/installed-backup']
         subprocess.run(command, timeout=200 if shipping_upload else 125, check=True)
     finally:
         (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in sorted(out.iterdir()) if p.is_file()))
@@ -322,7 +330,7 @@ def inside():
                 observe_refusal(stack, bus, display, pins, r, out, i['guiHash'], i['inventory'])
                 if i['shippingUpload']:
                     from shipping_upload import observe as observe_upload
-                    observe_upload(stack, bus, display, pins, r, out)
+                    observe_upload(stack, bus, display, pins, r, out, i['installedBackup'])
                 stack.close()
                 verify_uninstalled(r)
                 return
@@ -402,8 +410,10 @@ if __name__ == '__main__':
     elif len(sys.argv) == 3 and sys.argv[1] == '--gui-build':
         outer(True, Path(sys.argv[2]))
     elif (len(sys.argv) >= 5 and sys.argv[1] == '--gui-build' and sys.argv[3] == '--inventory-subject'
-          and sys.argv[5:] in ([], ['--shipping-upload'])):
-        outer(True, Path(sys.argv[2]), Path(sys.argv[4]), shipping_upload=bool(sys.argv[5:]))
+          and (sys.argv[5:] in ([], ['--shipping-upload']) or
+               (len(sys.argv) == 8 and sys.argv[5:7] == ['--shipping-upload', '--rust-backup']))):
+        outer(True, Path(sys.argv[2]), Path(sys.argv[4]), shipping_upload=bool(sys.argv[5:]),
+              backup_build=Path(sys.argv[7]) if len(sys.argv) == 8 else None)
     elif sys.argv[1:] in (['--same-id'], ['--different-id']):
         outer(sys.argv[1] == '--same-id')
     else:

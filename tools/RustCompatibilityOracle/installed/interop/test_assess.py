@@ -3,16 +3,41 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
+import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
+from installed_backup import open_database_handle, snapshot
 from shipping_upload import endpoint_tuple, FILENAME, IMAGE, multipart_image
 
 
 class ConfiguredUploadTests(unittest.TestCase):
+    @unittest.skipUnless(Path('/proc/self/fd').is_dir(), 'requires Linux process descriptors')
+    def test_compares_the_pinned_restored_inode_after_its_path_is_replaced(self):
+        with TemporaryDirectory() as tmp:
+            db = Path(tmp) / 'state.db'
+            db.write_bytes(b'original')
+            with db.open('rb') as pinned:
+                earlier = os.fstat(pinned.fileno())
+                db.rename(db.with_suffix('.old'))
+                db.write_bytes(b'new')
+                match = open_database_handle(os.getpid(), earlier)
+                self.assertEqual(match['inode'], earlier.st_ino)
+                self.assertNotEqual(match['inode'], db.stat().st_ino)
+
+    def test_replay_rejects_an_incomplete_schema_even_with_a_valid_version(self):
+        with TemporaryDirectory() as tmp:
+            db = Path(tmp) / 'bad.db'
+            con = sqlite3.connect(db)
+            con.executescript('CREATE TABLE sync_entries(entry TEXT); PRAGMA user_version=1;')
+            con.close()
+            with self.assertRaisesRegex(RuntimeError, 'Unexpected shipping tables'):
+                snapshot(db, standalone=True)
+
     def test_loopback_connection_matches_both_ipv4_and_mapped_socket_addresses(self):
         self.assertEqual(endpoint_tuple('0100007F:C234'), ('127.0.0.1', 49716))
         self.assertEqual(endpoint_tuple('0000000000000000FFFF00000100007F:0050'), ('127.0.0.1', 80))

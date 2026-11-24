@@ -25,12 +25,12 @@ ASSET_ID = '85a783ae-f459-41e9-ad2a-9f1fdc123742'
 TEST_KEY = 'synthetic-installed-upload'
 
 
-def multipart_image(content_type, body):
+def multipart_image(content_type, body, filename=FILENAME, image=IMAGE):
     message = BytesParser(policy=default).parsebytes(
         b'Content-Type: ' + content_type.encode('ascii') + b'\r\nMIME-Version: 1.0\r\n\r\n' + body)
     files = [part for part in message.iter_parts()
              if part.get_param('name', header='Content-Disposition') == 'assetData']
-    return len(files) == 1 and files[0].get_filename() == FILENAME and files[0].get_payload(decode=True) == IMAGE
+    return len(files) == 1 and files[0].get_filename() == filename and files[0].get_payload(decode=True) == image
 
 
 class UploadPeer(BaseHTTPRequestHandler):
@@ -63,10 +63,12 @@ class UploadPeer(BaseHTTPRequestHandler):
             return
         body = self.rfile.read(length)
         content_type = self.headers.get('Content-Type', '')
-        if not multipart_image(content_type, body):
+        matched = [name for name, (image, _) in self.server.assets.items() if multipart_image(content_type, body, name, image)]
+        if len(matched) != 1:
             self.reply(400, {})
             return
-        observed = dict(client=self.connection.getpeername(), server=self.connection.getsockname(), requestNs=time.monotonic_ns(),
+        name, = matched
+        observed = dict(filename=name, client=self.connection.getpeername(), server=self.connection.getsockname(), requestNs=time.monotonic_ns(),
                         contentType=content_type, bodySha256=hashlib.sha256(body).hexdigest())
         self.server.uploads.append(observed)
         (self.server.output / f'shipping-upload-{self.client_address[1]}.multipart').write_bytes(body)
@@ -75,7 +77,7 @@ class UploadPeer(BaseHTTPRequestHandler):
             self.reply(503, {})
             return
         observed['responseNs'] = time.monotonic_ns()
-        self.reply(201, {'id': ASSET_ID, 'status': 'created'})
+        self.reply(201, {'id': self.server.assets[name][1], 'status': 'created'})
 
 
 def endpoint_tuple(field):
@@ -115,7 +117,7 @@ def rows(path):
         return database.execute('SELECT source_path,relative_path,asset_id,file_size,direction,status FROM sync_entries').fetchall()
 
 
-def observe(stack, bus, display, pins, report, out):
+def observe(stack, bus, display, pins, report, out, backup=None):
     from assess import pidfd
     from gui_refusal import NAME, owner, quit_shipping, workers
     from observe import identity, window, witness
@@ -131,6 +133,7 @@ def observe(stack, bus, display, pins, report, out):
     server = ThreadingHTTPServer(('127.0.0.1', 0), UploadPeer)
     stack.callback(server.server_close)
     server.output, server.uploads = out, details['uploads']
+    server.assets = {FILENAME: (IMAGE, ASSET_ID)}
     server.received, server.release = threading.Event(), threading.Event()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -200,9 +203,16 @@ logging:
                 and identity(pid) == original['gui'] and os.path.samestat(before, endpoint.lstat())
                 and original_socket == client_socket(pid, observed) and not rows(database),
                 'Rust startup or the held shipping transfer changed unexpectedly')
+        if backup:
+            from installed_backup import start_snapshot, capture, restart
+            reader = start_snapshot(database, out, port, backup, sha(config))
+            stack.callback(reader.close)
         server.release.set()
         expected = [(str(media), FILENAME, ASSET_ID, len(IMAGE), 0, 0)]
         wait_for(lambda: check_alive(shipping, log) or rows(database) == expected, 20, 'No durable shipping upload row')
+        if backup:
+            details['rustBackup'] = capture(database, out, port, backup, sha(config), reader)
+            require(not lifetime.poll(0) and identity(pid) == original['gui'], 'Signed apphost exited during live backup')
         quit_shipping(bus)
         details['exit'] = shipping.wait(timeout=15)
         wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(),
@@ -226,6 +236,8 @@ logging:
             require(dest.execute('PRAGMA journal_mode=DELETE').fetchone() == ('delete',), 'Cannot finalize standalone SQLite copy')
         require(rows(copy) == expected, 'The exported shipping history did not reopen')
         details.update(rows=expected, databaseSha256=sha(copy), mediaSha256=sha(image), passed=True)
+        if backup:
+            restart(stack, bus, display, pins, report, out, details, server, config, database, media)
     finally:
         server.release.set()
         for path in sorted((profile / 'data/interop-logs').glob('*.log')):
