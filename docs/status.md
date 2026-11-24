@@ -1,5 +1,16 @@
 # Project Status
 
+## Shipping C# lookup of new Rust-written rows (2026-11-24)
+
+The development writer inserted 24 new entries on eight synthetic
+database copies. Both Linux x64 C# runtimes found the stable key. When
+the casing tables disagreed, an insensitive lookup missed the new relative
+name. A difference in the source path also made its listing miss the entry.
+Independent readback matched 96 lookups, 64 lists, 32 history values and
+all 78 existing rows. The offline run used an isolated network and immutable
+donors. Production handling of these new keys remains open.
+[Two casing profiles and original evidence](rust/rw02-legacy.md#c-readback-of-newly-inserted-rust-rows).
+
 ## Ordinary Windows GUI restart at 21e794f (2026-11-24)
 
 The x64 primary reopened in the foreground with its original inventory

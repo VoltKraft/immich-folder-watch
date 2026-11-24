@@ -544,3 +544,39 @@ controls. It reproduced 120 stored-key lookups. The native probes passed
 the same evidence directory. Its SHA-256 is
 `f5f1071c20d2d624190d24fe52e073536fe11b27a42716fcb6ca28ff7327b7c7`.
 Installed migration and rollback after application activity remain open.
+
+## C# readback of newly inserted Rust rows
+
+The Fedora x64 study inserted three new entries on each of eight copies of
+the two historical C# writers' finalized databases. The Rust development
+writer used the pinned storage libraries and explicitly selected either
+the 15.1 or the 17.0 casing table for each trial. The C# readers ran the
+shipping 3.0.4 store from `0cb3689`, whose Core tree matches `19dcbaf`.
+Both used .NET 10.0.12 and captured their own complete ICU casing table.
+[Reproduction and independent SQL comparison](../../tools/rust-qa/legacy-keys/README.md#insert-new-identities-on-finalized-copies).
+
+| Lookup using the original spelling | Sensitive, either reader | Insensitive, same table as the insert | Insensitive, other table |
+| --- | --- | --- | --- |
+| Stable source and relative name | Found | Found | Found |
+| `New/Only-ƛ.jpg` under a stable source | Found | Found | Single lookup empty. Source list still returns the original name and asset ID. |
+| `New/Source.jpg` under `/IfwSynthetic/Case-ƛ` | Found | Found | Single lookup empty. Listing the original source also misses the new entry. |
+
+In insensitive mode, querying the alternative spelling with `Ƛ` reached
+the 17.0 insertion from both readers. Both returned empty for that spelling
+when the insertion used 15.1. Both accounts retained their original transfer
+timestamps in every trial. Direct SQL agreed with all 96 single-file lookups,
+64 source lists and 32 history reads. Each copy gained exactly three rows.
+The four original databases held 39 rows. Across their eight working
+copies, independent readback recovered all 78 original rows with their rowids. The five study inputs, the original
+receipt and both writer directories were checked by opened file and
+directory identity before and after the trial. The worker compiled from a
+read-only source snapshot and ran with a separate network namespace showing
+only loopback and an empty IPv4 route table. The storage verifier checked
+all 31 crate archives and 2,214 source files before and after the native run.
+
+The report at `artifacts/rust/new-entry-readback-f932674-offline-01/result.json`
+has SHA-256 `4cc86159873ef842dc8460e21f1f6dfe145b6c1d1cec231ddaec291aee5f58dd`.
+Its raw `evidence.tar` has SHA-256
+`1194dacc81f3abb99625276755bf2f38c9dfe2bf97ae169a2adf5063e12eeca4`.
+Independent extraction compared all 160 raw members with the exported files.
+Choosing a production write policy for profile-dependent keys remains open.

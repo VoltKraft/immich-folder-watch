@@ -57,3 +57,55 @@ For a historical writer that predates in-process table capture, append
 to the readback command. Take the two manifest digests from the trusted
 original receipt. The diagnostic result identifies each missing writer table
 and records `writerTablesVerified` as `false`. Its reader table is present.
+
+## Insert new identities on finalized copies
+
+The [Linux x64 study](new-entry/run.py) reads the historical receipt and its
+two finalized writer directories from `artifacts/rust/casing-profile-verified-f538495`.
+Use the repository cache containing SDK 10.0.401, runtime 10.0.12 and the
+private ICU 74.2 libraries. The host ICU must reproduce the qualified
+Unicode 17.0 table. The driver needs a native Fedora x64 system with
+Bubblewrap user, mount and network namespaces, GNU `ar` and Python with
+zstd tar support. The output must be a fresh direct child of `artifacts/rust`.
+
+```bash
+python3 -B tools/rust-qa/legacy-keys/new-entry/run.py \
+  --dotnet artifacts/flatpak-local-2.11.2/sdk/dotnet \
+  --icu74 artifacts/rust/casing-oracle-verified-e59a691/icu74 \
+  --output artifacts/rust/new-entry-comparison
+```
+
+The driver opens each donor directory relative to a held Linux directory
+descriptor. It reads regular single-link inputs from their opened handles,
+checks the attested receipt and mounts those exact bytes read-only. It
+also mounts the five study files read-only and reconstructs the first-party
+sources from a single Git revision. The native processes see a new root
+containing the required system files, checkout inputs and private temporary
+directories. The run records its separate network namespace, loopback
+interface and empty IPv4 route table. The original package caches are read-only. Cargo uses its own
+registry copy. Each C# invocation gets a read-only mount of the eight Rust
+cases and a separate writable directory for its shipping store.
+
+The same run authenticates the Rust distribution in
+`artifacts/rust/toolchain-inputs`, the SDK tarball at
+`artifacts/flatpak-local-2.11.2/dotnet-sdk.tar.gz`, and
+`libicu74_74.2-1ubuntu3.1_amd64.deb` in
+`artifacts/rust/portal-noble/development-01/packages`. It compares the host, SDK driver,
+CoreLib and CoreCLR bytes with the .NET archive and the three ICU 74.2
+libraries with the Ubuntu package. Cargo metadata, the locked target graph,
+the original crate archives, the full unpacked sources and the selected
+notices are checked with the storage assessment's verifier.
+
+The development Rust writer builds against the storage assessment's locked
+libraries. On separate copies it uses each explicit casing table to insert
+three new entries in one transaction. It exercises a stable key, a changing
+relative name and a changing source name. Each native C# reader captures its
+complete casing table and calls the shipping store on fresh copies. The
+[SQL verifier](new-entry/verify.py) compares the single-file results, ordered
+source listings, account history, schema and every row with the original
+inputs and the three expected inserts. The output retains the Rust receipts,
+both C# reports and full tables, the copies, the five study sources, the
+Git source archive and the verified crate archives. `evidence.tar` is the
+raw export from the private namespace. `result.json` binds its digest
+to the original directory and file identities checked before and after
+the run.
