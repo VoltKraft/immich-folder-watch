@@ -98,6 +98,38 @@ and the Rust GUI's [filtered D-Bus trial](#second-launch-through-the-installed-f
 have separate positive activation evidence. Installed old/new writer
 handover remains open.
 
+### Rust startup while the shipping Flatpak is running
+
+On Fedora x64, the Rust GUI on branch `test` refused an ordinary start while
+the signed 3.0.4 application on branch `master` owned the shipping socket.
+Both branches used `io.github.voltkraft.immich-folder-watch` and the published
+sandbox permissions. The original GUI kept PID 88, window 4194319 and socket
+device/inode `96:73`. Both the ordinary start and a start requesting the optional
+inventory worker exited 1 with the occupied-endpoint error. The candidate had
+no bus name after either attempt. The private configuration and data contained
+only the original startup marker, whose digest stayed the same.
+
+After the original's normal tray Quit exited zero, the same Rust executable
+opened window 4194306 as PID 198 and rendered through llvmpipe. It drained on
+Quit and the two private application refs were removed. The positive run used
+an unconfigured profile with the optional worker disabled. The original and
+candidate executable SHA-256 values are recorded in the native result under
+`artifacts/rust/shipping-flatpak-interop/same-id-2_rcoy7y/`. Its `result.json`
+has SHA-256 `f9438bea3cdefd63334c3bbc424097d41babad94baa43e241c3eb75615940e71`.
+[Native startup comparison](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py).
+
+The candidate reads the application ID from `/.flatpak-info`, checks the
+private runtime directory's ownership and mode, and looks up the endpoint
+through its open directory handle. It verifies that handle's device and inode
+before accepting an absent name. Any existing entry blocks that startup. A
+stale entry therefore also blocks startup. The candidate leaves the entry in
+place and sends no activation. Its normal D-Bus election still covers the
+lifetime of a running Rust primary through worker drain. The admission check
+covers an entry already present in this runtime directory. An original
+process that binds later, another session or runtime directory, and package
+upgrade or rollback still require separate evidence.
+[Linux admission check](../../tools/rust-qa/gui/src/linux_legacy.rs).
+
 ## Ordinary second launch of the Linux GUI
 
 The shipping Flatpak starts its executable for each launch. When the Linux

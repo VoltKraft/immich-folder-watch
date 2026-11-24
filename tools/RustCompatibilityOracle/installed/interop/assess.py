@@ -1,6 +1,7 @@
 """Check the XDG path and process identity prerequisites of the installed old/new Linux pairing.
 
 Run python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py --same-id or --different-id.
+Use --gui-build artifacts/rust/GUI_BUILD to exercise the actual candidate against the installed old GUI.
 Use the published 3.0.4 bundle and detached signature described by ../launch/run.py and its
 pinned x64 Platform and GL runtimes. No previous trial output is required.
 """
@@ -70,7 +71,25 @@ def pidfd(stack, pid):
     return poll
 
 
-def outer(same_id):
+def gui_source_snapshot(root, recorded):
+    qa = root / 'tools/rust-qa/gui'
+    paths = [*sorted((qa / 'src').glob('*.rs')), qa / 'src/tray-icon.argb',
+             qa / 'Cargo.toml', qa / 'Cargo.lock', root / 'rust/Cargo.toml',
+             root / 'rust/crates/desktop-lifecycle/Cargo.toml', root / 'rust/crates/desktop-lifecycle/src/lib.rs']
+    allowed = {p.relative_to(root).as_posix(): p for p in paths}
+    require(isinstance(recorded, dict) and recorded.keys() == allowed.keys()
+            and 'tools/rust-qa/gui/src/linux_legacy.rs' in allowed,
+            'The native GUI source inventory differs from the expected local sources')
+    snapshot = {}
+    for name, path in allowed.items():
+        require(path.resolve(strict=True) == path and path.is_file(), 'Expected a regular local GUI source')
+        contents = path.read_bytes()
+        require(hashlib.sha256(contents).hexdigest() == recorded[name], 'The native GUI source binding differs')
+        snapshot[name] = contents
+    return snapshot
+
+
+def outer(same_id, gui_build=None):
     root = HERE.parents[3]
     art = root / 'artifacts/rust'
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
@@ -94,7 +113,10 @@ def outer(same_id):
             path.write_bytes(subprocess.check_output(['git', 'show', f'{revision}:{name}'], cwd=root))
             archive.write(path, name)
             snapshot[name] = sha(path)
-        for name in ('assess.py', 'hold.sh', 'test_assess.py'):
+        driver_names = ['assess.py', 'hold.sh', 'test_assess.py']
+        if gui_build is not None:
+            driver_names.extend(['gui_refusal.py', 'gui-launch.sh'])
+        for name in driver_names:
             driver = HERE / name
             relative = driver.relative_to(root).as_posix()
             dest = frozen / relative
@@ -132,7 +154,24 @@ def outer(same_id):
     # Relative source names keep compiler diagnostics embedded in the executable independent of the clone's path.
     subprocess.run([compiler, '--edition=2024', '-Dwarnings', '-O', 'main.rs', '-o', binary], cwd=probe_sources, check=True)
     require(sha(binary) == EXPECTED_PROBE, 'The compiler did not reproduce the path-independent probe binary')
-    save(out / 'inputs.json', dict(base=pins, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
+    gui_hash = None
+    gui_files = None
+    if gui_build is not None:
+        build = gui_build.resolve(strict=True)
+        require(build.is_relative_to(art.resolve()) and build != art, 'Expected an isolated GUI build')
+        gui = build / 'release/native-gui-assessment'
+        receipt = gui.with_suffix('.inputs.json')
+        require(all(p.resolve(strict=True) == p and p.is_file() for p in (gui, receipt)), 'Expected local build files')
+        evidence = json.loads(receipt.read_bytes())
+        require(evidence['target'] == 'x86_64-unknown-linux-gnu' and evidence['binary_sha256'] == sha(gui), 'The native GUI binary differs')
+        gui_sources = gui_source_snapshot(root, evidence['sources'])
+        with ZipFile(out / 'gui-sources.zip', 'x', ZIP_DEFLATED) as archive:
+            for name, contents in sorted(gui_sources.items()):
+                archive.writestr(name, contents)
+        shutil.copyfile(receipt, out / 'gui-build.json')
+        gui_hash = sha(gui)
+        gui_files = {name: sha(out / name) for name in ('gui-build.json', 'gui-sources.zip')}
+    save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
                                    sameId=same_id, revision=revision, rustc=sha(compiler), probe=EXPECTED_PROBE,
                                    sources=snapshot, archive=sha(out / 'observer-source.zip')))
     command = namespace(out, frozen / HERE.relative_to(root), None)
@@ -148,9 +187,18 @@ def outer(same_id):
         '--setenv', 'FLATPAK_SYSTEM_DIR', str(private), '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak',
         '--dir', '/run/user/0', '--setenv', 'XDG_RUNTIME_DIR', '/run/user/0', '--chdir', '/qa', '--', '/usr/bin/python3', '-B', '/app/assess.py', '--inside']
     try:
+        if gui_build is not None:
+            location = command.index('--chdir')
+            command[location:location] = ['--ro-bind', str(gui), '/candidate-gui']
         subprocess.run(command, timeout=125, check=True)
     finally:
         (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in sorted(out.iterdir()) if p.is_file()))
+
+
+def verify_uninstalled(report):
+    report['userInstallationEmpty'] = not subprocess.check_output(['flatpak', '--user', 'list', '--app', '--columns=ref'], text=True, timeout=6).strip()
+    require(report['userInstallationEmpty'], 'Installed application remained')
+    report['passed'] = True
 
 
 def inside():
@@ -210,13 +258,24 @@ def inside():
             bin_dir.mkdir(parents=True)
             (app / 'var').mkdir()
             (app / 'metadata').write_text(f'[Application]\nname={probe_app}\nruntime=org.freedesktop.Platform/x86_64/26.08\nsdk=org.freedesktop.Sdk/x86_64/26.08\n')
-            shutil.copy2(out / 'instance', bin_dir / 'instance')
-            shutil.copyfile('/app/hold.sh', bin_dir / 'hold')
-            (bin_dir / 'hold').chmod(0o755)
-            finish = ['--command=hold', '--share=ipc', '--share=network', '--socket=x11', '--device=dri', '--talk-name=org.kde.StatusNotifierWatcher']
+            if i['guiHash']:
+                require(sha(Path('/candidate-gui')) == i['guiHash'], 'Unexpected staged GUI')
+                shutil.copy2('/candidate-gui', bin_dir / 'native-gui-assessment')
+                shutil.copyfile('/app/gui-launch.sh', bin_dir / 'launch')
+            else:
+                shutil.copy2(out / 'instance', bin_dir / 'instance')
+                shutil.copyfile('/app/hold.sh', bin_dir / 'launch')
+            (bin_dir / 'launch').chmod(0o755)
+            finish = ['--command=launch', '--share=ipc', '--share=network', '--socket=x11', '--device=dri', '--talk-name=org.kde.StatusNotifierWatcher']
             installed = r['probeRef'] = export_install(app, probe_app, finish)
             stack.callback(setup_command, ['flatpak', '--user', 'remote-delete', 'fixture'])
             stack.callback(setup_command, ['flatpak', '--user', 'uninstall', '--noninteractive', installed['installed_ref']])
+            if i['guiHash']:
+                from gui_refusal import run as observe_refusal
+                observe_refusal(stack, bus, display, pins, r, out, i['guiHash'])
+                stack.close()
+                verify_uninstalled(r)
+                return
             tray = out / 'watcher.log'
             peer = checked_start(stack, ['/usr/bin/python3', '-B', '/watcher.py'], tray)
             wait_for(lambda: check_alive(peer, tray) or 'WATCHER_READY' in tray.read_text(), 5, 'Private status watcher unavailable')
@@ -279,9 +338,7 @@ def inside():
             r['originalNativeExited'] = bool(original_lifetime.poll(1000))
             require(r['originalNativeExited'] and r['probeExitedBeforeOriginalQuit'] and r['originalExit'] == r['probeExit'] == 0 and 'WRITER_RELEASED' in log.read_text().splitlines(), 'Original or probe did not quit normally')
             wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=3).strip(), 6, 'Installed instance remained after quit')
-        r['userInstallationEmpty'] = not subprocess.check_output(['flatpak', '--user', 'list', '--app', '--columns=ref'], text=True).strip()
-        require(r['userInstallationEmpty'], 'Installed application remained')
-        r['passed'] = True
+        verify_uninstalled(r)
     except Exception as error:
         r['error'] = str(error)
         raise
@@ -292,6 +349,8 @@ def inside():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--inside']:
         inside()
+    elif len(sys.argv) == 3 and sys.argv[1] == '--gui-build':
+        outer(True, Path(sys.argv[2]))
     elif sys.argv[1:] in (['--same-id'], ['--different-id']):
         outer(sys.argv[1] == '--same-id')
     else:

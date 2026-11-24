@@ -1,5 +1,14 @@
 # Project Status
 
+## Rust startup beside the installed 3.0.4 Flatpak (2026-11-24)
+
+An ordinary Rust launch and a launch requesting its inventory worker each
+stopped before taking the bus name or writing application data while the
+original GUI held its socket. After a normal 3.0.4 Quit, the same Rust
+executable started, rendered and quit on the private Fedora x64 desktop.
+A later or simultaneous legacy start and other sessions remain open.
+[Native trial with the installed applications](rust/rw02-instance.md#rust-startup-while-the-shipping-flatpak-is-running).
+
 ## Windows notification registration on a fresh user profile (2026-11-24)
 
 At `21e794f` Windows ARM64 created both WinRT notifiers, then returned

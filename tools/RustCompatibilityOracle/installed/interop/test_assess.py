@@ -1,12 +1,27 @@
 """Check that the two Flatpak prerequisite outcomes cannot be interchanged."""
 
 from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
-from assess import verify_paths, verify_siblings
+from assess import gui_source_snapshot, verify_paths, verify_siblings
 
 
 class IdentityTests(unittest.TestCase):
+    def test_receipt_cannot_select_files_for_the_native_gui_archive(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src = root / 'tools/rust-qa/gui/src'
+            src.mkdir(parents=True)
+            (src / 'linux_legacy.rs').touch()
+            expected = {'tools/rust-qa/gui/' + p for p in ('Cargo.toml', 'Cargo.lock', 'src/linux_legacy.rs', 'src/tray-icon.argb')}
+            expected.update(('rust/Cargo.toml', 'rust/crates/desktop-lifecycle/Cargo.toml', 'rust/crates/desktop-lifecycle/src/lib.rs'))
+            for names in (expected | {'../outside'}, expected - {'rust/Cargo.toml'}):
+                # The other required files do not exist. Reject the names before trying to open any of them.
+                with self.subTest(names=names), self.assertRaisesRegex(RuntimeError, 'source inventory'):
+                    gui_source_snapshot(root, dict.fromkeys(names, ''))
+
     def test_shared_id_needs_both_original_identities(self):
         verify_paths(True, [21, 5], [21, 5], [21, 9], 'NORMAL_ENDPOINT visible 21 9')
         for directory, endpoint in (([21, 6], 'NORMAL_ENDPOINT visible 21 9'),

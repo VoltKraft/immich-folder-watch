@@ -244,6 +244,7 @@ to reconcile project decisions, defaults, and recorded state.
   The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
   The [two installed refs](docs/rust/rw02-instance.md#shipping-flatpak-and-rust-probe-in-two-installed-refs)
   distinguish a shared socket name from verified activation across Flatpak PID namespaces.
+  Exercise [Rust startup with the signed legacy Flatpak running](docs/rust/rw02-instance.md#rust-startup-while-the-shipping-flatpak-is-running) before changing Linux instance admission.
   Preserve the [worker rollback fixtures](docs/development.md#repair-and-deletion-after-restoring-the-worker-database)
   and their external media, journal, peer request and assembly evidence.
   The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only

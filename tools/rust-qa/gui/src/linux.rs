@@ -1,3 +1,6 @@
+#[path = "linux_legacy.rs"]
+mod legacy;
+
 use super::{Command, Control};
 use std::collections::HashMap;
 use std::error::Error;
@@ -10,6 +13,7 @@ use zbus::{
 };
 
 const NAME: &str = "org.example.IfwGuiProbe";
+const INSTALLED_NAME: &str = "io.github.voltkraft.immich-folder-watch.RustAssessment";
 const APP_PATH: &str = "/org/example/IfwGuiProbe";
 const APP_INTERFACE: &str = "org.freedesktop.Application";
 const WATCHER: &str = "org.kde.StatusNotifierWatcher";
@@ -20,7 +24,7 @@ struct Application {
     control: Control,
     quitting: bool,
 }
-struct Item(Control);
+struct Item(Control, &'static str);
 
 fn dispatch(control: &Control, command: Command) -> fdo::Result<()> {
     control.send(command).map_err(|error| match error {
@@ -68,7 +72,7 @@ impl Application {
 impl Item {
     #[zbus(property)]
     fn id(&self) -> &str {
-        NAME
+        self.1
     }
     #[zbus(property)]
     fn title(&self) -> &str {
@@ -141,6 +145,11 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
     {
         return Err("Expected a private GUI assessment home and session bus".into());
     }
+    let name = if legacy::check_installed_runtime()? {
+        INSTALLED_NAME
+    } else {
+        NAME
+    };
     futures_lite::future::block_on(async {
         let connection = Builder::session()?
             .serve_at(
@@ -150,20 +159,20 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
                     quitting: false,
                 },
             )?
-            .serve_at("/StatusNotifierItem", Item(control))?
+            .serve_at("/StatusNotifierItem", Item(control, name))?
             .method_timeout(Duration::from_secs(2))
             .build()
             .await?;
         // Publish the interfaces first so a simultaneous launch can activate the winner.
         match connection
-            .request_name_with_flags(NAME, fdo::RequestNameFlags::DoNotQueue.into())
+            .request_name_with_flags(name, fdo::RequestNameFlags::DoNotQueue.into())
             .await
         {
             Ok(fdo::RequestNameReply::PrimaryOwner) => {}
             Err(zbus::Error::NameTaken) => {
                 let owner = fdo::DBusProxy::new(&connection)
                     .await?
-                    .get_name_owner(NAME.try_into()?)
+                    .get_name_owner(name.try_into()?)
                     .await?;
                 // A unique destination cannot autostart or silently target a successor.
                 let reply = connection
@@ -192,7 +201,7 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
                 "/StatusNotifierWatcher",
                 Some(WATCHER),
                 "RegisterStatusNotifierItem",
-                &NAME,
+                &name,
             )
             .await;
         if let Err(error) = &result {
