@@ -70,7 +70,8 @@ class OriginalFlyoutTests(unittest.TestCase):
 
     def test_chevron_capabilities_cannot_qualify_an_icon_or_flyout(self):
         baseline, hint, _, _, cleanup = self.history()
-        events = [baseline, hint, dict(stage="chevron-diagnostic", selection={"gate": "known-name-selection"}),
+        events = [baseline, hint, dict(stage="marker-grid", status="sampled", grid={"matches": 4, "matchingSampleSquares": 1}),
+                  dict(stage="chevron-diagnostic", selection={"gate": "known-name-selection"}),
                   dict(stage="chevron-hint", afterRejectionAtHint={"status": "bound-taskbar-point",
                        "elements": [{"Name": "Hidden icon menu", "invoke": True}]}),
                   cleanup | {"attempted": False, "restored": False, "observedOpen": None}]

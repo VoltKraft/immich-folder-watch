@@ -229,6 +229,65 @@ public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
             rootClass=root == bar ? "Shell_TrayWnd" : current.windowClass, pane=current, overflow=pane, monitor=monitor.ToInt64(), cursor=Cursor(),
             rgb=String.Format("{0:x2}{1:x2}{2:x2}",pixel & 255,(pixel >> 8) & 255,(pixel >> 16) & 255) };
     }
+    public sealed class MarkerGrid {
+        public int columns, rows, sampled, unobserved, matches, matchingSampleSquares;
+        public int[] step, matchingBounds;
+    }
+    // Only the coordinates and arrangement of challenge-color hits leave the scan.
+    public static MarkerGrid CountMarker(int[] rect, Func<int,int,int> sample) {
+        long w = (long)rect[2]-rect[0], h = (long)rect[3]-rect[1];
+        Require(w >= 2 && w <= 256 && h >= 2 && h <= 256, "Invalid marker grid rectangle");
+        int sx = ((int)w+15)/16, sy = ((int)h+15)/16;
+        var grid = new MarkerGrid { step=new int[]{sx,sy}, columns=((int)w+sx-1)/sx, rows=((int)h+sy-1)/sy };
+        var hit = new bool[grid.rows,grid.columns];
+        for (int row=0; row<grid.rows; row++) {
+            int y = rect[1] + Math.Min((int)h-1, row*sy+sy/2);
+            for (int col=0; col<grid.columns; col++) {
+                int x = rect[0] + Math.Min((int)w-1, col*sx+sx/2);
+                int outcome = sample(x,y);
+                if (outcome < 0) { grid.unobserved++; continue; }
+                grid.sampled++;
+                if (outcome == 0) continue;
+                hit[row,col] = true;
+                grid.matches++;
+                if (grid.matchingBounds == null) grid.matchingBounds = new int[]{x,y,x+1,y+1};
+                else {
+                    grid.matchingBounds[0] = Math.Min(grid.matchingBounds[0],x);
+                    grid.matchingBounds[1] = Math.Min(grid.matchingBounds[1],y);
+                    grid.matchingBounds[2] = Math.Max(grid.matchingBounds[2],x+1);
+                    grid.matchingBounds[3] = Math.Max(grid.matchingBounds[3],y+1);
+                }
+                if (row > 0 && col > 0 && hit[row-1,col] && hit[row,col-1] && hit[row-1,col-1])
+                    grid.matchingSampleSquares++;
+            }
+        }
+        return grid;
+    }
+    bool OnOriginalTaskbar(Point point, IntPtr hit, Sample center) {
+        return hit != IntPtr.Zero && GetAncestor(hit,2) == bar && MonitorFromPoint(point,0).ToInt64() == center.monitor &&
+            IsWindowVisible(hit) && WindowOwner(hit) == shellPid;
+    }
+    public MarkerGrid ReadMarkerGrid(Sample center, int[] expected) {
+        Require(center != null && center.pane == null && center.root == bar.ToInt64() &&
+                expected.Length == 3 && Array.TrueForAll(expected, v => v >= 0 && v <= 255) &&
+                center.Matches(Read(null)), "The initial marker rectangle or its original Explorer changed before the scan");
+        IntPtr dc=GetDC(IntPtr.Zero);
+        Require(dc != IntPtr.Zero, "Could not read the bounded marker grid");
+        MarkerGrid grid;
+        try {
+            grid = CountMarker(center.rect, delegate(int x, int y) {
+                var point = new Point { X=x, Y=y };
+                var hit = WindowFromPoint(point);
+                if (!OnOriginalTaskbar(point,hit,center)) return -1;
+                uint pixel = GetPixel(dc,x,y);
+                if (pixel == 0xffffffff || WindowFromPoint(point) != hit || !OnOriginalTaskbar(point,hit,center)) return -1;
+                return Math.Abs((int)(pixel & 255)-expected[0]) <= 8 && Math.Abs((int)((pixel>>8) & 255)-expected[1]) <= 8 &&
+                    Math.Abs((int)((pixel>>16) & 255)-expected[2]) <= 8 ? 1 : 0;
+            });
+        } finally { if (ReleaseDC(IntPtr.Zero,dc) == 0) throw new Win32Exception(Marshal.GetLastWin32Error()); }
+        Require(center.Matches(Read(null)), "The original marker rectangle or Explorer changed during the scan");
+        return grid;
+    }
     public void Dispose() {
         int error = 0;
         if (primaryHandle != IntPtr.Zero && !CloseHandle(primaryHandle)) error = Marshal.GetLastWin32Error();
@@ -257,15 +316,16 @@ function Get-Marker($Guard, [int[]]$Expected, $First) {
                 if ([Math]::Abs($channel - $Expected[$i]) -gt 8) { $ok = $false }
             }
             if ($ok) { return $live }
-            $reason = "The native icon rectangle yielded pixel $($live.rgb)"
+            $reason = [InvalidOperationException]::new("The native icon rectangle yielded pixel $($live.rgb)")
+            $reason.Data['markerColorMismatch'] = $true
         } catch {
             $underlying = $_.Exception.GetBaseException()
             if ($underlying -is [IfwIconSurface+PaneChanged] -or $underlying -isnot [InvalidOperationException]) { throw }
-            $reason = $underlying.Message
+            $reason = $underlying
         }
         Start-Sleep -Milliseconds 80
     } while ($until.Elapsed.TotalSeconds -lt 4)
-    throw [InvalidOperationException]::new($reason)
+    throw $reason
 }
 
 function Get-ExactProvider($Surface, [string]$Label) {
@@ -519,7 +579,20 @@ try {
         $reason = $_.Exception.GetBaseException()
         if ($reason -is [IfwIconSurface+PaneChanged] -or $reason -isnot [InvalidOperationException]) { throw }
         $guard.CheckOriginal()
-        Write-Event 'hint' @{surface=$script:lastSurface; reason=$reason.Message; markerObserved=$false; expectedRgb=($orig | ForEach-Object {$_.ToString('x2')}) -join ''}
+        $expectedRgb = ($orig | ForEach-Object {$_.ToString('x2')}) -join ''
+        Write-Event 'hint' @{surface=$script:lastSurface; reason=$reason.Message; markerObserved=$false; expectedRgb=$expectedRgb}
+        if ($reason.Data['markerColorMismatch'] -eq $true -and $script:lastSurface.root -eq $Bar) {
+            $scan = @{status='unavailable'; rect=$script:lastSurface.rect; expectedRgb=$expectedRgb}
+            try {
+                $scan.grid = $guard.ReadMarkerGrid($script:lastSurface, $orig)
+                $scan.status = 'sampled'
+            } catch {
+                $failure = $_.Exception.GetBaseException()
+                if ($failure -is [IfwIconSurface+PaneChanged] -or $failure -isnot [InvalidOperationException]) { throw }
+                $scan.reason = $failure.Message
+            }
+            Write-Event 'marker-grid' $scan
+        }
         $selection = @{expectedBar=$script:Bar; expectedPid=$script:ShellPid}
         $beforeChange = {
             param($Candidate,$Owner)

@@ -6,6 +6,39 @@ if ($errors.Count) { throw $errors[0] }
 $source=$ast.Find({param($n) $n -is [Management.Automation.Language.StringConstantExpressionAst] -and
     $n.Value.Contains('public sealed class IfwIconSurface')},$true)
 Add-Type -TypeDefinition $source.Value
+$testRect=[int[]]@(790,720,822,768)
+$grid=[IfwIconSurface]::CountMarker($testRect,{
+    param($x,$y)
+    if ($x -lt 790 -or $x -ge 822 -or $y -lt 720 -or $y -ge 768) { throw 'Read outside the original rectangle' }
+    if ($x -le 793 -and $y -le 724) { return 1 }
+    if ($x -eq 821) { return -1 }
+    return 0
+})
+if ($grid.matches -ne 4 -or $grid.matchingSampleSquares -ne 1 -or $grid.unobserved -ne 16 -or
+    $grid.sampled -ne 240 -or ($grid.step -join ',') -ne '2,3' -or
+    ($grid.matchingBounds -join ',') -ne '791,721,794,725') {
+    throw 'The offset marker or the unobserved part of the Shell rectangle was misreported'
+}
+$sparse=[IfwIconSurface]::CountMarker([int[]]@(-12,-4,4,12),{
+    param($x,$y)
+    if ($x -eq -12 -or $y -eq 11) {return 1}; return 0
+})
+if ($sparse.matches -ne 31 -or $sparse.matchingSampleSquares -ne 0 -or
+    ($sparse.matchingBounds -join ',') -ne '-12,-4,4,12') { throw 'Isolated rows were credited as a marker area' }
+$empty=[IfwIconSurface]::CountMarker([int[]]@(0,0,256,2),{
+    param($x,$y)
+    if ($x -lt 0 -or $x -ge 256 -or $y -lt 0 -or $y -ge 2) { throw 'Unbounded grid' }
+    return 0
+})
+if ($empty.columns -ne 16 -or $empty.rows -ne 2 -or $empty.sampled -ne 32 -or $null -ne $empty.matchingBounds) {
+    throw 'An empty maximally wide rectangle recorded a hit or lost its sample geometry'
+}
+try {
+    [void][IfwIconSurface]::CountMarker([int[]]@(0,0,257,2),{ throw 'Oversized rectangle read' })
+    throw 'Oversized rectangle accepted'
+} catch {
+    if ($_.Exception.GetBaseException().Message -ne 'Invalid marker grid rectangle') { throw }
+}
 . (Join-Path $PSScriptRoot '../windows-services/tray-overflow.ps1')
 foreach ($name in @('Wait-OpenedPane','Restore-OpenedPane','Invoke-OriginalIcon')) {
     $fn=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$true)
@@ -77,4 +110,4 @@ foreach ($case in @('open-threw','close-threw','already-dismissed','foreign-surf
         }
     }
 }
-Write-Output 'Seven original flyout recovery controls and the native tuple comparison passed.'
+Write-Output 'Four passive marker-grid controls, seven flyout recovery controls and the native tuple comparison passed.'
