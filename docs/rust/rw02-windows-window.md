@@ -457,6 +457,21 @@ Seven published source archives matched the Cargo index. Native iced
 performance and reader behavior remain unmeasured.
 [Accessibility issue](https://github.com/iced-rs/iced/issues/552) · [Embedded fonts](https://github.com/iced-rs/iced/blob/3997291f318a8bc06fa522f5579836fb3feb94df/graphics/src/text.rs#L110-L129) · [First icon font revision](https://github.com/iced-rs/iced/commit/2c8ba652a7929ac6c2af28ac60a8bd4b8e8e2f10).
 
+The 0.14.0 font contains seven mapped symbols. In the official Fontello
+catalog, `down-dir` derives from Font Awesome U+F0D7. The iced U+E800
+outline and Fontello U+25BE have the same 15 integer points and curve
+flags after translation in a 1,000-unit em. The compared Fontello TTF
+has SHA-256 `95a8828ad76d680a991877ff38545458232f486a34aadbb7733fbb3951a8acef`.
+The two checkmarks have
+matching 865 × 663 bounds but different point counts (22 and 23).
+Upstream documents the addition of the iced logo and four scroll icons
+in separate changes. The complete font still lacks verified glyph-level
+redistribution evidence. The native accessibility trial remains an
+independent prerequisite for this alternative.
+[Fontello catalog and source mapping](https://github.com/fontello/awesome-uni.font/blob/29d4e3ff028fc850a21b5eaafde0a83f22f59cf1/config.yml) ·
+[Logo change](https://github.com/iced-rs/iced/pull/2902) ·
+[Scroll icon change](https://github.com/iced-rs/iced/commit/99748b89dea3dc24db24a73d79d5fa3e410b73a4).
+
 ## Visible GDI and retained egui under the same inventory
 
 The x64 GDI surface met the four WPF window-response limits twice.

@@ -105,7 +105,7 @@ Under `artifacts/rust/appearance/`, the original Ubuntu result is in
 in `noble-x64/x86_64-krvf14l5/` and the Fedora result in `runs/x86_64-1g_p_xou/`.
 The observer creates the keyfile settings directory in the synthetic profile
 before starting either reader. Without it both portal processes initially
-kept reporting the default scheme. Hosted ARM64 verification is pending.
+kept reporting the default scheme.
 
 ### Stock Ubuntu x64 and ARM64 at 21e794f
 
