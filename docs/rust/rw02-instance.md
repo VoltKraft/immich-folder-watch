@@ -459,6 +459,49 @@ host the native launcher and tray logs matched the archived receipts and
 `1ec9fd1fa5f2bba87b45b983bdc8ff2ca110202e1cf66d312654a418f148bb1f`.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854302616) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14854152253).
 
+### Staged executable cleanup at 21e794f
+
+On Windows x64 the ordinary secondary returned zero. The original GUI
+(PID 7132) showed HWND 2031982 in the foreground and retained worker 5184.
+Its log recorded nine completed passes at shutdown. Both process jobs
+were empty. Windows then refused the DELETE handle for
+`subject/native-gui-assessment.exe` with sharing violation 32. The
+foreground trial retained its failure and the private-desktop trial was
+skipped. On ARM64, both launcher trials completed and removed their
+profiles. The original GUI (PID 5208) retained worker 1624 and reopened
+HWND 327924. All 41 samples over 2.016 seconds found the same visible
+window. None recorded it in the foreground.
+[Native launcher run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661).
+
+The two original receipts have SHA-256
+`e4232da904523e1f9f1d3eff57fc3701ff1c71c7cb73f633b65c332d4eabe54d`
+and `2ae35a8dfbabfc18a6c1f2f802cb5100ab9d19c0fb9d3a6b87e4f38b6af6f9da`
+for x64 and ARM64 respectively. Archive readback matched the four x64
+logs and seven ARM64 logs to their receipts. On each target all 13
+observer inputs matched the Git sources with the runner's line endings.
+
+The launcher observer now hashes each staged executable under its
+deny-write, deny-delete handle. A second handle keeps the original
+volume and file ID live and continues to deny writes as cleanup opens
+the DELETE handle. Only a sharing violation on that open permits a retry,
+for up to five seconds per executable. The observer compares the new
+handle's identity, requests disposition on that handle and confirms that
+opening the original name returns file-not-found. The subject directory
+stays pinned until both names are gone. An uncertain job exit preserves
+the profile. The executable receipts record their digest, identity,
+attempt count and any initial sharing refusal.
+[Launcher observer](../../tools/rust-qa/windows-launcher/observe.py).
+
+The Windows control holds a real deny-delete handle on the staged GUI
+copy until it observes the first native sharing violation. It then
+checks both executable dispositions and removal of the two fixture
+directories. Run the focused controls from the project root with
+`python -B -m unittest discover -s tools/rust-qa/windows-launcher -p test_staged_images.py`.
+The hosted control writes its source hashes and observations to
+`artifacts/rust/windows-launcher-staging/<target>/result.json`.
+Native results for the revised cleanup are pending.
+[Staged-image controls](../../tools/rust-qa/windows-launcher/test_staged_images.py).
+
 ## Second launch from a foreground test window
 
 The ordinary launcher trial starts the secondary process directly from

@@ -452,6 +452,10 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' }}
         run: python3 -B tools/rust-qa/performance/worker/check_hidden.py graphics-ci --second-launch
 
+      - name: Release the original staged Windows image after a temporary sharing violation
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        run: python -B -m unittest discover -s tools/rust-qa/windows-launcher -p test_staged_images.py -v
+
       - name: Verify native process ownership and cleanup in the resource fixture
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
         shell: pwsh
@@ -843,6 +847,7 @@ jobs:
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
             artifacts/rust/performance/graphics-ci-second-launch.json
+            artifacts/rust/windows-launcher-staging/${{ matrix.target }}/result.json
             artifacts/rust/windows-performance/native-*/*
             artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.json
             artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.log

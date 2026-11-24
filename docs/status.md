@@ -1,5 +1,16 @@
 # Project Status
 
+## Ordinary Windows GUI restart at 21e794f (2026-11-24)
+
+The x64 primary reopened in the foreground with its original inventory
+worker. Both jobs exited cleanly. Removal of the staged executable then
+failed with Windows sharing violation 32, so the private restart trial
+was skipped. ARM64 completed both restart trials and kept its worker.
+Its reopened window on the original desktop did not gain foreground focus.
+The revised fixture retains the original file identity while waiting for
+that sharing violation to clear. The dedicated Windows control is pending.
+[Native receipts and cleanup procedure](rust/rw02-instance.md#staged-executable-cleanup-at-21e794f).
+
 ## Ordinary Windows writer launch (2026-11-24)
 
 At `21e794f` the elevated controls again completed the writer handover

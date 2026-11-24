@@ -9,6 +9,7 @@ from pathlib import Path, PureWindowsPath
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -18,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 QA, ROOT = HERE.parent, HERE.parents[2]
 sys.path[:0] = [str(QA / "windows-performance"), str(QA / "windows-desktop")]
 import run as recorder
-from native import CleanupUnconfirmed, JobAccounting, ThreadEntry, pin_new_marker
+from native import CleanupUnconfirmed, JobAccounting, ThreadEntry, dispose_empty_directory, pin_new_marker
 from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
 from window_readback import PrivateMembership, check_private_snapshot, paint_control, snapshot
@@ -566,6 +567,125 @@ def profile_resources(api, parent, token, result):
     result["cleanupConfirmed"] = True
 
 
+def image_identity(api, handle):
+    attributes, identity = api.file_info(handle)
+    if attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x10 | 0x40):
+        raise CleanupUnconfirmed("The staged launcher image is no longer a regular file")
+    return identity
+
+
+def delete_staged_image(api, path, original, record):
+    """Retry only the sharing refusal on opening the original staged image for deletion."""
+    deadline = time.monotonic() + 5
+    record.update(attempts=0, timeoutMs=5000)
+    while True:
+        record["attempts"] += 1
+        try:
+            handle = api.path_handle(path, False, delete=True)
+        except OSError as error:
+            error.add_note(f"CreateFileW(DELETE | FILE_READ_ATTRIBUTES) on staged image 'subject/{path.name}'")
+            if getattr(error, "winerror", None) != 32:
+                raise
+            record.setdefault("firstSharingViolation", failures(error)[-1])
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(.05, remaining))
+            if time.monotonic() >= deadline:
+                raise
+            continue
+        break
+    try:
+        if image_identity(api, handle) != original:
+            raise CleanupUnconfirmed("The staged launcher image was replaced before disposition")
+        try:
+            api.delete_handle(handle)
+        except OSError as error:
+            error.add_note(f"FileDispositionInfoEx on staged image 'subject/{path.name}' (volume {original[0]}, file ID {original[1]})")
+            raise
+        record["dispositionAccepted"] = True
+    finally:
+        release_handle(api.close, "CloseHandle(staged image disposition)", handle)
+
+
+def require_absence(api, path):
+    try:
+        handle = api.path_handle(path, False)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 2:  # ERROR_FILE_NOT_FOUND under the pinned parent
+            return
+        error.add_note(f"CreateFileW after disposition of {path.name!r}")
+        raise
+    release_handle(api.close, "CloseHandle(staged path readback)", handle)
+    raise CleanupUnconfirmed(f"The staged path still exists after disposition: {path.name}")
+
+
+@contextmanager
+def staged_images(api, root, built_gui, inventory, result):
+    """Keep the original directory and both file identities live through checked removal."""
+    if not re.fullmatch(r"ifw-rw02-[0-9a-f]{32}", root.name) or built_gui.name != "native-gui-assessment.exe":
+        raise ValueError("Expected the fixed launcher image and private profile")
+    subject = root / "subject"
+    records = result["stagedImageCleanup"] = {}
+    with ExitStack() as resources:
+        # DELETE on this exact directory permits nonrecursive removal after both children are gone.
+        # Its sharing mode denies directory renames throughout the image transitions.
+        try:
+            subject.mkdir()
+            directory = api.path_handle(subject, True, delete=True)
+            directory_lease = resources.enter_context(ExitStack())
+            directory_lease.callback(release_handle, api.close, "CloseHandle(staged image directory)", directory)
+            attributes, directory_id = api.file_info(directory)
+            if not attributes & 0x10 or attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x40):
+                raise CleanupUnconfirmed("Expected the original regular subject directory")
+            pins = resources.enter_context(ExitStack())
+            images = []
+            for name, expected in ((built_gui.name, inventory["gui"]), ("ifw-performance-worker.exe", inventory["worker"])):
+                path = subject / name
+                with built_gui.with_name(name).open("rb") as source, path.open("xb") as destination:
+                    shutil.copyfileobj(source, destination)
+                pin = api.path_handle(path, False)
+                pins.callback(release_handle, api.close, "CloseHandle(staged image pin)", pin)
+                identity = image_identity(api, pin)
+                if recorder.sha(path) != expected:
+                    raise CleanupUnconfirmed("The pinned launcher executable differs from its build")
+                # This overlap retains the file ID and denies writes even after the deny-delete
+                # pin closes. FILE_READ_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ | DELETE.
+                witness = api.create_file(str(path), 0x81, 5, None, 3, 0x00200000, None)
+                if witness == c.c_void_p(-1).value:
+                    raise c.WinError(c.get_last_error())
+                lease = resources.enter_context(ExitStack())
+                lease.callback(release_handle, api.close, "CloseHandle(staged image witness)", witness)
+                if image_identity(api, witness) != identity:
+                    raise CleanupUnconfirmed("The staged image witness differs from its original pin")
+                record = records[name] = dict(sha256=expected, volume=identity[0], fileId=identity[1],
+                                              dispositionAccepted=False, absent=False)
+                images.append((path, identity, lease, record))
+        except Exception as error:
+            raise CleanupUnconfirmed("Could not establish the original staged launcher images") from error
+        remove = True
+        try:
+            yield subject / built_gui.name
+        except BaseException as error:
+            remove = not CleanupUnconfirmed.in_chain(error)
+            raise
+        finally:
+            if remove:
+                try:
+                    pins.close()
+                    for path, identity, lease, record in images:
+                        delete_staged_image(api, path, identity, record)
+                        lease.close()
+                        require_absence(api, path)
+                        record["absent"] = True
+                    # A replacement or unrecognized entry keeps the directory nonempty.
+                    dispose_empty_directory(api, directory, "subject", directory_id, result["directoryDispositionWaits"])
+                    directory_lease.close()
+                    require_absence(api, subject)
+                except Exception as error:
+                    raise CleanupUnconfirmed("Could not confirm removal of the original staged launcher images") from error
+
+
 @contextmanager
 def staged_profile(result, api, built_gui, inventory, *, token=None):
     token = uuid.uuid4().hex if token is None else token
@@ -579,16 +699,7 @@ def staged_profile(result, api, built_gui, inventory, *, token=None):
         if pid_file == c.c_void_p(-1).value:
             raise c.WinError(c.get_last_error())
         stack.callback(release_handle, api.close, "CloseHandle(launcher pid marker)", pid_file)
-        subject = root / "subject"
-        subject.mkdir()
-        gui = subject / built_gui.name
-        for original, digest in ((built_gui, inventory["gui"]),
-                                 (built_gui.with_name("ifw-performance-worker.exe"), inventory["worker"])):
-            staged = subject / original.name
-            shutil.copyfile(original, staged)
-            stack.enter_context(recorder.pin_path(api, staged, False))
-            if recorder.sha(staged) != digest:
-                raise ValueError("The pinned launcher executable differs from its build")
+        gui = stack.enter_context(staged_images(api, root, built_gui, inventory, result))
         trial = root / "rust-1"
         media = trial / "empty"
         media.mkdir(parents=True)
