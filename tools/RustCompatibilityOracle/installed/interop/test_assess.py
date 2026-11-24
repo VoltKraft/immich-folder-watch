@@ -1,14 +1,33 @@
 """Check that the two Flatpak prerequisite outcomes cannot be interchanged."""
 
 from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
-from assess import gui_source_snapshot, verify_paths, verify_siblings
+from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
 
 
 class IdentityTests(unittest.TestCase):
+    def test_installed_worker_must_match_the_gui_binary_and_reviewed_sources(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            subject = root / 'artifacts/rust/performance/subjects/swapped-input'
+            subject.mkdir(parents=True)
+            worker = b'synthetic'
+            (subject / 'ifw-performance-worker').write_bytes(worker)
+            digest = hashlib.sha256(worker).hexdigest()
+            build = dict(worker_sha256=digest, gui_sha256='original-gui', sources={'source': 'digest'})
+            with patch('assess.EXPECTED_WORKER', digest), patch('assess.subprocess.check_output', return_value=b'{"source":"digest"}'):
+                for field, wrong in [('worker_sha256', 'another-worker'), ('gui_sha256', 'another-gui'), ('sources', {})]:
+                    (subject / 'worker.inputs.json').write_text(json.dumps({**build, field: wrong}))
+                    with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'worker, native GUI or pinned source'):
+                        inventory_inputs(subject, root, 'revision', 'original-gui', 'release', root)
+                    self.assertFalse((root / 'inventory-sources.zip').exists())
+
     def test_receipt_cannot_select_files_for_the_native_gui_archive(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

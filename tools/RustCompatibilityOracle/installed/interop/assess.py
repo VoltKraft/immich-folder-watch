@@ -2,6 +2,7 @@
 
 Run python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py --same-id or --different-id.
 Use --gui-build artifacts/rust/GUI_BUILD to exercise the actual candidate against the installed old GUI.
+Add --inventory-subject artifacts/rust/performance/subjects/SUBJECT to run its reviewed worker on synthetic read-only inputs.
 Use the published 3.0.4 bundle and detached signature described by ../launch/run.py and its
 pinned x64 Platform and GL runtimes. No previous trial output is required.
 """
@@ -25,6 +26,9 @@ from zipfile import ZipFile, ZIP_DEFLATED
 HERE = Path(__file__).resolve().parent
 PROBE = 'org.example.IfwInteropProbe'
 EXPECTED_PROBE = '941d9567ad6c827e1b3b668aef6933d93133421b1de25c87c73f7fad75cb341b'
+EXPECTED_WORKER = '1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0'
+WORKER_CONFIG = '/qa/worker-profile/config'
+WORKER_LAUNCH = '#!/bin/sh\nset -eu\nexport XDG_CONFIG_HOME=' + WORKER_CONFIG + '\nexec /app/bin/ifw-performance-worker\n'
 QUALIFIED_SOURCES = {
     'main.rs': 'e93bde61c0577364043dbdfd55f9693358558d5099898942fc8d91afe6e67ecc',
     'unix.rs': '4feef97f3358d45b344bd93a83f4358df07be284e07103b0957609aad2646092',
@@ -89,7 +93,35 @@ def gui_source_snapshot(root, recorded):
     return snapshot
 
 
-def outer(same_id, gui_build=None):
+def inventory_inputs(subject, root, revision, gui_hash, release, out):
+    subjects = root / 'artifacts/rust/performance/subjects'
+    directory = subject.absolute()
+    require(directory.resolve(strict=True) == directory and directory.parent == subjects, 'Expected a local native worker subject')
+    worker, receipt = directory / 'ifw-performance-worker', directory / 'worker.inputs.json'
+    require(all(p.is_file() and p.resolve(strict=True) == p for p in (worker, receipt)), 'Expected regular worker and build receipt')
+    build = json.loads(receipt.read_bytes())
+    manifest = 'tools/rust-qa/performance/worker-inputs.json'
+    def original(rev, name):
+        return subprocess.check_output(['git', 'show', rev + ':' + name], cwd=root)
+    pins = json.loads(original(revision, manifest))
+    require(build['sources'] == pins and build['worker_sha256'] == sha(worker) == EXPECTED_WORKER and
+            build['gui_sha256'] == gui_hash, 'The worker, native GUI or pinned source set differs')
+    archive_path = out / 'inventory-sources.zip'
+    with ZipFile(archive_path, 'x', ZIP_DEFLATED) as archive:
+        archive.writestr(manifest, original(revision, manifest))
+        for name, expected in sorted(pins.items()):
+            blob = original(revision, name)
+            require(hashlib.sha256(blob).hexdigest() == expected, 'The reviewed worker source differs: ' + name)
+            archive.writestr(name, blob)
+        for name in ('App.axaml.cs', 'Platform/UnixSingleInstanceCoordinator.cs'):
+            path = 'src/ImmichFolderWatch.App.Linux/' + name
+            archive.writestr('shipping/' + path, original(release, path))
+    shutil.copyfile(receipt, out / 'worker-build.json')
+    return worker, dict(binary=sha(worker), build=sha(out / 'worker-build.json'), sourceArchive=sha(archive_path),
+                        launcher=hashlib.sha256(WORKER_LAUNCH.encode()).hexdigest())
+
+
+def outer(same_id, gui_build=None, inventory_subject=None):
     root = HERE.parents[3]
     art = root / 'artifacts/rust'
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
@@ -171,7 +203,11 @@ def outer(same_id, gui_build=None):
         shutil.copyfile(receipt, out / 'gui-build.json')
         gui_hash = sha(gui)
         gui_files = {name: sha(out / name) for name in ('gui-build.json', 'gui-sources.zip')}
-    save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
+    worker = worker_files = None
+    if inventory_subject is not None:
+        require(same_id and gui_hash, 'The installed worker requires the same-ID native GUI trial')
+        worker, worker_files = inventory_inputs(inventory_subject, root, revision, gui_hash, release['commit'], out)
+    save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, inventory=worker_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
                                    sameId=same_id, revision=revision, rustc=sha(compiler), probe=EXPECTED_PROBE,
                                    sources=snapshot, archive=sha(out / 'observer-source.zip')))
     command = namespace(out, frozen / HERE.relative_to(root), None)
@@ -190,6 +226,9 @@ def outer(same_id, gui_build=None):
         if gui_build is not None:
             location = command.index('--chdir')
             command[location:location] = ['--ro-bind', str(gui), '/candidate-gui']
+        if worker is not None:
+            location = command.index('--chdir')
+            command[location:location] = ['--ro-bind', str(worker), '/candidate-worker']
         subprocess.run(command, timeout=125, check=True)
     finally:
         (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in sorted(out.iterdir()) if p.is_file()))
@@ -262,6 +301,13 @@ def inside():
                 require(sha(Path('/candidate-gui')) == i['guiHash'], 'Unexpected staged GUI')
                 shutil.copy2('/candidate-gui', bin_dir / 'native-gui-assessment')
                 shutil.copyfile('/app/gui-launch.sh', bin_dir / 'launch')
+                if i['inventory']:
+                    require(sha(Path('/candidate-worker')) == i['inventory']['binary'], 'The staged worker differs')
+                    shutil.copy2('/candidate-worker', bin_dir / 'ifw-performance-worker')
+                    launcher = app / 'files/ifw-performance-worker'
+                    launcher.write_text(WORKER_LAUNCH)
+                    launcher.chmod(0o755)
+                    require(sha(launcher) == i['inventory']['launcher'], 'The worker-only configuration launcher differs')
             else:
                 shutil.copy2(out / 'instance', bin_dir / 'instance')
                 shutil.copyfile('/app/hold.sh', bin_dir / 'launch')
@@ -272,7 +318,7 @@ def inside():
             stack.callback(setup_command, ['flatpak', '--user', 'uninstall', '--noninteractive', installed['installed_ref']])
             if i['guiHash']:
                 from gui_refusal import run as observe_refusal
-                observe_refusal(stack, bus, display, pins, r, out, i['guiHash'])
+                observe_refusal(stack, bus, display, pins, r, out, i['guiHash'], i['inventory'])
                 stack.close()
                 verify_uninstalled(r)
                 return
@@ -351,6 +397,8 @@ if __name__ == '__main__':
         inside()
     elif len(sys.argv) == 3 and sys.argv[1] == '--gui-build':
         outer(True, Path(sys.argv[2]))
+    elif len(sys.argv) == 5 and sys.argv[1] == '--gui-build' and sys.argv[3] == '--inventory-subject':
+        outer(True, Path(sys.argv[2]), Path(sys.argv[4]))
     elif sys.argv[1:] in (['--same-id'], ['--different-id']):
         outer(sys.argv[1] == '--same-id')
     else:

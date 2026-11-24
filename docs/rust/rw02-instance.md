@@ -181,6 +181,45 @@ sessions, stale endpoints after abrupt exit and a handover with an active
 sync engine remain open. [Shipping coordinator](../../src/ImmichFolderWatch.App.Linux/Platform/UnixSingleInstanceCoordinator.cs)
 · [.NET 10.0.12 socket lifetime](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Sockets/src/System/Net/Sockets/Socket.cs#L3184-L3193).
 
+### Installed shipping launch during a Rust inventory
+
+On Fedora x64, the corrected Rust Flatpak ran the source-pinned inventory worker
+under the shipping application ID. The original signed 3.0.4 bundle and the
+Rust test branch shared a private X11 desktop and the ordinary Flatpak profile.
+Two launch-time read-only grants exposed a synthetic media directory and YAML
+configuration to the Rust test branch. Only its worker launcher selected that
+configuration through `XDG_CONFIG_HOME`. The worker used the GUI's filtered
+`/run/flatpak/bus` via `unix:path=/tmp/session-bus`. Both the worker's startup
+check and the observer encountered `ECONNREFUSED` at `127.0.0.1:9` in the
+private network namespace. The signed application received neither input grant.
+
+While the Rust GUI was hidden, the fixture created one JPEG filename before
+the signed launch and a different one after its exit. Rust PID 213 and its
+direct worker PID 224 retained their original start times and executable
+identities at five observations, including one while the signed apphost was
+present. Passes 2 and 3 found one and two files respectively, with one new
+file per pass. For each discovery the observer held an open descriptor for
+the same album inode and received a kernel `DN_ACCESS` event, after 4.44
+and 4.51 seconds. The signed PID 289 saw the original socket and
+exited zero. The listener counted two connections. The Rust window stayed
+hidden until a further worker-enabled Rust launch reopened XID 4194306 on
+the original primary. The original worker exited on GUI Quit. A subsequent
+3.0.4 primary opened and quit normally, the shared profile retained its sole
+startup marker, and the private installation was empty after uninstall.
+
+Reproduce with `python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py`
+and arguments `--gui-build artifacts/rust/gui-dual-election-01`
+and `--inventory-subject artifacts/rust/performance/subjects/linux-dual-election-8e1c5d7`.
+The result at `artifacts/rust/shipping-flatpak-interop/same-id-imaf441q/result.json`
+has SHA-256 `3ecf0a4abe209d3675aa2e519b16bfc9e58c1cc76a172450e043c03a57d046d1`.
+Independent readback checked the detached signature, 26 evidence files, 64
+archived source members and both synthetic inputs against the recorded sweeps.
+The signed secondary's startup path returns before starting its in-process
+services. This run covers an unconfigured shipping peer and a Rust inventory
+that reads file metadata. Writer handover with a configured synchronization
+engine remains open. [Installed observer](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py)
+· [Shipping startup](../../src/ImmichFolderWatch.App.Linux/App.axaml.cs).
+
 ## Ordinary second launch of the Linux GUI
 
 The shipping Flatpak starts its executable for each launch. When the Linux

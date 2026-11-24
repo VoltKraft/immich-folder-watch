@@ -1,10 +1,17 @@
 """Exercise the actual Rust GUI's ordinary startup while the signed shipping application owns its endpoint."""
 
 from pathlib import Path
+import errno
+import fcntl
 import os
 import re
+import signal
+import socket
 import stat
+import struct
 import subprocess
+import threading
+import time
 
 from gi.repository import Gio, GLib
 from observe import app_identity, identity, launching_app, window, witness
@@ -12,6 +19,115 @@ from run import APP, require, sha
 from session import checked_start, check_alive, wait_for
 
 NAME = APP + '.RustAssessment'
+WORKER_EXE = '/app/bin/ifw-performance-worker'
+
+
+def workers():
+    found = []
+    for proc in Path('/proc').iterdir():
+        if proc.name.isdecimal():
+            try:
+                if os.readlink(proc / 'exe') == WORKER_EXE:
+                    found.append(identity(int(proc.name)))
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+    return sorted(found, key=lambda entry: entry['pid'])
+
+
+class Inventory:
+    def __init__(self, info, out, report):
+        from assess import WORKER_CONFIG
+        from session import fresh_profile
+        require(out == Path('/qa') and not Path('/proc/net/route').read_text().splitlines()[1:],
+                'Inventory requires the routed-off private desktop')
+        self.config = Path(WORKER_CONFIG)
+        self.media = out / 'files'
+        self.media.mkdir(mode=0o700)
+        self.leaf = self.media / 'album'
+        self.leaf.mkdir(mode=0o700)
+        fresh_profile(self.config.parent, self.media)
+        self.log = out / 'released.log'
+        self.inputs = info
+        self.arguments = [f'--filesystem={path}:ro' for path in (self.media, self.config)] + ['--env=IFW_QA_BENCHMARK=1']
+        self.report = report['inventory'] = dict(inputs=info, transientRustArguments=self.arguments,
+            configSha256=sha(self.config / 'immich-folder-watch/config.yaml'), observations=[])
+
+    def attach(self, stack, primary):
+        from assess import pidfd
+        self.primary = primary
+        self.worker, = wait_for(workers, 8, 'The installed GUI did not start its worker')
+        pid = self.worker['pid']
+        proc = Path('/proc') / str(pid)
+        require(self.worker['parent'] == primary and sha(proc / 'exe') == self.inputs['binary'],
+                'Expected the actual reviewed direct inventory child of the installed GUI')
+        self.lifetime = pidfd(stack, pid)
+        root = proc / 'root'
+        env = dict(item.split(b'=', 1) for item in (proc / 'environ').read_bytes().split(b'\0') if b'=' in item)
+        required = {'IFW_QA_ISOLATED': '1', 'IFW_QA_BENCHMARK': '1', 'XDG_CONFIG_HOME': str(self.config),
+                    'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/tmp/session-bus', 'FLATPAK_ID': APP}
+        require(all(env.get(k.encode()) == v.encode() for k, v in required.items()), 'Worker environment differs')
+        mounts = dict((f[4], f[5]) for f in (s.split() for s in (proc / 'mountinfo').read_text().splitlines()) if f[4].startswith('/qa/'))
+        require(set(mounts) == {str(self.config), str(self.media)} and all('ro' in v.split(',') for v in mounts.values()) and
+                not (root / 'qa/inputs.json').exists() and
+                all(os.path.samestat(p.stat(), (root / p.relative_to('/')).stat()) for p in (self.media, self.config)),
+                'Expected only the two read-only synthetic input mounts')
+        link = os.readlink(root / 'tmp/session-bus')
+        require(link in ('/run/user/0/bus', '/run/flatpak/bus') and stat.S_ISSOCK((root / link.lstrip('/')).stat().st_mode)
+                and (root / 'app/ifw-performance-worker').is_file() and sha(root / 'app/ifw-performance-worker') == self.inputs['launcher']
+                and os.readlink(proc / 'ns/net') == os.readlink('/proc/self/ns/net'), 'Worker bus, network or launcher differs')
+        with socket.socket() as local:
+            code = local.connect_ex(('127.0.0.1', 9))
+        require(code == errno.ECONNREFUSED, 'Expected ECONNREFUSED at the private loopback endpoint')
+        self.report.update(worker=self.worker, primary=identity(primary), mounts=mounts, environment=required, busTarget=link,
+                           privateNetwork=os.readlink(proc / 'ns/net'), offlineLoopbackErrno=code)
+        wait_for(lambda: len(self.sweeps()) >= 2, 12, 'Missing the two initial inventory sweeps')
+        require(self.sweeps()[:2] == [(0, 0, 0), (0, 0, 1)], 'The synthetic album did not start empty')
+        self.check('initial')
+
+    def sweeps(self):
+        return [tuple(map(int, m)) for m in re.findall(r'^INVENTORY_COMPLETE files=(\d+) changed=(\d+) pass=(\d+)$',
+                                                        self.log.read_text(), re.MULTILINE)]
+
+    def check(self, phase):
+        require(not self.lifetime.poll(0) and workers() == [self.worker] and identity(self.primary) == self.report['primary'],
+                'The reviewed worker or its primary changed at ' + phase)
+        self.report['observations'].append(dict(phase=phase, primary=self.primary, workers=[self.worker['pid']]))
+
+    def discover(self, phase, count):
+        previous = self.sweeps()[-1][2]
+        # A one-shot, inode-bound Linux directory notification also works through the worker's read-only bind.
+        fd = os.open(self.leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        selected = os.fstat(fd)
+        signals = {signal.SIGRTMIN}
+        saved = signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+        try:
+            fcntl.fcntl(fd, fcntl.F_SETOWN_EX, struct.pack('=ii', fcntl.F_OWNER_TID, threading.get_native_id()))
+            fcntl.fcntl(fd, fcntl.F_SETSIG, signal.SIGRTMIN)
+            fcntl.fcntl(fd, fcntl.F_NOTIFY, fcntl.DN_ACCESS)
+            start = time.monotonic()
+            with (self.leaf / (phase + '.jpg')).open('xb') as file:
+                file.write(phase.encode())
+            read = signal.sigtimedwait(signals, 12)
+            accessed = time.monotonic() - start
+            require(read and read.si_code > 0, 'No independent Linux directory-access notification for ' + phase)
+            sweep = wait_for(lambda: next((r for r in self.sweeps() if r[2] > previous and r[:2] == (count, 1)), None),
+                             7, 'The installed worker did not discover ' + phase)
+        finally:
+            os.close(fd)
+            signal.sigtimedwait(signals, 0)
+            signal.pthread_sigmask(signal.SIG_SETMASK, saved)
+        require(os.path.samestat(selected, self.leaf.stat()), 'The observed album identity changed')
+        self.check(phase)
+        self.report[phase] = dict(file=phase + '.jpg', sweep=sweep, seconds=round(time.monotonic()-start, 4),
+                                  device=selected.st_dev, inode=selected.st_ino, directoryReadSeconds=accessed,
+                                  signal=read.si_signo, code=read.si_code, band=read.si_band)
+
+    def drained(self):
+        self.report['workerExited'] = bool(self.lifetime.poll(1000))
+        self.report['sweeps'] = self.sweeps()
+        require(self.report['workerExited'] and not workers() and self.log.read_text().splitlines().count('INVENTORY_STARTED') == 1
+                and sha(self.config / 'immich-folder-watch/config.yaml') == self.report['configSha256'],
+                'Expected one drained worker and its unchanged synthetic configuration')
 
 
 def owner(bus, name):
@@ -19,7 +135,7 @@ def owner(bus, name):
                          GLib.Variant('(s)', (name,)), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()[0]
 
 
-def observe_later_launches(stack, bus, display, pins, report, out, command, primary, first_window, lifetime):
+def observe_later_launches(stack, bus, display, pins, report, out, command, primary, first_window, lifetime, inventory=None):
     """Launch each installed ref while the unconfigured Rust GUI is hidden on the private X server."""
     from assess import pidfd
     xid = first_window['xid']
@@ -46,10 +162,25 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
     display.request_close(xid)
     wait_for(lambda: check_alive(primary, out / 'released.log') or display.visible() is None, 8, 'Rust window did not hide')
     require(not owner(bus, APP + '.Tray'), 'Shipping GUI still holds its tray name')
+    if inventory:
+        inventory.attach(stack, native)
+        inventory.discover('before-shipping', 1)
     oldlog = out / 'later-shipping.log'
     old = checked_start(stack, [*command, '--branch=master', APP], oldlog)
     pid = wait_for(lambda: check_alive(old, oldlog) or launching_app(old), 8, 'Could not identify the later shipping apphost')
     old_lifetime = pidfd(stack, pid)
+    if inventory:
+        root_fd = os.open(f'/proc/{pid}/root', os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
+        try:
+            for path in (inventory.media, inventory.config):
+                try:
+                    os.stat(path.relative_to('/'), dir_fd=root_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                raise RuntimeError('The shipping application received candidate-only workload grants')
+        finally:
+            os.close(root_fd)
+        inventory.report['shippingInputGrantsAbsent'] = True
     later['shipping'] = app_identity(old, pid, pins, report, out, 'later-shipping')
     old_directory = later['shipping']['directoryIdentity']['XDG_RUNTIME_DIR']
     observed_directory = runtime.stat()
@@ -58,6 +189,8 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
             'The later shipping executable used a different private runtime or profile')
     old_runtime = Path(f'/proc/{pid}/root') / later['shipping']['paths']['XDG_RUNTIME_DIR'].lstrip('/')
     later['socketSeenByShipping'] = socket_id(old_runtime / endpoint.name)
+    if inventory:
+        inventory.check('shipping-identified')
     def old_outcome():
         require(not lifetime.poll(0), 'Rust exited during the later shipping launch')
         visible = display.visible()
@@ -77,7 +210,10 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
                  socketAfterShipping=socket_id(endpoint), stillHidden=display.visible() is None)
     require(later['shippingExit'] == 0 and later['shippingExited'] and later['stillHidden']
             and not owner(bus, APP + '.Tray'), 'The isolated shipping launch did not finish cleanly')
-    result = subprocess.run([*command, '--branch=test', APP], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=12)
+    if inventory:
+        inventory.discover('after-shipping', 2)
+    result = subprocess.run([*command, '--branch=test', *(inventory.arguments if inventory else []), APP],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=12)
     (out / 'later-rust.log').write_bytes(result.stdout)
     wait_for(lambda: check_alive(primary, out / 'released.log') or display.visible() == xid, 10, 'Rust secondary failed to reopen the first window')
     later.update(rustSecondaryExit=result.returncode, reopenedWindow=window(display, xid), socketAfterRust=socket_id(endpoint),
@@ -85,6 +221,10 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
     require(result.returncode == 0 and (f'SECONDARY_ACTIVATED owner={initial_owner}'.encode() in result.stdout)
             and later['reopenedWindow'] == first_window and later['primaryAfterRust'] == original_gui
             and later['ownerAfterRust'] == initial_owner and not lifetime.poll(0), 'Rust secondary failed to preserve the original primary')
+    if inventory:
+        require(not any(mark in result.stdout for mark in (b'READY ', b'INVENTORY_STARTED', b'INVENTORY_COMPLETE')),
+                'The second worker-enabled Rust launch started a new supervisor or inventory')
+        inventory.check('after-rust-secondary')
     later['exclusive'] = (route == 'exited' and before is not None
                           and before == later['socketSeenByShipping'] == later['socketAfterShipping'] == later['socketAfterRust'])
 
@@ -95,7 +235,7 @@ def quit_shipping(bus):
                   Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
 
 
-def run(stack, bus, display, pins, report, out, gui_hash):
+def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
     from assess import pidfd
     watcher = out / 'watcher.log'
     watcher_process = checked_start(stack, ['/usr/bin/python3', '-B', '/watcher.py'], watcher)
@@ -148,7 +288,8 @@ def run(stack, bus, display, pins, report, out, gui_hash):
     report['originalExit'] = original.wait(timeout=12)
     require(report['originalExit'] == 0 and old_lifetime.poll(1000), 'The original GUI did not quit normally')
     log = out / 'released.log'
-    candidate = checked_start(stack, arguments, log)
+    inventory = Inventory(worker, out, report) if worker else None
+    candidate = checked_start(stack, [*command, '--branch=test', *(inventory.arguments if inventory else []), APP], log)
     new_xid = wait_for(lambda: check_alive(candidate, log) or (display.visible() if owner(bus, NAME) else None), 22, 'Rust did not show its window after the original quit')
     new_window = window(display, new_xid)
     native = new_window['xserverClientPid']
@@ -157,11 +298,13 @@ def run(stack, bus, display, pins, report, out, gui_hash):
     require(report['runningAfterRelease']['executable'] == gui_hash and 'READY ' in log.read_text(), 'The released GUI differs from the candidate')
     runtime_handle = os.open(f'/proc/{native}/root/run/user/0', os.O_DIRECTORY | os.O_RDONLY | os.O_CLOEXEC)
     stack.callback(os.close, runtime_handle)
-    observe_later_launches(stack, bus, display, pins, report, out, command, candidate, new_window, lifetime)
+    observe_later_launches(stack, bus, display, pins, report, out, command, candidate, new_window, lifetime, inventory)
     bus.call_sync(NAME, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
                   GLib.Variant('(sava{sv})', ('quit', [], {})), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
     report['candidateExit'] = candidate.wait(timeout=14)
     require(report['candidateExit'] == 0 and lifetime.poll(1000) and 'DRAINED ' in log.read_text(), 'Candidate did not drain and quit')
+    if inventory:
+        inventory.drained()
     counts = re.findall(r'^LEGACY_SOCKET_ACCEPTED ([0-9]+)$', log.read_text(), re.MULTILINE)
     report['acceptedConnectionsDuringRun'] = int(counts[0]) if len(counts) == 1 else None
     try:
@@ -183,7 +326,7 @@ def run(stack, bus, display, pins, report, out, gui_hash):
     require(report['restoredShippingExit'] == 0 and restored_lifetime.poll(1000), 'The restored original did not quit normally')
     wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(),
              6, 'A private application remained after both exited')
-    report.update(profileAfterQuit=profile_files(), positiveWorkerEnabled=False, refusalObserved=True)
+    report.update(profileAfterQuit=profile_files(), positiveWorkerEnabled=bool(inventory), refusalObserved=True)
     require(report['profileAfterQuit'] == profile, 'The private application data differs after the clean GUI run')
     require(report['laterLaunches']['exclusive'], 'The installed Rust primary did not exclude the later shipping primary')
     require(report['acceptedConnectionsDuringRun'] is not None and report['acceptedConnectionsDuringRun'] > 0,

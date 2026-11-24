@@ -241,6 +241,8 @@ to reconcile project decisions, defaults, and recorded state.
   distinguish the D-Bus proxy PID from the GUI's outer and sandbox PIDs.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
+  For Linux installed worker continuity, run the [signed second launch while
+  the Rust GUI inventories synthetic files](docs/rust/rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
   For the [installed Linux pairing](docs/rust/rw02-instance.md#shipping-launch-while-the-rust-flatpak-owns-the-endpoint),
   exercise both start orders and the return to the signed shipping GUI
   after the Rust primary has drained and released its endpoint.
