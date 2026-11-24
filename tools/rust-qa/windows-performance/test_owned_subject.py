@@ -3,6 +3,7 @@ from contextlib import ExitStack, contextmanager
 import ctypes as c
 import hashlib
 import io
+from itertools import count
 import os
 from pathlib import Path
 import subprocess
@@ -13,7 +14,7 @@ from unittest.mock import Mock, patch
 import uuid
 
 import native
-from run import idle_complete, pin_images
+from run import idle_complete, pin_images, wpf_second_launch
 
 
 class JobTests(unittest.TestCase):
@@ -75,6 +76,41 @@ class JobTests(unittest.TestCase):
 
 
 class FixtureTests(unittest.TestCase):
+    def wpf_launch(self, windows_seen, foreground, show_tick=3):
+        api, windows, primary, secondary = (Mock() for _ in range(4))
+        primary.pid, secondary.pid = 41, 42
+        primary.poll.return_value = secondary.poll.return_value = None
+        secondary.wait.return_value = 0
+        windows.visible.side_effect = windows_seen
+        windows.events = []
+        windows.pump.side_effect = lambda: windows.events.append(
+            {"event": "show", "root": True, "hwnd": 100, "winEventTimeMs": show_tick})
+        uptime = Mock(side_effect=[(1 << 32) - 4, (1 << 32) - 2, (1 << 32) + 50])
+        values = {}
+        with (patch.object(c, "WinDLL", create=True), patch("run.bind", side_effect=[lambda: foreground, uptime]),
+              patch("run.start_owned_subject", return_value=secondary),
+              patch("run.time.monotonic", side_effect=count()), patch("run.time.sleep")):
+            wpf_second_launch(api, windows, primary, Path("ImmichFolderWatch.exe"), Path("private"), {}, 7, values)
+        return api, values
+
+    def test_wpf_observer_accepts_original_window_remaining_in_background(self):
+        api, result = self.wpf_launch([100, None, None, 100, 100, 100], 500)
+        api.resume_owned_process.assert_called_once_with(42)
+        self.assertTrue(result["sameWindow"])
+        self.assertFalse(result["foregroundObserved"])
+        self.assertEqual("observed", result["status"])
+
+    def test_wpf_show_on_the_resume_tick_cannot_be_attributed_to_the_secondary(self):
+        _, result = self.wpf_launch([100, None, None, 100, 100], 100, (1 << 32) - 2)
+        self.assertTrue(result["foregroundObserved"])
+        self.assertEqual("show-order-inconclusive", result["status"])
+
+    def test_wpf_observer_rejects_reopen_before_resume_or_a_changed_window(self):
+        with self.assertRaisesRegex(ValueError, "must remain hidden"):
+            self.wpf_launch([100, None, 100], 100)
+        with self.assertRaisesRegex(ValueError, "different window"):
+            self.wpf_launch([100, None, None, 101], 100)
+
     def test_idle_requires_the_two_original_complete_lines(self):
         first = "INVENTORY_COMPLETE files=0 changed=0 pass=0\n"
         second = "INVENTORY_COMPLETE files=0 changed=0 pass=1"

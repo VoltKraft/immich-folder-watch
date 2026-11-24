@@ -526,6 +526,44 @@ The hosted control writes its source hashes and observations to
 Native results for the revised cleanup are pending.
 [Staged-image controls](../../tools/rust-qa/windows-launcher/test_staged_images.py).
 
+### Retained windows on the original desktop at 21e794f
+
+The two normal no-argument launches reached the original retained window.
+On x64 the secondary gave primary PID 7468 foreground permission. The
+same HWND 1245536 acquired foreground and keyboard focus. Inventory
+worker PID 6036 remained alive. On ARM64 the secondary granted permission
+to primary PID 5264, whose request for HWND 2032280 returned false. The
+window was visible with its original worker PID 5192. All 41 foreground
+samples over 2.017 seconds were negative and the keyboard check found no
+focus. The ordinary private-desktop restart passed on both architectures.
+
+The same retained binaries also ran the integrated tray trial. The x64
+Shell registered the icon, but the observer could not identify the
+hidden-icons control. The ARM64 Shell refused the initial registration
+and both retries. Neither original desktop delivered a verified activation
+from the Shell. Both private Shell-less fallback trials passed.
+[Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14960630023)
+· [Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14958668144).
+
+Detached readback verified each archive's Actions digest, 13 ordinary
+launcher inputs, 19 integrated tray inputs, all indexed process logs and
+the shared retained build receipt on each architecture. Its SHA-256 is
+`46dd9dd80047e959e0743cd913672a833d149e2f4d30a286a8baf7cf595c2bbb`.
+
+The WPF timing reference reopens its window for the measured cycles by
+signaling the shipping coordinator directly. A separate reference now
+starts the original WPF executable a second time without arguments after
+the final WPF idle trial has recorded its metrics. On the same disposable
+desktop it checks that the original primary remains hidden while the
+secondary is suspended, then observes the original HWND, its native show
+event, and foreground ownership after the secondary exits. An event on the
+same Windows uptime tick as the return from resume leaves its order
+inconclusive. The original WPF secondary can exit zero even when its
+signal fails. The native result will be recorded beside the final WPF
+trial as `wpf-3.second-launch.json`.
+[Shipping entry point](../../src/ImmichFolderWatch.App/Program.cs) ·
+[Native observer](../../tools/rust-qa/windows-performance/run.py).
+
 ## Second launch from a foreground test window
 
 The ordinary launcher trial starts the secondary process directly from

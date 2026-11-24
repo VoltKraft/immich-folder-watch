@@ -17,7 +17,7 @@ import uuid
 
 from build import HERE, ROOT, build, pe_machine, sha, write
 from metrics import IDLE_SECONDS, SETTLE_SECONDS, SWITCHES, TRIALS, budgets, comparison, p95, summarize
-from native import (CleanupUnconfirmed, Win32, checked, finish_owned_trace, hosted, observe_wpf_tray, owned_directory,
+from native import (CleanupUnconfirmed, Win32, bind, checked, finish_owned_trace, hosted, observe_wpf_tray, owned_directory,
                     pin_path, sid, start_owned_subject, wpf_profile)
 
 sys.path.insert(0, str(HERE.parent / "windows-inventory"))
@@ -154,7 +154,60 @@ def idle_complete(text):
     return len(rows) >= 2
 
 
-def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid, expected_machine, phase_log, owner_token):
+def wpf_second_launch(api, windows, primary, exe, area, env, log, report):
+    """Observe one ordinary launch after timing, using the same pinned WPF executable and profile."""
+    foreground = bind(c.WinDLL("user32"), "GetForegroundWindow", c.c_void_p)
+    uptime = bind(api.kernel, "GetTickCount64", c.c_uint64)
+    hwnd = windows.visible()
+    if not hwnd or primary.poll() is not None:
+        raise ValueError("The WPF reference needs its original live window")
+    report.update(primaryPid=primary.pid, hwnd=hwnd, initiallyForeground=foreground() == hwnd)
+    windows.close_window(hwnd)
+    await_value(lambda: wait_running(primary) or not windows.visible(), "The original WPF window did not hide")
+    with ExitStack() as child:
+        secondary = start_owned_subject(child, api, exe, area, env, log, False, stop_subject)
+        report.update(secondaryPid=secondary.pid, secondaryArguments=[])
+        wait_running(primary)
+        if windows.visible() is not None or secondary.poll() is not None:
+            raise ValueError("The WPF primary must remain hidden until its suspended secondary starts")
+        cursor = len(windows.events)
+        report["beforeResumeMs"] = uptime()
+        api.resume_owned_process(secondary.pid)
+        released = report["resumeReturnedMs"] = uptime()
+        report["secondaryExit"] = secondary.wait(timeout=10)
+        if report["secondaryExit"] != 0:
+            raise ValueError("The ordinary WPF secondary did not exit successfully")
+        reopened = await_value(lambda: wait_running(primary) or windows.visible(), "WPF did not reopen", timeout=5)
+        report.update(reopenedHwnd=reopened, sameWindow=reopened == hwnd)
+        if reopened != hwnd:
+            raise ValueError("The ordinary WPF launch showed a different window")
+        start = time.monotonic()
+        samples = 0
+        while True:
+            wait_running(primary)
+            if windows.visible() != hwnd:
+                raise ValueError("The original WPF window did not remain visible")
+            samples += 1
+            focused = foreground() == hwnd
+            if focused or time.monotonic() - start >= 2:
+                report.update(foregroundObserved=focused, samples=samples,
+                              elapsedMs=round((time.monotonic() - start) * 1000))
+                break
+            time.sleep(.05)
+        windows.pump()
+        observed = report["observationMs"] = uptime()
+        shows = report["rootShowEvents"] = [e for e in windows.events[cursor:]
+                                            if e["root"] and e["hwnd"] == hwnd and e["event"] == "show"]
+        # WinEvent uses a 32-bit uptime. An equal tick cannot order the show and resume.
+        elapsed = observed - released
+        ordered = (len(shows) == 1 and 0 <= elapsed <= 35_000
+                   and 0 < (shows[0]["winEventTimeMs"] - released) % (1 << 32) <= elapsed)
+    wait_running(primary)
+    report.update(secondaryJobDrained=True, status="observed" if ordered else "show-order-inconclusive")
+
+
+def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid, expected_machine, phase_log, owner_token,
+          *, compare_wpf_launch=False):
     rust = subject == "rust"
     area.mkdir()
     media = area / "empty"
@@ -263,6 +316,16 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                 result["controls"]["shippingTrayLookup"] = observe_wpf_tray(api, proc, handle)
             except (OSError, ValueError) as exc:
                 result["controls"]["shippingTrayLookup"] = dict(status="unavailable", reason=str(exc))
+            if compare_wpf_launch:
+                reference = result["controls"]["shippingSecondLaunch"] = {"status": "unavailable"}
+                try:
+                    wpf_second_launch(api, windows, proc, exe, area, env, log, reference)
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, TimeoutError) as exc:
+                    reference["error"] = f"{type(exc).__name__}: {exc}"
+                    if CleanupUnconfirmed.in_chain(exc):
+                        raise
+                finally:
+                    write(phase_log.with_suffix(".second-launch.json"), reference)
         result["termination"] = stop_subject(proc, rust, drain_log=phase_log)
     return result
 
@@ -325,7 +388,8 @@ def run(args):
                         print(f"Measuring native {subject} trial {n + 1} of {TRIALS}", flush=True)
                         name = f"{subject}-{n + 1}"
                         observation = trial(api, windows_fixture, subject, exe, observer, area / name, endpoint,
-                                            user_sid, expected, output / (name + ".log"), owner_token)
+                                            user_sid, expected, output / (name + ".log"), owner_token,
+                                            compare_wpf_launch=subject == "wpf" and n == TRIALS - 1)
                         report["trials"][subject].append(observation)
                         write(output / "result.json", report)
                         if file_observer is None:

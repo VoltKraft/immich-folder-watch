@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows foreground comparison (2026-11-24)
+
+After a normal second launch at `21e794f`, both retained windows reopened
+with the original worker. On x64 the window received keyboard focus.
+On ARM64 Windows refused foreground access after the secondary granted
+it. The separate reference will observe what happens when a second
+original WPF executable launches on the same host. The 31 portable
+performance checks passed, with two Windows-only checks pending.
+[Native results and control](rust/rw02-instance.md#retained-windows-on-the-original-desktop-at-21e794f).
+
 ## First shipping database write after rollback (2026-11-24)
 
 The original C# store wrote to 16 fresh copies of Rust-generated Linux x64
