@@ -109,21 +109,40 @@ def load_windows_fixture():
     return module
 
 
-def stop_subject(proc, rust):
+def stop_subject(proc, rust, *, drain_log=None):
+    """Reap the owned process and retain how it exited when qualifying a timed trial."""
+    method = "already exited"
     if proc.poll() is None:
         if rust:
             try:
+                method = "control-Q"
                 proc.stdin.write(b"Q")
                 proc.stdin.flush()
                 proc.wait(timeout=12)
-            except (OSError, subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
+                method = "control-Q timed out, forced cleanup"
+                proc.kill()
+            except OSError as exc:
+                method = f"control-Q failed ({exc}), forced cleanup"
                 proc.kill()
         else:
             # The shipping WPF host has no quit CLI. All measurements precede terminating this owned process.
+            method = "owned process terminated after sampling"
             proc.terminate()
-    proc.wait(timeout=15)
+    code = proc.wait(timeout=15)
     if proc.stdin:
-        proc.stdin.close()
+        try:
+            proc.stdin.close()
+        except BrokenPipeError:
+            # Flushing the already exited child's pipe again cannot change its exit status.
+            pass
+    if rust and drain_log is not None:
+        drained = any(line.startswith("DRAINED passes=") for line in
+                      drain_log.read_text(encoding="utf-8", errors="replace").splitlines())
+        if method != "control-Q" or code or not drained:
+            raise RuntimeError(f"{drain_log.name}: {method}, native exit 0x{code & 0xffffffff:08X}, "
+                               f"DRAINED marker {drained}")
+    return {"method": method, "exitCode": code}
 
 
 def idle_complete(text):
@@ -244,11 +263,7 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                 result["controls"]["shippingTrayLookup"] = observe_wpf_tray(api, proc, handle)
             except (OSError, ValueError) as exc:
                 result["controls"]["shippingTrayLookup"] = dict(status="unavailable", reason=str(exc))
-        stop_subject(proc, rust)
-        result["termination"] = {"method": "control-Q" if rust else "owned process terminated after sampling",
-                                 "exitCode": proc.returncode}
-        if rust and (proc.returncode or "DRAINED passes=" not in phase_log.read_text(errors="replace")):
-            raise RuntimeError("The native Rust GUI did not drain")
+        result["termination"] = stop_subject(proc, rust, drain_log=phase_log)
     return result
 
 

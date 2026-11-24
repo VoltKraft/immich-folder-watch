@@ -17,7 +17,7 @@ import uuid
 import build
 import metrics
 import native
-from run import present_counts
+from run import present_counts, stop_subject
 import scan
 import subject
 
@@ -51,6 +51,35 @@ def remove_ledger_image(api, exe, original, timeout=10):
 
 
 class RecorderTests(unittest.TestCase):
+    def test_rust_timing_requires_the_observed_quit_and_native_exit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "rust-3.log"
+            log.write_text("DRAINED passes=36\n", encoding="utf-8")
+            for polled, waits, expected, forced in (
+                (None, [0, 0], None, False),
+                (None, [0xC0000374, 0xC0000374], "control-Q, native exit 0xC0000374", False),
+                (0, [0], "already exited, native exit 0x00000000", False),
+                (None, [subprocess.TimeoutExpired("test", 12), 1], "control-Q timed out, forced cleanup", True),
+            ):
+                with self.subTest(polled=polled, expected=expected):
+                    proc = Mock()
+                    proc.poll.return_value = polled
+                    proc.wait.side_effect = waits
+                    if expected:
+                        with self.assertRaisesRegex(RuntimeError, expected):
+                            stop_subject(proc, True, drain_log=log)
+                    else:
+                        self.assertEqual(stop_subject(proc, True, drain_log=log), {"method": "control-Q", "exitCode": 0})
+                    self.assertEqual(proc.kill.called, forced)
+                    self.assertEqual(proc.stdin.write.called, polled is None)
+                    proc.stdin.close.assert_called_once()
+            log.write_text("WINDOW_RELEASED passes=36\n", encoding="utf-8")
+            proc = Mock()
+            proc.poll.return_value = None
+            proc.wait.return_value = 0
+            with self.assertRaisesRegex(RuntimeError, "rust-3.log: control-Q, native exit 0x00000000, DRAINED marker False"):
+                stop_subject(proc, True, drain_log=log)
+
     def test_failed_search_for_a_second_receiver_cannot_identify_a_unique_window(self):
         find, owner = Mock(side_effect=[73, None]), Mock()
         with patch.object(native.c, "WinDLL", create=True), patch.object(native, "bind", side_effect=[find, owner]), \

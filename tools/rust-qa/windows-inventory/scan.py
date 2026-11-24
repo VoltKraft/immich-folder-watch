@@ -278,8 +278,8 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
             api.resume_owned_process(proc.pid)
 
         def check():
-            if proc.poll() is not None:
-                raise RuntimeError("Measured GUI exited during its native scan")
+            if (code := proc.poll()) is not None:
+                raise RuntimeError(f"{target_log.name}: measured GUI exited during its scan with 0x{code & 0xffffffff:08X}")
 
         def completed(passes):
             check()
@@ -352,9 +352,7 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
             values = [(q["responseQpc"] - q["issuedQpc"]) * 1000 / api.frequency
                       for q in observed["eligibleResponses"] if q["action"] == action]
             metrics["scan_" + action + "_p95_ms"] = p95(values)
-        stop_subject(proc, rust)
-        if rust and (proc.returncode or "DRAINED passes=" not in target_log.read_text(encoding="utf-8", errors="replace")):
-            raise RuntimeError("The GUI failed to drain its comparison worker")
+        observed["termination"] = stop_subject(proc, rust, drain_log=target_log)
         observed.update(guiPid=proc.pid, inventoryPid=target, inventoryCreation100ns=identity, unchangedWorker=True,
                         completedPasses=2, rootWindowEvents=events, allRequests=requests, metrics=metrics)
         return observed

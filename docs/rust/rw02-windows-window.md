@@ -640,3 +640,35 @@ The external package and feature selections matched the ordinary build.
 Replaying the older native trace reproduced 1,167 qualifying presents and
 566 hidden intervals. It lacked the new stage samples. A native run of the
 instrumented executable is required to attribute the earlier delays.
+
+### Native process exits at a1011bf and e796d30
+
+Across these two revisions each native host completed three shipping WPF
+reference trials and compiled the retained GUI in 153 units. Both Windows
+architectures stopped before completing the three ordinary one-frame Rust
+trials. At `e796d30` the x64 canonical GUI exited with `0xC0000374`
+(heap corruption) on its second graphics generation. The ARM64 canonical
+GUI exited with `0xC0000005` (access violation). The x64 contrast capture
+worker independently exited with `0xC0000374`. At `a1011bf` the same
+heap-corruption code occurred in the x64 two-frame control and in the
+ARM64 one-frame measurement. The older logs report several other exits
+only as a failure to drain. The timing recorder now records the trial
+log name, quit or forced-cleanup path, process exit code and presence of
+the Rust drain marker when an idle or scan trial fails during teardown.
+[First x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212/artifacts/14869362811)
+· [First ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212/artifacts/14870570105).
+
+The first one-frame x64 Rust trial at `e796d30` completed both
+100,000-file inventories and exited normally. Detached replay recovered
+1,143 work-qualified window requests. The DXGI observer recorded 1,201
+successful presentations in its first-pass interval. The scan close/reopen p95 values
+were 41.1427/30.6124 ms against 31.314/21.813 ms on this host. Its
+second scan failed on worker drain and its third idle trial failed on
+GUI drain. ARM64 completed zero ordinary one-frame trials. The x64
+dispatch and frame observers stopped at their incomplete ordinary
+comparison. This run produced no stage trace and no new three-trial
+assessment of either renderer. The x64 and ARM64 detached reports have
+SHA-256 values `77a7aef59e702fc0ea76da2c025f71deaee75fa7fe2e32379720e9c6ed5f9aa3`
+and `cf52d977dcf56f65ea67544139b426a7ccfedefe3943e2756ab094079b692240`.
+[Second x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632)
+· [Second ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830).
