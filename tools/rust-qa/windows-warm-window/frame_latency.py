@@ -100,7 +100,7 @@ def visible_edits(base, measurement):
     return dict(observerResultSha256=sha(report_path), controls=edits)
 
 
-def visible_edit(folder, trial, depth, wait_policy="Wait"):
+def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=None):
     """Replay the two real input-desktop edits and retained native window from one trial."""
     if trial.get("error"):
         raise ValueError(f"The {depth}-frame edit observation failed: {trial['error']}")
@@ -112,7 +112,10 @@ def visible_edit(folder, trial, depth, wait_policy="Wait"):
             or transition["generationBefore"] != ["GRAPHICS_READY generation=1"]
             or sha(folder / "subject.log") != trial["subjectLog"]):
         raise ValueError("The edit observer did not retain its original HWND and renderer")
-    device = measured_generation(folder / "subject.log", "Mailbox", frame_latency=depth, wait_policy=wait_policy)
+    if device_observer is None:
+        device = measured_generation(folder / "subject.log", "Mailbox", frame_latency=depth, wait_policy=wait_policy)
+    else:
+        device = device_observer(folder / "subject.log")
     images = {}
     for phase, draft in (("before", "recoverydraft"), ("after", "recoverydraftafter")):
         path = folder / f"field-{phase}.json"

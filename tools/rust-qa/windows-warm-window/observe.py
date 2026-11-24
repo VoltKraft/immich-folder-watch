@@ -18,7 +18,7 @@ from window_lifetime import WindowLifetime
 
 
 def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=False, after_reopen=None,
-          desktop=None, evidence=None):
+          desktop=None, evidence=None, gdi_frame_observer=None):
     background = name.startswith("background") or name == "absent-tray"
     warm = name != "cold-residency"
     has_tray = name != "absent-tray"
@@ -31,6 +31,10 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
         root = stack.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
         env = {k: v for k, v in os.environ.items() if not k.startswith("IFW_QA_")}
         env.update(IFW_QA_ISOLATED="1", WGPU_DX12_COMPILER="Fxc", TEMP=str(root), TMP=str(root))
+        if gdi_frame_observer:
+            if name != "retained-edit":
+                raise ValueError("The GDI frame observer requires the retained editor control")
+            env["IFW_QA_WINDOWS_GDI_PRESENT"] = "1"
         if warm:
             env[DX12_WAIT_OPTION] = "Wait"
         if mailbox_two:
@@ -148,11 +152,17 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             if name.endswith("residency"):
                 residency_at("hidden")
             result["transitions"].append(dict(hidden=hwnd, generationBefore=generations))
+            if gdi_frame_observer:
+                result["transitions"][-1]["hiddenQpc"] = api.clock()
             if quit_hidden:
                 return
             start = len(observer.events)
+            if gdi_frame_observer:
+                result["transitions"][-1]["reopenIssuedQpc"] = api.clock()
             send(b"O")
             actual = wait(lambda: ready(), "visible after activation")
+            if gdi_frame_observer:
+                result["transitions"][-1]["visibleQpc"] = api.clock()
             wait(lambda: any(e["event"] == "show" and e["hwnd"] == actual for e in observer.events[start:]), "reopen show event")
             now = [s for s in logs() if s.startswith("GRAPHICS_READY ")]
             if warm and (hwnd != actual or now != generations or not still_owned(hwnd)):
@@ -173,6 +183,9 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             if not shell:
                 raise RuntimeError("The independent UI Automation observer is unavailable")
             evidence = output / ("field-" + phase + ".json")
+            if gdi_frame_observer:
+                window = gdi_frame_observer(hwnd, proc.pid)
+                started = api.clock()
             with (output / ("field-" + phase + ".log")).open("wb") as trace:
                 subprocess.run([shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
                                 "-File", str(QA / "observe-windows-input.ps1"), "-SubjectId", str(proc.pid),
@@ -183,6 +196,10 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             if found.get("status") != "passed" or found.get("processId") != proc.pid or found.get("windowHandle") != hwnd:
                 raise ValueError("Unverified owned HWND editing observation")
             result[phase + "Field"] = sha(evidence)
+            if gdi_frame_observer:
+                if gdi_frame_observer(hwnd, proc.pid) != window:
+                    raise ValueError("The original GUI client geometry changed during field capture")
+                result[phase + "FrameWindow"] = dict(root=window, qpc=[started, api.clock()])
 
         send(b"T" if has_tray else b"N")
         hidden = background and has_tray

@@ -207,7 +207,7 @@ def wpf_second_launch(api, windows, primary, exe, area, env, log, report):
 
 
 def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid, expected_machine, phase_log, owner_token,
-          *, compare_wpf_launch=False):
+          *, compare_wpf_launch=False, frame_observer=None):
     rust = subject == "rust"
     area.mkdir()
     media = area / "empty"
@@ -233,8 +233,12 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                 window = windows.visible()
                 return window if state else not window
             return await_value(poll, f"{subject} did not become {'visible' if state else 'hidden'}")
-        visible(True)
-        result["metrics"]["startup_ms"] = (api.clock() - proc.benchmark_start_qpc) * 1000 / api.frequency
+        initial_window = visible(True)
+        first_visible_qpc = api.clock()
+        result["metrics"]["startup_ms"] = (first_visible_qpc - proc.benchmark_start_qpc) * 1000 / api.frequency
+        if frame_observer:
+            frame_window = frame_observer(initial_window, proc.pid)
+            transitions = []
         handle = checked(api.open(0x0410, False, proc.pid))
         stack.callback(api.close, handle)
         if api.machine(handle) != (expected_machine, expected_machine):
@@ -259,7 +263,10 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                         and logs.count("Persistent reconciliation for uploadNew queued 0 changed file(s)") >= 2)
             await_value(engine_ready, "The real WPF host did not start its synthetic watcher", delay=.05)
             result["controls"]["realWpfWatcher"] = True
-        finish, trace = trace_start(stack, observer, proc.pid, area)
+        if frame_observer:
+            finish, trace = trace_start(stack, observer, proc.pid, area, timed_log=area / "present.log")
+        else:
+            finish, trace = trace_start(stack, observer, proc.pid, area)
 
         def reopen():
             if rust:
@@ -267,25 +274,35 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
                 proc.stdin.flush()
             else:
                 api.activate_wpf(user_sid, proc.pid)
-            return visible(True)
+            window = visible(True)
+            if frame_observer and window != initial_window:
+                raise ValueError("The retained frame controls reopened a different HWND")
+            return window
 
         def close():
             windows.close_window(visible(True))
             visible(False)
 
+        def transition(action):
+            issued = api.clock()
+            (close if action == "close" else reopen)()
+            response = api.clock()
+            if frame_observer:
+                transitions.append(dict(action=action, issuedQpc=issued, responseQpc=response, hwnd=initial_window))
+            return issued, response
+
         def calibrate():
-            tick = api.clock()
-            reopen()
+            tick, _ = transition("reopen")
             time.sleep(.75)
             return [tick, api.clock()]
 
-        close()
+        transition("close")
         controls = [calibrate()]
         spans = {}
         tree = SubjectTree(api, stack, proc.pid, expected_pids)
         for name in ("visible", "hidden"):
             if name == "hidden":
-                close()
+                transition("close")
             time.sleep(SETTLE_SECONDS)
             spans[name], samples = sample_idle(api, proc, tree, windows, name == "visible")
             result["idleSamples"][name] = samples
@@ -294,23 +311,28 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         controls.append(calibrate())
         close_ms, open_ms = [], []
         for _ in range(SWITCHES):
-            tick = api.clock()
-            close()
-            close_ms.append((api.clock() - tick) * 1000 / api.frequency)
+            tick, end = transition("close")
+            close_ms.append((end - tick) * 1000 / api.frequency)
             time.sleep(.1)
-            tick = api.clock()
-            reopen()
-            open_ms.append((api.clock() - tick) * 1000 / api.frequency)
+            tick, end = transition("reopen")
+            open_ms.append((end - tick) * 1000 / api.frequency)
             time.sleep(.1)
         result["idleVisibilityMs"] = {"close": close_ms, "reopen": open_ms}
         result["metrics"].update(idle_close_p95_ms=p95(close_ms), idle_reopen_p95_ms=p95(open_ms))
         finish()
-        present, result["presentation"] = present_counts(trace.read_text(errors="replace"), spans, controls, api.frequency)
-        result["metrics"].update(present)
+        if frame_observer is None:
+            present, result["presentation"] = present_counts(trace.read_text(errors="replace"), spans, controls, api.frequency)
+            result["metrics"].update(present)
         result["controls"]["windowEvents"] = {name: sum(e["event"] == name and e["root"] for e in windows.events)
                                                for name in ("show", "hide")}
         result["controls"]["successfulVisibilityCycles"] = SWITCHES
         result["controls"]["wholeProcessTree"] = tree.records
+        if frame_observer:
+            if frame_observer(visible(True), proc.pid) != frame_window:
+                raise ValueError("The original native client changed during the frame observations")
+            result["frameWindows"] = dict(root=frame_window, guiCreation100ns=api.process_identity(handle),
+                                          startupQpc=[proc.benchmark_start_qpc, first_visible_qpc], frequency=api.frequency,
+                                          spans=spans, controls=controls, requests=transitions)
         if not rust:
             try:
                 result["controls"]["shippingTrayLookup"] = observe_wpf_tray(api, proc, handle)
