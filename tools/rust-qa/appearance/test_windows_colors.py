@@ -4,9 +4,12 @@ from concurrent.futures import Future
 from contextlib import contextmanager
 import ctypes as c
 import hashlib
+import os
 from pathlib import Path
 import runpy
+import shutil
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -60,6 +63,19 @@ def bitmap(foreground, paper):
 
 
 class WindowsContrastTests(unittest.TestCase):
+    def test_passive_label_crop_requires_its_entire_unobstructed_rectangle(self):
+        host = (Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                if os.name == "nt" else shutil.which("pwsh"))
+        if not host:
+            self.skipTest("PowerShell is required for the label observer")
+        with tempfile.TemporaryDirectory() as temp:
+            env = dict(os.environ, POWERSHELL_TELEMETRY_OPTOUT="1")
+            if os.name != "nt":
+                for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+                    env[key] = str(Path(temp) / key)
+            subprocess.run([host, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                            "-File", HERE / "test_passive_label.ps1"], cwd=temp, env=env, check=True, timeout=30)
+
     def test_publisher_restores_its_thread_before_closing_the_owned_handle(self):
         publish = observer["on_subject_desktop"]
         name = "IfwQa_" + "1" * 32

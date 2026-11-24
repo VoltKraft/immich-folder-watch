@@ -248,3 +248,20 @@ A portable test exercised ordinary completion and an interrupted window
 check. The next native execution must establish whether the publisher can
 complete cleanup on the x64 host. [Thread desktop selection](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop)
 · [Desktop handle lifetime](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-closedesktop).
+
+### Passive capture of the filename label
+
+The two earlier ARM64 trials found the 66 × 18 pixel `Dateiname` label.
+Windows denied foreground activation, and the input guard stopped both
+captures before the first bitmap. The contrast observer now reads the
+screen while the label is visible on the selected private input desktop.
+It checks the original PID and HWND, rejects any visible higher window
+whose bounds overlap the crop, and verifies the owner at every physical
+pixel immediately before and after each screen read. An unreadable window
+rectangle or an incomplete Z-order walk also stops the capture. Each
+phase requires two identical rasters. The contrast raster must change,
+and the restored raster must match the baseline. Native results for this
+capture on Windows x64 and ARM64 remain open.
+[Passive label observer](../../tools/rust-qa/appearance/windows-label.ps1) ·
+[PowerShell regression controls](../../tools/rust-qa/appearance/test_passive_label.ps1) ·
+[Microsoft window hit testing](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-windowfrompoint).
