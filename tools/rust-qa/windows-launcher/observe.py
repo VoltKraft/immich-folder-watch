@@ -620,6 +620,31 @@ def require_absence(api, path):
     raise CleanupUnconfirmed(f"The staged path still exists after disposition: {path.name}")
 
 
+def directory_identity(api, handle):
+    attributes, identity = api.file_info(handle)
+    if not attributes & 0x10 or attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x40):
+        raise CleanupUnconfirmed("Expected the original regular subject directory")
+    return identity
+
+
+def remove_staged_directory(api, subject, directory_id, runtime_pin, waits):
+    # Keep the original file ID live while transferring from the deny-delete pin to the DELETE handle.
+    with ExitStack() as handles:
+        witness = api.create_file(str(subject), 0x81, 7, None, 3, 0x02200000, None)
+        if witness == c.c_void_p(-1).value:
+            raise c.WinError(c.get_last_error())
+        handles.callback(release_handle, api.close, "CloseHandle(staged directory witness)", witness)
+        if directory_identity(api, witness) != directory_id:
+            raise CleanupUnconfirmed("The staged directory witness differs from its original pin")
+        runtime_pin.close()
+        final = api.path_handle(subject, True, delete=True)
+        handles.callback(release_handle, api.close, "CloseHandle(staged directory disposition)", final)
+        if directory_identity(api, final) != directory_id:
+            raise CleanupUnconfirmed("The staged directory was replaced before disposition")
+        dispose_empty_directory(api, final, "subject", directory_id, waits)
+    require_absence(api, subject)
+
+
 @contextmanager
 def staged_images(api, root, built_gui, inventory, result):
     """Keep the original directory and both file identities live through checked removal."""
@@ -628,16 +653,14 @@ def staged_images(api, root, built_gui, inventory, result):
     subject = root / "subject"
     records = result["stagedImageCleanup"] = {}
     with ExitStack() as resources:
-        # DELETE on this exact directory permits nonrecursive removal after both children are gone.
-        # Its sharing mode denies directory renames throughout the image transitions.
         try:
             subject.mkdir()
-            directory = api.path_handle(subject, True, delete=True)
+            # The running Rust worker opens this directory with FILE_SHARE_READ | FILE_SHARE_WRITE.
+            directory = api.path_handle(subject, True)
             directory_lease = resources.enter_context(ExitStack())
             directory_lease.callback(release_handle, api.close, "CloseHandle(staged image directory)", directory)
-            attributes, directory_id = api.file_info(directory)
-            if not attributes & 0x10 or attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x40):
-                raise CleanupUnconfirmed("Expected the original regular subject directory")
+            directory_id = directory_identity(api, directory)
+            result["stagedDirectory"] = dict(volume=directory_id[0], fileId=directory_id[1], removed=False)
             pins = resources.enter_context(ExitStack())
             images = []
             for name, expected in ((built_gui.name, inventory["gui"]), ("ifw-performance-worker.exe", inventory["worker"])):
@@ -678,10 +701,8 @@ def staged_images(api, root, built_gui, inventory, result):
                         lease.close()
                         require_absence(api, path)
                         record["absent"] = True
-                    # A replacement or unrecognized entry keeps the directory nonempty.
-                    dispose_empty_directory(api, directory, "subject", directory_id, result["directoryDispositionWaits"])
-                    directory_lease.close()
-                    require_absence(api, subject)
+                    remove_staged_directory(api, subject, directory_id, directory_lease, result["directoryDispositionWaits"])
+                    result["stagedDirectory"]["removed"] = True
                 except Exception as error:
                     raise CleanupUnconfirmed("Could not confirm removal of the original staged launcher images") from error
 

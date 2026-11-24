@@ -731,6 +731,38 @@ and Shell readback SHA-256 is
 `711da3aa0f4dd89519a34f3cb9de8c98f6600ab8e54b99ee97adb73807cbdf85`.
 [x64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806170882) · [ARM64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805618878).
 
+## Canonical GUI startup on the staged Windows desktop at 13e4af8
+
+On x64 and ARM64 the ordinary launcher primary on Default, the launcher
+primary on its private desktop and the integrated tray primary on its private
+desktop each reported primary election, then exited with Windows sharing
+violation 32. All six exited before creating the inventory worker or
+reporting a window. Both integrated tray observers recorded an empty process
+job but lacked their normal drain marker and skipped the input-desktop phase.
+The two canonical launcher archives and both integrated tray archives matched
+their Actions SHA-256 values, all fourteen indexed logs and their observer
+sources. [x64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14965252875)
+· [ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14965748407)
+· [x64 GUI tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14966021136)
+· [ARM64 GUI tray](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14965378920).
+
+The fixture held DELETE access to the staged executable directory while
+the Rust supervisor opened that directory for reading with
+`FILE_SHARE_READ | FILE_SHARE_WRITE`. Those sharing modes conflict.
+The corrected fixture holds a read-only directory handle throughout the
+trial and the two executable removals. It then opens an identity witness
+that permits deletion, releases the running-phase handle and opens a
+disposition handle. Both handles must match the original volume and file
+ID. The fixture removes the empty directory and verifies its absence.
+The native control first reproduces the original handles on a separate
+empty directory and requires error 32 on the worker open. It then checks
+that the same worker access succeeds in the corrected stage. After that
+worker handle closes, a separate DELETE request must still fail against
+the fixture's running-phase pin. The next native execution will verify
+both observations. [Worker directory open](../../tools/rust-qa/gui/src/windows_worker.rs)
+· [Launcher fixture](../../tools/rust-qa/windows-launcher/observe.py)
+· [Native control](../../tools/rust-qa/windows-launcher/test_staged_images.py).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

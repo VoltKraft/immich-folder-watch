@@ -1,6 +1,7 @@
 """Check the staged-image deletion boundary and its actual Windows sharing refusal."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+import ctypes as c
 import json
 import os
 from pathlib import Path
@@ -130,21 +131,27 @@ class StagedImages(unittest.TestCase):
                 if not path.exists():
                     raise refusal(2)
                 if directory:
-                    self.assertEqual((path, delete), (subject, True))
-                    return opened(10)
+                    self.assertEqual(path, subject)
+                    if delete:
+                        self.assertEqual(alive, {20})
+                    return opened(30 if delete else 10)
                 index = [GUI, WORKER].index(path.name) + 1
                 if delete:
                     self.assertTrue({10, 20 + index} <= alive)
                     self.assertTrue({11, 12}.isdisjoint(alive))
                 return opened((30 if delete else 10) + index)
             def witness(path, access, sharing, security, disposition, flags, template):
+                if Path(path) == subject:
+                    self.assertEqual(alive, {10})
+                    self.assertEqual((access, sharing, disposition, flags), (0x81, 7, 3, 0x02200000))
+                    return opened(20)
                 index = [GUI, WORKER].index(Path(path).name) + 1
                 self.assertTrue({10, 10 + index} <= alive)
                 self.assertEqual((access, sharing, disposition, flags), (0x81, 5, 3, 0x00200000))
                 return opened(20 + index)
             def dispose(handle):
-                if handle == 10:
-                    self.assertEqual(alive, {10})
+                if handle == 30:
+                    self.assertEqual(alive, {20, 30})
                     subject.rmdir()
                 else:
                     index = handle - 30
@@ -155,7 +162,7 @@ class StagedImages(unittest.TestCase):
                 return True
             api.path_handle.side_effect = by_name
             api.create_file.side_effect = witness
-            api.file_info.side_effect = lambda h: (0x10 if h == 10 else 0x80, (1, h % 10))
+            api.file_info.side_effect = lambda h: (0x10 if h in (10, 20, 30) else 0x80, (1, 100 + h % 10))
             api.delete_handle.side_effect = dispose
             api.close.side_effect = close
             with self.assertRaisesRegex(ValueError, "actual observation"):
@@ -164,8 +171,29 @@ class StagedImages(unittest.TestCase):
                     raise ValueError("actual observation")
             self.assertFalse(alive)
             self.assertFalse(subject.exists())
+            self.assertEqual(result["stagedDirectory"], dict(volume=1, fileId=100, removed=True))
             for row in result["stagedImageCleanup"].values():
                 self.assertTrue(row["absent"] and row["dispositionAccepted"])
+
+    def test_directory_disposition_refuses_a_replacement_or_reparse_point_during_transfer(self):
+        for invalid in ((0x10, (73, 90)), (0x80, IDENTITY), (0x410, IDENTITY)):
+            for changed_handle in (20, 30):
+                with self.subTest(invalid=invalid, changed_handle=changed_handle):
+                    api, runtime = Mock(), Mock()
+                    api.create_file.return_value = 20
+                    api.path_handle.return_value = 30
+                    api.file_info.side_effect = lambda h: invalid if h == changed_handle else (0x10, IDENTITY)
+                    with self.assertRaises(observe.CleanupUnconfirmed):
+                        observe.remove_staged_directory(api, Path("subject"), IDENTITY, runtime, [])
+                    if changed_handle == 20:
+                        runtime.close.assert_not_called()
+                        api.path_handle.assert_not_called()
+                    else:
+                        runtime.close.assert_called_once()
+                        api.path_handle.assert_called_once_with(Path("subject"), True, delete=True)
+                    self.assertCountEqual([call.args[0] for call in api.close.call_args_list],
+                                          [20] if changed_handle == 20 else [20, 30])
+                    api.delete_handle.assert_not_called()
 
     @unittest.skipUnless(os.name == "nt", "requires native Windows file sharing and disposition")
     def test_windows_releases_real_deny_delete_handle_before_removing_staged_image(self):
@@ -181,7 +209,8 @@ class StagedImages(unittest.TestCase):
                                          observe.QA / "windows-performance/native.py",
                                          observe.QA / "windows-performance/run.py",
                                          observe.QA / "windows-performance/build.py",
-                                         observe.QA / "windows-desktop/win32.py")})
+                                         observe.QA / "windows-desktop/win32.py",
+                                         observe.QA / "gui/src/windows_worker.rs")})
         if observe.recorder.hosted():
             self.assertEqual(os.environ["NATIVE_TARGET"], target)
             result.update(source=os.environ["GITHUB_SHA"], run=os.environ["GITHUB_RUN_ID"],
@@ -196,6 +225,41 @@ class StagedImages(unittest.TestCase):
         with ExitStack() as stack:
             build = stack.enter_context(observe.recorder.owned_directory(system, temp, source))
             root = stack.enter_context(observe.recorder.owned_directory(system, temp, profile))
+            # Match windows_worker.rs: GENERIC_READ, FILE_SHARE_READ | WRITE, OPEN_EXISTING,
+            # FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT.
+            flags = 0x02200000
+            def worker_open(directory):
+                handle = system.create_file(str(directory), 0x80000000, 3, None, 3, flags, None)
+                if handle == c.c_void_p(-1).value:
+                    raise c.WinError(c.get_last_error())
+                return handle
+
+            def sharing_refusal(open_handle):
+                try:
+                    handle = open_handle()
+                except OSError as error:
+                    self.assertEqual(error.winerror, 32)
+                    return error.winerror
+                observe.release_handle(system.close, "CloseHandle(unexpected sharing control)", handle)
+                self.fail("Expected an actual sharing violation on CreateFileW")
+
+            historical = root / "historical-stage"
+            historical.mkdir()
+            with ExitStack() as control:
+                original = system.path_handle(historical, True, delete=True)
+                control.callback(observe.release_handle, system.close, "CloseHandle(historical stage)", original)
+                historical_id = observe.directory_identity(system, original)
+                try:
+                    refused = sharing_refusal(lambda: worker_open(historical))
+                    result["historicalDirectory"] = dict(volume=historical_id[0], fileId=historical_id[1],
+                        fixtureAccess=0x10080, fixtureShare=3, workerAccess=0x80000000, workerShare=3,
+                        workerOpenWin32Error=refused)
+                finally:
+                    self.assertEqual(observe.directory_identity(system, original), historical_id)
+                    observe.dispose_empty_directory(system, original, "historical-stage", historical_id,
+                                                    result["directoryDispositionWaits"])
+            observe.require_absence(system, historical)
+            result["historicalDirectory"]["removed"] = True
             for name in (GUI, WORKER):
                 shutil.copyfile(sys.executable, build / name)
             digest = observe.recorder.sha(sys.executable)
@@ -214,6 +278,17 @@ class StagedImages(unittest.TestCase):
             api.path_handle.side_effect = acquire
             with ThreadPoolExecutor(max_workers=1) as thread:
                 with observe.staged_images(api, root, build / GUI, inventory, result) as staged:
+                    child_pin = worker_open(staged.parent)
+                    try:
+                        attrs, identity = system.file_info(child_pin)
+                        self.assertTrue(attrs & 0x10)
+                        self.assertFalse(attrs & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x40))
+                        result["workerDirectoryPin"] = dict(access=0x80000000, share=3, flags=flags,
+                                                           volume=identity[0], fileId=identity[1])
+                    finally:
+                        observe.release_handle(system.close, "CloseHandle(test worker directory pin)", child_pin)
+                    result["fixtureDeleteOpenWin32Error"] = sharing_refusal(
+                        lambda: system.path_handle(staged.parent, True, delete=True))
                     other = system.path_handle(staged, False)
                     def release_after_refusal():
                         try:
@@ -223,6 +298,7 @@ class StagedImages(unittest.TestCase):
                     released = thread.submit(release_after_refusal)
                 self.assertTrue(released.result(timeout=1))
             self.assertFalse((root / "subject").exists())
+            self.assertEqual(result["stagedDirectory"], dict(volume=identity[0], fileId=identity[1], removed=True))
             images = result["stagedImageCleanup"]
             self.assertGreaterEqual(images[GUI]["attempts"], 2)
             self.assertEqual(images[GUI]["firstSharingViolation"]["win32Error"], 32)
