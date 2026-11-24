@@ -725,6 +725,29 @@ The archive SHA-256 values are
 has SHA-256 `dab6076ea382ae273c5bafc52bfce028e0562886ebc33204c5133bf75bc9aa3d`.
 [Directory grant results](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30).
 
+### X11 accessibility tree on Ubuntu ARM64
+
+At `a1011bf` the four X11 lifecycle cases passed. While searching for
+the first editable `Dateiname` field, a call to read the role of a tree
+node returned AT-SPI error 1, `Unknown interface 'org.a11y.atspi.Accessible'`.
+The observer exited before recording the field. At `e796d30` the same
+observer recorded the entry and completed the input checks. Both runs
+used GUI SHA-256 `9a6396be807da2052803b88347e2a2029e4d4effe7c0812b5139c25ae5ae6d7a`.
+[Earlier ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212/job/138029154014)
+· [Later ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/job/138068114065).
+
+The revised X11 observer restarts the entire tree scan from the desktop
+when it encounters that specific error. It permits three retries, 50 ms
+apart. A fourth occurrence and other bus errors fail the observation.
+The first accepted snapshot must contain the named editable field from
+the target process. Three local regression cases exercised a disappearing
+node, propagation of other errors and the retry limit. A private native
+x64 Xvnc run recorded all four lifecycle cases, the named field with
+`Grüße – Sommer.jpg`, three masked characters and the native clipboard
+round trip. Its `artifacts/rust/gui-run/x11-rm85rwk3/results.json` SHA-256
+is `af2f645ba3627eb126fdd58dcbcc5a80d81db7fc85ac256fbca541e3008ba8e8`.
+Native ARM64 execution of the revision is pending.
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

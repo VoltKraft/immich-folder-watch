@@ -47,6 +47,27 @@ def read_tree(target_pid):
     return result
 
 
+def read_x11_tree(target_pid):
+    # A desktop child can lose its Accessible interface between enumeration
+    # and its next D-Bus call. Discard that scan and start at the desktop again.
+    for attempt in range(4):
+        try:
+            return read_tree(target_pid)
+        except GLib.Error as error:
+            if (error.domain != "atspi_error" or error.code != 1
+                    or error.message != "Unknown interface 'org.a11y.atspi.Accessible'" or attempt == 3):
+                raise
+            print(f"Retrying X11 accessibility scan for PID {target_pid}: {error}", flush=True)
+            time.sleep(.05)
+
+
+def filename_snapshot(tree):
+    snapshot = tree()
+    if any(n["name"] == "Dateiname" and n["role"] in ("text", "entry") for n in snapshot):
+        return snapshot
+    return None
+
+
 def tap(observer, key):
     observer.key(key, True)
     observer.key(key, False)
@@ -111,14 +132,12 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
         ibus_start(stack)
     log = Path("/qa/input-app.log")
     app = checked_start(stack, ["/app/native-gui-assessment"], log)
-    tree = partial(read_tree, app.pid)
+    tree = partial(read_x11_tree if backend == "x11" else read_tree, app.pid)
     wait_for(lambda: check_alive(app, log) or observer.poll(), 10, "Input probe did not map")
     observer.focus_for_input()
     if not enabled():
         raise RuntimeError("The accessibility service disabled AT-SPI before window registration")
-    wait_for(lambda: any(n["name"] == "Dateiname" and n["role"] in ("text", "entry")
-                         for n in tree()), 8, "Editable filename missing from the accessibility tree")
-    initial = tree()
+    initial = wait_for(lambda: filename_snapshot(tree), 8, "Editable filename missing from the accessibility tree")
     names = {(node["role"], node["name"]) for node in initial}
     if (("password text", "Kennwort") not in names
             or not names.intersection({("push button", "English"), ("button", "English")})):
