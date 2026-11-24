@@ -165,12 +165,7 @@ def participants_exited(area):
     checked_processes = set()
     receipts = []
     for role in ("original", "scheduled"):
-        attempt = area / (role + "-attempt.json")
-        launched = area / (role + "-basic-user.json")
-        if launched.is_file() and read(launched)["launched"] and not attempt.is_file():
-            if not (area / (role + "-done.json")).is_file():
-                raise RuntimeError("The named Basic User action has no verifiable shutdown receipt")
-        receipts.extend((area / (role + "-bootstrap.json"), attempt))
+        receipts.extend(area / (role + suffix) for suffix in ("-bootstrap.json", "-console-helper.json", "-attempt.json"))
     for name in ("original-hold", "scheduled-refuse", "scheduled-hold", "original-refuse", "original-last"):
         receipts.append(area / (name + "-created.json"))
     for path in receipts:
@@ -194,6 +189,20 @@ def participants_exited(area):
             finally:
                 accounts.close(proc)
         checked_processes.add(process_key)
+    for role in ("original", "scheduled"):
+        attempt = area / (role + "-attempt.json")
+        launched = area / (role + "-basic-user.json")
+        if launched.is_file() and not attempt.is_file():
+            launch = read(launched)
+            started = launch["launched"]
+            claim = area / (role + "-console-launch.claim")
+            if claim.exists():
+                code = read(claim)["exitCode"] if claim.stat().st_size else None
+                if type(code) is not int or launch.get("launchExit", code) != code:
+                    raise RuntimeError("The fixed console launch has no verifiable utility exit or participant identity")
+                started = code == 0
+            if started and not (area / (role + "-done.json")).is_file():
+                raise RuntimeError("The named Basic User action has no verifiable shutdown receipt")
     return len(checked_processes)
 
 

@@ -241,6 +241,8 @@ class FixtureTests(unittest.TestCase):
                 if result["mode"] == STANDARD:
                     result.update(schedulerExit=1, cleanupExit=0)
                     write(area / "cleanup.json", {"cleanupVerified": True})
+                    write(area / "original-console-helper.json", {"pid": 123, "created100ns": 456})
+                    (area / "original-console-launch.claim").touch()
                 raise RuntimeError("Fixture registration failed")
             with patch.object(observe, "scheduled", side_effect=scheduled), patch.object(observe, "participants_exited", return_value=0):
                 ambient = observe.hosted_case(args, base, AMBIENT, object())
@@ -252,6 +254,8 @@ class FixtureTests(unittest.TestCase):
             self.assertTrue(standard["temporaryProfileRemoved"])
             self.assertFalse(read(output / "ambient-case.json")["ambientGuardPassed"])
             self.assertFalse(read(output / "standard-case.json")["standardUserGuardPassed"])
+            self.assertEqual(read(output / "original-console-helper.json"), {"pid": 123, "created100ns": 456})
+            self.assertEqual(read(output / "original-console-claim.json"), {"bytes": 0, "rawBase64": ""})
             self.assertIsNone(ambient["standardUserGuardPassed"])
             self.assertIsNone(standard["ambientGuardPassed"])
 

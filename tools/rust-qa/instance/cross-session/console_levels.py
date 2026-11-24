@@ -1,12 +1,14 @@
-"""Read the fixed system trust-level query on the fixture's own Windows console."""
+"""Read a fixed system trust-level operation on the fixture's own Windows console."""
 
 import ctypes as c
 from ctypes import wintypes as w
 from contextlib import ExitStack
 import os
 import subprocess
+import sys
+import time
 
-from fixture import bind, checked
+from fixture import HERE, bind, checked, write
 
 
 MAX_CELLS = 16384
@@ -38,10 +40,30 @@ def require_sole_client(process_list):
         raise RuntimeError("The console must belong to the dedicated query process")
 
 
-def query(runas, area):
-    """Run only /showtrustlevels and return its exit code and UTF-16 screen text."""
+def wait_for_private_screen(process_list, area):
+    # A successful launch may attach its console participant until the independent writer trial finishes.
+    deadline = time.monotonic() + 145
+    while True:
+        try:
+            require_sole_client(process_list)
+            return
+        except RuntimeError:
+            if (area / "abort").exists() or time.monotonic() >= deadline:
+                raise
+        time.sleep(.1)
+
+
+def query(runas, area, *, launch_role=None):
+    """Run the listing or launch the fixed Basic User participant and capture the native screen."""
     import msvcrt
 
+    arguments = [runas, "/showtrustlevels"]
+    if launch_role is not None:
+        if launch_role not in ("original", "scheduled"):
+            raise ValueError("Unknown Basic User participant")
+        participant = subprocess.list2cmdline([sys.executable, "-I", "-B", str(HERE / "worker.py"),
+                                             "--participant", launch_role, str(area)])
+        arguments = [runas, "/trustlevel:0x20000", participant]
     kernel = c.WinDLL("kernel32", use_last_error=True)
     process_list = bind(kernel, "GetConsoleProcessList", w.DWORD, c.POINTER(w.DWORD), w.DWORD)
     screen_info = bind(kernel, "GetConsoleScreenBufferInfo", w.BOOL, w.HANDLE, c.POINTER(ScreenInfo))
@@ -71,8 +93,17 @@ def query(runas, area):
         cursor, before = capture()
         if cursor or before:
             raise RuntimeError("The dedicated query console was already in use")
-        result = subprocess.run([runas, "/showtrustlevels"], cwd=area, stdin=source, stdout=screen,
+        claim = area / (launch_role + "-console-launch.claim") if launch_role is not None else None
+        if claim is not None:
+            claim.touch(exist_ok=False)
+        result = subprocess.run(arguments, cwd=area, stdin=source, stdout=screen,
                                 stderr=screen, close_fds=True, timeout=10)
-        require_sole_client(process_list)
+        if claim is not None:
+            write(claim, {"exitCode": result.returncode})
+        if claim is not None and result.returncode == 0:
+            wait_for_private_screen(process_list, area)
+        else:
+            require_sole_client(process_list)
         _, text = capture()
+        require_sole_client(process_list)
         return result.returncode, text

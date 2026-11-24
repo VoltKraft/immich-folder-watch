@@ -1,6 +1,7 @@
 """Exercise the existing Rust file guard using one account in two actual Windows OS sessions."""
 
 import argparse
+import base64
 import os
 from pathlib import Path
 import shutil
@@ -214,24 +215,35 @@ def hosted_case(args, runner_temp, mode, reference):
     except Exception:
         result["error"] = traceback.format_exc()
     finally:
-        # The unprefixed raw standard-user names remain available to existing readers.
-        try:
-            role_names = [role + suffix for role in PHASES
-                          for suffix in ("-bootstrap.json", "-basic-user.json", "-attempt.json", "-done.json", "-ready.json")]
-            phase_names = [name + suffix for phases in PHASES.values() for name, _ in phases
-                           for suffix in ("-created.json", "-held.json", "-finished.json")]
-            for name in ("worker-done.json", "scheduler.json", "cleanup.json", "original-bootstrap-done.json", *role_names, *phase_names):
-                if (area / name).is_file():
-                    shutil.copyfile(area / name, args.output / (prefix + name))
-        except OSError:
-            result.update(passed=False, receiptError=traceback.format_exc())
         try:
             result["participantExitsVerified"] = participants_exited(area)
             if result.get("schedulerStarted") and ("schedulerExit" not in result or result.get("cleanupExit") != 0 or
                     not (area / "cleanup.json").is_file() or not read(area / "cleanup.json").get("cleanupVerified")):
                 raise RuntimeError("Could not verify removal of the exact private scheduled task")
-            shutil.rmtree(area)
-            result["temporaryProfileRemoved"] = not area.exists()
+        except (OSError, RuntimeError):
+            result.update(passed=False, cleanupError=traceback.format_exc())
+        # The unprefixed raw standard-user names remain available to existing readers.
+        try:
+            role_names = [role + suffix for role in PHASES
+                          for suffix in ("-bootstrap.json", "-basic-user.json", "-console-helper.json",
+                                         "-attempt.json", "-done.json", "-ready.json")]
+            phase_names = [name + suffix for phases in PHASES.values() for name, _ in phases
+                           for suffix in ("-created.json", "-held.json", "-finished.json")]
+            for name in ("worker-done.json", "scheduler.json", "cleanup.json", "original-bootstrap-done.json", *role_names, *phase_names):
+                if (area / name).is_file():
+                    shutil.copyfile(area / name, args.output / (prefix + name))
+            for role in PHASES:
+                claim = area / (role + "-console-launch.claim")
+                if claim.is_file():
+                    raw = claim.read_bytes()
+                    write(args.output / (prefix + role + "-console-claim.json"),
+                          {"bytes": len(raw), "rawBase64": base64.b64encode(raw).decode("ascii")})
+        except OSError:
+            result.update(passed=False, receiptError=traceback.format_exc())
+        try:
+            if "cleanupError" not in result and "receiptError" not in result:
+                shutil.rmtree(area)
+                result["temporaryProfileRemoved"] = not area.exists()
         except (OSError, RuntimeError):
             result.update(passed=False, cleanupError=traceback.format_exc())
         result["passed"] = bool(result["passed"] and result["lockSequenceObserved"] and result["temporaryProfileRemoved"])

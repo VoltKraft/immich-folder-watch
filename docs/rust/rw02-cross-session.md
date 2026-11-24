@@ -24,7 +24,7 @@ The hosted controller builds the pinned native Rust image once. Each trial gets 
 
 For the ambient trial each bootstrap runs the fixed participant directly. The controller matches the participant to the same live process and checks each writer against its own session’s participant. It compares the account and session, elevation and type, integrity, UIAccess and restrictions, and a digest of the groups, restricting SIDs, capabilities and privilege attributes. A cross-session difference between the logon groups is expected. The reports retain digests and counts for these private inventories. [Authority inspection](../../tools/rust-qa/instance/cross-session/standard.py) · [Windows token information](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class)
 
-For the standard-user trial each primary token must report no elevation, default or limited elevation type, no enabled local administrative/operator aliases, no application capabilities or UIAccess, and integrity at or below Medium. The privilege inventory must fit the ordinary-user set, including disabled privileges. A participant meeting these checks can run the fixed test directly. If a hosted bootstrap has administrative authority, it records its original token facts. It can invoke the system `runas.exe` with the listed Basic User level `0x20000`, a profile-free launch and the exact hashed Python image/script for its role. This requires an already-running Secondary Logon service. A refused launch or insufficient effective token preserves its reason in the raw evidence. The test uses existing account and service settings. [Fixed participant](../../tools/rust-qa/instance/cross-session/worker.py) · [Mandatory integrity](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control) · [Windows Runas](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc771525%28v%3Dws.11%29)
+For the standard-user trial each primary token must report no elevation, default or limited elevation type, no enabled local administrative/operator aliases, no application capabilities or UIAccess, and integrity at or below Medium. The privilege inventory must fit the ordinary-user set, including disabled privileges. A participant meeting these checks can run the fixed test directly. If a hosted bootstrap has administrative authority, it records its original token facts. It can invoke the system `runas.exe` with the listed Basic User level `0x20000` and the exact hashed Python image and script for its role. This requires an already-running Secondary Logon service. A refused launch or insufficient effective token preserves its reason in the raw evidence. The test uses existing account and service settings. [Fixed participant](../../tools/rust-qa/instance/cross-session/worker.py) · [Mandatory integrity](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control) · [Windows Runas](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc771525%28v%3Dws.11%29)
 
 Each Rust process starts suspended and belongs to its owner’s private kill-on-close job. Before the first thread resumes, the controller checks its exact image, creation time, PID, account, native session and authority. It inspects each live holder again after its `WRITER_HELD` response. In order, the first process holds, its peer refuses, the first releases, the peer holds, the original side refuses, the peer releases, and the original side reacquires and releases. Each completion ties the actual response and exit code to the exact process and volume/file ID. The ordered events appear in `observedWriterEvents`. The managed oracle only reads the account identity. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Independent observation](../../tools/rust-qa/instance/cross-session/observe.py)
 
@@ -253,3 +253,42 @@ events and removed its synthetic resources on both hosts. Replay verified
 The ordinary-user handover still requires two existing sessions of the
 same account on a disposable Windows host.
 [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14836851751) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45210426209/artifacts/14836122324).
+
+## Basic User launch on a private console
+
+At `e796d30` both original sessions again reported the Basic User level on
+their private consoles. Each screen contained 280 UTF-16LE bytes with SHA-256
+`6d1f89626bf104dceb243134d5b5359d115891768722aa3753685ca8e7423ace`.
+The subsequent detached launch returned 1 on each host, with zero bytes on its
+combined output pipe. Both ambient writer trials passed. The cause of the
+ordinary launch refusal remains unknown.
+
+| Target | Original Basic User receipt SHA-256 |
+| --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632) | `c94e451bb0b91fe5afdbb9c12e92d86796276a81bd4f7547e9e57242da04b79f` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830) | `f6285eb76e7ea40d8bc58ee646e90a2bf354589d2fff5e6eecc68ebfb39ad96c` |
+
+After confirming the level, the hosted trial now executes the same-account
+form `runas /trustlevel:0x20000 <fixed participant>` once per role. The
+helper checks its bootstrap's live PID, creation time, image and session
+against the original receipt and rechecks the system utility's digest. It
+opens the fresh hidden console's own input and output handles, checks that
+the screen is blank and claims the role before starting the utility. It reads
+the screen only while it is the sole attached process. A participant that
+inherits the console can finish the guard exercise independently before that read.
+[Microsoft's documented same-account launch](https://devblogs.microsoft.com/premier-developer/how-to-force-vista-to-not-elevate-an-application/)
+
+Run the existing native hosted command above. For each attempted role its
+`*-basic-user.json` records `launchSource`, `consoleHelperExit` and the
+utility's own `launchExit` when available. The claim records that exit
+before the screen read, including when the capture subsequently fails.
+Cleanup verifies the console helper's PID and creation time along with the
+other participants. The evidence includes the helper identity and the claim's
+raw bytes, including an empty claim when the utility's exit is unknown.
+Decode `launchScreenUtf16LeBase64` and compare its complete length and
+SHA-256 with `launchOutput`. A helper error has its own diagnostic. The
+controller must still verify the participants' actual rights, distinct
+sessions, five writers, ordered guard events and cleanup before the
+standard-user case can pass. The 29 portable writer tests include ten
+console controls. Seven hosted-service and six scheduler cleanup controls
+passed under PowerShell 7.7.0. Native execution of this console launch is pending.

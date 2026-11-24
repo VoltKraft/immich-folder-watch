@@ -4,6 +4,7 @@ import base64
 import ctypes as c
 from ctypes import wintypes as w
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -31,7 +32,7 @@ def level_inventory(returncode, output):
 
 
 def launch_output(output):
-    """Preserve what the fixed launcher wrote to its combined output pipe."""
+    """Preserve a byte count, digest and bounded prefix for the fixed utility's output."""
     prefix = output[:4096]
     return {"bytes": len(output), "sha256": hashlib.sha256(output).hexdigest(),
             "prefixBase64": base64.b64encode(prefix).decode("ascii"), "truncated": len(prefix) < len(output)}
@@ -57,13 +58,15 @@ def observe_levels(report, redirected, console_probe):
     return second["levelListed"]
 
 
-def console_probe(area, role):
+def console_probe(area, role, *, launch=False):
     startup = subprocess.STARTUPINFO()
     startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
     startup.wShowWindow = subprocess.SW_HIDE
-    return subprocess.run([sys.executable, "-I", "-B", str(HERE / "worker.py"), "--console-levels", role, str(area)],
+    operation = "--console-launch" if launch else "--console-levels"
+    return subprocess.run([sys.executable, "-I", "-B", str(HERE / "worker.py"), operation, role, str(area)],
                           cwd=area, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup, close_fds=True, timeout=20)
+                          creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup, close_fds=True,
+                          timeout=165 if launch else 20)
 
 
 def own_identity(area, role):
@@ -125,6 +128,38 @@ def system_runas():
     return Path(folder.value) / "runas.exe"
 
 
+def authorize_console_launch(area, role, accounts, runas):
+    """Bind this one launch to the checked bootstrap that observed the Basic User level."""
+    parent = read(area / (role + "-bootstrap.json"))
+    if os.getppid() != parent["pid"]:
+        raise RuntimeError("The Basic User launch helper is outside its bootstrap")
+    _, _, live = accounts.identify(parent["pid"], expected_image=Path(sys.executable),
+                                   expected_session=parent["sessionId"], expected_created=parent["created100ns"])
+    request = read(area / (role + "-basic-user.json"))
+    listed = request.get("privateConsoleQuery", {}) if request.get("levelSource") == "private-console-query" else request
+    if (live != parent or request.get("launched") is not False or request.get("level") != "0x20000"
+            or request.get("levelSource") not in ("redirected-query", "private-console-query")
+            or request.get("secondaryLogonRunning") is not True or request.get("launcherSha256") != instance.sha(runas)
+            or listed.get("levelListed") is not True or listed.get("levelQueryExit") != 0
+            or "0x20000" not in listed.get("levelCodes", [])):
+        raise RuntimeError("The bootstrap did not authorize this fixed Basic User launch")
+
+
+def record_console_launch(report, result):
+    report["consoleHelperExit"] = result.returncode
+    if result.returncode:
+        report["consoleDiagnostic"] = result.stderr.decode("utf-8", errors="replace")[:1024]
+        raise RuntimeError("Could not observe the fixed Basic User launch on its private console")
+    receipt = json.loads(result.stdout)
+    code = receipt["exitCode"]
+    screen = base64.b64decode(receipt["screenUtf16LeBase64"], validate=True)
+    if (type(code) is not int or not 0 <= code <= 0xffffffff
+            or len(screen) > console_levels.MAX_CELLS * 2 or len(screen) % 2):
+        raise ValueError("Invalid Basic User console receipt")
+    report.update(launchExit=code, launchOutput=launch_output(screen),
+                  launchScreenUtf16LeBase64=receipt["screenUtf16LeBase64"], launched=code == 0)
+
+
 def basic_user(area, role, config):
     # Use only Windows' installed utility and the fixed, hashed Python/script pair.
     runas = system_runas()
@@ -154,16 +189,19 @@ def basic_user(area, role, config):
         levels = subprocess.run([runas, "/showtrustlevels"], **options)
         if not observe_levels(report, levels, lambda: console_probe(area, role)):
             raise RuntimeError("The Windows trust-level query did not confirm the Basic User prerequisite")
-        command = subprocess.list2cmdline([sys.executable, "-I", "-B", str(HERE / "worker.py"), "--participant", role, str(area)])
         if instance.sha(Path(sys.executable)) != config["pythonSha256"] or instance.sha(HERE / "worker.py") != config["workerSha256"]:
             raise RuntimeError("The fixed participant changed before Basic User launch")
-        launch = subprocess.run([runas, "/noprofile", "/trustlevel:0x20000", command], **options)
-        report["launchExit"] = launch.returncode
-        report["launchOutput"] = launch_output(launch.stdout)
-        report["launched"] = launch.returncode == 0
+        report["launchSource"] = "private-console"
+        write(area / (role + "-basic-user.json"), report)
+        record_console_launch(report, console_probe(area, role, launch=True))
         if not report["launched"]:
             raise RuntimeError("Windows refused the fixed Basic User action")
     finally:
+        claim = area / (role + "-console-launch.claim")
+        if "launchExit" not in report and claim.is_file() and claim.stat().st_size:
+            # The utility may have returned before a later console read or helper failure.
+            code = read(claim)["exitCode"]
+            report.update(launchExit=code, launched=code == 0)
         write(area / (role + "-basic-user.json"), report)
 
 
@@ -192,7 +230,7 @@ def main():
         raise SystemExit("A marked native Windows session is required")
     argv = sys.argv[1:]
     actor = len(argv) == 3 and argv[0] == "--participant" and argv[1] in PHASES
-    console = len(argv) == 3 and argv[0] == "--console-levels" and argv[1] in PHASES
+    console = len(argv) == 3 and argv[0] in ("--console-levels", "--console-launch") and argv[1] in PHASES
     original = len(argv) == 2 and argv[0] == "--original"
     if not (actor or console or original or len(argv) == 1):
         raise SystemExit("Expected a fixed synthetic writer role")
@@ -201,11 +239,18 @@ def main():
     role = argv[1] if actor or console else "original" if original else "scheduled"
     if console:
         try:
-            config, _, _, _ = own_identity(area, role)
+            config, accounts, _, identity = own_identity(area, role)
             if (config["mode"] != STANDARD or sys.stdout.isatty()
                     or instance.sha(HERE / "console_levels.py") != config["consoleLevelsSha256"]):
-                raise RuntimeError("The private query requires the identified hosted standard-user trial")
-            status, raw = console_levels.query(system_runas(), area)
+                raise RuntimeError("The private console requires the identified hosted standard-user trial")
+            runas = system_runas()
+            if argv[0] == "--console-launch":
+                write(area / (role + "-console-helper.json"), identity)
+                authorize_console_launch(area, role, accounts, runas)
+                status, raw = console_levels.query(runas, area, launch_role=role)
+                print(json.dumps({"exitCode": status, "screenUtf16LeBase64": base64.b64encode(raw).decode("ascii")}))
+                return 0
+            status, raw = console_levels.query(runas, area)
             sys.stdout.buffer.write(raw)
             return status
         except Exception as exc:

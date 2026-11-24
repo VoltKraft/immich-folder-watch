@@ -1,5 +1,17 @@
 # Project Status
 
+## Ordinary Windows writer launch (2026-11-24)
+
+At `21e794f` the elevated controls again completed the writer handover
+between sessions 2 and 0. Neither native Windows host established the
+standard-user case. The revised observer runs the fixed Basic User
+command once per role in its own console and retains its output and exit.
+Independent review added verification that the console helper exits before
+cleanup. All 29 portable writer controls and 13 PowerShell controls passed.
+[Guard and console evidence](rust/rw02-cross-session.md#basic-user-launch-on-a-private-console) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14957562590) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14956013931).
+
 ## Early Windows Shell observations at 21e794f (2026-11-24)
 
 All four native feasibility jobs passed. The separate desktop trial found
