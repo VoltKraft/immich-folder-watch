@@ -314,6 +314,10 @@ SQLite assessment. Each job records the C# writer's complete casing table,
 the two synthetic backups and the Rust observations for entries, tombstones
 and repair journals. Inspect `stored-keys/result.json` and the original
 `casing-fixtures/` inside the native storage evidence. [Cross-profile storage results](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+The same command inserts a new row on a copy of each backup, then uses the
+original C# store for two successive upserts. The top-level `result.json`
+records their readback under `storedKeys.newEntries`.
+[Native write and readback](rust/rw02-legacy.md#native-shipping-upserts-after-a-concordant-rust-insert).
 On Linux the fault fixture's private mount requires the documented
 namespace launcher. The [combined profile](rust/rw02-combined-profile.md)
 builds from verified local archives and exercises an offline Linux relink.

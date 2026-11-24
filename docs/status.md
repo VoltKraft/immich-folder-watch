@@ -1,5 +1,14 @@
 # Project Status
 
+## Native C# upserts after a Rust insert (2026-11-24)
+
+On Fedora x64 the shipping C# store read and updated the Rust-created
+Unicode filename twice in both case modes. Independent reads of all eight
+databases verified the original rows, schema and ROWIDs and the new file
+sizes of 83, 101 and 101. The four hosted desktop jobs now include the
+same check. Its first Windows and Ubuntu results are pending.
+[Native study](rust/rw02-legacy.md#native-shipping-upserts-after-a-concordant-rust-insert).
+
 ## Windows ARM64 native desktop at 21e794f (2026-11-24)
 
 The retained GUI met all eleven WPF resource limits. A second process

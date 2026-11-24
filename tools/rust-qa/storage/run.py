@@ -97,7 +97,7 @@ def main() -> int:
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--stored-keys", action="store_true",
-                        help="Inspect existing path identities in two additional synthetic C# backups")
+                        help="Inspect synthetic C# identities and check concordant inserts through the native rollback writer")
     parser.add_argument("--worker-activity", action="store_true",
                         help="Return native Rust backups to the shipping worker after a synthetic download, upload, deletion and interrupted timestamp repair")
     args = parser.parse_args()
@@ -263,11 +263,15 @@ def main() -> int:
         result["rust"] = rust_result
         result["csharp"] = csharp_result
         if args.stored_keys:
+            from native_insert import run_native_insert
+
             corpus = output / "casing-fixtures"
             observation = output / "stored-keys"
             command("stored-key-build", ["cargo", "build", "--manifest-path", str(MANIFEST), "--frozen",
-                                         "--release", "--target", args.target, "--example", "inspect_stored_keys"])
+                                         "--release", "--target", args.target, "--example", "inspect_stored_keys",
+                                         "--example", "update_study_copy"])
             example = executable.parent / "examples" / ("inspect_stored_keys" + executable.suffix)
+            writer = example.with_name("update_study_copy" + executable.suffix)
             command("stored-key-reference", [dotnet, str(assembly), "--casing-fixtures", str(corpus)])
             command("stored-key-readback", [sys.executable, "-B", str(HERE / "stored_keys.py"), "--probe",
                                             str(example), "--fixture", str(corpus), "--output", str(observation)])
@@ -276,7 +280,8 @@ def main() -> int:
                 raise ValueError("Stored key corpus came from a different C# build")
             result["storedKeys"] = {"inputs": sha256(corpus / "manifest.json"),
                                     "observations": sha256(observation / "result.json"),
-                                    "rustExecutable": sha256(example)}
+                                    "rustExecutable": sha256(example),
+                                    "newEntries": run_native_insert(command, corpus, writer, dotnet, assembly)}
         if args.worker_activity:
             command("worker-exchange-tests", [sys.executable, "-B", "-m", "unittest", "discover",
                                               "-s", str(HERE), "-p", "test_worker*.py"])

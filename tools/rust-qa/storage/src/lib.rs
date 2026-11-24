@@ -3,7 +3,7 @@
 
 use ifw_legacy::casing::ReferenceCaseMap;
 use ifw_legacy::paths::{normalize_absolute_source, normalize_relative_text};
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction, params};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -175,6 +175,11 @@ pub enum PathLookup {
         tables: BTreeSet<&'static str>,
     },
     Unresolved(Value),
+}
+
+pub enum InsertDecision {
+    Inserted,
+    Refused(PathLookup),
 }
 
 impl PathLookup {
@@ -365,5 +370,25 @@ impl Fixture {
             .iter()
             .map(|q| lookup(&self.forms, &accounts, q))
             .collect()
+    }
+
+    /// Insert one synthetic row using the display and key verified in the caller's write transaction.
+    pub fn insert_new(&self, tx: &Transaction<'_>, request: &Value) -> Result<InsertDecision> {
+        let answer = lookup(&self.forms, &read_records(tx, &self.forms)?, request)?;
+        let PathLookup::AbsentConcordant { display, key } = answer else {
+            return Ok(InsertDecision::Refused(answer));
+        };
+        let count = tx.execute(
+            "INSERT INTO sync_entries
+             (account_scope,source_path,source_key,relative_path,relative_path_key,asset_id,album_name,
+              file_size,last_write_time_utc,direction,status,last_synchronized_at_utc,tombstone_expires_at_utc)
+             VALUES (?1,?2,?3,?4,?5,?6,'Synthetic insert',83,'2024-02-29T03:04:05.1234567+00:00',
+                     1,0,'2024-02-29T03:04:05.1234567+00:00',NULL)",
+            params![field(request, "account")?, display[0], key[0], display[1], key[1], field(request, "asset")?],
+        )?;
+        if count != 1 {
+            return Err("expected exactly one inserted synthetic entry".into());
+        }
+        Ok(InsertDecision::Inserted)
     }
 }

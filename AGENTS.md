@@ -254,6 +254,8 @@ to reconcile project decisions, defaults, and recorded state.
   uses the complete casing table emitted by each C# writer and preserves
   original SQLite keys across both qualified profiles. The [shipping C# upsert after rollback](docs/rust/rw02-legacy.md#first-c-upsert-after-rollback)
   checks for duplicate entries when the rollback runtime uses a different table.
+  The [native insert trial](docs/rust/rw02-legacy.md#native-shipping-upserts-after-a-concordant-rust-insert)
+  follows the new row through both shipping upserts and compares all stored ROWIDs.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version

@@ -670,3 +670,36 @@ same-process casing tables and the databases. The independent SQL
 readback has SHA-256
 `8a78509bf17f630311012b70350b6e63abbb019a3d75ae9b1cfd16afc64a7637`.
 Installed migration and rollback with additional casing profiles remain open.
+
+### Native shipping upserts after a concordant Rust insert
+
+The desktop matrix already runs `storage/run.py --stored-keys` on Windows and Ubuntu,
+on x64 and ARM64. That command now copies each host's two finalized C# databases
+and calls the same Rust insertion operation as the three-profile study. The
+normal matrix uses the two qualified ICU tables. The shipping C# store on the
+same host then opens a fresh copy of the Rust output, finds the new entry by
+its original spelling and upserts it twice. The second pass starts from a
+standalone copy of the first. Both native processes use that host's path
+separators. The C# reader must reproduce the complete casing table of the
+original C# writer. The SQL readback compares every column and ROWID in all
+four tables, including the repairs, album ownership and account histories.
+[Native storage driver](../../tools/rust-qa/storage/run.py).
+
+On Fedora 45 x64, Rust stored `/IfwSynthetic/Temp/../Insert/` as
+`/IfwSynthetic/Insert` and retained the display name `New/Stable-é.jpg`.
+The sensitive database grew from four entries to five, with ROWID 5 for the
+new entry. The insensitive database grew from three to four, with ROWID 4.
+Both C# upserts preserved those counts and ROWIDs. The first changed the
+file size from 83 to 101 and the second preserved 101. In insensitive mode
+the qualified tables produced `NEW/DIVERGENT-ƛ.JPG` and `NEW/DIVERGENT-Ƛ.JPG`
+for the other requested name. Rust refused the insert and the copy kept its
+original SHA-256. All original C# fixture files retained their hashes.
+
+The local result at `artifacts/rust/storage-native/stored-insert-fedora-01/result.json`
+has SHA-256 `820a860ef1f44603fb6b38853621904227697866d6a89c9664dd796c068a31f9`.
+Its `storedKeys.newEntries` records the physical rows and the differing key
+pairs. The same change passed the separate Fedora three-profile regression
+with 144 shipping upserts and zero added C# rows. Its result at
+`artifacts/rust/concordant-insert-shared-01/result.json` has SHA-256
+`3242deb21b6fc684ef9c7157c3117cca66fa81663438f8d93946277245e56362`.
+Native results for the new write trial on Windows and Ubuntu remain pending.

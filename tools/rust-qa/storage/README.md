@@ -37,6 +37,13 @@ derived controls in their own directory. The completed report is
 cross-library reads with the same C# runtime.
 [Stored SQLite identity results](../../../docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
 
+On fresh copies of those two backups, Rust attempts a key on which the
+qualified tables agree. The native C# store reads and updates the new row
+twice. In insensitive mode the test also refuses a key on which the tables
+disagree and checks the original database hash. The top-level `result.json`
+records the row and counts under `storedKeys.newEntries`. Each standalone
+database is available under `native-insert-*`.
+
 ### Restore after a synthetic download
 
 `--worker-activity` adds the shipping worker to the same native SQLite

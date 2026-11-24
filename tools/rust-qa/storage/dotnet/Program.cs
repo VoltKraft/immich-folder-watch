@@ -19,6 +19,11 @@ internal static class Program
             await CasingCases.WriteAsync(destination);
             return;
         }
+        if (args is ["--casing-upsert", var fixture])
+        {
+            await CasingCases.UpsertInsertedAsync(fixture);
+            return;
+        }
         if (args is ["--casing-readback", var first, var second, var readback])
         {
             Environment.ExitCode = await CasingCases.CompareAsync(first, second, readback) ? 0 : 1;
@@ -32,7 +37,7 @@ internal static class Program
         }
         if (args.Length != 1)
         {
-            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output>, --casing-fixtures <new-output>, or --casing-readback <019b-fixture> <a7dc-fixture> <new-output> [--archived-writer-hashes <019b-manifest-sha256> <a7dc-manifest-sha256>]");
+            throw new ArgumentException("Usage: StorageReadback <synthetic-assessment-output>, --casing-fixtures <new-output>, --casing-upsert <native-fixture>, or --casing-readback <019b-fixture> <a7dc-fixture> <new-output> [--archived-writer-hashes <019b-manifest-sha256> <a7dc-manifest-sha256>]");
         }
         var output = Path.GetFullPath(args[0]);
         var scope = Path.GetFullPath("artifacts/rust") + Path.DirectorySeparatorChar;

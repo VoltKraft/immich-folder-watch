@@ -1,7 +1,9 @@
-//! Update one known scalar on a newly created copy of a frozen C# study backup.
+//! Exercise legacy updates and concordant new entries only on fresh copies of synthetic C# backups.
 #![forbid(unsafe_code)]
 
-use ifw_sqlite_assessment::{Fixture, PathLookup, Result, digest, field, limited, verify_backup};
+use ifw_sqlite_assessment::{
+    Fixture, InsertDecision, PathLookup, Result, digest, field, limited, verify_backup,
+};
 use rusqlite::{Connection, OpenFlags, TransactionBehavior, params};
 use serde_json::{Value, json};
 use std::fs::{self, File, OpenOptions};
@@ -116,8 +118,80 @@ fn update(db: &mut Connection, fixture: &Fixture, query: &Value) -> Result<(Valu
     Ok((decision, rows))
 }
 
+fn native_insert(directory: &Path, mode: &str, expected: &str) -> Result<()> {
+    let fixture = Fixture::load(directory, mode, expected, false)?;
+    if fixture.format != "ifw-qualified-path-key-fixture-v1"
+        || !fixture.directory.ends_with("casing-fixtures")
+    {
+        return Err("expected the native C# writer's original casing-fixtures directory".into());
+    }
+    let original = fixture.directory.join(format!("{mode}.db"));
+    let bytes = limited(File::open(&original)?, 16 * 1024 * 1024)?;
+    if digest(&bytes) != expected {
+        return Err("donor changed before copying".into());
+    }
+    let destination = fixture
+        .directory
+        .with_file_name(format!("native-insert-{mode}"));
+    new_directory(&destination)?;
+    let copy = destination.join("after.db");
+    new_file(&copy, &bytes)?;
+
+    let source = if cfg!(windows) {
+        "C:/IfwSynthetic/Temp/../Insert/"
+    } else {
+        "/IfwSynthetic/Temp/../Insert/"
+    };
+    let stable = json!({"account":"ifw-casing-primary", "source":source, "relative":"New/Stable-é.jpg", "asset":"asset-native-stable"});
+    let mut refused = Value::Null;
+    if mode == "insensitive" {
+        let dependent = json!({"account": stable["account"], "source":source, "relative":"New/Divergent-ƛ.jpg", "asset":"asset-native-dependent"});
+        let mut db = open_copy(&copy)?;
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let InsertDecision::Refused(answer) = fixture.insert_new(&tx, &dependent)? else {
+            return Err("a profile-dependent new identity was accepted".into());
+        };
+        let decision = answer.observation();
+        tx.rollback()?;
+        drop(db);
+        verify_backup(&copy, expected)?;
+        if decision["status"] != "absent-profile-dependent" {
+            return Err("expected a new key with differing historical representations".into());
+        }
+        refused = json!({"request": dependent, "decision": decision, "after": expected});
+    }
+    let mut db = open_copy(&copy)?;
+    let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    match fixture.insert_new(&tx, &stable)? {
+        InsertDecision::Inserted => tx.commit()?,
+        InsertDecision::Refused(answer) => {
+            return Err(format!("stable new entry refused: {}", answer.observation()).into());
+        }
+    }
+    drop(db);
+    let after = digest(&limited(File::open(&copy)?, 16 * 1024 * 1024)?);
+    verify_backup(&copy, &after)?;
+    verify_backup(&original, expected)?;
+    let receipt = json!({"format":"ifw-native-concordant-insert-v1", "os":std::env::consts::OS,
+        "arch":std::env::consts::ARCH, "writerProfile":fixture.writer, "donor":expected, "mode":mode,
+        "refused":refused, "stable":stable, "after":after});
+    new_file(
+        &destination.join("receipt.json"),
+        &serde_json::to_vec(&receipt)?,
+    )
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if let [flag, dir, mode, expected] = args.as_slice()
+        && flag == "--native-insert"
+    {
+        return native_insert(
+            Path::new(dir),
+            mode.to_str().ok_or("invalid comparison mode")?,
+            expected.to_str().ok_or("invalid digest")?,
+        );
+    }
     let (dir, mode, expected, destination, control) = match args.as_slice() {
         [dir, mode, expected, destination] => (dir, mode, expected, destination, false),
         [flag, dir, mode, expected, destination] if flag == "--unexplained-control" => {

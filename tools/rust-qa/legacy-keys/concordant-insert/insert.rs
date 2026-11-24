@@ -1,8 +1,10 @@
 //! Insert new entries only on fresh copies of the three frozen Linux x64 C# writer fixtures.
 #![forbid(unsafe_code)]
 
-use ifw_sqlite_assessment::{Fixture, PathLookup, Result, digest, field, limited, verify_backup};
-use rusqlite::{Connection, OpenFlags, TransactionBehavior, params};
+use ifw_sqlite_assessment::{
+    Fixture, InsertDecision, Result, digest, field, limited, verify_backup,
+};
+use rusqlite::{Connection, OpenFlags, TransactionBehavior};
 use serde_json::{Value, json};
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::Write;
@@ -15,11 +17,6 @@ const PROFILES: [&str; 3] = [
     "195bd89b3934dcf9c93b72b4232c53d9787dacb8ebbf2270df7a6a73e53f473e",
 ];
 const ACCOUNT: &str = "ifw-managed-invariant-study";
-const INSERT: &str = "INSERT INTO sync_entries
-    (account_scope,source_path,source_key,relative_path,relative_path_key,asset_id,album_name,
-     file_size,last_write_time_utc,direction,status,last_synchronized_at_utc,tombstone_expires_at_utc)
-    VALUES (?1,?2,?3,?4,?5,?6,'Synthetic insert',83,'2024-02-29T03:04:05.1234567+00:00',
-            1,0,'2024-02-29T03:04:05.1234567+00:00',NULL)";
 
 fn insert_batch(db: &mut Connection, fixture: &Fixture, batch: &Value) -> Result<Value> {
     let rows = batch["entries"]
@@ -31,29 +28,11 @@ fn insert_batch(db: &mut Connection, fixture: &Fixture, batch: &Value) -> Result
         if field(row, "account")? != ACCOUNT {
             return Err("expected the synthetic study account".into());
         }
-        let answer = fixture
-            .inspect(&tx, std::slice::from_ref(row))?
-            .pop()
-            .ok_or("missing historical lookup")?;
-        let PathLookup::AbsentConcordant { display, key } = answer else {
+        if let InsertDecision::Refused(answer) = fixture.insert_new(&tx, row)? {
             tx.rollback()?;
             return Ok(
                 json!({"status":"refused", "rowsCommitted":0, "blockedIndex":index, "decision":answer.observation()}),
             );
-        };
-        if tx.execute(
-            INSERT,
-            params![
-                ACCOUNT,
-                display[0],
-                key[0],
-                display[1],
-                key[1],
-                field(row, "asset")?
-            ],
-        )? != 1
-        {
-            return Err("expected exactly one inserted entry".into());
         }
     }
     tx.commit()?;
