@@ -703,3 +703,8 @@ with 144 shipping upserts and zero added C# rows. Its result at
 `artifacts/rust/concordant-insert-shared-01/result.json` has SHA-256
 `3242deb21b6fc684ef9c7157c3117cca66fa81663438f8d93946277245e56362`.
 Native results for the new write trial on Windows and Ubuntu remain pending.
+Each matrix host uploads its synthetic donor databases, Rust outputs and
+two C# upsert snapshots per case to its `rust-storage-diagnostics` artifact
+as soon as the storage step finishes. Its result, source hashes and
+available logs accompany the databases. This supports inspecting the
+write and rollback while the same job exercises the desktop.

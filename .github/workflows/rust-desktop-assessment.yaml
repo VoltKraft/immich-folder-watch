@@ -69,8 +69,8 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --stored-keys --output "artifacts/rust/storage-native/$NATIVE_TARGET"
 
-      - name: Retain failed storage diagnostics before the desktop trials
-        if: ${{ !cancelled() && steps.storage.outcome == 'failure' }}
+      - name: Retain the native SQLite insert and rollback evidence before desktop trials
+        if: ${{ !cancelled() && (steps.storage.outcome == 'success' || steps.storage.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rust-storage-diagnostics-${{ matrix.target }}-${{ github.sha }}
@@ -78,6 +78,11 @@ jobs:
             artifacts/rust/storage-native/${{ matrix.target }}/result.json
             artifacts/rust/storage-native/${{ matrix.target }}/*.log
             artifacts/rust/storage-native/${{ matrix.target }}/evidence-hashes.json
+            artifacts/rust/storage-native/${{ matrix.target }}/first-party-source-hashes.json
+            artifacts/rust/storage-native/${{ matrix.target }}/casing-fixtures/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-sensitive/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-insensitive/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-upserts/
           if-no-files-found: error
           retention-days: 14
 
