@@ -1,5 +1,60 @@
 # Project Status
 
+## Signed Flatpak second launch during a live Rust inventory (2026-11-24)
+
+The installed Fedora x64 GUI kept its original inventory worker across
+a signed 3.0.4 launch. The worker discovered one new file on each side
+of the launch, with independent kernel notifications for the same album
+directory. The signed process exited, a Rust second launch reopened the
+original window, and both installed refs were removed after Quit.
+The ordinary shipping profile had no watch entries. The Rust worker
+received two temporary read-only inputs for this trial. Five fixture
+tests passed and the original signature and source archives were verified.
+[Native trial](rust/rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
+
+## Windows launcher and contrast observers (2026-11-24)
+
+On both architectures at `13e4af8`, the six canonical launcher and tray
+primaries exited with Windows error 32 after election and before worker
+startup. The test driver held DELETE access to the directory that the
+Rust worker needed to open. It now requests deletion after process drain
+and verifies the directory identity before removing it. The affected
+observer sources at `1b4d050` still contain the original collision.
+[Native logs and correction](rust/rw02-windows-services.md#canonical-gui-startup-on-the-staged-windows-desktop-at-13e4af8).
+
+An independent change at `12833b5` allows the contrast observer to read
+a visible, unobstructed label on its private desktop without activating
+the window. All 24 appearance tests passed locally. Native Windows runs
+are required for both corrections.
+[Contrast observation](rust/rw02-appearance.md#passive-capture-of-the-filename-label).
+
+## Native checks for the 1b4d050 candidate (2026-11-24)
+
+All four native feasibility jobs passed at
+`1b4d0509c6e3482b9fc203151a06f6536b83c9c1` on Windows and Ubuntu,
+x64 and ARM64. The four C# reference jobs completed successfully.
+This revision includes the installed Linux single-instance fix,
+cross-language SQLite insertions and Windows controls for WPF activation
+and DX12 timing. The separate desktop matrix covers these new observations.
+The regular Windows CI job timed out after 30 seconds in the WPF watermark
+test for a collapsed password input. Its WPF assembly reported 35 passes
+and one timeout. The native Windows Core suite reported 562 passes and
+nine skips. A targeted retry of that Windows job uses the same revision.
+[Original Windows CI job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138787595722).
+
+The four jobs for the shipping 3.0.4 installer passed again. Independent
+readback matched the published archive digests and 54 indexed files in
+total. On every host, the installed and repaired payload inventories matched.
+The retained YAML and SQLite database were byte-identical to their seeded
+copies. Reopening each database reproduced every row and the complete schema.
+[Installer jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591405) ·
+[Installed reference procedure](rust/rw01-installed-packages.md#installed-reference-on-all-four-hosts).
+
+[Draft PR](https://github.com/VoltKraft/immich-folder-watch/pull/46) ·
+[Native feasibility at 1b4d050](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591654) ·
+[Desktop assessment at 1b4d050](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591328) ·
+[Desktop assessment at 13e4af8](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
 ## Windows x64 frame-readiness comparison (2026-11-24)
 
 The separate diagnostic GUI can return control to the event loop while the

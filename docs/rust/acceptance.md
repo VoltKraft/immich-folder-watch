@@ -69,6 +69,21 @@ utility, but none produced a participant identity or writer event. Each
 elevated control recorded the expected eight lock events from five writers.
 [Native Basic User results](rw02-cross-session.md#native-basic-user-console-results-at-13e4af8).
 
+On Fedora x64, the installed Rust GUI also kept its original read-only
+inventory worker while a signed 3.0.4 launch saw the live Rust socket and
+exited. The same worker found a new file before and after that launch.
+The two synthetic inputs were read-only inside the Rust Flatpak and absent
+from the 3.0.4 sandbox. A subsequent Rust launch reopened the original
+window. This covers same-session worker continuity. Installed migration
+and recovery after application sync remain open.
+[Installed interoperation with a running worker](rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
+
+The `13e4af8` canonical Windows tray and launcher trials stopped before
+worker startup on both architectures. Their harness held DELETE access on
+the directory the worker needed to open. The fixed probes require new
+native results. The earlier successful keyboard trials still refer to
+their original revisions. [Original logs and correction](rw02-windows-services.md#canonical-gui-startup-on-the-staged-windows-desktop-at-13e4af8).
+
 At `3b4854d` the [watch adapter](rw02-watch-events.md) passed fifteen
 filesystem scenarios on each Ubuntu architecture and thirteen on each
 Windows architecture. The Windows nonrecursive watch reported a modification
