@@ -291,4 +291,38 @@ controller must still verify the participants' actual rights, distinct
 sessions, five writers, ordered guard events and cleanup before the
 standard-user case can pass. The 29 portable writer tests include ten
 console controls. Seven hosted-service and six scheduler cleanup controls
-passed under PowerShell 7.7.0. Native execution of this console launch is pending.
+passed under PowerShell 7.7.0.
+
+### Native Basic User console results at 13e4af8
+
+Both Windows hosts ran the private-console launch at
+`13e4af8f5e6826324afbb5de4d34aeb2ba6a27fb`. On each host the original
+bootstrap ran in session 2 and the scheduled bootstrap in session 0.
+They shared the account SID and had elevated Default primary tokens at
+High integrity. Each private console listed `0x20000 (Basic User)` in the
+same 280 UTF-16LE bytes. All four fixed launches returned exit 0 from
+both `runas.exe` and the console helper. Each raw launch claim independently
+recorded that exit. The four launch screens contained zero bytes and supplied
+no Windows error code or diagnostic. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
+Neither role produced an ordinary participant's attempt, readiness or
+completion receipt on either host. The controller timed out after 110 seconds
+waiting for `original-ready.json`. Cleanup reported
+`The named Basic User action has no verifiable shutdown receipt`. Both
+standard-user profiles were retained. The scheduler removed both task
+registrations on each host, the shared build was removed, batch-logon assignments
+were unchanged and Secondary Logon returned to Stopped with Manual startup.
+The records establish neither the cause of the missing participant nor its
+authority or exit. The standard-user handover remains open.
+
+The separate elevated trial passed on both hosts. Five identified Rust
+writers per host produced all eight ordered lock events against the original
+file. Independent replay matched each ZIP's Actions digest, all 41 indexed
+member hashes and 23 source hashes to the measured revision and pinned
+reference. The replay at `artifacts/rust/hosted-writer/45476186847/replay.json`
+has SHA-256 `e206e1c3a63b58f16b670b24f850ddb98602091e45f31f453cc3b1af5de6d420`.
+
+| Original writer archive | ZIP SHA-256 |
+| --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14965426353) | `d0a944240bac0f67e11a52f857654f927174e726d5000e7728700b80ef7f45b4` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14964748110) | `7073381142cc72bd54948cd1d6ac37f31ca6909c363ea11014a46afb819beb21` |

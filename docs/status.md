@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows cross-session writer check at 13e4af8 (2026-11-24)
+
+Five elevated writers on each Windows host produced all eight expected
+lock events across sessions 2 and 0. Both sessions listed the Basic User
+level. All four separate launch utilities returned zero, with empty launch
+screens. Neither host produced a standard user's identity or writer receipt.
+The scheduler removed its task registrations and restored Secondary Logon.
+Standard-user exclusion remains open on x64 and ARM64.
+[Original archives and readback](rust/rw02-cross-session.md#native-basic-user-console-results-at-13e4af8).
+
 ## Signed 3.0.4 launch while the installed Rust GUI is running (2026-11-24)
 
 On Fedora x64 the original version previously opened a second window

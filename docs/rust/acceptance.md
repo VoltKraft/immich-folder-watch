@@ -63,6 +63,12 @@ code 1 with zero output bytes. Neither host started an ordinary-user
 writer. Installed handover and standard-user cross-session exclusion remain open.
 [Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
+At `13e4af8` the private consoles in sessions 2 and 0 listed Basic User
+on both Windows architectures. All four launches returned zero from the
+utility, but none produced a participant identity or writer event. Each
+elevated control recorded the expected eight lock events from five writers.
+[Native Basic User results](rw02-cross-session.md#native-basic-user-console-results-at-13e4af8).
+
 At `3b4854d` the [watch adapter](rw02-watch-events.md) passed fifteen
 filesystem scenarios on each Ubuntu architecture and thirteen on each
 Windows architecture. The Windows nonrecursive watch reported a modification
