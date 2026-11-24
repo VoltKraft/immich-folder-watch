@@ -1,5 +1,15 @@
 # Project Status
 
+## Installed Flatpak socket and process identity (2026-11-24)
+
+The signed 3.0.4 application and the isolated Rust probe saw the same Unix
+socket when installed under the shipping app ID on two branches. A separate
+test ID had its own runtime directory. Each application ran in its own PID
+namespace, so the probe could not establish the positive peer PID required
+by the existing interop check. Both processes exited and both refs were
+removed on each desktop. Installed old/new activation remains open.
+[Paired native observations](rust/rw02-instance.md#shipping-flatpak-and-rust-probe-in-two-installed-refs).
+
 ## Ordinary second launch of the shipping Linux Flatpak (2026-11-24)
 
 On a private x64 X11 desktop the original 3.0.4 Flatpak reopened its

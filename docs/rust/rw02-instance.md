@@ -67,6 +67,37 @@ The legacy writer ignored the new lock on every target. Cross-session ownership
 for the same Windows SID and prevention of legacy restarts during installed
 handover remain open.
 
+### Shipping Flatpak and Rust probe in two installed refs
+
+On two private Fedora x64 X11 desktops the original, signature-verified
+3.0.4 deployment ran alongside the compiled Rust writer-lock probe. The
+probe ran its ordinary synthetic lock lifecycle. Its launcher observed
+the application socket by file type and inode without connecting to it.
+Both trials used separate per-user installations with no external route.
+
+| Installed refs | Runtime directory and shipping socket | Process namespaces |
+| --- | --- | --- |
+| Shipping ID on branches `master` and `test` | Both saw runtime directory 96:47 and socket 96:72. | Outer PIDs 89 and 169 each had local PID 2 in a separate sibling PID namespace. |
+| Shipping ID and a separate test ID | Runtime directories were 83:47 and 83:81. Only the original could see socket 83:72. | Outer PIDs 88 and 170 each had local PID 2 in a separate sibling PID namespace. |
+
+The same-ID trial establishes that both branches can see the same socket
+on this runtime. Neither process has a positive local PID for its sibling
+under the observed namespace topology. The probe's existing activation
+contract expects that PID. No trial queried socket peer credentials or
+delivered an activation. In both cases the original application and Rust
+probe exited zero and both test refs were removed. [Source-bound native
+observer](../../tools/RustCompatibilityOracle/installed/interop/assess.py)
+· [Peer identity check](../../tools/rust-qa/instance/unix.rs).
+
+The same-ID and different-ID result SHA-256 values are
+`baa881024dc808c1eca3f24faba0306f0622ee530b983e31895d48127345ddfd`
+and `04caced3ba5601581fa2fa499e4e85245eea8dea55bc91e3545e32fc2979ade1`.
+The archived inputs identify the native compiler, executable, original
+release signature and both process lifetimes. The [two shipping launches](rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference)
+and the Rust GUI's [filtered D-Bus trial](#second-launch-through-the-installed-flatpak)
+have separate positive activation evidence. Installed old/new writer
+handover remains open.
+
 ## Ordinary second launch of the Linux GUI
 
 The shipping Flatpak starts its executable for each launch. When the Linux
