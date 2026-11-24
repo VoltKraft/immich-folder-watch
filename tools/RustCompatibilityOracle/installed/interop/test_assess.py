@@ -9,6 +9,25 @@ import unittest
 from unittest.mock import patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
+from shipping_upload import endpoint_tuple, FILENAME, IMAGE, multipart_image
+
+
+class ConfiguredUploadTests(unittest.TestCase):
+    def test_loopback_connection_matches_both_ipv4_and_mapped_socket_addresses(self):
+        self.assertEqual(endpoint_tuple('0100007F:C234'), ('127.0.0.1', 49716))
+        self.assertEqual(endpoint_tuple('0000000000000000FFFF00000100007F:0050'), ('127.0.0.1', 80))
+        self.assertNotEqual(endpoint_tuple('0200007F:0050'), ('127.0.0.1', 80))
+
+    def test_only_one_matching_filename_field_and_payload_qualify_as_uploaded_media(self):
+        content_type = 'multipart/form-data; boundary=unit-boundary'
+        part = (f'--unit-boundary\r\nContent-Disposition: form-data; name=assetData; filename="{FILENAME}"\r\n\r\n'.encode()
+                + IMAGE + b'\r\n')
+        end = b'--unit-boundary--\r\n'
+        self.assertTrue(multipart_image(content_type, part + end))
+        for content in (end, part + part + end, part.replace(IMAGE, b'other') + end,
+                        part.replace(FILENAME.encode(), b'other.png') + end, part.replace(b'assetData', b'filename') + end):
+            with self.subTest(content=content):
+                self.assertFalse(multipart_image(content_type, content))
 
 
 class IdentityTests(unittest.TestCase):
