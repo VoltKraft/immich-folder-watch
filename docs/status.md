@@ -1,5 +1,30 @@
 # Project Status
 
+## Full egui rendering through GDI on Windows x64 (2026-11-25)
+
+At `c00a863` the isolated x64 comparison rebuilds the complete retained
+view with offscreen WARP rendering and GDI bitmap output. Two offline
+reconstructions matched. Ten Python tests and four compiled Rust layout
+checks passed. Independent review verified the corrected client clipping
+checks around each transfer and release of the window DC before recording
+success. The full-view comparison needs native editor pixels, idle and
+100,000-file measurements against the original WPF limits. RW-02 remains
+open. [Implemented comparison and checks](rust/rw02-windows-window.md#presenting-the-full-retained-view-with-gdi).
+
+## Ordinary second launch on Ubuntu x64 and ARM64 (2026-11-25)
+
+Both Ubuntu desktop assessments at `4e3dbc4` completed successfully.
+Ordinary and background second launches reached the original GUI and
+inventory worker. All 407 x64 and 178 ARM64 window operations issued
+during observed file reads completed within the measured work. Both
+hosts passed all eleven resource limits. [Original archives and native readback](rust/rw02-native-gui.md#ordinary-second-launch-during-the-ubuntu-inventories-at-4e3dbc4).
+
+All 28 PR checks reported for `e534887` passed, including the four native
+feasibility jobs, the four compatibility reference jobs and original
+installers on all four targets. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088803) ·
+[Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088805) ·
+[Original installers](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088763).
+
 ## Installed signed worker restart and corrected Windows launcher (2026-11-25)
 
 On Fedora x64 the Rust helper backed up a committed upload from the live

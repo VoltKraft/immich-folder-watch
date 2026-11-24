@@ -53,6 +53,10 @@ image once across both lifetimes. This adds installed evidence for a
 shipping worker consuming Rust's backup under RI-AC03.
 [Installed backup, restart and readback](rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
 
+At `4e3dbc4` both Ubuntu architectures retained the original X11 GUI and
+worker across two ordinary executable launches. Both completed all eleven
+same-host performance checks. [Native second launches during inventory](rw02-native-gui.md#ordinary-second-launch-during-the-ubuntu-inventories-at-4e3dbc4).
+
 | Criteria | Current result | Evidence needed for completion |
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |

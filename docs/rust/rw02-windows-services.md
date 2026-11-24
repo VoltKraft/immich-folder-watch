@@ -821,6 +821,18 @@ the icon add and v4 registration. The independent rectangle query returned
 retained its own worker. This host supplied no icon to activate.
 [Original ARM64 tray archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14974376768).
 
+The retained variant kept its original HWND and worker across the ordinary
+second launch on both architectures. On x64 the first independent sample
+found HWND 2359632 visible, foreground, active and focused. Worker 2948
+stayed with primary 5684. On ARM64 Windows declined the foreground
+request after the secondary granted permission. HWND 2097612 was visible
+and retained worker 1696, but none of 41 samples over 2.021 seconds found
+foreground. The last focus sample found an active window without focus.
+Both private-desktop restart controls passed. Neither architecture
+demonstrated a retained-window Shell click.
+[Retained x64 observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14975353233) ·
+[Retained ARM64 observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14976386454).
+
 The follow-up observer at `236c852` samples up to 16 by 16 points inside that same
 rectangle when the center misses the first marker. Each eligible point
 must still lie on the original Explorer surface and monitor. The report

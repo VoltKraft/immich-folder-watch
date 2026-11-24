@@ -790,6 +790,26 @@ has SHA-256 `687d3ff70ecb44ee3d6722fb34b11f493aa6a1b237e28f1ab498253af063b524`.
 [Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14967501592) ·
 [Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14966527490).
 
+### Ordinary second launch during the Ubuntu inventories at 4e3dbc4
+
+On both Ubuntu architectures, a normal secondary and a secondary launched
+with `--background` activated the original X11 window. Each secondary exited
+in 27–28 ms. The original GUI and inventory worker kept their process
+identities through both activations and drained after a hidden Quit.
+Each host also passed all eleven resource limits across three inventory trials.
+
+| Ubuntu target | Scan reopen / same-host limit (ms) | Scan close / limit (ms) | Requests completed during reads |
+| --- | ---: | ---: | ---: |
+| [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14975048846) | 0.94 / 16.29 | 0.38 / 15.63 | 407 of 407 |
+| [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14974878803) | 0.91 / 16.18 | 0.33 / 15.45 | 178 of 178 |
+
+Both original archives contained Orca speech on X11 and Wayland, Japanese
+Wayland composition, restored high-contrast colors, two Plasma activations,
+five graphics recovery controls and a successful offline Wayland relink.
+The detached comparison in
+`artifacts/rust/hosted-desktop-storage/45496492050/linux-desktop-readback.json`
+has SHA-256 `f70d5852e9330c95f622f9b8f2e7d86be20a02a7925db0546377018c23acd0ab`.
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

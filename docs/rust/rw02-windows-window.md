@@ -771,3 +771,19 @@ message ID and time in the owned window procedure and its default
 processing, limited to the retained root's direct show. The offline reader
 reproduced the two older traces without attributing message times to them.
 [Procedure and raw records](../../tools/rust-qa/windows-frame-cost/README.md).
+
+### Presenting the full retained view with GDI
+
+The x64 comparison keeps the complete egui view, DX12 CPU rendering, input
+and accessibility. Its separate executable paints offscreen and presents
+the result through GDI. The original retained GUI uses its DXGI swapchain.
+The comparison uses the same native WPF limits, inventory and window
+observer. The recorder requires a reopened filename edit with independent
+pixel evidence. Two offline reconstructions at `c00a863` produced the same
+source archive, SHA-256 `a4c2627e8145d9a33a45466b47fdc915dd507cfa6b51f7a58015d3add0ec9ad5`.
+They selected the original 135 package and feature combinations. The
+complete GUI passed the Windows x64 target Clippy check on Linux. Direct
+checking of the changed library and its unmodified source found the same
+two upstream lint expectations. Native timings for the new output path
+remain open.
+[Sources, native command and replay](../../tools/rust-qa/windows-gdi-present/README.md).

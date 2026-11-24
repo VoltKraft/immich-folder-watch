@@ -341,6 +341,13 @@ and eframe. The result includes four visibility timings, verified changes
 to two screen pixels and matching kernel file events during the
 100,000-file scan. [GDI recorder and artifacts](../tools/rust-qa/windows-gdi-control/README.md).
 
+On the same native Windows x64 runner,
+`python tools/rust-qa/windows-warm-window/measure.py x86_64-pc-windows-msvc --gdi-present`
+compares the full retained egui view drawing offscreen and presenting through
+GDI. It uses the earlier WPF limits, records the actual bitmap transfers,
+and verifies edits in the reopened filename field.
+[Full-view renderer and offline replay](../tools/rust-qa/windows-gdi-present/README.md).
+
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).
 
