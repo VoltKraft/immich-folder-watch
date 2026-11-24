@@ -1,5 +1,20 @@
 # Project Status
 
+## Signed 3.0.4 launch while the installed Rust GUI is running (2026-11-24)
+
+On Fedora x64 the original version previously opened a second window
+when launched after the Rust GUI. The revised Rust primary reserved the
+legacy socket. A later shipping process saw that same socket and exited
+zero while Rust stayed hidden. A Rust second launch reopened the original
+window. After Rust quit the socket was absent and the shipping GUI started
+normally again. Both refs were removed and the unconfigured profile retained
+its original marker. This covers the two observed start orders in one
+Flatpak runtime. Installed migration after sync and overlapping package
+changes remain open.
+All 27 native GUI and tray tests passed. A separate private D-Bus loss test
+confirmed that the Rust primary held its socket until supervisor shutdown.
+[Original and corrected installed trials](rust/rw02-instance.md#shipping-launch-while-the-rust-flatpak-owns-the-endpoint).
+
 ## Four native desktop assessments at 21e794f (2026-11-24)
 
 Both Ubuntu desktop jobs passed. The retained Windows ARM64 GUI met all

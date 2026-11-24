@@ -4,6 +4,7 @@ mod legacy;
 use super::{Command, Control};
 use std::collections::HashMap;
 use std::error::Error;
+use std::ops::Deref;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::TrySendError;
 use std::time::Duration;
@@ -22,6 +23,7 @@ type PlatformData = HashMap<String, OwnedValue>;
 
 struct Application {
     control: Control,
+    admitted: bool,
     quitting: bool,
 }
 struct Item(Control, &'static str);
@@ -35,6 +37,9 @@ fn dispatch(control: &Control, command: Command) -> fdo::Result<()> {
 
 impl Application {
     fn enqueue(&self, command: Command) -> fdo::Result<()> {
+        if !self.admitted {
+            return Err(fdo::Error::Failed("GUI startup has not completed".into()));
+        }
         if self.quitting {
             return Err(fdo::Error::Failed("GUI is shutting down".into()));
         }
@@ -139,13 +144,36 @@ pub(super) fn graphics_attention(connection: &Connection, control: &Control, una
     }
 }
 
-pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<dyn Error>> {
+pub(super) struct Primary {
+    connection: Connection,
+    installed_socket: Option<legacy::Guard>,
+}
+
+impl Deref for Primary {
+    type Target = Connection;
+
+    fn deref(&self) -> &Connection {
+        &self.connection
+    }
+}
+
+impl Primary {
+    pub(super) async fn graceful_shutdown(self) {
+        // The supervisor calls this after worker drain. Even a disconnected
+        // object server cannot release the shipping endpoint earlier.
+        self.connection.graceful_shutdown().await;
+        drop(self.installed_socket);
+    }
+}
+
+pub(super) fn start(control: Control) -> Result<Option<(Primary, bool)>, Box<dyn Error>> {
     if std::env::var("HOME").as_deref() != Ok("/tmp/home")
         || std::env::var("DBUS_SESSION_BUS_ADDRESS").as_deref() != Ok("unix:path=/tmp/session-bus")
     {
         return Err("Expected a private GUI assessment home and session bus".into());
     }
-    let name = if legacy::check_installed_runtime()? {
+    let runtime = legacy::installed_runtime()?;
+    let name = if runtime.is_some() {
         INSTALLED_NAME
     } else {
         NAME
@@ -156,19 +184,27 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
                 APP_PATH,
                 Application {
                     control: control.clone(),
+                    admitted: false,
                     quitting: false,
                 },
             )?
-            .serve_at("/StatusNotifierItem", Item(control, name))?
             .method_timeout(Duration::from_secs(2))
             .build()
             .await?;
-        // Publish the interfaces first so a simultaneous launch can activate the winner.
-        match connection
+        // Hold the async interface lock through both elections. An ordinary
+        // simultaneous D-Bus Activate waits until admission has succeeded or failed.
+        let application = connection
+            .object_server()
+            .interface::<_, Application>(APP_PATH)
+            .await?;
+        let mut admission = application.get_mut().await;
+        let installed_socket = match connection
             .request_name_with_flags(name, fdo::RequestNameFlags::DoNotQueue.into())
             .await
         {
-            Ok(fdo::RequestNameReply::PrimaryOwner) => {}
+            Ok(fdo::RequestNameReply::PrimaryOwner) => {
+                runtime.map(legacy::Runtime::claim).transpose()?
+            }
             Err(zbus::Error::NameTaken) => {
                 let owner = fdo::DBusProxy::new(&connection)
                     .await?
@@ -194,7 +230,14 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
             }
             Err(error) => return Err(error.into()),
             Ok(_) => return Err("Unexpected D-Bus ownership result for a new connection".into()),
-        }
+        };
+        connection
+            .object_server()
+            .at("/StatusNotifierItem", Item(control, name))
+            .await?;
+        admission.admitted = true;
+        drop(admission);
+        drop(application);
         let result = connection
             .call_method(
                 Some(WATCHER),
@@ -207,7 +250,13 @@ pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<
         if let Err(error) = &result {
             println!("TRAY_REGISTRATION {error}");
         }
-        Ok(Some((connection, result.is_ok())))
+        Ok(Some((
+            Primary {
+                connection,
+                installed_socket,
+            },
+            result.is_ok(),
+        )))
     })
 }
 
@@ -226,8 +275,14 @@ mod tests {
                 graphics_attention: Default::default(),
                 appearance: Default::default(),
             },
+            admitted: false,
             quitting: false,
         };
+        assert!(matches!(
+            app.activate(PlatformData::new()),
+            Err(fdo::Error::Failed(_))
+        ));
+        app.admitted = true;
         app.activate(PlatformData::new()).unwrap();
         assert!(matches!(
             app.activate(PlatformData::new()),

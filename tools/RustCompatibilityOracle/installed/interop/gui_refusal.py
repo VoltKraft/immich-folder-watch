@@ -1,11 +1,13 @@
 """Exercise the actual Rust GUI's ordinary startup while the signed shipping application owns its endpoint."""
 
 from pathlib import Path
+import os
+import re
 import stat
 import subprocess
 
 from gi.repository import Gio, GLib
-from observe import identity, window, witness
+from observe import app_identity, identity, launching_app, window, witness
 from run import APP, require, sha
 from session import checked_start, check_alive, wait_for
 
@@ -15,6 +17,82 @@ NAME = APP + '.RustAssessment'
 def owner(bus, name):
     return bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'NameHasOwner',
                          GLib.Variant('(s)', (name,)), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()[0]
+
+
+def observe_later_launches(stack, bus, display, pins, report, out, command, primary, first_window, lifetime):
+    """Launch each installed ref while the unconfigured Rust GUI is hidden on the private X server."""
+    from assess import pidfd
+    xid = first_window['xid']
+    native = first_window['xserverClientPid']
+    proc_root = Path(f'/proc/{native}/root')
+    runtime = proc_root / 'run/user/0'
+    endpoint = runtime / 'immich-folder-watch.sock'
+    def socket_id(name):
+        try:
+            node = name.lstat()
+        except FileNotFoundError:
+            return None
+        require(stat.S_ISSOCK(node.st_mode), 'Unexpected entry at the private runtime endpoint')
+        return [node.st_dev, node.st_ino]
+
+    before = socket_id(endpoint)
+    def read_owner():
+        return bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                             'GetNameOwner', GLib.Variant('(s)', (NAME,)), None,
+                             Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()[0]
+    initial_owner = read_owner()
+    original_gui = identity(native)
+    later = report['laterLaunches'] = dict(candidateSocket=before, candidateOwner=initial_owner)
+    display.request_close(xid)
+    wait_for(lambda: check_alive(primary, out / 'released.log') or display.visible() is None, 8, 'Rust window did not hide')
+    require(not owner(bus, APP + '.Tray'), 'Shipping GUI still holds its tray name')
+    oldlog = out / 'later-shipping.log'
+    old = checked_start(stack, [*command, '--branch=master', APP], oldlog)
+    pid = wait_for(lambda: check_alive(old, oldlog) or launching_app(old), 8, 'Could not identify the later shipping apphost')
+    old_lifetime = pidfd(stack, pid)
+    later['shipping'] = app_identity(old, pid, pins, report, out, 'later-shipping')
+    old_directory = later['shipping']['directoryIdentity']['XDG_RUNTIME_DIR']
+    observed_directory = runtime.stat()
+    require(old_directory == [observed_directory.st_dev, observed_directory.st_ino] and
+            later['shipping']['directoryIdentity'] == report['original']['directoryIdentity'],
+            'The later shipping executable used a different private runtime or profile')
+    old_runtime = Path(f'/proc/{pid}/root') / later['shipping']['paths']['XDG_RUNTIME_DIR'].lstrip('/')
+    later['socketSeenByShipping'] = socket_id(old_runtime / endpoint.name)
+    def old_outcome():
+        require(not lifetime.poll(0), 'Rust exited during the later shipping launch')
+        visible = display.visible()
+        if visible is not None:
+            return ('window', visible)
+        if owner(bus, APP + '.Tray'):
+            return ('tray', None)
+        if old.poll() is not None:
+            return ('exited', None)
+    route, shown = wait_for(old_outcome, 15, 'The later shipping launch did not resolve')
+    later.update(legacyOutcome=route, observedWindow=window(display, shown) if shown is not None else None)
+    if route != 'exited':
+        # A separate primary is a real failure. Quit it through its own menu before collecting cleanup.
+        wait_for(lambda: owner(bus, APP + '.Tray'), 6, 'Second shipping primary has no tray')
+        quit_shipping(bus)
+    later.update(shippingExit=old.wait(timeout=10), shippingExited=bool(old_lifetime.poll(1000)),
+                 socketAfterShipping=socket_id(endpoint), stillHidden=display.visible() is None)
+    require(later['shippingExit'] == 0 and later['shippingExited'] and later['stillHidden']
+            and not owner(bus, APP + '.Tray'), 'The isolated shipping launch did not finish cleanly')
+    result = subprocess.run([*command, '--branch=test', APP], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=12)
+    (out / 'later-rust.log').write_bytes(result.stdout)
+    wait_for(lambda: check_alive(primary, out / 'released.log') or display.visible() == xid, 10, 'Rust secondary failed to reopen the first window')
+    later.update(rustSecondaryExit=result.returncode, reopenedWindow=window(display, xid), socketAfterRust=socket_id(endpoint),
+                 ownerAfterRust=read_owner(), primaryAfterRust=identity(native))
+    require(result.returncode == 0 and (f'SECONDARY_ACTIVATED owner={initial_owner}'.encode() in result.stdout)
+            and later['reopenedWindow'] == first_window and later['primaryAfterRust'] == original_gui
+            and later['ownerAfterRust'] == initial_owner and not lifetime.poll(0), 'Rust secondary failed to preserve the original primary')
+    later['exclusive'] = (route == 'exited' and before is not None
+                          and before == later['socketSeenByShipping'] == later['socketAfterShipping'] == later['socketAfterRust'])
+
+
+def quit_shipping(bus):
+    bus.call_sync(APP + '.Tray', '/StatusNotifierItem/Menu', 'com.canonical.dbusmenu', 'Event',
+                  GLib.Variant('(isvu)', (3, 'clicked', GLib.Variant('i', 0), 0)), None,
+                  Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
 
 
 def run(stack, bus, display, pins, report, out, gui_hash):
@@ -66,8 +144,7 @@ def run(stack, bus, display, pins, report, out, gui_hash):
             and refusal['oldAlive'] and not refusal['candidateBusOwner'] and refusal['originalIdentity'] == first['gui']
             and refusal['originalWindow'] == first['window'] and refusal['originalEndpointAfter'] == before
             and refusal['profileAfter'] == profile, 'The candidate did not refuse before startup with the original state intact')
-    bus.call_sync(APP + '.Tray', '/StatusNotifierItem/Menu', 'com.canonical.dbusmenu', 'Event',
-                  GLib.Variant('(isvu)', (3, 'clicked', GLib.Variant('i', 0), 0)), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
+    quit_shipping(bus)
     report['originalExit'] = original.wait(timeout=12)
     require(report['originalExit'] == 0 and old_lifetime.poll(1000), 'The original GUI did not quit normally')
     log = out / 'released.log'
@@ -78,11 +155,36 @@ def run(stack, bus, display, pins, report, out, gui_hash):
     lifetime = pidfd(stack, native)
     report['runningAfterRelease'] = dict(gui=identity(native), window=new_window, executable=sha(Path(f'/proc/{native}/exe')))
     require(report['runningAfterRelease']['executable'] == gui_hash and 'READY ' in log.read_text(), 'The released GUI differs from the candidate')
+    runtime_handle = os.open(f'/proc/{native}/root/run/user/0', os.O_DIRECTORY | os.O_RDONLY | os.O_CLOEXEC)
+    stack.callback(os.close, runtime_handle)
+    observe_later_launches(stack, bus, display, pins, report, out, command, candidate, new_window, lifetime)
     bus.call_sync(NAME, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
                   GLib.Variant('(sava{sv})', ('quit', [], {})), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
     report['candidateExit'] = candidate.wait(timeout=14)
     require(report['candidateExit'] == 0 and lifetime.poll(1000) and 'DRAINED ' in log.read_text(), 'Candidate did not drain and quit')
+    counts = re.findall(r'^LEGACY_SOCKET_ACCEPTED ([0-9]+)$', log.read_text(), re.MULTILINE)
+    report['acceptedConnectionsDuringRun'] = int(counts[0]) if len(counts) == 1 else None
+    try:
+        os.stat('immich-folder-watch.sock', dir_fd=runtime_handle, follow_symlinks=False)
+    except FileNotFoundError:
+        report['endpointAbsentAfterRustQuit'] = True
+    else:
+        raise RuntimeError('A legacy endpoint remained in the pinned runtime directory after Rust quit')
+    require(not owner(bus, NAME), 'The Rust GUI retained its bus name after exit')
+    restored_log = out / 'restored-shipping.log'
+    restored = checked_start(stack, [*command, '--branch=master', APP], restored_log)
+    shown = wait_for(lambda: check_alive(restored, restored_log) or display.visible(), 20, 'The original GUI did not return after Rust quit')
+    restored_app = report['shippingAfterRustQuit'] = witness(restored, window(display, shown), pins, report, out, 'restored-shipping')
+    restored_lifetime = pidfd(stack, restored_app['gui']['pid'])
+    require(restored_app['directoryIdentity'] == first['directoryIdentity'], 'Restored application used a different profile or runtime directory')
+    wait_for(lambda: check_alive(restored, restored_log) or owner(bus, APP + '.Tray'), 8, 'The restored original did not own its tray')
+    quit_shipping(bus)
+    report['restoredShippingExit'] = restored.wait(timeout=12)
+    require(report['restoredShippingExit'] == 0 and restored_lifetime.poll(1000), 'The restored original did not quit normally')
     wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(),
              6, 'A private application remained after both exited')
     report.update(profileAfterQuit=profile_files(), positiveWorkerEnabled=False, refusalObserved=True)
     require(report['profileAfterQuit'] == profile, 'The private application data differs after the clean GUI run')
+    require(report['laterLaunches']['exclusive'], 'The installed Rust primary did not exclude the later shipping primary')
+    require(report['acceptedConnectionsDuringRun'] is not None and report['acceptedConnectionsDuringRun'] > 0,
+            'The Rust listener did not observe a connection during the later shipping launch')

@@ -60,16 +60,22 @@ def main(args):
                 "--ro-bind", str(fonts), "/fonts", "--bind", str(build), "/build",
                 "--setenv", "IFW_QA_FONT_DIR", "/fonts", "--setenv", "HOME", "/test-home",
                 "--setenv", "PATH", "/toolchain/bin:/usr/bin", "--setenv", "CARGO_HOME", "/cargo",
-                "--setenv", "CARGO_TARGET_DIR", "/build", "--chdir", "/project/tools/rust-qa/gui",
-                "--", "/toolchain/bin/cargo"]
+                "--setenv", "CARGO_TARGET_DIR", "/build", "--chdir", "/project/tools/rust-qa/gui"]
+    cargo = ["--", "/toolchain/bin/cargo"]
     if args.clippy:
-        subprocess.run([*command, "clippy", "--frozen", "--all-targets", "--jobs", str(args.jobs),
+        subprocess.run([*command, *cargo, "clippy", "--frozen", "--all-targets", "--jobs", str(args.jobs),
                         "--", "-D", "warnings"], check=True)
         return
     if args.test:
-        subprocess.run([*command, "test", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
+        # The private test bus resolves the namespace UID for D-Bus EXTERNAL authentication.
+        with tempfile.TemporaryDirectory(dir=build) as temporary:
+            passwd, group = Path(temporary) / "passwd", Path(temporary) / "group"
+            passwd.write_text(f"qa:x:{os.getuid()}:{os.getgid()}:Synthetic GUI:/test-home:/bin/false\n")
+            group.write_text(f"qa:x:{os.getgid()}:\n")
+            subprocess.run([*command, "--ro-bind", str(passwd), "/etc/passwd", "--ro-bind", str(group), "/etc/group",
+                            *cargo, "test", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
         return
-    subprocess.run([*command, "build", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
+    subprocess.run([*command, *cargo, "build", "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
     sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", *sorted((HERE / "src").glob("*.rs")), HERE / "src/tray-icon.argb",
                ROOT / "rust/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/Cargo.toml",
                ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]

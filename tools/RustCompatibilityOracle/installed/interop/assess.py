@@ -214,7 +214,7 @@ def inside():
     pins = i['base']
     probe_app = i['probeAppId']
     r = dict(passed=False, inputs=sha(out / 'inputs.json'), namespaces=namespaces(), sameId=i['sameId'],
-             activationAttempted=False, installedHandoverQualified=False, peerCredentialsMeasured=False)
+             observerSentLegacySignal=False, installedHandoverQualified=False, peerCredentialsMeasured=False)
     try:
         require(os.getuid() == 0 and Path.home() == Path('/tmp/home') and not Path.home().exists() and not Path('/var/lib/flatpak').exists()
                 and all(v != i['namespaces'][k] for k, v in r['namespaces'].items()) and not Path('/proc/net/route').read_text().splitlines()[1:]

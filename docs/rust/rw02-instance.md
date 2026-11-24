@@ -118,7 +118,7 @@ candidate executable SHA-256 values are recorded in the native result under
 has SHA-256 `f9438bea3cdefd63334c3bbc424097d41babad94baa43e241c3eb75615940e71`.
 [Native startup comparison](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py).
 
-The candidate reads the application ID from `/.flatpak-info`, checks the
+At `0ccd036` the candidate reads the application ID from `/.flatpak-info`, checks the
 private runtime directory's ownership and mode, and looks up the endpoint
 through its open directory handle. It verifies that handle's device and inode
 before accepting an absent name. Any existing entry blocks that startup. A
@@ -129,6 +129,57 @@ covers an entry already present in this runtime directory. An original
 process that binds later, another session or runtime directory, and package
 upgrade or rollback still require separate evidence.
 [Linux admission check](../../tools/rust-qa/gui/src/linux_legacy.rs).
+
+In the reverse-order test on the same Fedora x64 fixture, the Rust GUI
+from `0ccd036` (PID 199) remained hidden while signed 3.0.4 (PID 272)
+opened a separate window, XID 8388623. Both used an unconfigured profile.
+After 3.0.4 quit, another ordinary Rust launch reopened the first Rust
+window, XID 4194306. Both applications exited zero. The profile still
+contained only the original startup marker. The native result under
+`artifacts/rust/shipping-flatpak-interop/same-id-pnnphoi4/` has SHA-256
+`fc0b9a168f6fb7dac2c4eda6bd55c1f88975910cd7163354a7bab82dcb578c80`.
+
+### Shipping launch while the Rust Flatpak owns the endpoint
+
+On the corrected Fedora x64 trial, an already running 3.0.4 again excluded
+both Rust starts. After that process exited, Rust PID 209 became primary.
+It published its already-listening Unix socket with a hard link that
+requires the public name to be absent. The GUI retained the socket in the
+supervisor alongside the D-Bus connection. A Rust secondary uses the bus.
+The legacy listener accepts and closes connections without reading their
+contents or requesting an action in the GUI.
+
+While Rust was hidden, the later signed 3.0.4 process (PID 283) saw
+the same private runtime directory and socket device/inode `97:104`.
+It exited zero. The Rust window stayed hidden and the old tray name
+remained unowned after exit. An ordinary Rust launch then reopened the
+original window 4194306 with its original PID and bus owner. The listener
+recorded two connections during the trial. After Rust quit, an independent
+lookup through the pinned runtime directory found the socket absent.
+The original version then started as PID 377, opened its own window and
+quit normally. Both refs were removed. The sole original profile marker
+retained its SHA-256 throughout. The result under
+`artifacts/rust/shipping-flatpak-interop/same-id-4tmbpwku/` has SHA-256
+`cbb85e6f7fd4ad554efa03db773c7cda2e14dac9e15fcca6a41d78e2b81efab9`.
+[Installed observer](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py)
+· [Linux election](../../tools/rust-qa/gui/src/linux.rs).
+
+All 27 local native GUI and tray tests passed, as did Clippy. In a separate
+test a private D-Bus daemon exited while Rust held the socket. The listener
+still accepted a connection after bus loss, and explicit supervisor shutdown
+removed the socket. The offline GUI test launcher supplies a temporary
+synthetic account entry for that private bus.
+
+These installed trials use an unconfigured profile on a single private
+desktop. The original process exits before Rust first claims the endpoint.
+During shutdown the shipping coordinator disposes its bound socket and
+then attempts another removal by name. The bundled .NET 10.0.12 runtime
+also removes that name during socket disposal. Installing across an
+overlapping old shutdown therefore still requires confirmation that the
+original process has fully exited. Concurrent package changes, other
+sessions, stale endpoints after abrupt exit and a handover with an active
+sync engine remain open. [Shipping coordinator](../../src/ImmichFolderWatch.App.Linux/Platform/UnixSingleInstanceCoordinator.cs)
+· [.NET 10.0.12 socket lifetime](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Sockets/src/System/Net/Sockets/Socket.cs#L3184-L3193).
 
 ## Ordinary second launch of the Linux GUI
 
@@ -612,6 +663,18 @@ Detached readback verified each archive's Actions digest, 13 ordinary
 launcher inputs, 19 integrated tray inputs, all indexed process logs and
 the shared retained build receipt on each architecture. Its SHA-256 is
 `46dd9dd80047e959e0743cd913672a833d149e2f4d30a286a8baf7cf595c2bbb`.
+
+On the dedicated keyboard desktop the foreground launcher's F24 key-up
+started an ordinary secondary on both Windows architectures. On x64,
+secondary PID 1740 returned the foreground to primary PID 10092, HWND
+5898592, with inventory worker 4084. On ARM64 the corresponding identities
+were secondary 8500, primary 2924, HWND 1442392 and worker 2460. Each first
+sample found the original window visible, active and keyboard-focused.
+Both primary and secondary processes exited zero. Both supervisors restored
+Default. For each architecture detached readback matched all 17 observer
+sources and the six indexed files, including the two process logs and
+the native keyboard record. [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292)
+· [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675).
 
 The WPF timing reference reopens its window for the measured cycles by
 signaling the shipping coordinator directly. A separate reference now
