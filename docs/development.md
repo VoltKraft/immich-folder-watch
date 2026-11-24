@@ -118,7 +118,8 @@ Supply a fresh output directory each time. Omitting `--package` downloads
 the exact published asset. The Windows executor requires the matching
 disposable GitHub-hosted Windows runner on `rewrite/rust`. The four-target
 workflow uploads the native logs, retained synthetic profile and evidence
-hashes. [Original packages and results](rust/rw01-installed-packages.md) · [Installer workflow](../.github/workflows/rust-legacy-install.yaml).
+hashes. The [separate Fedora x64 launch test](rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) runs the signed 3.0.4 Flatpak twice on a private X11 desktop.
+[Original packages and results](rust/rw01-installed-packages.md) · [Installer workflow](../.github/workflows/rust-legacy-install.yaml).
 
 ## Rust feasibility workspace
 

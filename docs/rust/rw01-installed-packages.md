@@ -85,6 +85,36 @@ matched. The local evidence indexes in
 `8a5d3d06713d6cf4b229acfc8a3320287f07a3a264d18e0dc885d08ac1ab24e2`
 and `d1485b18398fe3792a778af0eea2cd439fc377ba3810b5b6021c18c943071884`.
 
+## Two ordinary launches of the installed Linux x64 reference
+
+An offline Fedora x64 desktop installed the original 3.0.4 bundle into a
+fresh per-user repository. The installed OSTree commit
+`abeebe13b83cc4b8246fb4a8715daddce7f3dd4bf52861ae4ca33b06755104da`
+verified against the separately published commit signature and the
+repository's release public key. The executable and managed assembly
+also matched the earlier installation and repair inventories.
+[Release asset](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4) ·
+[Detached commit metadata](https://voltkraft.github.io/immich-folder-watch/repo/objects/ab/eebe13b83cc4b8246fb4a8715daddce7f3dd4bf52861ae4ca33b06755104da.commitmeta).
+
+The observer started the installed app normally twice with an unconfigured
+synthetic profile. The first apphost, PID 54, hid X11 window 4194319. A
+second Flatpak instance started apphost PID 132 and exited zero. X-Resource
+identified the same first process and window after reopening. The two
+instances shared their runtime and configuration directories. The observer
+invoked the first app's exported Quit menu item on the private bus. The
+original process exited zero, followed by successful uninstall. This
+observation covers two launches of the shipping version without watched
+sources or an active synchronization workload.
+
+The accepted `result.json` SHA-256 is
+`2165bb6d1fc44ffdea1c77143255b3bd317147287b4c3d6b4d719d7b18e217d5`
+under `artifacts/rust/shipping-flatpak-launch/x11-vh5z2iam/`. Independent
+readback verified the signature, all 16 indexed files, 13 source inputs
+and both ordinary exits. Its SHA-256 is
+`414c7e789a476371bd1ac74d144a2c2a53a37494e085ca0a595dc272bc91372f`.
+For reproduction use the pinned bundle, detached metadata and installed
+public Platform and Mesa deployment specified by the [native launch driver](../../tools/RustCompatibilityOracle/installed/launch/run.py).
+
 ## Installed reference on all four hosts
 
 At `0f29659`, all four native jobs installed the original shipping package,

@@ -241,6 +241,7 @@ to reconcile project decisions, defaults, and recorded state.
   shipping sources. The actual Windows IPC names require a disposable runner.
   The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses
   original release packages, disposable installs and the synthetic legacy corpus.
+  The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
   Preserve the [worker rollback fixtures](docs/development.md#repair-and-deletion-after-restoring-the-worker-database)
   and their external media, journal, peer request and assembly evidence.
   The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only

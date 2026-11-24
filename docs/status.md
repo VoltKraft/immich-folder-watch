@@ -1,5 +1,13 @@
 # Project Status
 
+## Ordinary second launch of the shipping Linux Flatpak (2026-11-24)
+
+On a private x64 X11 desktop the original 3.0.4 Flatpak reopened its
+existing window after a normal second launch. Both app processes exited
+zero. The original deployment matched the public release signature and
+the independent installed-file inventory. The trial used no watch entries.
+[Installed application and evidence](rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference).
+
 ## Windows foreground comparison (2026-11-24)
 
 After a normal second launch at `21e794f`, both retained windows reopened
