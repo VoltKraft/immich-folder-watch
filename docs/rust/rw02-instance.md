@@ -67,6 +67,46 @@ The legacy writer ignored the new lock on every target. Cross-session ownership
 for the same Windows SID and prevention of legacy restarts during installed
 handover remain open.
 
+## Ordinary second launch of the Linux GUI
+
+The shipping Flatpak starts its executable for each launch. When the Linux
+coordinator finds a primary, it asks that process to show its window. On
+Fedora 45 x64, starting the Rust GUI at `21e794f` again took the application
+bus name away from the primary on both X11 and Wayland. On X11 the new
+process opened a different window and started a second inventory worker.
+The existing desktop and tray tests had sent activation messages directly
+to the primary. [Flatpak entry](../../packaging/flatpak/io.github.voltkraft.immich-folder-watch.desktop) ·
+[Shipping startup](../../src/ImmichFolderWatch.App.Linux/App.axaml.cs).
+
+The pinned zbus 5.19.0 default allows an owner to be replaced and asks to
+replace an existing owner. The GUI now exports its interfaces before it
+requests the name with only `DoNotQueue`. A secondary resolves the owner's
+unique bus name, sends it one `Activate` request and checks the reply before
+exiting. The primary acknowledges an accepted command and rejects a full
+queue or a request received during shutdown. Election precedes appearance
+monitoring, graphics and worker startup. [Linux adapter](../../tools/rust-qa/gui/src/linux.rs) ·
+[Startup order](../../tools/rust-qa/gui/src/main.rs).
+
+| Fedora x64, private X11 | Original | Corrected |
+| --- | --- | --- |
+| Normal second launch | Owner moved from PID 9 to 67. Workers 16 and 73 were live together. The secondary remained running after eight seconds. | The secondary exited successfully in 27 ms. Primary 9 retained its name, window 4194306 and worker 16. |
+| Second launch with `--background` | The normal launch had already failed. | The secondary exited successfully in 30 ms and reopened the same window. |
+| Inventory and Quit | The fixture stopped the failed secondary and its worker. The original drained on Quit. | Worker 16 found the new synthetic file in 4.753 s. The observer independently verified that the access time advanced on the same directory inode. Both process handles reported exit on Quit. |
+
+Both runs used worker SHA-256
+`1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0`.
+The GUI compiler receipts differ only in the two startup source files and
+the executable digest. The paired worker reports have SHA-256
+`cb5ef33ecaf3e5d1445b22d9e36dfaa213217732a82843231148a96e172603c7`
+and `55a881867816cbbb773936bfb89a888e881061c5ec571d1000843415f8077d4d`
+respectively. A separate X11 and Wayland lifecycle run confirmed that the
+corrected GUI retained its original owner after ordinary launch and drained
+on Quit. X11 remapped its existing window. Wayland presented a new surface
+from the original process. These tests cover one Linux desktop session.
+Installed old/new handover and Windows cross-session writer exclusion have
+separate acceptance requirements. [Worker observer](../../tools/rust-qa/performance/worker/second_launch.py) ·
+[Native desktop observers](../../tools/rust-qa/gui/native.py).
+
 ## Ordinary second launch of the Windows GUI
 
 The shipping desktop shortcut starts the executable without arguments. A second

@@ -2,6 +2,7 @@ use super::{Command, Control};
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::TrySendError;
 use std::time::Duration;
 use zbus::{
     Connection, connection::Builder, fdo, interface, object_server::SignalEmitter,
@@ -9,39 +10,57 @@ use zbus::{
 };
 
 const NAME: &str = "org.example.IfwGuiProbe";
+const APP_PATH: &str = "/org/example/IfwGuiProbe";
+const APP_INTERFACE: &str = "org.freedesktop.Application";
 const WATCHER: &str = "org.kde.StatusNotifierWatcher";
 const NO_DISPLAY: &str = "Graphics unavailable. Activate to retry. Background work continues.";
 type PlatformData = HashMap<String, OwnedValue>;
 
-struct Application(Control);
+struct Application {
+    control: Control,
+    quitting: bool,
+}
 struct Item(Control);
 
 fn dispatch(control: &Control, command: Command) -> fdo::Result<()> {
-    control
-        .send(command)
-        .map_err(|_| fdo::Error::Failed("GUI command queue unavailable".into()))
+    control.send(command).map_err(|error| match error {
+        TrySendError::Full(_) => fdo::Error::LimitsExceeded("GUI command queue is full".into()),
+        TrySendError::Disconnected(_) => fdo::Error::Failed("GUI command receiver closed".into()),
+    })
+}
+
+impl Application {
+    fn enqueue(&self, command: Command) -> fdo::Result<()> {
+        if self.quitting {
+            return Err(fdo::Error::Failed("GUI is shutting down".into()));
+        }
+        dispatch(&self.control, command)
+    }
 }
 
 #[interface(name = "org.freedesktop.Application")]
 impl Application {
     fn activate(&self, _platform_data: PlatformData) -> fdo::Result<()> {
-        dispatch(&self.0, Command::Open)
+        self.enqueue(Command::Open)
     }
 
     fn activate_action(
-        &self,
+        &mut self,
         action_name: &str,
         _parameter: Vec<OwnedValue>,
         _platform_data: PlatformData,
     ) -> fdo::Result<()> {
-        match action_name {
-            "quit" => dispatch(&self.0, Command::Quit),
-            "close" => dispatch(&self.0, Command::Close),
+        let command = match action_name {
+            "quit" => Command::Quit,
+            "close" => Command::Close,
             "qa-destroy-graphics" if super::graphics::allows_test_fault() => {
-                dispatch(&self.0, Command::DestroyGraphics)
+                Command::DestroyGraphics
             }
-            _ => Err(fdo::Error::InvalidArgs("Unknown fixture action".into())),
-        }
+            _ => return Err(fdo::Error::InvalidArgs("Unknown fixture action".into())),
+        };
+        self.enqueue(command)?;
+        self.quitting = matches!(command, Command::Quit);
+        Ok(())
     }
 }
 
@@ -116,7 +135,7 @@ pub(super) fn graphics_attention(connection: &Connection, control: &Control, una
     }
 }
 
-pub(super) fn start(control: Control) -> Result<(Connection, bool), Box<dyn Error>> {
+pub(super) fn start(control: Control) -> Result<Option<(Connection, bool)>, Box<dyn Error>> {
     if std::env::var("HOME").as_deref() != Ok("/tmp/home")
         || std::env::var("DBUS_SESSION_BUS_ADDRESS").as_deref() != Ok("unix:path=/tmp/session-bus")
     {
@@ -124,12 +143,49 @@ pub(super) fn start(control: Control) -> Result<(Connection, bool), Box<dyn Erro
     }
     futures_lite::future::block_on(async {
         let connection = Builder::session()?
-            .name(NAME)?
-            .serve_at("/org/example/IfwGuiProbe", Application(control.clone()))?
+            .serve_at(
+                APP_PATH,
+                Application {
+                    control: control.clone(),
+                    quitting: false,
+                },
+            )?
             .serve_at("/StatusNotifierItem", Item(control))?
-            .method_timeout(Duration::from_secs(3))
+            .method_timeout(Duration::from_secs(2))
             .build()
             .await?;
+        // Publish the interfaces first so a simultaneous launch can activate the winner.
+        match connection
+            .request_name_with_flags(NAME, fdo::RequestNameFlags::DoNotQueue.into())
+            .await
+        {
+            Ok(fdo::RequestNameReply::PrimaryOwner) => {}
+            Err(zbus::Error::NameTaken) => {
+                let owner = fdo::DBusProxy::new(&connection)
+                    .await?
+                    .get_name_owner(NAME.try_into()?)
+                    .await?;
+                // A unique destination cannot autostart or silently target a successor.
+                let reply = connection
+                    .call_method(
+                        Some(owner.as_str()),
+                        APP_PATH,
+                        Some(APP_INTERFACE),
+                        "Activate",
+                        &PlatformData::new(),
+                    )
+                    .await?;
+                if reply.header().sender().map(|name| name.as_str()) != Some(owner.as_str())
+                    || !reply.body().is_empty()
+                {
+                    return Err("Unexpected reply from the running GUI".into());
+                }
+                println!("SECONDARY_ACTIVATED owner={owner}");
+                return Ok(None);
+            }
+            Err(error) => return Err(error.into()),
+            Ok(_) => return Err("Unexpected D-Bus ownership result for a new connection".into()),
+        }
         let result = connection
             .call_method(
                 Some(WATCHER),
@@ -142,6 +198,48 @@ pub(super) fn start(control: Control) -> Result<(Connection, bool), Box<dyn Erro
         if let Err(error) = &result {
             println!("TRAY_REGISTRATION {error}");
         }
-        Ok((connection, result.is_ok()))
+        Ok(Some((connection, result.is_ok())))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc::sync_channel;
+
+    #[test]
+    fn secondary_activation_reports_full_closed_and_quitting_queues() {
+        let (sender, commands) = sync_channel(1);
+        let mut app = Application {
+            control: Control {
+                sender,
+                window: Default::default(),
+                graphics_attention: Default::default(),
+                appearance: Default::default(),
+            },
+            quitting: false,
+        };
+        app.activate(PlatformData::new()).unwrap();
+        assert!(matches!(
+            app.activate(PlatformData::new()),
+            Err(fdo::Error::LimitsExceeded(_))
+        ));
+        assert!(matches!(
+            app.activate_action("quit", vec![], PlatformData::new()),
+            Err(fdo::Error::LimitsExceeded(_))
+        ));
+        assert!(matches!(commands.try_recv(), Ok(Command::Open)));
+        app.activate_action("quit", vec![], PlatformData::new())
+            .unwrap();
+        assert!(matches!(commands.try_recv(), Ok(Command::Quit)));
+        assert!(matches!(
+            app.activate(PlatformData::new()),
+            Err(fdo::Error::Failed(_))
+        ));
+        drop(commands);
+        assert!(matches!(
+            dispatch(&app.control, Command::Open),
+            Err(fdo::Error::Failed(_))
+        ));
+    }
 }

@@ -1,5 +1,15 @@
 # Project Status
 
+## Linux second launch and inventory ownership (2026-11-24)
+
+On Fedora x64 the GUI at `21e794f` lost its bus name to a second ordinary
+launch under X11 and Wayland. The X11 run observed two simultaneous
+inventory workers. The corrected build passed both native window lifecycles.
+On X11, normal and background launches reopened the original window, and
+the original worker discovered a new file before draining on Quit. The
+Ubuntu x64 and ARM64 workflow now exercises the same worker check.
+[Control and corrected results](rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui).
+
 ## Windows recovery and notification comparison (2026-11-24)
 
 The GUI and the independent capture worker now respect the lifetime of the

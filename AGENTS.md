@@ -233,6 +233,8 @@ to reconcile project decisions, defaults, and recorded state.
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.
+  Verify [ordinary Linux second launches](docs/rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui)
+  with the real executable and the original window, bus owner and inventory worker.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
   The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses

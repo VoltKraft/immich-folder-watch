@@ -439,7 +439,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         appearance: Arc::default(),
     };
     #[cfg(target_os = "linux")]
-    let (native, available) = linux::start(control.clone())?;
+    let Some((native, available)) = linux::start(control.clone())? else {
+        return Ok(());
+    };
     #[cfg(target_os = "linux")]
     let mut appearance = {
         let handle = control.clone();

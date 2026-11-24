@@ -30,6 +30,41 @@ def action(name):
     return call(BUS_NAME, APP_PATH, "org.freedesktop.Application.ActivateAction", name, "[]", "{}")
 
 
+def desktop_owner():
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+    def query(method, name):
+        reply = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                              method, GLib.Variant("(s)", (name,)), None, Gio.DBusCallFlags.NONE, 2000, None)
+        return reply.unpack()[0]
+
+    owner = query("GetNameOwner", BUS_NAME)
+    return {"busName": owner, "pid": query("GetConnectionUnixProcessID", owner)}
+
+
+def second_launch(stack, primary, log):
+    from session import checked_start
+    before = desktop_owner()
+    if before["pid"] != primary.pid:
+        raise RuntimeError("The hidden primary does not own the application bus name")
+    child = checked_start(stack, ["/app/native-gui-assessment"], log)
+    observation = {"primaryPid": primary.pid, "secondaryPid": child.pid, "ownerBefore": before}
+    try:
+        try:
+            observation["secondaryExit"] = child.wait(timeout=6)
+        except subprocess.TimeoutExpired:
+            observation["timeoutSeconds"] = 6
+        observation["ownerAfter"] = desktop_owner()
+        observation["primaryExit"] = primary.poll()
+    finally:
+        log.with_suffix(".json").write_text(json.dumps(observation, indent=2) + "\n")
+    if (observation.get("secondaryExit") != 0 or observation["primaryExit"] is not None
+            or observation["ownerAfter"] != before):
+        raise RuntimeError(f"Ordinary second launch failed: {observation}. See {log}")
+    return observation
+
+
 class X11Observer:
     class MapEvent(c.Structure):
         _fields_ = [("type", c.c_int), ("serial", c.c_ulong), ("sent", c.c_int),
@@ -96,6 +131,7 @@ def run_case(stack, observer, name, background, tray, controls):
     log = Path("/qa") / f"{name}.log"
     process = checked_start(stack, ["/app/native-gui-assessment", *(["--background"] if background else [])], log)
     steps = []
+    launch = {}
 
     def mark(label):
         steps.append({"time": clock(), "action": label})
@@ -150,8 +186,12 @@ def run_case(stack, observer, name, background, tray, controls):
         if any(e["event"] == "map" for e in observer.events[after_close:]):
             raise RuntimeError("A hidden window briefly remapped after close")
         before_open = len(observer.events)
-        mark("desktop Activate")
-        call(BUS_NAME, APP_PATH, "org.freedesktop.Application.Activate", "{}")
+        if name == "foreground":
+            mark("ordinary second launch")
+            launch["secondLaunch"] = second_launch(stack, process, Path("/qa/foreground-secondary.log"))
+        else:
+            mark("desktop Activate")
+            call(BUS_NAME, APP_PATH, "org.freedesktop.Application.Activate", "{}")
         wait_for(lambda: alive() and observed_transition(before_open, 'map'), 10,
                  f"The desktop activation did not remap the application window. See {log}")
     mark("desktop Quit")
@@ -164,7 +204,7 @@ def run_case(stack, observer, name, background, tray, controls):
     if not controls and expected_intent == "BackgroundStartup":
         if "DRAINED passes=0" not in messages or any(e["event"] == "map" for e in observer.events[before:]):
             raise RuntimeError("The never-shown process created a window or rendered a frame")
-    return {"case": name, "steps": [{**s, "time": round(s["time"] - start, 6)} for s in steps],
+    return {"case": name, **launch, "steps": [{**s, "time": round(s["time"] - start, 6)} for s in steps],
             "window_events": [{**e, "time": round(e["time"] - start, 6)} for e in observer.events[before:]],
             "application": messages, "exit": process.returncode}
 

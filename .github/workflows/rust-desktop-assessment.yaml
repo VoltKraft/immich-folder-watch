@@ -448,6 +448,10 @@ jobs:
           python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
           python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
 
+      - name: Reopen the Linux GUI by launching its ordinary executable while the inventory worker runs
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' }}
+        run: python3 -B tools/rust-qa/performance/worker/check_hidden.py graphics-ci --second-launch
+
       - name: Verify native process ownership and cleanup in the resource fixture
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
         shell: pwsh
@@ -838,6 +842,7 @@ jobs:
             artifacts/rust/graphics/*-ci/*.log
             artifacts/rust/graphics/runtime-ci/subject/*.json
             artifacts/rust/performance/hosted-*.json
+            artifacts/rust/performance/graphics-ci-second-launch.json
             artifacts/rust/windows-performance/native-*/*
             artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.json
             artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.log

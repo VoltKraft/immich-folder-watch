@@ -218,6 +218,14 @@ PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
 measured presentation modes and remaining checks.
 
+After staging the integrated Linux GUI and worker, run
+`python3 -B tools/rust-qa/performance/worker/check_hidden.py STAGED_SUBJECT --second-launch`.
+It starts the ordinary executable twice on a private X11 desktop, once with
+no arguments and once with `--background`. It checks the actual D-Bus owner,
+window, inventory worker, file rediscovery and shutdown. The separate
+`gui/native.py` lifecycle checks exercise the ordinary launch on X11 and Wayland.
+[Linux second-launch results](rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui).
+
 The Windows assessment runs the ordinary launcher first, followed by
 `python -B tools/rust-qa/windows-launcher/native_tray.py <native-target>`
 on the disposable x64 and ARM64 runners. The latter starts the elected GUI
