@@ -746,7 +746,35 @@ x64 Xvnc run recorded all four lifecycle cases, the named field with
 `Grüße – Sommer.jpg`, three masked characters and the native clipboard
 round trip. Its `artifacts/rust/gui-run/x11-rm85rwk3/results.json` SHA-256
 is `af2f645ba3627eb126fdd58dcbcc5a80d81db7fc85ac256fbca541e3008ba8e8`.
-Native ARM64 execution of the revision is pending.
+At `21e794f` the revised observer completed the X11 input and screen-reader
+trial on Ubuntu ARM64. Its original input report has SHA-256
+`79558361d77e5ceba9091eb7e6b9d0fed8d2132da321cde341a963c606a68744`.
+
+## Ubuntu native results at 21e794f
+
+Both Ubuntu 24.04.5 hosts met all eleven paired X11 resource limits. During
+each of three scan trials the original worker inventoried 100,000 files
+twice. Every measured show and close request issued during observed
+directory reads also finished within that interval.
+
+| Native archive | Startup / limit (ms) | Scan show p95 / limit (ms) | Scan close p95 / limit (ms) | Completed during reads |
+| --- | ---: | ---: | ---: | ---: |
+| [x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14959038938) | 258.45 / 1633.993 | 0.98 / 16.01 | 0.44 / 11.26 | 336 |
+| [ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14960740245) | 225.52 / 1570.584 | 1.08 / 16.72 | 0.41 / 15.63 | 184 |
+
+On each host Plasma reopened the original window twice and Orca spoke the
+German and English field names on both X11 and Wayland. The 32 packaged
+and 32 unmodified portal operations reproduced the missing read lease.
+The 46 private backport operations demonstrated contention and recovery.
+Both stock Settings portals exposed GNOME's high-contrast preference.
+[Visible contrast on both architectures](rw02-appearance.md#stock-ubuntu-x64-and-arm64-at-21e794f).
+
+The x64 and ARM64 desktop archives matched their Actions SHA-256 digests
+`5cddd30afeb24a2895ad4e4c1e406b9862ae431cd6a16bf1eeda9002aa636e97`
+and `0fec9c90f4021c9b1e32a0f54ad6d52ef0cea5807a01765f369afea72379344b`.
+The detached comparison in
+`artifacts/rust/hosted-desktop-storage/45469433661/linux-desktop-readback.json`
+has SHA-256 `0292ad5b6ae3cda95258e25dff73ca104fb1a39855dcb55f0ef2987ede8c6e80`.
 
 ## First-frame regression
 

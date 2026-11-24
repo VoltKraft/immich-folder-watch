@@ -107,6 +107,24 @@ The observer creates the keyfile settings directory in the synthetic profile
 before starting either reader. Without it both portal processes initially
 kept reporting the default scheme. Hosted ARM64 verification is pending.
 
+### Stock Ubuntu x64 and ARM64 at 21e794f
+
+On native Ubuntu 24.04.5 the stock portal exposed GNOME's boolean
+high-contrast preference on both architectures. Five changes produced
+panel gray levels 248, 27, 0, 255 and 248 in the same window. The label
+had 97 near-white pixels on the black panel and 42 near-black pixels on
+white. After the portal restarted, the dark panel changed from 27 to 0
+and back to 27 while the dark preference stayed selected. Both GUIs
+returned to the light palette and drained normally.
+
+The five samples, label counts and portal PIDs happened to match on the
+two hosts, giving their appearance result the same SHA-256
+`3ea11bbb1cb1f9db20455a1cd39db18c62da8a27efe8758d1a2ee6d7dadc411f`.
+The separate native build receipts identify GUI SHA-256 `7e486dbc…`
+on x64 and `a028155d…` on ARM64. Detached verification matched all 25
+build inputs and all four observer sources to the revision.
+[Both original native archives](rw02-native-gui.md#ubuntu-native-results-at-21e794f).
+
 ## Windows contrast theme observation
 
 The shipping WPF `ThemeWatcher` reads the app light/dark preference and

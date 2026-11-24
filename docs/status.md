@@ -1,5 +1,15 @@
 # Project Status
 
+## Native Ubuntu desktop results at 21e794f (2026-11-24)
+
+Ubuntu x64 and ARM64 both passed all eleven same-host X11 limits.
+Orca spoke the expected labels under X11 and Wayland and both stock
+Noble portals drove visible high-contrast changes in the Rust window.
+The original archives matched their published digests. The next desktop
+run covers the Linux ordinary second launch with its inventory worker.
+[Native results and archives](rust/rw02-native-gui.md#ubuntu-native-results-at-21e794f)
+· [Desktop run for 13e4af8](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
 ## Windows mixed-DPI and RDP test desktop (2026-11-24)
 
 The user currently has neither Windows evaluation media nor an available
