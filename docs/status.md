@@ -8,6 +8,9 @@ back with keyboard focus. Japanese input composed and committed its filename.
 NVDA timed out looking for the German filename label. The contrast observer
 stopped at its first ownership check, before changing any setting. The
 revised guard reports each failing operation and passed 22 portable tests.
+The input observer now records how many editors Windows exposed when it
+looked for the German filename. PowerShell fixture checks exercised empty,
+partial and interrupted reads. The native repeat is pending.
 [Timing](rust/rw02-windows-window.md#native-results-at-21e794f) · [Native input](rust/rw02-windows-desktop.md#arm64-keyboard-reader-and-input-method-at-21e794f) · [Contrast](rust/rw02-appearance.md#windows-arm64-before-the-first-capture-at-21e794f).
 
 ## Rust startup beside the installed 3.0.4 Flatpak (2026-11-24)

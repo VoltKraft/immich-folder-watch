@@ -102,11 +102,11 @@ function Wait-Observation([scriptblock]$Read, [string]$Label) {
     throw "Timed out observing $Label."
 }
 
-function Get-AccessibleName($Element) {
+function Get-AccessibleName($Element, [int]$Owner = 0) {
     $name = $Element.Current.Name
     if ($name) { return $name }
     $label = $Element.Current.LabeledBy
-    if ($null -ne $label) { return $label.Current.Name }
+    if ($null -ne $label -and ($Owner -eq 0 -or $label.Current.ProcessId -eq $Owner)) { return $label.Current.Name }
     return ''
 }
 
@@ -221,6 +221,33 @@ function Get-Field([string]$Name, $Role) {
     return $null
 }
 
+function Get-InitialEditor([ValidateSet('Dateiname','Kennwort')][string]$Name, $Condition) {
+    # A null label has not been fully checked. Never persist provider-supplied text.
+    $scan = [ordered]@{ requested=$Name; editCount=$null; Dateiname=$null; Kennwort=$null }
+    $result.initialEditorSearch = $scan
+    try {
+        $elements = $root.FindAll($scope, $Condition)
+        $scan.editCount = $elements.Count
+        foreach ($element in $elements) {
+            if ($element.Current.ProcessId -ne $SubjectId) { throw 'The UI Automation editor changed ownership.' }
+            $label = Get-AccessibleName $element $SubjectId
+            if ($label -cin @('Dateiname','Kennwort')) { $scan[$label] = $true }
+            if ($label -ceq $Name) { return $element }
+        }
+        foreach ($expected in @('Dateiname','Kennwort')) {
+            if ($null -eq $scan[$expected]) { $scan[$expected] = $false }
+        }
+    } catch {
+        $failure = Get-UiaReadFailure $_
+        if ($failure) {
+            $scan.providerError = $failure
+            throw 'UI Automation could not finish reading the owned German editors.'
+        }
+        throw
+    }
+    return $null
+}
+
 function Get-SubjectFocus {
     $element = [Windows.Automation.AutomationElement]::FocusedElement
     if ($null -ne $element -and $element.Current.ProcessId -eq $SubjectId) {
@@ -297,8 +324,11 @@ try {
     if ($result.dpi -eq 0) { throw 'Could not observe the native window DPI.' }
     $edit = [Windows.Automation.ControlType]::Edit
     $button = [Windows.Automation.ControlType]::Button
-    $file = Wait-Observation { Get-Field 'Dateiname' $edit } 'German filename label'
-    $password = Wait-Observation { Get-Field 'Kennwort' $edit } 'German password label'
+    $ownedEditors = [Windows.Automation.AndCondition]::new(
+        [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, $edit),
+        [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, $SubjectId))
+    $file = Wait-Observation { Get-InitialEditor 'Dateiname' $ownedEditors } 'German filename label'
+    $password = Wait-Observation { Get-InitialEditor 'Kennwort' $ownedEditors } 'German password label'
     $english = Wait-Observation { Get-Field 'English' $button } 'language button'
     $result.germanLabels = @((Get-AccessibleName $file), (Get-AccessibleName $password), (Get-AccessibleName $english))
     $result.passwordProperty = $password.Current.IsPassword

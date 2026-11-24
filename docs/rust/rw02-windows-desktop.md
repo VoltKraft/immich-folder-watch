@@ -18,6 +18,13 @@ during its separate trial. The UI Automation driver timed out looking for
 the German filename label and matched none of the seven expected
 announcements. Its process exited normally and its profile was removed.
 
+The revised input observer records the last number of owned UI Automation
+editors and whether it identified each expected German label. An incomplete
+read leaves the unexamined labels unknown and retains the provider error
+type and HRESULT when available. The five-second search and the native
+reader acceptance criteria still apply. The earlier archive lacks these
+observations.
+
 The retained display inventory found a single 1024 × 768 monitor at 96 DPI
 in a console session. The filename field did not receive focus on that
 display. Mixed DPI and RDP remain unmeasured. The full ARM64 archive SHA-256
