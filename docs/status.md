@@ -1,5 +1,16 @@
 # Project Status
 
+## Early Windows Shell observations at 21e794f (2026-11-24)
+
+All four native feasibility jobs passed. The separate desktop trial found
+the private Explorer taskbar before its receiver could start on either
+Windows host. On x64 the rectangle still had zero area. Both original
+input desktops were restored. The observer now waits for a visible
+taskbar with real bounds and retains each ownership failure condition.
+All 62 portable service tests passed. Native pointer activation remains open.
+[Windows archives and checks](rust/rw02-windows-services.md#private-explorer-startup-at-21e794f) ·
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433140).
+
 ## Linux second launch and inventory ownership (2026-11-24)
 
 On Fedora x64 the GUI at `21e794f` lost its bus name to a second ordinary

@@ -273,6 +273,28 @@ The private trial result hashes are
 (x64) and `686cd35dcbc7b31881668db6a6e70cb3cabad7559f2e770cc154eec25789da94`
 (ARM64). [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460092).
 
+### Private Explorer startup at 21e794f
+
+Both native hosts found an Explorer taskbar on the owned desktop in
+session 2. On x64 its first rectangle was `[0, 0, 0, 0]`. ARM64
+reported `[0, 720, 1024, 768]`. Both failed the subsequent visible
+window and owner check before launching the Rust icon receiver. The
+original observer returned one error for all four conditions, so the
+ARM64 record does not identify which condition failed. Both Explorer
+jobs emptied, their temporary directories were removed and the original
+`Default` input desktops were restored.
+[Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14956742379) ·
+[Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14958032495).
+
+The observer now waits within the original 18-second startup limit for a
+visible taskbar with nonempty bounds. It retains the first and last
+samples, pins the process and verifies the Explorer job, session and desktop
+before the receiver can start. Subsequent checks identify changes in HWND,
+visibility, PID or desktop. The portable controls cover an empty rectangle,
+a still-hidden taskbar with full bounds and a taskbar that never becomes
+ready. Pointer activation still requires a real fixture pixel and the
+matching native Shell callback. [Private Explorer observer](../../tools/rust-qa/windows-services/activation_native.py).
+
 ## Late notification on the original desktop
 
 The Windows desktop assessment reuses the native service executable after

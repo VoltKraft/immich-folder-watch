@@ -15,6 +15,41 @@ from activation_worker import challenge, check_registration_cleanup, gesture, ov
 
 
 class Activation(unittest.TestCase):
+    def test_private_explorer_must_present_its_taskbar_before_the_receiver_starts(self):
+        api = Native.__new__(Native)
+        api.require_desktop = Mock()
+        api.find = Mock(side_effect=[0x40132, 0x40132, 0x40132])
+        api.desk = Mock()
+        sizes = iter([(0, 0, 0, 0), (0, 720, 1024, 768), (0, 720, 1024, 768)])
+
+        def read_rect(_bar, pointer):
+            rect = c.cast(pointer, c.POINTER(w.RECT)).contents
+            rect.left, rect.top, rect.right, rect.bottom = next(sizes)
+            return True
+
+        api.desk.window_rect.side_effect = read_rect
+        api.desk.visible.side_effect = [True, False, True]
+        record = {}
+        with patch("activation_native.time.sleep") as wait:
+            self.assertEqual(api.wait_for_taskbar(record), 0x40132)
+        self.assertEqual(wait.call_count, 2)
+        self.assertEqual(api.require_desktop.call_count, 3)
+        self.assertEqual(record["startupTaskbar"]["first"]["rect"], [0, 0, 0, 0])
+        self.assertEqual(record["startupTaskbar"]["last"]["rect"], [0, 720, 1024, 768])
+
+    def test_absent_or_unpositioned_taskbar_expires_without_starting_the_receiver(self):
+        api = Native.__new__(Native)
+        api.require_desktop = Mock()
+        api.find = Mock(side_effect=[None, 0x40132])
+        api.desk = Mock()
+        api.desk.window_rect.return_value = False
+        record = {}
+        with (patch("activation_native.time.monotonic", side_effect=[0, 1, 2, 19]),
+              patch("activation_native.time.sleep"), self.assertRaises(Unavailable)):
+            api.wait_for_taskbar(record)
+        self.assertIsNone(record["startupTaskbar"]["last"]["rect"])
+        self.assertIn("shellWindowAfterAttempt", record)
+
     def test_native_registration_retry_requires_the_same_shell_and_confirmed_cleanup(self):
         first = {"private_tray.initial.add": True, "private_tray.registered": True, "private_tray.remove": True}
         retried = {**first, "private_tray.initial.add": False, "private_tray.startup_retry.add": True,

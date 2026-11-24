@@ -191,18 +191,28 @@ class Native:
                 if not record["jobEmpty"] or wait(pi.process, 8000) != 0:
                     raise RuntimeError("The private Explorer processes did not complete cleanup")
 
-    @contextmanager
-    def shell_owner(self, job, record):
+    def wait_for_taskbar(self, record):
         until = time.monotonic() + 18
+        observations = record["startupTaskbar"] = {}
         while time.monotonic() < until:
             self.require_desktop()
             bar = self.find(BAR, None)
             if bar:
-                break
+                rect = w.RECT()
+                bounds = rect_values(rect) if self.desk.window_rect(bar, c.byref(rect)) else None
+                visible = bool(self.desk.visible(bar))
+                sample = {"hwnd": hex(bar), "visible": visible, "rect": bounds}
+                observations.setdefault("first", sample)
+                observations["last"] = sample
+                if visible and bounds and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+                    return bar
             time.sleep(.12)
-        else:
-            record["shellWindowAfterAttempt"] = self.desk.window(self.desk.shell())
-            raise Unavailable("Explorer did not create Shell_TrayWnd on the explicitly selected private desktop")
+        record["shellWindowAfterAttempt"] = self.desk.window(self.desk.shell())
+        raise Unavailable("Explorer did not present a visible taskbar with nonempty bounds on the private desktop")
+
+    @contextmanager
+    def shell_owner(self, job, record):
+        bar = self.wait_for_taskbar(record)
         window = self.desk.window(bar)
         pid = window["pid"]
         window.update(session=self.desk.pid_session(pid), threadDesktop=self.desk.name(self.desk.thread_desktop(window["tid"])))
@@ -223,9 +233,12 @@ class Native:
         d = self.desk
         actual = w.DWORD()
         tid = d.owner(bar, c.byref(actual))
-        if (self.find(BAR, None) != bar or not d.visible(bar) or actual.value != pid
-                or not tid or d.name(d.thread_desktop(tid)) != self.name):
-            raise Unavailable("The pinned private Explorer no longer owns a visible taskbar")
+        same_window = self.find(BAR, None) == bar
+        visible = bool(d.visible(bar))
+        same_desktop = bool(tid) and d.name(d.thread_desktop(tid)) == self.name
+        if not (same_window and visible and actual.value == pid and same_desktop):
+            raise Unavailable(f"Private taskbar changed: same HWND={same_window}, visible={visible}, "
+                              f"same PID={actual.value == pid}, same desktop={same_desktop}")
 
     def visible_owners(self, job, subject, record):
         self.require_desktop()
