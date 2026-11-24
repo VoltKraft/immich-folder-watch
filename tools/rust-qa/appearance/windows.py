@@ -1,7 +1,7 @@
 """Observe live Windows contrast colors on the ordinary Rust filename label."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack
 import ctypes as c
 from ctypes import wintypes as w
 import os
@@ -26,7 +26,6 @@ from windows_observer import private_gui_environment, private_profile, select_po
 from worker import hosted, named_desktop, powershell
 
 TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
-SESSION = runpy.run_path(str(QA / "windows-desktop/session.py"))
 
 
 def job_guard():
@@ -97,8 +96,8 @@ def require_live_window(api, session, name, pid, hwnd):
 
 
 def on_subject_desktop(api, name, cycle):
-    if same_name(name, "Default"):
-        return cycle()
+    if not named_desktop(name):
+        raise ValueError("The contrast publisher requires the test-owned input desktop")
     handle = check(api.open_named(name, 0, False, READ_OBJECTS), "OpenDesktopW(contrast publisher)")
     try:
         def publish():
@@ -128,7 +127,7 @@ def exercise(api, context, pid, hwnd, env, ps, output, report):
     if (setup["session"] != context["session"] or setup["source"] != report["build"]["source"]
             or setup["target"] != report["target"] or setup["run"] != os.environ["GITHUB_RUN_ID"]
             or setup["attempt"] != os.environ["GITHUB_RUN_ATTEMPT"]
-            or (not same_name(name, "Default") and not named_desktop(name))):
+            or not named_desktop(name)):
         raise ValueError("The capture worker does not belong to its contrast supervisor")
     def window_guard():
         require_live_window(api, context["session"], name, pid, hwnd)
@@ -158,10 +157,20 @@ def exercise(api, context, pid, hwnd, env, ps, output, report):
 def inputs(folder):
     files = [*TEXT["observer_paths"](), Path(__file__).resolve(), HERE / "windows_colors.py",
              HERE / "windows-label.ps1", HERE / "test_windows_colors.py", QA / "windows-services/service_sources.py",
-             QA / "windows-performance/native.py", QA / "windows-desktop/session.py", ROOT / ".gitattributes"]
+             QA / "windows-performance/native.py", ROOT / ".gitattributes"]
     files += [ROOT / name for name in TEXT["read"](folder / "build.json")["compilerSources"]]
     verify = runpy.run_path(str(QA / "windows-services/service_sources.py"))["verify_checkout"]
     return verify(ROOT, files, os.environ["GITHUB_SHA"])
+
+
+def capture_profile(output):
+    name = TEXT["read"](output / "control/session.json")["profile"]
+    if not isinstance(name, str) or not re.fullmatch(r"profile-[a-zA-Z0-9_-]+", name):
+        raise ValueError("The capture worker needs the supervisor's private profile")
+    path = output.resolve(strict=True) / name
+    if path.resolve(strict=True) != path or not path.is_dir():
+        raise ValueError("The capture profile must be the supervisor's original directory")
+    return path
 
 
 def capture_worker(target, folder, output):
@@ -173,14 +182,12 @@ def capture_worker(target, folder, output):
             stack.enter_context(pin_path(Win32(), binary, False))
             report["build"] = TEXT["check_build"](target, binary, folder)
             report["inputs"] = inputs(folder)
-            profile = stack.enter_context(private_profile(output, "profile-", report))
+            profile = capture_profile(output)
             env = private_gui_environment(profile)
             ps, report["observerHosts"] = select_powershell(profile, "accessibility", env=env)
             if not ps:
                 raise RuntimeError("The native UI Automation observer could not start")
             TEXT["observe"](binary, output, env, ps, report, exercise=exercise)
-        if not report["profileRemoved"]:
-            raise RuntimeError("The private Windows capture profile remains")
         report["status"] = "passed"
     except Exception:
         report["error"] = traceback.format_exc()
@@ -203,13 +210,12 @@ def supervise(target, folder, output):
         if not ordinary_console(context, "Default"):
             raise RuntimeError("Start the contrast supervisor on the active unlocked disposable runner")
         session = context["session"]
-        announce(control, "session", token, session=session, source=report["source"], target=target,
-                 run=report["run"], attempt=report["attempt"])
         placement = report["placement"] = {}
-        obstruction = SESSION["placement"](folder, TEXT["read"](folder / "build.json"), context, placement)
-        placement["obstruction"] = obstruction
-        selected = TEXT["DESKTOP"]["named_input_desktop"](desk, placement) if obstruction else nullcontext("Default")
-        with selected as desktop, ThreadPoolExecutor(max_workers=1) as pool, ExitStack() as stack:
+        selected = TEXT["DESKTOP"]["named_input_desktop"](desk, placement)
+        with (private_profile(output, "profile-", report) as profile, selected as desktop,
+              ThreadPoolExecutor(max_workers=1) as pool, ExitStack() as stack):
+            announce(control, "session", token, session=session, source=report["source"], target=target,
+                     run=report["run"], attempt=report["attempt"], profile=profile.name)
             job = report["captureJob"] = {}
             placement["selected"] = desktop
             worker = pool.submit(capture_job, target, desktop, job)
@@ -252,7 +258,7 @@ def supervise(target, folder, output):
                 announce(control, "stop", token)
         child = TEXT["read"](output / "worker.json")
         if (worker.result() or not job.get("jobClosed") or child.get("status") != "passed"
-                or not child.get("drained") or not child.get("profileRemoved") or not report["restoreVerified"]):
+                or not child.get("drained") or not report["profileRemoved"] or not report["restoreVerified"]):
             raise RuntimeError("The native capture, system restoration or process cleanup is unconfirmed")
         report["status"] = "passed"
     except Exception:

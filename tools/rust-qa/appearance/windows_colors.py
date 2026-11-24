@@ -31,21 +31,16 @@ class State:
 class SystemColors:
     def __init__(self, bind, check):
         user = c.WinDLL("user32", use_last_error=True)
-        kernel = c.WinDLL("kernel32", use_last_error=True)
         self.parameters = bind(user, "SystemParametersInfoW", c.c_int, c.c_uint32, c.c_uint32,
                                c.POINTER(HighContrast), c.c_uint32)
         self.color = bind(user, "GetSysColor", c.c_uint32, c.c_int)
-        self.free = bind(kernel, "LocalFree", c.c_void_p, c.c_void_p)
         self.check = check
 
     def read(self):
         value = HighContrast(c.sizeof(HighContrast), 0, None)
         self.check(self.parameters(0x42, value.size, c.byref(value), 0), "SPI_GETHIGHCONTRAST")
-        try:
-            scheme = c.wstring_at(value.scheme) if value.scheme else None
-        finally:
-            if value.scheme and self.free(value.scheme):
-                raise OSError("Could not release the Windows high contrast scheme name")
+        # User32 retains the string across calls. Keep an independent snapshot.
+        scheme = c.wstring_at(value.scheme) if value.scheme else None
         colors = {}
         for role, index in COLOR_INDEX.items():
             colorref = self.color(index)

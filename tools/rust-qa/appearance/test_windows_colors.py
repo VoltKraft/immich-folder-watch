@@ -1,6 +1,8 @@
 """Test the native fixture's rollback and independent bitmap checks using synthetic observations."""
 from dataclasses import replace
 from concurrent.futures import Future
+from contextlib import contextmanager
+import ctypes as c
 import hashlib
 from pathlib import Path
 import runpy
@@ -11,7 +13,7 @@ from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 observer = runpy.run_path(str(HERE / "windows.py"))
-from windows_colors import AVAILABLE, ON, State, contrast_cycle, label_bitmap, label_colors
+from windows_colors import AVAILABLE, ON, HighContrast, State, SystemColors, contrast_cycle, label_bitmap, label_colors
 
 
 BASE = State(AVAILABLE | 4, "original scheme", {"window": [248, 248, 248], "text": [0, 0, 0]})
@@ -58,6 +60,59 @@ def bitmap(foreground, paper):
 
 
 class WindowsContrastTests(unittest.TestCase):
+    def test_repeated_reads_copy_the_name_from_user32_owned_storage(self):
+        scheme = c.create_unicode_buffer(32)
+        def parameters(action, size, pointer, flags):
+            self.assertEqual((action, size, flags), (0x42, c.sizeof(HighContrast), 0))
+            value = c.cast(pointer, c.POINTER(HighContrast)).contents
+            value.flags, value.scheme = AVAILABLE, c.addressof(scheme)
+            return 1
+        exports = {"SystemParametersInfoW": parameters, "GetSysColor": lambda _: 0x20c3d5}
+        with patch.object(c, "WinDLL", create=True):
+            system = SystemColors(lambda library, name, *args: exports[name], self.assertTrue)
+        observations = []
+        for name in ("", "Contrast A", "Contrast B"):
+            scheme.value = name
+            observations.append(system.read())
+        self.assertEqual([s.scheme for s in observations], ["", "Contrast A", "Contrast B"])
+        self.assertEqual(observations[-1].colors["text"], [213, 195, 32])
+
+    def test_supervisor_owns_the_profile_across_an_abrupt_capture_exit(self):
+        target = "x86_64-pc-windows-msvc"
+        name = "IfwQa_" + "a" * 32
+        released = []
+        @contextmanager
+        def selected(desk, placement):
+            try:
+                yield name
+            finally:
+                released.append(name)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "windows-contrast"
+            def early_exit(actual, desktop, receipt):
+                self.assertEqual((actual, desktop), (target, name))
+                profile = observer["capture_profile"](output)
+                (profile / "observer-cache").write_text("synthetic")
+                receipt.update(workerExit=91, jobClosed=True)
+                return 91
+            supervise = observer["supervise"]
+            api = Mock()
+            api.context.return_value = {"session": 2}
+            with (patch.dict(supervise.__globals__, Desktop=lambda: api, Win32=Mock, job_guard=lambda: None,
+                             ordinary_console=lambda ctx, desk: True, inputs=lambda _: {}, capture_job=early_exit),
+                  patch.dict(observer["TEXT"]["DESKTOP"], named_input_desktop=selected),
+                  patch.dict("os.environ", GITHUB_SHA="a"*40, GITHUB_RUN_ID="7", GITHUB_RUN_ATTEMPT="1"),
+                  patch("builtins.print")):
+                self.assertEqual(supervise(target, root, output), 1)
+            record = observer["TEXT"]["read"](output / "result.json")
+            self.assertTrue(record["profileRemoved"])
+            self.assertTrue(record["captureJob"]["jobClosed"])
+            self.assertIn("ended with 91 before ready", record["error"])
+            self.assertNotIn("original", record)
+            self.assertEqual(list(output.glob("profile-*")), [])
+            self.assertEqual(released, [name])
+
     def test_observes_both_modes_and_restores_each_initial_state(self):
         for initial in (BASE, HIGH):
             with self.subTest(initial=initial.enabled):

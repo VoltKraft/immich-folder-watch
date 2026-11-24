@@ -35,7 +35,7 @@ pub use native::{attach, current};
 mod native {
     use super::{Palette, changed_visible, rgb};
     use std::cell::Cell;
-    use windows::Win32::Foundation::{HLOCAL, HWND, LPARAM, LRESULT, LocalFree, WPARAM};
+    use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::Graphics::Gdi::{
         COLOR_BTNFACE, COLOR_BTNTEXT, COLOR_GRAYTEXT, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT,
         COLOR_HOTLIGHT, COLOR_WINDOW, COLOR_WINDOWTEXT, GetSysColor, InvalidateRect,
@@ -58,7 +58,7 @@ mod native {
             cbSize: size_of::<HIGHCONTRASTW>() as u32,
             ..Default::default()
         };
-        // User32 fills this exact structure. It allocates the optional default scheme name.
+        // User32 owns the returned scheme pointer. We only consume the contrast flags.
         unsafe {
             SystemParametersInfoW(
                 SPI_GETHIGHCONTRAST,
@@ -66,13 +66,6 @@ mod native {
                 Some((&raw mut contrast).cast()),
                 SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
             )?;
-            if !contrast.lpszDefaultScheme.is_null()
-                && !LocalFree(Some(HLOCAL(contrast.lpszDefaultScheme.0.cast())))
-                    .0
-                    .is_null()
-            {
-                return Err(windows::core::Error::from_thread());
-            }
             Ok(contrast
                 .dwFlags
                 .contains(HCF_HIGHCONTRASTON)

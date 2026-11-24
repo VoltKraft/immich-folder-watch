@@ -101,10 +101,12 @@ label's physical crop before and after each capture. Two stable bitmap
 samples from that label are retained in each mode.
 
 The supervisor records the original flags, scheme name and eight system
-colors. A separate bounded worker opens the window, reads the session
-palette and captures its label. The supervisor owns both setting changes
-and any temporary desktop switch. It broadcasts from the subject's input
-desktop and opens the native executable and process by handle.
+colors. It creates a private input desktop and a synthetic profile. A
+separate bounded worker opens the window there, reads the session palette
+and captures its label. The supervisor owns both setting changes, restores
+the input desktop and removes the profile after the worker's job closes.
+It broadcasts from the subject's desktop and opens the native executable
+and process by handle.
 It requests an in-session contrast change and broadcast, then restores the
 original mode even if the capture worker fails. It verifies the original
 flags, scheme and colors through Win32. For a successful observation,
@@ -116,3 +118,42 @@ ordered pixels so a header or row-padding change cannot count as a visible
 change. Native results belong to
 `artifacts/rust/gui-native/<target>/windows-contrast/` in the desktop archive.
 [Observer and measurements](../../tools/rust-qa/appearance/windows.py) · [Win32 setting and rollback](../../tools/rust-qa/appearance/windows_colors.py) · [HIGHCONTRASTW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-highcontrastw) · [SystemParametersInfoW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow).
+
+### Native baseline and scheme ownership at e796d30
+
+Four native trials at `a1011bf` and `e796d30` stopped during the ordinary
+appearance baseline. Each supervisor read flags `0x7e`, an empty scheme
+name and eight colors. Each original result matched its Actions ZIP digest,
+its GUI compiler receipt and all 54 source inputs from the corresponding
+Git revision. None reached the first request to change the Windows setting.
+
+| Revision | Windows x64 archive | Windows ARM64 archive |
+| --- | --- | --- |
+| [a1011bf run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212) | [14869362811](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212/artifacts/14869362811) | [14870570105](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212/artifacts/14870570105) |
+| [e796d30 run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266) | [14874798632](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632) | [14873982830](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830) |
+
+Both x64 windows rendered the same 66 × 18 pixel filename label. In all
+four BMPs, 857 of the 1,188 pixels had RGB (248, 248, 248). The raster
+SHA-256 was `60b0c5288a6f7e28c00e0d1b1c59fe2b6395c57c6b1aff2946118000eddda8b1`.
+Each capture process then exited with Windows status `0xc0000374` (heap
+corruption). Its job closed and the synthetic PowerShell cache remained
+in the worker's profile. On ARM64, Windows denied the original foreground
+request on the default desktop both times. UI Automation found the label,
+both guards refused to capture its pixels, and each subject drained and
+removed its synthetic profile. Detached readback of all four archives is
+in `artifacts/rust/hosted-appearance/readback.json`, SHA-256
+`9f09896e8d17cf585d7554858784ae37fc5c899c6e043080dfd9937ade998b20`.
+
+The Rust adapter and the Python observer both called `LocalFree` on the
+scheme pointer from `SPI_GETHIGHCONTRAST`. Microsoft's Windows Forms
+implementation documents that Windows retains this pointer across calls.
+The adapter now reads only the flags. The observer copies the scheme into
+its own string before its next call. The original crash reports contain
+the exit status but no stack identifying a particular free. Native
+high-contrast pixels and the restored label on both architectures remain
+open until the corrected trial completes. [Windows Forms implementation](https://source.dot.net/System.Private.Windows.Core/Windows/Win32/PInvokeCore.SystemParametersInfo.cs.html)
+
+Twenty portable observer tests passed, including repeated reads from
+borrowed storage and profile cleanup after an abrupt child exit. Frozen
+Clippy checks with warnings denied passed for the ordinary and retained
+GUI sources under both Windows targets on Linux.
