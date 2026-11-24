@@ -702,6 +702,29 @@ unmodified rebuild and the private backport completed their separate trials.
 [Native x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14863376245)
 · [Stock refusal and grant readback](rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
 
+## Ubuntu native results at e796d30
+
+Both Ubuntu desktops passed all eleven X11 limits. Each Plasma panel
+reopened the original GUI window twice. The icon crops contained 277 and
+259 gold pixels and both adjacent controls contained zero. On each host,
+three two-pass inventories visited the 100 directories and 100,000 test
+files. The table distinguishes actions issued during observed directory
+reads from those that also finished before the last read. On x64 the last
+close in trial three took 0.20 ms and finished just outside that interval.
+
+| Target | Startup / limit (ms) | Scan show p95 / limit (ms) | Scan close p95 / limit (ms) | Issued / finished during reads |
+| --- | ---: | ---: | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14871528168) | 161.01 / 990.384 | 0.86 / 16.00 | 0.32 / 15.48 | 283 / 282 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14871454213) | 212.69 / 1569.96 | 0.92 / 16.281 | 0.36 / 15.58 | 183 / 183 |
+
+The archive SHA-256 values are
+`e247bac15fccb1333b9ce9175b8511e2cf2912fa8eae66cda27145022add80bf`
+(x64) and `b43156955950ebd02981eb0dc00b99cd69e66c2ec276b703a76b5e158bf6e11e`
+(ARM64). The local readback at
+`artifacts/rust/hosted-desktop-storage/45271221266/linux-desktop-readback.json`
+has SHA-256 `dab6076ea382ae273c5bafc52bfce028e0562886ebc33204c5133bf75bc9aa3d`.
+[Directory grant results](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

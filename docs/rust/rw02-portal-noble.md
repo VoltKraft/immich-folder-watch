@@ -359,6 +359,28 @@ The `amd64-w9i6r7vr` result SHA-256 is
 `7f7be799c7cf3163fc2634ff17d0350715a706fe7fd64d143318da30a5af59dd`.
 [Original native x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236/artifacts/14863376245).
 
+### Native Ubuntu grant replay at e796d30
+
+Both hosted Noble architectures completed the revised descriptor trial.
+Each ran 32 operations with the distribution package, 32 with the
+pristine rebuild and 46 with the private backport. On each host the
+first two services returned errno 38 on all seventeen grant lock attempts
+apiece. The patched service acquired the file, refused the read while the
+writer held it and reacquired the same file identity after release. Each
+of the three grants was revoked and its original contents survived.
+
+For each architecture, direct archive readback matched the eleven observer
+and five Rust filesystem sources to Git, all three observation and input
+digests, six permission replies and twelve detached directory labels. Each
+walk through the reader's original grant returned the same directory pair
+as the independent named lookup, including mount IDs. This completes the
+hosted x64 recheck of the observer that previously stopped at operation 31.
+
+| Native archive | Portal result SHA-256 |
+| --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14871528168) | `54ff811b9d8928ae1919caaf02983b96bef0a36a99d7105a91108daea65ffd8c` |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14871454213) | `00a93228ea9e81297fc5a4451e1c41b0cf71143d12a2fd548ad0e8da5b0a32e5` |
+
 ### Walking the album through the reader's original grant
 
 Noble's Documents implementation queues invalidation of a physical

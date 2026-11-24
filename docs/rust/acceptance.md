@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-6084b23), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-6084b23) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-descriptor-replay-at-6084b23) include the x64 stock-observer stop. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-6084b23), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-e796d30) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -117,6 +117,14 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 · [C# reference jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264125).
 
 ## Native evidence matrix
+
+At `e796d30` the Ubuntu desktops each met all eleven X11 limits and
+completed all three portal service comparisons. The Windows desktop jobs
+failed. On both hosts the new keyboard-launch trial stopped before its
+secondary process started and WinRT stopped before showing a notification.
+The separate four-target feasibility jobs passed.
+[Ubuntu comparisons](rw02-native-gui.md#ubuntu-native-results-at-e796d30) ·
+[Desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266).
 
 On November 23, one offline Ubuntu x64 guest passed the installed
 Documents package upgrade and downgrade with the same ordinary Flatpak

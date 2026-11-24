@@ -1,5 +1,22 @@
 # Project Status
 
+## Native desktop and feasibility checks at e796d30 (2026-11-24)
+
+All four native feasibility jobs, the compatibility reference, CI and
+CodeQL passed. Both Ubuntu desktop jobs also passed. Each met all eleven
+X11 resource limits, reopened the original window twice from Plasma and
+completed 110 Documents operations. On Windows both desktop jobs failed.
+The x64 process terminated with heap corruption during a graphics check.
+On both architectures the history senders created the WinRT notifier but
+its `Setting` lookup returned `0x80070490` before delivery. The dedicated
+keyboard trial lost its primary process before the second launch.
+RW-02 remains open. Verify Windows again after correcting the lifetime of
+the system-provided contrast scheme pointer.
+[Ubuntu timings](rust/rw02-native-gui.md#ubuntu-native-results-at-e796d30) ·
+[Documents evidence](rust/rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) ·
+[Four native feasibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221926) ·
+[Desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266).
+
 ## Four desktop jobs at 6084b23 (2026-11-23)
 
 Native Ubuntu x64/ARM64 and the retained Windows ARM64 Mailbox GUI met
