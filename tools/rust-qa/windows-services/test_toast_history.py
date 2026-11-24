@@ -1,5 +1,5 @@
 """Regression controls for inbox notification history, selective removal and archived readback."""
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 import json
 import os
@@ -7,10 +7,11 @@ from pathlib import Path, PureWindowsPath
 import sys
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 from uuid import UUID
 
 import toast_history as h
+import toast_display_name as registration
 
 TOKEN = "1234567890ab4def9123456789abcdef"
 TARGET = "x86_64-pc-windows-msvc"
@@ -111,6 +112,152 @@ def trial(flags=None, directory=None):
 
 
 class ToastHistoryTests(unittest.TestCase):
+    def test_compare_display_name_only_for_two_absent_settings_before_show(self):
+        for phase, code, should_register in (("notifier-setting", h.NOT_FOUND, True),
+                                            ("notifier-create", h.NOT_FOUND, False),
+                                            ("notifier-setting", -2147024891, False)):
+            with self.subTest(phase=phase, code=code):
+                state, report, windows, operations = set(), {}, [], []
+
+                @contextmanager
+                def register():
+                    windows.append("installed")
+                    try:
+                        yield
+                    finally:
+                        windows.append("removed")
+
+                def call(op):
+                    operations.append(op)
+                    if op.startswith("post-") and not windows:
+                        return dict(fields={}, phases=["identity", "shortcut", phase], hresult=code)
+                    return item(op, state, {})
+
+                if should_register:
+                    self.assertEqual(h.assess_registration(call, TOKEN, report, register), "passed")
+                    self.assertEqual(windows, ["installed", "removed"])
+                    self.assertTrue(report["shortcutOnly"]["finallyEmpty"])
+                    self.assertEqual(operations[:4], ["inspect", "post-quiet", "post-normal", "inspect"])
+                    self.assertEqual(report["cleanup"], {"normal": ["quiet"], "quiet": []})
+                else:
+                    with self.assertRaises(h.Unavailable):
+                        h.assess_registration(call, TOKEN, report, register)
+                    self.assertEqual(windows, [])
+                    self.assertTrue(report["finallyEmpty"])
+
+    def test_only_new_registry_handles_are_cleaned_up_after_a_sender_failure(self):
+        api = Mock()
+        api.reg.KEY_READ, api.reg.KEY_SET_VALUE = 1, 2
+        api.create.return_value = (1001, 2)
+        record = {}
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            with registration.new_identity(api, 1000, "test-identity", record):
+                self.fail("The existing identity must remain untouched")
+        api.delete_empty.assert_not_called()
+        api.reg.CloseKey.assert_called_once_with(1001)
+        self.assertEqual(record["leafDisposition"], 2)
+        api.create.return_value = (1002, 1)
+        with self.assertRaisesRegex(RuntimeError, "sender"):
+            with registration.new_identity(api, 1000, "test-identity", record):
+                raise RuntimeError("sender")
+        api.delete_empty.assert_called_once_with(1002)
+        api.reg.CloseKey.assert_called_with(1002)
+
+    def test_registry_parent_is_only_opened_and_cleanup_uses_the_original_leaf(self):
+        api = Mock()
+        reg = api.reg
+        reg.HKEY_CURRENT_USER, reg.KEY_READ, reg.KEY_CREATE_SUB_KEY, reg.KEY_SET_VALUE, reg.REG_SZ = 99, 1, 4, 2, 1
+        aumid = registration.identity(TOKEN)
+        reg.OpenKey.side_effect = [nullcontext(71), nullcontext(73), FileNotFoundError()]
+        api.create.return_value = (72, 1)
+        reg.QueryInfoKey.return_value = (0, 1, 0)
+        reg.QueryValueEx.return_value = (h.DISPLAY + TOKEN, reg.REG_SZ)
+        receipt = {}
+        with registration.display_name(TOKEN, receipt, api=api):
+            self.assertTrue(receipt["readback"])
+        self.assertEqual(reg.OpenKey.call_args_list, [
+            call(99, h.PARENT, 0, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY),
+            call(71, aumid, 0, reg.KEY_READ), call(71, aumid, 0, reg.KEY_READ)])
+        api.create.assert_called_once_with(71, aumid, reg.KEY_READ | reg.KEY_SET_VALUE | registration.DELETE)
+        api.delete_empty.assert_called_once_with(72)
+        reg.DeleteValue.assert_called_once_with(72, "DisplayName")
+        self.assertTrue(receipt["leafRemoved"])
+
+    def test_collision_precheck_and_missing_parent_make_no_registry_changes(self):
+        api = Mock()
+        reg = api.reg
+        reg.HKEY_CURRENT_USER, reg.KEY_READ, reg.KEY_CREATE_SUB_KEY = 99, 1, 4
+        reg.OpenKey.side_effect = [nullcontext(70), FileNotFoundError(), FileNotFoundError()]
+        self.assertFalse(registration.identity_absent(TOKEN, reg))
+        self.assertTrue(registration.identity_absent(TOKEN, reg))
+        receipt = {}
+        with self.assertRaisesRegex(registration.MissingNamespace, "is absent"):
+            with registration.display_name(TOKEN, receipt, api=api):
+                self.fail("A missing Windows namespace must not start any registered exchange")
+        self.assertEqual(receipt["parent"], h.PARENT)
+        self.assertFalse(receipt["parentOpened"])
+        self.assertNotIn("leafDisposition", receipt)
+        self.assertEqual(reg.OpenKey.call_args_list, [
+            call(99, h.PARENT + "\\" + registration.identity(TOKEN), 0, reg.KEY_READ)] * 2 +
+            [call(99, h.PARENT, 0, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY)])
+        api.create.assert_not_called()
+        api.delete_empty.assert_not_called()
+        reg.SetValueEx.assert_not_called()
+
+    def test_replay_requires_the_original_shortcut_only_processes_and_registry_cleanup(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            run, report = trial(directory=directory)
+            run()
+            build_path = directory / "native-build.json"
+            build = json.loads(build_path.read_bytes())
+            build["sourceFiles"][h.DISPLAY_NAME_SOURCE] = "b"*64
+            h.write(build_path, build)
+            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(build_path), registryIdentityInitiallyAbsent=True)
+            procs = report["processes"]
+            for i in reversed(range(2, len(procs))):
+                proc = procs[i]
+                new = f"{i + 4:03}-{proc['operation']}.txt"
+                (directory / proc["log"]).rename(directory / new)
+                proc["log"] = new
+            first = []
+            for index, op in enumerate(("inspect", "post-quiet", "post-normal", "inspect"), 2):
+                pid, name = 5000 + index, f"{index:03}-{op}.txt"
+                log = (f"operation={op}\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid={pid}\n"
+                       "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n")
+                refused = op.startswith("post-")
+                if refused:
+                    log += ("phase=notifier-create\nready.1.create=0\nphase=notifier-setting\n"
+                            f"ready.1.setting={h.NOT_FOUND}\nProbe HRESULT {h.NOT_FOUND}\n")
+                else:
+                    log += "phase=history\ncount=0\n"
+                (directory / name).write_bytes(log.encode())
+                proc = dict(operation=op, pid=pid, exit=int(refused), jobEmpty=True, machine=[0x8664, 0x8664],
+                            creation100ns=50000 + index, log=name, logSha256=h.sha(directory / name))
+                if refused:
+                    proc["notifierReadiness"] = [{"create": 0, "setting": h.NOT_FOUND}]
+                first.append(proc)
+            procs[2:2] = first
+            report["shortcutOnly"] = dict(initiallyEmpty=True, finallyEmpty=True, cleanup={},
+                                          modes={m: {"platformError": f"post-{m} returned HRESULT 0x80070490 during notifier-setting"}
+                                                 for m in ("quiet", "normal")})
+            receipt = dict(startProcess=6, endProcess=len(procs), aumid="IFW.RustQA.Toast." + TOKEN,
+                           displayName=h.DISPLAY + TOKEN, view="native", leafDisposition=1,
+                           parent=h.PARENT, parentOpened=True, readback=True, leafRemoved=True)
+            path = directory / "display-name.json"
+            for override in ({}, {"startProcess": 5}, {"endProcess": 7}, {"leafDisposition": 2},
+                             {"leafRemoved": False}, {"parentOpened": False}, {"parent": "other"}):
+                h.write(path, {**receipt, **override})
+                report["evidenceFiles"] = h.evidence_files(directory)
+                if not override:
+                    self.assertTrue(h.replay(directory, report)["finallyEmpty"])
+                else:
+                    with self.subTest(override=override), self.assertRaisesRegex(ValueError, "registration"):
+                        h.replay(directory, report)
+            report["registryIdentityInitiallyAbsent"] = False
+            with self.assertRaisesRegex(ValueError, "collision check"):
+                h.replay(directory, report)
+
     def test_prepare_uses_its_own_profile_marker_and_the_original_default_desktop_launcher(self):
         for arch, (target, machine) in h.TARGET.items():
             with self.subTest(target=target):
@@ -139,13 +286,20 @@ class ToastHistoryTests(unittest.TestCase):
               patch.object(h.uuid, "uuid4", return_value=UUID(hex=TOKEN)), patch.object(probe, "Win32", return_value=api),
               patch.object(probe, "Desktop", return_value=Mock(context=Mock(return_value=DESKTOP))),
               patch.object(build, "pe_machine", return_value=machine),
+              patch.object(h, "identity_absent", side_effect=[False, True]) as absent,
               patch.object(probe, "pin_path", return_value=nullcontext()) as image_pin,
               patch.object(probe, "fixture_profile", return_value=nullcontext(area)) as profile,
               patch.object(probe, "pin_new_marker") as marker, patch.dict(sys.modules, msvcrt=Mock()),
               patch.object(probe, "start", wraps=named_process.start) as start,
               patch.object(named_process, "Kernel", side_effect=ReachedNativeLaunch) as kernel):
+            collision = {}
+            with self.assertRaisesRegex(ValueError, "identity already exists"):
+                h.measure(target, exe, Path(temporary), collision)
+            self.assertFalse(collision["registryIdentityInitiallyAbsent"])
+            start.assert_not_called()
             with self.assertRaises(ReachedNativeLaunch):
                 h.measure(target, exe, Path(temporary), record)
+        self.assertEqual(absent.call_args_list, [call(TOKEN), call(TOKEN)])
         profile.assert_called_once_with(api, Path(str(root)), TOKEN, record)
         image_pin.assert_called_once_with(api, exe, False)
         self.assertEqual(marker.call_args.args[1:], (api, area / "synthetic.fixture", TOKEN))

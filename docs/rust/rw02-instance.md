@@ -452,3 +452,19 @@ python -B tools/rust-qa/windows-launcher/input_launch.py $env:NATIVE_TARGET
 
 [Keyboard trial](../../tools/rust-qa/windows-launcher/input_launch.py)
 · [Native input and handler](../../tools/rust-qa/windows-launcher/input_gesture.py).
+
+### Named input desktop at e796d30
+
+On Windows x64 and ARM64 the retained GUI started in session 2 on the
+fixture's own input desktop. Both primary processes exposed their original
+window, selected the DX12 Microsoft Basic Render Driver, presented with
+Mailbox at one-frame latency and logged both empty inventory passes. Before
+the observer could request close, the x64 primary exited with
+`0xC0000005` and the ARM64 primary with `0xC000041D`. Neither trial
+reached the keystroke or started a secondary process. Each supervisor closed
+its worker job, removed its synthetic profile and restored the original Default
+desktop. The original archives identify the exit codes and stage. They contain
+no faulting module or stack. Detached readback matched all 17 observer inputs
+and the ordinary-launcher receipt for each architecture. Its SHA-256 is
+`99280ab4b7c80853d75e35243070f5275523ced8fa6b03ee5c1f1a68b7d89e34`.
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830).

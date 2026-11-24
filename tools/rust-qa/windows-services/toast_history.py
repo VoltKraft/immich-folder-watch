@@ -1,7 +1,7 @@
 """Observe two inbox WinRT toasts using only this disposable job's unique app identity."""
 
 import argparse
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import hashlib
 import json
 import os
@@ -13,12 +13,14 @@ import uuid
 
 from activation import ART, HERE, QA, ROOT, TARGET, hosted, module, paths, sha, write
 from service_sources import service_files, verify_checkout
+from toast_display_name import DISPLAY, PARENT, MissingNamespace, display_name, identity_absent
 
 LINK = "IFW synthetic notification.lnk"
 PROGRAMS = "a77f5d77-2e2b-44c3-a6a2-aba601054a51"
 OPERATIONS = {"prepare", "register", "inspect", "post-quiet", "post-normal", "remove-quiet", "remove-normal"}
 HISTORY_PHASES = ["identity", "shortcut", "history"]
 READINESS_SOURCE = "tools/rust-qa/windows-services/src/toast_readiness.rs"
+DISPLAY_NAME_SOURCE = "tools/rust-qa/windows-services/toast_display_name.py"
 NOT_FOUND = 0x80070490 - (1 << 32)
 MAX_NOTIFIER_ATTEMPTS = 17
 REQUIRED_IMPORTS = {"RoInitialize", "RoUninitialize", "InitPropVariantFromCLSID", "SetCurrentProcessExplicitAppUserModelID",
@@ -266,6 +268,29 @@ def validate_imports(imports):
         raise ValueError("Native executable lacks the reviewed Windows notification or identity calls")
 
 
+def assess_registration(call, token, record, register, *, delay=time.sleep, clock=time.monotonic):
+    """Compare the display-name registration only after both shortcut-only senders stopped before Show."""
+    shortcut = {}
+    try:
+        status = exchange(call, token, shortcut, delay=delay, clock=clock)
+    except Unavailable:
+        missing = {mode: {"platformError": f"post-{mode} returned HRESULT 0x80070490 during notifier-setting"}
+                   for mode in ("quiet", "normal")}
+        if (shortcut.get("modes") != missing or shortcut.get("initiallyEmpty") is not True
+                or shortcut.get("finallyEmpty") is not True or shortcut.get("cleanup") != {}):
+            record.update(shortcut)
+            raise
+    except Exception:
+        record.update(shortcut)
+        raise
+    else:
+        record.update(shortcut)
+        return status
+    record["shortcutOnly"] = shortcut
+    with register():
+        return exchange(call, token, record, delay=delay, clock=clock)
+
+
 def evidence_files(directory):
     return {p.name: sha(p) for p in sorted(directory.iterdir()) if p.name != "result.json" and p.is_file()}
 
@@ -279,6 +304,8 @@ def replay(directory, result):
     if not 10 <= len(journal) <= 150 or any(proc["operation"] not in OPERATIONS for proc in journal):
         raise ValueError("Invalid operation journal")
     required = {"native-build.json", "pe-imports.json", "shortcut.bin", "desktop.json"}
+    if "shortcutOnly" in result:
+        required.add("display-name.json")
     required.update(f"{i:03}-{proc['operation']}.txt" for i, proc in enumerate(journal))
     files = [p for p in directory.iterdir() if p.name != "result.json"]
     if ({p.name for p in files} != required or set(result["evidenceFiles"]) != required
@@ -290,6 +317,8 @@ def replay(directory, result):
     required_checks = ["compiler", "inventory", "clippy", "build", "toast-controls"]
     if READINESS_SOURCE in build["sourceFiles"]:
         required_checks.append("notifier-readiness")
+    if DISPLAY_NAME_SOURCE in build["sourceFiles"] and result.get("registryIdentityInitiallyAbsent") is not True:
+        raise ValueError("Missing the pre-registration notification identity collision check")
     if (sha(native_report) != result["earlyResultSha256"] or build["hosted"] is not True
             or not re.fullmatch("[0-9a-f]{64}", result["binarySha256"])
             or (build["head"], build["target"], build["workflowRun"], build["workflowAttempt"], build["probeSha256"])
@@ -341,9 +370,25 @@ def replay(directory, result):
         row = archived(operation)
         if row["hresult"] is not None or row["fields"].get(flag) != "true":
             raise ValueError("Missing native shortcut preparation or registration")
+    @contextmanager
+    def registration():
+        if "shortcutOnly" not in result or DISPLAY_NAME_SOURCE not in build["sourceFiles"]:
+            raise ValueError("Missing the native display-name comparison")
+        receipt = json.loads((directory / "display-name.json").read_bytes())
+        if (any(type(receipt.get(k)) is not int for k in ("startProcess", "endProcess", "leafDisposition"))
+                or receipt.get("startProcess") != index or receipt.get("aumid") != "IFW.RustQA.Toast." + token
+                or receipt.get("displayName") != DISPLAY + token or receipt.get("view") != "native"
+                or receipt.get("leafDisposition") != 1 or receipt.get("parent") != PARENT
+                or any(receipt.get(key) is not True for key in ("readback", "leafRemoved", "parentOpened"))):
+            raise ValueError("The native notification registration or cleanup differs")
+        yield
+        if receipt.get("endProcess") != index:
+            raise ValueError("The native notification registration did not span the second exchange")
+
     original = {}
-    status = exchange(archived, token, original, delay=lambda _: None, clock=lambda: 0)
+    status = assess_registration(archived, token, original, registration, delay=lambda _: None, clock=lambda: 0)
     if (status != "passed" or index != len(journal)
+            or original.get("shortcutOnly") != result.get("shortcutOnly")
             or any(original[k] != result.get(k) for k in ("initiallyEmpty", "finallyEmpty", "modes", "cleanup"))):
         raise ValueError("The raw native history differs from the reported outcome")
     return original
@@ -364,6 +409,9 @@ def measure(target, exe, out, record):
         raise ValueError("Expected a native observer and native sender")
     token = uuid.uuid4().hex
     record.update(token=token, processes=[], presentationObserved=None, activationObserved=None)
+    record["registryIdentityInitiallyAbsent"] = identity_absent(token)
+    if not record["registryIdentityInitiallyAbsent"]:
+        raise ValueError("The notification identity already exists before the shortcut-only trial")
     temp = Path(os.environ["RUNNER_TEMP"])
     with ExitStack() as outer:
         outer.enter_context(pin_path(api, exe, False))
@@ -412,7 +460,19 @@ def measure(target, exe, out, record):
                 registered = call("register")
                 if registered["hresult"] is not None or registered["fields"].get("shellNotified") != "true":
                     raise ValueError("Could not announce the owned shortcut to the Shell")
-                return exchange(call, token, record)
+                @contextmanager
+                def registration():
+                    receipt = {"startProcess": len(record["processes"])}
+                    try:
+                        with display_name(token, receipt):
+                            yield
+                    except MissingNamespace as exc:
+                        raise Unavailable(str(exc)) from exc
+                    finally:
+                        receipt["endProcess"] = len(record["processes"])
+                        write(out / "display-name.json", receipt)
+
+                return assess_registration(call, token, record, registration)
         finally:
             record["ownedFolderRemoved"] = record["ownedFolderCreated"] and not os.path.lexists(directory)
             if record["ownedFolderCreated"] and not record["ownedFolderRemoved"]:

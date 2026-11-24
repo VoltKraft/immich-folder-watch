@@ -481,8 +481,29 @@ passed frozen Clippy checks for both Windows targets. Two Rust tests
 exercised the wait and 55 service tests passed locally. The source-bound
 local readback SHA-256 was
 `554c54d034acaafc8ade7280a49cfa5b53599e89e10cc7396da2eb47422e4531`.
-The effect on native delivery requires a new Windows run.
+The next native run identified the failing call on both architectures.
 [Native trial and archive replay](../../tools/rust-qa/windows-services/toast-history.md).
+
+### Native notification setting at e796d30
+
+Four native senders on Windows x64 and ARM64 verified their installed
+shortcut and queried their own notification identity 16 times each.
+All 64 notifier creations succeeded. Every following `Setting` query
+returned `0x80070490`. All four senders ended before `Show`. On each
+host, separate processes read empty history before and after the senders,
+and cleanup removed the shortcut folder and synthetic profile. All twelve
+processes ran elevated on the original Default desktop in session 2.
+Detached readback matched six process logs, the PE import table and
+43 source files on each host against the native build. Its SHA-256 is
+`82e3ce74f5d039817c4acdbac064a3be1ecb2267a68ca2bbebbb0564d65fd607`.
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14875525894) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874246937).
+
+The follow-up trial compares the terminal shortcut-only result with
+a per-user display name for the same notification identity, using the
+same installed shortcut and Rust executable throughout. The Windows
+notification setting, selective history readback and cleanup criteria
+apply after registration. Native results for the comparison are pending.
+[Procedure and ownership](../../tools/rust-qa/windows-services/toast-history.md#per-user-display-name-comparison).
 
 ## Primary GUI and Shell callback
 

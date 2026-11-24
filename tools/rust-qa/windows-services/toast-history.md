@@ -29,12 +29,28 @@ process limit. An enabled setting permits one `Show` per sender. A disabled
 setting ends that sender's trial. Earlier reports preserve their original
 combined `notifier` phase.
 
-For a newly installed test shortcut each sender logs the HRESULT for
-`CreateToastNotifierWithId` and for the notifier's `Setting` query.
-Only `ERROR_NOT_FOUND` from either lookup can trigger another read for
-the same app identity. The sender spaces the reads by 500 ms, with an
-eight-second budget and a maximum of 17 attempts. The process supervisor
-enforces its 25-second limit on a stalled native call. An enabled
-notifier can call `Show` once for its tag. A disabled setting ends the
-send. An access refusal, a presentation error and a cleanup error each
-retain their own native outcomes.
+## Per-user display name comparison
+
+When both shortcut-only senders report `ERROR_NOT_FOUND` specifically from
+the notification setting and an independent final reader still finds zero
+entries, the observer adds one volatile display-name value under
+`HKCU\Software\Classes\AppUserModelId\IFW.RustQA.Toast.<token>`.
+This follows the unpackaged desktop reference's display-name registration.
+The trial retains the same shortcut, stub CLSID, caller, executable and
+tags. It reads the value from a separate handle and runs both senders
+and the independent history readers again. A disabled setting or access
+refusal ends the original trial. Each tag can reach `Show` at most once
+across both runs. [Microsoft's unpackaged desktop registration example](https://github.com/WindowsNotifications/desktop-toasts/blob/master/CPP-WINRT/DesktopToastsCppWinRtApp/DesktopNotificationManagerCompat.cpp)
+
+The recorder keeps the first exchange in `shortcutOnly` and records the
+second exchange's process range in `display-name.json`. Before preparing
+the shortcut it checks that the UUID leaf is absent from the per-user
+registry. Creating the leaf also checks the native creation disposition
+for a collision. The registration opens the existing
+`HKCU\Software\Classes\AppUserModelId` with rights to read and create a
+child. If Windows reports that namespace absent, the receipt identifies
+it and the comparison ends as unavailable. On exit the observer removes
+its display name, deletes the empty UUID leaf by its original handle and
+checks that the name is absent. The shortcut and synthetic profile
+remain pinned throughout both exchanges.
+[User-mode removal by handle](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwdeletekey).
