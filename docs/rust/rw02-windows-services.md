@@ -527,6 +527,23 @@ notification setting, selective history readback and cleanup criteria
 apply after registration. Native results for the comparison are pending.
 [Procedure and ownership](../../tools/rust-qa/windows-services/toast-history.md#per-user-display-name-comparison).
 
+### Fresh Windows user profile at 21e794f
+
+On ARM64 the ordinary and quiet senders each created a notifier 16 times.
+Every query of the notification setting returned `0x80070490`. A separate
+reader found an empty history before and after both senders. Neither sender
+called `Show`. The display-name comparison then stopped because the fresh
+user profile lacked `HKCU\Software\Classes\AppUserModelId`. The observer
+removed its shortcut, owned folder and synthetic profile. In the independent
+classic tray trial Explorer declined to add the icon, so the receiver issued
+no balloon request. [WinRT archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963030294) · [Classic notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14961599872).
+
+The revised hosted comparison can create the missing standard container
+in the existing user's Classes hive. The observer records the disposition
+and removes its own temporary identity by handle. Its 63 local service
+checks passed. Native delivery and visible presentation remain open.
+[Registry scope and reproduction](../../tools/rust-qa/windows-services/toast-history.md#per-user-display-name-comparison).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

@@ -46,11 +46,15 @@ The recorder keeps the first exchange in `shortcutOnly` and records the
 second exchange's process range in `display-name.json`. Before preparing
 the shortcut it checks that the UUID leaf is absent from the per-user
 registry. Creating the leaf also checks the native creation disposition
-for a collision. The registration opens the existing
+for a collision. On the disposable hosted runner, the observer opens
 `HKCU\Software\Classes\AppUserModelId` with rights to read and create a
-child. If Windows reports that namespace absent, the receipt identifies
-it and the comparison ends as unavailable. On exit the observer removes
+child. When the namespace is missing, it opens the current user's existing
+`Software\Classes` and creates the single standard container with ordinary
+registry lifetime. The receipt records whether Windows created it or
+another caller supplied it first. Only the UUID leaf receives a value.
+A newly created shared container remains in the disposable runner profile
+until the VM is discarded. On exit the observer removes
 its display name, deletes the empty UUID leaf by its original handle and
 checks that the name is absent. The shortcut and synthetic profile
 remain pinned throughout both exchanges.
-[User-mode removal by handle](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwdeletekey).
+[Registry creation and dispositions](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regcreatekeyexw) · [User-mode removal by handle](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwdeletekey).

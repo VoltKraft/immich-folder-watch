@@ -4,13 +4,15 @@ import ctypes as c
 from ctypes import wintypes as w
 import re
 
-PARENT = r"Software\Classes\AppUserModelId"
+CLASSES = r"Software\Classes"
+NAMESPACE = "AppUserModelId"
+PARENT = CLASSES + "\\" + NAMESPACE
 DISPLAY = "IFW synthetic notification "
 DELETE = 0x10000
 
 
 class MissingNamespace(Exception):
-    """The original per-user notification registration namespace does not exist."""
+    """The current test user's Classes hive is unavailable."""
 
 
 class NativeKeys:
@@ -25,10 +27,9 @@ class NativeKeys:
         self.delete_key.argtypes = (w.HANDLE,)
         self.delete_key.restype = w.LONG
 
-    def create(self, parent, name, rights):
+    def create(self, parent, name, rights, *, volatile=True):
         handle, disposition = w.HANDLE(), w.DWORD()
-        # REG_OPTION_VOLATILE applies only to the newly created UUID leaf.
-        error = self.create_key(int(parent), name, 0, None, 1, rights, None, c.byref(handle), c.byref(disposition))
+        error = self.create_key(int(parent), name, 0, None, int(volatile), rights, None, c.byref(handle), c.byref(disposition))
         if error:
             raise c.WinError(error)
         return handle.value, disposition.value
@@ -78,18 +79,45 @@ def identity_absent(token, reg=None):
 
 
 @contextmanager
+def notification_namespace(api, record):
+    reg = api.reg
+    rights = reg.KEY_READ | reg.KEY_CREATE_SUB_KEY
+    try:
+        existing = reg.OpenKey(reg.HKEY_CURRENT_USER, PARENT, 0, rights)
+    except FileNotFoundError:
+        pass
+    else:
+        with existing as parent:
+            record.update(parentOpened=True, namespaceAcquisition="opened")
+            yield parent
+        return
+
+    # A fresh hosted user can lack the standard registration namespace. Create only
+    # that container, with ordinary lifetime so other applications can use it.
+    # Neither the container nor any other application's identity belongs to this test.
+    try:
+        classes = reg.OpenKey(reg.HKEY_CURRENT_USER, CLASSES, 0, reg.KEY_CREATE_SUB_KEY)
+    except FileNotFoundError as exc:
+        record["parentOpened"] = False
+        raise MissingNamespace("The current user's registry path HKCU\\" + CLASSES + " is absent") from exc
+    with classes as root:
+        parent, disposition = api.create(root, NAMESPACE, rights, volatile=False)
+    try:
+        if disposition not in (1, 2):
+            raise ValueError("Unknown disposition for the notification namespace")
+        record.update(parentOpened=True, namespaceAcquisition="created" if disposition == 1 else "opened-concurrently")
+        yield parent
+    finally:
+        reg.CloseKey(parent)
+
+
+@contextmanager
 def display_name(token, record, *, api=None):
     name, value = identity(token), DISPLAY + token
     api = api or NativeKeys()
     reg = api.reg
     record.update(aumid=name, displayName=value, view="native", parent=PARENT, leafRemoved=False)
-    try:
-        existing = reg.OpenKey(reg.HKEY_CURRENT_USER, PARENT, 0, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY)
-    except FileNotFoundError as exc:
-        record["parentOpened"] = False
-        raise MissingNamespace("The per-user notification registry namespace HKCU\\" + PARENT + " is absent") from exc
-    record["parentOpened"] = True
-    with existing as parent:
+    with notification_namespace(api, record) as parent:
         try:
             with new_identity(api, parent, name, record) as leaf:
                 try:

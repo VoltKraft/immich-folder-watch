@@ -21,6 +21,8 @@ OPERATIONS = {"prepare", "register", "inspect", "post-quiet", "post-normal", "re
 HISTORY_PHASES = ["identity", "shortcut", "history"]
 READINESS_SOURCE = "tools/rust-qa/windows-services/src/toast_readiness.rs"
 DISPLAY_NAME_SOURCE = "tools/rust-qa/windows-services/toast_display_name.py"
+# This original observer could only open an existing namespace.
+OPEN_ONLY_SOURCE_SHA256 = "3ef83b73b4867be311d3657a86d2e99247cc2495972f826dcd29c9ad52aa80bb"
 NOT_FOUND = 0x80070490 - (1 << 32)
 MAX_NOTIFIER_ATTEMPTS = 17
 REQUIRED_IMPORTS = {"RoInitialize", "RoUninitialize", "InitPropVariantFromCLSID", "SetCurrentProcessExplicitAppUserModelID",
@@ -375,6 +377,12 @@ def replay(directory, result):
         if "shortcutOnly" not in result or DISPLAY_NAME_SOURCE not in build["sourceFiles"]:
             raise ValueError("Missing the native display-name comparison")
         receipt = json.loads((directory / "display-name.json").read_bytes())
+        acquisition = receipt.get("namespaceAcquisition")
+        if build["sourceFiles"][DISPLAY_NAME_SOURCE] == OPEN_ONLY_SOURCE_SHA256:
+            if acquisition is not None:
+                raise ValueError("Unexpected registration namespace receipt for the original observer")
+        elif acquisition not in ("opened", "created", "opened-concurrently"):
+            raise ValueError("Missing registration namespace disposition")
         if (any(type(receipt.get(k)) is not int for k in ("startProcess", "endProcess", "leafDisposition"))
                 or receipt.get("startProcess") != index or receipt.get("aumid") != "IFW.RustQA.Toast." + token
                 or receipt.get("displayName") != DISPLAY + token or receipt.get("view") != "native"

@@ -182,27 +182,53 @@ class ToastHistoryTests(unittest.TestCase):
         api.delete_empty.assert_called_once_with(72)
         reg.DeleteValue.assert_called_once_with(72, "DisplayName")
         self.assertTrue(receipt["leafRemoved"])
+        self.assertEqual(receipt["namespaceAcquisition"], "opened")
 
-    def test_collision_precheck_and_missing_parent_make_no_registry_changes(self):
+    def test_collision_precheck_and_missing_classes_hive_make_no_registry_changes(self):
         api = Mock()
         reg = api.reg
         reg.HKEY_CURRENT_USER, reg.KEY_READ, reg.KEY_CREATE_SUB_KEY = 99, 1, 4
-        reg.OpenKey.side_effect = [nullcontext(70), FileNotFoundError(), FileNotFoundError()]
+        reg.OpenKey.side_effect = [nullcontext(70), FileNotFoundError(), FileNotFoundError(), FileNotFoundError()]
         self.assertFalse(registration.identity_absent(TOKEN, reg))
         self.assertTrue(registration.identity_absent(TOKEN, reg))
         receipt = {}
         with self.assertRaisesRegex(registration.MissingNamespace, "is absent"):
             with registration.display_name(TOKEN, receipt, api=api):
-                self.fail("A missing Windows namespace must not start any registered exchange")
+                self.fail("An unavailable Classes hive must not start the registered exchange")
         self.assertEqual(receipt["parent"], h.PARENT)
         self.assertFalse(receipt["parentOpened"])
         self.assertNotIn("leafDisposition", receipt)
         self.assertEqual(reg.OpenKey.call_args_list, [
             call(99, h.PARENT + "\\" + registration.identity(TOKEN), 0, reg.KEY_READ)] * 2 +
-            [call(99, h.PARENT, 0, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY)])
+            [call(99, h.PARENT, 0, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY),
+             call(99, registration.CLASSES, 0, reg.KEY_CREATE_SUB_KEY)])
         api.create.assert_not_called()
         api.delete_empty.assert_not_called()
         reg.SetValueEx.assert_not_called()
+
+    def test_fresh_user_creates_only_the_namespace_and_owns_only_the_test_leaf(self):
+        for disposition, acquisition in ((1, "created"), (2, "opened-concurrently")):
+            with self.subTest(acquisition=acquisition):
+                api = Mock()
+                reg = api.reg
+                reg.HKEY_CURRENT_USER, reg.KEY_READ, reg.KEY_CREATE_SUB_KEY, reg.KEY_SET_VALUE, reg.REG_SZ = 99, 1, 4, 2, 1
+                reg.OpenKey.side_effect = [FileNotFoundError(), nullcontext(70), nullcontext(73), FileNotFoundError()]
+                api.create.side_effect = [(71, disposition), (72, 1)]
+                reg.QueryInfoKey.return_value = (0, 1, 0)
+                reg.QueryValueEx.return_value = (h.DISPLAY + TOKEN, reg.REG_SZ)
+                receipt = {}
+                with self.assertRaisesRegex(RuntimeError, "sender"):
+                    with registration.display_name(TOKEN, receipt, api=api):
+                        raise RuntimeError("sender failed")
+                self.assertEqual(receipt["namespaceAcquisition"], acquisition)
+                self.assertTrue(receipt["leafRemoved"])
+                self.assertEqual(api.create.call_args_list, [
+                    call(70, registration.NAMESPACE, reg.KEY_READ | reg.KEY_CREATE_SUB_KEY, volatile=False),
+                    call(71, registration.identity(TOKEN), reg.KEY_READ | reg.KEY_SET_VALUE | registration.DELETE)])
+                api.delete_empty.assert_called_once_with(72)
+                reg.SetValueEx.assert_called_once_with(72, "DisplayName", 0, reg.REG_SZ, h.DISPLAY + TOKEN)
+                reg.DeleteValue.assert_called_once_with(72, "DisplayName")
+                self.assertEqual(reg.CloseKey.call_args_list, [call(72), call(71)])
 
     def test_replay_requires_the_original_shortcut_only_processes_and_registry_cleanup(self):
         with TemporaryDirectory() as tmp:
@@ -243,10 +269,10 @@ class ToastHistoryTests(unittest.TestCase):
                                                  for m in ("quiet", "normal")})
             receipt = dict(startProcess=6, endProcess=len(procs), aumid="IFW.RustQA.Toast." + TOKEN,
                            displayName=h.DISPLAY + TOKEN, view="native", leafDisposition=1,
-                           parent=h.PARENT, parentOpened=True, readback=True, leafRemoved=True)
+                           parent=h.PARENT, parentOpened=True, namespaceAcquisition="created", readback=True, leafRemoved=True)
             path = directory / "display-name.json"
             for override in ({}, {"startProcess": 5}, {"endProcess": 7}, {"leafDisposition": 2},
-                             {"leafRemoved": False}, {"parentOpened": False}, {"parent": "other"}):
+                             {"leafRemoved": False}, {"parentOpened": False}, {"parent": "other"}, {"namespaceAcquisition": None}):
                 h.write(path, {**receipt, **override})
                 report["evidenceFiles"] = h.evidence_files(directory)
                 if not override:
@@ -254,6 +280,13 @@ class ToastHistoryTests(unittest.TestCase):
                 else:
                     with self.subTest(override=override), self.assertRaisesRegex(ValueError, "registration"):
                         h.replay(directory, report)
+            del receipt["namespaceAcquisition"]
+            build["sourceFiles"][h.DISPLAY_NAME_SOURCE] = h.OPEN_ONLY_SOURCE_SHA256
+            h.write(build_path, build)
+            h.write(path, receipt)
+            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(build_path),
+                          evidenceFiles=h.evidence_files(directory))
+            self.assertTrue(h.replay(directory, report)["finallyEmpty"])
             report["registryIdentityInitiallyAbsent"] = False
             with self.assertRaisesRegex(ValueError, "collision check"):
                 h.replay(directory, report)

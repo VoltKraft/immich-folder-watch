@@ -1,5 +1,15 @@
 # Project Status
 
+## Windows notification registration on a fresh user profile (2026-11-24)
+
+At `21e794f` Windows ARM64 created both WinRT notifiers, then returned
+`0x80070490` for every notification-setting query. The original profile
+lacked the standard per-user registration namespace. No sender reached
+`Show`. The revised comparison can create the namespace on a disposable
+hosted runner. All 63 portable service checks passed. The next native trial
+must establish delivery and separate history readback.
+[Original results and procedure](rust/rw02-windows-services.md#fresh-windows-user-profile-at-21e794f).
+
 ## Preventing duplicate entries on rollback (2026-11-24)
 
 On six copies produced by three Linux x64 C# writers, Rust inserted 24
