@@ -6,6 +6,9 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Mutex, OnceLock};
 
+mod window_messages;
+pub use window_messages::{default_proc, wndproc};
+
 const LIMIT: usize = 262_144;
 type Handle = *mut c_void;
 
@@ -150,6 +153,7 @@ pub struct Span {
     call_start: i64,
     call_end: i64,
     hwnd: i64,
+    previous_root: Option<i64>,
     _thread: PhantomData<Rc<()>>,
 }
 /// Bracket the actual API instruction inside the scope and keep its unmodified result.
@@ -165,9 +169,15 @@ pub fn native<T>(
         return call();
     }
     span.hwnd = hwnd;
+    let message_scope = if stage == "direct" && matches!(arg, 4 | 5) {
+        window_messages::show(hwnd, span.id)
+    } else {
+        None
+    };
     span.call_start = clock();
     let result = call();
     span.call_end = clock();
+    drop(message_scope);
     span.value = value(&result);
     result
 }
@@ -211,6 +221,7 @@ pub fn span(stage: &'static str, value: i64) -> Span {
         call_start: 0,
         call_end: 0,
         hwnd: 0,
+        previous_root: None,
         _thread: PhantomData,
     };
     if let Some(log) = log() {
@@ -220,6 +231,9 @@ pub fn span(stage: &'static str, value: i64) -> Span {
         log.next += 1;
         span.id = entry.id;
         span.parent = entry.parent;
+        if stage == "show-call" {
+            span.previous_root = Some(window_messages::ROOT.replace(value));
+        }
         PARENT.set(entry.id);
         log.push(entry);
         drop(log);
@@ -229,6 +243,9 @@ pub fn span(stage: &'static str, value: i64) -> Span {
 }
 impl Drop for Span {
     fn drop(&mut self) {
+        if let Some(previous) = self.previous_root {
+            window_messages::ROOT.set(previous);
+        }
         if self.id != 0 {
             let call_end = if self.call_end == 0 {
                 clock()
@@ -286,6 +303,7 @@ pub fn finish() -> std::io::Result<()> {
             )?;
         }
         writeln!(out, "FRAME_END")?;
+        window_messages::write(&mut out, freq)?;
         out.flush()?;
     }
     Ok(())

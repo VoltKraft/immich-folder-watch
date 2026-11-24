@@ -105,6 +105,15 @@ class FrameCost(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "native frame trace"):
             readback.analyze(text, dxgi, scan, {})
 
+    def test_original_frame_trace_is_distinct_from_the_new_message_measurement(self):
+        original = fixture()
+        self.assertNotIn("windowMessages", readback.analyze(*original))
+        with self.assertRaisesRegex(ValueError, "HWND message trace"):
+            readback.analyze(*original, message_trace=True)
+        log, dxgi, scan, limits = original
+        with self.assertRaisesRegex(ValueError, "matching diagnostic source"):
+            readback.analyze(log + "\nWND_BEGIN\n", dxgi, scan, limits)
+
     def test_changed_compiler_manifest_or_library_tree_is_rejected(self):
         expected = readback.prepare.PINS["compilerTrees"]
         for tree in (expected, {**expected, "eframe": {"files": 1, "sha256": "wrong"}}):

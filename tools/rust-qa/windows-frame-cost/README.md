@@ -17,6 +17,12 @@ Slow responses use the unchanged WPF maximum for the corresponding action. Their
 
 The subject requests dispatch statistics for its own executing thread with zero hardware counters. Each boundary brackets the read with QPC and retains the Win32 return code. Successful reads supply cumulative thread cycles and context switches, plus the wait-reason bits since the preceding read. A refused read records the error and tries the ordinary thread-cycle query. Cycles and switch counts describe complete bracketing samples. They provide no exact duration per scheduling state or wait reason. The GPU execution timeline, other processes and compositor scheduling are outside this observation. Instrumentation affects this separate process's timings. The eleven acceptance metrics always come from the ordinary build. [Microsoft PERFORMANCE_DATA](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-performance_data)
 
+## Synchronous messages during a direct reopen
+
+The existing frame-cost scan records the public winit window procedure while the UI thread calls `ShowWindow` on its retained root. The same thread brackets the calls to `DefWindowProcW` from that procedure. The `WND` rows in `rust-1-scan.log` carry ordered QPC endpoints, parent row numbers and system message IDs. IDs at or above `WM_USER` share one category. The recorder reads neither message parameter. It keeps up to 65,536 rows in thread-local memory and flushes them after the workload. The replay rejects lost rows and requires a marker for every matching direct show, including those with zero messages.
+
+`cost.windowMessages.shows` reports native QPC ticks for each direct call. `wndprocUnionTicks` is the union of its observed callback intervals. `outsideWndprocTicks` is the time inside `ShowWindow` outside that union. Within the union, `wndprocOtherTicks` and `defaultProcTicks` charge elapsed time to the innermost measured scope. `byMessage` groups those ticks by message ID. A nested window procedure reached during default processing therefore receives its own time. `slowReopens` clips the same intervals to each independent visibility request and response. These wall times include any suspension within the recorded scope. Earlier source-bound traces replay their original frame measurements and omit the `windowMessages` field.
+
 ## Deferred readiness on the Windows x64 CPU adapter
 
 Run the bounded comparison after a successful same-host frame-cost diagnosis.

@@ -6,10 +6,13 @@ from zipfile import ZipFile
 from hashlib import sha256
 import json
 import sys
+import re
+import subprocess
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "windows-warm-window"))
 import dispatch
+import message_times
 import prepare
 from frame_latency import HOST_BUILD, measured_generation, replay_scan
 from inputs import recorder, sha
@@ -99,7 +102,7 @@ def complete_frame(frame, rows):
     return waits
 
 
-def analyze(text, dxgi, scan, limits):
+def analyze(text, dxgi, scan, limits, *, message_trace=False):
     source = dispatch.correlate(text, dxgi, scan, False)
     problem = dispatch.hidden_failure("root-repaint", source["hidden"])
     if problem:
@@ -200,13 +203,25 @@ def analyze(text, dxgi, scan, limits):
     for r in slow:
         del r["last"]
         r["frames"] = sorted(r["frames"])
+    details = {"windowMessages": message_times.analyze(text, nodes, pid, tid, hwnd, hz, slow)} if message_trace else {}
+    if not message_trace and any(line.startswith("WND") for line in text.splitlines()):
+        raise ValueError("Window message evidence requires its matching diagnostic source")
     return dict(pid=pid, thread=tid, hwnd=hwnd, frequency=hz, hidden=source["hidden"], visibilityPaths=dict(paths),
                 verifiedPresentedFrames=len(observed), waitResults=dict(wait_results), presentedAfterTimeout=timed_out,
                 schedulerReadStatuses={str(k):v for k, v in status.items()}, schedulerComplete=set(status) == {0},
-                slowResponses=slow)
+                slowResponses=slow, **details)
 
 TRIAL = "rust-1-scan"
-FILES = ("prepare.py", "probes.patch", "sources.json", "trace.rs", "readback.py", "frame_case.py")
+FILES = ("prepare.py", "probes.patch", "sources.json", "trace.rs", "window_messages.rs", "message_times.py", "readback.py", "frame_case.py")
+# Original format before the retained root WndProc was instrumented.
+LEGACY_INPUTS = {
+    "prepare.py": "d315fa6e26d160691e8b4262e4be50d3fe48cdd0ae0ca35de587828c1c1e79a6",
+    "probes.patch": "dd3b02e50c38f1ab9f01bbc310c5b73848659c589ed77637a156962bab442f73",
+    "sources.json": "2a77983e1422b82eaf6d6b0f9a76c6a9223e24b9502c024478fd758248fe3f48",
+    "trace.rs": "9369e0044ae6f0d77e681d53913649e56a58b3e9e2f88338072f42ef8e0f9f23",
+    "readback.py": "809e66ffe5954e95090ab096ba29a8c1f51b9f93fdea4af1f0dafdc074544ff1",
+    "frame_case.py": "9d1ad9f421ccf8fdc092fe22c219487f1c6da300d507060a5eb25feeb3a4900d"
+}
 RAW = (".log", "-files.log", "-presents.log", "-requests.json")
 
 
@@ -225,11 +240,19 @@ def pair(base, report):
     regular = json.loads(dispatch_file.read_bytes())
     paired = {**report, "binary": report["pairedBinary"]}
     fields = (*HOST_BUILD, "referenceBudgetSha256", "observerInputs")
-    original_observers = {name: sha(prepare.WARM / name) for name in ("measure.py", "frame_latency.py", "inputs.py", "scan_present.py")}
+    def driver_hash(name):
+        if report.get("diagnosticInputs") == LEGACY_INPUTS:
+            revision = report["revision"]
+            if not re.fullmatch("[0-9a-f]{40}", revision):
+                raise ValueError("Missing original observer revision")
+            blob = subprocess.check_output(["git", "show", revision + ":tools/rust-qa/windows-warm-window/" + name], cwd=prepare.ROOT)
+            return sha256(blob).hexdigest()
+        return sha(prepare.WARM / name)
+    original_observers = {name: driver_hash(name) for name in ("measure.py", "frame_latency.py", "inputs.py", "scan_present.py")}
     if (report["observerInputs"] != original_observers or any(record[k] != paired[k] for k in fields for record in (primary, regular))
             or primary["status"] not in ("measured-metrics-passed", "over-budget")
             or regular["status"] != "dispatch-observed" or regular["primaryResultSha256"] != sha(primary_file)
-            or regular["dispatchObserverSha256"] != sha(prepare.WARM / "dispatch.py")
+            or regular["dispatchObserverSha256"] != driver_hash("dispatch.py")
             or primary["diagnosticControl"] or not regular["diagnosticControl"]
             or any(record["presentMode"] != "Mailbox" or record["desiredMaximumFrameLatency"] != 1
                    or record["inputs"]["inventory"]["gui"] != paired["binary"] for record in (primary, regular))
@@ -280,12 +303,15 @@ def compiler_receipt(out, report):
     if sources["application"] != app_sources:
         raise ValueError("A diagnostic application input changed outside the measured trace")
     with ZipFile(archive) as z:
-        prepare.verify_compiler_sources(z.read, sources["trees"])
         if len(z.namelist()) != len(set(z.namelist())):
             raise ValueError("Duplicate source archive member")
-        for name in ("sources.json", "probes.patch", "prepare.py", "trace.rs"):
-            if z.read(name) != (HERE / name).read_bytes():
-                raise ValueError("The original compiler source archive differs from this diagnosis")
+        files = ["sources.json", "probes.patch", "prepare.py", "trace.rs"]
+        if report["diagnosticInputs"] != LEGACY_INPUTS:
+            files.append("window_messages.rs")
+        if any(sha256(z.read(name)).hexdigest() != report["diagnosticInputs"][name] for name in files):
+            raise ValueError("The original compiler source archive differs from this diagnosis")
+        source_pins = json.loads(z.read("sources.json"))
+        prepare.verify_compiler_sources(z.read, sources["trees"], pins=source_pins)
         if (z.read("ordinary-source.zip") != (base / "eframe-source.zip").read_bytes()
                 or z.read("notices/ifw-frame-timing/LICENSE") != (prepare.ROOT / "LICENSE").read_bytes().replace(b"\r\n", b"\n")):
             raise ValueError("The original ordinary sources or diagnostic license changed")
@@ -327,9 +353,10 @@ def compiler_receipt(out, report):
 
 
 def recalculate(out, report):
+    legacy = report["diagnosticInputs"] == LEGACY_INPUTS
     if (report["target"] != prepare.TARGET or not report["diagnosticControl"] or report["presentMode"] != "Mailbox"
             or report["desiredMaximumFrameLatency"] != 1 or report["pair"] != pair(out.parent, report)
-            or report["diagnosticInputs"] != inputs() or report["raw"] != raw_hashes(out)):
+            or (not legacy and report["diagnosticInputs"] != inputs()) or report["raw"] != raw_hashes(out)):
         raise ValueError("Wrong source, runner, workload or native observation")
     reference_path = out / "reference-budget.json"
     budget = json.loads(reference_path.read_bytes())
@@ -353,7 +380,7 @@ def recalculate(out, report):
     if (measured_generation(subject, "Mailbox", dispatch_trace=True) != scan["device"]
             or any(r.startswith(("WINDOW_WAKE ", "WINDOW_HIDDEN_PAINT ")) for r in log.splitlines())):
         raise ValueError("A different device or visibility policy was measured")
-    return analyze(log, (out / (TRIAL + "-presents.log")).read_text(encoding="ascii"), scan, budget["maximums"])
+    return analyze(log, (out / (TRIAL + "-presents.log")).read_text(encoding="ascii"), scan, budget["maximums"], message_trace=not legacy)
 
 
 if __name__ == "__main__":

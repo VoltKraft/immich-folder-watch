@@ -59,10 +59,10 @@ def extract(gui, name, row, bundle):
         bundle[f"notices/{name}/{notice}"] = checked(package / notice, digest)
 
 
-def verify_compiler_sources(read, trees):
+def verify_compiler_sources(read, trees, *, pins=PINS):
     files = {"Cargo.lock", *(f"manifests/{name}/Cargo.toml" for name in (*LIBS, "native-gui-assessment"))}
-    if (set(PINS["compilerFiles"]) != files or trees != PINS["compilerTrees"]
-            or any(sha256(read(name)).hexdigest() != PINS["compilerFiles"][name] for name in files)):
+    if (set(pins["compilerFiles"]) != files or trees != pins["compilerTrees"]
+            or any(sha256(read(name)).hexdigest() != pins["compilerFiles"][name] for name in files)):
         raise ValueError("The reconstructed compiler manifests, lock or library trees differ")
 
 
@@ -76,6 +76,7 @@ def stage(out):
     patch = checked(HERE / "probes.patch", PINS["sourcePatchSha256"])
     bundle = {"sources.json": (HERE / "sources.json").read_bytes(), "probes.patch": patch,
               "prepare.py": Path(__file__).read_bytes(), "trace.rs": (HERE / "trace.rs").read_bytes(),
+              "window_messages.rs": (HERE / "window_messages.rs").read_bytes(),
               "ordinary-source.zip": ordinary_bundle.read_bytes(),
               "notices/ifw-frame-timing/LICENSE": (ROOT / "LICENSE").read_bytes().replace(b"\r\n", b"\n")}
     for name in PINS["packages"]:
@@ -89,6 +90,7 @@ def stage(out):
     trace = gui / LIBS[TIMING]
     (trace / "src").mkdir(parents=True)
     shutil.copyfile(HERE / "trace.rs", trace / "src/lib.rs")
+    shutil.copyfile(HERE / "window_messages.rs", trace / "src/window_messages.rs")
     (trace / "Cargo.toml").write_text(
         '[package]\nname = "ifw-frame-timing"\nversion = "0.0.0"\nedition = "2024"\nlicense = "AGPL-3.0-only"\n',
         encoding="ascii", newline="\n")

@@ -19,6 +19,10 @@
     "src/ui_trace.rs": {
       "before": "2bd6f731d8a28b5db98b1d35ddfd0a94e319fb26476afb24ec3a4ef23f56b92a",
       "after": "94b40a601df8cf9f37ad57a25c171754a16bbfc82d335baa9511a34c71a16dae"
+    },
+    "artifacts/retained/winit/src/platform_impl/windows/event_loop.rs": {
+      "before": "f99c748e189ea8ce4bde08ec186ee27306756ce93d5235371e198c07e582c52d",
+      "after": "d88d69413291f83a371f7283ae8db52ceac2a600a67f3aa96167d23de2b6e211"
     }
   },
   "packages": {
@@ -47,7 +51,7 @@
       "vcs": null
     }
   },
-  "sourcePatchSha256": "dd3b02e50c38f1ab9f01bbc310c5b73848659c589ed77637a156962bab442f73",
+  "sourcePatchSha256": "ab6912bd6abad146c0f511ffc94bf3130da8b2969e007f0676645c27ddc5f4e6",
   "compilerFiles": {
     "Cargo.lock": "e72bf0d9be5cddb3fbf03beb62cc2d259e8cf24669a51fd77d38925f9929d6eb",
     "manifests/eframe/Cargo.toml": "abb311c397e9f337e367b7ce56f4716c39e1837eda37235e4e2adb73feb1ff12",
@@ -64,7 +68,7 @@
     },
     "winit": {
       "files": 217,
-      "sha256": "b39f8203203851beb5ceced66ebc306316bb54e57032ed93569b21a83e08b6ae"
+      "sha256": "650559d34339110f9a52f9878858e324d3c45a04311f010bc605852421a74cb8"
     },
     "egui-wgpu": {
       "files": 12,
@@ -75,8 +79,8 @@
       "sha256": "a37c03b0d8300116b38cba691cf22d7e191227ea340217d3f29aeb7f54459a68"
     },
     "ifw-frame-timing": {
-      "files": 2,
-      "sha256": "284f311b05d670971fa7a70bd5a5fa585fafdebc74d5be5557b9660cdca3e01f"
+      "files": 3,
+      "sha256": "b45bf4bc71257d60730aadbe95f2d1a7d0ed27024c320b50631f9e73026a0619"
     }
   }
 }

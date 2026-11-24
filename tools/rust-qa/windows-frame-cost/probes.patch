@@ -231,3 +231,75 @@
      }
      Ok(())
  }
+--- a/artifacts/retained/winit/src/platform_impl/windows/event_loop.rs
++++ b/artifacts/retained/winit/src/platform_impl/windows/event_loop.rs
+@@ -1,3 +1,4 @@
++// Modified by Immich Folder Watch for the isolated Windows message timing trial.
+ #![allow(non_snake_case)]
+
+ mod runner;
+@@ -1060,6 +1061,7 @@
+     wparam: WPARAM,
+     lparam: LPARAM,
+ ) -> LRESULT {
++    let _message = ifw_frame_timing::wndproc(window as i64, msg);
+     let userdata = unsafe { super::get_window_long(window, GWL_USERDATA) };
+
+     let userdata_ptr = match (userdata, msg) {
+@@ -1070,7 +1072,7 @@
+             let result = match unsafe { initdata.on_nccreate(window) } {
+                 Some(userdata) => unsafe {
+                     super::set_window_long(window, GWL_USERDATA, userdata as _);
+-                    DefWindowProcW(window, msg, wparam, lparam)
++                    timed_default_proc(window, msg, wparam, lparam)
+                 },
+                 None => -1, // failed to create the window
+             };
+@@ -1086,9 +1088,9 @@
+             let initdata = &mut *(initdata as *mut InitData<'_>);
+
+             initdata.on_create();
+-            return DefWindowProcW(window, msg, wparam, lparam);
+-        },
+-        (0, _) => return unsafe { DefWindowProcW(window, msg, wparam, lparam) },
++            return timed_default_proc(window, msg, wparam, lparam);
++        },
++        (0, _) => return unsafe { timed_default_proc(window, msg, wparam, lparam) },
+         _ => userdata as *mut WindowData,
+     };
+
+@@ -1291,7 +1293,7 @@
+             // `WM_PAINT` as handled we should call the `DefWindowProcW`. Call it and check whether
+             // user asked for redraw during `RedrawRequested` event handling and request it again
+             // after marking `WM_PAINT` as handled.
+-            result = ProcResult::Value(unsafe { DefWindowProcW(window, msg, wparam, lparam) });
++            result = ProcResult::Value(unsafe { timed_default_proc(window, msg, wparam, lparam) });
+             if std::mem::take(&mut userdata.window_state_lock().redraw_requested) {
+                 unsafe { RedrawWindow(window, ptr::null(), 0, RDW_INTERNALPAINT) };
+             }
+@@ -1614,7 +1616,7 @@
+         WM_IME_SETCONTEXT => {
+             // IME UI visibility flags are in lparam.
+             let lparam = lparam & !(ISC_SHOWUICOMPOSITIONWINDOW as isize);
+-            result = ProcResult::Value(unsafe { DefWindowProcW(window, msg, wparam, lparam) });
++            result = ProcResult::Value(unsafe { timed_default_proc(window, msg, wparam, lparam) });
+         },
+
+         // this is necessary for us to maintain minimize/restore state
+@@ -2467,9 +2469,15 @@
+         .unwrap_or_else(|| result = ProcResult::Value(-1));
+
+     match result {
+-        ProcResult::DefWindowProc(wparam) => unsafe { DefWindowProcW(window, msg, wparam, lparam) },
++        ProcResult::DefWindowProc(wparam) => unsafe { timed_default_proc(window, msg, wparam, lparam) },
+         ProcResult::Value(val) => val,
+     }
++}
++
++// Only the diagnostic build records the default procedure called by the public HWND's WndProc.
++unsafe fn timed_default_proc(window: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
++    let _default = ifw_frame_timing::default_proc(window as i64, msg);
++    unsafe { DefWindowProcW(window, msg, wparam, lparam) }
+ }
+
+ unsafe extern "system" fn thread_event_target_callback(
