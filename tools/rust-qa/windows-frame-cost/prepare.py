@@ -36,14 +36,14 @@ def environment(out):
                 PATH=str(ROOT / "artifacts/rust/toolchain/bin") + os.pathsep + os.environ["PATH"])
 
 
-def extract(gui, name, row, bundle):
+def extract(gui, name, row, bundle, *, destination=None):
     expected = PINS["packages"][name]
     stem = name + "-" + expected["version"]
     archive = warm.eframe_source.original_archive(dict(crate=stem, archiveSha256=expected["archiveSha256"]))
     if (row["version"], row["checksum"]) != (expected["version"], expected["archiveSha256"]):
         raise ValueError("Diagnostic package differs from the retained lock")
     bundle[stem + ".crate"] = archive
-    package = gui / LIBS[name]
+    package = gui / (LIBS[name] if destination is None else destination)
     with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as source:
         names = [m.name.removeprefix(stem + "/") for m in source if m.isfile() and m.name.startswith(stem + "/")]
         if any(not m.isfile() or not m.name.startswith(stem + "/") for m in source) or len(names) != len(set(names)):

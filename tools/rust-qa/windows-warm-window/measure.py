@@ -70,6 +70,7 @@ def main(target, variant="mailbox"):
         "dispatch": ("dispatch", "Mailbox", 1),
         "frame-cost": ("frame-cost", "Mailbox", 1),
         "deferred-frame": ("deferred-frame", "Mailbox", 1),
+        "gdi-present": ("gdi-present", "GDI", None),
         "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
     }[variant]
     out = base / folder
@@ -80,11 +81,17 @@ def main(target, variant="mailbox"):
     try:
         if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
                                          "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE",
-                                         "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL", "IFW_QA_WINDOWS_FRAME_COST")):
+                                         "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL", "IFW_QA_WINDOWS_FRAME_COST",
+                                         "IFW_QA_WINDOWS_GDI_PRESENT")):
             raise ValueError("Select the requested diagnosis using the recorder option")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
+        if variant == "gdi-present":
+            sys.path.insert(0, str(QA / "windows-gdi-present"))
+            import gdi_build
+            import gdi_case
+            binary = gdi_build.build(out, base, record)
         if variant in ("deferred-frame", "frame-cost"):
             sys.path.insert(0, str(QA / "windows-frame-cost"))
             if variant == "deferred-frame":
@@ -97,6 +104,9 @@ def main(target, variant="mailbox"):
                 import frame_case
                 binary = frame_case.prepare_subject(base, out, budget, record)
         with ExitStack() as scope:
+            if variant == "gdi-present":
+                os.environ["IFW_QA_WINDOWS_GDI_PRESENT"] = "1"
+                scope.callback(os.environ.pop, "IFW_QA_WINDOWS_GDI_PRESENT")
             if DX12_WAIT_OPTION in os.environ and os.environ[DX12_WAIT_OPTION].casefold() != "wait":
                 raise ValueError("The native DX12 frame latency comparison requires Wait mode")
             if DX12_WAIT_OPTION not in os.environ:
@@ -148,11 +158,12 @@ def main(target, variant="mailbox"):
                 offline.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 offline.bind(("127.0.0.1", 0))
                 endpoint = "http://127.0.0.1:" + str(offline.getsockname()[1])
-                if variant == "deferred-frame":
-                    deferred_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, budget)
+                if variant in ("deferred-frame", "gdi-present"):
+                    case = gdi_case if variant == "gdi-present" else deferred_case
+                    case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, budget)
                     if sha(budget) != before:
-                        raise ValueError("The WPF budget changed during the deferred-frame comparison")
-                    record["status"] = "deferred-frame-observed"
+                        raise ValueError("The WPF budget changed during the renderer comparison")
+                    record["status"] = variant + "-observed"
                     return 0
                 if variant == "frame-cost":
                     frame_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record)
@@ -222,5 +233,7 @@ if __name__ == "__main__":
                       help="build and trace the additional x64 root-repaint diagnostic after ordinary dispatch")
     mode.add_argument("--deferred-frame", dest="variant", action="store_const", const="deferred-frame",
                       help="compare one native x64 trial with timed redraws on an unready DX12 frame")
+    mode.add_argument("--gdi-present", dest="variant", action="store_const", const="gdi-present",
+                      help="measure the retained egui view rendering offscreen with WARP and presenting through GDI")
     args = parser.parse_args()
     raise SystemExit(main(args.target, args.variant))

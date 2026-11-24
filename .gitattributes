@@ -45,6 +45,10 @@ tools/rust-qa/windows-inventory/** text eol=lf
 tools/rust-qa/windows-launcher/*.py text eol=lf
 tools/rust-qa/windows-launcher/*.ps1 text eol=lf
 tools/rust-qa/windows-frame-cost/** text eol=lf
+tools/rust-qa/windows-gdi-present/** text eol=lf
+tools/rust-qa/observe-windows-gui.py text eol=lf
+tools/rust-qa/observe-windows-input.ps1 text eol=lf
+tools/rust-qa/windows_observer.py text eol=lf
 tools/rust-qa/windows-warm-window/** text eol=lf
 tools/rust-qa/windows-warm-window/candidate.patch text eol=lf whitespace=-blank-at-eol
 tools/rust-qa/windows-display/** text eol=lf

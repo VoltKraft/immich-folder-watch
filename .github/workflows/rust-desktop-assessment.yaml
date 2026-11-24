@@ -620,6 +620,21 @@ jobs:
           python -B tools/rust-qa/windows-frame-cost/deferred_case.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/deferred-frame
           exit $LASTEXITCODE
 
+      - name: Compare full egui frames presented through GDI on Windows x64
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.warm.outcome == 'success' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/measured/result.json') != '' }}
+        timeout-minutes: 23
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-gdi-present
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --gdi-present
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-gdi-present/gdi_case.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/gdi-present
+          exit $LASTEXITCODE
+
       - name: Observe Vulkan loss and redraw on X11
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
@@ -892,6 +907,12 @@ jobs:
             artifacts/rust/windows-warm-window/*/deferred-frame/deferred-source.zip
             artifacts/rust/windows-warm-window/*/deferred-frame/deferred.exe
             artifacts/rust/windows-warm-window/*/deferred-frame/retained-edit/
+            artifacts/rust/windows-warm-window/*/gdi-present/*.json
+            artifacts/rust/windows-warm-window/*/gdi-present/*.log
+            artifacts/rust/windows-warm-window/*/gdi-present/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/gdi-present/source.zip
+            artifacts/rust/windows-warm-window/*/gdi-present/gdi.exe
+            artifacts/rust/windows-warm-window/*/gdi-present/retained-edit/
             artifacts/rust/platform-logs/native-*/*.json
             artifacts/rust/platform-logs/native-*/daemon.log
             artifacts/rust/gui-build/release/*.inputs.json

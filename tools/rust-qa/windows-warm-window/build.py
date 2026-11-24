@@ -79,7 +79,7 @@ def feature_rows(manifest, target, env):
     return sorted(rows)
 
 
-def compiler_graph(messages, gui, selected):
+def compiler_graph(messages, gui, selected, *, extra_local=None):
     """Match every reported Cargo package and feature set to the retained lock and native tree."""
     successful = {"reason": "build-finished", "success": True}
     if (not messages or messages[-1] != successful
@@ -90,6 +90,8 @@ def compiler_graph(messages, gui, selected):
     local = {"native-gui-assessment": gui, "desktop-lifecycle": gui.parents[2] / "rust/crates/desktop-lifecycle",
              "eframe": gui / eframe_source.PACKAGE, "winit": gui / eframe_source.WINIT_PACKAGE,
              **{name: gui / "artifacts/text" / name for name in ("egui", "epaint", "unicode-bidi")}}
+    if extra_local:
+        local.update(extra_local)
     observed = set()
     units = [item for item in messages if item["reason"] == "compiler-artifact"]
     for unit in units:
