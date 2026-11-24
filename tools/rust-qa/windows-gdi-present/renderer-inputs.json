@@ -1,0 +1,19 @@
+{
+  "files": {
+    "artifacts/gdi/egui-wgpu/src/winit.rs": [
+      "3f9f39150119a4ef071ab9e0ed9384edbebad36cc72bc35a90ac1639d165be51",
+      "3282b85b103627d887b4f516e1ed20fcf432faf8e8c07de11bb36e6df99f36ce"
+    ]
+  },
+  "copies": {
+    "artifacts/gdi/egui-wgpu/src/gdi_present.rs": {
+      "source": "gdi_present.rs",
+      "sha256": "2ed0a90a18bc9bedeee8ee6bd771a3070c30daad4e31e2afde2fb3aed639a659"
+    },
+    "artifacts/gdi/egui-wgpu/src/dib_layout.rs": {
+      "source": "dib_layout.rs",
+      "sha256": "61e3fbc8499c0fccc1fe6af85327026659f50b1c5328722bffd93327e81476b3"
+    }
+  },
+  "patchSha256": "efcb27639b3ce0a6e1a9108f0dbb789a4b508250e9beb47bd17b31133df4c122"
+}

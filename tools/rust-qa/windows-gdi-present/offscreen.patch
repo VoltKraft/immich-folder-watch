@@ -1,0 +1,89 @@
+--- a/artifacts/gdi/egui-wgpu/src/winit.rs
++++ b/artifacts/gdi/egui-wgpu/src/winit.rs
+@@ -11,0 +12,16 @@
++#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++#[path = "gdi_present.rs"]
++mod gdi_present;
++
++#[derive(Default)]
++struct GdiFrames {
++    full: u64,
++    partial: u64,
++}
++impl Drop for GdiFrames {
++    fn drop(&mut self) {
++        use std::io::Write as _;
++        let _ = writeln!(std::io::stdout().lock(), "GDI_PRESENT_END frames={} partial={}", self.full, self.partial);
++    }
++}
++
+@@ -12,0 +29 @@
++    gdi_frame: Option<GdiFrames>,
+@@ -116,0 +134,5 @@
++        if surface_state.gdi_frame.is_some() {
++            // This real HWND surface supplies adapter capabilities. The GDI route never
++            // configures a flip chain or acquires one of its back buffers.
++            return;
++        }
+@@ -304,0 +327,7 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        let gdi_frame = self.render_state.as_ref().and_then(|render| {
++            gdi_present::selected(viewport_id, &render.adapter, self.support_transparent_backbuffer)
++                .then(GdiFrames::default)
++        });
++        #[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
++        let gdi_frame = None;
+@@ -308,0 +338 @@
++                gdi_frame,
+@@ -352,0 +383,4 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if surface_state.gdi_frame.is_some() {
++            gdi_present::check_size(width, height).expect("Invalid dimensions for the GDI readback");
++        }
+@@ -524 +557,0 @@
+-        let capture = !capture_data.is_empty();
+@@ -552,0 +586,2 @@
++        let gdi = surface_state.gdi_frame.is_some();
++        let capture = gdi || !capture_data.is_empty();
+@@ -594 +629 @@
+-        let output_frame = {
++        let output_frame = (!gdi).then(|| {
+@@ -601 +636 @@
+-        };
++        });
+@@ -607,2 +642,3 @@
+-            wgpu::CurrentSurfaceTexture::Success(frame) => Some(frame),
+-            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
++            None => None,
++            Some(wgpu::CurrentSurfaceTexture::Success(frame)) => Some(frame),
++            Some(wgpu::CurrentSurfaceTexture::Suboptimal(frame)) => {
+@@ -612 +648 @@
+-            other => {
++            Some(other) => {
+@@ -756 +792 @@
+-        {
++        let submission = {
+@@ -760,3 +796 @@
+-            render_state
+-                .queue
+-                .submit(core::iter::chain(user_cmd_bufs, [encoded]));
++            let index = render_state.queue.submit(core::iter::chain(user_cmd_bufs, [encoded]));
+@@ -764 +798,4 @@
+-        };
++            index
++        };
++        #[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
++        let _ = submission;
+@@ -782,0 +820,12 @@
++            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++            if let Some(frame) = &mut surface_state.gdi_frame {
++                let readback = gdi_present::Readback {
++                    device: render_state.device.clone(),
++                    submission,
++                    buffer: capture_buffer,
++                    size: [surface_state.width, surface_state.height],
++                    format: screen_capture_state.texture.format(),
++                };
++                readback.present(window, frame, capture_data).expect("GDI frame presentation failed");
++                return vsync_sec;
++            }
