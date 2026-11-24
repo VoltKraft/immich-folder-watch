@@ -620,3 +620,53 @@ The raw archive contains both native writer reports, both reader reports,
 all four in-process casing tables and 32 standalone backups. Its SHA-256
 is `1ca6d3c0072539b4151fd4a5168ee904e3830919c47d0ca406e961ddf6d3fdd2`.
 Production migration policy and installed rollback after synchronization remain open.
+
+### Inserting a new row across three qualified rollback profiles
+
+The development writer opens a fresh copy of a finalized Linux x64 fixture.
+It accepts the exact full-table digests for ICU 74.2, the .NET 10.0.12 managed
+invariant mode and ICU 78. Within an immediate SQLite transaction it checks
+the account's existing entries and timestamp repairs using the three-profile
+lookup. A new entry requires agreement on both the normalized source and
+relative key and a known absence under those profiles. A refusal rolls back
+the entire requested batch and records the failing index and lookup result.
+The earlier studies retain the writer that reproduced the eight duplicates.
+[Development writer](../../tools/rust-qa/legacy-keys/concordant-insert/insert.rs) ·
+[Offline comparison](../../tools/rust-qa/legacy-keys/concordant-insert/study.py).
+
+From the repository root, run the comparison against the archived synthetic
+writers and the cached Linux x64 tool inputs in a fresh output directory.
+
+```bash
+python3 -B tools/rust-qa/legacy-keys/concordant-insert/study.py \
+  --output artifacts/rust/concordant-insert-comparison
+```
+
+On Fedora x64 the writer accepted two stable names on each of the three
+insensitive copies and six names on each sensitive copy. The shipping store
+found all 24 entries using the submitted spellings, including a source with
+`Child/../Insert-ASCII/`. Both languages stored its normalized display path.
+Each of the three real .NET profiles updated the accepted entries twice.
+All 144 upserts kept the original physical keys and ROWIDs. Direct SQL
+verified all 36 standalone C# backups and the 71 original records across the
+six donors.
+
+All 26 refused transactions preserved the input database byte for byte.
+Twelve mixed batches contained `ƛ` or `ſ` in the source or relative name.
+Two more encountered existing histories with two distinct physical keys.
+Six included a second request for an entry staged earlier in the same
+transaction. The other six retried previously committed entries. The
+development writer also refused an unknown profile, an incomplete profile
+set and a repeated profile before creating an output copy. The historical
+read-only observer reproduced its 318 recorded results.
+
+The native result at `artifacts/rust/concordant-insert-typed-03/result.json`
+has SHA-256 `d2a340bc12794ddfbfd5f9e25af99cc501f69184f11c2819aa98b0c6bef27644`.
+The 91-member `evidence.tar` has SHA-256
+`db9716fa60aaa95ec9080a503e9f27eb6c2a7df00259e0f6b2fc32e9136135ad`.
+It contains the dependency source snapshot from `7a0ad39`, the exact
+storage library and development writer used for this trial, the three
+same-process casing tables and the databases. The independent SQL
+readback has SHA-256
+`8a78509bf17f630311012b70350b6e63abbb019a3d75ae9b1cfd16afc64a7637`.
+Installed migration and rollback with additional casing profiles remain open.

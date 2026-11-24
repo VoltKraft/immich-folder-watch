@@ -44,7 +44,7 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
-| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [New Rust insertions](rw02-legacy.md#c-readback-of-newly-inserted-rust-rows) showed a lookup mismatch across casing profiles on Linux x64. The [first C# writes after rollback](rw02-legacy.md#first-c-upsert-after-rollback) produced eight duplicate entries across four synthetic copies. [Detached YAML readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. On all four targets the [shipping worker resumed from a Rust backup](rw01-storage-contract.md#four-worker-restarts-on-each-native-target) after download, upload, deletion and interrupted timestamp repair. Production write policy, migration and rollback after Rust engine activity remain open. |
+| RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [New Rust insertions](rw02-legacy.md#c-readback-of-newly-inserted-rust-rows) showed a lookup mismatch across casing profiles on Linux x64. The [first C# writes after rollback](rw02-legacy.md#first-c-upsert-after-rollback) produced eight duplicate entries across four synthetic copies. A [three-profile insertion check](rw02-legacy.md#inserting-a-new-row-across-three-qualified-rollback-profiles) then preserved 24 new rows through 144 C# upserts without duplicates. [Detached YAML readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. On all four targets the [shipping worker resumed from a Rust backup](rw01-storage-contract.md#four-worker-restarts-on-each-native-target) after download, upload, deletion and interrupted timestamp repair. Production write policy, migration and rollback after Rust engine activity remain open. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
 | RI-AC05 | Open | [Ordinary Rust GUI second launch on Fedora x64](rw02-instance.md#ordinary-second-launch-of-the-linux-gui) retained the primary and its inventory worker. Installed old/new handover, standard-user cross-session ownership and durable product shutdown remain open. |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
@@ -117,6 +117,13 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 · [C# reference jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264125).
 
 ## Native evidence matrix
+
+At `13e4af8` all four native runners passed the filesystem watch and
+rescan checks and restarted the shipping worker from Rust backups after
+download, upload, deletion and interrupted timestamp repair. Both Windows
+hosts also passed the loopback SMB and FAT recovery checks. All 20 checks
+on the draft PR passed for this revision. The separate desktop assessment
+covers GUI and platform behavior. [Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186668) · [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
 
 At `e796d30` the Ubuntu desktops each met all eleven X11 limits and
 completed all three portal service comparisons. The Windows desktop jobs

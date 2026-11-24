@@ -1,5 +1,16 @@
 # Project Status
 
+## Preventing duplicate entries on rollback (2026-11-24)
+
+On six copies produced by three Linux x64 C# writers, Rust inserted 24
+new rows whose normalized keys agreed across all qualified rollback
+profiles. The shipping store updated these rows 144 times without adding
+a duplicate. Each of 26 refused batches left its database byte-for-byte
+intact. Independent SQL readback matched the 71 original rows and all 36
+post-write backups. These results cover the selected profiles on native
+Fedora x64. Installed migration after Rust sync activity remains open.
+[Inputs, implementation and native results](rust/rw02-legacy.md#inserting-a-new-row-across-three-qualified-rollback-profiles).
+
 ## Installed Flatpak socket and process identity (2026-11-24)
 
 The signed 3.0.4 application and the isolated Rust probe saw the same Unix

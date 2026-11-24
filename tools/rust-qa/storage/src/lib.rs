@@ -52,6 +52,11 @@ struct Forms {
     maps: Vec<ReferenceCaseMap>,
 }
 
+struct PathForms {
+    display: Key,
+    keys: Vec<Key>,
+}
+
 impl Forms {
     fn load(mode: &str, profiles: &[Profile], study: bool) -> Result<Self> {
         if !matches!(mode, "sensitive" | "insensitive") {
@@ -74,20 +79,22 @@ impl Forms {
         Ok(Self { maps })
     }
 
-    fn spellings(&self, source: &str, relative: &str) -> Result<Vec<Key>> {
+    fn spellings(&self, source: &str, relative: &str) -> Result<PathForms> {
         let native = normalize_absolute_source(Path::new(source))?;
         let source = native
             .to_str()
             .ok_or("source cannot be represented losslessly")?;
         let relative = normalize_relative_text(relative)?;
-        if self.maps.is_empty() {
-            return Ok(vec![[source.to_owned(), relative]]);
-        }
-        Ok(self
-            .maps
-            .iter()
-            .map(|map| [map.uppercase(source), map.uppercase(&relative)])
-            .collect())
+        let display = [source.to_owned(), relative];
+        let keys = if self.maps.is_empty() {
+            vec![display.clone()]
+        } else {
+            self.maps
+                .iter()
+                .map(|map| [map.uppercase(&display[0]), map.uppercase(&display[1])])
+                .collect()
+        };
+        Ok(PathForms { display, keys })
     }
 }
 
@@ -128,7 +135,9 @@ fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {
         accounts.entry(row.get(0)?).or_default().push(Record {
             table: "sync_entries",
             stored: [row.get(1)?, row.get(2)?],
-            spellings: forms.spellings(row.get_ref(3)?.as_str()?, row.get_ref(4)?.as_str()?)?,
+            spellings: forms
+                .spellings(row.get_ref(3)?.as_str()?, row.get_ref(4)?.as_str()?)?
+                .keys,
         });
     }
     let mut repairs = db.prepare(
@@ -145,16 +154,22 @@ fn read_records(db: &Connection, forms: &Forms) -> Result<Accounts> {
         accounts.entry(account).or_default().push(Record {
             table: "sync_timestamp_repairs",
             stored: [row.get(1)?, row.get(2)?],
-            spellings: forms.spellings(
-                field(original, "SourcePath")?,
-                field(original, "RelativePath")?,
-            )?,
+            spellings: forms
+                .spellings(
+                    field(original, "SourcePath")?,
+                    field(original, "RelativePath")?,
+                )?
+                .keys,
         });
     }
     Ok(accounts)
 }
 
 pub enum PathLookup {
+    AbsentConcordant {
+        display: [String; 2],
+        key: [String; 2],
+    },
     Existing {
         key: [String; 2],
         tables: BTreeSet<&'static str>,
@@ -165,6 +180,7 @@ pub enum PathLookup {
 impl PathLookup {
     pub fn observation(&self) -> Value {
         match self {
+            Self::AbsentConcordant { .. } => json!({"status": "absent-concordant"}),
             Self::Existing { key, tables } => {
                 json!({"status": "existing", "storedKey": key, "tables": tables})
             }
@@ -175,7 +191,10 @@ impl PathLookup {
 
 fn lookup(forms: &Forms, accounts: &Accounts, request: &Value) -> Result<PathLookup> {
     let account = field(request, "account")?;
-    let query = forms.spellings(field(request, "source")?, field(request, "relative")?)?;
+    let PathForms {
+        display,
+        keys: query,
+    } = forms.spellings(field(request, "source")?, field(request, "relative")?)?;
     let records = accounts.get(account).map_or(&[][..], Vec::as_slice);
     // A partial understanding of an account cannot establish a missing identity.
     if records.iter().any(|record| !record.explained()) {
@@ -196,9 +215,14 @@ fn lookup(forms: &Forms, accounts: &Accounts, request: &Value) -> Result<PathLoo
         }
     }
     let Some(key) = keys.pop_first() else {
-        let concordant = query.iter().all(|form| form == &query[0]);
+        if query.iter().all(|form| form == &query[0]) {
+            return Ok(PathLookup::AbsentConcordant {
+                display,
+                key: query[0].clone(),
+            });
+        }
         return Ok(PathLookup::Unresolved(
-            json!({"status": if concordant { "absent-concordant" } else { "absent-profile-dependent" }}),
+            json!({"status": "absent-profile-dependent"}),
         ));
     };
     if !keys.is_empty() {
