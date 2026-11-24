@@ -1,5 +1,37 @@
 # Project Status
 
+## Windows recovery and notification comparison (2026-11-24)
+
+The GUI and the independent capture worker now respect the lifetime of the
+system-owned contrast scheme. Independent review checked the memory ownership,
+desktop restoration and capture cleanup. Twenty contrast and thirteen desktop
+tests passed, and the ordinary and retained sources passed frozen Clippy checks
+for both Windows architectures. Checkpoint `fb01b52` contains the fix.
+The resource observer now records the actual native exit code if the GUI stops
+before a timed trial drains. At `e796d30` one x64 scan finished and exceeded
+both WPF-derived limits. The stage-level timing comparison needs three trials.
+
+The notification comparison now tests a per-user display name after both original
+shortcut-only senders fail during the WinRT settings lookup. It uses an existing
+registry namespace and removes its own temporary app identity. Sixty local service
+checks passed. The keyboard-launch trial still requires both a live primary and a
+successful foreground handover.
+[Native contrast failures and fix](rust/rw02-appearance.md#windows-contrast-theme-observation) ·
+[Incomplete timing runs](rust/rw02-windows-window.md#native-process-exits-at-a1011bf-and-e796d30) ·
+[Native notifier lookup](rust/rw02-windows-services.md#native-notification-setting-at-e796d30) ·
+[Keyboard launch](rust/rw02-instance.md#named-input-desktop-at-e796d30).
+
+## System contrast on native Linux x64 (2026-11-24)
+
+On a stock Ubuntu 24.04.5 userspace, the old Linux GUI missed the
+high-contrast setting exposed by the GTK portal. A build with only the
+Rust appearance adapter changed rendered both high-contrast palettes,
+reopened its original window and followed contrast-only changes after a
+portal restart. Fedora 45 passed the same checks with its standard key.
+All 21 native GUI tests passed. Hosted ARM64 and the corrected Windows
+color capture remain open.
+[Native results and exact inputs](rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals).
+
 ## Native desktop and feasibility checks at e796d30 (2026-11-24)
 
 All four native feasibility jobs, the compatibility reference, CI and

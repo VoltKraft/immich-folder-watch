@@ -8,13 +8,13 @@ portal reported five successive color and contrast settings.
 and [pinned Linux event loop](https://docs.rs/winit/0.30.13/src/winit/platform_impl/linux/mod.rs.html).
 
 The Linux adapter uses the existing zbus dependency. It subscribes before
-its first `ReadAll`, reads the appearance namespace after each settings
-change and observes replacement of the portal service. It retains the
+its first `ReadAll`, reads the appearance and GNOME accessibility namespaces
+after a relevant settings change and observes replacement of the portal service. It retains the
 last snapshot while the window is hidden. A change wakes an existing
 window and the GUI thread applies the palette. Missing or unknown values
 use the framework default. Shutdown closes the observer connection and
-joins its worker. The settings adapter only handles the portal's unsigned
-integer values and stays independent of egui.
+joins its worker. The settings adapter uses the standard unsigned contrast value when present.
+Older GTK portals can instead supply GNOME’s boolean high-contrast setting.
 [XDG Settings specification](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Settings.html),
 [native adapter](../../tools/rust-qa/gui/src/linux_appearance.rs) and
 [palette](../../tools/rust-qa/gui/src/appearance_style.rs).
@@ -71,6 +71,41 @@ a fresh directory in `artifacts/rust/appearance/runs`. The
 `45dc03bc05d71766b19f4d0b56f37dbc92951ef9` alongside its original
 build receipt. Contrast is measured when the running portal exports it.
 [Native observer](../../tools/rust-qa/appearance/linux.py).
+
+## High contrast on older Ubuntu Settings portals
+
+The GTK backend on the tested Noble desktop exported the boolean
+`org.gnome.desktop.a11y.interface/high-contrast`. Its standard appearance
+namespace contained only the color scheme. The Rust GUI now reads both
+through the same Settings portal. It observes changes to that specific
+GNOME key and uses it only when the standard contrast key is absent.
+An unknown standard value retains the default. No host configuration or
+additional library is needed. [GTK backend settings](https://github.com/flatpak/xdg-desktop-portal-gtk/blob/1.15.1/src/settings.c) · [Rust adapter](../../tools/rust-qa/gui/src/linux_appearance.rs).
+
+Two native x64 applications ran against the same Ubuntu 24.04.5 userspace
+on the Fedora kernel. Their compiler records differed only in
+`linux_appearance.rs`. Both used the same portal executables and observer.
+The original adapter stayed at gray levels 27 and 248 when the portal
+reported high contrast. The corrected adapter rendered black and white
+backgrounds with 97 light and 42 dark label pixels respectively. After a
+hidden change the same X11 window reopened with the original light palette.
+The test started a new portal process, kept the scheme dark and observed
+the panel turn black and then dark gray as contrast changed. Each new state
+produced two identical screen samples. On Fedora 45 the same checks passed
+through the standard contrast key.
+
+| Native test | Result SHA-256 |
+| --- | --- |
+| Noble x64 previous adapter, high contrast failed | `baa27a13587d626a9d0da2863355d8b210e493504d885fd50ae6a9a9308a4a8e` |
+| Noble x64 corrected adapter | `e4ec74c9df3fd07108adcb64c6aa9dbc23abae9d2c5a616d04cbc60a090de3e9` |
+| Fedora x64 corrected adapter | `67668c7c68ba46812d2cff77ef2880bf97d799f941d2d5a8b0f7350d14822786` |
+
+Under `artifacts/rust/appearance/`, the original Ubuntu result is in
+`noble-previous-adapter/runs/x86_64-dl22mr4r/`, the corrected Ubuntu result
+in `noble-x64/x86_64-krvf14l5/` and the Fedora result in `runs/x86_64-1g_p_xou/`.
+The observer creates the keyfile settings directory in the synthetic profile
+before starting either reader. Without it both portal processes initially
+kept reporting the default scheme. Hosted ARM64 verification is pending.
 
 ## Windows contrast theme observation
 

@@ -20,6 +20,7 @@ PORTAL = "org.freedesktop.portal.Desktop"
 OBJECT = "/org/freedesktop/portal/desktop"
 SETTINGS = "org.freedesktop.portal.Settings"
 APPEARANCE = "org.freedesktop.appearance"
+GNOME_ACCESSIBILITY = "org.gnome.desktop.a11y.interface"
 CONTROL_REVISION = "45dc03bc05d71766b19f4d0b56f37dbc92951ef9"
 SERVICES = {
     "org.freedesktop.impl.portal.PermissionStore": "xdg-permission-store",
@@ -87,6 +88,8 @@ def inside(control):
     config = Path.home() / ".config/xdg-desktop-portal"
     config.mkdir(parents=True)
     (config / "portals.conf").write_text("[preferred]\ndefault=gtk\n")
+    # Both processes must be able to watch the private keyfile's containing directory at startup.
+    (Path.home() / ".config/glib-2.0/settings").mkdir(parents=True)
     Path("/run/user/0").chmod(0o700)
     report = {"mode": "original-control" if control else "candidate", "passed": False, "settings": []}
     try:
@@ -114,16 +117,28 @@ def inside(control):
             report["desktopServices"] = processes
 
             def settings():
-                reply = bus.call_sync(PORTAL, OBJECT, SETTINGS, "ReadAll", GLib.Variant("(as)", ([APPEARANCE],)),
+                reply = bus.call_sync(PORTAL, OBJECT, SETTINGS, "ReadAll",
+                                      GLib.Variant("(as)", ([APPEARANCE, GNOME_ACCESSIBILITY],)),
                                       None, Gio.DBusCallFlags.NONE, 1500, None)
-                return reply.unpack()[0].get(APPEARANCE, {})
+                values = reply.unpack()[0]
+                observed = dict(values.get(APPEARANCE, {}))
+                gnome = values.get(GNOME_ACCESSIBILITY, {})
+                if "high-contrast" in gnome:
+                    observed["gnome-high-contrast"] = gnome["high-contrast"]
+                return observed
 
             # Only read capabilities actually exported by this distribution's portal.
             initial = settings()
             if "color-scheme" not in initial:
                 raise RuntimeError("The desktop's Settings portal did not export its color scheme")
-            contrast_capable = "contrast" in initial
+            if "contrast" in initial:
+                contrast_key = "contrast"
+            elif type(initial.get("gnome-high-contrast")) is bool:
+                contrast_key = "gnome-high-contrast"
+            else:
+                contrast_key = None
             report["initialPortal"] = initial
+            report["contrastKey"] = contrast_key
             colors = Gio.Settings.new("org.gnome.desktop.interface")
             contrast = Gio.Settings.new("org.gnome.desktop.a11y.interface")
 
@@ -132,11 +147,13 @@ def inside(control):
                     raise RuntimeError("The private GNOME settings backend refused the requested state")
                 Gio.Settings.sync()
                 expected = {"color-scheme": {"prefer-dark": 1, "prefer-light": 2}[scheme]}
-                if contrast_capable:
-                    expected["contrast"] = int(high)
+                if contrast_key:
+                    expected[contrast_key] = int(high) if contrast_key == "contrast" else high
                 def value():
                     observed = settings()
-                    return observed if all(observed.get(k) == v for k, v in expected.items()) else None
+                    report["lastPortalRead"] = {"expected": expected, "observed": observed}
+                    return observed if all(type(observed.get(k)) is type(v) and observed[k] == v
+                                           for k, v in expected.items()) else None
                 return wait_for(value, 5, "The portal did not report " + str(expected))
 
             established = change("prefer-light", False)
@@ -148,7 +165,7 @@ def inside(control):
             wait_for(lambda: "ADAPTER " in log.read_text() and check_alive(subject, log) is None, 10, "No native renderer")
             report["application"] = {"pid": subject.pid, "xid": window}
             cases = [("prefer-light", False), ("prefer-dark", False)]
-            if contrast_capable:
+            if contrast_key:
                 cases.extend([("prefer-dark", True), ("prefer-light", True)])
             cases.append(("prefer-light", False))
             for index, (scheme, high) in enumerate(cases):
@@ -162,6 +179,8 @@ def inside(control):
                     bus.call_sync("org.example.IfwGuiProbe", "/org/example/IfwGuiProbe", "org.freedesktop.Application",
                                   "Activate", GLib.Variant("(a{sv})", ({},)), None, Gio.DBusCallFlags.NONE, 2000, None)
                     window = wait_for(lambda: check_alive(subject, log) or display.visible(), 5, "Activation did not reopen the window")
+                    if window != report["application"]["xid"]:
+                        raise ValueError("Activation replaced the original application window")
                 deadline = time.monotonic() + 2
                 while True:
                     check_alive(subject, log)
@@ -189,13 +208,22 @@ def inside(control):
                 wait_for(lambda: check_alive(replacement, restart_log) or pid(PORTAL) == replacement.pid,
                          8, "Replacement frontend did not acquire the private address")
                 states = []
-                for scheme in ("prefer-dark", "prefer-light"):
-                    values = change(scheme, False)
+                restart_cases = [("prefer-dark", False)]
+                if contrast_key:
+                    restart_cases.extend([("prefer-dark", True), ("prefer-dark", False)])
+                restart_cases.append(("prefer-light", False))
+                for scheme, high in restart_cases:
+                    values = change(scheme, high)
                     def painted():
                         check_alive(subject, log)
                         screen = sample(display, window, subject)
-                        return screen if matches(screen["panelRgb"], scheme, False) else None
-                    states.append({"scheme": scheme, "portal": values, **wait_for(painted, 4, "Stale appearance after portal restart")})
+                        ink = screen["lightInkPixels" if scheme == "prefer-dark" else "darkInkPixels"]
+                        return screen if matches(screen["panelRgb"], scheme, high) and (not high or ink >= 4) else None
+                    first = wait_for(painted, 4, "Stale appearance after portal restart")
+                    time.sleep(.12)
+                    if painted() != first:
+                        raise ValueError("Palette changed between samples on the replacement portal")
+                    states.append({"scheme": scheme, "highContrast": high, "portal": values, **first})
                 report["portalRestart"] = {"oldPid": frontend.pid, "newPid": replacement.pid, "states": states}
             bus.call_sync("org.example.IfwGuiProbe", "/org/example/IfwGuiProbe", "org.freedesktop.Application",
                           "ActivateAction", GLib.Variant("(sava{sv})", ("quit", [], {})), None,

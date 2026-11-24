@@ -7,6 +7,7 @@ use std::time::Duration;
 use zbus::{Connection, Proxy, connection::Builder, zvariant::OwnedValue};
 
 const NAMESPACE: &str = "org.freedesktop.appearance";
+const GNOME_ACCESSIBILITY: &str = "org.gnome.desktop.a11y.interface";
 type Settings = HashMap<String, HashMap<String, OwnedValue>>;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -32,7 +33,17 @@ impl Appearance {
                 Some(2) => Scheme::Light,
                 _ => Scheme::System,
             },
-            high_contrast: value("contrast") == Some(1),
+            high_contrast: match settings
+                .get(NAMESPACE)
+                .and_then(|group| group.get("contrast"))
+            {
+                Some(value) => u32::try_from(value).ok() == Some(1),
+                None => settings
+                    .get(GNOME_ACCESSIBILITY)
+                    .and_then(|group| group.get("high-contrast"))
+                    .and_then(|value| bool::try_from(value).ok())
+                    .unwrap_or(false),
+            },
         }
     }
 }
@@ -50,13 +61,24 @@ async fn observe(connection: &Connection, update: impl Fn(Appearance)) -> zbus::
         .receive_signal_with_args("SettingChanged", &[(0, NAMESPACE)])
         .await?;
     let mut owners = proxy.receive_owner_changed().await?;
+    let mut gnome_contrast = proxy
+        .receive_signal_with_args(
+            "SettingChanged",
+            &[(0, GNOME_ACCESSIBILITY), (1, "high-contrast")],
+        )
+        .await?;
     loop {
-        let state: zbus::Result<Settings> = proxy.call("ReadAll", &(vec![NAMESPACE],)).await;
+        let state: zbus::Result<Settings> = proxy
+            .call("ReadAll", &(vec![NAMESPACE, GNOME_ACCESSIBILITY],))
+            .await;
         update(state.as_ref().map(Appearance::read).unwrap_or_default());
         // Yield to incoming events. Closing the monitor connection terminates both paths.
-        let next = future::or(async { changes.next().await.is_some() }, async {
-            owners.next().await.is_some()
-        })
+        let next = future::or(
+            future::or(async { changes.next().await.is_some() }, async {
+                gnome_contrast.next().await.is_some()
+            }),
+            async { owners.next().await.is_some() },
+        )
         .await;
         if !next {
             return Ok(());
@@ -119,6 +141,32 @@ impl Drop for Monitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn older_portals_supply_contrast_through_the_gnome_boolean() {
+        let mut settings = Settings::from([(
+            GNOME_ACCESSIBILITY.into(),
+            HashMap::from([("high-contrast".into(), OwnedValue::from(true))]),
+        )]);
+        assert!(Appearance::read(&settings).high_contrast);
+        for value in [
+            OwnedValue::from(0u32),
+            OwnedValue::from(2u32),
+            OwnedValue::from(false),
+        ] {
+            settings.insert(
+                NAMESPACE.into(),
+                HashMap::from([("contrast".into(), value)]),
+            );
+            assert!(!Appearance::read(&settings).high_contrast);
+        }
+        settings.remove(NAMESPACE);
+        settings
+            .get_mut(GNOME_ACCESSIBILITY)
+            .unwrap()
+            .insert("high-contrast".into(), OwnedValue::from(1u32));
+        assert!(!Appearance::read(&settings).high_contrast);
+    }
 
     #[test]
     fn only_known_typed_portal_values_select_appearance() {

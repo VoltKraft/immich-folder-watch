@@ -2,6 +2,14 @@
 
 **Keep egui/eframe with wgpu as the preferred candidate. RW-02 remains open.** At `6084b23` both Ubuntu hosts and Windows ARM64 met all eleven native resource limits in the selected profiles. Both retained Windows x64 Mailbox depths exceeded the same-host WPF limits for idle close, scan close and scan reopen. Both Windows targets passed the full ordinary filename and reopened editor checks. A second normal launch gave the original window keyboard focus on x64. ARM64 kept it in the background. Interactive Shell activation, notification presentation, mixed DPI and RDP still require native evidence. RW-03 depends on RW-02 acceptance. [Scan measurements](rw02-windows-window.md#native-results-at-6084b23) · [Reopened filenames](rw02-windows-text.md#captured-ordinary-and-reopened-filenames-at-1904be7) · [Project contract](../project.md#m-rust-implementation-20261114) · [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md)
 
+At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
+Windows jobs ended before a complete comparison. The x64 scan that did
+finish exceeded both window-response limits. The Windows contrast adapter
+has since been corrected. On native x64, the Linux GUI also followed high
+contrast on a stock Noble GTK portal through its GNOME setting.
+[Windows process exits](rw02-windows-window.md#native-process-exits-at-a1011bf-and-e796d30)
+· [Ubuntu and Fedora contrast](rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals).
+
 ## What the gate requires
 
 RW-01 is accepted. RW-02 requires a minimal native Rust GUI, filesystem, legacy codec and realtime spikes, four native target results, an exact licensed feature/font graph, a stack choice and an effort estimate. The GUI must demonstrate hidden startup, close/reopen with the engine alive, tray or launcher activation, clean Quit/restart, idle repaint behavior, both Linux window systems, Windows focus/COM, parented portals, tray absence/restart and notifications. It also requires scaling and multiple monitors, keyboard-only operation, screen-reader labels/focus, masking, German text, real IME composition, Unicode paste and graphics initialization/loss/fallback. The same-machine .NET reference sets explicit startup, CPU, memory, repaint and 100,000-file scan response budgets. [GUI gate](../rust-rewrite-plan.md#gui-acceptance-before-full-commitment) · [Native architecture and validation](../rust-desktop-standard.md#rds-08-build-and-validation-contract)

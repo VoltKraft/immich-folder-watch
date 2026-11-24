@@ -210,6 +210,8 @@ to reconcile project decisions, defaults, and recorded state.
   Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [system appearance](docs/rust/rw02-appearance.md) and
   [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
+  Check the [older GTK contrast setting](docs/rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals)
+  through the private Settings portal when changing Linux appearance.
   The Windows contrast supervisor owns the temporary setting and verifies its
   restoration even if the bounded native capture worker exits.
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
