@@ -1,5 +1,30 @@
 # Project Status
 
+## Windows notification result when the setting is unavailable (2026-11-24)
+
+The six senders at `21e794f` received a notifier from Windows, then
+stopped because the optional setting query returned `0x80070490`. After
+the bounded lookup, the revised trial sends through its own verified
+notifier once in this case. An explicit disabled setting still ends the
+trial. The observer records the actual Show HRESULT and requires separate
+history reads and selective removal before claiming delivery. The 65
+service checks and the three Rust readiness tests passed locally, and
+both Windows targets passed cross-Clippy. Native results are pending.
+[WinRT procedure and evidence requirements](../tools/rust-qa/windows-services/toast-history.md).
+
+## Candidate checks at bcbf326 (2026-11-24)
+
+All 28 checks reported on draft PR 46 passed at
+`bcbf3262517af1bb9f73832c1d2426b8b67e0cca`, including four native Rust
+feasibility jobs, four C# reference jobs, four reference installer jobs
+and both Rust CodeQL jobs. The separate desktop assessment is queued.
+It carries the Win32 staging correction and the new four-target SQLite
+check. The previous queued assessment at `1b4d050` was superseded with
+zero jobs executed.
+[PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493088022) ·
+[Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493087858).
+
 ## Signed Flatpak second launch during a live Rust inventory (2026-11-24)
 
 The installed Fedora x64 GUI kept its original inventory worker across
@@ -39,8 +64,10 @@ and DX12 timing. The separate desktop matrix covers these new observations.
 The regular Windows CI job timed out after 30 seconds in the WPF watermark
 test for a collapsed password input. Its WPF assembly reported 35 passes
 and one timeout. The native Windows Core suite reported 562 passes and
-nine skips. A targeted retry of that Windows job uses the same revision.
-[Original Windows CI job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138787595722).
+nine skips. The targeted retry at the same revision passed all 36 WPF
+assembly tests in eight seconds and repeated the 562 Core passes.
+[First Windows CI job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138787595722) ·
+[Successful retry](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138794638967).
 
 The four jobs for the shipping 3.0.4 installer passed again. Independent
 readback matched the published archive digests and 54 indexed files in

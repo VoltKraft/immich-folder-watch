@@ -776,6 +776,20 @@ The detached comparison in
 `artifacts/rust/hosted-desktop-storage/45469433661/linux-desktop-readback.json`
 has SHA-256 `0292ad5b6ae3cda95258e25dff73ca104fb1a39855dcb55f0ef2987ede8c6e80`.
 
+At `13e4af8` both Ubuntu hosts again met all eleven limits. On x64 the
+scan reopen and close p95s were 0.84 and 0.38 ms across the three trials.
+On ARM64 they were 0.91 and 0.35 ms. All 316 x64 and 181 ARM64 window
+requests completed during observed directory reads. Orca spoke the expected
+field names on X11 and Wayland. Both high-contrast trials restored the
+original colors, and both builds reproduced the offline Wayland relink.
+The separate portal trials repeated the stock refusal and private backport
+contention. The installer feasibility result still comes from the offline
+Noble x64 guest. The combined archive readback at
+`artifacts/rust/hosted-desktop-storage/45476186847/linux-desktop-readback.json`
+has SHA-256 `687d3ff70ecb44ee3d6722fb34b11f493aa6a1b237e28f1ab498253af063b524`.
+[Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14967501592) ·
+[Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14966527490).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop
