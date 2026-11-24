@@ -564,6 +564,16 @@ and removes its own temporary identity by handle. Its 63 local service
 checks passed. Native delivery and visible presentation remain open.
 [Registry scope and reproduction](../../tools/rust-qa/windows-services/toast-history.md#per-user-display-name-comparison).
 
+The six senders in the original `21e794f` archives all reported elevated
+tokens. The revised WinRT trial follows Microsoft's classic desktop send
+sequence when the last notifier was created but its setting alone remains
+unavailable with `0x80070490` after the bounded wait. It uses that notifier
+once and records the signed `Show` HRESULT. A disabled setting or access
+denial still ends the attempt. History delivery requires two independent
+content matches and selective removal. A native result for the revised
+sender and a direct observation of banner presentation remain open.
+[Microsoft's desktop send example](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/hh802768%28v%3Dvs.85%29) · [Recorder and replay](../../tools/rust-qa/windows-services/toast-history.md).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
@@ -762,6 +772,15 @@ the fixture's running-phase pin. The next native execution will verify
 both observations. [Worker directory open](../../tools/rust-qa/gui/src/windows_worker.rs)
 · [Launcher fixture](../../tools/rust-qa/windows-launcher/observe.py)
 · [Native control](../../tools/rust-qa/windows-launcher/test_staged_images.py).
+
+The retained-window launcher and tray observers used the same staging
+helper at this revision. All six of their primary process logs also record
+election followed by error 32. None reached inventory or activation.
+Detached replay of both archives matched each observer source and indexed
+log. Its SHA-256 is
+`e30c504320b897a4ede58a0d7e8dad09fa17daeb3963f36345fabbc1c6b86ca7`.
+[x64 retained archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14966273317) ·
+[ARM64 retained archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14967851248).
 
 ## Shipping WPF tray lookup
 

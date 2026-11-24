@@ -508,7 +508,7 @@ class ToastHistoryTests(unittest.TestCase):
             run()
             build_path = d / "native-build.json"
             build = json.loads(build_path.read_bytes())
-            build["sourceFiles"][h.READINESS_SOURCE] = "3" * 64
+            build["sourceFiles"][h.READINESS_SOURCE] = h.SETTING_REQUIRED_SHA256
             build["steps"]["notifier-readiness"] = 0
             h.write(build_path, build)
             report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(build_path))
@@ -540,6 +540,106 @@ class ToastHistoryTests(unittest.TestCase):
             proc["notifierReadiness"].pop(0)
             with self.assertRaisesRegex((RuntimeError, ValueError), "readiness|cleanup"):
                 h.replay(d, report)
+
+    def test_direct_show_requires_the_final_notifier_and_reports_its_exact_hresult(self):
+        prefix = (f"operation=post-quiet\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid=12\n"
+                  "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n")
+        created = "phase=notifier-create\nready.1.create=0\n"
+        setting = "phase=notifier-setting\nready.1.setting="
+        unknown = created + setting + f"{h.NOT_FOUND}\nreadinessElapsedMs=7520\nsetting=unavailable\n"
+        properties = "phase=content\nsuppressPopup=true\nmirroringDisabled=true\nexpirationTicks=12345\n"
+        shown = properties + "phase=show\nshowHresult=0\nshowReturned=true\n"
+        denied = -2147024891
+
+        def parse(log, hr=None):
+            terminal = "" if hr is None else f"Probe HRESULT {hr}\n"
+            return h.parse_log((prefix + log + terminal).encode(), "post-quiet", TOKEN, 12, 2,
+                               int(hr is not None), require_readiness=True, direct_show=True)
+
+        for value in (0, 1):
+            row = parse(unknown + shown.replace("showHresult=0", f"showHresult={value}"))
+            self.assertTrue(h.validate_post(row, "quiet"))
+            self.assertEqual(row["postResult"], dict(setting="unavailable", showHresult=value))
+        row = parse(unknown + properties + f"phase=show\nshowHresult={denied}\n", denied)
+        self.assertEqual(row["postResult"], dict(setting="unavailable", showHresult=denied))
+        for token in ("suppressPopup=true\n", "mirroringDisabled=true\n", "expirationTicks=12345\n"):
+            with self.subTest(token=token), self.assertRaisesRegex(ValueError, "properties before Show"):
+                parse(unknown + properties.replace(token, "") + f"phase=show\nshowHresult={denied}\n", denied)
+        with self.assertRaisesRegex(ValueError, "properties before Show"):
+            parse(unknown + properties.replace("suppressPopup=true", "suppressPopup=false")
+                  + f"phase=show\nshowHresult={denied}\n", denied)
+        with self.assertRaisesRegex(ValueError, "original native Show return"):
+            parse(unknown + "showReturned=true\n" + shown.replace("showReturned=true\n", ""))
+        for blocked in ("1", "2", "3", "4"):
+            raw = created + setting + f"0\nsetting={blocked}\n"
+            row = parse(raw)
+            self.assertFalse(h.validate_post(row, "quiet"))
+            self.assertEqual(row["postResult"], dict(setting=blocked, showHresult=None))
+            with self.assertRaises(ValueError):
+                parse(raw + shown)
+        for raw in (unknown.replace("7520", "200"), unknown.replace("7520", "-1"),
+                    unknown.replace("ready.1.setting=" + str(h.NOT_FOUND), "ready.1.setting=" + str(denied)),
+                    f"phase=notifier-create\nready.1.create={h.NOT_FOUND}\nreadinessElapsedMs=8000\nsetting=unavailable\n",
+                    created + setting + f"{h.NOT_FOUND}\nsetting=0\n"):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                parse(raw + shown)
+        for raw, hr in ((shown.replace("showHresult=0\n", ""), None),
+                        (shown.replace("showHresult=0", f"showHresult={denied}"), None),
+                        (shown, denied), (shown.replace("showHresult=0", "showHresult=2147483648"), None),
+                        (properties + "phase=show\n", denied)):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                parse(unknown + raw, hr)
+
+    def test_direct_show_replay_requires_both_history_rows_and_independent_readback(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            run, report = trial(directory=directory)
+            run()
+            native = directory / "native-build.json"
+            build = json.loads(native.read_bytes())
+            build["sourceFiles"][h.READINESS_SOURCE] = "3" * 64
+            build["steps"]["notifier-readiness"] = 0
+            h.write(native, build)
+            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(native))
+            for proc in report["processes"]:
+                op = proc["operation"]
+                if not op.startswith("post-"):
+                    continue
+                quiet = op == "post-quiet"
+                # One sender has an unavailable setting; the other reads Enabled.
+                code = h.NOT_FOUND if quiet else 0
+                setting = "unavailable" if quiet else "0"
+                proc["notifierReadiness"] = [dict(create=0, setting=code)]
+                proc["postResult"] = dict(setting=setting, showHresult=0)
+                name = directory / proc["log"]
+                raw = (f"operation={op}\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid={proc['pid']}\n"
+                       "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n"
+                       f"phase=notifier-create\nready.1.create=0\nphase=notifier-setting\nready.1.setting={code}\n")
+                if quiet:
+                    raw += "readinessElapsedMs=8000\n"
+                raw += (f"setting={setting}\nphase=content\nsuppressPopup={str(quiet).lower()}\n"
+                        "mirroringDisabled=true\nexpirationTicks=12345\nphase=show\nshowHresult=0\nshowReturned=true\n")
+                name.write_bytes(raw.encode())
+                proc["logSha256"] = h.sha(name)
+            report["evidenceFiles"] = h.evidence_files(directory)
+            self.assertTrue(h.replay(directory, report)["finallyEmpty"])
+            for attr in ("presentationObserved", "activationObserved"):
+                with self.subTest(attr=attr), self.assertRaises(ValueError):
+                    h.replay(directory, {**report, attr: True})
+            sender = next(p for p in report["processes"] if p["operation"] == "post-quiet")
+            sender["postResult"]["showHresult"] = 1
+            with self.assertRaisesRegex(RuntimeError, "exact toast cleanup") as rejected:
+                h.replay(directory, report)
+            self.assertIn("Show result", str(rejected.exception.__cause__))
+            sender["postResult"]["showHresult"] = 0
+            reader = next(p for p in report["processes"] if p["operation"] == "inspect"
+                          and b"quiet.title" in (directory / p["log"]).read_bytes())
+            path = directory / reader["log"]
+            path.write_bytes(path.read_bytes().replace(b"IFW synthetic quiet", b"Different quiet"))
+            reader["logSha256"] = h.sha(path)
+            report["evidenceFiles"] = h.evidence_files(directory)
+            with self.assertRaises((ValueError, RuntimeError)):
+                h.replay(directory, report)
 
     def test_recognizes_group_tag_and_both_exact_title_fields(self):
         clean = item("inspect", {"normal"}, {})["fields"]

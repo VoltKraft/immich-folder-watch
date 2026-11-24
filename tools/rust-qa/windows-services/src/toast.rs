@@ -192,15 +192,20 @@ fn post(id: &Identity<'_>, quiet: bool) -> Result<()> {
                 "ready.{attempt}.setting={}",
                 setting.as_ref().err().map_or(0, |e| e.code().0)
             );
-            Ok((notifier, setting.map_err(|e| e.code().0)?))
+            Ok((notifier, setting.map_err(|e| e.code().0)))
         },
         || started.elapsed(),
         std::thread::sleep,
     )
     .map_err(|hr| Error::from_hresult(HRESULT(hr)))?;
-    println!("setting={}", setting.0);
-    if setting != NotificationSetting::Enabled {
-        return Ok(());
+    if let Some(setting) = setting {
+        println!("setting={}", setting.0);
+        if setting != NotificationSetting::Enabled {
+            return Ok(());
+        }
+    } else {
+        println!("readinessElapsedMs={}", started.elapsed().as_millis());
+        println!("setting=unavailable");
     }
     let (title, body) = (id.title(mode), id.body(mode));
     // This synthetic protocol has no registered handler and is never invoked.
@@ -242,7 +247,11 @@ fn post(id: &Identity<'_>, quiet: bool) -> Result<()> {
         expiration.UniversalTime
     );
     std::io::stdout().flush()?;
-    notifier.Show(&toast)?;
+    // The typed projection discards successful HRESULT values. Call the same generated
+    // Show slot with both live interfaces on their originating apartment.
+    let shown = unsafe { (notifier.vtable().Show)(notifier.as_raw(), toast.as_raw()) };
+    println!("showHresult={}", shown.0);
+    shown.ok()?;
     println!("showReturned=true");
     Ok(())
 }

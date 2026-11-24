@@ -20,11 +20,15 @@ PROGRAMS = "a77f5d77-2e2b-44c3-a6a2-aba601054a51"
 OPERATIONS = {"prepare", "register", "inspect", "post-quiet", "post-normal", "remove-quiet", "remove-normal"}
 HISTORY_PHASES = ["identity", "shortcut", "history"]
 READINESS_SOURCE = "tools/rust-qa/windows-services/src/toast_readiness.rs"
+# This original sender stopped on every failed Setting query.
+SETTING_REQUIRED_SHA256 = "9486cd76711a68ea684c150f822457e7b37c6d92566f83c9ccfb43d2cef72a82"
 DISPLAY_NAME_SOURCE = "tools/rust-qa/windows-services/toast_display_name.py"
 # This original observer could only open an existing namespace.
 OPEN_ONLY_SOURCE_SHA256 = "3ef83b73b4867be311d3657a86d2e99247cc2495972f826dcd29c9ad52aa80bb"
 NOT_FOUND = 0x80070490 - (1 << 32)
 MAX_NOTIFIER_ATTEMPTS = 17
+# The sender stops when another 500 ms wait would reach the 8-second budget.
+LAST_WAIT_MS = 7500
 REQUIRED_IMPORTS = {"RoInitialize", "RoUninitialize", "InitPropVariantFromCLSID", "SetCurrentProcessExplicitAppUserModelID",
                     "PropVariantChangeType", "GetTokenInformation"}
 # Failure of one of these Windows services/capabilities is recorded as unavailable.
@@ -38,7 +42,7 @@ def request_identity(target):
         raise ValueError("Use the corresponding disposable Windows runner on the rewrite branch")
 
 
-def notifier_attempts(fields, phases, hresult):
+def notifier_attempts(fields, phases, hresult, *, direct_show):
     """Check the complete bounded Create/Setting sequence before content or Show."""
     raw = [key for key in fields if key.startswith("ready.")]
     observed = []
@@ -59,21 +63,29 @@ def notifier_attempts(fields, phases, hresult):
         observed.append(calls)
         if code != NOT_FOUND or f"ready.{number + 1}.create" not in fields:
             break
-    if code:
+    setting = fields.get("setting")
+    if direct_show and calls.get("setting") == NOT_FOUND:
+        elapsed = fields.get("readinessElapsedMs", "")
+        if (setting != "unavailable" or not re.fullmatch(r"0|[1-9][0-9]{0,9}", elapsed)
+                or (len(observed) < MAX_NOTIFIER_ATTEMPTS and int(elapsed) < LAST_WAIT_MS)):
+            raise ValueError("Missing bounded wait for the unavailable native setting")
+    elif setting == "unavailable" or "readinessElapsedMs" in fields:
+        raise ValueError("A sender claimed an unavailable setting without its final verified notifier")
+    if code and setting != "unavailable":
         if hresult != code or "setting" in fields or "showReturned" in fields:
             raise ValueError("Notifier readiness refusal differs from the sender result")
-    elif fields.get("setting") == "0":
+    elif setting in ("0", "unavailable"):
         expected_phases.append("content")
         if hresult is None or "show" in phases:
             expected_phases.append("show")
-    elif fields.get("setting") not in ("1", "2", "3", "4") or hresult is not None:
+    elif setting not in ("1", "2", "3", "4") or hresult is not None:
         raise ValueError("Missing or invalid notification setting after readiness")
     if expected_keys != raw or expected_phases != phases:
         raise ValueError("Notifier readiness calls or phases differ from the native result")
     return observed
 
 
-def parse_log(data, operation, token, expected_pid, session, exit_code, *, require_readiness=False):
+def parse_log(data, operation, token, expected_pid, session, exit_code, *, require_readiness=False, direct_show=False):
     if not re.fullmatch(r"[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}", token):
         raise ValueError("Expected the trial's version 4 UUID")
     if len(data) > 8192:
@@ -93,21 +105,38 @@ def parse_log(data, operation, token, expected_pid, session, exit_code, *, requi
         key, separator, value = line.partition("=")
         if not separator or key in fields:
             raise ValueError("Malformed or duplicate native toast evidence")
-        if pending_call is not None:
+        if pending_call == "show":
+            if (key != "showHresult" or not re.fullmatch(r"0|-?[1-9][0-9]{0,9}", value)
+                    or not -(1 << 31) <= int(value) < (1 << 31)):
+                raise ValueError("Missing immediate native Show HRESULT")
+            pending_call = None
+        elif key == "showHresult":
+            raise ValueError("Show HRESULT outside the native Show call")
+        elif pending_call is not None:
             if not re.fullmatch(r"ready\.[1-9][0-9]?\." + pending_call, key):
                 raise ValueError("Missing immediate notifier readiness result")
             pending_call = None
         elif key.startswith("ready."):
             raise ValueError("Notifier readiness result is outside its native call phase")
         if key == "phase":
+            if direct_show and value == "notifier-create" and (
+                    fields.get("installedLinkVerified") != "true" or "setting" in fields or "readinessElapsedMs" in fields):
+                raise ValueError("Notifier query outside the verified shortcut and setting sequence")
             phases.append(value)
             if value in ("notifier-create", "notifier-setting"):
                 pending_call = value.removeprefix("notifier-")
+            elif value == "show" and direct_show:
+                verify_properties(fields, operation.removeprefix("post-"))
+                pending_call = "show"
         else:
             if operation == "inspect" and exit_code == 0 and key == "count" and phases != HISTORY_PHASES:
                 raise ValueError("The native row count appeared outside the exact history-read phase")
+            if direct_show and key in ("setting", "readinessElapsedMs") and phases[-1:] != ["notifier-setting"]:
+                raise ValueError("Native setting evidence appeared outside the setting query")
+            if direct_show and key == "showReturned" and ("showHresult" not in fields or value != "true"):
+                raise ValueError("Missing the original native Show return")
             fields[key] = value
-    if (fields.get("operation") != operation or fields.get("aumid") != "IFW.RustQA.Toast." + token
+    if (pending_call is not None or fields.get("operation") != operation or fields.get("aumid") != "IFW.RustQA.Toast." + token
             or fields.get("pid") != str(expected_pid) or fields.get("session") != str(session)
             or fields.get("elevated") not in ("true", "false") or not phases or phases[0] != "identity"
             or (exit_code == 0) != (hresult is None)):
@@ -117,7 +146,13 @@ def parse_log(data, operation, token, expected_pid, session, exit_code, *, requi
     item = dict(fields=fields, phases=phases, hresult=hresult)
     if operation in ("post-quiet", "post-normal") and (exit_code == 0 or len(phases) > 2) and (
             require_readiness or any(phase.startswith("notifier-") for phase in phases)):
-        item["notifierReadiness"] = notifier_attempts(fields, phases, hresult)
+        item["notifierReadiness"] = notifier_attempts(fields, phases, hresult, direct_show=direct_show)
+        if direct_show:
+            code = int(fields["showHresult"]) if "showHresult" in fields else None
+            if ((code is not None and (code if code < 0 else None) != hresult)
+                    or ("showReturned" in fields) != (code is not None and code >= 0)):
+                raise ValueError("Native Show HRESULT differs from the returned result")
+            item["postResult"] = dict(setting=fields.get("setting"), showHresult=code)
     return item
 
 
@@ -135,18 +170,26 @@ def observed_rows(fields, token):
     return modes
 
 
+def verify_properties(fields, mode):
+    if (mode not in ("quiet", "normal") or fields.get("suppressPopup") != ("true" if mode == "quiet" else "false")
+            or fields.get("mirroringDisabled") != "true" or int(fields.get("expirationTicks", "0")) <= 0):
+        raise ValueError("Missing the verified notification properties before Show")
+
+
 def validate_post(item, mode):
     fields = item["fields"]
-    if fields.get("setting") not in ("0", "1", "2", "3", "4"):
+    if fields.get("setting") not in ("0", "1", "2", "3", "4", "unavailable"):
         raise ValueError("Unknown native notification setting")
-    if fields["setting"] != "0":
+    if (fields["setting"] == "unavailable"
+            and item.get("notifierReadiness", [])[-1:] != [{"create": 0, "setting": NOT_FOUND}]):
+        raise ValueError("Missing direct evidence of the unavailable setting")
+    if fields["setting"] not in ("0", "unavailable"):
         if "show" in item["phases"] or "showReturned" in fields:
             raise ValueError("A disabled setting allowed a send attempt")
         return False
-    if (fields.get("suppressPopup") != ("true" if mode == "quiet" else "false")
-            or fields.get("mirroringDisabled") != "true" or fields.get("showReturned") != "true"
-            or int(fields.get("expirationTicks", "0")) <= 0 or item["phases"][-1] != "show"):
-        raise ValueError("The native sender did not confirm this request's properties and Show result")
+    verify_properties(fields, mode)
+    if fields.get("showReturned") != "true" or item["phases"][-1] != "show":
+        raise ValueError("The native sender did not confirm its Show result")
     return True
 
 
@@ -360,10 +403,12 @@ def replay(directory, result):
         if identity in identities:
             raise ValueError("A sender or observer process identity was reused")
         identities.add(identity)
+        readiness = build["sourceFiles"].get(READINESS_SOURCE)
         row = parse_log((directory / filename).read_bytes(), operation, token, proc["pid"],
-                        result["desktop"]["session"], proc["exit"], require_readiness=READINESS_SOURCE in build["sourceFiles"])
-        if row.get("notifierReadiness") != proc.get("notifierReadiness"):
-            raise ValueError("The reported notifier readiness differs from the original native calls")
+                        result["desktop"]["session"], proc["exit"], require_readiness=readiness is not None,
+                        direct_show=readiness not in (None, SETTING_REQUIRED_SHA256))
+        if any(row.get(key) != proc.get(key) for key in ("notifierReadiness", "postResult")):
+            raise ValueError("The reported readiness or Show result differs from the original native calls")
         if operation != "prepare" and row["fields"].get("installedLinkVerified") != "true":
             raise ValueError("Missing identity readback from the installed Start Menu shortcut")
         return row
@@ -395,7 +440,8 @@ def replay(directory, result):
 
     original = {}
     status = assess_registration(archived, token, original, registration, delay=lambda _: None, clock=lambda: 0)
-    if (status != "passed" or index != len(journal)
+    if (status != "passed" or index != len(journal) or result.get("presentationObserved") is not None
+            or result.get("activationObserved") is not None
             or original.get("shortcutOnly") != result.get("shortcutOnly")
             or any(original[k] != result.get(k) for k in ("initiallyEmpty", "finallyEmpty", "modes", "cleanup"))):
         raise ValueError("The raw native history differs from the reported outcome")
@@ -434,9 +480,11 @@ def measure(target, exe, out, record):
             record["processes"].append(info)
             with child(api, exe, ["--hosted-toast-history", str(area), token, operation], area, env, log, info) as proc:
                 proc.wait(timeout=25)
-            item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"], require_readiness=True)
-            if "notifierReadiness" in item:
-                info["notifierReadiness"] = item["notifierReadiness"]
+            item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"],
+                             require_readiness=True, direct_show=True)
+            for key in ("notifierReadiness", "postResult"):
+                if key in item:
+                    info[key] = item[key]
             info["logSha256"] = sha(log)
             if operation != "prepare" and item["fields"].get("installedLinkVerified") != "true":
                 raise ValueError("The native subject could not verify the installed shortcut")
@@ -519,7 +567,7 @@ def main():
         readiness = original / "notifier-readiness.txt"
         if (type(build["steps"].get("notifier-readiness")) is not int or build["steps"]["notifier-readiness"] != 0
                 or sha(readiness) != build["evidenceFiles"].get(readiness.name)
-                or "test result: ok. 2 passed; 0 failed;" not in readiness.read_text(encoding="utf-8")):
+                or "test result: ok. 3 passed; 0 failed;" not in readiness.read_text(encoding="utf-8")):
             raise ValueError("The native build did not complete the notifier readiness controls")
         result["earlyEvidence"][readiness.name] = sha(readiness)
         pe = module("toast_pe", QA / "windows-imports/formats.py")
