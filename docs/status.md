@@ -13,6 +13,9 @@ Flatpak runtime. Installed migration after sync and overlapping package
 changes remain open.
 All 27 native GUI and tray tests passed. A separate private D-Bus loss test
 confirmed that the Rust primary held its socket until supervisor shutdown.
+On the same binary, ordinary Rust second launches kept their original
+owners on X11 and Wayland. The independent X11 inventory worker found
+the subsequently added file in 4.6592 s and exited on Quit.
 [Original and corrected installed trials](rust/rw02-instance.md#shipping-launch-while-the-rust-flatpak-owns-the-endpoint).
 
 ## Four native desktop assessments at 21e794f (2026-11-24)

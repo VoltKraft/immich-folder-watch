@@ -193,8 +193,9 @@ to the primary. [Flatpak entry](../../packaging/flatpak/io.github.voltkraft.immi
 [Shipping startup](../../src/ImmichFolderWatch.App.Linux/App.axaml.cs).
 
 The pinned zbus 5.19.0 default allows an owner to be replaced and asks to
-replace an existing owner. The GUI now exports its interfaces before it
-requests the name with only `DoNotQueue`. A secondary resolves the owner's
+replace an existing owner. The GUI exports the application interface before
+it requests the name with only `DoNotQueue`. It admits activation after
+the primary has acquired any necessary legacy socket. A secondary resolves the owner's
 unique bus name, sends it one `Activate` request and checks the reply before
 exiting. The primary acknowledges an accepted command and rejects a full
 queue or a request received during shutdown. Election precedes appearance
@@ -220,6 +221,19 @@ from the original process. These tests cover one Linux desktop session.
 Installed old/new handover and Windows cross-session writer exclusion have
 separate acceptance requirements. [Worker observer](../../tools/rust-qa/performance/worker/second_launch.py) ·
 [Native desktop observers](../../tools/rust-qa/gui/native.py).
+
+At `8e1c5d7` the same executable as the signed-package pairing passed
+both ordinary and background second launches with an active synthetic
+inventory worker on a separate Fedora x64 desktop. Both secondaries exited
+zero. The primary (PID 9), worker (PID 16) and XID 4194306 survived.
+The original worker discovered a file added after both launches in 4.6592 s
+and drained on Quit. The report SHA-256 is
+`c3dc6df1d1d1cb9b0b4711444c723bed61b229ad75cc07d8f422fb7c2cdbf31e`.
+Separate native X11 and Wayland runs retained their original D-Bus owners
+through ordinary second launch, exercised keyboard input and drained on
+Quit. Their result SHA-256 values are
+`c1ef41f16778eaca4a12bcb7b7cdd14577db501cd55d2e7047d2cf9d208d620b`
+and `da3612d04f5c811fb6a1e1c43a1720add41acce2c85b41b1d19d22432b36327f`.
 
 ### Second launch through the installed Flatpak
 
