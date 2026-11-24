@@ -60,6 +60,43 @@ def bitmap(foreground, paper):
 
 
 class WindowsContrastTests(unittest.TestCase):
+    def test_publisher_restores_its_thread_before_closing_the_owned_handle(self):
+        publish = observer["on_subject_desktop"]
+        name = "IfwQa_" + "1" * 32
+        for interrupted in (False, True):
+            with self.subTest(interrupted=interrupted):
+                active = [21]
+                events = []
+                api = Mock()
+                api.open_named.return_value = 42
+                api.thread.return_value = 7
+                api.thread_desktop.side_effect = lambda _: active[0]
+                api.name.side_effect = {21: "Default", 42: name}.__getitem__
+                def attach(handle):
+                    events.append(("attach", handle))
+                    active[0] = handle
+                    return True
+                def close(handle):
+                    events.append(("close", handle))
+                    return active[0] == 21
+                def cycle():
+                    self.assertEqual(active[0], 42)
+                    if interrupted:
+                        raise ValueError("Original window was lost")
+                    return "observed"
+                api.close.side_effect = close
+                receipt = {}
+                with patch.object(c, "WinDLL", create=True), patch.dict(publish.__globals__,
+                        bind=lambda *_: attach, ordinary_console=lambda *_: True):
+                    if interrupted:
+                        with self.assertRaisesRegex(ValueError, "Original window was lost"):
+                            publish(api, name, cycle, receipt)
+                    else:
+                        self.assertEqual(publish(api, name, cycle, receipt), "observed")
+                self.assertEqual(events, [("attach", 42), ("attach", 21), ("close", 42)])
+                self.assertEqual(receipt, dict(originalThreadDesktop="Default", originalThreadDesktopRestored=True,
+                                               ownedHandleClosed=True))
+
     def test_repeated_reads_copy_the_name_from_user32_owned_storage(self):
         scheme = c.create_unicode_buffer(32)
         def parameters(action, size, pointer, flags):

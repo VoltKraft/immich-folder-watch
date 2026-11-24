@@ -241,3 +241,10 @@ temporary profile was removed. This run produced no theme change or
 rendered contrast samples. Its result SHA-256 is
 `d6b23b36f298715b1e2d4a1b3271283740a3639d3bdbc0ca0e01c6ecfe69fbc0`.
 [Original x64 desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292).
+
+The publisher now restores and checks its original thread desktop before
+closing the handle it opened. Its result records both operations separately.
+A portable test exercised ordinary completion and an interrupted window
+check. The next native execution must establish whether the publisher can
+complete cleanup on the x64 host. [Thread desktop selection](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop)
+· [Desktop handle lifetime](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-closedesktop).

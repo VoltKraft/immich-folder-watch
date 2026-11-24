@@ -11,6 +11,9 @@ reopens. Both Windows hosts passed the foreground keyboard relaunch. NVDA
 delivered all seven expected cues on x64. ARM64 stopped at the first field.
 The Windows desktop jobs remain failed, including contrast and notification
 presentation. Mixed DPI and RDP still need a suitable test desktop.
+The revised contrast publisher restores its original thread desktop before
+closing the test handle. All 23 portable appearance tests passed. The
+native repeat is pending.
 [Original jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661)
 · [Frame and window measurements](rust/rw02-windows-window.md#native-results-at-21e794f)
 · [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).

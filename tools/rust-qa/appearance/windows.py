@@ -135,23 +135,40 @@ def require_live_window(api, session, name, pid, hwnd):
         reject("GetAncestor(GA_ROOT)", hwnd, ancestor)
 
 
-def on_subject_desktop(api, name, cycle):
+def on_subject_desktop(api, name, cycle, report):
     if not named_desktop(name):
         raise ValueError("The contrast publisher requires the test-owned input desktop")
     handle = check(api.open_named(name, 0, False, READ_OBJECTS), "OpenDesktopW(contrast publisher)")
     try:
         def publish():
             attach = bind(c.WinDLL("user32", use_last_error=True), "SetThreadDesktop", w.BOOL, w.HANDLE)
-            check(attach(handle), "SetThreadDesktop(contrast publisher)")
-            if not ordinary_console(api.context(), name):
-                raise RuntimeError("The contrast publisher did not join the owned input desktop")
-            return cycle()
-        # Both setting broadcasts originate on the subject's desktop. This short-lived
-        # supervisor thread exits before its handle closes, including after capture failure.
+            thread = api.thread()
+            original = check(api.thread_desktop(thread), "GetThreadDesktop(contrast publisher)")
+            original_name = api.name(original)
+            if not same_name(original_name, "Default") and not same_name(original_name, name):
+                raise RuntimeError("The contrast publisher started on an unexpected desktop")
+            report["originalThreadDesktop"] = original_name
+            changed = not same_name(original_name, name)
+            if changed:
+                check(attach(handle), "SetThreadDesktop(contrast publisher)")
+            try:
+                if not ordinary_console(api.context(), name):
+                    raise RuntimeError("The contrast publisher did not join the owned input desktop")
+                return cycle()
+            finally:
+                if changed:
+                    # GetThreadDesktop lends the original handle. Only the handle we opened is closed.
+                    check(attach(original), "SetThreadDesktop(restore contrast publisher)")
+                current = check(api.thread_desktop(thread), "GetThreadDesktop(restored contrast publisher)")
+                report["originalThreadDesktopRestored"] = same_name(api.name(current), original_name)
+                if not report["originalThreadDesktopRestored"]:
+                    raise RuntimeError("Could not verify the contrast publisher's original thread desktop")
+        # Join the publisher after it drops its association with our handle.
         with ThreadPoolExecutor(max_workers=1) as publisher:
             return publisher.submit(publish).result()
     finally:
-        check(api.close(handle), "CloseDesktop(contrast publisher)")
+        report["ownedHandleClosed"] = bool(api.close(handle))
+        check(report["ownedHandleClosed"], "CloseDesktop(contrast publisher)")
 
 
 def capture_job(target, desktop, report):
@@ -293,7 +310,7 @@ def supervise(target, folder, output):
                     return original
                 def change_and_restore():
                     contrast_cycle(SystemColors(bind, check), session_guard, window_guard, capture, report)
-                on_subject_desktop(desk, desktop, change_and_restore)
+                on_subject_desktop(desk, desktop, change_and_restore, report.setdefault("publisher", {}))
             finally:
                 announce(control, "stop", token)
         child = TEXT["read"](output / "worker.json")
