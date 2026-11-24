@@ -1,7 +1,7 @@
 """Observe the signed Flatpak uploading one synthetic image while Rust attempts an ordinary launch."""
 
 import base64
-from contextlib import closing
+from contextlib import closing, ExitStack
 from email.parser import BytesParser
 from email.policy import default
 import hashlib
@@ -33,7 +33,31 @@ def multipart_image(content_type, body, filename=FILENAME, image=IMAGE):
     return len(files) == 1 and files[0].get_filename() == filename and files[0].get_payload(decode=True) == image
 
 
+def empty_permission_probe(content_type, body):
+    message = BytesParser(policy=default).parsebytes(b'Content-Type: ' + content_type.encode('ascii') + b'\r\n\r\n')
+    boundary = message.get_boundary()
+    if message.get_content_type() != 'multipart/form-data' or not boundary:
+        return False
+    marker = b'--' + boundary.encode('ascii')
+    lines = [line for line in body.split(b'\r\n') if line]
+    return lines in ([marker + b'--'], [marker, marker + b'--'])
+
+
+def verify_asset_posts(posts, expected):
+    completed = []
+    for post in posts:
+        if post.get('kind') == 'permission-probe' and post.get('status') == 400:
+            continue
+        if post.get('kind') != 'matched-image' or post.get('status') != 201:
+            raise ValueError('An unrecognized, refused or incomplete asset request reached the loopback peer')
+        completed.append((post['phase'], post['filename']))
+    if completed != expected:
+        raise ValueError('The asset request history differs from the two process lifetimes')
+
+
 class UploadPeer(BaseHTTPRequestHandler):
+    timeout = 6
+
     def log_message(self, format, *args):
         pass
 
@@ -44,6 +68,9 @@ class UploadPeer(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+        if getattr(self, 'post_record', None) is not None:
+            self.post_record['status'] = status
+            self.post_record['answeredNs'] = time.monotonic_ns()
 
     def do_GET(self):
         if self.path in ('/api/server/ping', '/api/server-info/ping'):
@@ -54,20 +81,39 @@ class UploadPeer(BaseHTTPRequestHandler):
             self.reply(404, {})
 
     def do_POST(self):
-        if self.path != '/api/assets' or self.headers.get('x-api-key') != TEST_KEY:
+        if self.path != '/api/assets':
             self.reply(404, {})
             return
-        length = int(self.headers.get('Content-Length', '-1'))
+        record = self.post_record = dict(phase=self.server.phase, entryNs=time.monotonic_ns(),
+                                         client=self.client_address, kind='incomplete')
+        with self.server.post_lock:
+            self.server.posts.append(record)
+            number = len(self.server.posts)
+        if self.headers.get('x-api-key') != TEST_KEY:
+            record['kind'] = 'wrong-test-key'
+            self.reply(404, {})
+            return
+        declared = self.headers.get('Content-Length', '')
+        length = int(declared) if declared.isascii() and declared.isdigit() and len(declared) <= 6 else -1
         if not 0 <= length <= 65536:
+            record['kind'] = 'unsupported-length'
             self.reply(411, {})
             return
         body = self.rfile.read(length)
         content_type = self.headers.get('Content-Type', '')
-        matched = [name for name, (image, _) in self.server.assets.items() if multipart_image(content_type, body, name, image)]
+        record.update(contentType=content_type, bytesRead=len(body), declaredBytes=length,
+                      bodySha256=hashlib.sha256(body).hexdigest(), bodyFile=f'asset-post-{number}.body')
+        (self.server.output / record['bodyFile']).write_bytes(body)
+        if len(body) != length:
+            self.reply(400, {})
+            return
+        matched = [name for name, (image, _) in tuple(self.server.assets.items()) if multipart_image(content_type, body, name, image)]
         if len(matched) != 1:
+            record['kind'] = 'permission-probe' if empty_permission_probe(content_type, body) else 'unrecognized-multipart'
             self.reply(400, {})
             return
         name, = matched
+        record.update(kind='matched-image', filename=name)
         observed = dict(filename=name, client=self.connection.getpeername(), server=self.connection.getsockname(), requestNs=time.monotonic_ns(),
                         contentType=content_type, bodySha256=hashlib.sha256(body).hexdigest())
         self.server.uploads.append(observed)
@@ -129,17 +175,20 @@ def observe(stack, bus, display, pins, report, out, backup=None):
             not Path('/proc/net/route').read_text().splitlines()[1:] and
             not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True).strip(),
             'The configured upload requires the empty private offline desktop')
-    details = report['configuredShippingUpload'] = {'uploads': []}
+    details = report['configuredShippingUpload'] = {'uploads': [], 'assetPosts': []}
     server = ThreadingHTTPServer(('127.0.0.1', 0), UploadPeer)
-    stack.callback(server.server_close)
+    server.daemon_threads = False  # server_close waits for every accepted request thread.
+    server.phase, server.posts, server.post_lock = 'original', details['assetPosts'], threading.Lock()
+    peer_lifetime = stack.enter_context(ExitStack())
+    peer_lifetime.callback(server.server_close)
     server.output, server.uploads = out, details['uploads']
     server.assets = {FILENAME: (IMAGE, ASSET_ID)}
     server.received, server.release = threading.Event(), threading.Event()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    stack.callback(thread.join, 3)
-    stack.callback(server.shutdown)
-    stack.callback(server.release.set)
+    peer_lifetime.callback(thread.join)
+    peer_lifetime.callback(server.shutdown)
+    peer_lifetime.callback(server.release.set)
     port = server.server_port
     config = profile / 'config/immich-folder-watch/config.yaml'
     database = config.with_name('sync-state.db')
@@ -238,6 +287,13 @@ logging:
         details.update(rows=expected, databaseSha256=sha(copy), mediaSha256=sha(image), passed=True)
         if backup:
             restart(stack, bus, display, pins, report, out, details, server, config, database, media)
+        peer_lifetime.close()
+        expected_posts = [('original', FILENAME)]
+        if backup:
+            from installed_backup import NEW_NAME
+            expected_posts.append(('restored', NEW_NAME))
+        verify_asset_posts(server.posts, expected_posts)
+        details['assetRequestHandlersDrained'] = True
     finally:
         server.release.set()
         for path in sorted((profile / 'data/interop-logs').glob('*.log')):

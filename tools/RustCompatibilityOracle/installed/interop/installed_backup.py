@@ -182,6 +182,7 @@ def restart(stack, bus, display, pins, report, out, details, server, config, dat
     logs = config.parents[2] / 'data/interop-logs'
     offsets = {p: p.stat().st_size for p in logs.glob('*.log')}
     server.uploads = restart_result['uploads']
+    server.phase = 'restored'
     log = out / 'restarted-shipping.log'
     process = checked_start(stack, ['flatpak', 'run', '--user', '--branch=master', APP], log)
     window_id = wait_for(lambda: check_alive(process, log) or display.visible(), 18, 'Restored shipping GUI did not show')

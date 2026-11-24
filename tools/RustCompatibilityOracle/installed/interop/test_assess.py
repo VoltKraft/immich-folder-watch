@@ -12,10 +12,29 @@ from unittest.mock import patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
 from installed_backup import open_database_handle, snapshot
-from shipping_upload import endpoint_tuple, FILENAME, IMAGE, multipart_image
+from shipping_upload import empty_permission_probe, endpoint_tuple, FILENAME, IMAGE, multipart_image, verify_asset_posts
 
 
 class ConfiguredUploadTests(unittest.TestCase):
+    def test_empty_permission_multipart_excludes_a_partial_or_unknown_upload(self):
+        content_type = 'multipart/form-data; boundary=unit-boundary'
+        self.assertTrue(empty_permission_probe(content_type, b'--unit-boundary\r\n\r\n--unit-boundary--\r\n'))
+        self.assertTrue(empty_permission_probe(content_type, b'--unit-boundary--\r\n'))
+        for body in (b'', b'--wrong--\r\n', b'--unit-boundary\r\n',
+                     b'--unit-boundary\r\nContent-Disposition: form-data; name=assetData\r\n\r\n--unit-boundary--\r\n'):
+            with self.subTest(body=body):
+                self.assertFalse(empty_permission_probe(content_type, body))
+
+    def test_all_asset_posts_must_finish_and_match_the_expected_worker_lifetime(self):
+        original = dict(phase='original', filename=FILENAME, kind='matched-image', status=201)
+        probe = dict(phase='restored', kind='permission-probe', status=400)
+        expected = [('original', FILENAME)]
+        verify_asset_posts([original, probe], expected)
+        for extra in (original, {**original, 'phase': 'restored'}, {**original, 'status': 503},
+                      {'kind': 'incomplete'}, {'kind': 'unrecognized-multipart', 'status': 400}):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                verify_asset_posts([original, probe, extra], expected)
+
     @unittest.skipUnless(Path('/proc/self/fd').is_dir(), 'requires Linux process descriptors')
     def test_compares_the_pinned_restored_inode_after_its_path_is_replaced(self):
         with TemporaryDirectory() as tmp:
