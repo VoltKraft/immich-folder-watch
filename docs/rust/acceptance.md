@@ -40,6 +40,12 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+Every native host at `4e3dbc4` added one case-compatible Rust row in
+each of its two C# databases. Both subsequent C# upserts preserved its
+ROWID and every existing row. Independent readback covered 32 SQLite
+files. This closes the native insertion trial under RI-AC03.
+[Four-target originals and runtime versions](rw02-legacy.md#native-sqlite-insert-and-two-c-upserts-at-4e3dbc4).
+
 | Criteria | Current result | Evidence needed for completion |
 | --- | --- | --- |
 | RI-AC01 / PAR-01…10 | Open | Complete package and feature matrix with actual Rust results |
@@ -77,6 +83,13 @@ from the 3.0.4 sandbox. A subsequent Rust launch reopened the original
 window. This covers same-session worker continuity. Installed migration
 and recovery after application sync remain open.
 [Installed interoperation with a running worker](rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
+
+On Fedora x64 the configured signed 3.0.4 worker also sent a synthetic PNG
+while a worker-enabled Rust launch exited at the occupied endpoint. The
+test peer held its response across that launch. The signed process retained
+the same TCP connection and persisted the expected asset ID exactly once.
+After Quit the row reopened from its SQLite backup.
+[Configured upload and process lifetime](rw02-instance.md#rust-startup-during-a-signed-worker-upload).
 
 The `13e4af8` canonical Windows tray and launcher trials stopped before
 worker startup on both architectures. Their harness held DELETE access on

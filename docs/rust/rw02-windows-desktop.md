@@ -1,5 +1,34 @@
 # RW-02 Windows foreground and keyboard observation
 
+## ARM64 reader and input method at 13e4af8
+
+On native Windows ARM64, portable x64 NVDA 2026.3.1 read the ARM64 Rust
+window using OneCore. Its observer found all seven expected announcements
+in order across twelve utterances, including the German filename and
+password fields, three mask states and the English filename label. Ordinary
+Delete emptied the accessible document range and the Unicode filename
+survived a clipboard round trip. NVDA quit through its own window and its
+temporary profile was removed. The archive contains the observer's results
+and the SHA-256 of the private speech log.
+
+The preinstalled input layouts lacked Japanese. In the separate Basic
+Typing trial, the native IME showed a preedit, Enter committed U+3042
+(`あ`) to the ordinary filename, and the observer verified restoration
+of the original layout. Both display inventories saw one console monitor.
+The contrast supervisor stopped at its window-ownership check before
+changing the palette. The independent accessibility readback has SHA-256
+`eaa774749eed1ad3407db7b70259c4971ccafabafca0fdd9dda3e3faa55acfeb`.
+[Original Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14970348839).
+
+On x64, NVDA spoke the seven expected announcements in order across
+sixteen utterances. Ordinary Delete, the Unicode clipboard and the
+prepared Japanese IME all passed. The contrast supervisor stopped at
+the same window-ownership check. Closing the private desktop handle
+then returned Win32 error 170. Neither architecture reached the first
+palette change. The x64 accessibility readback has SHA-256
+`5a84bccf71b49a34804ccc60250a713f100bb7961cdbb948184342a96b62ef40`.
+[Original Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14972721704).
+
 ## ARM64 keyboard, reader and input method at 21e794f
 
 A genuine F24 key-up in the foreground launcher's message loop started a

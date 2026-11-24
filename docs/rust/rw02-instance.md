@@ -220,6 +220,43 @@ that reads file metadata. Writer handover with a configured synchronization
 engine remains open. [Installed observer](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py)
 · [Shipping startup](../../src/ImmichFolderWatch.App.Linux/App.axaml.cs).
 
+### Rust startup during a signed worker upload
+
+At `f5e84bc` on Fedora x64, a configured, signed 3.0.4 Flatpak uploaded
+a 69-byte synthetic PNG from its private data directory to an HTTP peer
+on the isolated desktop's loopback interface. The peer received the named
+multipart file and held its response. The signed apphost owned the matching
+established TCP connection before and after a worker-enabled Rust launch.
+The original log records an inotify registration error and the shipping
+polling fallback discovering the image during `uploadAll` reconciliation.
+Rust used the same two read-only inputs as its preceding successful inventory.
+It exited 1 at the occupied activation socket. The original signed GUI,
+socket and connection survived. No Rust bus owner or inventory worker
+remained, and the upload row was still absent.
+
+The peer then returned the synthetic asset ID. The shipping worker recorded
+one synchronized upload with that ID, filename, source directory and size.
+The row survived ordinary Quit and reopening a standalone SQLite backup.
+The PNG and configuration retained their original bytes. The private
+desktop released both bus names, the activation socket and all Flatpak
+processes. Both installed application refs were removed. This qualifies a
+live, configured **shipping** transfer in the same-session startup check.
+Rust engine activity and installed product migration still require their
+own tests.
+
+Run the preceding Fedora command with the additional `--shipping-upload`
+argument. Its evidence directory contains the signed build information,
+original HTTP body, YAML, application log and SQLite snapshot. The
+`same-id-xhk9fs1o/result.json` SHA-256 is
+`7c678b23175ab205dae79b5f954238b8d281ec6500b4d1a4f6fb5c9ef4b7c518`.
+Independent readback verified the signed commit, all 33 indexed files,
+65 archived source members, the PNG's chunk checksums and the complete
+SQLite row including the derived account scope. SQLite `quick_check`
+returned `ok`. The Rust refusal took 81.32 ms inside the held request.
+The report under `upload-readback-xhk9fs1o/readback.json` has SHA-256
+`424f0c6619045441a8f962bd82e4bd47a8b5c68c8d4ad1dc5f902f8288e3c7a9`.
+[Upload observer](../../tools/RustCompatibilityOracle/installed/interop/shipping_upload.py).
+
 ## Ordinary second launch of the Linux GUI
 
 The shipping Flatpak starts its executable for each launch. When the Linux

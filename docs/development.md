@@ -119,6 +119,10 @@ the exact published asset. The Windows executor requires the matching
 disposable GitHub-hosted Windows runner on `rewrite/rust`. The four-target
 workflow uploads the native logs, retained synthetic profile and evidence
 hashes. The [separate Fedora x64 launch test](rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) runs the signed 3.0.4 Flatpak twice on a private X11 desktop.
+The [configured upload trial](rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload)
+holds a real transfer from that signed app while a worker-enabled Rust
+launch attempts to take ownership. Its test peer and both installed refs
+run inside the same disposable network namespace.
 [Original packages and results](rust/rw01-installed-packages.md) · [Installer workflow](../.github/workflows/rust-legacy-install.yaml).
 
 ## Rust feasibility workspace

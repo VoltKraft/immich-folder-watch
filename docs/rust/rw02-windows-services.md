@@ -574,6 +574,19 @@ content matches and selective removal. A native result for the revised
 sender and a direct observation of banner presentation remain open.
 [Microsoft's desktop send example](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/hh802768%28v%3Dvs.85%29) · [Recorder and replay](../../tools/rust-qa/windows-services/toast-history.md).
 
+At `13e4af8` the four x64 and two ARM64 WinRT senders repeated the 16
+successful notifier creations and `0x80070490` setting responses per
+sender, with zero calls to Show and empty history. The separate classic
+receiver on x64 saw one Shell show callback and two timeouts. All 87 UI
+Automation sweeps finished without a provider error and found no visible
+matching title and body. The ARM64 Shell declined icon registration and
+the classic receiver did not request a balloon. The direct-Show change
+postdates this source.
+[x64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14972183094) ·
+[x64 classic](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14973117325) ·
+[ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14970553191) ·
+[ARM64 classic](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14969828998).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

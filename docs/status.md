@@ -1,5 +1,35 @@
 # Project Status
 
+## Cross-language SQLite writes on four native targets (2026-11-25)
+
+At `4e3dbc4`, Windows and Ubuntu on x64 and ARM64 all passed the new
+SQLite insertion trial. Each C# donor gained exactly one Rust-created row.
+Two C# upserts preserved its ROWID and every previous row. The independent
+readback compared all 32 original database files. The hosted C# programs
+used the shipping store sources and .NET 10.0.15. The separate local
+comparison used .NET 10.0.12. Product migration remains open.
+[Four sets of original databases](rust/rw02-legacy.md#native-sqlite-insert-and-two-c-upserts-at-4e3dbc4).
+
+## Configured shipping upload and Windows desktop results (2026-11-24)
+
+On isolated Fedora x64 the signed 3.0.4 worker uploaded a synthetic PNG.
+The test peer held its response while the Rust Flatpak attempted to start
+with its previously verified inventory inputs. Rust exited at the occupied
+socket. The original process kept its established TCP connection, committed
+one synchronized SQLite row and quit normally. Reopening the saved database
+confirmed the filename, size and asset ID. Seven fixture tests passed at
+`f5e84bc`. [Configured upload](rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload).
+
+At `13e4af8` both Ubuntu desktop jobs passed. Both Windows jobs failed.
+ARM64 passed eleven of eleven WPF limits with either Mailbox profile.
+Windows x64 passed eight, exceeding idle close and both scan response limits.
+Both architectures passed NVDA and Japanese IME. The contrast observer on
+each host stopped before the first palette change. The revised native
+desktop assessment at `4e3dbc4` started on all four hosts.
+[Windows measurements](rust/rw02-windows-window.md#native-results-at-13e4af8) ·
+[Windows keyboard and reader](rust/rw02-windows-desktop.md#arm64-reader-and-input-method-at-13e4af8) ·
+[Four-target desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050).
+
 ## Windows notification result when the setting is unavailable (2026-11-24)
 
 The six senders at `21e794f` received a notifier from Windows, then
@@ -12,18 +42,21 @@ service checks and the three Rust readiness tests passed locally, and
 both Windows targets passed cross-Clippy. Native results are pending.
 [WinRT procedure and evidence requirements](../tools/rust-qa/windows-services/toast-history.md).
 
-## Candidate checks at bcbf326 (2026-11-24)
+## Candidate checks at 4e3dbc4 and bcbf326 (2026-11-24)
 
+All 20 PR checks at `4e3dbc42cb22f4aa9cdae932fc897791e594fbca` passed,
+including the four native feasibility jobs and both Rust CodeQL jobs.
 All 28 checks reported on draft PR 46 passed at
 `bcbf3262517af1bb9f73832c1d2426b8b67e0cca`, including four native Rust
 feasibility jobs, four C# reference jobs, four reference installer jobs
-and both Rust CodeQL jobs. The separate desktop assessment is queued.
-It carries the Win32 staging correction and the new four-target SQLite
-check. The previous queued assessment at `1b4d050` was superseded with
-zero jobs executed.
+and both Rust CodeQL jobs. The queued desktop assessments at `1b4d050`
+and `bcbf326` were both superseded before any job ran. The consolidated
+`4e3dbc4` assessment includes the Win32 staging correction, the new
+four-target SQLite check and the WinRT notification trial.
 [PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks) ·
-[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493088022) ·
-[Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493087858).
+[Native feasibility at 4e3dbc4](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496491986) ·
+[Desktop assessment at 4e3dbc4](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050) ·
+[Native feasibility at bcbf326](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493088022).
 
 ## Signed Flatpak second launch during a live Rust inventory (2026-11-24)
 

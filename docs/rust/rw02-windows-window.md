@@ -729,3 +729,33 @@ the same thread after an externally observed reopen and verifies the
 reopened editor's screen pixels. It takes one resource and inventory
 trial against the original WPF limits. Native results for this experiment
 are pending. [Commands and replay](../../tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter).
+
+### Native results at 13e4af8
+
+On Windows ARM64 the one- and two-frame Mailbox profiles each met all
+eleven same-host WPF limits. Under the 100,000-file inventory, the default
+profile's median close and reopen p95 were 4.8299 and 4.4415 ms, against
+limits of 14.114 and 15.236 ms. Both its idle intervals recorded zero
+presentations. FIFO met ten limits. Its scan close took 19.7652 ms. The
+independent replay of the original archive has SHA-256
+`a8a8e142f20ce23864c8476ee8db29065e2d9847624aef8e2eb52ec2b37383c7`.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14970348839) ·
+[Keyboard, reader and input method](rw02-windows-desktop.md#arm64-reader-and-input-method-at-13e4af8).
+
+On x64 all three retained profiles met eight of eleven limits. The
+default one-frame Mailbox exceeded three same-host WPF limits.
+
+| x64 response, median trial p95 (ms) | Retained Rust GUI | Limit |
+| --- | ---: | ---: |
+| Idle close | 49.4868 | 14.616 |
+| Scan close | 39.7505 | 32.032 |
+| Scan reopen | 37.0320 | 22.473 |
+
+The separate GDI control passed all four window-response limits. In the
+instrumented full GUI, 42 of 53 over-limit closes spent at least half the
+interval in the DX12 frame wait. For 166 of 167 over-limit reopens, the
+direct Win32 `ShowWindow` call occupied at least half the interval. The
+native trace contained 1,157 successful presentations and none in 569
+hidden intervals. The x64 readback has SHA-256
+`62e948cd60ee1cfd41e3f01d7a3e58720f523d3a55003ebcf8ec2973be4deb1f`.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14972721704).

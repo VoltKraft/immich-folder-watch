@@ -702,9 +702,34 @@ pairs. The same change passed the separate Fedora three-profile regression
 with 144 shipping upserts and zero added C# rows. Its result at
 `artifacts/rust/concordant-insert-shared-01/result.json` has SHA-256
 `3242deb21b6fc684ef9c7157c3117cca66fa81663438f8d93946277245e56362`.
-Native results for the new write trial on Windows and Ubuntu remain pending.
 Each matrix host uploads its synthetic donor databases, Rust outputs and
 two C# upsert snapshots per case to its `rust-storage-diagnostics` artifact
 as soon as the storage step finishes. Its result, source hashes and
 available logs accompany the databases. This supports inspecting the
 write and rollback while the same job exercises the desktop.
+
+### Native SQLite insert and two C# upserts at 4e3dbc4
+
+All four native hosts completed the write trial at
+`4e3dbc42cb22f4aa9cdae932fc897791e594fbca`. On each host both donor
+databases contained four entries. Rust added a fifth entry with ROWID 5.
+The native C# store read its 83-byte file size, updated it to 101 and
+repeated the upsert. The size remained 101 and the ROWID remained 5.
+Independent readback compared all 32 SQLite files, every prior row in
+four tables and ten schema entries per database. The case-insensitive
+insertion refused for divergent case mappings preserved each original
+database digest.
+
+The source-built C# store and native oracle on these runners used .NET
+10.0.15 and SQLite 3.53.4. All four emitted the qualified Unicode 15.1
+casing table with 1,449 mappings. The earlier Linux x64 comparison used
+.NET 10.0.12 with the Unicode 17.0 table. The four C# store source files
+match the shipping tag and baseline byte for byte. The four-target
+readback at `artifacts/rust/hosted-desktop-storage/45496492050/four-host-sqlite-readback.json`
+has SHA-256 `e588bad41f2ba88af9f1c3f33c3792601be0f8747d372e746874c077ac1352e7`.
+The installed 3.0.4 packages contain .NET 10.0.12. Their install,
+repair and uninstall results are recorded in the [installed reference](rw01-installed-packages.md#installed-reference-on-all-four-hosts).
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14971464832) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14972444099) ·
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14973617113) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14973137587).
