@@ -13,6 +13,7 @@ import uuid
 
 from activation import ART, HERE, QA, ROOT, TARGET, hosted, module, paths, sha, write
 from service_sources import service_files, verify_checkout
+import toast_banner
 from toast_display_name import DISPLAY, PARENT, MissingNamespace, display_name, identity_absent
 
 LINK = "IFW synthetic notification.lnk"
@@ -353,13 +354,19 @@ def replay(directory, result):
         required.add("display-name.json")
     required.update(f"{i:03}-{proc['operation']}.txt" for i, proc in enumerate(journal))
     files = [p for p in directory.iterdir() if p.name != "result.json"]
-    if ({p.name for p in files} != required or set(result["evidenceFiles"]) != required
-            or any(p.is_symlink() or not p.is_file() for p in files)
+    if (not required <= {p.name for p in files} or any(p.is_symlink() or not p.is_file() for p in files)
             or evidence_files(directory) != result["evidenceFiles"]):
         raise ValueError("Missing, changed or unexpected raw native evidence")
     native_report = directory / "native-build.json"
     build = json.loads(native_report.read_bytes())
     required_checks = ["compiler", "inventory", "clippy", "build", "toast-controls"]
+    if toast_banner.SOURCE in build["sourceFiles"]:
+        required_checks.append("notification-points")
+        required.add("notification-points.txt")
+        points = directory / "notification-points.txt"
+        if (not points.is_file() or sha(points) != build["evidenceFiles"].get(points.name)
+                or points.read_text(encoding="utf-8").splitlines().count("WinRT popup selection passed.") != 1):
+            raise ValueError("The native build did not verify the popup selection control")
     if READINESS_SOURCE in build["sourceFiles"]:
         required_checks.append("notifier-readiness")
     if DISPLAY_NAME_SOURCE in build["sourceFiles"] and result.get("registryIdentityInitiallyAbsent") is not True:
@@ -386,6 +393,7 @@ def replay(directory, result):
         raise ValueError("Missing owned shortcut, profile cleanup or process evidence")
     index = 0
     identities = set()
+    banners = []
 
     def archived(operation):
         nonlocal index
@@ -411,6 +419,12 @@ def replay(directory, result):
             raise ValueError("The reported readiness or Show result differs from the original native calls")
         if operation != "prepare" and row["fields"].get("installedLinkVerified") != "true":
             raise ValueError("Missing identity readback from the installed Start Menu shortcut")
+        if toast_banner.SOURCE in build["sourceFiles"] and operation.startswith("post-"):
+            toast_banner.show_timing(row)
+            if operation == "post-normal":
+                extra, outcome = toast_banner.archived(directory, index - 1, proc, row, context["session"], machine)
+                required.update(extra)
+                banners.append(outcome)
         return row
 
     for operation, flag in (("prepare", "prepared"), ("register", "shellNotified")):
@@ -440,11 +454,21 @@ def replay(directory, result):
 
     original = {}
     status = assess_registration(archived, token, original, registration, delay=lambda _: None, clock=lambda: 0)
-    if (status != "passed" or index != len(journal) or result.get("presentationObserved") is not None
+    if set(result["evidenceFiles"]) != required:
+        raise ValueError("Missing or unexpected raw native evidence")
+    if toast_banner.SOURCE in build["sourceFiles"]:
+        if result.get("normalBanners") != banners or result.get("historyStatus") != status:
+            raise ValueError("The reported WinRT history or popup outcomes differ from the original observations")
+    elif "normalBanners" in result:
+        raise ValueError("The original history-only probe could not observe a WinRT popup")
+    visible = True if any(row["status"] == "visible" for row in banners) else None
+    if (status != "passed" or index != len(journal) or result.get("presentationObserved") is not visible
             or result.get("activationObserved") is not None
             or original.get("shortcutOnly") != result.get("shortcutOnly")
             or any(original[k] != result.get(k) for k in ("initiallyEmpty", "finallyEmpty", "modes", "cleanup"))):
         raise ValueError("The raw native history differs from the reported outcome")
+    if toast_banner.SOURCE in build["sourceFiles"]:
+        original.update(normalBanners=banners, presentationObserved=visible, historyStatus=status)
     return original
 
 
@@ -462,7 +486,7 @@ def measure(target, exe, out, record):
     if any(pe_machine(path) != TARGET[os.environ["RUNNER_ARCH"]][1] for path in (exe, Path(sys.executable))):
         raise ValueError("Expected a native observer and native sender")
     token = uuid.uuid4().hex
-    record.update(token=token, processes=[], presentationObserved=None, activationObserved=None)
+    record.update(token=token, processes=[], normalBanners=[], presentationObserved=None, activationObserved=None)
     record["registryIdentityInitiallyAbsent"] = identity_absent(token)
     if not record["registryIdentityInitiallyAbsent"]:
         raise ValueError("The notification identity already exists before the shortcut-only trial")
@@ -475,19 +499,30 @@ def measure(target, exe, out, record):
                    IFW_QA_ISOLATED="1", IFW_QA_INVENTORY_TOKEN=token)
 
         def call(operation):
-            log = out / f"{len(record['processes']):03}-{operation}.txt"
+            index = len(record["processes"])
+            log = out / f"{index:03}-{operation}.txt"
             info = dict(operation=operation, log=log.name)
             record["processes"].append(info)
-            with child(api, exe, ["--hosted-toast-history", str(area), token, operation], area, env, log, info) as proc:
-                proc.wait(timeout=25)
-            item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"],
-                             require_readiness=True, direct_show=True)
-            for key in ("notifierReadiness", "postResult"):
-                if key in item:
-                    info[key] = item[key]
-            info["logSha256"] = sha(log)
-            if operation != "prepare" and item["fields"].get("installedLinkVerified") != "true":
-                raise ValueError("The native subject could not verify the installed shortcut")
+
+            def run():
+                with child(api, exe, ["--hosted-toast-history", str(area), token, operation], area, env, log, info) as proc:
+                    proc.wait(timeout=25)
+                item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"],
+                                 require_readiness=True, direct_show=True)
+                for key in ("notifierReadiness", "postResult"):
+                    if key in item:
+                        info[key] = item[key]
+                info["logSha256"] = sha(log)
+                if operation != "prepare" and item["fields"].get("installedLinkVerified") != "true":
+                    raise ValueError("The native subject could not verify the installed shortcut")
+                return item
+
+            if operation != "post-normal":
+                return run()
+            item, banner = toast_banner.observe(api, desktop, area, env, out, index, token, info, run, session)
+            record["normalBanners"].append(banner)
+            if banner["status"] == "visible":
+                record["presentationObserved"] = True
             return item
 
         prepared = call("prepare")
@@ -564,6 +599,10 @@ def main():
                 or not controls.read_text(encoding="utf-8").rstrip().endswith("OK")):
             raise ValueError("The native build did not complete the history and cleanup controls")
         result["earlyEvidence"][controls.name] = sha(controls)
+        points = original / "notification-points.txt"
+        if points.read_text(encoding="utf-8").splitlines().count("WinRT popup selection passed.") != 1:
+            raise ValueError("The native UI Automation build did not execute the popup selection control")
+        (out / points.name).write_bytes(points.read_bytes())
         readiness = original / "notifier-readiness.txt"
         if (type(build["steps"].get("notifier-readiness")) is not int or build["steps"]["notifier-readiness"] != 0
                 or sha(readiness) != build["evidenceFiles"].get(readiness.name)
@@ -578,12 +617,12 @@ def main():
             raise ValueError("The native service's import table changed since the original build")
         (out / table.name).write_bytes(table.read_bytes())
         (out / "native-build.json").write_bytes((original / "result.json").read_bytes())
-        result["status"] = measure(target, exe, out, result)
+        result["historyStatus"] = result["status"] = measure(target, exe, out, result)
         if result["status"] == "passed":
             result["evidenceFiles"] = evidence_files(out)
             replay(out, result)
     except Unavailable as exc:
-        result.update(status="unavailable", reason=str(exc))
+        result.update(status="unavailable", historyStatus="unavailable", reason=str(exc))
     except Exception as exc:
         result.update(status="failed", error=dict(type=type(exc).__name__, message=str(exc)))
     finally:

@@ -18,6 +18,14 @@ The result and raw per-process logs are under `artifacts/rust/windows-services/t
 python3 -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msvc --replay /path/to/evidence
 ```
 
+## Visible normal WinRT popup
+
+The normal sender records the native performance-counter frequency and the interval around its single synchronous `Show`. An independent UI Automation process on the runner's unlocked `WinSta0\Default` desktop starts before the normal sender. It first checks for the absence of the two fresh labels, then searches for the exact normal title and body through ten seconds after the sender returns. The quiet toast has different text and uses `SuppressPopup`. The observer supplies no input and leaves notification settings and the notification center alone.
+
+The shared Shell observer verifies two distinct on-screen points, their UI Automation labels and the native window under each point. The match must belong to a same-user Shell process in the original console session. A popup observation also requires a common ancestor with the normal toast window's automation ID, `NormalToastView` or `Normal Toast View`, on a `Windows.UI.Core.CoreWindow` host. Replay checks the recorded ancestor path from the common label container. A visible label pair from an unrecognized Shell surface is retained as a diagnostic. A Windows version exposing a different popup identity leaves the banner outcome open. The popup criterion follows the original accessibility observation from the NVDA project. [Native toast window identification](https://github.com/nvaccess/nvda/issues/5136)
+
+The numbered `*-normal-popup.json` file binds the normal sender's original PID and creation time to the observer process, active desktop and clock interval. The matching `.log` retains its baseline, timed sweeps and terminal result when the observer ran. A complete positive trace sets `presentationObserved` to true. `normalBanners` records unavailable or incomplete observations, and `historyStatus` records the independent native delivery and exact removal. The process journal still limits each tag to one `Show`. Detached replay uses the source list from the native build to identify earlier history-only archives.
+
 Each sender checks its installed shortcut and records the HRESULT from
 `CreateToastNotifierWithId` and, when creation succeeds, the HRESULT from
 `ToastNotifier.Setting`. Each pair appears in order in the original log

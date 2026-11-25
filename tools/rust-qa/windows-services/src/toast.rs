@@ -247,10 +247,14 @@ fn post(id: &Identity<'_>, quiet: bool) -> Result<()> {
         expiration.UniversalTime
     );
     std::io::stdout().flush()?;
+    let frequency = crate::tray::qpc_frequency()?;
+    let begin = crate::tray::qpc()?;
     // The typed projection discards successful HRESULT values. Call the same generated
     // Show slot with both live interfaces on their originating apartment.
     let shown = unsafe { (notifier.vtable().Show)(notifier.as_raw(), toast.as_raw()) };
+    let end = crate::tray::qpc()?;
     println!("showHresult={}", shown.0);
+    println!("showFrequency={frequency}\nshowBeginQpc={begin}\nshowEndQpc={end}");
     shown.ok()?;
     println!("showReturned=true");
     Ok(())

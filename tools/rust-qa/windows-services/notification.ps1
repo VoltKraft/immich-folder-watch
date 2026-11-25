@@ -1,11 +1,14 @@
 # Observe only the fresh synthetic title and body on the disposable runner's original desktop.
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$Token,
-      [Parameter(Mandatory)][string]$Fixture)
+      [Parameter(Mandatory)][string]$Fixture,
+      [ValidateSet('Shell','WinrtNormal')][string]$Kind='Shell')
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows' -or
     $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust' -or
-    $env:IFW_QA_LATE_NOTIFICATION -cne '1' -or [IO.Path]::GetFullPath($Fixture) -ine (Join-Path $env:RUNNER_TEMP "ifw-shell-$Token") -or
+    $Kind -cnotin @('Shell','WinrtNormal') -or ($Kind -ceq 'Shell' -and $env:IFW_QA_LATE_NOTIFICATION -cne '1') -or
+    ($Kind -ceq 'WinrtNormal' -and $env:IFW_QA_TOAST_HISTORY -cne '1') -or
+    [IO.Path]::GetFullPath($Fixture) -ine (Join-Path $env:RUNNER_TEMP "ifw-shell-$Token") -or
     [IO.File]::ReadAllText((Join-Path $Fixture 'synthetic.fixture')) -cne $Token) { throw 'Expected the disposable notification fixture' }
 function Emit([hashtable]$Record) {
     [Console]::Out.WriteLine('NOTICE_OBSERVER ' + ($Record | ConvertTo-Json -Depth 8 -Compress))
@@ -44,6 +47,7 @@ public static class IfwNoticeDesktop {
     [DllImport("user32")] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
     [DllImport("user32",SetLastError=true)] static extern bool CloseDesktop(IntPtr h);
     [DllImport("user32")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32")] static extern IntPtr GetShellWindow();
     [DllImport("user32")] static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32")] static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder cls, int count);
@@ -54,6 +58,9 @@ public static class IfwNoticeDesktop {
     [DllImport("user32")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
 
     public class Root { public long hwnd, creation; public uint pid, session; public string image, windowClass; public bool sameUser; }
+    public static uint ShellPid() {
+        uint pid; return GetWindowThreadProcessId(GetShellWindow(), out pid) != 0 ? pid : 0;
+    }
     static string ObjName(IntPtr h) {
         var s = new StringBuilder(256); uint used;
         return h != IntPtr.Zero && GetUserObjectInformation(h,2,s,512,out used) ? s.ToString() : "";
@@ -224,11 +231,36 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
                 $b = Read-Label $bodyNode $HostWindow $body $container $allowParentHit $bodyBounds $bp
                 if ($null -ne $a -and $null -ne $b -and $titleNode.Current.BoundingRectangle.Equals($titleBounds) -and
                     $bodyNode.Current.BoundingRectangle.Equals($bodyBounds)) {
+                    $match = @{title=$a; body=$b; host=$HostWindow; container=($container.GetRuntimeId() -join ',')
+                             rootId=($uia.GetRuntimeId() -join ','); desktop='Default'}
+                    if ($Kind -ceq 'WinrtNormal') {
+                        $ancestor = $container
+                        $ancestorPath = @()
+                        for ($depth=0; $null -ne $ancestor -and $depth -lt 16; $depth++) {
+                            $properties = $ancestor.Current
+                            if ($properties.ProcessId -ne $HostWindow.pid) { break }
+                            $ancestorPath += ($ancestor.GetRuntimeId() -join ',')
+                            $explorer = [IO.Path]::GetFileName($HostWindow.image) -ieq 'explorer.exe'
+                            $shellPid = [IfwNoticeDesktop]::ShellPid()
+                            if ((-not $explorer -or $shellPid -eq $HostWindow.pid) -and
+                                $HostWindow.windowClass -ceq 'Windows.UI.Core.CoreWindow' -and
+                                $properties.ControlType -eq [Windows.Automation.ControlType]::Window -and
+                                $properties.AutomationId -cin @('NormalToastView','Normal Toast View')) {
+                                $match.popup = @{runtimeId=$ancestorPath[-1]; pid=$properties.ProcessId
+                                    controlType='Window'; automationId=$properties.AutomationId; shellPid=$shellPid
+                                    containerPath=$ancestorPath}
+                                break
+                            }
+                            if ([Windows.Automation.Automation]::Compare($ancestor,$uia)) { break }
+                            $ancestor = $walker.GetParent($ancestor)
+                        }
+                    }
                     $lastA = [IfwNoticeDesktop]::Hit($HostWindow,$tp[0],$tp[1]); $lastB = [IfwNoticeDesktop]::Hit($HostWindow,$bp[0],$bp[1])
-                    if ($null -eq $lastA -or $null -eq $lastB -or $lastA.hwnd -ne $a.nativeHit.hwnd -or $lastB.hwnd -ne $b.nativeHit.hwnd) { return }
-                    return @{title=$a; body=$b; host=$HostWindow; container=($container.GetRuntimeId() -join ',')
-                             rootId=($uia.GetRuntimeId() -join ','); tick=[IfwNoticeDesktop]::GetTickCount64()
-                             qpc=[Diagnostics.Stopwatch]::GetTimestamp(); desktop='Default'}
+                    if ($null -eq $lastA -or $null -eq $lastB -or $lastA.hwnd -ne $a.nativeHit.hwnd -or $lastB.hwnd -ne $b.nativeHit.hwnd -or
+                        -not $titleNode.Current.BoundingRectangle.Equals($titleBounds) -or -not $bodyNode.Current.BoundingRectangle.Equals($bodyBounds)) { return }
+                    $match.tick = [IfwNoticeDesktop]::GetTickCount64()
+                    $match.qpc = [Diagnostics.Stopwatch]::GetTimestamp()
+                    return $match
                 }
                 return
             }
@@ -240,17 +272,22 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
     }
 }
 
-function Read-NoticeScan {
-    $roots = [IfwNoticeDesktop]::Roots()
-    $errorsSeen = 0; $lastHresult = $null; $found = $null
+function Read-NoticeRoots($roots) {
+    $errorsSeen = 0; $lastHresult = $null; $found = $null; $unclassified = $null
     foreach ($candidate in $roots) {
         try { $found = Match-Notice $candidate $titleCondition $bodyCondition }
         catch [System.Windows.Automation.ElementNotAvailableException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
         catch [Runtime.InteropServices.COMException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
-        if ($null -ne $found) { break }
+        if ($null -ne $found) {
+            if ($Kind -cne 'WinrtNormal' -or $found.ContainsKey('popup')) { break }
+            if ($null -eq $unclassified) { $unclassified = $found }
+        }
     }
+    if ($null -eq $found -or -not $found.ContainsKey('popup') -and $null -ne $unclassified) { $found = $unclassified }
     return @{roots=$roots.Count; match=$found; errors=$errorsSeen; lastHresult=$lastHresult}
 }
+
+function Read-NoticeScan { Read-NoticeRoots ([IfwNoticeDesktop]::Roots()) }
 
 function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) {
     $frequency = [Diagnostics.Stopwatch]::Frequency
@@ -296,11 +333,17 @@ function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) 
             return 2
         }
         # The synchronous Shell call can return between polls. Re-scan immediately until its marker arrives.
-        if ($null -ne $sentQpc) { Start-Sleep -Milliseconds 100 }
+        if ($null -ne $sentQpc -or $Kind -ceq 'WinrtNormal') { Start-Sleep -Milliseconds 100 }
     }
 }
 
-$title = "IFW notice $Token"; $body = "Synthetic IFW notification $Token"
+if ($Kind -ceq 'WinrtNormal') {
+    $title = "IFW synthetic normal $Token"; $body = "Rust normal notification history $Token"
+    $controlDir = Join-Path $Fixture 'normal-popup'
+} else {
+    $title = "IFW notice $Token"; $body = "Synthetic IFW notification $Token"
+    $controlDir = $Fixture
+}
 $name = [Windows.Automation.AutomationElement]::NameProperty
 $titleCondition = [Windows.Automation.PropertyCondition]::new($name,$title)
 $bodyCondition = [Windows.Automation.PropertyCondition]::new($name,$body)
@@ -321,7 +364,7 @@ try {
         $baselineQpc -lt $nativeBefore -or $baselineQpc -gt $nativeAfter) { throw 'Stopwatch did not read the original QPC epoch' }
     Emit @{stage='armed'; tick=[IfwNoticeDesktop]::GetTickCount64(); qpc=$baselineQpc; nativeBeforeQpc=$nativeBefore; nativeAfterQpc=$nativeAfter
            frequency=[Diagnostics.Stopwatch]::Frequency; initialRoots=$baseline.roots; preexistingMatch=$false}
-    exit (Watch-Notice $Fixture $Token { Read-NoticeScan })
+    exit (Watch-Notice $controlDir $Token { Read-NoticeScan })
 } catch {
     $cause = $_.Exception.GetBaseException()
     if ($cause -is [InvalidOperationException] -or $cause -is [Runtime.InteropServices.COMException]) {

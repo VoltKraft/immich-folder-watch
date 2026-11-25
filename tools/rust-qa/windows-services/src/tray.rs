@@ -158,6 +158,14 @@ fn performance_value(read: unsafe extern "system" fn(*mut i64) -> i32) -> Result
     Ok(value)
 }
 
+pub(super) fn qpc() -> Result<i64> {
+    performance_value(QueryPerformanceCounter)
+}
+
+pub(super) fn qpc_frequency() -> Result<i64> {
+    performance_value(QueryPerformanceFrequency)
+}
+
 fn notification_data(icon: &Icon<'_>, id: &str, body: &str) -> NOTIFYICONDATAW {
     let mut notice = icon.base();
     notice.uFlags = NIF_INFO | NIF_REALTIME;
@@ -169,14 +177,14 @@ fn notification_data(icon: &Icon<'_>, id: &str, body: &str) -> NOTIFYICONDATAW {
 
 fn timed_notification(icon: &Icon<'_>, id: &str) -> Result<bool> {
     let notice = notification_data(icon, id, &format!("Synthetic IFW notification {id}"));
-    let begin = performance_value(QueryPerformanceCounter)?;
+    let begin = qpc()?;
     // Keep formatting and log I/O outside the two observations of the synchronous Shell call.
     let (accepted, raw) = unsafe {
         SetLastError(WIN32_ERROR(0));
         let accepted = Shell_NotifyIconW(NIM_MODIFY, &notice).as_bool();
         (accepted, GetLastError().0)
     };
-    let end = performance_value(QueryPerformanceCounter)?;
+    let end = qpc()?;
     println!("notice.request_begin_qpc={begin}\nnotice.request_end_qpc={end}");
     println!(
         "notice.notification_request={accepted}\nnotice.notification_request.raw_last_error={raw}"
@@ -221,10 +229,7 @@ pub(super) fn notification_only(area: &Path, id: &str) -> Result<()> {
         pump(0);
         let before = EVENTS.get();
         notification_state("notice");
-        println!(
-            "notice.qpc_frequency={}",
-            performance_value(QueryPerformanceFrequency)?
-        );
+        println!("notice.qpc_frequency={}", qpc_frequency()?);
         let requested = added && v4 && timed_notification(&icon, id)?;
         println!("notice.requested={requested}");
         signal_observer(area, "notice.sent", id)?;

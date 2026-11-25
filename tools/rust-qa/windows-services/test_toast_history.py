@@ -12,6 +12,8 @@ from uuid import UUID
 
 import toast_history as h
 import toast_display_name as registration
+import toast_banner as banner
+from test_notification import trace
 
 TOKEN = "1234567890ab4def9123456789abcdef"
 TARGET = "x86_64-pc-windows-msvc"
@@ -109,6 +111,162 @@ def trial(flags=None, directory=None):
         return status
 
     return run, report
+
+
+def direct_report(directory):
+    run, report = trial(directory=directory)
+    run()
+    native = directory / "native-build.json"
+    build = json.loads(native.read_bytes())
+    build["sourceFiles"][h.READINESS_SOURCE] = "3" * 64
+    build["steps"]["notifier-readiness"] = 0
+    h.write(native, build)
+    report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(native))
+    for proc in report["processes"]:
+        op = proc["operation"]
+        if not op.startswith("post-"):
+            continue
+        quiet = op == "post-quiet"
+        # One sender has an unavailable setting; the other reads Enabled.
+        code = h.NOT_FOUND if quiet else 0
+        setting = "unavailable" if quiet else "0"
+        proc["notifierReadiness"] = [dict(create=0, setting=code)]
+        proc["postResult"] = dict(setting=setting, showHresult=0)
+        name = directory / proc["log"]
+        raw = (f"operation={op}\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid={proc['pid']}\n"
+               "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n"
+               f"phase=notifier-create\nready.1.create=0\nphase=notifier-setting\nready.1.setting={code}\n")
+        if quiet:
+            raw += "readinessElapsedMs=8000\n"
+        raw += (f"setting={setting}\nphase=content\nsuppressPopup={str(quiet).lower()}\n"
+                "mirroringDisabled=true\nexpirationTicks=12345\nphase=show\nshowHresult=0\nshowReturned=true\n")
+        name.write_bytes(raw.encode())
+        proc["logSha256"] = h.sha(name)
+    report["evidenceFiles"] = h.evidence_files(directory)
+    return report
+
+
+class ToastBannerTests(unittest.TestCase):
+    def setUp(self):
+        self.rows, self.receipt, _ = trace(2)
+        self.match = deepcopy(self.rows[2]["match"])
+        self.rows[2]["match"] = self.match
+        self.match["title"] = dict(self.match["title"], text=f"IFW synthetic normal {TOKEN}")
+        self.match["body"] = dict(self.match["body"], text=f"Rust normal notification history {TOKEN}")
+        self.match["host"] = dict(self.match["host"], windowClass="Windows.UI.Core.CoreWindow")
+        self.match["popup"] = dict(runtimeId="12,85", pid=34, shellPid=34, controlType="Window",
+                                   automationId="NormalToastView", containerPath=["12,87", "12,85"])
+        self.aumid = "IFW.RustQA.Toast." + TOKEN
+        self.sender = dict(operation="post-normal", log="005-post-normal.txt", pid=25, creation100ns=123)
+        self.receipt.update(aumid=self.aumid, senderIdentity=[25, 123], senderLog=self.sender["log"],
+                            desktopBefore=deepcopy(DESKTOP), desktopAfter=deepcopy(DESKTOP), windowsDirectory=r"C:\Windows",
+                            observer=dict(pid=26, creation100ns=122, machine=[0x8664] * 2, exit=0, jobEmpty=True))
+        self.item = dict(phases=["show"], hresult=None, postResult=dict(showHresult=0),
+                         fields=dict(operation="post-normal", aumid=self.aumid, suppressPopup="false", showHresult="0",
+                                     showFrequency="1000", showBeginQpc="186", showEndQpc="202", showReturned="true"))
+
+    def result(self):
+        return banner.assess(self.receipt, self.rows, self.sender, self.item, 2, 0x8664)
+
+    def test_normal_toast_visible_only_in_its_own_physical_popup_after_show_begins(self):
+        self.assertEqual(self.result()["status"], "visible")
+        self.assertEqual(self.result()["samplingWindow"]["acceptedSample"], 2)
+        for changes in (dict(automationId="NotificationCenterToastViewDetails"), dict(containerPath=["12,413", "12,85"])):
+            with self.subTest(changes=changes), patch.dict(self.match["popup"], changes), self.assertRaises(ValueError):
+                self.result()
+        del self.match["popup"]
+        self.assertEqual(self.result()["status"], "unavailable")
+        self.match["title"]["text"] = f"IFW synthetic quiet {TOKEN}"
+        with self.assertRaises(ValueError):
+            self.result()
+
+    def test_wrong_shell_owner_wrong_sender_or_earlier_match_cannot_confirm(self):
+        self.match["popup"]["shellPid"] = 42
+        with self.assertRaises(ValueError):
+            self.result()
+        self.match["popup"]["shellPid"] = 34
+        self.item["fields"]["showBeginQpc"] = "193"
+        with self.assertRaises(ValueError):
+            self.result()
+        self.item["fields"]["showBeginQpc"] = "186"
+        for key, wrong in (("aumid", "other"), ("senderIdentity", [25, 122]), ("senderLog", "004-post-quiet.txt")):
+            with self.subTest(key=key), patch.dict(self.receipt, {key: wrong}), self.assertRaises(ValueError):
+                self.result()
+        self.receipt["desktopAfter"]["inputDesktop"] = "another"
+        self.assertEqual(self.result()["status"], "unavailable")
+        with patch.dict(self.receipt["observer"], jobEmpty=False), self.assertRaises(ValueError):
+            self.result()
+
+    def test_denial_suppression_and_unavailable_provider_give_no_presentation(self):
+        for changes in ({"hresult": -1}, {"postResult": {"showHresult": None}},
+                        {"fields": dict(self.item["fields"], suppressPopup="true")}):
+            with self.subTest(changes=changes), patch.dict(self.item, changes):
+                self.assertEqual(self.result()["status"], "unavailable")
+        with patch.dict(self.sender, operation="post-quiet"), self.assertRaises(ValueError):
+            self.result()
+        with patch.dict(self.receipt["observer"], forced=True), self.assertRaises(ValueError):
+            self.result()
+        del self.receipt["observer"]
+        self.rows.clear()
+        self.assertEqual(self.result()["status"], "unavailable")
+
+    def test_sender_still_runs_exactly_once_when_the_original_desktop_has_no_observer(self):
+        with TemporaryDirectory() as directory, patch.dict(os.environ, SystemRoot=r"C:\Windows"), patch.object(
+                banner, "select_powershell", return_value=(None, [])):
+            folder = Path(directory)
+            api, desktop = Mock(frequency=1000), Mock()
+            api.clock.return_value = 400
+            desktop.context.return_value = DESKTOP
+            send = Mock(return_value=self.item)
+            sender = self.sender | {"machine": (0x8664, 0x8664)}
+            post, outcome = banner.observe(api, desktop, folder, {}, folder, 5, TOKEN, sender, send, 2)
+            send.assert_called_once_with()
+            self.assertIs(post, self.item)
+            self.assertEqual(outcome["status"], "unavailable")
+            files, original = banner.archived(folder, 5, sender, self.item, 2, 0x8664)
+            self.assertEqual(files, {"005-normal-popup.json"})
+            self.assertEqual(original, outcome)
+
+    def test_replay_binds_new_observation_and_preserves_history_without_a_banner(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            report = direct_report(directory)
+            native = directory / "native-build.json"
+            build = json.loads(native.read_bytes())
+            build["sourceFiles"][banner.SOURCE] = "5" * 64
+            points = directory / "notification-points.txt"
+            points.write_text("WinRT popup selection passed.\n")
+            build["steps"]["notification-points"] = 0
+            build["evidenceFiles"][points.name] = h.sha(points)
+            h.write(native, build)
+            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(native), historyStatus="passed")
+            for index, proc in enumerate(report["processes"]):
+                if not proc["operation"].startswith("post-"):
+                    continue
+                path = directory / proc["log"]
+                raw = path.read_bytes().replace(b"showReturned=true", b"showFrequency=1000\nshowBeginQpc=186\nshowEndQpc=202\nshowReturned=true")
+                path.write_bytes(raw)
+                proc["logSha256"] = h.sha(path)
+                if proc["operation"] == "post-normal":
+                    name = f"{index:03}-normal-popup"
+                    source = dict(self.receipt, senderLog=proc["log"], senderIdentity=[proc["pid"], proc["creation100ns"]],
+                                  observerLog=name + ".log")
+                    h.write(directory / (name + ".json"), source)
+                    log = directory / (name + ".log")
+                    log.write_text("".join("NOTICE_OBSERVER " + json.dumps(row) + "\n" for row in self.rows))
+            report.update(presentationObserved=True, normalBanners=[self.result()], evidenceFiles=h.evidence_files(directory))
+            self.assertTrue(h.replay(directory, report)["presentationObserved"])
+            # Recompute every file digest after removing only the popup surface evidence.
+            del self.match["popup"]
+            log.write_text("".join("NOTICE_OBSERVER " + json.dumps(row) + "\n" for row in self.rows))
+            report["evidenceFiles"] = h.evidence_files(directory)
+            with self.assertRaises(ValueError):
+                h.replay(directory, report)
+            report.update(presentationObserved=None, normalBanners=[self.result()])
+            replayed = h.replay(directory, report)
+            self.assertEqual(replayed["historyStatus"], "passed")
+            self.assertIsNone(replayed["presentationObserved"])
+            self.assertTrue(replayed["finallyEmpty"])
 
 
 class ToastHistoryTests(unittest.TestCase):
@@ -593,35 +751,7 @@ class ToastHistoryTests(unittest.TestCase):
     def test_direct_show_replay_requires_both_history_rows_and_independent_readback(self):
         with TemporaryDirectory() as tmp:
             directory = Path(tmp)
-            run, report = trial(directory=directory)
-            run()
-            native = directory / "native-build.json"
-            build = json.loads(native.read_bytes())
-            build["sourceFiles"][h.READINESS_SOURCE] = "3" * 64
-            build["steps"]["notifier-readiness"] = 0
-            h.write(native, build)
-            report.update(observerInputs=build["sourceFiles"], earlyResultSha256=h.sha(native))
-            for proc in report["processes"]:
-                op = proc["operation"]
-                if not op.startswith("post-"):
-                    continue
-                quiet = op == "post-quiet"
-                # One sender has an unavailable setting; the other reads Enabled.
-                code = h.NOT_FOUND if quiet else 0
-                setting = "unavailable" if quiet else "0"
-                proc["notifierReadiness"] = [dict(create=0, setting=code)]
-                proc["postResult"] = dict(setting=setting, showHresult=0)
-                name = directory / proc["log"]
-                raw = (f"operation={op}\naumid=IFW.RustQA.Toast.{TOKEN}\nphase=identity\npid={proc['pid']}\n"
-                       "session=2\nelevated=true\nphase=shortcut\ninstalledLinkVerified=true\n"
-                       f"phase=notifier-create\nready.1.create=0\nphase=notifier-setting\nready.1.setting={code}\n")
-                if quiet:
-                    raw += "readinessElapsedMs=8000\n"
-                raw += (f"setting={setting}\nphase=content\nsuppressPopup={str(quiet).lower()}\n"
-                        "mirroringDisabled=true\nexpirationTicks=12345\nphase=show\nshowHresult=0\nshowReturned=true\n")
-                name.write_bytes(raw.encode())
-                proc["logSha256"] = h.sha(name)
-            report["evidenceFiles"] = h.evidence_files(directory)
+            report = direct_report(directory)
             self.assertTrue(h.replay(directory, report)["finallyEmpty"])
             for attr in ("presentationObserved", "activationObserved"):
                 with self.subTest(attr=attr), self.assertRaises(ValueError):

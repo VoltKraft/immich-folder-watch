@@ -28,6 +28,22 @@ if (-not (Contains-Point $same $p) -or $null -ne [IfwNoticeDesktop]::LabelPoint(
 }
 Write-Output 'Notification pixel selection passed.'
 
+# An unclassified history surface must not hide a later real WinRT popup on the same scan.
+$roots = $ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Read-NoticeRoots'},$true)
+. ([scriptblock]::Create($roots.Extent.Text))
+function Match-Notice($candidate) { return $candidate }
+$Kind = 'WinrtNormal'
+$history = @{container='history'}
+$popup = @{container='popup'; popup=@{runtimeId='7,11'}}
+if ((Read-NoticeRoots @($history,$popup)).match.container -cne 'popup' -or
+    (Read-NoticeRoots @($history,$null)).match.container -cne 'history') {
+    throw 'The regular toast and a history-only surface were conflated'
+}
+$Kind = 'Shell'
+if ((Read-NoticeRoots @($history,$popup)).match.container -cne 'history') { throw 'The original Shell matcher changed' }
+Write-Output 'WinRT popup selection passed.'
+
 # Run the same polling loop against a temporary sender and a title/body match that exists for only one sweep.
 $watch = $ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Watch-Notice'},$true)

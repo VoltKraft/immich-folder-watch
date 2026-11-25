@@ -159,7 +159,7 @@ def inside(point, bounds):
     return bounds[0] <= point[0] < bounds[2] and bounds[1] <= point[1] < bounds[3]
 
 
-def check_match(match, token, session, winroot):
+def check_match(match, token, session, winroot, *, winrt_normal=False):
     host = match["host"]
     base = PureWindowsPath(winroot)
     files = {"explorer.exe", "System32/ShellHost.exe", "SystemApps/ShellExperienceHost_cw5n1h2txyewy/ShellExperienceHost.exe",
@@ -171,10 +171,12 @@ def check_match(match, token, session, winroot):
             or not host["windowClass"]
             or PureWindowsPath(host["image"]) not in {base / name for name in files}):
         raise ValueError("The visible match did not identify an original same-user Shell notification host")
-    for field, expected in (("title", "IFW notice " + token), ("body", "Synthetic IFW notification " + token)):
+    labels = (("IFW synthetic normal ", "Rust normal notification history ") if winrt_normal
+              else ("IFW notice ", "Synthetic IFW notification "))
+    for field, prefix in zip(("title", "body"), labels):
         item = match[field]
         native, provider = item["nativeHit"], item["providerHit"]
-        if (item["text"] != expected or item["pid"] != host["pid"] or item["offscreen"] is not False or not item["runtimeId"]
+        if (item["text"] != prefix + token or item["pid"] != host["pid"] or item["offscreen"] is not False or not item["runtimeId"]
                 or not item.get("directParent") or not isinstance(native, dict) or not isinstance(provider, dict)
                 or native.get("root") != host["hwnd"] or native.get("pid") != host["pid"]
                 or any(type(native.get(k)) is not int or native[k] <= 0 for k in ("hwnd", "monitor", "tid"))
@@ -232,6 +234,16 @@ def wait_for_observer(path, provider):
 
 
 def observed_presentation(items, token, session, winroot, record, native):
+    called = native.get("notice.initial.add") is True and native.get("notice.initial.version4") is True
+    begin, end = native.get("notice.request_begin_qpc"), native.get("notice.request_end_qpc")
+    if not called and (begin is not None or end is not None or any(k.startswith("notice.notification_request") for k in native)):
+        raise ValueError("An unregistered notification recorded a Shell request")
+    return timed_presentation(items, token, session, winroot, record, native.get("notice.qpc_frequency"),
+                              (begin, end) if called else None)
+
+
+def timed_presentation(items, token, session, winroot, record, sender_frequency, interval, *, winrt_normal=False):
+    """Compare the independent physical title/body sweeps with the sender's actual native call."""
     final = [e for e in items if e["stage"] in ("visible", "unavailable")]
     if not final:
         return None
@@ -250,16 +262,14 @@ def observed_presentation(items, token, session, winroot, record, native):
                                                  ("qpcFrequency", "releaseQpc", "acknowledgedQpc", "finishQpc"))
     sent = event["sentObservedQpc"]
     if (not all(type(n) is int for n in (frequency, release, acknowledged, finish, sent))
-            or frequency != armed["frequency"] or native.get("notice.qpc_frequency") != frequency
+            or frequency != armed["frequency"] or sender_frequency != frequency
             or not armed["lastSampleEndQpc"] <= release <= acknowledged <= finish or not release <= sent <= finish):
         raise ValueError("The notification clocks or sender acknowledgement do not match")
-    called = native.get("notice.initial.add") is True and native.get("notice.initial.version4") is True
-    begin, end = native.get("notice.request_begin_qpc"), native.get("notice.request_end_qpc")
+    called = interval is not None
     if called:
+        begin, end = interval
         if type(begin) is not int or type(end) is not int or not release <= begin <= end <= min(sent, acknowledged):
             raise ValueError("The native Shell call lacks its original synchronous interval")
-    elif begin is not None or end is not None or any(k.startswith("notice.notification_request") for k in native):
-        raise ValueError("An unregistered notification recorded a Shell request")
 
     rows = items[1:-1]
     previous = armed["qpc"]
@@ -294,13 +304,27 @@ def observed_presentation(items, token, session, winroot, record, native):
             continue
         matches += 1
         match = row["match"]
-        check_match(match, token, session, winroot)
+        check_match(match, token, session, winroot, winrt_normal=winrt_normal)
         if type(match.get("qpc")) is not int or not start <= match["qpc"] <= stopped:
             raise ValueError("The physical title/body match occurred outside its sweep")
         if not called or match["qpc"] < begin:
             raise ValueError("The fresh notification was already visible before its Shell request")
         # A query started before release can complete later with a cached UIA node.
-        if chosen is None and go and start > begin:
+        if winrt_normal and "popup" in match:
+            popup = match["popup"]
+            if (not row["roots"] or not isinstance(popup, dict) or not popup.get("runtimeId")
+                    or popup.get("pid") != match["host"]["pid"] or type(popup.get("shellPid")) is not int
+                    or (PureWindowsPath(match["host"]["image"]).name.casefold() == "explorer.exe"
+                        and popup["shellPid"] != match["host"]["pid"])
+                    or match["host"]["windowClass"] != "Windows.UI.Core.CoreWindow"
+                    or popup.get("controlType") != "Window" or popup.get("automationId") not in ("NormalToastView", "Normal Toast View")):
+                raise ValueError("The Shell popup did not identify a native toast window")
+            path = popup.get("containerPath")
+            if (not isinstance(path, list) or not 1 <= len(path) <= 16 or any(not isinstance(p, str) or not p for p in path)
+                    or len(set(path)) != len(path) or path[0] != match["container"] or path[-1] != popup["runtimeId"]
+                    or match["rootId"] in path[:-1]):
+                raise ValueError("The physical title/body container did not belong to the observed toast popup")
+        if chosen is None and go and start > begin and (not winrt_normal or "popup" in match):
             chosen = (number, start, match)
     if (not seen_sent or first_returned - sent >= 10 * frequency or rows[-1]["startQpc"] - sent < 10 * frequency
             or event["samples"] != len(rows) or event["providerErrors"] != errors or event["peakKnownRoots"] != peak
@@ -321,6 +345,9 @@ def observed_presentation(items, token, session, winroot, record, native):
             phase = "spans-shell-return"
         record["samplingWindow"]["matchPhase"] = phase
         event = event | {"match": match}
+    elif winrt_normal and matches:
+        event = event | dict(stage="unavailable", providerStage=provider_stage,
+                             reason="No timed pair of visible labels was attributed to a native toast popup")
     elif called and not overlapping:
         event = event | dict(stage="unavailable", providerStage=provider_stage,
                              reason="The synchronous Shell request fell between two independent UIA sweeps")
