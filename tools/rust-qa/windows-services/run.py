@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,66 @@ QA = HERE.parent
 ROOT = QA.parents[1]
 sys.path.insert(0, str(QA))
 from service_sources import service_files, verify_checkout
+
+ICON_TEST = "tray::image_tests::archived_marker_pixels_survive_native_hicon_rasterization"
+
+
+def verify_icon_rasters(path):
+    """Read the eight original offscreen DIB snapshots, both handle releases and the exact native test result."""
+    rows = path.read_text(encoding="utf-8").splitlines()
+    if rows.count(f"test {ICON_TEST} ... ok") != 1:
+        raise ValueError("The native tray image test did not run successfully")
+    captures = [row for row in rows if row.startswith("HICON_RASTER ")]
+    keys = [(rgb, scale, bg) for rgb in ("1fc653", "33c733") for scale in ("source", "systemSmall")
+            for bg in ("ff000000", "ffffffff")]
+    if len(captures) != len(keys) or [line for line in rows if line.startswith("HICON_RELEASED ")] != [
+            "HICON_RELEASED rgb=1fc653", "HICON_RELEASED rgb=33c733"]:
+        raise ValueError("Missing native raster or checked HICON destruction")
+    small = None
+    for line, (rgb, scale, bg) in zip(captures, keys):
+        fields = dict(part.split("=", 1) for part in line.split()[1:])
+        width, height = int(fields["width"]), int(fields["height"])
+        if (fields["rgb"], fields["scale"], fields["background"]) != (rgb, scale, bg) or not (
+                8 <= width <= 128 and 8 <= height <= 128):
+            raise ValueError("Unexpected native raster size or challenge")
+        if scale == "source":
+            if (width, height) != (32, 32):
+                raise ValueError("The producer's source image size differs")
+            left, top, right, bottom = 5, 5, 27, 27
+        else:
+            if small is not None and small != (width, height):
+                raise ValueError("The system small icon metrics differ between native renders")
+            small = width, height
+            left, top, right, bottom = (width + 3) // 4, (height + 3) // 4, width * 3 // 4, height * 3 // 4
+        pixels = fields["pixels"]
+        if (fields["interior"] != f"{left},{top},{right},{bottom}" or len(pixels) != 8 * width * height
+                or not re.fullmatch("[0-9a-f]+", pixels)):
+            raise ValueError("Incomplete original top-down DIB or incorrect sampled bounds")
+        # All four corners of the pinned unscaled 32x32 frame have zero alpha.
+        if scale == "source" and any(pixels[8 * i + 2:8 * (i + 1)] != bg[2:]
+                                     for i in (0, width - 1, width * (height - 1), width * height - 1)):
+            raise ValueError("Transparent source corners did not retain their original DIB background")
+        expected = (right - left) * (bottom - top)
+        exact = sum(pixels[8 * (y * width + x) + 2:8 * (y * width + x + 1)] == rgb
+                    for y in range(top, bottom) for x in range(left, right))
+        if exact != expected or fields["exact"] != f"{exact}/{expected}":
+            raise ValueError("The original opaque marker pixels differ from the recorded observation")
+
+
+def observe_services_and_image(result, output, step, observe_services):
+    try:
+        step("tray-image", ["cargo", "test", "--frozen", ICON_TEST, "--", "--exact", "--show-output", "--test-threads=1"])
+        verify_icon_rasters(output / "tray-image.txt")
+        result["trayImage"] = {"status": "passed", "log": "tray-image.txt"}
+    except (subprocess.SubprocessError, OSError, KeyError, ValueError) as error:
+        # Keep measuring the actual Shell even when its separate image control fails.
+        result["trayImage"] = {"status": "failed", "log": "tray-image.txt", "reason": str(error)}
+    result["observations"] = observe_services()
+    if result["observations"]["failedChecks"]:
+        raise ValueError("Native checks failed, see result.json, native.txt and observer.json")
+    result["probeCompleted"] = True
+    if result["trayImage"]["status"] == "failed":
+        print("Independent HICON producer control failed:", result["trayImage"]["reason"], file=sys.stderr)
 
 
 def sha(path):
@@ -276,11 +337,11 @@ def main():
         tick = ctypes.WinDLL("kernel32").GetTickCount64
         tick.restype = ctypes.c_uint64
         tick.argtypes = []
-        result["measureUptimeMs"] = tick()
-        result["observations"] = measure(exe, output, hosted, args.hosted_startup)
-        if result["observations"]["failedChecks"]:
-            raise ValueError("Native checks failed, see result.json, native.txt and observer.json")
-        result["probeCompleted"] = True
+        def observe_services():
+            result["measureUptimeMs"] = tick()
+            return measure(exe, output, hosted, args.hosted_startup)
+
+        observe_services_and_image(result, output, step, observe_services)
     finally:
         result.setdefault("probeCompleted", False)
         result["evidenceFiles"] = {p.name: sha(p) for p in sorted(output.iterdir()) if p.is_file() and p.name != "result.json"}

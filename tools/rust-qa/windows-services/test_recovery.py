@@ -4,10 +4,55 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from run import recover
+from run import ICON_TEST, observe_services_and_image, recover, verify_icon_rasters
 from windows_observer import select_powershell
+
+
+class TrayImageEvidence(unittest.TestCase):
+    def test_native_services_still_run_after_a_failing_image_test_or_an_invalid_capture(self):
+        for code in (1, 0):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp)
+                result = {}
+                def step(name, args):
+                    self.assertEqual(name, "tray-image")
+                    self.assertIn("--exact", args)
+                    (output / "tray-image.txt").write_bytes(b"incomplete native image observation\n")
+                    if code:
+                        raise subprocess.CalledProcessError(code, args)
+
+                shell = Mock(return_value={"failedChecks": [], "completedServiceControl": True})
+                with patch("sys.stderr"):
+                    observe_services_and_image(result, output, step, shell)
+                shell.assert_called_once_with()
+                self.assertEqual(result["observations"], shell.return_value)
+                self.assertTrue(result["probeCompleted"])
+                self.assertEqual(result["trayImage"]["status"], "failed")
+                self.assertEqual((output / result["trayImage"]["log"]).read_bytes(), b"incomplete native image observation\n")
+
+    def test_original_pixels_both_colors_sizes_backgrounds_and_cleanup_are_required(self):
+        rows = [f"test {ICON_TEST} ... ok"]
+        for rgb in ("1fc653", "33c733"):
+            for scale, w, lo, hi in (("source", 32, 5, 27), ("systemSmall", 16, 4, 12)):
+                n = (hi - lo) ** 2
+                for bg in ("ff000000", "ffffffff"):
+                    pixels = "".join("ff" + rgb if lo <= x < hi and lo <= y < hi else bg
+                                     for y in range(w) for x in range(w))
+                    rows.append(f"HICON_RASTER rgb={rgb} scale={scale} width={w} height={w} background={bg} "
+                                f"interior={lo},{lo},{hi},{hi} exact={n}/{n} pixels={pixels}")
+            rows.append("HICON_RELEASED rgb=" + rgb)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tray-image.txt"
+            path.write_text("\n".join(rows))
+            verify_icon_rasters(path)
+            for mutation in (rows[1:], rows[:-1], [*rows[:3], *rows[4:]],
+                             [rows[0], rows[1].replace("ff1fc653", "ff33c733", 1), *rows[2:]],
+                             [*rows[:2], rows[2].replace("pixels=ffffffff", "pixels=ff000000"), *rows[3:]]):
+                path.write_text("\n".join(mutation))
+                with self.assertRaises(ValueError):
+                    verify_icon_rasters(path)
 
 
 class ObserverSelection(unittest.TestCase):

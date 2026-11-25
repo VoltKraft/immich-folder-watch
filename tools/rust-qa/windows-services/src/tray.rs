@@ -21,6 +21,10 @@ pub(super) mod activation;
 mod shell;
 use shell::*;
 
+#[cfg(test)]
+#[path = "tray_image_test.rs"]
+mod image_tests;
+
 impl Icon<'_> {
     fn add(&mut self, phase: &str) -> Result<bool> {
         // LoadIconW returns a shared system icon. Do not destroy the shared handle.
