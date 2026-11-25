@@ -173,9 +173,78 @@ class WindowsContrastTests(unittest.TestCase):
                 api = FakeSystem(initial)
                 r = run_cycle(api)
                 self.assertEqual(api.calls, [not initial.enabled, initial.enabled])
+                self.assertIs(r["settingChangeAttempted"], True)
                 self.assertTrue(r["restoreVerified"])
+                self.assertEqual(r["afterSet"], r["changed"])
+                self.assertEqual(r["beforeRestore"], r["changed"])
                 self.assertEqual(r["original"], r["restored"])
                 self.assertEqual(r["originalFrame"], r["restoredFrame"])
+
+    def test_unnamed_scheme_retains_the_verified_baseline_without_a_set_or_restore(self):
+        for scheme, kind in ((None, "NULL"), ("", "empty")):
+            with self.subTest(scheme=scheme):
+                system = FakeSystem(replace(BASE, scheme=scheme))
+                system.read = Mock(wraps=system.read)
+                capture = Mock(return_value={"rasterSha256": "baseline"})
+                report = {}
+                reason = contrast_cycle(system, lambda: None, lambda: None, capture, report, wait=instant)
+                self.assertIn(kind + " original scheme", reason)
+                self.assertEqual(system.calls, [])
+                self.assertEqual(system.read.call_count, 2)
+                capture.assert_called_once_with("original", system.state)
+                self.assertEqual(report["baselineReadback"], report["original"])
+                self.assertEqual(report["original"]["scheme"], scheme)
+                self.assertIs(report["settingChangeAttempted"], False)
+                self.assertNotIn("restoreVerified", report)
+                child = dict(status="baseline-only", drained=True, subjectExit=0)
+                report.update(captureJob=dict(jobClosed=True), profileRemoved=True)
+                finish = observer["finish_contrast"]
+                for bad_report, bad_child, exit_code in ((dict(profileRemoved=False), {}, 0),
+                        (dict(captureJob=dict(jobClosed=False)), {}, 0), ({}, dict(drained=False), 0),
+                        ({}, dict(subjectExit=1), 0), ({}, dict(status="failed"), 0), ({}, {}, 1)):
+                    with self.assertRaises(RuntimeError):
+                        finish(dict(report, **bad_report), dict(child, **bad_child), exit_code, reason)
+                finish(report, child, 0, reason)
+                self.assertEqual((report["status"], report["reason"]), ("unavailable", reason))
+
+    def test_unnamed_scheme_changes_during_baseline_are_reported_as_failure(self):
+        system, report = FakeSystem(replace(BASE, scheme="")), {}
+        def changed(*_):
+            system.state = BASE
+            return {"rasterSha256": "initial"}
+        with self.assertRaisesRegex(RuntimeError, "changed during the baseline"):
+            run_cycle(system, changed, report)
+        self.assertEqual(report["original"]["scheme"], "")
+        self.assertEqual(report["baselineReadback"], vars(BASE))
+        self.assertEqual(system.calls, [])
+
+    def test_unnamed_worker_only_finishes_after_the_bound_baseline_stop(self):
+        run, announce = observer["exercise"], observer["announce"]
+        system = FakeSystem(replace(BASE, scheme=""))
+        for confirmed in (True, False):
+            with self.subTest(confirmed=confirmed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory)
+                control = output / "control"
+                control.mkdir()
+                report = dict(build=dict(source="a"*40), target="aarch64-pc-windows-msvc")
+                announce(control, "session", "nonce", session=2, source=report["build"]["source"],
+                         target=report["target"], run="7", attempt="1")
+                announce(control, "request-original", "nonce", state=vars(system.state))
+                stop = {"baselineOnly": True} if confirmed else {}
+                announce(control, "stop", "nonce", **stop)
+                with (patch.dict(run.__globals__, require_live_window=Mock(), SystemColors=lambda *_: system,
+                                 powershell=Mock(return_value=0), verify_frames=Mock(return_value={"pixels": 7})),
+                      patch.dict("os.environ", GITHUB_RUN_ID="7", GITHUB_RUN_ATTEMPT="1")):
+                    args = (Mock(), dict(session=2, threadDesktop="IfwQa_" + "a"*32), 72, 85, {}, "ps", output, report)
+                    if confirmed:
+                        run(*args)
+                        self.assertIs(report["baselineOnly"], True)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "did not confirm"):
+                            run(*args)
+                        self.assertNotIn("baselineOnly", report)
+                self.assertEqual(sorted(p.name for p in control.glob("observed-*.json")), ["observed-original.json"])
+                self.assertEqual(system.calls, [])
 
     def test_missing_baseline_or_unavailable_mode_never_changes_appearance(self):
         for system, capture in [(FakeSystem(replace(BASE, flags=0)), lambda *_: 1),
@@ -233,6 +302,8 @@ class WindowsContrastTests(unittest.TestCase):
             self.assertEqual(api.calls, [True])
             self.assertEqual(api.state, unrelated)
             self.assertFalse(r["restoreVerified"])
+            self.assertEqual(r["afterSet"], vars(HIGH))
+            self.assertEqual(r["beforeRestore"], vars(unrelated))
 
     def test_unchanged_window_pixels_and_wrong_restored_palette_fail(self):
         api = FakeSystem()
@@ -324,6 +395,23 @@ class WindowsContrastTests(unittest.TestCase):
             self.assertEqual(api.state, changed)
             self.assertEqual(api.calls, [True])
             self.assertFalse(record["restoreVerified"])
+            self.assertEqual(record["afterSet"], vars(changed))
+            self.assertEqual(record["beforeRestore"], vars(changed))
+
+    def test_palette_changes_after_a_switched_sample_but_before_stabilization(self):
+        foreign = replace(HIGH, colors=BASE.colors)
+        api, record = FakeSystem(), {}
+        def interrupted(read, condition, label):
+            self.assertEqual(read(), HIGH)
+            api.state = foreign
+            raise OSError("next contrast query failed")
+        with self.assertRaisesRegex(RuntimeError, "Another accessibility setting"):
+            contrast_cycle(api, lambda: None, lambda: None, lambda *_: {}, record, wait=interrupted)
+        self.assertEqual(api.calls, [True])
+        self.assertEqual(record["afterSet"], vars(HIGH))
+        self.assertEqual(record["beforeRestore"], vars(foreign))
+        self.assertNotIn("changed", record)
+        self.assertFalse(record["restoreVerified"])
 
     def test_cleanup_survives_two_transient_read_errors_after_worker_exit(self):
         class LostWorker(FakeSystem):
@@ -361,18 +449,39 @@ class WindowsContrastTests(unittest.TestCase):
                 record = run_cycle(api)
                 self.assertTrue(record["restoreVerified"])
                 self.assertEqual(record["restoreReportedError"], "restore call interrupted")
+                self.assertEqual(record["afterRestoreError"], vars(BASE if applied else HIGH))
                 self.assertEqual(api.calls, [True, False] if applied else [True, False, False])
 
-    def test_setting_a_different_flag_before_a_confirmed_transition_aborts(self):
-        class ForeignFlag(FakeSystem):
+    def test_failed_restore_retains_the_foreign_readback_and_does_not_retry(self):
+        foreign = replace(HIGH, scheme="external")
+        class RestoreError(FakeSystem):
             def set_mode(self, original, enabled):
                 super().set_mode(original, enabled)
-                self.state = replace(self.state, flags=self.state.flags | 16)
-        api, record = ForeignFlag(), {}
-        with self.assertRaisesRegex(RuntimeError, "Another accessibility setting"):
+                if not enabled:
+                    self.state = foreign
+                    raise OSError("interrupted restore")
+        api, record = RestoreError(), {}
+        with self.assertRaisesRegex(TimeoutError, "original flags, scheme and colors"):
             run_cycle(api, record=record)
-        self.assertEqual(api.calls, [True])
+        self.assertEqual(api.calls, [True, False])
+        self.assertEqual(record["beforeRestore"], vars(HIGH))
+        self.assertEqual(record["afterRestoreError"], vars(foreign))
         self.assertFalse(record["restoreVerified"])
+
+    def test_unexpected_scheme_or_flag_after_a_reported_set_is_retained_before_rejecting_restore(self):
+        for changed in (replace(HIGH, scheme="another scheme"), replace(HIGH, flags=HIGH.flags | 16)):
+            class ForeignState(FakeSystem):
+                def set_mode(self, original, enabled):
+                    super().set_mode(original, enabled)
+                    self.state = changed
+            api, record = ForeignState(), {}
+            with self.subTest(changed=changed), self.assertRaisesRegex(RuntimeError, "Another accessibility setting"):
+                run_cycle(api, record=record)
+            self.assertEqual(api.calls, [True])
+            self.assertFalse(record["restoreVerified"])
+            self.assertEqual(record["afterSet"], vars(changed))
+            self.assertEqual(record["beforeRestore"], vars(changed))
+            self.assertNotIn("changed", record)
 
     def test_phases_are_atomic_bound_to_the_trial_and_reject_a_stopped_worker(self):
         announce, message = observer["announce"], observer["message"]

@@ -84,19 +84,21 @@ def cleanup_read(system):
 def owned_transition(original, observed):
     return (observed.enabled != original.enabled
             and not ((observed.flags ^ original.flags) & ~(ON | OPTION_NO_THEME_CHANGE))
-            and (original.scheme is None or observed.scheme == original.scheme))
+            and observed.scheme == original.scheme)
 
 
 def restore(system, original, record, wait):
     def read():
         return cleanup_read(system)
     live = read()
+    record["beforeRestore"] = vars(live)
+    observed = record.get("afterSet")
+    record.setdefault("afterSet", vars(live))
     if live.enabled != original.enabled:
-        expected = record.get("changed")
-        # After a partly failed SET there is no confirmed replacement snapshot.
-        # Only restore the exact original scheme and other flags in that case.
-        expected_match = vars(live) == expected if expected is not None else live.scheme == original.scheme
-        if not owned_transition(original, live) or not expected_match:
+        # A read can succeed before the settling loop fails. Preserve the entire
+        # switched palette when one was observed, even before it became stable.
+        saw_switch = observed is not None and bool(observed["flags"] & ON) != original.enabled
+        if not owned_transition(original, live) or (saw_switch and vars(live) != observed):
             raise RuntimeError("Another accessibility setting changed before restoration")
         try:
             system.set_mode(original, original.enabled)
@@ -105,6 +107,7 @@ def restore(system, original, record, wait):
             # Windows can return an error after applying a setting. Only retry
             # if the exact still-owned state survived the first attempt.
             after = read()
+            record["afterRestoreError"] = vars(after)
             if after == live:
                 try:
                     system.set_mode(original, original.enabled)
@@ -121,18 +124,31 @@ def contrast_cycle(system, session_guard, window_guard, capture, record, wait=aw
     session_guard()
     window_guard()
     original = system.read()
+    record["settingChangeAttempted"] = False
     if not original.flags & AVAILABLE:
         raise RuntimeError("Windows did not report an available high contrast setting")
     record["original"] = vars(original)
     first = record["originalFrame"] = capture("original", original)
     session_guard()
-    if system.read() != original:
+    baseline = system.read()
+    record["baselineReadback"] = vars(baseline)
+    if baseline != original:
         raise RuntimeError("System appearance changed during the baseline observation")
     window_guard()
+    if not original.scheme:
+        kind = "NULL" if original.scheme is None else "empty"
+        return f"The {kind} original scheme returned by SPI_GETHIGHCONTRAST has no name for exact restoration"
+
+    def read_after_set():
+        state = system.read()
+        record["afterSet"] = vars(state)
+        return state
+
     record["restoreVerified"] = False
     try:
+        record["settingChangeAttempted"] = True
         system.set_mode(original, not original.enabled)
-        before = wait(system.read, lambda state: state.enabled != original.enabled, "Windows did not change contrast mode")
+        before = wait(read_after_set, lambda state: state.enabled != original.enabled, "Windows did not change contrast mode")
         if not owned_transition(original, before):
             raise RuntimeError("A different contrast scheme or accessibility flag appeared during the change")
         record["changed"] = vars(before)

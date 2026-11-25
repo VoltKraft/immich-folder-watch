@@ -71,7 +71,7 @@ def announce(folder, name, token, **fields):
 def message(folder, name, token, worker=None, timeout=85):
     deadline = time.monotonic() + timeout
     while not (folder / (name + ".json")).is_file():
-        if (folder / "stop.json").exists():
+        if name != "stop" and (folder / "stop.json").exists():
             raise RuntimeError("The contrast supervisor ended the observation")
         if worker is not None and worker.done():
             raise RuntimeError(f"The native capture worker ended with {worker.result()} before {name}")
@@ -228,6 +228,11 @@ def exercise(api, context, pid, hwnd, env, ps, output, report):
             raise ValueError("The Windows palette changed while the worker observed the label")
         signature = verify_frames(output, phase, observed, pid, hwnd, state)
         announce(control, "observed-" + phase, token, pid=pid, hwnd=hwnd, frame=signature, state=vars(state))
+        if phase == "original" and not state.scheme:
+            if message(control, "stop", token) != {"baselineOnly": True}:
+                raise RuntimeError("The supervisor did not confirm the read-only contrast baseline")
+            report["baselineOnly"] = True
+            return
 
 
 def inputs(folder):
@@ -264,11 +269,28 @@ def capture_worker(target, folder, output):
             if not ps:
                 raise RuntimeError("The native UI Automation observer could not start")
             TEXT["observe"](binary, output, env, ps, report, exercise=exercise)
-        report["status"] = "passed"
+        report["status"] = "baseline-only" if report.get("baselineOnly") else "passed"
     except Exception:
         report["error"] = traceback.format_exc()
     write_json(output / "worker.json", report)
-    return int(report["status"] != "passed")
+    return int(report["status"] == "failed")
+
+
+def finish_contrast(report, child, worker_exit, unavailable):
+    baseline_only = unavailable is not None
+    child_status = "baseline-only" if baseline_only else "passed"
+    if (worker_exit or not report["captureJob"].get("jobClosed") or child.get("status") != child_status
+            or child.get("subjectExit") != 0 or not child.get("drained") or not report.get("profileRemoved")):
+        raise RuntimeError("The native capture or process cleanup is unconfirmed")
+    if baseline_only:
+        if (report["settingChangeAttempted"] is not False or report["baselineReadback"] != report["original"]
+                or not report["originalFrame"] or report["original"]["scheme"] not in (None, "")):
+            raise ValueError("The read-only baseline and the original Windows contrast setting disagree")
+        report.update(status="unavailable", reason=unavailable)
+    elif report.get("restoreVerified"):
+        report["status"] = "passed"
+    else:
+        raise RuntimeError("The Windows contrast restoration is unconfirmed")
 
 
 def supervise(target, folder, output):
@@ -295,6 +317,7 @@ def supervise(target, folder, output):
             job = report["captureJob"] = {}
             placement["selected"] = desktop
             worker = pool.submit(capture_job, target, desktop, job)
+            unavailable = None
             try:
                 ready = report["ready"] = message(control, "ready", token, worker, timeout=100)
                 pid, hwnd = ready["pid"], ready["hwnd"]
@@ -330,22 +353,20 @@ def supervise(target, folder, output):
                             raise RuntimeError("The capture worker or original Rust process exited")
                         tid = require_live_window(desk, session, desktop, pid, hwnd, publisher_desktop=publisher_desktop)
                         checks.append(dict(desktop=desktop, hwnd=hwnd, pid=pid, tid=tid, enumerated=1))
-                    contrast_cycle(SystemColors(bind, check), session_guard, window_guard, capture, report)
-                on_subject_desktop(desk, desktop, change_and_restore, report.setdefault("publisher", {}))
+                    return contrast_cycle(SystemColors(bind, check), session_guard, window_guard, capture, report)
+                unavailable = on_subject_desktop(desk, desktop, change_and_restore, report.setdefault("publisher", {}))
             finally:
-                announce(control, "stop", token)
+                stop = {"baselineOnly": True} if unavailable is not None else {}
+                announce(control, "stop", token, **stop)
         child = TEXT["read"](output / "worker.json")
-        if (worker.result() or not job.get("jobClosed") or child.get("status") != "passed"
-                or not child.get("drained") or not report["profileRemoved"] or not report["restoreVerified"]):
-            raise RuntimeError("The native capture, system restoration or process cleanup is unconfirmed")
-        report["status"] = "passed"
+        finish_contrast(report, child, worker.result(), unavailable)
     except Exception:
         report["error"] = traceback.format_exc()
     write_json(output / "result.json", report)
     files = sorted(p for p in output.rglob("*") if p.is_file() and p.parent in (output, control))
     (output / "evidence.sha256").write_text("".join(f"{sha256(p)}  {p.relative_to(output).as_posix()}\n" for p in files),
                                             encoding="utf-8", newline="\n")
-    print(report.get("error") or report["status"])
+    print(report.get("error") or report.get("reason") or report["status"])
     return int(report["status"] != "passed")
 
 
