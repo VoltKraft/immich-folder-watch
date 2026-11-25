@@ -95,7 +95,8 @@ class WindowsContrastTests(unittest.TestCase):
                 def close(handle):
                     events.append(("close", handle))
                     return active[0] == 21
-                def cycle():
+                def cycle(handle):
+                    self.assertEqual(handle, 42)
                     self.assertEqual(active[0], 42)
                     if interrupted:
                         raise ValueError("Original window was lost")
@@ -424,9 +425,54 @@ class WindowsContrastTests(unittest.TestCase):
         api.name.return_value = desk
         api.visible.return_value, api.iconic.return_value = True, False
         api.ancestor.return_value = hwnd
-        def guard():
-            observer["require_live_window"](api, session, desk, pid, hwnd)
+        def guard(**kwargs):
+            return observer["require_live_window"](api, session, desk, pid, hwnd, **kwargs)
         return api, context, guard
+
+    def test_publisher_enumerates_the_exact_root_on_its_held_private_input_desktop(self):
+        api, context, guard = self.owned_window()
+        context.update(threadDesktop=context["inputDesktop"], threadReceivesInput=True)
+        api.receiving_input.return_value = True
+        api.count_top_level_window.return_value = 1
+        self.assertEqual(guard(publisher_desktop=731), 72)
+        api.count_top_level_window.assert_called_once_with(731, 789)
+        api.receiving_input.assert_called_once_with(731)
+        self.assertEqual(api.owner.call_count, 2)
+        api.thread_desktop.assert_not_called()
+
+    def test_publisher_refuses_wrong_desktop_or_incomplete_membership_before_palette_write(self):
+        for failure in ("publisher thread", "thread input query", "desktop handle name", "desktop handle receives input",
+                        "no match", "duplicate", "enumeration error", "PID changed", "TID changed"):
+            with self.subTest(failure=failure):
+                api, context, guard = self.owned_window()
+                context.update(threadDesktop=context["inputDesktop"], threadReceivesInput=True)
+                api.receiving_input.return_value = True
+                api.count_top_level_window.return_value = 1
+                if failure == "publisher thread":
+                    context["threadDesktop"] = "Default"
+                elif failure == "thread input query":
+                    context["threadReceivesInput"] = {"win32Error": 5}
+                elif failure == "desktop handle name":
+                    api.name.return_value = "Default"
+                elif failure == "desktop handle receives input":
+                    api.receiving_input.return_value = {"win32Error": 5}
+                elif failure == "enumeration error":
+                    api.count_top_level_window.side_effect = OSError(5, "EnumDesktopWindows")
+                elif failure in ("no match", "duplicate"):
+                    api.count_top_level_window.return_value = 0 if failure == "no match" else 2
+                else:
+                    owners = iter([(123, 72), (9000, 72) if failure == "PID changed" else (123, 91)])
+                    def owner(_, slot):
+                        slot._obj.value, tid = next(owners)
+                        return tid
+                    api.owner.side_effect = owner
+                system = FakeSystem()
+                with self.assertRaises((ValueError, OSError)) as raised:
+                    run_cycle(system, window_guard=lambda: guard(publisher_desktop=731))
+                if failure in ("thread input query", "desktop handle receives input"):
+                    self.assertIn("'win32Error': 5", str(raised.exception))
+                self.assertEqual(system.calls, [])
+                api.thread_desktop.assert_not_called()
 
     def test_supervisor_rechecks_hwnd_owner_visibility_and_active_desktop_before_the_set(self):
         api, context, guard = self.owned_window()

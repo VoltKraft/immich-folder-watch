@@ -84,7 +84,7 @@ def message(folder, name, token, worker=None, timeout=85):
     return data
 
 
-def require_live_window(api, session, name, pid, hwnd):
+def require_live_window(api, session, name, pid, hwnd, *, publisher_desktop=None):
     def reject(operation, expected, observed):
         raise ValueError(f"The original visible Rust root HWND {hwnd} of PID {pid} in session {session} "
                          f"on {name!r} failed {operation} (expected {expected!r}, observed {observed!r})")
@@ -121,11 +121,29 @@ def require_live_window(api, session, name, pid, hwnd):
     thread = nonzero("GetWindowThreadProcessId", api.owner, hwnd, c.byref(owner))
     if owner.value != pid:
         reject("GetWindowThreadProcessId owner PID", pid, owner.value)
-    handle = nonzero(f"GetThreadDesktop for subject thread {thread}", api.thread_desktop, thread)
-    c.set_last_error(0)
-    thread_name = api.name(handle)
-    if not same_name(thread_name, name):
-        reject("GetUserObjectInformationW(UOI_NAME) on the subject thread desktop", name, desktop_name(thread_name))
+    if publisher_desktop is None:
+        handle = nonzero(f"GetThreadDesktop for subject thread {thread}", api.thread_desktop, thread)
+        c.set_last_error(0)
+        thread_name = api.name(handle)
+        if not same_name(thread_name, name):
+            reject("GetUserObjectInformationW(UOI_NAME) on the subject thread desktop", name, desktop_name(thread_name))
+    else:
+        if not named_desktop(name) or not ordinary_console(context, name):
+            reject("publisher thread on the owned input desktop", (name, True),
+                   (desktop_name(context["threadDesktop"]), context["threadReceivesInput"]))
+        held_name = api.name(publisher_desktop)
+        if not same_name(held_name, name):
+            reject("publisher desktop handle name", name, desktop_name(held_name))
+        receives_input = api.receiving_input(publisher_desktop)
+        if receives_input is not True:
+            reject("publisher desktop handle receives input", True, receives_input)
+        matches = api.count_top_level_window(publisher_desktop, hwnd)
+        if matches != 1:
+            reject("EnumDesktopWindows membership", 1, matches)
+        after = w.DWORD()
+        after_thread = nonzero("GetWindowThreadProcessId after enumeration", api.owner, hwnd, c.byref(after))
+        if (after.value, after_thread) != (pid, thread):
+            reject("window owner after enumeration", (pid, thread), (after.value, after_thread))
     if not api.visible(hwnd):
         reject("IsWindowVisible", True, False)
     if api.iconic(hwnd):
@@ -133,6 +151,7 @@ def require_live_window(api, session, name, pid, hwnd):
     ancestor = nonzero("GetAncestor(GA_ROOT)", api.ancestor, hwnd, GA_ROOT)
     if ancestor != hwnd:
         reject("GetAncestor(GA_ROOT)", hwnd, ancestor)
+    return thread
 
 
 def on_subject_desktop(api, name, cycle, report):
@@ -154,7 +173,7 @@ def on_subject_desktop(api, name, cycle, report):
             try:
                 if not ordinary_console(api.context(), name):
                     raise RuntimeError("The contrast publisher did not join the owned input desktop")
-                return cycle()
+                return cycle(handle)
             finally:
                 if changed:
                     # GetThreadDesktop lends the original handle. Only the handle we opened is closed.
@@ -297,10 +316,6 @@ def supervise(target, folder, output):
                     job_guard()
                     if desk.pid_session(os.getpid()) != session:
                         raise ValueError("The contrast supervisor left its original logon session")
-                def window_guard():
-                    if worker.done() or alive(handle, 0) != 258:
-                        raise RuntimeError("The capture worker or original Rust process exited")
-                    require_live_window(desk, session, ready["desktop"], pid, hwnd)
                 def capture(phase, state):
                     announce(control, "request-" + phase, token, state=vars(state))
                     ack = message(control, "observed-" + phase, token, worker)
@@ -308,7 +323,13 @@ def supervise(target, folder, output):
                     if ack != {"pid": pid, "hwnd": hwnd, "frame": original, "state": vars(state)}:
                         raise ValueError("The capture receipt differs from the native files or supervisor's palette")
                     return original
-                def change_and_restore():
+                def change_and_restore(publisher_desktop):
+                    checks = report["publisher"]["windowChecks"] = []
+                    def window_guard():
+                        if worker.done() or alive(handle, 0) != 258:
+                            raise RuntimeError("The capture worker or original Rust process exited")
+                        tid = require_live_window(desk, session, desktop, pid, hwnd, publisher_desktop=publisher_desktop)
+                        checks.append(dict(desktop=desktop, hwnd=hwnd, pid=pid, tid=tid, enumerated=1))
                     contrast_cycle(SystemColors(bind, check), session_guard, window_guard, capture, report)
                 on_subject_desktop(desk, desktop, change_and_restore, report.setdefault("publisher", {}))
             finally:

@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 from job import ExtendedLimits, Process, Startup
 from run import pe_machine, switch_back
-from win32 import SessionInfo, ordinary_console
+from win32 import Desktop, SessionInfo, ordinary_console
 from worker import field_center, input_passed, named_desktop, shared_windows
 
 
@@ -20,6 +20,26 @@ def active(desktop="Default"):
 
 
 class DesktopTests(unittest.TestCase):
+    def test_enumeration_counts_only_the_target_and_rejects_partial_failure(self):
+        api = object.__new__(Desktop)
+        def enumerate_windows(desktop, visit, param):
+            self.assertEqual((desktop, param), (520, 0))
+            for candidate in (306, 318, 327):
+                self.assertTrue(visit(candidate, 0))
+            return finished
+        with patch.object(c, "WinDLL", create=True), \
+                patch.object(c, "WINFUNCTYPE", create=True, return_value=lambda callback: callback), \
+                patch("win32.bind", return_value=enumerate_windows), \
+                patch.object(c, "get_last_error", create=True, return_value=5):
+            finished = True
+            self.assertEqual(api.count_top_level_window(520, 318), 1)
+            self.assertEqual(api.count_top_level_window(520, 399), 0)
+            finished = False
+            with self.assertRaisesRegex(OSError, "EnumDesktopWindows"):
+                api.count_top_level_window(520, 318)
+            with self.assertRaises(ValueError):
+                api.count_top_level_window(None, 318)
+
     def test_empty_named_desktop_can_only_retry_a_positive_window_wait(self):
         windows = shared_windows()
         observer = object.__new__(windows)

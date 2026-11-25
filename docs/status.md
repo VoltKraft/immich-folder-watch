@@ -1,5 +1,16 @@
 # Project Status
 
+## Windows contrast observer on the private test desktop (2026-11-25)
+
+At `4e3dbc4` Windows ARM64 denied the supervisor's query for the GUI
+thread's desktop before the first palette read. The capture worker had
+verified the original HWND. The publisher restored Default and closed its
+handle. It now checks for the same HWND on its own held desktop handle.
+Independent review and 40 portable tests covered window identity, partial
+enumeration, capture and cleanup, including the PowerShell label checks.
+Windows contrast presentation is still open.
+[Native error, ownership check and restoration](rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4).
+
 ## Full egui rendering through GDI on Windows x64 (2026-11-25)
 
 At `c00a863` the isolated x64 comparison rebuilds the complete retained

@@ -265,3 +265,22 @@ capture on Windows x64 and ARM64 remain open.
 [Passive label observer](../../tools/rust-qa/appearance/windows-label.ps1) ·
 [PowerShell regression controls](../../tools/rust-qa/appearance/test_passive_label.ps1) ·
 [Microsoft window hit testing](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-windowfrompoint).
+
+### Contrast publisher on the private desktop at 4e3dbc4
+
+On Windows ARM64 the capture worker verified the native GUI (PID 1868,
+HWND 4128924) on the fixture desktop in session 2. The supervisor verified
+the executable and its creation time. Windows returned error 5 when the
+publisher queried the desktop of GUI thread 9684. The trial stopped before
+the first palette read. The publisher returned to Default and closed its
+desktop handle. The GUI exited normally and the profile was removed.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237).
+
+The publisher now enumerates top-level windows on the private desktop
+handle it already holds with `DESKTOP_READOBJECTS`. It requires the original
+root HWND exactly once, the same owner PID and thread on both sides of the
+enumeration, and the publisher thread on that active input desktop. The
+capture worker independently checks the GUI thread's desktop. The original,
+changed and restored label still require two matching captures each. Native
+results with the publisher change are pending.
+[Observer](../../tools/rust-qa/appearance/windows.py) · [Windows desktop enumeration](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdesktopwindows).

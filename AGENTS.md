@@ -213,7 +213,9 @@ to reconcile project decisions, defaults, and recorded state.
   Check the [older GTK contrast setting](docs/rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals)
   through the private Settings portal when changing Linux appearance.
   The Windows contrast supervisor owns the temporary setting and verifies its
-  restoration even if the bounded native capture worker exits.
+  restoration even if the bounded native capture worker exits. Verify the
+  [original GUI window on its held private desktop](docs/rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4)
+  before changing the palette.
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
   ARM64. Run its native GUI and panel on the matching architecture.
   Use the dedicated native service fixtures with disposable profiles.
