@@ -5,9 +5,12 @@ from contextlib import redirect_stdout
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import runpy
+import shutil
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -29,6 +32,63 @@ def png(path, width, height, changed):
 
 
 class DisplayTests(unittest.TestCase):
+    def test_display_and_text_import_the_hash_used_by_the_field_capture(self):
+        shell = (Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                 if os.name == "nt" else shutil.which("pwsh"))
+        if not shell:
+            self.skipTest("PowerShell is required for the shared capture imports")
+        qa = Path(__file__).resolve().parents[1]
+        driver = """
+$ErrorActionPreference = 'Stop'
+$env:PSModulePath = $env:IFW_EMPTY_MODULES
+$PSModuleAutoloadingPreference = 'None'
+if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) { throw 'Expected an isolated module path' }
+function Parse-Observer([string]$path) {
+    $errors = $null
+    $tree = [Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)
+    if ($errors.Count) { throw $errors[0] }
+    return $tree
+}
+$ast = Parse-Observer $env:IFW_SHARED_CAPTURE
+$imports = @((Parse-Observer $env:IFW_CAPTURE_CONSUMER).FindAll({ param($n)
+    $n -is [Management.Automation.Language.ForEachStatementAst] -and
+    $n.Condition.Extent.Text.Contains("'Capture-SubjectField'")
+}, $true))
+if ($imports.Count -ne 1) { throw 'Missing the capture import in the observer' }
+. ([scriptblock]::Create($imports[0].Extent.Text))
+$capture = (Get-Command Capture-SubjectField -CommandType Function).ScriptBlock.Ast
+$hash = $capture.Find({ param($n)
+    $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-FieldPngHash'
+}, $true)
+# Isolate the saved file digest from the UIA and screen operations in this imported capture.
+if ($hash) { . ([scriptblock]::Create($hash.Extent.Text)) }
+$calls = @($capture.FindAll({ param($n)
+    $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Get-FieldPngHash'
+}, $true))
+if ($calls.Count -ne 1) { throw 'Expected the saved PNG digest in the imported capture' }
+$png = $env:IFW_SAMPLE_PNG
+& ([scriptblock]::Create($calls[0].Extent.Text))
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "source [frame].png"
+            expected = png(path, 32, 10, True)["sha256"]
+            modules = root / "modules"
+            modules.mkdir()
+            env = dict(os.environ, IFW_SHARED_CAPTURE=str(qa / "observe-windows-input.ps1"),
+                       IFW_SAMPLE_PNG=str(path),
+                       IFW_EMPTY_MODULES=str(modules), PSModulePath=str(modules), POWERSHELL_TELEMETRY_OPTOUT="1")
+            if os.name != "nt":
+                for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+                    env[key] = str(root / key)
+            for consumer in ("windows-display/field.ps1", "windows-text/observe.ps1"):
+                with self.subTest(consumer=consumer):
+                    proc = subprocess.run([shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", driver],
+                                          cwd=root, env=dict(env, IFW_CAPTURE_CONSUMER=str(qa / consumer)),
+                                          capture_output=True, text=True, timeout=30)
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    self.assertEqual(proc.stdout.splitlines(), [expected])
+
     def test_remote_input_uses_the_own_active_unlocked_session(self):
         context = {"session": 3, "activeConsoleSession": 1, "windowStation": "WinSta0", "stationVisible": True,
                    "inputDesktop": "Default", "threadDesktop": "Default", "threadReceivesInput": True,

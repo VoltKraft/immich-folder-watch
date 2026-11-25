@@ -131,17 +131,18 @@ function Wait-ReaderCue([string]$Name) {
     throw "Missing NVDA speech observation for $Name."
 }
 
-function Get-FieldPngHash([string]$Path) {
-    $stream = [IO.File]::OpenRead($Path)
-    try {
-        $sha = [Security.Cryptography.SHA256]::Create()
-        try {
-            return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
-        } finally { $sha.Dispose() }
-    } finally { $stream.Dispose() }
-}
-
 function Capture-SubjectField($Element, [string]$Suffix, $ExpectedFocus = $Element) {
+    # The display and text observers import this function's definition without running this script.
+    function Get-FieldPngHash([string]$Path) {
+        $stream = [IO.File]::OpenRead($Path)
+        try {
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try {
+                return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+            } finally { $sha.Dispose() }
+        } finally { $stream.Dispose() }
+    }
+
     $r = $Element.Current.BoundingRectangle
     $x = [int][Math]::Ceiling($r.Left + 2)
     $y = [int][Math]::Ceiling($r.Top + 2)
