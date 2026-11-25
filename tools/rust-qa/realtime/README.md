@@ -22,7 +22,11 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 16 wire scenarios. The TLS controls use a fresh private CA,
+build and all 18 wire scenarios. The peer records the namespace disconnect
+for an established polling or WebSocket session. On WebSocket it also checks
+the normal close code, the reason and completion of the reply. Two stop controls
+withhold the namespace acknowledgement or the WebSocket close reply.
+The TLS controls use a fresh private CA,
 one server certificate for the loopback endpoint and one for a different
 loopback address. The latter must complete no HTTP requests. The peer records
 the incoming TLS ClientHello separately from HTTP requests. The test uses

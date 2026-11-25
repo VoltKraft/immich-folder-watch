@@ -32,8 +32,9 @@ becomes a bounded tokio-tungstenite stream. The client exchanges
 `2probe`/`3probe` before sending `5`. A refused probe leaves polling usable.
 An uncertain final upgrade write ends the session. A server heartbeat determines
 the next deadline, capped at 120 seconds. The initial handshake and the upgrade
-have ten-second ceilings. Shutdown drops an in-flight read, connection attempt
-or reconnect delay. Delays grow to a maximum of 30 seconds. [Session](../../tools/rust-qa/realtime/src/session.rs),
+have ten-second ceilings. Shutdown cancels an outstanding read or reconnect delay
+and gives an established session two seconds to disconnect on its active
+transport. Delays between attempts grow to a maximum of 30 seconds. [Session](../../tools/rust-qa/realtime/src/session.rs),
 [Engine.IO](https://socket.io/docs/v4/engine-io-protocol/) and
 [Socket.IO](https://socket.io/docs/v4/socket-io-protocol/).
 
@@ -45,6 +46,36 @@ authority. One queued wakeup suffices for overlapping events and periodic
 ticks. The fixture consumer performs an authenticated HTTP read of its
 synthetic empty album inventory. [Framing](../../rust/crates/ifw-immich/src/realtime.rs)
 and [Socket.IO parser](../../tools/rust-qa/realtime/src/protocol.rs).
+
+### Stopping an established session
+
+The signed Linux x64 Flatpak 3.0.4 assemblies ran on their delivered .NET
+10.0.12 runtime against a loopback peer. Each of the four connections had
+delivered an album event before the driver called `StopAsync`. For ordinary
+polling the peer received one final POST with `41` while a GET was pending.
+The corresponding packet on the `/collection` namespace was `41/collection,`.
+On WebSocket the peer received the same namespace packet, then a normal close
+frame with code 1000 and the reason `io client disconnect`. It replied with
+code 1000. The four C# stop calls took 9.68–12.29 ms. The shipping wire
+record has SHA-256 `a074f7d59b1cd8660a1238501137d7b09ed640f8f3d84e3da68c92116c701c9e`.
+[Package and assembly provenance](rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies) ·
+[Shipping stop deadline](../../src/ImmichFolderWatch.Immich/ImmichRealtimeClient.cs).
+
+On `1e3c024` the Rust process reported a normal stop while the peer observed
+no final polling POST. The WebSocket ended at TCP EOF. The corrected supervisor
+signals the owning session and waits up to two seconds. An acknowledged
+namespace sends its disconnect on the active transport. The WebSocket then
+exchanges close frames. A pending read can be interrupted, and an outstanding
+write finishes before the disconnect starts.
+
+The native Fedora x64 run passed all 18 loopback scenarios, including both
+namespaces and both transports. With an 850 ms run budget, the process
+exited at 855 ms when the namespace acknowledgement was withheld. The
+peer saw no disconnect for that unacknowledged namespace. When an upgraded
+peer withheld its close reply, the process reported a stop timeout and
+exited at 2,857 ms with one connection attempt. The session receipt has
+SHA-256 `8fa72e38a325c3ebd49c0f4f3a0dda0840629e23762578ec7f082cb248b2104f`.
+[Native runner and wire checks](../../tools/rust-qa/realtime/README.md).
 
 ### TLS endpoint identity
 

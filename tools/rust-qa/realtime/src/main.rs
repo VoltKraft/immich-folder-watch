@@ -7,7 +7,7 @@ mod transport;
 
 use reqwest::{Certificate, Url};
 use std::{cell::Cell, net::IpAddr, path::Path, process::ExitCode, time::Duration};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::{self, Instant, MissedTickBehavior};
 use transport::Transport;
 
@@ -38,6 +38,7 @@ enum Observation {
     Event,
     Periodic,
     Lost(Error),
+    StopFailed(Error),
     Inventory,
     Stopped,
 }
@@ -46,6 +47,7 @@ impl Observation {
     fn print(self) {
         match self {
             Self::Lost(e) => println!("Lost {e:?}"),
+            Self::StopFailed(e) => println!("StopFailed {e:?}"),
             Self::UpgradeDeclined(e) => println!("UpgradeDeclined {e:?}"),
             other => println!("{other:?}"),
         }
@@ -70,14 +72,20 @@ async fn supervise(
         }
         observe(event);
     };
+    let (request_stop, mut stopping) = oneshot::channel();
     let connection = async {
         loop {
             report(Observation::Attempt);
-            if let Err(error) = session::run(transport, refresh, &report).await {
-                report(Observation::Lost(error));
-            }
+            let Err(error) = session::run(transport, refresh, &report, &mut stopping).await else {
+                return;
+            };
+            report(Observation::Lost(error));
             let delay = retry.get();
-            time::sleep(delay).await;
+            tokio::select! {
+                biased;
+                _ = &mut stopping => return,
+                _ = time::sleep(delay) => {}
+            }
             retry.set((delay * 2).min(Duration::from_secs(30)));
         }
     };
@@ -85,11 +93,19 @@ async fn supervise(
     loop {
         tokio::select! {
             biased;
-            _ = &mut shutdown => { observe(Observation::Stopped); return; }
+            _ = &mut shutdown => break,
             _ = interval.tick() => { let _ = refresh.try_send(()); observe(Observation::Periodic); }
             _ = &mut connection => unreachable!("the reconnect loop ends by cancellation"),
         }
     }
+    let _ = request_stop.send(());
+    if time::timeout(Duration::from_secs(2), connection)
+        .await
+        .is_err()
+    {
+        observe(Observation::StopFailed(Error::Timeout));
+    }
+    observe(Observation::Stopped);
 }
 
 fn interval(value: &str) -> Result<Duration, Error> {

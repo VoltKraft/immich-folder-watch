@@ -1,8 +1,9 @@
 use futures_util::{SinkExt, StreamExt};
 use ifw_immich::realtime::{EnginePacket, polling_packets, websocket_packet};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Instant, timeout_at};
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::protocol::{CloseFrame, frame::coding::CloseCode};
 
 use crate::protocol::{Action, Open, socket_packet};
 use crate::transport::{CONNECT_TIMEOUT, Socket, Transport};
@@ -24,9 +25,15 @@ pub(crate) async fn run(
     transport: &Transport,
     refresh: &mpsc::Sender<()>,
     observe: Observe<'_>,
+    stopping: &mut oneshot::Receiver<()>,
 ) -> Result<(), Error> {
     let connect_deadline = Instant::now() + CONNECT_TIMEOUT;
-    let body = timeout_at(connect_deadline, transport.poll(None)).await??;
+    let Some(opening) =
+        until_stop(stopping, timeout_at(connect_deadline, transport.poll(None))).await
+    else {
+        return Ok(());
+    };
+    let body = opening??;
     let mut packets = polling_packets(&body).map_err(|_| Error::Protocol)?;
     let Some(Ok(EnginePacket::Open(text))) = packets.next() else {
         return Err(Error::Protocol);
@@ -41,12 +48,16 @@ pub(crate) async fn run(
         refresh,
         observe,
     };
-    let connect = if transport.namespace == "/" {
-        "40".to_owned()
-    } else {
-        format!("40{},", transport.namespace)
+    let connect = session.namespace_packet("40");
+    let Some(post) = until_stop(
+        stopping,
+        timeout_at(connect_deadline, session.send(connect)),
+    )
+    .await
+    else {
+        return Ok(());
     };
-    timeout_at(connect_deadline, session.send(connect)).await??;
+    post??;
     for packet in packets {
         timeout_at(
             connect_deadline,
@@ -55,29 +66,82 @@ pub(crate) async fn run(
         .await??;
     }
     drop(body);
-    while !session.connected {
-        timeout_at(connect_deadline.min(session.heartbeat), session.receive()).await??;
+    session.listen(connect_deadline, stopping).await?;
+    if session.connected
+        && let Err(error) = session.disconnect().await
+    {
+        observe(Observation::StopFailed(error));
     }
-    if session.open.websocket {
-        // There is no GET or POST in flight. A failure before "5" still owns
-        // the polling transport. After "5", reconnect on uncertainty.
-        let deadline = session.heartbeat.min(Instant::now() + CONNECT_TIMEOUT);
-        match timeout_at(deadline, transport.probe(&session.open.sid)).await {
-            Ok(Ok(mut ws)) => {
-                timeout_at(deadline, ws.send(Message::text("5"))).await??;
-                session.socket = Some(ws);
-                observe(Observation::Upgraded);
-            }
-            Ok(Err(err)) => observe(Observation::UpgradeDeclined(err)),
-            Err(_) => observe(Observation::UpgradeDeclined(Error::Timeout)),
-        }
-    }
-    loop {
-        timeout_at(session.heartbeat, session.receive()).await??;
+    Ok(())
+}
+
+async fn until_stop<T>(
+    stopping: &mut oneshot::Receiver<()>,
+    operation: impl Future<Output = T>,
+) -> Option<T> {
+    tokio::select! {
+        biased;
+        _ = stopping => None,
+        result = operation => Some(result),
     }
 }
 
 impl Session<'_> {
+    fn namespace_packet(&self, kind: &str) -> String {
+        if self.transport.namespace == "/" {
+            kind.to_owned()
+        } else {
+            format!("{kind}{},", self.transport.namespace)
+        }
+    }
+
+    async fn listen(
+        &mut self,
+        connect_deadline: Instant,
+        stopping: &mut oneshot::Receiver<()>,
+    ) -> Result<(), Error> {
+        while !self.connected {
+            if !timeout_at(connect_deadline.min(self.heartbeat), self.receive(stopping)).await?? {
+                return Ok(());
+            }
+        }
+        if self.open.websocket {
+            // Polling owns the session until the upgrade packet has been sent.
+            let deadline = self.heartbeat.min(Instant::now() + CONNECT_TIMEOUT);
+            let probe = timeout_at(deadline, self.transport.probe(&self.open.sid));
+            match until_stop(stopping, probe).await {
+                None => return Ok(()),
+                Some(Ok(Ok(mut ws))) => {
+                    timeout_at(deadline, ws.send(Message::text("5"))).await??;
+                    self.socket = Some(ws);
+                    (self.observe)(Observation::Upgraded);
+                }
+                Some(Ok(Err(err))) => (self.observe)(Observation::UpgradeDeclined(err)),
+                Some(Err(_)) => (self.observe)(Observation::UpgradeDeclined(Error::Timeout)),
+            }
+        }
+        while timeout_at(self.heartbeat, self.receive(stopping)).await?? {}
+        Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<(), Error> {
+        self.send(self.namespace_packet("41")).await?;
+        if let Some(ws) = &mut self.socket {
+            ws.close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: "io client disconnect".into(),
+            }))
+            .await?;
+            while let Some(message) = ws.next().await {
+                if matches!(message?, Message::Close(_)) {
+                    return Ok(());
+                }
+            }
+            return Err(Error::Disconnected);
+        }
+        Ok(())
+    }
+
     async fn send(&mut self, text: String) -> Result<(), Error> {
         if let Some(ws) = &mut self.socket {
             ws.send(Message::text(text)).await?;
@@ -89,9 +153,14 @@ impl Session<'_> {
         }
     }
 
-    async fn receive(&mut self) -> Result<(), Error> {
+    /// Interrupt reads at shutdown. Finish any current write before issuing the
+    /// disconnect, so the session cannot have two polling POSTs in flight.
+    async fn receive(&mut self, stopping: &mut oneshot::Receiver<()>) -> Result<bool, Error> {
         if let Some(ws) = &mut self.socket {
-            match ws.next().await.ok_or(Error::Disconnected)?? {
+            let Some(frame) = until_stop(stopping, ws.next()).await else {
+                return Ok(false);
+            };
+            match frame.ok_or(Error::Disconnected)?? {
                 Message::Text(text) => {
                     self.handle(websocket_packet(text.as_bytes()).map_err(|_| Error::Protocol)?)
                         .await?
@@ -102,12 +171,16 @@ impl Session<'_> {
                 Message::Frame(_) => return Err(Error::Protocol),
             }
         } else {
-            let body = self.transport.poll(Some(&self.open.sid)).await?;
-            for packet in polling_packets(&body).map_err(|_| Error::Protocol)? {
+            let Some(response) =
+                until_stop(stopping, self.transport.poll(Some(&self.open.sid))).await
+            else {
+                return Ok(false);
+            };
+            for packet in polling_packets(&response?).map_err(|_| Error::Protocol)? {
                 self.handle(packet.map_err(|_| Error::Protocol)?).await?;
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     async fn handle(&mut self, packet: EnginePacket<'_>) -> Result<(), Error> {
