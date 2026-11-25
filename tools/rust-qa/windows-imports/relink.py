@@ -129,8 +129,8 @@ def variant(work, source, rebuilt, compiler, target, run, env, native, result):
         project, env=env, timeout=240)
     observations = json.loads(sessions.read_bytes())
     cases = observations["cases"]
-    if (len(cases) != 18 or cases.keys() != original_sessions["cases"].keys()
-            or not {"wrong-host-tls", "stop-before-ack", "close-timeout"} <= cases.keys()
+    if (len(cases) != 20 or cases.keys() != original_sessions["cases"].keys()
+            or not {"wrong-host-tls", "stop-before-ack", "close-timeout", "ack-after-upgrade", "stalled-probe"} <= cases.keys()
             or observations["redirectTargetRequests"] != 0 or observations["redirectTargetCredentials"] != 0):
         raise ValueError("Native transport observations are incomplete")
     result.update(probeSha256=sha(candidate), originalProbeSha256=sha(original_exe),

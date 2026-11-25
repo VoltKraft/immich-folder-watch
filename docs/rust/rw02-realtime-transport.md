@@ -77,6 +77,39 @@ exited at 2,857 ms with one connection attempt. The session receipt has
 SHA-256 `8fa72e38a325c3ebd49c0f4f3a0dda0840629e23762578ec7f082cb248b2104f`.
 [Native runner and wire checks](../../tools/rust-qa/realtime/README.md).
 
+### Namespace acknowledgement during a transport upgrade
+
+At `bcacfaf` a loopback server held the namespace polling GET until the
+client probed its advertised WebSocket. The Rust client waited ten seconds
+for the polling acknowledgement, timed out and received no subscribed event.
+On the same peer, the signed 3.0.4 Linux x64 assemblies upgraded, accepted
+the acknowledgement on WebSocket and received the event in both the default
+and `/collection` namespaces.
+
+The corrected client receives polling packets while qualifying the new
+transport. After a positive probe it stops issuing GETs and drains the
+current GET and its writes before sending the Engine.IO upgrade packet.
+The original namespace deadline applies on either transport. In the
+Fedora x64 trial the peer released a held polling GET with a heartbeat
+and a noop, held the HTTP pong response for a further 150 ms, and then
+observed `5` before sending the WebSocket namespace acknowledgement. A
+second peer withheld the probe pong while its polling transport delivered
+the acknowledgement, an album event and eight heartbeats. The client
+answered all eight and shut down on the same polling session.
+[Engine.IO upgrade procedure](https://socket.io/docs/v4/engine-io-protocol/#upgrade) ·
+[Wire observations](../../tools/rust-qa/realtime/verify.py).
+
+The local native suite passed 20 scenarios. In separate one-second
+comparisons, both namespaces delivered an event and completed the close
+exchange with the acknowledgement on either transport. The original
+polling control returned a namespace acknowledgement on **every** GET.
+If another GET reached it before the probe completed, Rust reported a
+protocol error on the repeated CONNECT. A control that acknowledges
+each namespace once passed all four combinations. The late-acknowledgement
+handler was identical in both comparisons. The full native suite's
+`sessions.json` has SHA-256
+`769508629866d3efe0f9befdd2212bdc36f1b31a2a84a8634e14f3ef3b779ddf`.
+
 ### TLS endpoint identity
 
 The TLS observer now distinguishes a trusted issuer from a certificate that

@@ -22,7 +22,13 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 18 wire scenarios. The peer records the namespace disconnect
+build and all 20 wire scenarios. The upgrade trials exercise the namespace
+acknowledgement on either transport. The polling case delivers an event
+before cutover. In the other case the peer releases a held poll after the
+WebSocket probe and checks the polling heartbeat reply before sending the
+namespace acknowledgement on WebSocket. A stalled upgrade probe checks that
+polling continues to receive the namespace acknowledgement, events and
+heartbeats. The peer records the namespace disconnect
 for an established polling or WebSocket session. On WebSocket it also checks
 the normal close code, the reason and completion of the reply. Two stop controls
 withhold the namespace acknowledgement or the WebSocket close reply.

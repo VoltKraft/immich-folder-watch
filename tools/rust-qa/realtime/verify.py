@@ -64,6 +64,10 @@ class Peer(ThreadingHTTPServer):
         self.errors = []
         self.close_packets = []
         self.stopping = threading.Event()
+        self.poll_started = threading.Event()
+        self.probe_answered = threading.Event()
+        self.held_poll_released = threading.Event()
+        self.upgrade_committed = threading.Event()
         self.tls_client_hello = threading.Event()
         self.lock = threading.Lock()
         self.polls = {}
@@ -139,6 +143,9 @@ class Handler(BaseHTTPRequestHandler):
             self.server.mark("namespacePosts")
         elif packet == b"3":
             self.server.mark("pollingPongs")
+            if self.server.scenario == "ack-after-upgrade":
+                assert not self.server.upgrade_committed.wait(0.15), "upgrade overtook a pending polling POST"
+                self.server.mark("releasedPollingPongs")
         elif packet == ("41" + self.server.ns).encode():
             self.server.mark("pollingDisconnects")
             self.server.close_packets.append({"httpPost": packet.decode("ascii")})
@@ -167,8 +174,8 @@ class Handler(BaseHTTPRequestHandler):
             sid = f"synthetic-{count}"
             peer.polls[sid] = 0
             upgrade = peer.scenario in {"websocket", "ws-size", "upgrade-redirect", "probe-refused", "tls", "reconnect",
-                                        "close-timeout"}
-            heartbeat_timeout = 150 if peer.scenario == "missed-heartbeat" else 3000
+                                        "close-timeout", "ack-after-upgrade", "stalled-probe"}
+            heartbeat_timeout = {"missed-heartbeat": 150, "stalled-probe": 400}.get(peer.scenario, 3000)
             handshake = dict(sid=sid, upgrades=["websocket"] if upgrade else [],
                              pingInterval=heartbeat_timeout, pingTimeout=heartbeat_timeout, maxPayload=LIMIT)
             self.body(b"0" + json.dumps(handshake).encode())
@@ -183,12 +190,35 @@ class Handler(BaseHTTPRequestHandler):
         peer = self.server
         peer.polls[sid] += 1
         number = peer.polls[sid]
-        if number == 1 and peer.scenario == "stop-before-ack":
+        if peer.scenario == "stalled-probe":
+            if number == 1:
+                self.body(b"6")
+            elif number == 2:
+                self.body(("40" + peer.ns + '{"sid":"polling-namespace-id"}').encode())
+            elif number == 3:
+                self.body(event("on_album_update", peer.ns))
+            else:
+                time.sleep(0.12)
+                self.body(b"2")
+        elif peer.scenario == "ack-after-upgrade":
+            if number == 1:
+                peer.poll_started.set()
+                assert peer.probe_answered.wait(4), "client waited for a polling namespace ACK before probing"
+                peer.held_poll_released.set()
+                self.body(b"2\x1e6")
+            else:
+                assert peer.held_poll_released.is_set(), "overlapping polling GETs"
+                self.body(b"6")
+        elif number == 1 and peer.scenario == "stop-before-ack":
             peer.mark("pendingNamespaceAcks")
             peer.stopping.wait(6)
             self.close_connection = True
         elif number == 1:
-            self.body(("40" + peer.ns + '{"sid":"separate-socket-id"}').encode())
+            ack = ("40" + peer.ns + '{"sid":"separate-socket-id"}').encode()
+            if peer.scenario == "websocket":
+                self.body(ack + b"\x1e" + event("on_album_invite", peer.ns))
+            else:
+                self.body(ack)
         elif peer.scenario == "poll-size" and number == 2:
             self.send_response(200)
             self.send_header("Transfer-Encoding", "chunked")
@@ -204,6 +234,9 @@ class Handler(BaseHTTPRequestHandler):
         elif number == 2 and peer.scenario == "exact-size":
             prefix = b'42["on_album_update","'
             self.body(prefix + b"a" * (LIMIT - len(prefix) - 2) + b'"]')
+        elif peer.scenario in {"websocket", "tls", "ws-size", "reconnect", "close-timeout"}:
+            assert peer.probe_answered.wait(4), "websocket did not complete its probe"
+            self.body(b"6")
         else:
             peer.mark("pendingPolls")
             peer.stopping.wait(6)
@@ -232,9 +265,20 @@ class Handler(BaseHTTPRequestHandler):
         if peer.scenario == "probe-refused":
             send_frame(self.wfile, 8, struct.pack("!H", 1000))
             return
+        if peer.scenario == "stalled-probe":
+            peer.stopping.wait(6)
+            return
+        if peer.scenario == "ack-after-upgrade":
+            assert peer.poll_started.wait(4), "expected the active namespace poll"
         send_frame(self.wfile, 1, b"3probe")
+        peer.probe_answered.set()
         assert client_frame(self.rfile) == (1, b"5")
         peer.mark("upgrades")
+        if peer.scenario == "ack-after-upgrade":
+            peer.upgrade_committed.set()
+            assert peer.counts["releasedPollingPongs"] == 1, "upgrade overtook the polling heartbeat reply"
+            send_frame(self.wfile, 1, ("40" + peer.ns + '{"sid":"websocket-namespace-id"}').encode())
+            peer.mark("websocketNamespaceAcks")
         if peer.scenario == "ws-size":
             send_frame(self.wfile, 1, b'a' * (LIMIT // 2), final=False)
             send_frame(self.wfile, 0, b'b' * (LIMIT // 2 + 1))
@@ -335,7 +379,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
     rejected_tls = name in {"untrusted-tls", "wrong-host-tls"}
     encrypted = rejected_tls or name in {"tls", "upgrade-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
-    api = "/collection/api" if name in {"polling", "tls"} else "/api"
+    api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade"} else "/api"
     with peer(name, api, contexts[certificate_address] if encrypted else None) as origin:
         origin.redirect_port = redirect.server_port
         protocol = "https" if encrypted else "http"
@@ -343,6 +387,8 @@ def run_scenario(executable, name, directory, contexts, redirect):
         trust = directory / ("other.crt" if name == "untrusted-tls" else "ca.crt")
         mode = "https" if encrypted or name == "http-default" else "allow-http"
         budget = 1300 if name in {"tls", "reconnect", "exact-size", "ws-size", "poll-size"} else 850
+        if name == "stalled-probe":
+            budget = 1750
         retry = 130 if name == "reconnect" else 30_000
         before = time.monotonic()
         proc = subprocess.run([str(executable), url, mode, str(trust), str(budget), str(retry), "100"],
@@ -377,14 +423,18 @@ def run_scenario(executable, name, directory, contexts, redirect):
 
 
 def check_protocol(name, trace, stats, events):
-    polling_at_stop = name in {"polling", "upgrade-redirect", "probe-refused", "exact-size", "cancel-poll"}
-    websocket_at_stop = name in {"websocket", "tls", "reconnect", "close-timeout"}
+    polling_at_stop = name in {"polling", "upgrade-redirect", "probe-refused", "exact-size", "cancel-poll", "stalled-probe"}
+    websocket_at_stop = name in {"websocket", "tls", "reconnect", "close-timeout", "ack-after-upgrade"}
     assert stats["pollingDisconnects"] == int(polling_at_stop), (events, stats)
     assert stats["websocketDisconnects"] == stats["normalCloseFrames"] == int(websocket_at_stop), (events, stats)
     assert stats["normalCloseReplies"] == int(websocket_at_stop and name != "close-timeout"), (events, stats)
     assert [e for e in events if e.startswith("StopFailed")] == (["StopFailed Timeout"] if name == "close-timeout" else [])
     if name == "stop-before-ack":
         assert stats["pendingNamespaceAcks"] == stats["namespacePosts"] == 1 and not trace["Connected"], (events, stats)
+    if name == "stalled-probe":
+        assert stats["probes"] == trace["Connected"] == trace["Event"] == 1, (events, stats)
+        assert stats["pollingPongs"] == trace["Heartbeat"] >= 2 and not trace["Upgraded"], (events, stats)
+        assert not any(e.startswith("Lost") for e in events), events
     if name in {"opening-size", "poll-size", "ws-size"}:
         assert trace["Lost Limit"] == 1 and not trace["Event"], (events, stats)
     if name == "redirect":
@@ -395,8 +445,17 @@ def check_protocol(name, trace, stats, events):
     if websocket_at_stop or name == "ws-size":
         assert stats["probes"] == stats["upgrades"] == trace["Upgraded"] and stats["upgrades"] >= 1, (events, stats)
     if websocket_at_stop:
-        assert stats["websocketPongs"] == stats["enginePongs"] == trace["Heartbeat"], (events, stats)
-        assert trace["Event"] == stats["upgrades"], (events, stats)
+        assert stats["websocketPongs"] == stats["enginePongs"] == stats["upgrades"], (events, stats)
+        assert stats["enginePongs"] + stats["pollingPongs"] == trace["Heartbeat"], (events, stats)
+        assert trace["Event"] == stats["upgrades"] + int(name == "websocket"), (events, stats)
+        if name == "ack-after-upgrade":
+            assert events.index("Upgraded") < events.index("Connected") < events.index("Event"), events
+            assert stats["websocketNamespaceAcks"] == stats["pollingPongs"] == stats["releasedPollingPongs"] == 1
+            assert trace["Attempt"] == 1
+        else:
+            assert events.index("Connected") < events.index("Upgraded"), events
+        if name == "websocket":
+            assert events.index("Connected") < events.index("Event") < events.index("Upgraded"), events
     if name == "reconnect":
         assert trace["Lost Disconnected"] == 1 and trace["Connected"] == 2, (events, stats)
     if name in {"polling", "upgrade-redirect", "probe-refused"}:
@@ -424,7 +483,8 @@ def main():
     executable = args.probe.resolve(strict=True)
     cases = ("polling", "websocket", "tls", "untrusted-tls", "wrong-host-tls", "http-default", "upgrade-redirect",
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
-             "reconnect", "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout")
+             "reconnect", "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
+             "stalled-probe")
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

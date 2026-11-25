@@ -1,6 +1,7 @@
 use futures_util::{SinkExt, StreamExt};
 use ifw_immich::realtime::{EnginePacket, polling_packets, websocket_packet};
-use tokio::sync::{mpsc, oneshot};
+use std::task::Poll;
+use tokio::sync::{mpsc, watch};
 use tokio::time::{Instant, timeout_at};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::protocol::{CloseFrame, frame::coding::CloseCode};
@@ -25,7 +26,7 @@ pub(crate) async fn run(
     transport: &Transport,
     refresh: &mpsc::Sender<()>,
     observe: Observe<'_>,
-    stopping: &mut oneshot::Receiver<()>,
+    stopping: &mut watch::Receiver<bool>,
 ) -> Result<(), Error> {
     let connect_deadline = Instant::now() + CONNECT_TIMEOUT;
     let Some(opening) =
@@ -76,12 +77,12 @@ pub(crate) async fn run(
 }
 
 async fn until_stop<T>(
-    stopping: &mut oneshot::Receiver<()>,
+    stopping: &mut watch::Receiver<bool>,
     operation: impl Future<Output = T>,
 ) -> Option<T> {
     tokio::select! {
         biased;
-        _ = stopping => None,
+        _ = stopping.wait_for(|stopping| *stopping) => None,
         result = operation => Some(result),
     }
 }
@@ -98,30 +99,80 @@ impl Session<'_> {
     async fn listen(
         &mut self,
         connect_deadline: Instant,
-        stopping: &mut oneshot::Receiver<()>,
+        stopping: &mut watch::Receiver<bool>,
     ) -> Result<(), Error> {
-        while !self.connected {
-            if !timeout_at(connect_deadline.min(self.heartbeat), self.receive(stopping)).await?? {
+        if self.open.websocket && !self.upgrade(connect_deadline, stopping).await? {
+            return Ok(());
+        }
+        loop {
+            if !timeout_at(self.read_deadline(connect_deadline), self.receive(stopping)).await?? {
                 return Ok(());
             }
         }
-        if self.open.websocket {
-            // Polling owns the session until the upgrade packet has been sent.
-            let deadline = self.heartbeat.min(Instant::now() + CONNECT_TIMEOUT);
-            let probe = timeout_at(deadline, self.transport.probe(&self.open.sid));
-            match until_stop(stopping, probe).await {
-                None => return Ok(()),
-                Some(Ok(Ok(mut ws))) => {
-                    timeout_at(deadline, ws.send(Message::text("5"))).await??;
-                    self.socket = Some(ws);
-                    (self.observe)(Observation::Upgraded);
-                }
-                Some(Ok(Err(err))) => (self.observe)(Observation::UpgradeDeclined(err)),
-                Some(Err(_)) => (self.observe)(Observation::UpgradeDeclined(Error::Timeout)),
-            }
+    }
+
+    fn read_deadline(&self, connect_deadline: Instant) -> Instant {
+        if self.connected {
+            self.heartbeat
+        } else {
+            self.heartbeat.min(connect_deadline)
         }
-        while timeout_at(self.heartbeat, self.receive(stopping)).await?? {}
-        Ok(())
+    }
+
+    async fn upgrade(
+        &mut self,
+        connect_deadline: Instant,
+        stopping: &mut watch::Receiver<bool>,
+    ) -> Result<bool, Error> {
+        let deadline = Instant::now() + CONNECT_TIMEOUT;
+        let sid = self.open.sid.clone();
+        let probe = timeout_at(deadline, self.transport.probe(&sid));
+        let mut probe_stop = stopping.clone();
+        let observe = self.observe;
+        let qualification = async {
+            match until_stop(&mut probe_stop, probe).await {
+                Some(Ok(Ok(ws))) => return Some(ws),
+                Some(Ok(Err(error))) => observe(Observation::UpgradeDeclined(error)),
+                Some(Err(_)) => observe(Observation::UpgradeDeclined(Error::Timeout)),
+                None => {}
+            }
+            None
+        };
+        tokio::pin!(qualification);
+        let socket = loop {
+            // Pause new GETs as soon as the websocket probe succeeds.
+            let ready =
+                std::future::poll_fn(|cx| Poll::Ready(qualification.as_mut().poll(cx))).await;
+            if let Poll::Ready(done) = ready {
+                break done;
+            }
+            let poll = timeout_at(self.read_deadline(connect_deadline), self.receive(stopping));
+            tokio::pin!(poll);
+            tokio::select! {
+                biased;
+                // Poll this GET first so the other branch can only drain a
+                // request already under way. Its reply can include a pong POST.
+                active = &mut poll => if !active?? { return Ok(false); },
+                done = &mut qualification => {
+                    let active = if done.is_some() {
+                        timeout_at(deadline, poll).await?
+                    } else {
+                        poll.await
+                    };
+                    if !active?? { return Ok(false); }
+                    break done;
+                }
+            }
+        };
+        if *stopping.borrow() {
+            return Ok(false);
+        }
+        if let Some(mut ws) = socket {
+            timeout_at(deadline, ws.send(Message::text("5"))).await??;
+            self.socket = Some(ws);
+            observe(Observation::Upgraded);
+        }
+        Ok(true)
     }
 
     async fn disconnect(&mut self) -> Result<(), Error> {
@@ -155,7 +206,7 @@ impl Session<'_> {
 
     /// Interrupt reads at shutdown. Finish any current write before issuing the
     /// disconnect, so the session cannot have two polling POSTs in flight.
-    async fn receive(&mut self, stopping: &mut oneshot::Receiver<()>) -> Result<bool, Error> {
+    async fn receive(&mut self, stopping: &mut watch::Receiver<bool>) -> Result<bool, Error> {
         if let Some(ws) = &mut self.socket {
             let Some(frame) = until_stop(stopping, ws.next()).await else {
                 return Ok(false);

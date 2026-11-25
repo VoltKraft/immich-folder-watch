@@ -7,7 +7,7 @@ mod transport;
 
 use reqwest::{Certificate, Url};
 use std::{cell::Cell, net::IpAddr, path::Path, process::ExitCode, time::Duration};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, watch};
 use tokio::time::{self, Instant, MissedTickBehavior};
 use transport::Transport;
 
@@ -72,7 +72,7 @@ async fn supervise(
         }
         observe(event);
     };
-    let (request_stop, mut stopping) = oneshot::channel();
+    let (request_stop, mut stopping) = watch::channel(false);
     let connection = async {
         loop {
             report(Observation::Attempt);
@@ -83,7 +83,7 @@ async fn supervise(
             let delay = retry.get();
             tokio::select! {
                 biased;
-                _ = &mut stopping => return,
+                _ = stopping.wait_for(|stopping| *stopping) => return,
                 _ = time::sleep(delay) => {}
             }
             retry.set((delay * 2).min(Duration::from_secs(30)));
@@ -98,7 +98,7 @@ async fn supervise(
             _ = &mut connection => unreachable!("the reconnect loop ends by cancellation"),
         }
     }
-    let _ = request_stop.send(());
+    let _ = request_stop.send(true);
     if time::timeout(Duration::from_secs(2), connection)
         .await
         .is_err()
