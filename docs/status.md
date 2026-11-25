@@ -1,5 +1,23 @@
 # Project Status
 
+## Windows editor capture and visible WinRT notification (2026-11-25)
+
+The corrected editor capture at `09b3087` reproduced the hash of the
+original x64 image from the interrupted deadline-based redraw. The new
+WinRT observer at `e174bac` checks the actual ordinary notification against
+its sender's native `Show` interval, two visible Shell labels and their
+popup ancestry. Independent review covered attribution, timing and cleanup.
+Both earlier Windows notification archives passed replay. Locally, 70
+service tests and the PowerShell point, popup and timing checks passed.
+The retained-window suite passed 29 tests with one Windows-only skip.
+Frozen Clippy checks for both MSVC targets passed. The full-view GDI
+and frame observers passed 10 and 15 tests respectively,
+plus four compiled bitmap-layout checks. The native tests for these fixes
+and the contrast publisher at `a2bd24a` follow the `989bb33` matrix.
+[Editor and original failure](rust/rw02-windows-window.md#native-results-at-4e3dbc4) ·
+[WinRT delivery and popup observer](rust/rw02-windows-services.md#winrt-history-and-classic-shell-delivery-at-4e3dbc4) ·
+[Contrast publisher](rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4).
+
 ## Windows native results at 4e3dbc4 (2026-11-25)
 
 The full desktop matrix finished with two successful Ubuntu jobs and two

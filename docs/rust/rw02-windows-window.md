@@ -793,6 +793,12 @@ isolated Windows PowerShell host could write the PNG but could not resolve
 leaves the deadline-based comparison incomplete.
 [Diagnostic and reproduction](../../tools/rust-qa/windows-frame-cost/README.md).
 
+At `09b3087` the editor observer hashes the saved PNG with the SHA-256
+stream API available in Windows PowerShell 5.1. It reproduced the digest
+of the original 1,396-byte PNG under isolated PowerShell 7.7.0. Regression
+checks compared differently encoded images and exercised missing and
+locked files. The reopened native comparison requires a new Windows run.
+
 On Windows ARM64 the canonical GUI met six of eleven limits from the
 same host's WPF trials. Both retained Mailbox profiles met all eleven,
 with three trials per profile. Each inventory ran twice over 100,000 files.

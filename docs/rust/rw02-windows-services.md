@@ -608,6 +608,15 @@ one show and two timeout callbacks. All 86 UI Automation sweeps completed
 without a provider error. None found the visible title and body.
 [Original x64 classic archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979736952) · [Original ARM64 classic archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979421612).
 
+The new WinRT observer arms before the ordinary sender and compares the
+actual `Show` interval with an independent UI Automation observer's clock.
+It looks for both synthetic strings on the visible Shell popup and checks
+the two physical points against the original Shell window. History readback
+and selective cleanup still run when a popup cannot be identified.
+Both original history-only archives above passed replay. Native evidence
+from this new observer is pending.
+[Popup observation and raw records](../../tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the
