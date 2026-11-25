@@ -172,6 +172,18 @@ impl UtcTicks {
         Ok(Self(ticks as u64))
     }
 
+    /// Match the shipping Linux worker's last-write tick for an open file.
+    /// Linux supplies whole seconds and a nonnegative nanosecond fraction.
+    /// The worker keeps the complete 100 ns ticks in that fraction, including
+    /// for files dated before 1970. Persisted timestamps use the exact codec.
+    #[cfg(target_os = "linux")]
+    pub fn from_linux_mtime(metadata: &std::fs::Metadata) -> Result<Self, TimestampError> {
+        use std::os::unix::fs::MetadataExt;
+
+        let nanos = u32::try_from(metadata.mtime_nsec()).map_err(|_| TimestampError::Range)?;
+        Self::from_unix_time(metadata.mtime(), nanos - nanos % 100)
+    }
+
     /// Return Unix seconds and nanoseconds with a nonnegative remainder before 1970 too.
     pub fn to_unix_time(self) -> (i64, u32) {
         let difference = i128::from(self.0) - i128::from(UNIX_EPOCH_TICKS);
@@ -285,5 +297,43 @@ mod tests {
             UtcTicks::from_unix_time(i64::MAX, 0),
             Err(TimestampError::Range)
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_file_times_keep_complete_ticks_on_either_side_of_the_epoch() {
+        use std::fs::File;
+        use std::os::unix::fs::MetadataExt;
+        use std::time::{Duration, UNIX_EPOCH};
+
+        let path = std::env::temp_dir().join(format!("ifw-mtime-{}", std::process::id()));
+        let file = File::create_new(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        for (offset_ns, expected_ticks) in [
+            (-101_i64, -2_i64),
+            (-100, -1),
+            (-1, -1),
+            (0, 0),
+            (1, 0),
+            (99, 0),
+            (100, 1),
+            (199, 1),
+            (999_999_999, 9_999_999),
+        ] {
+            let difference = Duration::from_nanos(offset_ns.unsigned_abs());
+            let instant = if offset_ns < 0 {
+                UNIX_EPOCH - difference
+            } else {
+                UNIX_EPOCH + difference
+            };
+            file.set_modified(instant).unwrap();
+            let metadata = file.metadata().unwrap();
+            assert_eq!(metadata.mtime(), offset_ns.div_euclid(1_000_000_000));
+            assert_eq!(metadata.mtime_nsec(), offset_ns.rem_euclid(1_000_000_000));
+            assert_eq!(
+                UtcTicks::from_linux_mtime(&metadata).unwrap().ticks(),
+                UNIX_EPOCH_TICKS.checked_add_signed(expected_ticks).unwrap()
+            );
+        }
     }
 }

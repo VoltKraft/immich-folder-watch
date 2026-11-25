@@ -14,10 +14,11 @@ inputs in a development-only workspace. C# oracles are development tooling only.
   seven fractional digits and `+00:00`. Its separate repair-JSON scalar codec
   supports System.Text.Json's trimmed fractional representation. This scalar
   codec does not parse whole JSON records.
-- Unix conversion uses floor-based seconds plus a nonnegative nanosecond
-  remainder, including dates before 1970. Sub-tick precision is rejected rather
-  than silently truncated. Calendar, leap-year, range, offset and precision errors
-  are explicit. Direction/status codecs reject unknown numeric enum values.
+- Exact Unix conversion uses floor-based seconds plus a nonnegative nanosecond
+  remainder, including dates before 1970. It rejects sub-tick precision.
+  For an open Linux file, the [mtime conversion](#linux-file-modification-times)
+  retains the complete ticks in its native timestamp. Direction and status
+  codecs reject unknown numeric enum values.
 - Native source normalization accepts explicit absolute OS paths and never opens
   them. Linux handles lexical dot components without losing arbitrary OS bytes;
   Windows uses the pinned standard library's `GetFullPathNameW`-backed expansion.
@@ -38,6 +39,34 @@ no filesystem access and currently delegates ordinary Windows paths to
 [`GetFullPathNameW`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfullpathnamew).
 Neither API resolves or authorizes a file object. Runtime authorization remains
 the [handle-bound filesystem contract](../watch-root-security.md).
+
+### Linux file modification times
+
+The shipping worker reads an open file's last-write time to compare it
+with the timestamp in its SQLite mapping. On Linux its `statx` adapter
+divides the nonnegative nanosecond fraction by 100 before adding ticks
+to the whole seconds. The Rust scalar codec already preserved exact
+persisted timestamps. Files observed on disk can have additional
+nanoseconds. `UtcTicks::from_linux_mtime` now accepts the metadata from
+the open file and applies the shipping worker's conversion.
+[C# handle read](../../src/ImmichFolderWatch.Core/Services/SecureFileSystem/SecureNativeFileSystem.Linux.cs) ·
+[Rust conversion and native tests](../../rust/crates/ifw-legacy/src/timestamp.rs).
+
+On Fedora x64 the original signed 3.0.4 Flatpak assembly opened six
+synthetic files through `SecureWatchRoot.OpenRead`. The Rust reader
+opened the same files through `safe_fs::Directory` and verified the
+file identity. All six tick values and SQL strings matched. For a file
+dated one nanosecond before 1970 both returned
+`1969-12-31T23:59:59.9999999+00:00`. The four observations between
+ticks were unrepresentable by the exact scalar conversion. The native
+unit test also reads nine timestamps back from an open file descriptor.
+The combined Linux profile compares the synthetic file's actual mtime of
+1,795,219,200,000,000,199 Unix nanoseconds with the legacy SQL value
+`2026-11-21T00:00:00.0000001+00:00`. The six-file comparison receipt is
+`artifacts/rust/mtime-qualification/fedora-x64-1e3c024/comparison.json`,
+SHA-256 `4fcb13e55e09889ff88c4f87321b2008cc7557965c6ab6f45a689eebc1d0cd51`.
+[Combined native comparison](../../tools/rust-qa/combined-profile/src/main.rs) ·
+[Signed package identity](rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
 
 ## Executable differential test
 

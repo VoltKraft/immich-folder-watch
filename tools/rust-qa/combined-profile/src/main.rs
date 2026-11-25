@@ -132,6 +132,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         row
     );
     let utc = UtcTicks::parse_sql(&row.utc)?;
+    #[cfg(target_os = "linux")]
+    assert_eq!(UtcTicks::from_linux_mtime(&media.metadata()?)?, utc);
     let sql = Connection::open_in_memory()?;
     sql.execute(
         "CREATE TABLE sample (name TEXT, ticks TEXT, digest BLOB)",

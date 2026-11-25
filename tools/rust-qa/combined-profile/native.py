@@ -61,10 +61,16 @@ def run_native(target, toolchain, vendor, build, output, env, jobs):
     build.mkdir(exist_ok=True)
     fixture = output / "synthetic-root"
     fixture.mkdir()
-    (fixture / "sample.txt").write_bytes(b"combined fixture\n")
+    sample = fixture / "sample.txt"
+    sample.write_bytes(b"combined fixture\n")
     binary_name = "ifw-combined-assessment" + (".exe" if os.name == "nt" else "")
     binary = build / target / "release" / binary_name
     if sys.platform == "linux":
+        # The legacy Linux worker persists the complete 100 ns ticks of this file.
+        mtime_ns = 1_795_219_200_000_000_199
+        os.utime(sample, ns=(mtime_ns, mtime_ns))
+        if sample.stat().st_mtime_ns != mtime_ns:
+            raise ValueError("The synthetic filesystem did not preserve the requested nanoseconds")
         prefix = linux_namespace(toolchain, vendor, build, fixture, sqlite["flags"])
         config = source_config(Path("/vendor"))
         cargo = "/toolchain/bin/cargo"
@@ -107,6 +113,7 @@ def run_native(target, toolchain, vendor, build, output, env, jobs):
               "buildLogSha256": sha256(output / "build.log"), "clippyLogSha256": sha256(output / "clippy.log"),
               "smokeSha256": sha256(output / "smoke.json"), "sqliteFlags": sqlite["flags"]}
     if sys.platform == "linux":
+        answer["sampleMtimeNs"] = mtime_ns
         answer["nativeRendererSymbols"] = linux_renderer_symbols(binary, output / "renderer-symbols.txt", env)
         imports = ["readelf", "--wide", "--dynamic", str(binary)]
     else:
