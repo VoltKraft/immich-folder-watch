@@ -8,17 +8,22 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
-The `f155b65` desktop matrix passed on both Ubuntu hosts and failed on
-both Windows hosts. Each Ubuntu GUI and both retained Mailbox profiles on
-each Windows architecture met all eleven same-host performance limits.
-The preceding x64 run exceeded two. Full egui GDI and deferred DXGI each
-passed all eleven in one x64 trial and showed the edited filename after
-reopening. On both Windows hosts NVDA spoke all seven expected cues and
-the real Japanese IME committed U+3042. Mixed-DPI and RDP evidence still
-requires a suitable disposable Windows desktop. The user currently has
-neither installation media nor access to such a VM.
-[Windows timings](rust/rw02-windows-window.md#native-results-at-f155b65) ·
-[Native desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295).
+The `5efe1f1` desktop matrix passed on Ubuntu x64 and ARM64 and failed
+on both Windows hosts. Both Ubuntu GUIs and both retained Windows ARM64
+Mailbox profiles met all eleven same-host limits. The two x64 profiles
+each met nine. Both exceeded the close and reopen limits during inventory.
+The ordinary and reopened filename editors passed on both Windows hosts. NVDA spoke the expected cues
+and the native Japanese IME committed U+3042 on both Windows hosts.
+Actual Windows tray activation, a visible notification, a reversible
+contrast change and ordinary-user cross-session exclusion remain open.
+The hosted consoles supply one 96-DPI display each. Mixed DPI and RDP
+require a suitable disposable Windows test desktop, currently unavailable.
+The next native acceptance run needs that environment and a visible Shell
+on the test account. The Ubuntu portal package decision remains limited
+to the completed feasibility trial.
+[Windows timings](rust/rw02-windows-window.md#native-results-at-5efe1f1) ·
+[Ubuntu desktops](rust/rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) ·
+[Completed matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758).
 
 All 20 regular PR checks at `f155b65` passed, including native feasibility
 on Windows and Ubuntu x64 and ARM64. Independent replay of the four
@@ -26,7 +31,7 @@ worker-backup archives matched all 16 C# restarts to the databases returned
 by Rust. [Four-target feasibility run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394) ·
 [Worker restart evidence](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
 
-In the x64 Windows trials two staged filenames initially returned access denied
+In the `f155b65` x64 Windows trials two staged filenames initially returned access denied
 after disposition and then returned file-not-found on the eighth and seventh
 reads. Both retained Explorer trials proceeded through cleanup. On both Windows
 hosts the native icon bitmap was correct and both WinRT notices reached
@@ -36,21 +41,19 @@ Actual Shell tray activation and standard-user cross-session exclusion remain op
 [Windows launcher](rust/rw02-instance.md#native-staged-image-readback-at-f155b65) ·
 [Icon pixels and popup](rust/rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65).
 
-Both disposable Windows runners reached the contrast baseline with an
-empty original scheme. After a setting change neither supervisor could
-confirm restoration. At `e23fd9f` the fixture records unnamed schemes and
-their original label without changing the setting. A named trial retains
-the observed state even when it declines a restore. All 31 local
-appearance checks passed, including the PowerShell capture controls.
-[Native failure and observer correction](rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
+At `f155b65` neither Windows contrast trial verified restoration after
+changing an unnamed original scheme. With the guard at `5efe1f1`, both
+recorded the original pixels and the same eight colors before and after
+capture. Both returned unavailable with `settingChangeAttempted=false`
+and verified cleanup. [Contrast results](rust/rw02-appearance.md#native-read-only-contrast-baseline-at-5efe1f1).
 
-At `f155b65` the display and text scripts that import the shared editor
-capture function omitted its PNG hash helper. This stopped both x64
-source-display captures and all four ordinary and reopened filename
-observations. Both actual PowerShell importers reproduced the error
-in isolation. With the correction both returned the expected digest.
-The local display and text suites passed 17 and seven checks respectively.
-[Native errors and local regression test](rust/rw02-windows-display.md#hosted-display-and-field-capture-at-f155b65).
+Both x64 source-display captures and all four ordinary and reopened
+filename trials recovered after fixing the shared PNG digest helper.
+Each filename trial distinguished eight glyphs and verified three edits
+through both native text interfaces. The ARM64 display observers still
+could not obtain foreground focus for their separate source-display
+pictures. [Native text](rust/rw02-windows-text.md#ordinary-and-reopened-filenames-at-5efe1f1) ·
+[Displays](rust/rw02-windows-display.md#source-monitor-capture-at-5efe1f1).
 
 On Fedora x64 the shipping C# loader accepted ordinary synthetic profiles
 that exceeded the Rust YAML probe's initial limits. The 100-folder profile
@@ -64,6 +67,13 @@ byte digest on each host. The delivered Linux x64 3.0.4 Flatpak assemblies
 also read, validated, saved and reopened both Rust outputs. Saving the
 unchanged 300-folder case reproduced the original C# file byte for byte.
 [Folder lists and native evidence](rust/rw02-yaml.md#four-native-saved-folder-exchanges-at-5efe1f1) · [Signed package assemblies](rust/rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
+
+All 20 regular PR checks passed at `5efe1f1`, including the four native
+feasibility jobs. The combined desktop assessment covers both Windows
+observer fixes and the larger YAML cases. The intermediate desktop runs
+at `e23fd9f` and `210291d` were cancelled before their Windows contrast
+trials. [Four-target feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715810) ·
+[Combined desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758).
 
 ## Windows retained launch and test profile cleanup (2026-11-25)
 
@@ -79,7 +89,8 @@ two native Windows controls. [Retained launcher results and control](rust/rw02-i
 
 The normal WinRT popup observer uses the fixture's existing guarded
 directory creation with a per-run name at `068cab4`. Its 73 portable
-service checks passed. Native popup evidence is pending.
+service checks passed. The subsequent native popup results are recorded
+in the [Windows Shell trials](rust/rw02-windows-services.md#native-notification-observations-at-5efe1f1).
 [Ordinary WinRT popup](../tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup).
 The user confirmed that a Windows evaluation medium and an approved
 test VM are currently unavailable for the mixed-DPI and RDP trials.

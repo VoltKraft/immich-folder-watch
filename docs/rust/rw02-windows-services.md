@@ -942,6 +942,18 @@ registration and returned a show callback. The 86 independent observations
 found no matching visible title and body.
 [x64 WinRT and popup](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991333500) · [x64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991363312).
 
+### Native notification observations at 5efe1f1
+
+Windows again stored both WinRT notices in the test app's
+history and accepted their selective removal on both architectures. The
+ordinary send returned `S_OK` in 2.44 ms on x64 and 6.36 ms on ARM64.
+Across 84 x64 and 92 ARM64 sweeps the independent popup reader found
+no matching visible pair and recorded no provider errors. Each observation
+continued for ten seconds after the send. The separate x64 classic Shell
+trial received a show callback. Its 91 sweeps found no visible pair.
+ARM64 Explorer refused the classic registration.
+[x64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14997780160) · [ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996411832) · [x64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996548148) · [ARM64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14997195340).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

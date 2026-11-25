@@ -926,3 +926,31 @@ six limits. FIFO passed ten, with a scan-close p95 of 18.13 ms against
 The screenshot digest and readback ran under the system Windows PowerShell
 5.1 host. The small GDI control obtained no attributable screen pixels.
 [ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).
+
+### Native results at 5efe1f1
+
+On ARM64 the canonical GUI met six WPF limits and both retained Mailbox
+queue depths met all eleven. With one queued frame, closing and reopening
+during observed file reads took 3.48 and 4.03 ms at p95, against limits
+of 13.86 and 15.09 ms. FIFO exceeded the scan-close limit at 16.85 ms.
+Both Mailbox editor controls verified 177 changed pixels. The simple GDI
+control obtained no attributable pixels in 969 attempts.
+[ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996337844).
+
+On x64 both Mailbox profiles met nine of eleven limits. Close and reopen
+during inventory exceeded the same-host WPF limits of 19.02 and 20.32 ms.
+Their p95 values were 20.69 and 28.19 ms with one queued frame and 34.34
+and 44.89 ms with two. Both editors showed 209 changed pixels after the
+window reopened. The canonical GUI met six limits, FIFO eight and the
+single deferred DXGI trial ten. The ordinary DXGI trace recorded 370
+presentations and none in 249 hidden intervals. The DX12 frame wait
+accounted for at least half the response time in 50 of 52 slow closes,
+and the direct visibility call did so in 53 of 62 slow reopens.
+
+The full egui GDI trial produced a valid reopened editor and completed
+219 full transfers during inventory. Of the 211 transfers in the first
+pass, 210 began after the next close request. Only one completed in the
+required interval between a confirmed reopen and the next close request.
+The minimum was five. This run therefore has no qualified full GDI
+comparison. The small GDI color control met its four timing limits.
+[x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).

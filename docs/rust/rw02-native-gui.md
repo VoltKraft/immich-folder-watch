@@ -843,6 +843,19 @@ SHA-256 `612f6d02d6fec6827d07a8ad95e98934083fdbc71c059cb259a926286f51a805`.
 | [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987724149) | 252.01 / 1,325.67 | 0.95 / 15.98 | 0.41 / 13.23 | 331 of 331 |
 | [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987593371) | 202.52 / 1,193.48 | 0.91 / 16.07 | 0.36 / 15.52 | 177 of 177 |
 
+### Ubuntu native results at 5efe1f1
+
+Both native desktops again met all eleven limits. On x64 the Rust GUI
+started in 187.49 ms against 1,227.90 ms for Avalonia. It responded to
+all 319 requests issued during observed file reads. On ARM64 the startup
+times were 202.84 and 1,425.00 ms, with all 178 requests answered during
+reads. The Plasma panel, Japanese input and the portal comparisons
+passed on both architectures. The stock and pristine-rebuilt Documents
+services refused the read lease, and the private backport passed all 46
+operations. The combined desktop readback has SHA-256
+`0c70111c32486bacc884134738a343082c4196ed5454325aaadd16b0f1caa60a`.
+[Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993553466) · [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993788718).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

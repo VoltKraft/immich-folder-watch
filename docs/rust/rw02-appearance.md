@@ -327,3 +327,23 @@ label and its restoration to the original pixels.
 [Win32 structure](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-highcontrastw) ·
 [System parameters](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow) ·
 [Supervisor](../../tools/rust-qa/appearance/windows.py) · [State readback](../../tools/rust-qa/appearance/windows_colors.py).
+
+### Native read-only contrast baseline at 5efe1f1
+
+On Windows ARM64 the new supervisor twice observed the original 66 × 18
+label on the held desktop. Before and after capture Windows reported the
+same eight system colors, flags `0x7e` and a non-null empty string. The
+supervisor recorded `settingChangeAttempted=false`. It made no request
+to change or restore the setting. The capture worker and GUI both exited
+successfully, the job and desktop handles closed, the supervisor returned
+to Default and the profile was removed. The original job log confirms the
+unavailable result and exit 1. A named scheme with a reversible change
+and three measured label states is still required for a positive contrast
+trial. [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996337844).
+
+Windows x64 followed the same read-only path. Its two label captures
+matched the ARM64 raster, including all 857 background pixels. The
+pre- and post-capture flags, scheme and eight colors matched. The
+supervisor recorded `settingChangeAttempted=false`, verified process,
+desktop and profile cleanup, and returned unavailable.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).

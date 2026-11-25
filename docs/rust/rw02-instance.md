@@ -916,3 +916,13 @@ error 2. Both workers disappeared at the first check. In the independent
 foreground trials, a real F24 launch focused the same retained HWND on
 both hosts and preserved the original worker.
 [x64 controls](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627) · [ARM64 controls](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).
+
+At `5efe1f1` the x64 F24 observer received the marked key events,
+the primary reported the secondary's PID in its open request, and the
+original HWND had focus on the first independent sample. It kept the
+same worker and both GUI processes exited cleanly. Windows timestamped
+the secondary's resume and the original window's show event at the same
+millisecond. The first sample after the trigger already showed a visible
+window. The observer returned unavailable for their ordering. Those two
+timestamps had been 16 ms apart in the successful `f155b65` trial.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).

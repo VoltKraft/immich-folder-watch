@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-f155b65), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-f155b65) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-5efe1f1), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -40,15 +40,18 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
-At `f155b65` both retained Mailbox profiles on each Windows architecture
-met all eleven same-host WPF limits. The preceding x64 run exceeded two.
-Both hosts passed NVDA, Japanese IME, foreground keyboard launch, WinRT
-history readback and selective removal. The Shell observers could not
-confirm a visible tray activation or notification on either host. Both
-contrast trials attempted a change from an unnamed scheme and could not
-verify restoration. Both Windows hosts exposed one 96-DPI console monitor.
-Mixed DPI, RDP and the standard-user cross-session trial remain open.
-[Windows measurements](rw02-windows-window.md#native-results-at-f155b65) · [Tray and notifications](rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65) · [Contrast](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65) · [Launch and cleanup](rw02-instance.md#native-staged-image-readback-at-f155b65).
+At `5efe1f1` both retained Windows ARM64 Mailbox profiles met all eleven
+same-host WPF limits. Both x64 profiles met nine and exceeded close and
+reopen during inventory. The ordinary and reopened filename controls,
+NVDA, Japanese IME and WinRT history passed on both. A real visible
+Windows tray activation and notification remain open. The corrected
+contrast trials captured the unnamed original palettes without changing
+them. Both hosts supplied one 96-DPI console display. Mixed DPI, RDP
+and ordinary-user cross-session exclusion remain open.
+[Timings](rw02-windows-window.md#native-results-at-5efe1f1) ·
+[Filename edits](rw02-windows-text.md#ordinary-and-reopened-filenames-at-5efe1f1) ·
+[Contrast](rw02-appearance.md#native-read-only-contrast-baseline-at-5efe1f1) ·
+[Tray and notifications](rw02-windows-services.md#native-notification-observations-at-5efe1f1).
 
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
@@ -69,9 +72,9 @@ image once across both lifetimes. This adds installed evidence for a
 shipping worker consuming Rust's backup under RI-AC03.
 [Installed backup, restart and readback](rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
 
-At `f155b65` both Ubuntu desktops passed all eleven same-host performance
-checks. The x64 GUI responded to all 331 requests made during observed file
-reads. ARM64 answered all 177. [Linux desktop evidence](rw02-native-gui.md#ubuntu-native-results-at-f155b65).
+At `5efe1f1` both Ubuntu desktops passed all eleven same-host performance
+checks. The x64 GUI responded to all 319 requests made during observed file
+reads. ARM64 answered all 178. [Linux desktop evidence](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1).
 
 | Criteria | Current result | Evidence needed for completion |
 | --- | --- | --- |

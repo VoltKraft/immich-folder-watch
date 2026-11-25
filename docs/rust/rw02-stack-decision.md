@@ -1,15 +1,17 @@
 # RW-02 stack decision
 
 **Keep egui/eframe with wgpu as the preferred candidate. RW-02 remains open.**
-At `f155b65` both Ubuntu X11 hosts and both retained Mailbox configurations
-on each Windows architecture met all eleven same-host limits. The preceding
-x64 host exceeded the scan close and reopen budgets. Full egui GDI drew and
-reopened an editable window on x64. Both Windows architectures passed NVDA,
-Japanese IME and WinRT notification history. Real Shell activation, visible
-notification, system contrast, mixed DPI and RDP remain open. The hosted
-Windows consoles each supplied one 96-DPI monitor.
-[Windows measurements](rw02-windows-window.md#native-results-at-f155b65) ·
-[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-f155b65) ·
+At `5efe1f1` both Ubuntu X11 hosts and both retained Windows ARM64
+Mailbox profiles met all eleven same-host limits. Both x64 profiles
+exceeded the scan-close and scan-reopen budgets. They had met them
+at `f155b65` and exceeded them at `989bb33`. The ordinary and reopened
+filename editors, NVDA, Japanese IME and WinRT history passed on both
+Windows hosts. Both captured the original palette for the unnamed
+system scheme without changing it. A visible Shell activation and banner, an actual
+contrast change, mixed DPI and RDP remain open. Both Windows consoles
+supplied one 96-DPI display.
+[Windows measurements](rw02-windows-window.md#native-results-at-5efe1f1) ·
+[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
 At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
@@ -32,8 +34,8 @@ All four archived subjects at `8b071ab` rebuilt the reviewed graph. Subsequent r
 | --- | --- | --- |
 | Linux x64 | X11 and Wayland lifecycle, native Orca, XIM/GNOME composition, monitor moves, mixed-direction editing and parented Flatpak grants. The repeated X11 measurements passed all eleven limits. Actual private Plasma panel clicks and system appearance changes passed on x64. | On an offline Noble VM the installed private backport enforced the read lease and the original package was restored successfully. The user deferred distribution approval. [Installed comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest). [Portal](rw02-portal-noble.md) · [Plasma](rw02-plasma.md) · [Appearance](rw02-appearance.md) |
 | Linux ARM64 | Native Orca speech and masking on both backends, Mozc commit, mixed scaling, installed Flatpak grants and Vulkan loss. At `1b95ba0` all eleven X11 limits passed and two Plasma panel clicks reopened the same window. | The stock Documents portal refused the required lock. Its private Noble backport passed. At `21e794f` the stock Settings portal supplied GNOME’s contrast setting and the ARM64 GUI visibly followed it. [Native contrast](rw02-appearance.md#stock-ubuntu-x64-and-arm64-at-21e794f). [Plasma evidence](rw02-plasma.md#native-ubuntu-arm64-panel-at-6af7100) · [Installed grants](rw02-portal-dialog.md) |
-| Windows x64 | At `f155b65` both Mailbox profiles met all eleven WPF limits. NVDA, IME, clipboard, DX12 recovery, Startup and WinRT history passed. WPF and Rust gained focus after an ordinary second launch. | At `989bb33` both Mailbox profiles exceeded the scan-close and scan-reopen limits. At `f155b65` Explorer accepted both retained registrations, but neither rectangle showed its marker. Visible notification, system contrast, mixed DPI and RDP remain open. [Timings](rw02-windows-window.md#native-results-at-f155b65) · [Tray and notifications](rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65) · [Display](rw02-windows-display.md#hosted-display-and-field-capture-at-f155b65) |
-| Windows ARM64 | Both Mailbox profiles met all eleven limits on three successive hosts. NVDA, Japanese IME, WinRT history, clipboard and Startup passed. The foreground keyboard launch focused the retained window. | Both WPF and Rust reopened in the background after an ordinary second launch. Explorer declined registration. Visible notification, system contrast, mixed DPI and RDP remain open. [Second launches](rw02-instance.md#native-staged-image-readback-at-f155b65) · [Tray and notifications](rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65) · [Contrast](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65) |
+| Windows x64 | At `f155b65` both Mailbox profiles met all eleven WPF limits. NVDA, IME, clipboard, DX12 recovery, Startup and WinRT history passed. WPF and Rust gained focus after an ordinary second launch. | At `989bb33` and `5efe1f1` both Mailbox profiles exceeded the scan-close and scan-reopen limits. At `f155b65` Explorer accepted both retained registrations, but neither rectangle showed its marker. Visible notification, system contrast, mixed DPI and RDP remain open. [Timings](rw02-windows-window.md#native-results-at-5efe1f1) · [Tray and notifications](rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65) · [Display](rw02-windows-display.md#hosted-display-and-field-capture-at-f155b65) |
+| Windows ARM64 | Both Mailbox profiles met all eleven limits again at `5efe1f1`. NVDA, Japanese IME, WinRT history, clipboard and Startup passed. The foreground keyboard launch focused the retained window. | Both WPF and Rust reopened in the background after an ordinary second launch. Explorer declined registration. Visible notification, system contrast, mixed DPI and RDP remain open. [Second launches](rw02-instance.md#native-staged-image-readback-at-f155b65) · [Tray and notifications](rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65) · [Contrast](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65) |
 
 Fedora additionally exercised a real Intel Iris Xe render node. At `68795a2`, three independent trials on a private Mutter virtual output recovered to llvmpipe, preserved the worker and accepted the next edit. Six 15-second idle intervals had zero application buffer commits. This establishes hardware-backed rendering on that virtual output. The plan also calls for assessment under RDP and on lower-end GPUs. It prescribes neither a physical GPU reset nor every possible GPU/monitor pairing. A focused iced comparison is the contingency for a failed essential capability, alongside a documented eframe fix. Glow is optional. [Intel results](rw02-wayland-recovery.md) · [Renderer decision](../rust-rewrite-plan.md#gui-decision)
 

@@ -122,3 +122,16 @@ generation one across hide and reopen.
 | --- | --- | --- |
 | [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14859761846) | `62858e399afff8b8dff68fd5fbb827fd2a5e81d34bf8ee4ab71916f87c754f76` | `f4f2b3a4734fcd457773c9c368194f20c0cf32b2ce5518b1c8ea60bd43597af4` |
 | [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156/artifacts/14857840215) | `ca315e10e2af185af7b72e246c3a200e7e094e411feeba41d5336d0e9bafe342` | `051eaa6b03d8e11bd0559e1e1922368350729096667255a5e475823679119d51` |
+
+### Ordinary and reopened filenames at 5efe1f1
+
+The corrected shared capture ran in system Windows PowerShell 5.1 on
+x64 and ARM64. All four actual filename images were 276 × 18 pixels
+with 152 colors, the same eight distinguishable glyph masks and the same
+PNG digest as the earlier passing sample above. Independent decoding
+of the PNGs and PPMs gave identical RGB bytes. Both UI Automation text
+interfaces returned the expected selection and edit in all twelve
+mouse, caret and Delete cases. Both retained GUIs preserved the original
+HWND and the first DX12 device generation through reopening. The
+separate x64 display observers also recovered their source-monitor
+images. [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996337844) · [Source-display results](rw02-windows-display.md#source-monitor-capture-at-5efe1f1).

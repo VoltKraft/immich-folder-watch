@@ -97,6 +97,17 @@ process with an empty module path and autoload disabled. Both reproduced
 the missing helper from the earlier source and both corrected importers
 returned the independently calculated digest of the test PNG.
 
+### Source-monitor capture at 5efe1f1
+
+Both x64 display observers again captured an actual edited
+field on the source monitor. The canonical and retained GUI ran on the
+same single 96-DPI console display. The two ARM64 display observers
+reported the same topology and protocol. Neither obtained foreground
+focus for its source-monitor picture. The separate ordinary and reopened
+filename trials passed on both hosts. Each architecture still requires
+a mixed-DPI desktop and an actual RDP session.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996337844).
+
 ### Required observations on a disposable native desktop
 
 Use a dedicated Windows x64 or ARM64 test VM with the matching MSVC build
