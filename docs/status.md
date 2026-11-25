@@ -1,5 +1,25 @@
 # Project Status
 
+## Windows retained launch and test profile cleanup (2026-11-25)
+
+At `989bb33` ordinary second launches reopened the original retained HWND
+and kept the same worker on both architectures. It gained keyboard focus
+on x64. On ARM64 it remained in the background for all 41 observations.
+Two separate x64 Shell preflights stopped at a single access-denied
+readback after Windows had accepted deletion of the staged image.
+The observer now gives that read up to five seconds and still requires
+file-not-found. On ARM64 both profiles completed cleanup and Explorer
+refused the icon. The local launcher suite passed 100 checks and skipped
+two native Windows controls. [Retained launcher results and control](rust/rw02-instance.md#retained-windows-second-launches-at-989bb33).
+
+The normal WinRT popup observer uses the fixture's existing guarded
+directory creation with a per-run name at `068cab4`. Its 73 portable
+service checks passed. Native popup evidence is pending.
+[Ordinary WinRT popup](../tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup).
+The user confirmed that a Windows evaluation medium and an approved
+test VM are currently unavailable for the mixed-DPI and RDP trials.
+[Required desktop observations](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
 ## Windows tray raster and icon producer (2026-11-25)
 
 At `989bb33` Explorer on x64 accepted the native notification icon.

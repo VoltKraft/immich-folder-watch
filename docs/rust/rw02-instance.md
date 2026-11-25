@@ -853,3 +853,31 @@ active-window state and keyboard focus at the first independent observation.
 Worker PID 1464 survived the reopen. The processes exited successfully
 and the host restored the Default desktop.
 [ARM64 native WPF and Rust records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237) · [Ordinary retained Rust HWNDs](rw02-windows-services.md#corrected-canonical-windows-launcher-at-4e3dbc4).
+
+### Retained Windows second launches at 989bb33
+
+On x64 the ordinary second launch brought the original HWND 3015190
+to the foreground with keyboard focus at the first sample. Worker 884
+survived and the secondary exited successfully. Two separate Shell
+preflights drained their process jobs and Windows accepted disposition on
+each original staged GUI executable. After the fixture released its last
+file handle, its first read of each filename returned Win32 error 5.
+Cleanup remained unconfirmed and both subsequent retained Shell attempts
+were skipped. The earlier successful ordinary launch removed its copy
+of the same executable. [Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14981932344).
+
+On ARM64 the original HWND 1966576 reopened and worker 7216 survived.
+All 41 observations over 2.019 seconds found the window in the background.
+Explorer declined registration on both retained Shell attempts, and both
+profiles passed cleanup. [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14981947506).
+
+Windows can return access denied for a name pending deletion. The x64
+archive did not identify a remaining handle. The revised observer retries
+only that read, under the pinned parent, for up to five seconds after
+disposition and witness release. It records the attempt count and first
+and last Win32 errors separately from the original DELETE open. Only
+file-not-found confirms absence. An open name, a different error or
+expiry stops cleanup. The native control holds one additional read
+handle sharing deletion until the first refused read, then requires a
+successful absence check. The native result of this control is pending.
+[Windows file open semantics](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew) · [Windows disposition flags](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/ns-ntddk-_file_disposition_information_ex) · [Staged image control](../../tools/rust-qa/windows-launcher/test_staged_images.py).

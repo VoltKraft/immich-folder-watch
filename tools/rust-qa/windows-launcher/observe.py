@@ -620,6 +620,31 @@ def require_absence(api, path):
     raise CleanupUnconfirmed(f"The staged path still exists after disposition: {path.name}")
 
 
+def wait_for_staged_image_absence(api, path, record):
+    """Read the name under its pinned parent after the original file handles have closed."""
+    deadline = time.monotonic() + 5
+    readback = record["nameReadback"] = dict(attempts=0, timeoutMs=5000)
+    while True:
+        readback["attempts"] += 1
+        try:
+            require_absence(api, path)
+        except OSError as error:
+            code = getattr(error, "winerror", None)
+            readback.setdefault("firstWin32Error", code)
+            readback["lastWin32Error"] = code
+            remaining = deadline - time.monotonic()
+            # A delete-pending name may deny opens until the last handle closes.
+            if code != 5 or remaining <= 0:
+                raise
+            time.sleep(min(.05, remaining))
+            if time.monotonic() >= deadline:
+                raise
+        else:
+            readback.setdefault("firstWin32Error", 2)
+            readback["lastWin32Error"] = 2
+            return
+
+
 def directory_identity(api, handle):
     attributes, identity = api.file_info(handle)
     if not attributes & 0x10 or attributes & (stat.FILE_ATTRIBUTE_REPARSE_POINT | 0x40):
@@ -699,7 +724,7 @@ def staged_images(api, root, built_gui, inventory, result):
                     for path, identity, lease, record in images:
                         delete_staged_image(api, path, identity, record)
                         lease.close()
-                        require_absence(api, path)
+                        wait_for_staged_image_absence(api, path, record)
                         record["absent"] = True
                     remove_staged_directory(api, subject, directory_id, directory_lease, result["directoryDispositionWaits"])
                     result["stagedDirectory"]["removed"] = True

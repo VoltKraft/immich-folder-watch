@@ -113,6 +113,49 @@ class StagedImages(unittest.TestCase):
         api.close.assert_called_once_with(41)
         api.delete_handle.assert_not_called()
 
+    def test_staged_name_readback_retries_access_denied_and_requires_file_not_found(self):
+        api, record = Mock(), {"attempts": 1}
+        path = Path("subject") / GUI
+        api.path_handle.side_effect = [refusal(5), refusal(5), refusal(2)]
+        with patch.object(observe.time, "sleep") as sleep:
+            observe.wait_for_staged_image_absence(api, path, record)
+        self.assertEqual(record["attempts"], 1)
+        self.assertEqual(record["nameReadback"], dict(attempts=3, timeoutMs=5000, firstWin32Error=5, lastWin32Error=2))
+        self.assertEqual(sleep.call_count, 2)
+        for request in api.path_handle.call_args_list:
+            self.assertEqual((request.args, request.kwargs), ((path, False), {}))
+        api.delete_handle.assert_not_called()
+
+    def test_staged_name_readback_expires_and_stops_on_any_open_name_or_other_error(self):
+        for outcome in (refusal(5), refusal(3), refusal(32), 41):
+            with self.subTest(outcome=outcome):
+                api, record = Mock(), {}
+                api.path_handle.side_effect = [refusal(5), outcome]
+                with (patch.object(observe.time, "monotonic", side_effect=[10., 14.98, 14.99, 15.]),
+                      patch.object(observe.time, "sleep") as sleep,
+                      self.assertRaises((OSError, observe.CleanupUnconfirmed)) as caught):
+                    observe.wait_for_staged_image_absence(api, Path("subject") / GUI, record)
+                sleep.assert_called_once()
+                self.assertEqual(record["nameReadback"]["attempts"], 2)
+                if isinstance(outcome, OSError):
+                    self.assertIs(caught.exception, outcome)
+                    self.assertEqual(record["nameReadback"]["lastWin32Error"], outcome.winerror)
+                else:
+                    self.assertIsInstance(caught.exception, observe.CleanupUnconfirmed)
+                    api.close.assert_called_once_with(outcome)
+                api.delete_handle.assert_not_called()
+
+    def test_oversleep_does_not_allow_a_late_positive_readback(self):
+        api, record = Mock(), {}
+        api.path_handle.side_effect = [refusal(5), refusal(2)]
+        with (patch.object(observe.time, "monotonic", side_effect=[10., 14.99, 15.1]),
+              patch.object(observe.time, "sleep"), self.assertRaises(OSError) as caught):
+            observe.wait_for_staged_image_absence(api, Path("subject") / GUI, record)
+        self.assertEqual(caught.exception.winerror, 5)
+        self.assertEqual(record["nameReadback"]["lastWin32Error"], 5)
+        api.path_handle.assert_called_once()
+        api.delete_handle.assert_not_called()
+
     def test_full_transition_retains_original_identity_until_disposition_and_requires_absence(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -274,9 +317,11 @@ class StagedImages(unittest.TestCase):
                 except OSError as error:
                     if path == gui and opts.get("delete") and error.winerror == 32:
                         blocked.set()
+                    elif path == gui and not opts and error.winerror == 5:
+                        pending_lease.close()
                     raise
             api.path_handle.side_effect = acquire
-            with ThreadPoolExecutor(max_workers=1) as thread:
+            with ExitStack() as pending_lease, ThreadPoolExecutor(max_workers=1) as thread:
                 with observe.staged_images(api, root, build / GUI, inventory, result) as staged:
                     child_pin = worker_open(staged.parent)
                     try:
@@ -289,6 +334,13 @@ class StagedImages(unittest.TestCase):
                         observe.release_handle(system.close, "CloseHandle(test worker directory pin)", child_pin)
                     result["fixtureDeleteOpenWin32Error"] = sharing_refusal(
                         lambda: system.path_handle(staged.parent, True, delete=True))
+                    # Keep one real share-delete handle until the first read of the pending name.
+                    pending = system.create_file(str(staged), 0x81, 5, None, 3, 0x00200000, None)
+                    if pending == c.c_void_p(-1).value:
+                        raise c.WinError(c.get_last_error())
+                    pending_lease.callback(observe.release_handle, system.close, "CloseHandle(test pending image)", pending)
+                    self.assertEqual(system.file_info(pending)[1], (
+                        result["stagedImageCleanup"][GUI]["volume"], result["stagedImageCleanup"][GUI]["fileId"]))
                     other = system.path_handle(staged, False)
                     def release_after_refusal():
                         try:
@@ -302,6 +354,9 @@ class StagedImages(unittest.TestCase):
             images = result["stagedImageCleanup"]
             self.assertGreaterEqual(images[GUI]["attempts"], 2)
             self.assertEqual(images[GUI]["firstSharingViolation"]["win32Error"], 32)
+            readback = images[GUI]["nameReadback"]
+            self.assertGreaterEqual(readback["attempts"], 2)
+            self.assertEqual((readback["firstWin32Error"], readback["lastWin32Error"]), (5, 2))
             self.assertTrue(all(row["absent"] and row["dispositionAccepted"] for row in images.values()))
             self.assertEqual(len({(row["volume"], row["fileId"]) for row in images.values()}), 2)
         result["fixtureRemoved"] = not root.exists() and not build.exists()
