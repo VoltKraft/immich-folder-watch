@@ -91,9 +91,10 @@ internal static class Program
             ["multiline"] = "immich:\n  apiKey: |\n    synthetic-first\n    synthetic-second\nlogging: {logDirectory: 'logs/../logs'}\n",
             ["trailing-path-separator"] = "watch: {sources: [{path: 'media/'}]}\nlogging: {logDirectory: 'logs/'}\n",
             ["unknown-property-casing"] = "Immich: {apiKey: ignored}\nimmich: {ApiKey: ignored-too}\n",
+            ["format-mark-in-key"] = "retry:\n  maxAttempts: 7\n  \uFEFFmaxAttempts: 11\n",
         };
         foreach (var entry in additional) cases.Add(entry.Key, Encoding.UTF8.GetBytes(entry.Value));
-        var encodingSamples = YamlFileEncodings.Samples().Concat(SavedFolderLists())
+        var encodingSamples = YamlFileEncodings.Samples().Concat(SavedFolderLists()).Append(SavedAlbumWithFormatMark())
             .ToDictionary(sample => sample.Name, StringComparer.Ordinal);
         foreach (var sample in encodingSamples.Values) cases.Add(sample.Name, sample.Bytes);
         var loader = new AppConfigLoader();
@@ -146,6 +147,18 @@ internal static class Program
             CasingSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "casing.json")))), Cases = rows
         });
         Console.WriteLine($"C# YAML reference exported: {rows.Count} cases, {corpusAssertions} accepted-corpus assertions, all Unicode scalars.");
+    }
+
+    private static YamlFileEncodings.Sample SavedAlbumWithFormatMark()
+    {
+        var config = new AppConfig
+        {
+            Immich = new ImmichSettings { ServerApiUrl = "https://example.invalid/api", ApiKey = "synthetic-example" },
+        };
+        config.Watch.Sources.Add(new WatchSourceSettings { Path = "Pictures", AlbumName = "\uFEFFFoto", Extensions = [".jpg"] });
+        var saved = new AppConfigWriter().Serialize(config);
+        var encoding = new UTF8Encoding(true);
+        return new("saved-album-format-mark", [.. encoding.GetPreamble(), .. encoding.GetBytes(saved)], encoding.CodePage);
     }
 
     private static IEnumerable<YamlFileEncodings.Sample> SavedFolderLists()

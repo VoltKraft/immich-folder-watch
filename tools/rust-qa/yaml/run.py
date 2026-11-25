@@ -95,6 +95,15 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
     if {path.name for path in profile.iterdir()} != {name + ".yaml" for name in inputs}:
         raise ValueError("Original profile files differ from the exported cases")
     verify_encodings(profile, inputs)
+    marked = inputs["saved-album-format-mark"]
+    album = "\ufeffFoto"
+    if (marked["editable"]["watch"]["sources"][0]["albumName"] != album
+            or marked["runtime"]["watch"]["sources"][0]["albumName"] != album
+            or f"albumName: {album}" not in [line.strip() for line in marked["written"].splitlines()]
+            or (profile / "saved-album-format-mark.yaml").read_bytes() != codecs.BOM_UTF8 + marked["written"].encode("utf-8")):
+        raise ValueError("The saved plain album or its file preamble differs")
+    if inputs["format-mark-in-key"]["editable"]["retry"]["maxAttempts"] != 7:
+        raise ValueError("A key prefixed with U+FEFF replaced the ordinary key")
     for name, count, codec, bom in (
         ("folders-100-utf8", 100, "utf-8", b""),
         ("folders-300-utf8", 300, "utf-8", b""),

@@ -41,6 +41,8 @@ pub fn options() -> Options {
         duplicate_keys: DuplicateKeyPolicy::LastWins,
         merge_keys: MergeKeyPolicy::AsOrdinary,
         reject_unsupported_tags: true,
+        // YamlDotNet writes U+FEFF at the start of a plain album name verbatim.
+        bom_inside_document_as_content: true,
         strict_booleans: false,
         legacy_octal_numbers: true,
         with_snippet: false,

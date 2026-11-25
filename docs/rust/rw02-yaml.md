@@ -342,6 +342,29 @@ SHA-256 `530106cdc6ba549daf0dc3464cde5988a728d82551bd2ba21efd991054c7a7b5`.
 [Release input pins](../../tools/RustCompatibilityOracle/installed/release.json) ·
 [Original native input](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14991894015).
 
+### Leading U+FEFF in a saved album name
+
+The shipping writer emits the five-character album name `\uFEFFFoto` as a
+plain YAML scalar. The original Rust reader rejected the 590-byte C# save
+with SHA-256 `a79e6909bf517ee563bed00a61054325c42cfcbfd824cbdb5f2568b963e34550`.
+At the beginning of the scalar its UTF-8 bytes are `EF BB BF 46 6F 74 6F`.
+The file decoder consumes a byte-order mark at the beginning of the file.
+Inside the document the [parser options](../../tools/rust-qa/yaml/src/codec.rs)
+now preserve U+FEFF as scalar content. A property named `\uFEFFmaxAttempts`
+remains an unknown property. The one-document limit still rejects the
+multiple-document control.
+
+On Fedora x64 the native comparison passed 59 cases, 177 byte comparisons,
+289 semantic comparisons and 160 C# readback assertions. The original save
+and the same save with a UTF-8 preamble produced identical Rust output.
+The Rust writer escaped the album as `"\uFEFFFoto"` in both the original
+and edited configurations. The delivered 3.0.4 Flatpak assemblies described
+above read, validated, saved and reopened both outputs. After adding a
+second folder the first album retained all five characters. Saving the
+unchanged configuration reproduced the 590 original bytes. The local
+receipt at `artifacts/rust/yaml-assessment/format-mark-original-signed-x64/result.json`
+has SHA-256 `2befca957f6b93bfb6a6a694bfc449b2850f7f4cc7496161a3d6f458370a960e`.
+
 ## Native runner and observed results
 
 From the repository root with the pinned native toolchains:
