@@ -80,6 +80,14 @@ outputs were verified. The receipt in
 has SHA-256 `506138998efe6e24b9b582e9b6a1a30d5a911177e0bf08311bb319046690e8ba`.
 [Windows GUI binding review](rw02-gui-dependencies.md#windows-notification-area-bindings).
 
+The Fedora x64 build with the [Linux file timestamp conversion](rw02-legacy.md#linux-file-modification-times)
+read the same open file in the original and relinked executables.
+Both matched its modification time of 1,795,219,200,000,000,199 Unix
+nanoseconds to the SQL value ending in `.0000001+00:00`. All 74 recorded
+source hashes matched `c51491b`. The local result at
+`artifacts/rust/combined-profile/runs/mtime-fingerprint-02/result.json`
+has SHA-256 `1a82fbdc3a1076fa5c76d7052f4ad9ce6b8561602ec66a6630c105f8f711b0a3`.
+
 ## Reproduction
 
 Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the disposable GitHub-hosted x64 or ARM64 host, the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)

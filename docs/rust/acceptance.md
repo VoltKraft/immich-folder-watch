@@ -40,6 +40,15 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+The Fedora x64 qualification now includes a C#-saved album with leading
+U+FEFF, observation of sub-tick Linux file times through the native file
+handles in each implementation, namespace acknowledgement on either
+transport, and the peer's actual disconnect packets on normal shutdown.
+[YAML and shipped readback](rw02-yaml.md#leading-ufeff-in-a-saved-album-name) ·
+[Native file time](rw02-legacy.md#linux-file-modification-times) ·
+[Session shutdown](rw02-realtime-transport.md#stopping-an-established-session) ·
+[Upgrade and polling fallback](rw02-realtime-transport.md#namespace-acknowledgement-during-a-transport-upgrade).
+
 At `5efe1f1` both retained Windows ARM64 Mailbox profiles met all eleven
 same-host WPF limits. Both x64 profiles met nine and exceeded close and
 reopen during inventory. The ordinary and reopened filename controls,

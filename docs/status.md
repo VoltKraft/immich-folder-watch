@@ -8,6 +8,25 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02
+compatibility findings. A saved album beginning with U+FEFF now survives
+Rust read, edit and C# save at `83fd2d0`. At `c51491b` Rust matched all
+six Linux file modification times read by the shipping worker's handle
+adapter, including one nanosecond before the Unix epoch. At `bcacfaf`
+the Rust realtime client sent the same disconnect packets as the shipping
+client on both polling and WebSocket. All 18 local transport cases passed.
+[Album name](rust/rw02-yaml.md#leading-ufeff-in-a-saved-album-name) ·
+[File timestamps](rust/rw02-legacy.md#linux-file-modification-times) ·
+[Realtime shutdown](rust/rw02-realtime-transport.md#stopping-an-established-session).
+
+At `ff55f52` the realtime client accepted the namespace acknowledgement
+over polling or over the upgraded WebSocket. If the WebSocket probe
+stalled, the client kept receiving polling events and answering heartbeats
+on the original session. All 20 Fedora x64 transport cases passed. The
+signed client and Rust also received the subscribed event from the same
+synthetic server in both namespace configurations.
+[Wire traces and native controls](rust/rw02-realtime-transport.md#namespace-acknowledgement-during-a-transport-upgrade).
+
 The `5efe1f1` desktop matrix passed on Ubuntu x64 and ARM64 and failed
 on both Windows hosts. Both Ubuntu GUIs and both retained Windows ARM64
 Mailbox profiles met all eleven same-host limits. The two x64 profiles
