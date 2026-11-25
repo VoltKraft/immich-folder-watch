@@ -410,7 +410,10 @@ Windows runs it only on the disposable rewrite runner because the legacy names c
 
 The [YAML assessment](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes)
 moves its byte-preserving synthetic reference before Rust reads it, then opens
-the Rust-written files with the shipping C# loader. Upload only its individual run output. The separate private cache
+the Rust-written files with the shipping C# loader. Each successful native
+round trip publishes its individual run directory in the source-revision
+`rust-yaml-<target>-<commit>` Actions artifact. It includes the original
+files and the [100- and 300-folder comparisons](rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders). The separate private cache
 contains original third-party archives. The [Linux service tests](rust/rw02-linux-services.md)
 exercise tray-owner changes and actual synthetic Documents grants. On a native
 Linux builder, set `IFW_QA_REFERENCE_SDK` to the root of the pinned .NET SDK

@@ -52,6 +52,15 @@ in isolation. With the correction both returned the expected digest.
 The local display and text suites passed 17 and seven checks respectively.
 [Native errors and local regression test](rust/rw02-windows-display.md#hosted-display-and-field-capture-at-f155b65).
 
+On Fedora x64 the shipping C# loader accepted ordinary synthetic profiles
+that exceeded the Rust YAML probe's initial limits. The 100-folder profile
+failed when edited, and both 300-folder forms failed on admission. At
+`0468771` all six original profiles passed the full cross-language round
+trip. The native regression includes a 330,124-byte UTF-32LE C# save and
+verifies the edit through folder 301. The 57-case local run passed 171
+byte comparisons, 277 semantic checks and 152 C# readback assertions.
+[Folder lists, encodings and limits](rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders).
+
 ## Windows retained launch and test profile cleanup (2026-11-25)
 
 At `989bb33` ordinary second launches reopened the original retained HWND

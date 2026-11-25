@@ -230,10 +230,11 @@ these limits to the C# baseline or send amplification attacks to that baseline:
 
 | Resource | Assessment limit |
 | --- | ---: |
-| YAML input / serialized output | 65,536 bytes each |
+| YAML file bytes | 1,048,580, including a possible byte-order mark |
+| Decoded UTF-8 text / serialized output | 262,144 bytes each |
 | Structural / flow depth | 16 |
-| Nodes / parser events | 2,048 / 4,096 |
-| Total scalar bytes | 32,768 |
+| Nodes / parser events | 16,384 / 32,768 |
+| Total scalar bytes | 131,072 |
 | Aliases / anchors | 32 / 32 |
 | Retained anchor events / bytes | 4,096 / 65,536 |
 | Replayed events / replay depth / per-anchor expansions | 4,096 / 16 / 32 |
@@ -255,6 +256,42 @@ wall-clock/RSS measurement, production file acquisition, supported path
 namespaces and application-level validation remain separate
 work. Negative numeric values accepted by the legacy loader are not thereby
 approved by the application's configuration validator.
+
+### Ordinary profiles with 100 and 300 folders
+
+The original native corpus contained at most four watch folders per
+profile. On Fedora x64 the shipping .NET configuration reader, writer
+and validator also accepted ordinary lists of 20, 100 and 300 synthetic
+folders. The earlier Rust codec could read and rewrite the 100-folder
+case. Adding a 101st folder reached node 2,049 and failed. A concise
+300-folder profile reached the same node limit on its first read. A
+73,280-byte C# save exceeded the old 65,536-byte file limit. The trial
+kept the original files for a second comparison.
+
+At `0468771` the codec gives flat records the finite byte, node, event
+and scalar allowances in the table above. The raw file allowance
+accommodates a four-byte UTF-32 code unit for every ASCII character in
+the text budget plus its BOM. The alias and anchor limits, replay limits
+and read-only treatment of malformed encodings still apply.
+
+The regression uses the shipping C# writer to save profiles with a
+different path and album name for each folder. The cases include
+per-folder sync modes, recursive flags, extensions and exclusions. Rust
+reopens each file, writes it, then writes a second copy with an additional
+folder, German language and a changed retry limit. The original C# loader
+reads both copies in editing and runtime modes. On Fedora the 300-folder
+UTF-8 and UTF-32LE saves occupied 84,930 and 330,124 bytes. Both produced
+the same 89,998-byte UTF-8 result after insertion of folder 301. The
+independent readback compared all settings and the order of every folder.
+This is measured capacity for those profiles. Admission of larger
+production configurations remains a migration decision.
+[C# fixture](../../tools/rust-qa/yaml/dotnet/Program.cs) · [Rust codec](../../tools/rust-qa/yaml/src/codec.rs) · [Byte decoder](../../tools/rust-qa/yaml/src/encoding.rs).
+
+The local run at `artifacts/rust/yaml-assessment/runs/0468771-linux-x64/`
+matched all 124 first-party sources to that commit. Its `result.json` has
+SHA-256 `6ccd5cb696151e9a1dbb19571f4ac5cc37acbb864d38c091d0fe1147ba213496`.
+The 279-file evidence index has SHA-256
+`6045eb7806513aa7b28ca2c4eb9d1c4f426bc0fee2d42a7e23ca7c85c651728b`.
 
 ## Native runner and observed results
 

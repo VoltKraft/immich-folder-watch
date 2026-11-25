@@ -194,7 +194,8 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
-  Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md) and the
+  Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
+  the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
