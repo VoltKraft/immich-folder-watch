@@ -40,6 +40,14 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+At `4e3dbc4` both native Windows architectures passed the ordinary
+WinRT send, independent title and body readback, and selective removal.
+Both retained Mailbox profiles on each host passed all eleven WPF resource
+limits. The x64 deadline-based redraw still lacks its reopened editor
+capture. Shell activation, visible notifications, contrast and the
+interactive display trials keep desktop acceptance open.
+[Notification results](rw02-windows-services.md#winrt-history-and-classic-shell-delivery-at-4e3dbc4) · [Native measurements](rw02-windows-window.md#native-results-at-4e3dbc4) · [Ordinary and keyboard launches](rw02-instance.md#wpf-and-retained-rust-second-launches-at-4e3dbc4).
+
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
 ROWID and every existing row. Independent readback covered 32 SQLite

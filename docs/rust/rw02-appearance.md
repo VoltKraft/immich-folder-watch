@@ -276,6 +276,12 @@ the first palette read. The publisher returned to Default and closed its
 desktop handle. The GUI exited normally and the profile was removed.
 [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237).
 
+The x64 publisher also received error 5 querying GUI thread 6800, belonging
+to PID 7360 and HWND 9437532. It returned to Default and closed its handle.
+Both hosts drained the original GUI and closed the job. Neither had
+requested a palette change.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979507507).
+
 The publisher now enumerates top-level windows on the private desktop
 handle it already holds with `DESKTOP_READOBJECTS`. It requires the original
 root HWND exactly once, the same owner PID and thread on both sides of the

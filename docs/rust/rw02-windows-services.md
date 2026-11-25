@@ -587,6 +587,27 @@ postdates this source.
 [ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14970553191) ·
 [ARM64 classic](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14969828998).
 
+### WinRT history and classic Shell delivery at 4e3dbc4
+
+Both native Windows architectures passed the WinRT history trial. On each
+host, the quiet sender's optional setting query returned `0x80070490` on
+all sixteen attempts. The ordinary sender observed the enabled setting on
+its first attempt. Both calls to `Show` returned `S_OK`. Independent native
+processes read each exact title, body, tag and group. Removing the ordinary
+entry left the quiet entry in history. Two final reads found the history
+empty. All twelve processes on each host exited successfully and cleanup
+removed the shortcut and synthetic profile. An on-screen banner still
+needs a visible title and body.
+[Original x64 WinRT archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979881380) · [Original ARM64 WinRT archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978463516).
+
+In the separate classic ARM64 trial, Explorer declined initial registration.
+The receiver made no balloon request. The observer completed 112 UI
+Automation sweeps without a provider error and found no matching banner.
+On x64 Explorer accepted registration and the request. The receiver recorded
+one show and two timeout callbacks. All 86 UI Automation sweeps completed
+without a provider error. None found the visible title and body.
+[Original x64 classic archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979736952) · [Original ARM64 classic archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979421612).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

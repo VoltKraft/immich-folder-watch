@@ -1,5 +1,30 @@
 # Project Status
 
+## Windows native results at 4e3dbc4 (2026-11-25)
+
+The full desktop matrix finished with two successful Ubuntu jobs and two
+failed Windows jobs. Both Windows hosts passed the WinRT history test,
+including selective removal, NVDA, Japanese composition and all eleven
+WPF limits for both retained Mailbox profiles. During an ordinary second
+launch, the WPF and retained Rust windows obtained foreground on x64 and
+stayed in the background on ARM64. The foreground keyboard trial gave
+Rust focus on both. Actual Shell activation, visible notifications,
+Windows contrast, a standard-user cross-session writer and the display
+checks still lack their required evidence. Both displays supplied one
+96-DPI console monitor. [Full run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050) ·
+[WinRT and Shell](rust/rw02-windows-services.md#winrt-history-and-classic-shell-delivery-at-4e3dbc4) ·
+[WPF and Rust launches](rust/rw02-instance.md#wpf-and-retained-rust-second-launches-at-4e3dbc4) ·
+[NVDA, IME and display](rust/rw02-windows-desktop.md#reader-japanese-input-and-display-at-4e3dbc4).
+
+In the x64 deadline-based redraw trial, 264 resumed frame submissions
+matched independent DXGI events during the first inventory. Its first
+editor capture stopped when the isolated PowerShell host could not resolve
+`Get-FileHash`. Evidence for a reopened editor remains outstanding. The
+four desktop jobs for `989bb33` have started. The prior 24 PR checks at
+that revision passed. [x64 measurements](rust/rw02-windows-window.md#native-results-at-4e3dbc4) ·
+[989bb33 desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105) ·
+[989bb33 native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900291).
+
 ## Windows contrast observer on the private test desktop (2026-11-25)
 
 At `4e3dbc4` Windows ARM64 denied the supervisor's query for the GUI

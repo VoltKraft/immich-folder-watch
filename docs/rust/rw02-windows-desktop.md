@@ -1,5 +1,21 @@
 # RW-02 Windows foreground and keyboard observation
 
+## Reader, Japanese input and display at 4e3dbc4
+
+NVDA 2026.3.1 spoke the seven expected German and English field, masking
+and language announcements on both native GUIs. The reader examined 15
+utterances on x64 and 12 on ARM64. The portable reader used the x64 build
+on both hosts. In separate runs, the system Japanese IME produced preedit
+and committed U+3042 (`あ`) into the ordinary filename field on both hosts.
+Both restored their original keyboard layouts and removed the test profiles.
+
+Each display observer found one 1024 × 768 monitor at 96 DPI and a console
+session. On x64 both display trials obtained the edited source-monitor
+frame. On ARM64 the display trials could not focus the field for that frame.
+The Japanese input and reader trials used their own windows. Readback
+matched 40 observer sources per host to the native checkout.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979507507) · [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237) · [Required mixed-DPI and RDP observations](rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
 ## ARM64 reader and input method at 13e4af8
 
 On native Windows ARM64, portable x64 NVDA 2026.3.1 read the ARM64 Rust

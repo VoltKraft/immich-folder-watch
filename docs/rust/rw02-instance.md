@@ -829,3 +829,27 @@ no faulting module or stack. Detached readback matched all 17 observer inputs
 and the ordinary-launcher receipt for each architecture. Its SHA-256 is
 `99280ab4b7c80853d75e35243070f5275523ced8fa6b03ee5c1f1a68b7d89e34`.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14874798632) · [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266/artifacts/14873982830).
+
+### WPF and retained Rust second launches at 4e3dbc4
+
+On Windows x64 an ordinary second launch reopened the original WPF HWND
+1901124 and it held foreground at the first sample. The second process
+exited successfully. The retained Rust window held foreground and keyboard
+focus at the first sample in both its ordinary and its F24 keyboard trial.
+The first trial retained worker 2948 and the second retained worker 8012.
+WPF's three lookups of its tray icon returned the same rectangle as the
+separate Rust trial. The rectangle by itself established no activation.
+[x64 native WPF and Rust records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979507507).
+
+On Windows ARM64 the original WPF 3.0.4 sources and the retained Rust
+GUI both reopened their original HWND on an ordinary second launch.
+The WPF window appeared 63 ms after resume. All 41 subsequent foreground
+samples over 2.019 seconds showed it in the background. The retained Rust
+window also remained in the background across its 41 samples.
+
+On the private input desktop, a foreground window receiving F24 launched
+the same retained Rust executable. Its original HWND 4326006 had foreground,
+active-window state and keyboard focus at the first independent observation.
+Worker PID 1464 survived the reopen. The processes exited successfully
+and the host restored the Default desktop.
+[ARM64 native WPF and Rust records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237) · [Ordinary retained Rust HWNDs](rw02-windows-services.md#corrected-canonical-windows-launcher-at-4e3dbc4).

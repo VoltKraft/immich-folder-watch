@@ -772,6 +772,37 @@ processing, limited to the retained root's direct show. The offline reader
 reproduced the two older traces without attributing message times to them.
 [Procedure and raw records](../../tools/rust-qa/windows-frame-cost/README.md).
 
+### Native results at 4e3dbc4
+
+On Windows x64 both retained Mailbox profiles met all eleven limits across
+three trials each. With one queued frame, scan close and reopen p95 were
+21.92 and 12.01 ms against 31.07 and 22.53 ms. The canonical GUI met six
+limits. Retained FIFO exceeded the scan close budget at 41.72 ms. The
+small GDI control met its four window-response limits. Of 1,091 traced
+frame presentations in the dispatch comparison, none began during the
+379 verified hidden intervals. The preceding x64 run at `13e4af8`
+exceeded three limits on the ordinary retained configuration.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979507507) · [Prior x64 comparison](#native-results-at-13e4af8).
+
+The separate x64 deadline-based redraw collected 779 requests during
+confirmed file reads. Independent DXGI events matched 264 resumed frame
+submissions in the first inventory. Its eleven single-trial values were
+within the same host's WPF limits. During the first editor capture, the
+isolated Windows PowerShell host could write the PNG but could not resolve
+`Get-FileHash`. The editor check ended before the close and reopen. This
+leaves the deadline-based comparison incomplete.
+[Diagnostic and reproduction](../../tools/rust-qa/windows-frame-cost/README.md).
+
+On Windows ARM64 the canonical GUI met six of eleven limits from the
+same host's WPF trials. Both retained Mailbox profiles met all eleven,
+with three trials per profile. Each inventory ran twice over 100,000 files.
+After an ordinary filename edit, each Mailbox editor had 209 changed
+pixels on its reopened window. The retained FIFO profile exceeded one
+limit. Scan close p95 was 20.37 ms against 13.72 ms. The separate
+two-color GDI control could not identify its two screen points as belonging
+to its initial window. It produced no complete timing comparison.
+[ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237).
+
 ### Presenting the full retained view with GDI
 
 The x64 comparison keeps the complete egui view, DX12 CPU rendering, input
