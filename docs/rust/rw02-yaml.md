@@ -293,6 +293,55 @@ SHA-256 `6ccd5cb696151e9a1dbb19571f4ac5cc37acbb864d38c091d0fe1147ba213496`.
 The 279-file evidence index has SHA-256
 `6045eb7806513aa7b28ca2c4eb9d1c4f426bc0fee2d42a7e23ca7c85c651728b`.
 
+### Four native saved-folder exchanges at 5efe1f1
+
+Each native host completed 57 cases using the shipping C# configuration
+sources on .NET 10.0.15. Each passed 171 byte comparisons, 277 semantic
+assertions and 152 C# readback assertions. The ten inputs with decoding
+errors produced no replacement files. The 300-folder C# saves differed
+in byte length between Windows and Linux. Across both encodings and all
+four hosts the final Rust YAML for 301 folders was identical. Its 89,998
+bytes have SHA-256
+`d189a42aaf1efa502f70eed2a676f7d8b4587f0b372fed93a4e791e3364081f2`.
+
+| Original archive | UTF-8 bytes for 300 folders | UTF-32LE bytes for 300 folders |
+| --- | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14991894015) | 84,930 | 330,124 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14992767644) | 84,930 | 330,124 |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14992778162) | 88,849 | 345,800 |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14991884778) | 88,849 | 345,800 |
+
+Detached replay checked all 1,116 indexed files, the 124 first-party
+sources per target and the original loader and writer against the
+shipping revision. An independent comparison of the decoded settings
+checked each folder's path, album, mode, filters and position before
+and after the edit. The combined receipt at
+`artifacts/rust/hosted-yaml/45548715758/four-host-saved-folders.json`
+has SHA-256 `e88c8c76667a4261f48b46df7542e6821e849d9b4ae7882377222b4b94600fce`.
+
+### Reading the Rust output with the delivered 3.0.4 Flatpak assemblies
+
+An isolated driver on Fedora x64 loaded the config reader, writer,
+validator, YamlDotNet and .NET 10.0.12 runtime from the original signed
+Linux x64 Flatpak via the local .NET host. The package's OSTree commit was
+`abeebe13b83cc4b8246fb4a8715daddce7f3dd4bf52861ae4ca33b06755104da`.
+The extracted `ImmichFolderWatch.Core.dll` had version 3.0.4.0 and
+SHA-256 `22fd3d96b18f11a6bd018a3d378cbf7903140e1aed5bee2eb5a39c9a730a8e03`.
+
+The test took the 300- and 301-folder Rust results from the original
+Ubuntu x64 archive above. The delivered reader opened each in editing
+and runtime modes. The writer saved both and the validator accepted the
+reopened files. All eight fields of every folder, their order, all other
+settings and the resolved runtime paths matched. In the unchanged case
+the writer reproduced the original 84,930-byte C# save byte for byte.
+After the edit it produced an 85,184-byte save with folder 301 intact.
+The test exercised the delivered assemblies directly using a synthetic
+profile. Its local `result.json` in
+`artifacts/rust/yaml-assessment/signed-flatpak-3.0.4-folders/` has
+SHA-256 `530106cdc6ba549daf0dc3464cde5988a728d82551bd2ba21efd991054c7a7b5`.
+[Release input pins](../../tools/RustCompatibilityOracle/installed/release.json) ·
+[Original native input](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14991894015).
+
 ## Native runner and observed results
 
 From the repository root with the pinned native toolchains:

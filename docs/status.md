@@ -57,9 +57,13 @@ that exceeded the Rust YAML probe's initial limits. The 100-folder profile
 failed when edited, and both 300-folder forms failed on admission. At
 `0468771` all six original profiles passed the full cross-language round
 trip. The native regression includes a 330,124-byte UTF-32LE C# save and
-verifies the edit through folder 301. The 57-case local run passed 171
-byte comparisons, 277 semantic checks and 152 C# readback assertions.
-[Folder lists, encodings and limits](rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders).
+verifies the edit through folder 301. All four hosts at `5efe1f1` passed
+57 cases each, with 171 byte comparisons, 277 semantic checks and 152 C#
+readback assertions per host. The edited 301-folder file had the same
+byte digest on each host. The delivered Linux x64 3.0.4 Flatpak assemblies
+also read, validated, saved and reopened both Rust outputs. Saving the
+unchanged 300-folder case reproduced the original C# file byte for byte.
+[Folder lists and native evidence](rust/rw02-yaml.md#four-native-saved-folder-exchanges-at-5efe1f1) · [Signed package assemblies](rust/rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
 
 ## Windows retained launch and test profile cleanup (2026-11-25)
 

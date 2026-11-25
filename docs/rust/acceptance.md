@@ -56,6 +56,12 @@ ROWID and every existing row. Independent readback covered 32 SQLite
 files. This closes the native insertion trial under RI-AC03.
 [Four-target originals and runtime versions](rw02-legacy.md#native-sqlite-insert-and-two-c-upserts-at-4e3dbc4).
 
+At `5efe1f1` Rust opened ordinary .NET saves with 100 and 300 watch
+folders and wrote unchanged and edited copies on all four targets. The
+C# loader read both. The 301-folder result was identical across targets
+and the original UTF-8 and UTF-32LE files retained their hashes.
+[Four native YAML exchanges](rw02-yaml.md#four-native-saved-folder-exchanges-at-5efe1f1).
+
 On Fedora x64, Rust backed up a configured, signed 3.0.4 process's live
 WAL after an upload. A new signed process opened the returned database
 and successfully uploaded a second image. The peer observed the original
