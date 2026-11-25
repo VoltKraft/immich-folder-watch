@@ -227,6 +227,56 @@ class ToastBannerTests(unittest.TestCase):
             self.assertEqual(files, {"005-normal-popup.json"})
             self.assertEqual(original, outcome)
 
+    def test_armed_provider_runs_the_single_sender_under_the_native_directory_name_contract(self):
+        from native import Win32
+        with TemporaryDirectory() as directory, patch.dict(os.environ, SystemRoot=r"C:\Windows"):
+            folder = Path(directory)
+            api, desktop = Mock(frequency=1000), Mock()
+            api.nt_create.return_value = 0
+            api.clock.side_effect = [182, 210, 10230]
+            desktop.context.return_value = DESKTOP
+            controls = folder / ("ifw-rw02-" + TOKEN)
+
+            @contextmanager
+            def owned(api, parent, name):
+                # Run the actual relative-name guard up to the first (mocked) native call.
+                Win32.create_child_directory(api, 51, name)
+                api.nt_create.assert_called_once()
+                self.assertEqual(parent / name, controls)
+                controls.mkdir()
+                yield controls
+
+            raw = folder / "005-normal-popup.log"
+            def write_rows(rows):
+                raw.write_text("".join("NOTICE_OBSERVER " + json.dumps(row) + "\n" for row in rows))
+
+            @contextmanager
+            def provider(api, program, args, area, env, log, record):
+                self.assertEqual(log, raw)
+                self.assertEqual(args[-2:], ["-Kind", "WinrtNormal"])
+                write_rows(self.rows[:2])
+                proc = Mock()
+                proc.wait.side_effect = lambda *, timeout: self.assertEqual((controls / "notice.sent").read_text(), TOKEN)
+                yield proc
+                self.assertTrue((controls / "notice.finish").is_file())
+                record.update(self.receipt["observer"])
+
+            def post():
+                self.assertTrue((controls / "notice.go").is_file())
+                write_rows(self.rows)
+                return self.item
+
+            send = Mock(side_effect=post)
+            sender = self.sender | {"machine": (0x8664, 0x8664)}
+            with patch.object(banner, "select_powershell", return_value=("powershell.exe", [])), \
+                    patch.object(banner, "owned_directory", owned), patch.object(banner, "child", provider), \
+                    patch.object(banner, "wait_for_observer", return_value=True):
+                _, observation = banner.observe(api, desktop, folder, {}, folder, 5, TOKEN, sender, send, 2)
+            send.assert_called_once_with()
+            self.assertEqual(observation["status"], "visible")
+            _, original = banner.archived(folder, 5, sender, self.item, 2, 0x8664)
+            self.assertEqual(observation, original)
+
     def test_replay_binds_new_observation_and_preserves_history_without_a_banner(self):
         with TemporaryDirectory() as tmp:
             directory = Path(tmp)

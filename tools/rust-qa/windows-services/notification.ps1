@@ -339,7 +339,7 @@ function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) 
 
 if ($Kind -ceq 'WinrtNormal') {
     $title = "IFW synthetic normal $Token"; $body = "Rust normal notification history $Token"
-    $controlDir = Join-Path $Fixture 'normal-popup'
+    $controlDir = Join-Path $Fixture "ifw-rw02-$Token"
 } else {
     $title = "IFW notice $Token"; $body = "Synthetic IFW notification $Token"
     $controlDir = $Fixture

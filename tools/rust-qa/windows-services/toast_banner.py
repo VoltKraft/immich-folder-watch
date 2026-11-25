@@ -87,7 +87,7 @@ def observe(api, desktop, area, env, out, index, token, sender, send, session):
             if receipt["desktopBefore"]["session"] == session and ordinary_console(receipt["desktopBefore"], "Default"):
                 program, receipt["uiaHosts"] = select_powershell(area, "accessibility", env)
                 if program:
-                    controls = stack.enter_context(owned_directory(api, area, "normal-popup"))
+                    controls = stack.enter_context(owned_directory(api, area, "ifw-rw02-" + token))
                     args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
                             "-File", str(HERE / "notification.ps1"), "-Token", token, "-Fixture", str(area),
                             "-Kind", "WinrtNormal"]
