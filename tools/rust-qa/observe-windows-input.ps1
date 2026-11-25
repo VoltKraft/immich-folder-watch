@@ -131,6 +131,16 @@ function Wait-ReaderCue([string]$Name) {
     throw "Missing NVDA speech observation for $Name."
 }
 
+function Get-FieldPngHash([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try {
+            return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+        } finally { $sha.Dispose() }
+    } finally { $stream.Dispose() }
+}
+
 function Capture-SubjectField($Element, [string]$Suffix, $ExpectedFocus = $Element) {
     $r = $Element.Current.BoundingRectangle
     $x = [int][Math]::Ceiling($r.Left + 2)
@@ -177,7 +187,7 @@ function Capture-SubjectField($Element, [string]$Suffix, $ExpectedFocus = $Eleme
         if ($colors.Count -lt 5) { throw 'Filename capture did not show a drawn text field.' }
         $png = "$OutputFile.$Suffix.png"
         $bitmap.Save($png, [Drawing.Imaging.ImageFormat]::Png)
-        return [ordered]@{ x=$x; y=$y; width=$width; height=$height; colors=$colors.Count; sha256=(Get-FileHash $png).Hash.ToLowerInvariant() }
+        return [ordered]@{ x=$x; y=$y; width=$width; height=$height; colors=$colors.Count; sha256=(Get-FieldPngHash $png) }
     } finally { $bitmap.Dispose() }
 }
 

@@ -3,6 +3,7 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import shutil
 import struct
 import subprocess
 import tempfile
@@ -179,6 +180,47 @@ class FrameLatencyTests(unittest.TestCase):
         output.write_text(json.dumps(report))
         with self.assertRaisesRegex(ValueError, "display the changed text"):
             visible_edits(self.base, self.host)
+
+    def test_field_capture_hashes_original_png_bytes_without_optional_powershell_modules(self):
+        shell = (Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                 if os.name == "nt" else shutil.which("pwsh"))
+        if not shell:
+            self.skipTest("PowerShell is required for the screenshot digest")
+        path = self.base / "field [edited].png"
+        encoded = self.base / "same pixels.png"
+        expected = [png(path, 0)["sha256"], png(encoded, 0, text=True)["sha256"]]
+        self.assertNotEqual(*expected)
+        driver = """
+$ErrorActionPreference = 'Stop'
+$PSModuleAutoLoadingPreference = 'None'
+if (Get-Module Microsoft.PowerShell.Utility) { Remove-Module Microsoft.PowerShell.Utility -Force }
+if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) { throw 'Expected the isolated host to lack Get-FileHash.' }
+$errors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:IFW_PIXEL_SOURCE, [ref]$null, [ref]$errors)
+if ($errors.Count) { throw $errors[0] }
+$hash = $ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-FieldPngHash'}, $true)
+$capture = $ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Capture-SubjectField'}, $true)
+$calls = @($capture.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Get-FieldPngHash'}, $true))
+if ($calls.Count -ne 1 -or $calls[0].CommandElements[1].Extent.Text -cne '$png') { throw 'Expected the capture to hash its saved PNG.' }
+. ([scriptblock]::Create($hash.Extent.Text))
+Get-FieldPngHash $env:IFW_PIXEL_FILE
+$lock = [IO.File]::Open($env:IFW_PIXEL_FILE, 'Open', 'ReadWrite', 'None')
+try {
+    try { Get-FieldPngHash $env:IFW_PIXEL_FILE; throw 'Reported a digest for a locked capture.' } catch [IO.IOException] {}
+} finally { $lock.Dispose() }
+try { Get-FieldPngHash ($env:IFW_PIXEL_FILE + '.missing'); throw 'Reported a digest for a missing capture.' } catch [IO.FileNotFoundException] {}
+Get-FieldPngHash $env:IFW_PIXEL_ENCODED
+"""
+        env = dict(os.environ, IFW_PIXEL_SOURCE=str(QA / "observe-windows-input.ps1"),
+                   IFW_PIXEL_FILE=str(path), IFW_PIXEL_ENCODED=str(encoded), PSModulePath=str(self.base),
+                   POWERSHELL_TELEMETRY_OPTOUT="1")
+        if os.name != "nt":
+            for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+                env[key] = str(self.base / key)
+        proc = subprocess.run([shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", driver],
+                              cwd=self.base, env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.splitlines(), expected)
 
     @unittest.skipUnless(os.name == "nt", "requires the Windows System.Drawing bitmap decoder")
     def test_native_bitmap_comparison_rejects_equal_pixels_and_a_blinking_or_moved_caret(self):
