@@ -287,6 +287,43 @@ handle it already holds with `DESKTOP_READOBJECTS`. It requires the original
 root HWND exactly once, the same owner PID and thread on both sides of the
 enumeration, and the publisher thread on that active input desktop. The
 capture worker independently checks the GUI thread's desktop. The original,
-changed and restored label still require two matching captures each. Native
-results with the publisher change are pending.
+changed and restored label each require two matching captures.
 [Observer](../../tools/rust-qa/appearance/windows.py) · [Windows desktop enumeration](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdesktopwindows).
+
+### Windows contrast baseline and restoration at f155b65
+
+On the disposable Windows 11 ARM64 runner, the publisher enumerated the
+original GUI window on the held input desktop. Two independent captures
+of the filename label gave the same 66 × 18 pixel image. Its background
+covered 857 of the 1,188 pixels at RGB (248, 248, 248). Windows reported
+flags `0x7e`, a non-null empty scheme name and the ordinary system colors.
+
+After the supervisor requested high contrast, it observed the enabled
+bit change. A difference in the scheme or the other flags caused it to
+reject that state. The fixture did not retain the rejected value. The
+restore guard declined to overwrite an unrecognized setting. The result
+has `restoreVerified=false` and contains neither a changed frame nor a
+verified restored palette. The supervisor returned its thread to Default,
+closed the desktop handle, drained the GUI job and removed the test
+profile. [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).
+
+The disposable Windows Server x64 run returned the same flags, empty
+scheme, eight colors and label pixels. It also attempted the change,
+declined to restore the unrecognized state and recorded
+`restoreVerified=false`. It closed its job, restored the thread desktop
+and removed the profile. The final account palette on both of those
+disposable runners is unknown. [Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627).
+
+The revised observer keeps the two baseline images and reads the flags,
+scheme and eight colors again. If the original scheme pointer is null or
+its string is empty, it reports which case it found, drains the worker and
+ends the trial before requesting a setting change. Windows documents the
+default-scheme field and the mode bit separately. Its API contract gives
+no round-trip rule for an unnamed scheme. A named baseline on a disposable
+desktop allows the existing toggle and restore test. The post-change and
+pre-restoration reads are retained even when they fail the ownership
+checks. A positive contrast result still requires the actual changed
+label and its restoration to the original pixels.
+[Win32 structure](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-highcontrastw) ·
+[System parameters](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow) ·
+[Supervisor](../../tools/rust-qa/appearance/windows.py) · [State readback](../../tools/rust-qa/appearance/windows_colors.py).

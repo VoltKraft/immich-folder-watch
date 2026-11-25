@@ -215,7 +215,8 @@ to reconcile project decisions, defaults, and recorded state.
   The Windows contrast supervisor owns the temporary setting and verifies its
   restoration even if the bounded native capture worker exits. Verify the
   [original GUI window on its held private desktop](docs/rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4)
-  before changing the palette.
+  before changing the palette. With an unnamed original scheme, retain the
+  read-only [Windows contrast baseline](docs/rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
   ARM64. Run its native GUI and panel on the matching architecture.
   Use the dedicated native service fixtures with disposable profiles.

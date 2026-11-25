@@ -829,6 +829,20 @@ and pristine-rebuilt Documents services refused the read lease. The
 private backport passed its contention and recovery checks. The combined
 Ubuntu readback has SHA-256 `17593647c96a6a635c6f44767de1ba647cd35aa77af8c508b50f3bab09fddb55`.
 
+### Ubuntu native results at f155b65
+
+Both Ubuntu jobs passed all eleven limits again. All requests issued
+during observed filesystem reads completed during inventory. Orca, Japanese
+input, visible Plasma tray activation, system appearance changes, graphics
+recovery, installed portal grants and the offline Wayland relink passed
+on both architectures. The detached readback covering both archives has
+SHA-256 `612f6d02d6fec6827d07a8ad95e98934083fdbc71c059cb259a926286f51a805`.
+
+| Ubuntu target | Rust / Avalonia startup (ms) | Scan reopen p95 / limit (ms) | Scan close p95 / limit (ms) | Requests completed during reads |
+| --- | ---: | ---: | ---: | ---: |
+| [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987724149) | 252.01 / 1,325.67 | 0.95 / 15.98 | 0.41 / 13.23 | 331 of 331 |
+| [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987593371) | 202.52 / 1,193.48 | 0.91 / 16.07 | 0.36 / 15.52 | 177 of 177 |
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

@@ -913,6 +913,35 @@ observations found that pair. The timed WinRT popup observer first runs
 in the following desktop matrix.
 [x64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14987305015) · [ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14984226649) · [x64 Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14986431031) · [ARM64 Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14984431074).
 
+### Native icon pixels and WinRT popup at f155b65
+
+On both Windows architectures the bitmap control drew both archived marker colors
+from the real HICONs on black and white backgrounds. All 484 checked
+interior pixels at 32 × 32 and all 64 at 16 × 16 matched each marker.
+The original corners were transparent and both icons were destroyed.
+On ARM64 Explorer declined registration for the canonical and retained GUI icons.
+[x64 icon and desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627) ·
+[ARM64 icon and desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738) ·
+[Retained Shell trials](rw02-instance.md#native-staged-image-readback-at-f155b65).
+
+The ordinary ARM64 WinRT send returned `S_OK` in 5.91 ms. The popup
+observer made 92 sweeps on the original desktop, continued after the
+send, and encountered no provider error. No sweep attributed a visible
+title and body to the test notification. The independent history reader
+found both exact entries, removed each selectively and verified empty
+history twice. The classic Shell trial made 110 observations after
+Explorer declined registration. [ARM64 WinRT and popup](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14989564512) · [ARM64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990122838).
+
+On x64 the ordinary WinRT notifier reported enabled on its first query.
+Its single send returned `S_OK` in 3.06 ms. Over the ten-second
+observation window the independent reader made 82 sweeps and encountered
+no provider errors. None showed the test title and body together. The
+history reader found both entries and verified selective removal through
+an empty history. In the separate classic Shell trial, Explorer accepted
+registration and returned a show callback. The 86 independent observations
+found no matching visible title and body.
+[x64 WinRT and popup](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991333500) · [x64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991363312).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

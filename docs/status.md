@@ -8,17 +8,17 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
-The complete desktop matrix at `989bb33` passed on both Ubuntu hosts and
-failed on both Windows hosts. The retained Windows ARM64 GUI passed all
-eleven performance limits with either Mailbox queue depth. Both x64
-Mailbox profiles exceeded the scan-close and scan-reopen limits. The
-first native full egui GDI trial exceeded two limits and stopped before
-the reopened editor capture. Both Windows hosts passed Japanese input,
-NVDA, WinRT notification history and the foreground keyboard launch.
-Real Shell activation, a visible notification, contrast, standard-user
-cross-session writer exclusion, mixed DPI and RDP remain open.
-[Windows timings](rust/rw02-windows-window.md#native-results-at-989bb33) ·
-[Native desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105).
+The `f155b65` desktop matrix passed on both Ubuntu hosts and failed on
+both Windows hosts. Each Ubuntu GUI and both retained Mailbox profiles on
+each Windows architecture met all eleven same-host performance limits.
+The preceding x64 run exceeded two. Full egui GDI and deferred DXGI each
+passed all eleven in one x64 trial and showed the edited filename after
+reopening. On both Windows hosts NVDA spoke all seven expected cues and
+the real Japanese IME committed U+3042. Mixed-DPI and RDP evidence still
+requires a suitable disposable Windows desktop. The user currently has
+neither installation media nor access to such a VM.
+[Windows timings](rust/rw02-windows-window.md#native-results-at-f155b65) ·
+[Native desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295).
 
 All 20 regular PR checks at `f155b65` passed, including native feasibility
 on Windows and Ubuntu x64 and ARM64. Independent replay of the four
@@ -26,10 +26,31 @@ worker-backup archives matched all 16 C# restarts to the databases returned
 by Rust. [Four-target feasibility run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394) ·
 [Worker restart evidence](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
 
-The separate `f155b65` desktop matrix started all four jobs after the
-`989bb33` run completed. It includes the corrected Windows contrast,
-editor, WinRT popup and staging observers and the native tray icon bitmap
-control. [Follow-up desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295).
+In the x64 Windows trials two staged filenames initially returned access denied
+after disposition and then returned file-not-found on the eighth and seventh
+reads. Both retained Explorer trials proceeded through cleanup. On both Windows
+hosts the native icon bitmap was correct and both WinRT notices reached
+history. The independent popup observers found no visible matching alert.
+Actual Shell tray activation and standard-user cross-session exclusion remain open.
+[Ubuntu](rust/rw02-native-gui.md#ubuntu-native-results-at-f155b65) ·
+[Windows launcher](rust/rw02-instance.md#native-staged-image-readback-at-f155b65) ·
+[Icon pixels and popup](rust/rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65).
+
+Both disposable Windows runners reached the contrast baseline with an
+empty original scheme. After a setting change neither supervisor could
+confirm restoration. At `e23fd9f` the fixture records unnamed schemes and
+their original label without changing the setting. A named trial retains
+the observed state even when it declines a restore. All 31 local
+appearance checks passed, including the PowerShell capture controls.
+[Native failure and observer correction](rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
+
+At `f155b65` the display and text scripts that import the shared editor
+capture function omitted its PNG hash helper. This stopped both x64
+source-display captures and all four ordinary and reopened filename
+observations. Both actual PowerShell importers reproduced the error
+in isolation. With the correction both returned the expected digest.
+The local display and text suites passed 17 and seven checks respectively.
+[Native errors and local regression test](rust/rw02-windows-display.md#hosted-display-and-field-capture-at-f155b65).
 
 ## Windows retained launch and test profile cleanup (2026-11-25)
 

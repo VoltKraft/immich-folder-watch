@@ -879,5 +879,40 @@ and last Win32 errors separately from the original DELETE open. Only
 file-not-found confirms absence. An open name, a different error or
 expiry stops cleanup. The native control holds one additional read
 handle sharing deletion until the first refused read, then requires a
-successful absence check. The native result of this control is pending.
+successful absence check.
 [Windows file open semantics](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew) · [Windows disposition flags](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/ns-ntddk-_file_disposition_information_ex) · [Staged image control](../../tools/rust-qa/windows-launcher/test_staged_images.py).
+
+### Native staged image readback at f155b65
+
+On Windows x64 the normal GUI tray preflight encountered the same
+access-denied read after Windows accepted disposition on the original
+staged GUI file, ID 844424930195012. No test handle was deliberately held
+open in this preflight. The eighth read returned file-not-found. The worker
+image and both images in the Default-desktop trial returned file-not-found
+at the first read. The recorder confirmed cleanup in both profiles. The
+independent ordinary launcher also confirmed all four names absent at the
+first read. [Native tray and staging record](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987084653) ·
+[Ordinary launcher record](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14986709542).
+
+The retained x64 GUI also encountered access denied on the original
+staged name and confirmed absence on its seventh read. The other nine
+GUI and worker names were absent at the first read. Both retained Shell
+attempts then ran on the original desktop. In each trial Explorer accepted
+registration, but none of the 256 sampled points in its reported rectangle
+showed the corresponding test color. The ordinary second launch reopened
+HWND 5111934 with foreground and keyboard focus and kept worker 5720.
+On ARM64 all ten names were absent at the first read. The ordinary second
+launch reopened HWND 2163306, kept worker 6136 and stayed in the
+background for 41 observations over 2.020 seconds. Explorer declined
+registration in both retained Shell attempts. All profiles passed cleanup.
+[Retained x64 trials](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14988197453) ·
+[Retained ARM64 trials](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14987583680).
+
+In the separate controlled trial, both architectures observed Windows
+error 32 on the initial delete-open of the deliberately held GUI image.
+After Windows accepted disposition, the first name check returned error
+5. Releasing the final sharing handle allowed the second check to confirm
+error 2. Both workers disappeared at the first check. In the independent
+foreground trials, a real F24 launch focused the same retained HWND on
+both hosts and preserved the original worker.
+[x64 controls](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627) · [ARM64 controls](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).

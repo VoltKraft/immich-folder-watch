@@ -472,6 +472,18 @@ independent prerequisite for this alternative.
 [Logo change](https://github.com/iced-rs/iced/pull/2902) ·
 [Scroll icon change](https://github.com/iced-rs/iced/commit/99748b89dea3dc24db24a73d79d5fa3e410b73a4).
 
+The November 25 follow-up found 0.14.0 was still the latest official iced
+release. The published `iced_winit` 0.14.1 and `iced_widget` 0.14.2
+feature sets expose no AccessKit option. Upstream still
+tracks this work in issue 552. The development tree at `98bd48f` contains
+the same 5,700-byte icon font as the stable release. These inputs leave
+native screen-reader support and the complete font attribution unresolved.
+[Official release](https://github.com/iced-rs/iced/releases/tag/0.14.0) ·
+[iced_winit features](https://docs.rs/crate/iced_winit/0.14.1/features) ·
+[iced_widget features](https://docs.rs/crate/iced_widget/0.14.2/features) ·
+[AccessKit tracking](https://github.com/iced-rs/iced/issues/552) ·
+[Development font source](https://github.com/iced-rs/iced/blob/98bd48fe011efc0ec5819fee0fa7673a7169ff11/graphics/src/text.rs#L126).
+
 ## Visible GDI and retained egui under the same inventory
 
 The x64 GDI surface met the four WPF window-response limits twice.
@@ -881,3 +893,36 @@ committed U+3042. The canonical and retained GUIs each ran on a single
 96-DPI console display. The retained process hid its original window and
 kept the first DX12 device generation. The run supplied no second display
 or RDP session. [ARM64 desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14985155609) · [Ordinary launch and Shell](rw02-instance.md#retained-windows-second-launches-at-989bb33).
+
+### Native results at f155b65
+
+On x64 the retained Mailbox profiles with one and two queued frames each
+passed all eleven WPF limits across three trials. The canonical GUI
+passed six limits. FIFO passed ten with a scan-close p95 of 36.87 ms.
+The WPF inventories returned 724, 717 and 723 responses during observed
+file reads. The canonical Rust counts were 70, 68 and 70. Each trial
+completed two passes over 100,000 files.
+
+| x64 p95 during inventory (ms) | WPF limit | Retained Mailbox, one frame | Full egui GDI, one trial | Deferred DXGI, one trial |
+| --- | ---: | ---: | ---: | ---: |
+| Close | 27.47 | 11.92 | 12.80 | 13.03 |
+| Reopen | 20.78 | 9.62 | 10.74 | 9.75 |
+
+The full egui GDI and deferred DXGI experiments each met eleven timing
+limits in their single trial. Both verified an edit on the original
+reopened HWND. Each independent PNG comparison found 209 changed pixels
+across 29 columns and 18 rows. GDI copied 689 full frames during
+inventory and none during 259 hidden intervals. All 244 reopens measured
+during file reads drew a complete frame. The three-trial Mailbox results
+and the earlier x64 failures above show that the timing margins vary
+between hosted machines.
+[x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627).
+
+Both ARM64 Mailbox queue depths again passed all eleven same-host limits.
+With one queued frame the idle close and reopen p95 were 3.02 and 5.21 ms.
+During inventory these were 4.10 and 4.56 ms. The canonical GUI passed
+six limits. FIFO passed ten, with a scan-close p95 of 18.13 ms against
+14.37 ms. Each Mailbox editor produced 177 changed pixels after reopening.
+The screenshot digest and readback ran under the system Windows PowerShell
+5.1 host. The small GDI control obtained no attributable screen pixels.
+[ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).

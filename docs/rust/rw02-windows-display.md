@@ -79,6 +79,24 @@ The hosted displays could not exercise a move to a monitor with different
 DPI or a connected RDP session. The [separate filename test](rw02-windows-text.md)
 has its own keyboard and glyph evidence.
 
+### Hosted display and field capture at f155b65
+
+Both Windows hosts again reported a single 1024 × 768 monitor at 96 DPI
+and WTS console protocol 0. The original and retained GUIs used the
+recorded native binaries. On x64 both source-display captures reached
+the filename editor but failed to resolve `Get-FieldPngHash`. The field
+observer imported the capture function without the digest helper it
+called. The same error stopped the canonical and reopened filename
+observers on both architectures. The separate reader and IME trials
+passed. The original topology and session observations remain usable.
+[x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14991846627) · [ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295/artifacts/14990910738).
+
+The shared capture function now includes its PNG digest operation. A
+regression test runs each actual importer in a separate PowerShell
+process with an empty module path and autoload disabled. Both reproduced
+the missing helper from the earlier source and both corrected importers
+returned the independently calculated digest of the test PNG.
+
 ### Required observations on a disposable native desktop
 
 Use a dedicated Windows x64 or ARM64 test VM with the matching MSVC build
