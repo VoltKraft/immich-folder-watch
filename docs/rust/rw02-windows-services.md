@@ -904,6 +904,15 @@ Real Shell registrations and clicks have their own outcomes. The producer
 control passed cross-compilation checks and awaits native execution.
 [Native HICON control](../../tools/rust-qa/windows-services/src/tray_image_test.rs) · [Recorder and pixel verification](../../tools/rust-qa/windows-services/run.py) · [Windows icon drawing](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawiconex).
 
+In the late notification trial on that revision, each Windows host again
+posted the ordinary and quiet WinRT notices, read their exact contents
+and verified selective removal. The classic x64 icon received one show
+and two timeout callbacks. None of 87 Shell observations saw the required
+title and body on screen. On ARM64 registration failed, and none of 117
+observations found that pair. The timed WinRT popup observer first runs
+in the following desktop matrix.
+[x64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14987305015) · [ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14984226649) · [x64 Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14986431031) · [ARM64 Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14984431074).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

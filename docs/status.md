@@ -1,5 +1,36 @@
 # Project Status
 
+## Current Rust implementation goal
+
+Goal `M-RUST-IMPLEMENTATION-20261114` runs on `rewrite/rust` in chat
+`01a1db8f-b8ef-7903-8dfc-932f9b39c743`. RW-01 is accepted. RW-02 is
+qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
+The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
+[Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
+
+The complete desktop matrix at `989bb33` passed on both Ubuntu hosts and
+failed on both Windows hosts. The retained Windows ARM64 GUI passed all
+eleven performance limits with either Mailbox queue depth. Both x64
+Mailbox profiles exceeded the scan-close and scan-reopen limits. The
+first native full egui GDI trial exceeded two limits and stopped before
+the reopened editor capture. Both Windows hosts passed Japanese input,
+NVDA, WinRT notification history and the foreground keyboard launch.
+Real Shell activation, a visible notification, contrast, standard-user
+cross-session writer exclusion, mixed DPI and RDP remain open.
+[Windows timings](rust/rw02-windows-window.md#native-results-at-989bb33) ·
+[Native desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105).
+
+All 20 regular PR checks at `f155b65` passed, including native feasibility
+on Windows and Ubuntu x64 and ARM64. Independent replay of the four
+worker-backup archives matched all 16 C# restarts to the databases returned
+by Rust. [Four-target feasibility run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394) ·
+[Worker restart evidence](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
+The separate `f155b65` desktop matrix started all four jobs after the
+`989bb33` run completed. It includes the corrected Windows contrast,
+editor, WinRT popup and staging observers and the native tray icon bitmap
+control. [Follow-up desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937295).
+
 ## Windows retained launch and test profile cleanup (2026-11-25)
 
 At `989bb33` ordinary second launches reopened the original retained HWND

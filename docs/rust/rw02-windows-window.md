@@ -824,3 +824,60 @@ checking of the changed library and its unmodified source found the same
 two upstream lint expectations. Native timings for the new output path
 remain open.
 [Sources, native command and replay](../../tools/rust-qa/windows-gdi-present/README.md).
+
+### Native results at 989bb33
+
+On x64 the two retained Mailbox profiles each met nine of eleven WPF
+limits. Both exceeded scan close and reopen. The three WPF inventories
+provided 1,176, 1,184 and 1,189 responses qualified by concurrent file
+reads. The corresponding canonical Rust scans provided 87, 86 and 85.
+Each trial inventoried 100,000 files twice.
+
+| x64 response p95 in ms | WPF limit | Mailbox, one queued frame | Mailbox, two queued frames |
+| --- | ---: | ---: | ---: |
+| Close during inventory | 29.63 | 41.31 | 42.12 |
+| Reopen during inventory | 21.40 | 34.88 | 44.87 |
+
+Both ordinary Mailbox editor comparisons verified 177 changed pixels
+on the reopened window. FIFO exceeded three limits. The simple GDI
+control met all four window-response limits.
+[Original x64 builds, captures and timing records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14986561641).
+
+The separate full egui GDI trial compiled 153 Cargo units from the
+reconstructed sources above. It copied 369 full frames during the scan
+and drew none in 353 hidden intervals. Twelve reopens during observed
+file reads each produced a full frame. The single trial met nine of
+eleven limits. Its scan reopen was 10.49 ms, scan close was 38.73 ms
+and idle close was 27.22 ms against a 13.96 ms idle-close limit. The
+deadline-based DXGI experiment also met nine of eleven limits. Both
+experiments saved their initial editor PNG. The isolated Windows
+PowerShell 5.1 host then failed to resolve `Get-FileHash` before the
+reopened editor capture. The source correction at `09b3087` is in the
+next matrix. [GDI trial and replay](../../tools/rust-qa/windows-gdi-present/README.md).
+
+The instrumented x64 run matched 615 independent DXGI presentations and
+observed none in 387 hidden intervals. The DX12 frame wait accounted for
+at least half the latency of 31 of 32 slow closes. Each of the 120 slow
+reopens entered `ShowWindow`. Of 2,763 ms accumulated inside that call,
+2,286 ms elapsed outside the application's window procedure. The trace
+does not identify a specific Windows component for that time.
+[WndProc and frame observer](../../tools/rust-qa/windows-frame-cost/README.md).
+
+On ARM64 the canonical GUI met six of eleven WPF limits. The retained
+Mailbox profiles with queue depths one and two met all eleven. Each
+profile ran three trials with two inventories of 100,000 files per trial.
+For Mailbox with one queued frame, idle close and reopen p95 were 2.84
+and 4.02 ms. During inventory they were 5.81 and 4.73 ms. The independent
+reopened editor comparison found 209 changed pixels for each Mailbox
+profile. FIFO exceeded the scan-close limit at 20.15 ms against 14.32 ms.
+The two-color GDI control could not attribute its screen points to the
+test window and produced no completed timing trial.
+[Original ARM64 builds and measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14985155609).
+
+Both WPF and Rust reopened in the background on an ordinary ARM64 second
+launch. Rust obtained focus on the first sample after a foreground F24
+launch and kept its worker. NVDA spoke all seven cues and Japanese input
+committed U+3042. The canonical and retained GUIs each ran on a single
+96-DPI console display. The retained process hid its original window and
+kept the first DX12 device generation. The run supplied no second display
+or RDP session. [ARM64 desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14985155609) · [Ordinary launch and Shell](rw02-instance.md#retained-windows-second-launches-at-989bb33).

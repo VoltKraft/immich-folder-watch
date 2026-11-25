@@ -305,6 +305,18 @@ results reproduced the reference readback with SHA-256
 Rollback after the installed Rust sync engine's own activity remains open.
 [Native C# reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230320974).
 
+At `f155b65` all four targets repeated the four worker restarts. Detached
+replay verified 1,466 indexed files, compared 161 first-party source
+files per archive with the measured Git revision and recovered all 16
+distinct xUnit executions. Each shipping worker consumed the Rust backup
+identified by its returned bytes after download, upload, propagated deletion
+or interrupted timestamp repair. The combined readback SHA-256 is
+`05b00b8ec4a85bd3b3ab0768c5e81b7688ba4a84d44751154aca773655e1813c`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14982900992) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14982163282) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14982193656) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14981499821).
+
 ### Installed Fedora worker resumes from a live Rust backup
 
 On Fedora x64 at `3709869` the original signed 3.0.4 Flatpak uploaded
