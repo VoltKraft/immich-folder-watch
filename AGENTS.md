@@ -221,6 +221,8 @@ to reconcile project decisions, defaults, and recorded state.
   Use the dedicated native service fixtures with disposable profiles.
   The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
   owned desktop, a visible synthetic icon and a matching native Shell callback.
+  Use the [tray rectangle and HICON measurements](docs/rust/rw02-windows-services.md#sampling-the-explorer-tray-rectangle-at-989bb33)
+  to compare the supplied icon with the pixels on the original Explorer surface.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).

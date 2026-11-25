@@ -810,6 +810,25 @@ The detached comparison in
 `artifacts/rust/hosted-desktop-storage/45496492050/linux-desktop-readback.json`
 has SHA-256 `f70d5852e9330c95f622f9b8f2e7d86be20a02a7925db0546377018c23acd0ab`.
 
+### Ubuntu native repeat at 989bb33
+
+Both jobs passed all eleven same-host resource limits over three two-pass
+inventories of 100,000 files. Both retained the original GUI, X11 window
+and worker through ordinary and background second launches. These took
+27/27 ms on x64 and 28/27 ms on ARM64.
+
+| Ubuntu target | Rust / Avalonia startup (ms) | Scan reopen p95 / limit (ms) | Scan close p95 / limit (ms) | Requests completed during reads |
+| --- | ---: | ---: | ---: | ---: |
+| [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14981548570) | 187.37 / 1,020.11 | 0.71 / 15.78 | 0.27 / 10.93 | 321 of 321 |
+| [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14980604493) | 208.95 / 1,212.31 | 0.94 / 16.07 | 0.36 / 15.49 | 178 of 178 |
+
+Both originals include Orca output on X11 and Wayland, Japanese Wayland
+composition, contrast transitions, Plasma panel activation, graphics
+recovery and an offline relink of a modified Wayland binding. The stock
+and pristine-rebuilt Documents services refused the read lease. The
+private backport passed its contention and recovery checks. The combined
+Ubuntu readback has SHA-256 `17593647c96a6a635c6f44767de1ba647cd35aa77af8c508b50f3bab09fddb55`.
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop

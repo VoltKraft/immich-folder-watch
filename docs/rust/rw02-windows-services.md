@@ -872,6 +872,38 @@ without a valid read are counted separately. The raster is a passive
 observation. The original two-color and provider checks still govern
 activation. The native `4e3dbc4` result contains the earlier center observations.
 
+### Sampling the Explorer tray rectangle at 989bb33
+
+On x64 the original Explorer registered the canonical Rust icon and returned
+`[790,720,822,768]` for it. The center was RGB `eeeeee`. The independent
+observer read 256 points in a 16 × 16 grid on the same monitored Explorer
+surface. All reads succeeded. None matched the icon's `33c733` marker.
+UI Automation also found no identified hidden-icons button or matching item
+at the center. The observer sent no activation input. Worker 5668 survived
+until Quit, the receiver removed its icon and the test profile was cleaned up.
+[Original x64 tray archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14981286389).
+
+On ARM64 Explorer declined the initial add and two registration retries.
+The rectangle lookup returned `E_FAIL`. With no rectangle to sample, the
+observer finished after confirming receiver shutdown and job cleanup.
+The ordinary launcher still reopened the canonical GUI and retained worker
+10400. Its visible window stayed in the background for all 40 samples
+over 2.008 seconds. The ordinary x64 launcher retained worker 8528 and
+obtained foreground on its first sample.
+[Original ARM64 tray archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14980322661) ·
+[ARM64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14981825678) · [x64 launcher](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105/artifacts/14979924686).
+
+The producer control at `bfe10f5` checks an earlier point in delivery.
+It draws the actual HICON returned by the shared Rust implementation into a
+private bitmap, using each of the two archived x64 marker colors at 32 × 32
+and the native small-icon size. It keeps the complete pixels from black and
+white backgrounds. Independent readback checks the interior RGB, transparent
+source corners and confirmed handle cleanup. The native service archive
+retains the output in `tray-image.txt` and its result in `trayImage`.
+Real Shell registrations and clicks have their own outcomes. The producer
+control passed cross-compilation checks and awaits native execution.
+[Native HICON control](../../tools/rust-qa/windows-services/src/tray_image_test.rs) · [Recorder and pixel verification](../../tools/rust-qa/windows-services/run.py) · [Windows icon drawing](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawiconex).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

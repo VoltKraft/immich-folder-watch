@@ -1,5 +1,25 @@
 # Project Status
 
+## Windows tray raster and icon producer (2026-11-25)
+
+At `989bb33` Explorer on x64 accepted the native notification icon.
+All 256 measured points in its reported rectangle belonged to the original
+Explorer surface. None showed the fixture's marker. On ARM64 the Shell
+declined registration and two retries. Both ordinary GUI launchers
+reopened and retained their workers. The producer test at `bfe10f5`
+draws both archived marker colors through native HICONs into private
+bitmaps for comparison with these screen results. Seventy-two service
+tests and frozen cross-Clippy on both Windows targets passed locally.
+Its native result is pending. [Both Shell and launcher observations](rust/rw02-windows-services.md#sampling-the-explorer-tray-rectangle-at-989bb33).
+
+All 20 PR checks reported at `38557b5` passed, including native feasibility
+on all four targets and both CodeQL workflows. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521494827) · [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521503142) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521498776).
+
+Both `989bb33` Ubuntu desktop jobs passed all eleven limits. All 321 x64
+and 178 ARM64 requests made during observed file reads completed during
+the inventory. Both hosts retained the original window and worker on both
+second launches. [Native Ubuntu performance and desktop records](rust/rw02-native-gui.md#ubuntu-native-repeat-at-989bb33).
+
 ## Windows editor capture and visible WinRT notification (2026-11-25)
 
 The corrected editor capture at `09b3087` reproduced the hash of the
