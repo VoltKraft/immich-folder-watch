@@ -150,6 +150,15 @@ jobs:
           python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
+      - name: Retain native transport results before the desktop trials
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-realtime-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/realtime-native/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Rebuild the ARM64 import library and relink the tested transport
         if: ${{ !cancelled() && matrix.target == 'aarch64-pc-windows-msvc' && steps.windows_transport.outcome == 'success' }}
         shell: pwsh

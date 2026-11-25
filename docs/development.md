@@ -245,7 +245,11 @@ python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-ch
 
 The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
 records native Rust and C# storage results, loopback sessions, graph digests,
-adapters and observed window transitions. Windows uses the fixture's inherited
+adapters and observed window transitions. The transport's `sessions.json`
+includes the [packets received by the peer on shutdown](rust/rw02-realtime-transport.md#stopping-an-established-session).
+Each target uploads the native transport report, checksums and logs in
+`rust-realtime-<target>-<commit>` before it starts the desktop trials.
+Windows uses the fixture's inherited
 control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
 [native GUI report](rust/rw02-native-gui.md) for the desktop prerequisites,
