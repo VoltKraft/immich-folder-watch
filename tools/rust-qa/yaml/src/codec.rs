@@ -5,7 +5,10 @@ use serde_json::Value;
 use serde_saphyr::{DuplicateKeyPolicy, MergeKeyPolicy, Options};
 use std::io::Write;
 
-pub const MAX_BYTES: usize = 65_536;
+/// UTF-8 text on input and output. A UTF-32 file may need four bytes per
+/// ASCII character plus its BOM for the same admitted document.
+pub const MAX_TEXT_BYTES: usize = 256 * 1024;
+pub const MAX_FILE_BYTES: usize = 4 * MAX_TEXT_BYTES + 4;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Failure {
@@ -29,9 +32,9 @@ impl std::error::Error for Failure {}
 pub fn options() -> Options {
     let mut options = serde_saphyr::options! {
         budget: serde_saphyr::budget! {
-            max_reader_input_bytes: Some(MAX_BYTES), max_depth: 16, flow_nesting_limit: 16,
-            max_nodes: 2048, max_events: 4096, max_documents: 1,
-            max_total_scalar_bytes: 32_768, max_aliases: 32, max_anchors: 32,
+            max_reader_input_bytes: Some(MAX_TEXT_BYTES), max_depth: 16, flow_nesting_limit: 16,
+            max_nodes: 16_384, max_events: 32_768, max_documents: 1,
+            max_total_scalar_bytes: 128 * 1024, max_aliases: 32, max_anchors: 32,
             max_recorded_anchor_events: 4096, max_recorded_anchor_bytes: 65_536,
             max_inclusion_depth: 0,
         },
@@ -76,7 +79,7 @@ pub fn write(config: &Config) -> Result<Vec<u8>, Failure> {
         .as_object_mut()
         .ok_or(Failure::InvalidDocument)?
         .remove("extensions");
-    write_value(&value, MAX_BYTES)
+    write_value(&value, MAX_TEXT_BYTES)
 }
 
 fn write_value(value: &Value, limit: usize) -> Result<Vec<u8>, Failure> {
@@ -114,11 +117,11 @@ mod tests {
     use super::*;
 
     fn budget_pair(input: &str, restrict: impl FnOnce(&mut Options)) {
-        assert!(parse(input, options(), MAX_BYTES).is_ok());
+        assert!(parse(input, options(), MAX_TEXT_BYTES).is_ok());
         let mut limited = options();
         restrict(&mut limited);
         assert!(matches!(
-            parse(input, limited, MAX_BYTES),
+            parse(input, limited, MAX_TEXT_BYTES),
             Err(Failure::Budget)
         ));
     }
@@ -131,7 +134,7 @@ mod tests {
             Err(Failure::InputBytes)
         ));
         let value = serde_json::json!({"value":"日本語 😀: # null"});
-        let encoded = write_value(&value, MAX_BYTES).unwrap();
+        let encoded = write_value(&value, MAX_TEXT_BYTES).unwrap();
         assert_eq!(write_value(&value, encoded.len()).unwrap(), encoded);
         assert_eq!(
             write_value(&value, encoded.len() - 1),
@@ -186,12 +189,12 @@ mod tests {
             "watch: {sources: [&cycle [*cycle]]}",
             "immich: {apiKey: !include synthetic}",
         ] {
-            assert!(parse(input, options(), MAX_BYTES).is_err());
+            assert!(parse(input, options(), MAX_TEXT_BYTES).is_err());
         }
         let error = match parse(
             "immich: {allowInsecureHttp: SYNTHETIC-SECRET}",
             options(),
-            MAX_BYTES,
+            MAX_TEXT_BYTES,
         ) {
             Ok(_) => panic!("invalid boolean accepted"),
             Err(error) => error,

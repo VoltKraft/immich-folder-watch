@@ -64,7 +64,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let expected_text = row["yaml"].as_str().ok_or("missing synthetic YAML")?;
         let decoded = if byte_reference {
             let path = reference_path.join("profile").join(format!("{name}.yaml"));
-            let input = encoding::read(std::fs::File::open(path)?, codec::MAX_BYTES)?;
+            let input = encoding::read(
+                std::fs::File::open(path)?,
+                codec::MAX_FILE_BYTES,
+                codec::MAX_TEXT_BYTES,
+            )?;
             ensure(
                 input.text == expected_text,
                 &format!("C#/Rust file decoding differs: {name}"),
@@ -80,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             None
         };
         let source = decoded.as_ref().map_or(expected_text, |input| &input.text);
-        let parsed = codec::parse(source, codec::options(), codec::MAX_BYTES);
+        let parsed = codec::parse(source, codec::options(), codec::MAX_TEXT_BYTES);
         ensure(
             parsed.is_ok()
                 == row["accepted"]
@@ -117,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         checks += 2;
         let independent_written = row["written"].as_str().ok_or("missing C# writer result")?;
         ensure(
-            codec::parse(independent_written, codec::options(), codec::MAX_BYTES)?
+            codec::parse(independent_written, codec::options(), codec::MAX_TEXT_BYTES)?
                 .normalize(&rules)
                 == config,
             &format!("C# writer/Rust reader differ: {name}"),
@@ -139,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 codec::parse(
                     std::str::from_utf8(&yaml)?,
                     codec::options(),
-                    codec::MAX_BYTES,
+                    codec::MAX_TEXT_BYTES,
                 )?
                 .normalize(&rules)
                     == config,
@@ -156,11 +160,23 @@ fn main() -> Result<(), Box<dyn Error>> {
             file.write_all(&yaml)?;
         }
     }
+    let options = codec::options();
+    let budget = options
+        .budget
+        .as_ref()
+        .ok_or("missing YAML assessment budget")?;
+    let aliases = &options.alias_limits;
     let mut report = json!({"format":"ifw-rw02-yaml-result-v1", "platform":std::env::consts::OS,
         "architecture":std::env::consts::ARCH, "assertions":checks, "cases":cases,
-        "limits":{"inputBytes":codec::MAX_BYTES,"outputBytes":codec::MAX_BYTES,"depth":16,"nodes":2048,
-            "events":4096,"scalarBytes":32768,"aliases":32,"anchors":32,"retainedAnchorEvents":4096,
-            "retainedAnchorBytes":65536,"replayedEvents":4096,"aliasDepth":16,"expansionsPerAnchor":32,"documents":1},
+        "limits":{
+            "fileBytes":codec::MAX_FILE_BYTES, "inputBytes":budget.max_reader_input_bytes, "outputBytes":codec::MAX_TEXT_BYTES,
+            "depth":budget.max_depth, "flowDepth":budget.flow_nesting_limit, "nodes":budget.max_nodes, "events":budget.max_events,
+            "scalarBytes":budget.max_total_scalar_bytes, "aliases":budget.max_aliases, "anchors":budget.max_anchors,
+            "retainedAnchorEvents":budget.max_recorded_anchor_events, "retainedAnchorBytes":budget.max_recorded_anchor_bytes,
+            "replayedEvents":aliases.max_total_replayed_events, "aliasDepth":aliases.max_replay_stack_depth,
+            "expansionsPerAnchor":aliases.max_alias_expansions_per_anchor, "documents":budget.max_documents,
+            "includeDepth":budget.max_inclusion_depth
+        },
         "unproven":["production configuration adapter", "universal Unicode policy", "arbitrary Windows namespace/drive-relative paths",
             "atomic configuration publication and crash recovery", "full migration", "wall-clock/RSS production budget"]});
     if byte_reference {

@@ -40,5 +40,18 @@ generated from the actual native C# runtime; no universal Unicode map is assumed
 Outputs include source-bound reports, rejected cases, positive/negative budget
 tests, and real C# readback of unchanged and modified Rust YAML.
 
+The shipping writer generates ordinary profiles with 100 and 300 ordered
+sources and per-folder settings. The comparison reads both UTF-8 files and
+a UTF-32LE copy of the 300-folder file. It checks the complete editing and
+runtime objects and adds one folder before the second Rust write. The C#
+reader verifies both returned documents.
+
+The assessment admits up to 256 KiB of decoded UTF-8 text or serialized
+output. Its separate file limit permits four bytes per UTF-8 byte plus a
+four-byte BOM, so an ASCII-heavy UTF-32 file can carry the same text.
+The parser allows 16,384 nodes, 32,768 events and 128 KiB of scalar text.
+Depth, alias expansion and retained anchor data have their own limits.
+The native report records the configured limits along with its observations.
+
 See [the YAML assessment record](../../../docs/rust/rw02-yaml.md) for exact inputs,
 license disposition, actual results, policy choices and remaining qualification.

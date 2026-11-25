@@ -93,7 +93,8 @@ internal static class Program
             ["unknown-property-casing"] = "Immich: {apiKey: ignored}\nimmich: {ApiKey: ignored-too}\n",
         };
         foreach (var entry in additional) cases.Add(entry.Key, Encoding.UTF8.GetBytes(entry.Value));
-        var encodingSamples = YamlFileEncodings.Samples().ToDictionary(sample => sample.Name, StringComparer.Ordinal);
+        var encodingSamples = YamlFileEncodings.Samples().Concat(SavedFolderLists())
+            .ToDictionary(sample => sample.Name, StringComparer.Ordinal);
         foreach (var sample in encodingSamples.Values) cases.Add(sample.Name, sample.Bytes);
         var loader = new AppConfigLoader();
         var rows = new List<object>();
@@ -145,6 +146,34 @@ internal static class Program
             CasingSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "casing.json")))), Cases = rows
         });
         Console.WriteLine($"C# YAML reference exported: {rows.Count} cases, {corpusAssertions} accepted-corpus assertions, all Unicode scalars.");
+    }
+
+    private static IEnumerable<YamlFileEncodings.Sample> SavedFolderLists()
+    {
+        foreach (var count in new[] { 100, 300 })
+        {
+            var config = new AppConfig
+            {
+                Immich = new ImmichSettings { ServerApiUrl = "https://example.invalid/api", ApiKey = "synthetic-demo" },
+            };
+            for (var i = 1; i <= count; i++)
+            {
+                config.Watch.Sources.Add(new WatchSourceSettings
+                {
+                    Path = $"Albums/Archive-{i:D3}",
+                    AlbumName = $"Archiv {i:D3} – 日本語",
+                    IncludeSubdirectories = i % 2 == 0,
+                    Extensions = [".jpg", ".jpeg", ".png"],
+                    ExcludeDirectories = ["Thumbnails"],
+                    ExcludeFileNames = ["cover.png"],
+                    SyncMode = i % 3 == 0 ? WatchSourceSyncModes.Sync : WatchSourceSyncModes.UploadAll,
+                });
+            }
+            var saved = new AppConfigWriter().Serialize(config);
+            yield return new($"folders-{count}-utf8", Encoding.UTF8.GetBytes(saved), Encoding.UTF8.CodePage);
+            if (count == 300)
+                yield return new("folders-300-utf32", [.. Encoding.UTF32.GetPreamble(), .. Encoding.UTF32.GetBytes(saved)], Encoding.UTF32.CodePage);
+        }
     }
 
     private static void Tokenize(JsonNode value, string property, string profile)

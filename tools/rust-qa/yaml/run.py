@@ -95,6 +95,18 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
     if {path.name for path in profile.iterdir()} != {name + ".yaml" for name in inputs}:
         raise ValueError("Original profile files differ from the exported cases")
     verify_encodings(profile, inputs)
+    for name, count, codec, bom in (
+        ("folders-100-utf8", 100, "utf-8", b""),
+        ("folders-300-utf8", 300, "utf-8", b""),
+        ("folders-300-utf32", 300, "utf-32-le", codecs.BOM_UTF32_LE),
+    ):
+        case = inputs[name]
+        paths = [source["path"] for source in case["editable"]["watch"]["sources"]]
+        if (paths != [f"Albums/Archive-{i:03}" for i in range(1, count + 1)]
+                or case["sourceHadDecodingErrors"] or not case["accepted"]
+                or case["yaml"] != case["written"]
+                or (profile / (name + ".yaml")).read_bytes() != bom + case["written"].encode(codec)):
+            raise ValueError(f"Native saved folder list or source order differs: {name}")
     writable = {name for name, row in inputs.items() if row["accepted"] and not row["sourceHadDecodingErrors"]}
     expected_files = {name + suffix for name in writable for suffix in (".roundtrip.yaml", ".changed.yaml")}
     if {path.name for path in rust_output.iterdir()} != expected_files | {"result.json", "csharp-readback.json"}:

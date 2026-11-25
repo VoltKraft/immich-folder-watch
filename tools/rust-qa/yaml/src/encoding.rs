@@ -51,18 +51,18 @@ impl Decoded {
     }
 }
 
-pub fn read(reader: impl Read, limit: usize) -> Result<Decoded, Failure> {
+pub fn read(reader: impl Read, file_limit: usize, text_limit: usize) -> Result<Decoded, Failure> {
     let mut bytes = Vec::new();
     reader
-        .take((limit as u64).saturating_add(1))
+        .take((file_limit as u64).saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(|error| Failure::InputIo(error.kind()))?;
-    if bytes.len() > limit {
+    if bytes.len() > file_limit {
         return Err(Failure::InputBytes);
     }
     let (encoding, content) = detect(&bytes);
     let mut decoded = Decoded {
-        text: String::with_capacity(content.len()),
+        text: String::with_capacity(content.len().min(text_limit)),
         encoding,
         had_errors: false,
         source_bytes: bytes.len(),
@@ -70,9 +70,9 @@ pub fn read(reader: impl Read, limit: usize) -> Result<Decoded, Failure> {
     match encoding {
         Encoding::Utf8 => {
             for chunk in content.utf8_chunks() {
-                decoded.push_text(chunk.valid(), limit)?;
+                decoded.push_text(chunk.valid(), text_limit)?;
                 if !chunk.invalid().is_empty() {
-                    decoded.push_scalar(None, limit)?;
+                    decoded.push_scalar(None, text_limit)?;
                 }
             }
         }
@@ -83,10 +83,10 @@ pub fn read(reader: impl Read, limit: usize) -> Result<Decoded, Failure> {
                 _ => u16::from_be_bytes,
             };
             for scalar in char::decode_utf16(words.iter().copied().map(word)) {
-                decoded.push_scalar(scalar.ok(), limit)?;
+                decoded.push_scalar(scalar.ok(), text_limit)?;
             }
             if !trailing.is_empty() {
-                decoded.push_scalar(None, limit)?;
+                decoded.push_scalar(None, text_limit)?;
             }
         }
         Encoding::Utf32Le | Encoding::Utf32Be => {
@@ -96,10 +96,10 @@ pub fn read(reader: impl Read, limit: usize) -> Result<Decoded, Failure> {
                 _ => u32::from_be_bytes,
             };
             for &value in words {
-                decoded.push_scalar(char::from_u32(word(value)), limit)?;
+                decoded.push_scalar(char::from_u32(word(value)), text_limit)?;
             }
             if !trailing.is_empty() {
-                decoded.push_scalar(None, limit)?;
+                decoded.push_scalar(None, text_limit)?;
             }
         }
     }
@@ -155,7 +155,7 @@ mod tests {
         ));
         for (code_page, mut bytes, payload) in cases {
             bytes.extend(payload);
-            let decoded = read(SingleBytes(&bytes), 64).unwrap();
+            let decoded = read(SingleBytes(&bytes), 64, 64).unwrap();
             assert_eq!(decoded.encoding as u16, code_page);
             assert_eq!(decoded.source_bytes, bytes.len());
             assert_eq!(decoded.text, text);
@@ -175,7 +175,7 @@ mod tests {
             (&[0xff, 0xfe, 0, 0, 0, 0xd8, 0, 0, 7], 12000, "��"),
             (&[0, 0, 0xfe, 0xff, 0, 0x11, 0, 0, 1, 2, 3], 12001, "��"),
         ] {
-            let decoded = read(SingleBytes(bytes), 64).unwrap();
+            let decoded = read(SingleBytes(bytes), 64, 64).unwrap();
             assert_eq!(decoded.encoding as u16, code_page);
             assert_eq!(decoded.text, text);
             assert!(decoded.had_errors);
@@ -185,17 +185,17 @@ mod tests {
     #[test]
     fn bounds_original_reads_and_utf8_expansion_independently() {
         let mut source = Cursor::new(b"0123456789");
-        assert!(matches!(read(&mut source, 3), Err(Failure::InputBytes)));
+        assert!(matches!(read(&mut source, 3, 64), Err(Failure::InputBytes)));
         assert_eq!(source.position(), 4);
-        assert_eq!(read(&b"abc"[..], 3).unwrap().text, "abc");
-        assert_eq!(read(&[][..], 0).unwrap().text, "");
-        assert_eq!(read(&[0xff, 0xff][..], 6).unwrap().text, "��");
+        assert_eq!(read(&b"abc"[..], 3, 3).unwrap().text, "abc");
+        assert_eq!(read(&[][..], 0, 0).unwrap().text, "");
+        assert_eq!(read(&[0xff, 0xff][..], 2, 6).unwrap().text, "��");
         assert!(matches!(
-            read(&[0xff, 0xff][..], 5),
+            read(&[0xff, 0xff][..], 2, 5),
             Err(Failure::InputBytes)
         ));
         let wide = [0xff, 0xfe, 0x00, 0x4e, 0x01, 0x4e, 0x02, 0x4e];
-        assert!(matches!(read(&wide[..], 8), Err(Failure::InputBytes)));
-        assert_eq!(read(&wide[..], 9).unwrap().text.len(), 9);
+        assert!(matches!(read(&wide[..], 8, 8), Err(Failure::InputBytes)));
+        assert_eq!(read(&wide[..], 8, 9).unwrap().text.len(), 9);
     }
 }
