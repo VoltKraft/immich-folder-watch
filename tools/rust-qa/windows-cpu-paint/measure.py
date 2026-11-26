@@ -26,7 +26,7 @@ sys.path.extend(str(QA / directory) for directory in ("windows-gdi-present", "wi
 import gdi_case as gdi
 from frame_ready_case import job_resources, native_window, resource_metrics, scan_views
 
-MODE = "CPU_PAINT_MODE backend=Dx12 device=Cpu"
+MODE = "CPU_PAINT_MODE backend=Dx12 device=Cpu selection=adapter"
 CPU = re.compile(r"CPU_FRAME seq=(\d+) pid=(\d+) hwnd=(\d+) tid=(\d+) begin=(\d+) rasterEnd=(\d+) "
                  r"start=(\d+) end=(\d+) width=(\d+) height=(\d+) meshes=(\d+) vertices=(\d+) "
                  r"indices=(\d+) sets=(\d+) frees=(\d+) lines=(\d+) flushed=1")
@@ -197,6 +197,24 @@ def resource_comparison(metrics, limits, ordinary):
     return dict(status="within-limits" if all(r["passed"] for r in values.values()) else "over-budget", metrics=values)
 
 
+def reopen_delivery(eligible, frames, frequency):
+    reopens = [event for event in eligible if event["action"] == "reopen"]
+    requests = {event["responseQpc"]: event["issuedQpc"] for event in reopens}
+    visible = {frame["hwndVisibleQpc"] for frame in frames}
+    if (frequency <= 0 or not frames or len(requests) != len(reopens)
+            or len(visible) != len(frames) or not visible.issubset(requests)):
+        raise ValueError("Cannot match full frames to distinct eligible reopens")
+    delays = []
+    for frame in frames:
+        observed = frame["hwndVisibleQpc"]
+        issued = requests[observed]
+        if not issued <= observed <= frame["fullBlitStartQpc"] <= frame["flushReturnedQpc"]:
+            raise ValueError("CPU frame preceded its window request or observation")
+        delays.append((frame["flushReturnedQpc"] - issued) * 1000 / frequency)
+    return dict(eligibleReopens=len(reopens), reopensWithFullBlit=len(delays),
+                requestToFirstFullBlitP95Ms=recorder.p95(delays))
+
+
 def readback(out, record):
     baseline = out.parents[2] / "windows-performance" / ("native-" + dwm.TARGET)
     refs = dwm.references(out, record, baseline, separate_gui=True, candidate_presentation=("CPU-GDI", None))
@@ -221,10 +239,11 @@ def readback(out, record):
     generation(original)
     series, cost = frames(original.read_text(encoding="utf-8"), root, meta["frequency"])
     progress = gdi.scan_observation(out, row, series)
+    delivery = reopen_delivery(scan["eligibleResponses"], progress["firstFullBlitAfterObservedReopen"], meta["frequency"])
     pixels = editor_result(out, row, series)
     budget = dwm.read(out / "reference-budget.json")["maximums"]
     ordinary = dwm.read(out.parent / "measured/result.json")["comparison"]
-    return dict(references=refs, idle=idle, scan=dict(**progress, cost=cost), editor=pixels,
+    return dict(references=refs, idle=idle, scan=dict(**progress, cost=cost, delivery=delivery), editor=pixels,
                 resources=resource_comparison(row["metrics"], budget, ordinary))
 
 

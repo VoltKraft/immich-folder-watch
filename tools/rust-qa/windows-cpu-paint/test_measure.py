@@ -107,6 +107,17 @@ class FrameEvidence(unittest.TestCase):
         with self.assertRaises(ValueError):
             case.resource_comparison(metrics,limits,ordinary)
 
+    def test_full_blit_latency_includes_time_before_the_hwnd_became_visible(self):
+        requests = [dict(action="reopen", issuedQpc=1, responseQpc=6),
+                    dict(action="close", issuedQpc=22, responseQpc=24),
+                    dict(action="reopen", issuedQpc=30, responseQpc=35)]
+        frame = dict(hwndVisibleQpc=6, fullBlitStartQpc=10, flushReturnedQpc=15)
+        self.assertEqual(case.reopen_delivery(requests, [frame], 1000),
+                         dict(eligibleReopens=2, reopensWithFullBlit=1, requestToFirstFullBlitP95Ms=14.))
+        for changed in ([frame, frame], [dict(frame, hwndVisibleQpc=7)], [dict(frame, fullBlitStartQpc=5)]):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                case.reopen_delivery(requests, changed, 1000)
+
     def test_both_editor_inputs_need_their_own_mesh_and_the_same_scanning_window(self):
         root = {key:ROOT[key] for key in ("hwnd", "pid", "tid")}
         field = lambda a,b: dict(root=dict(ROOT), qpc=[a,b])

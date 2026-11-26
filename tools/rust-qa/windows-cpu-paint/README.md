@@ -6,18 +6,24 @@ the original meshes and font atlas on the CPU, presents the BGRA output
 on the original HWND with GDI and compares the results against three
 ordinary WPF and retained egui trials on the same runner.
 
-The original application initializes WARP as usual. With the isolated
-CPU trial enabled, the root renderer draws directly into its CPU buffer.
-The trial accepts the editor's single managed atlas, linear filtering,
-clamped edges, opaque surface and mesh primitives. It checks dimensions,
-indices and texture updates before drawing. The observer binds each
+This build selects CPU painting when wgpu reports the DX12 Microsoft Basic
+Render Driver on an opaque, supported 8-bit root surface. Other adapters
+use the ordinary wgpu renderer. A supported CPU frame also applies its
+changed textures to the ordinary renderer. If a later valid draw needs
+another sampler, a paint callback or an additional surface, the build
+switches to wgpu for the remainder of the renderer's lifetime. The current
+draw and its pending texture updates continue on that path.
+The observer binds each
 completed transfer to the HWND, UI thread and QPC clock, counts idle
 frames and verifies that edits on both sides of a close and reopen
 produced new visible pixels. The idle and scan processes must each keep
 their first WARP device through Quit, with no active device loss or retry.
-ETW observes the separate worker reading
-100,000 synthetic inputs twice. All eleven same-host budgets apply.
-[Original offscreen pixel comparisons](headless/README.md).
+ETW observes the separate worker reading 100,000 synthetic inputs twice.
+All eleven same-host budgets apply. The timing report also gives the
+eligible reopen count, the number with a complete editor frame and the
+p95 from request to completed transfer for those frames.
+[Original offscreen pixel comparisons](headless/README.md) ·
+[First native trial with explicit CPU selection](../../../docs/rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
 
 ## Native run and replay
 
@@ -30,6 +36,10 @@ python -B tools/rust-qa/windows-cpu-paint/upstream.py artifacts/rust/cpu-paint-c
 python -B tools/rust-qa/windows-warm-window/measure.py x86_64-pc-windows-msvc --cpu-paint
 python -B tools/rust-qa/windows-cpu-paint/measure.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint
 ```
+
+The separate texture example must show the partial update on the same
+window after switching to wgpu. The native and detached commands both
+use the staged CPU build. [Visible handoff and readback](handoff/README.md).
 
 The fetch verifies the sizes and hashes of three original crate archives.
 Further source reconstruction and compilation use the offline cache.

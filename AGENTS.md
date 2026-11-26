@@ -257,7 +257,8 @@ to reconcile project decisions, defaults, and recorded state.
   and file observations.
   The separate [CPU paint comparison](tools/rust-qa/windows-cpu-paint/README.md)
   uses the retained meshes and atlas. Preserve its original crate notices,
-  native compiler outputs, real editor pixels and same-host WPF limits.
+  native adapter decision, compiler outputs, real editor pixels and same-host WPF limits.
+  Verify a partial texture update remains visible when rendering switches to wgpu.
   For the separate [deferred-frame trial](tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter),
   retain the native renderer trace and the changed pixels on the reopened window.
   Keep the integrated Linux and Windows inventory subjects bound to the

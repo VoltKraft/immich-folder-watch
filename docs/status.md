@@ -16,6 +16,15 @@ the p95 was 24.04 ms. The ordinary retained renderer met eight limits.
 A second native CPU comparison at `972adc6` is in progress.
 [Native comparison and archived compiler and window evidence](rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
 
+The next private x64 build selects CPU painting from the actual WARP
+adapter and root surface. It retains wgpu's texture state across CPU
+frames so a later unsupported sampler can switch renderers without
+losing a partial texture update. Local frozen reconstruction and
+Windows x64 cross-Clippy passed. The native timing and three visible
+texture samples for this implementation are pending.
+[Renderer comparison](../tools/rust-qa/windows-cpu-paint/README.md) ·
+[Texture handoff and readback](../tools/rust-qa/windows-cpu-paint/handoff/README.md).
+
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
 original database included 16 WAL frames. In both trials a new WPF worker

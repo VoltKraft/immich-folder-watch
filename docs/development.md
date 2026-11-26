@@ -477,7 +477,10 @@ and verifies edits in the reopened filename field.
 The Windows x64 transition workflow also compares a private CPU rasterizer
 on the same original editor and measures GDI transfers during both inventory
 passes. It retains the native libraries, GUI, compiler output and source
-archive for replay against the same WPF limits.
+archive for replay against the same WPF limits. A separate example uses
+the same compiled renderer to draw and partially update a texture. It
+then requests nearest filtering and checks that the updated pixels remain
+visible on the same window after wgpu takes over.
 [CPU renderer commands and evidence](../tools/rust-qa/windows-cpu-paint/README.md).
 
 The x64 and ARM64 import-library jobs rebuild the selected native library

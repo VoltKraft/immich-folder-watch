@@ -1,4 +1,4 @@
-//! Direct CPU presentation for the explicitly selected private Windows x64 root.
+//! Direct CPU presentation for the qualified WARP root of the private Windows x64 build.
 use std::io::{self, Write as _};
 use std::sync::Arc;
 use winit::raw_window_handle::{HasWindowHandle as _, RawWindowHandle};
@@ -6,6 +6,7 @@ use winit::window::Window;
 
 #[path = "cpu_raster.rs"]
 mod cpu_raster;
+pub(super) use cpu_raster::PaintError;
 #[allow(dead_code)] // The shared DIB module also supports padded GPU copies.
 #[path = "dib_layout.rs"]
 mod dib_layout;
@@ -66,16 +67,20 @@ fn ticks() -> io::Result<i64> {
     }
     Ok(value)
 }
-fn drawable(hwnd: isize, size: [u32; 2]) -> io::Result<bool> {
+fn visible_size(hwnd: isize) -> io::Result<Option<[u32; 2]>> {
     let mut rect = [0; 4];
     // SAFETY: the caller borrows the Window for the entire paint on its owner thread.
     if unsafe { GetClientRect(hwnd, &raw mut rect) } == 0 {
         return Err(io::Error::last_os_error());
     }
-    Ok(unsafe { IsWindowVisible(hwnd) != 0 && IsIconic(hwnd) == 0 }
-        && size[0] > 0
-        && size[1] > 0
-        && rect == [0, 0, size[0] as i32, size[1] as i32])
+    if unsafe { IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 } || rect[2] == 0 || rect[3] == 0
+    {
+        return Ok(None);
+    }
+    if rect[0] != 0 || rect[1] != 0 || rect[2] < 0 || rect[3] < 0 {
+        return Err(io::Error::other("Invalid root client bounds"));
+    }
+    Ok(Some([rect[2] as u32, rect[3] as u32]))
 }
 struct Dc {
     hwnd: isize,
@@ -120,38 +125,49 @@ pub(super) struct Presenter {
     full: u64,
     partial: u64,
 }
-impl Presenter {
-    pub(super) fn new(
-        id: egui::ViewportId,
-        adapter: &wgpu::Adapter,
-        transparent: bool,
-    ) -> Option<Self> {
-        if std::env::var("IFW_QA_CPU_PAINT").as_deref() != Ok("1") {
-            return None;
+pub(super) enum Route {
+    FirstSurface,
+    Cpu(Box<Presenter>),
+    Wgpu,
+}
+
+impl Route {
+    pub(super) fn install(&mut self, state: &crate::RenderState, compatible_root: bool) {
+        match self {
+            Self::FirstSurface => {
+                let info = state.adapter.get_info();
+                if compatible_root
+                    && matches!(
+                        state.target_format,
+                        wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
+                    )
+                    && info.backend == wgpu::Backend::Dx12
+                    && info.device_type == wgpu::DeviceType::Cpu
+                    && info.name == "Microsoft Basic Render Driver"
+                {
+                    println!("CPU_PAINT_MODE backend=Dx12 device=Cpu selection=adapter");
+                    *self = Self::Cpu(Box::new(Presenter {
+                        raster: cpu_raster::Raster::new(),
+                        owner: None,
+                        full: 0,
+                        partial: 0,
+                    }));
+                } else {
+                    *self = Self::Wgpu;
+                }
+            }
+            Self::Cpu(_) => self.fallback("surface"),
+            Self::Wgpu => {}
         }
-        let info = adapter.get_info();
-        assert!(
-            id == egui::ViewportId::ROOT
-                && !transparent
-                && std::env::var("IFW_QA_ISOLATED").as_deref() == Ok("1")
-                && info.backend == wgpu::Backend::Dx12
-                && info.device_type == wgpu::DeviceType::Cpu
-                && info.name == "Microsoft Basic Render Driver",
-            "CPU painter requires the isolated opaque WARP root"
-        );
-        writeln!(
-            io::stdout().lock(),
-            "CPU_PAINT_MODE backend=Dx12 device=Cpu"
-        )
-        .expect("Could not record CPU paint mode");
-        Some(Self {
-            raster: cpu_raster::Raster::new(),
-            owner: None,
-            full: 0,
-            partial: 0,
-        })
     }
 
+    pub(super) fn fallback(&mut self, reason: &'static str) {
+        *self = Self::Wgpu;
+        println!("CPU_PAINT_FALLBACK reason={reason}");
+    }
+}
+
+impl Presenter {
     #[expect(clippy::too_many_arguments)]
     pub(super) fn paint(
         &mut self,
@@ -160,15 +176,13 @@ impl Presenter {
         scale: f32,
         clear: [f32; 4],
         jobs: &[egui::ClippedPrimitive],
-        delta: &mut egui::TexturesDelta,
-        callbacks: Vec<egui::ScreenshotCallback>,
-    ) -> io::Result<()> {
+        delta: &egui::TexturesDelta,
+        capture: bool,
+    ) -> Result<(), PaintError> {
         let RawWindowHandle::Win32(raw) =
             window.window_handle().map_err(io::Error::other)?.as_raw()
         else {
-            return Err(io::Error::other(
-                "CPU painter requires the original Win32 root",
-            ));
+            return Err(PaintError::Unsupported("window-handle"));
         };
         let hwnd = raw.hwnd.get();
         let tid = unsafe { GetCurrentThreadId() };
@@ -178,34 +192,57 @@ impl Presenter {
             || owner != pid
             || *self.owner.get_or_insert((hwnd, tid)) != (hwnd, tid)
         {
-            return Err(io::Error::other("CPU paint root HWND or owner changed"));
+            return Err(io::Error::other("CPU paint root HWND or owner changed").into());
         }
-        let dc = drawable(hwnd, size)?.then(|| Dc::new(hwnd)).transpose()?;
+        let current = visible_size(hwnd)?;
+        if current.is_some_and(|actual| actual != size) {
+            return Err(PaintError::Unsupported("dimensions"));
+        }
+        let dc = current.map(|_| Dc::new(hwnd)).transpose()?;
         let clip = dc.as_ref().map(Dc::clip).transpose()?;
         if dc.is_none() || clip.is_some_and(|c| c.kind == 1) {
-            if !callbacks.is_empty() {
-                return Err(io::Error::other("CPU screenshot requires a drawable root"));
+            if let Some(dc) = dc {
+                dc.close()?;
+            }
+            // The normal renderer supports screenshot capture even without a drawable surface.
+            if capture {
+                return Err(PaintError::Unsupported("hidden-capture"));
+            }
+            if jobs
+                .iter()
+                .any(|job| matches!(job.primitive, egui::epaint::Primitive::Callback(_)))
+            {
+                return Err(PaintError::Unsupported("callback"));
             }
             if !delta.is_empty() {
                 self.raster.draw(None, clear, &[], delta, scale)?;
-            }
-            if let Some(dc) = dc {
-                dc.close()?;
             }
             return Ok(());
         }
         let dc = dc.expect("Visible DC");
         let before = clip.expect("Visible clip");
         let [width, height] = size;
-        let layout = Layout::new(width, height, 4)?;
+        let layout = match Layout::new(width, height, 4) {
+            Ok(layout) => layout,
+            Err(_) => {
+                dc.close()?;
+                return Err(PaintError::Unsupported("dimensions"));
+            }
+        };
         let begin = ticks()?;
-        let counts = self.raster.draw(
+        let counts = match self.raster.draw(
             Some([width as usize, height as usize]),
             clear,
             jobs,
             delta,
             scale,
-        )?;
+        ) {
+            Ok(counts) => counts,
+            Err(error) => {
+                dc.close()?;
+                return Err(error);
+            }
+        };
         let raster_end = ticks()?;
         let info = BitmapInfo {
             header_bytes: 40,
@@ -245,7 +282,7 @@ impl Presenter {
             }
             let same = unsafe { GetWindowThreadProcessId(hwnd, &raw mut owner) } == tid
                 && owner == pid
-                && drawable(hwnd, size)?;
+                && visible_size(hwnd)? == Some(size);
             dib_layout::complete(lines, before, dc.clip()?, same, layout)
         })();
         let full = match dc.close().and(outcome) {
@@ -256,7 +293,7 @@ impl Presenter {
                     "GDI_FAILED hwnd={hwnd} tid={tid} start={start} end={end} width={width} height={height} lines={lines} flushed={}",
                     u8::from(flushed)
                 )?;
-                return Err(error);
+                return Err(error.into());
             }
         };
         let (event, counter) = if full {
@@ -280,7 +317,47 @@ impl Presenter {
             counts.sets,
             counts.frees
         )?;
-        drop(log);
+        Ok(())
+    }
+
+    /// Mirror the texture lifetime of the completed frame without acquiring a GPU surface.
+    pub(super) fn finish(
+        &self,
+        state: &crate::RenderState,
+        delta: &mut egui::TexturesDelta,
+        [width, height]: [u32; 2],
+        callbacks: Vec<egui::ScreenshotCallback>,
+    ) {
+        cpu_raster::finish_frame(
+            delta,
+            |delta| {
+                let mut renderer = state.renderer.write();
+                #[expect(clippy::iter_over_hash_type)]
+                for (id, changes) in delta.set.drain() {
+                    for change in changes {
+                        renderer.update_texture(&state.device, &state.queue, id, &change);
+                    }
+                }
+            },
+            || {
+                state.queue.submit([]);
+            },
+            |delta| {
+                let mut renderer = state.renderer.write();
+                #[expect(clippy::iter_over_hash_type)]
+                for id in delta.free.drain() {
+                    renderer.free_texture(&id);
+                }
+            },
+            || self.complete_screenshots([width, height], callbacks),
+        );
+    }
+
+    fn complete_screenshots(
+        &self,
+        [width, height]: [u32; 2],
+        callbacks: Vec<egui::ScreenshotCallback>,
+    ) {
         if !callbacks.is_empty() {
             let image = Arc::new(egui::ColorImage::new(
                 [width as usize, height as usize],
@@ -297,7 +374,6 @@ impl Presenter {
                 callback.complete(Arc::clone(&image));
             }
         }
-        Ok(())
     }
 }
 impl Drop for Presenter {

@@ -39,8 +39,21 @@ class RendererControls(unittest.TestCase):
                            cwd=target, input=patch, check=True)
             self.assertEqual([sha256(p.read_bytes()).hexdigest() for p in (original, entry)], pins["files"][PKG + "winit.rs"])
             route = entry.read_text(encoding="utf-8").split("pub fn paint_and_update_textures(", 1)[1]
-            self.assertLess(route.index("cpu.paint("), route.index("return 0.0;"))
-            self.assertLess(route.index("return 0.0;"), route.index("let mut render_queue_guard"))
+            self.assertLess(route.index("cpu.paint("), route.index("cpu.finish("))
+            self.assertLess(route.index("return 0.0;"), route.index("self.cpu.fallback(reason)"))
+            self.assertLess(route.index("self.cpu.fallback(reason)"), route.index("get_current_texture()"))
+            presenter = (HERE / "cpu_present.rs").read_text(encoding="utf-8")
+            self.assertNotIn("IFW_QA_CPU_PAINT", presenter)
+            self.assertIn("info.backend == wgpu::Backend::Dx12", presenter)
+            self.assertIn("info.device_type == wgpu::DeviceType::Cpu", presenter)
+            self.assertIn('info.name == "Microsoft Basic Render Driver"', presenter)
+            self.assertIn("Self::Wgpu => {}", presenter)
+            finish = presenter.split("pub(super) fn finish(", 1)[1].split("fn complete_screenshots", 1)[0]
+            self.assertEqual(finish.count("let mut renderer = state.renderer.write();"), 2)
+            self.assertLess(finish.index("renderer.update_texture("), finish.index("state.queue.submit([])"))
+            self.assertLess(finish.index("state.queue.submit([])"), finish.rindex("state.renderer.write()"))
+            self.assertLess(finish.index("renderer.free_texture("), finish.index("self.complete_screenshots("))
+            self.assertNotIn("get_current_texture", finish)
 
     def test_real_raster_pixels_deltas_and_input_limits(self):
         sources = prepare(ROOT / "artifacts/rust/cpu-paint-cache").sources

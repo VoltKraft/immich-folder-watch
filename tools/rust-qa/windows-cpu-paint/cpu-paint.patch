@@ -7,37 +7,52 @@
 +mod cpu_present;
 @@ -32,0 +37,2 @@
 +    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-+    cpu: Option<cpu_present::Presenter>,
++    cpu: cpu_present::Route,
 @@ -69,0 +76,2 @@
 +            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-+            cpu: None,
-@@ -304,0 +313,13 @@
++            cpu: cpu_present::Route::FirstSurface,
+@@ -304,0 +313,8 @@
 +        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        self.cpu.install(
++            self.render_state.as_ref().unwrap(),
++            viewport_id == ViewportId::ROOT
++                && !self.support_transparent_backbuffer
++                && self.options.msaa_samples <= 1
++                && self.options.depth_stencil_format.is_none(),
++        );
+@@ -354,0 +371,7 @@
++
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if matches!(self.cpu, cpu_present::Route::Cpu(_)) {
++            // The first ordinary GPU frame will configure this root at its latest nonzero size.
++            surface_state.needs_reconfigure = true;
++            return;
++        }
+@@ -500,0 +524,27 @@
++
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if let cpu_present::Route::Cpu(cpu) = &mut self.cpu
++            && let Some(surface) = self.surfaces.get(&viewport_id)
 +        {
-+            if self.cpu.is_none() {
-+                self.cpu = cpu_present::Presenter::new(
-+                    viewport_id, &self.render_state.as_ref().unwrap().adapter,
-+                    self.support_transparent_backbuffer,
-+                );
++            match cpu.paint(
++                window,
++                [surface.width, surface.height],
++                pixels_per_point,
++                clear_color,
++                clipped_primitives,
++                textures_delta,
++                !capture_data.is_empty(),
++            ) {
++                Ok(()) => {
++                    cpu.finish(
++                        self.render_state.as_ref().unwrap(),
++                        textures_delta,
++                        [surface.width, surface.height],
++                        capture_data,
++                    );
++                    return 0.0;
++                }
++                Err(cpu_present::PaintError::Unsupported(reason)) => self.cpu.fallback(reason),
++                Err(cpu_present::PaintError::Failure(error)) => panic!("CPU root paint failed: {error}"),
 +            }
-+            if self.cpu.is_some() {
-+                assert!(viewport_id == ViewportId::ROOT && self.options.msaa_samples <= 1
-+                    && self.options.depth_stencil_format.is_none(), "CPU trial requires a single ordinary root");
-+            }
-+        }
-@@ -354,0 +376,5 @@
-+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-+        if self.cpu.is_some() {
-+            return; // The root's physical dimensions are current; no flip chain or GPU attachments.
-+        }
-+
-@@ -500,0 +527,9 @@
-+
-+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-+        if let Some(cpu) = &mut self.cpu {
-+            assert_eq!(viewport_id, ViewportId::ROOT);
-+            let surface = self.surfaces.get(&viewport_id).expect("Missing CPU root surface");
-+            cpu.paint(window, [surface.width, surface.height], pixels_per_point, clear_color,
-+                clipped_primitives, textures_delta, capture_data).expect("CPU root paint failed");
-+            return 0.0;
 +        }

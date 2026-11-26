@@ -118,6 +118,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Compare CPU-painted editor frames and real inventory responses on the same desktop
+        id: cpu
         if: ${{ !cancelled() && steps.baseline.outcome == 'success' }}
         timeout-minutes: 35
         shell: pwsh
@@ -130,6 +131,20 @@ jobs:
           python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --cpu-paint
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B tools/rust-qa/windows-cpu-paint/measure.py "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/cpu-paint"
+          exit $LASTEXITCODE
+
+      - name: Verify the visible transition from CPU painting to wgpu
+        if: ${{ !cancelled() && steps.cpu.outcome != 'skipped' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu-build.json') != '' }}
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          $area = "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/cpu-paint"
+          python -B -m unittest discover -s tools/rust-qa/windows-cpu-paint/handoff
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-cpu-paint/handoff/run.py $area
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-cpu-paint/handoff/readback.py $area
           exit $LASTEXITCODE
 
       - name: Retain original comparisons, frame observations and native build inputs
@@ -165,3 +180,4 @@ jobs:
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/source.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu-libraries.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/scan-editor/
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/handoff/

@@ -124,9 +124,6 @@ def main(target, variant="mailbox"):
                 import frame_case
                 binary = frame_case.prepare_subject(base, out, budget, record)
         with ExitStack() as scope:
-            if variant == "cpu-paint":
-                os.environ["IFW_QA_CPU_PAINT"] = "1"
-                scope.callback(os.environ.pop, "IFW_QA_CPU_PAINT")
             if variant == "gdi-present":
                 os.environ["IFW_QA_WINDOWS_GDI_PRESENT"] = "1"
                 scope.callback(os.environ.pop, "IFW_QA_WINDOWS_GDI_PRESENT")
