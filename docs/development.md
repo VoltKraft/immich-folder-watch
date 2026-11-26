@@ -365,6 +365,19 @@ compiled x64 CPU-adapter GUI. Its readback pairs a resumed redraw with
 a successful presentation while the reopened window was visible. The
 ordinary three-trial run still owns the resource decision.
 [Deferred-frame commands and evidence](../tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter).
+
+The [Windows x64 transition workflow](../.github/workflows/rust-windows-transitions.yaml)
+builds the ordinary and retained GUIs, freezes three same-host WPF trials
+and records all eleven metrics for the two Rust builds. It then compares
+two fresh instances of the same retained executable during file inventory.
+Only the experimental instance requests disabled DWM transitions on its
+own root window. The native comparison archives both executable images,
+the original measurements, file and presentation events, and the editor
+captures. A complete over-budget reference comparison can supply data for
+this diagnostic. Its recorded limit failures remain part of the stack decision.
+[Window-level API](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute) ·
+[Diagnostic commands and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md).
+
 The WPF recorder queries the shipping tray icon after each idle trial and
 retains the HRESULT and rectangle with the receiver identity.
 [Shipping tray lookup](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).

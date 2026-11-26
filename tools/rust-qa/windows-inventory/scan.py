@@ -59,7 +59,7 @@ def environment(area, endpoint, rust, media, owner_token):
            "HTTP_PROXY": endpoint, "HTTPS_PROXY": endpoint, "ALL_PROXY": endpoint, "NO_PROXY": "localhost,127.0.0.1,::1",
            "DOTNET_CLI_TELEMETRY_OPTOUT": "1"}
     for key in ("IFW_QA_GRAPHICS", "IFW_QA_BENCHMARK", "IFW_QA_INVENTORY_ROOT", "IFW_QA_INVENTORY_TOKEN",
-                "IFW_QA_INVENTORY_TRIAL", "IFW_QA_INVENTORY_PORT"):
+                "IFW_QA_INVENTORY_TRIAL", "IFW_QA_INVENTORY_PORT", "IFW_QA_DWM_TRANSITIONS"):
         env.pop(key, None)
     if rust:
         for key in ("APPDATA", "LOCALAPPDATA", "HOME", "USERPROFILE"):
@@ -231,12 +231,16 @@ def coverage(text, requests, first_complete, second_complete, frequency, target,
 
 
 def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, output, await_value, stop_subject, p95, owner_token,
-            *, presentation_trace=None, visibility_witness=None):
+            *, presentation_trace=None, visibility_witness=None, dwm_transitions=None, after_inventory=None):
     from native import CleanupUnconfirmed, finish_owned_trace, start_owned_subject
     rust = subject == "rust"
     area.mkdir()
     media = area.parent / "files"
     env = environment(area, endpoint, rust, media, owner_token)
+    if dwm_transitions is not None:
+        if not rust or dwm_transitions not in ("ordinary", "disabled") or after_inventory is None:
+            raise ValueError("The DWM comparison requires a Rust scan and post-scan editor observer")
+        env["IFW_QA_DWM_TRANSITIONS"] = dwm_transitions
     target_log = output / (area.name + ".log")
     observer_log = output / (area.name + "-files.log")
     input_log = output / (area.name + "-requests.json")
@@ -375,6 +379,8 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
             values = [(q["responseQpc"] - q["issuedQpc"]) * 1000 / api.frequency
                       for q in observed["eligibleResponses"] if q["action"] == action]
             metrics["scan_" + action + "_p95_ms"] = p95(values)
+        if after_inventory is not None:
+            observed["editor"] = after_inventory(windows, proc, area, env, target_log, int(window))
         observed["termination"] = stop_subject(proc, rust, drain_log=target_log)
         observed.update(guiPid=proc.pid, inventoryPid=target, inventoryCreation100ns=identity, unchangedWorker=True,
                         completedPasses=2, rootWindowEvents=events, allRequests=requests, metrics=metrics)

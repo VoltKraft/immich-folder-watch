@@ -7,6 +7,10 @@ on:
       - '.github/workflows/rust-desktop-assessment.yaml'
       - 'rust/**'
       - 'tools/rust-qa/**'
+      # The x64 transition workflow owns the paired observer. Shared code still runs on all four hosts.
+      - '!tools/rust-qa/windows-warm-window/dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/test_dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
       - 'tools/RustCompatibilityOracle/installed/interop/**'
       - 'tools/RustCompatibilityOracle/installed/launch/**'
       - 'tools/RustCompatibilityOracle/installed/run.py'

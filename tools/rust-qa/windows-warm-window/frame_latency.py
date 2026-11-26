@@ -100,22 +100,23 @@ def visible_edits(base, measurement):
     return dict(observerResultSha256=sha(report_path), controls=edits)
 
 
-def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=None):
+def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=None, subject_log=None):
     """Replay the two real input-desktop edits and retained native window from one trial."""
     if trial.get("error"):
         raise ValueError(f"The {depth}-frame edit observation failed: {trial['error']}")
+    subject_log = folder / "subject.log" if subject_log is None else subject_log
     transition, = trial["transitions"]
     hwnd, pid = transition["hidden"], trial["pid"]
     if (trial["case"] != "retained-edit" or not pid or not hwnd or trial["creation100ns"] <= 0
             or hwnd != transition["reopened"] or trial["exitCode"] != 0 or trial["singleWake"]
             or transition["generationBefore"] != transition["generationAfter"]
             or transition["generationBefore"] != ["GRAPHICS_READY generation=1"]
-            or sha(folder / "subject.log") != trial["subjectLog"]):
+            or sha(subject_log) != trial["subjectLog"]):
         raise ValueError("The edit observer did not retain its original HWND and renderer")
     if device_observer is None:
-        device = measured_generation(folder / "subject.log", "Mailbox", frame_latency=depth, wait_policy=wait_policy)
+        device = measured_generation(subject_log, "Mailbox", frame_latency=depth, wait_policy=wait_policy)
     else:
-        device = device_observer(folder / "subject.log")
+        device = device_observer(subject_log)
     images = {}
     for phase, draft in (("before", "recoverydraft"), ("after", "recoverydraftafter")):
         path = folder / f"field-{phase}.json"

@@ -1,0 +1,111 @@
+name: Rust Windows x64 window transitions
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-transitions.yaml'
+      - 'tools/rust-qa/windows-inventory/scan.py'
+      - 'tools/rust-qa/windows-warm-window/**'
+      - '!tools/rust-qa/windows-warm-window/**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: x64
+
+      - name: Reconstruct the filtered worker dependencies and build the canonical GUI
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Check the recorders and build the retained GUI
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B -m unittest discover -s tools/rust-qa/windows-performance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location tools/rust-qa/windows-warm-window
+          python -B -m unittest test_dwm_transitions
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          python -B tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Collect three WPF, canonical and retained trials on this runner
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          $PSNativeCommandUseErrorActionPreference = $false
+          function Confirm-Comparison([string]$ReportPath, [int]$RecorderExit) {
+            $report = Get-Content -LiteralPath $ReportPath -Raw | ConvertFrom-Json
+            $metrics = @($report.comparison.PSObject.Properties)
+            if ($metrics.Count -ne 11 -or @($metrics | Where-Object { $_.Value.passed -isnot [bool] }).Count) {
+              throw "Incomplete metrics in $ReportPath"
+            }
+            $missed = @($metrics | Where-Object { !$_.Value.passed })
+            if ($RecorderExit -eq 1 -and $report.status -eq 'over-budget' -and $missed.Count -gt 0) {
+              Write-Host "Measured limits exceeded in ${ReportPath}: $($missed.Name -join ', ')"
+            } elseif ($RecorderExit -ne 0 -or $report.status -ne 'measured-metrics-passed' -or $missed.Count) {
+              throw "Measurement failed in ${ReportPath}: $($report.status), exit $RecorderExit"
+            }
+          }
+          $reference = "artifacts/rust/windows-performance/native-$env:NATIVE_TARGET"
+          python -B tools/rust-qa/windows-performance/run.py $env:NATIVE_TARGET --output $reference
+          Confirm-Comparison "$reference/result.json" $LASTEXITCODE
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET
+          Confirm-Comparison "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/measured/result.json" $LASTEXITCODE
+          exit 0
+
+      - name: Compare transition policies on the original HWND of each fresh subject
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dwm-transitions
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/dwm_transitions.py "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/dwm-transitions"
+          exit $LASTEXITCODE
+
+      - name: Retain original comparisons, frame observations and native build inputs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-windows-transitions-x64-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            artifacts/rust/gui-native/x86_64-pc-windows-msvc/*.json
+            artifacts/rust/gui-native/x86_64-pc-windows-msvc/gui-unit-tests.log
+            artifacts/rust/gui-build/release/native-gui-assessment.exe
+            artifacts/rust/yaml-assessment/runs/x86_64-pc-windows-msvc/filtered-sources.tar
+            artifacts/rust/windows-performance/native-x86_64-pc-windows-msvc/
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build.json
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/compiler.jsonl
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/eframe-source.zip
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/native-gui-assessment.exe
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/measured/
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/dwm-transitions/

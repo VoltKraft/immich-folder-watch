@@ -110,6 +110,17 @@ Only five reopens completed their first blit before the next close.
 [Native GDI timings](rust/rw02-windows-window.md#native-gdi-readback-phases) ·
 [Original measurements and new trial](../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
 
+The Windows x64 transition recorder compares the same retained executable
+with the ordinary window policy and with DWM transitions disabled on its
+original HWND. Each leg requires native file reads, completed DXGI presents
+and a visible edit after reopening. The source review, five portable
+regressions and x64 MSVC-target Clippy passed. Replaying the three original
+Mailbox scans at `ead9fb3` found 584, 553 and 585 qualifying reopens
+with complete presents. The effect of the per-window setting still
+requires native execution.
+[Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md) ·
+[Native x64 workflow](../.github/workflows/rust-windows-transitions.yaml).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

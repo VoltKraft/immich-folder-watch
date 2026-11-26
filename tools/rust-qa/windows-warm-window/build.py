@@ -55,12 +55,14 @@ def stage(project):
     for patch in patches:
         subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--whitespace=error", "-"],
                        input=patch, cwd=gui, env=env, check=True)
-    for name in ("loop_wake.rs", "windows_present.rs", "ui_trace.rs"):
+    for name in ("loop_wake.rs", "windows_present.rs", "ui_trace.rs", "dwm_transitions.rs"):
         shutil.copyfile(HERE / name, gui / "src" / name)
     # Extend the canonical read-only Win32 queries with the comparison's existing timing queries.
     shutil.copyfile(HERE / "win32_clock.rs", gui / "src/win32_clock.rs")
     with (gui / "src/lib.rs").open("a", encoding="utf-8", newline="\n") as library:
         library.write("\nmod win32_clock;\npub use win32_clock::{counter, frequency, thread_id};\n")
+        library.write('#[cfg(all(windows, target_arch = "x86_64"))]\nmod dwm_transitions;\n'
+                      '#[cfg(all(windows, target_arch = "x86_64"))]\npub use dwm_transitions::observe_transitions;\n')
     eframe_source.prepare(gui)
     return gui
 

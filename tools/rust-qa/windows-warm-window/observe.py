@@ -17,6 +17,20 @@ from residency import sample
 from window_lifetime import WindowLifetime
 
 
+def capture_field(shell, root, env, output, hwnd, pid, log, phase):
+    evidence = output / ("field-" + phase + ".json")
+    with (output / ("field-" + phase + ".log")).open("wb") as trace:
+        subprocess.run([shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
+                        "-File", str(QA / "observe-windows-input.ps1"), "-SubjectId", str(pid),
+                        "-WindowHandle", str(hwnd), "-SubjectLog", str(log), "-OutputFile", str(evidence),
+                        "-RecoveryPhase", phase], cwd=root, env=env, stdin=subprocess.DEVNULL,
+                       stdout=trace, stderr=subprocess.STDOUT, check=True, timeout=85)
+    found = json.loads(evidence.read_text(encoding="utf-8-sig"))
+    if found.get("status") != "passed" or found.get("processId") != pid or found.get("windowHandle") != hwnd:
+        raise ValueError("Unverified owned HWND editing observation")
+    return sha(evidence)
+
+
 def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=False, after_reopen=None,
           desktop=None, evidence=None, gdi_frame_observer=None):
     background = name.startswith("background") or name == "absent-tray"
@@ -182,20 +196,10 @@ def drive(api, fixture, binary, output, name, *, single_wake=False, mailbox_two=
             recorder.write(output / ("hosts-" + phase + ".json"), attempts)
             if not shell:
                 raise RuntimeError("The independent UI Automation observer is unavailable")
-            evidence = output / ("field-" + phase + ".json")
             if gdi_frame_observer:
                 window = gdi_frame_observer(hwnd, proc.pid)
                 started = api.clock()
-            with (output / ("field-" + phase + ".log")).open("wb") as trace:
-                subprocess.run([shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
-                                "-File", str(QA / "observe-windows-input.ps1"), "-SubjectId", str(proc.pid),
-                                "-WindowHandle", str(hwnd), "-SubjectLog", str(log), "-OutputFile", str(evidence),
-                                "-RecoveryPhase", phase], cwd=root, env=env, stdin=subprocess.DEVNULL,
-                               stdout=trace, stderr=subprocess.STDOUT, check=True, timeout=85)
-            found = json.loads(evidence.read_text(encoding="utf-8-sig"))
-            if found.get("status") != "passed" or found.get("processId") != proc.pid or found.get("windowHandle") != hwnd:
-                raise ValueError("Unverified owned HWND editing observation")
-            result[phase + "Field"] = sha(evidence)
+            result[phase + "Field"] = capture_field(shell, root, env, output, hwnd, proc.pid, log, phase)
             if gdi_frame_observer:
                 if gdi_frame_observer(hwnd, proc.pid) != window:
                     raise ValueError("The original GUI client geometry changed during field capture")

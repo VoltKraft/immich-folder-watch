@@ -13,6 +13,13 @@ pub(super) fn choose(
     // eframe owns its configured surface. A second unconfigured surface for this same HWND
     // queries the selected adapter's capabilities without allocating another swap chain.
     let window = creation.winit_window()?.clone();
+    #[cfg(target_arch = "x86_64")]
+    if let Some(mode) = std::env::var_os("IFW_QA_DWM_TRANSITIONS") {
+        assert_eq!(std::env::var("IFW_QA_ISOLATED").as_deref(), Ok("1"));
+        assert_eq!(std::env::var("IFW_QA_BENCHMARK").as_deref(), Ok("1"));
+        assert_eq!(generation, 1, "The DWM comparison lost its original device");
+        native_gui_assessment::observe_transitions(&window, &mode);
+    }
     let surface = match render.instance.create_surface(window) {
         Ok(surface) => surface,
         Err(error) => {

@@ -243,6 +243,9 @@ to reconcile project decisions, defaults, and recorded state.
   with observed screen pixels and independent file activity.
   Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)
   to diagnose scan response delays. Compare the ordinary GUI with the same-host WPF limits.
+  For the [Windows x64 transition comparison](tools/rust-qa/windows-warm-window/dwm-transitions.md),
+  retain the per-window API outcome, file and frame timings, and editor pixels
+  alongside the three WPF and ordinary retained trials on the same host.
   Run the [full-view GDI comparison](tools/rust-qa/windows-gdi-present/README.md)
   on the same x64 desktop and retain its real editor pixels, GDI transfers,
   [buffer reuse and map timings](tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer)
