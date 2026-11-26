@@ -868,6 +868,27 @@ has SHA-256 `7fe27b50e5548be94e1f99a2299ce84d42fe60b78b29eb0bbca6f778b478ba73`.
 [x64 measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15143181045) ·
 [ARM64 measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15142177818).
 
+### Ubuntu native results at 3d67a46
+
+Both Ubuntu jobs that verified the installed worker handover also passed the
+desktop assessment. Three Avalonia and three Rust trials on each runner supplied
+the comparison. Both Rust builds met all eleven limits. Visible and hidden
+idle CPU, damage events and rendering events were zero in both Rust medians.
+
+| Native archive | Startup, ms | RSS visible / hidden, MiB | Close / reopen p95, ms | Close / reopen samples during reads |
+| --- | ---: | --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45877580663/artifacts/15148633458) | 223.43 | 124.48 / 124.48 | 0.72 / 0.96 | 87 / 86 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45877580663/artifacts/15147613318) | 207.68 | 120.06 / 120.06 | 0.38 / 0.91 | 90 / 88 |
+
+Every counted Rust request and its response fell within independently observed
+directory activity. Each worker made two inventory passes over 100,000
+synthetic files. Replay verified each native executable’s source receipt and
+recomputed both applications’ medians and the host limits. The detached
+reports in `artifacts/rust/hosted-desktop-storage/45877580663/linux/` have
+SHA-256 `585fdb75693e2efbd22baef83b6b70353d8f8e5d3b2e1d2842f7cad635069be9`
+for x64 and `fa15c7a33c96ef9bb9a1e58b27dd4f11172f861c1ce4479ca7ee032577762e5f`
+for ARM64.
+
 ### Ubuntu native results at e2f161b
 
 Both Ubuntu desktops met all eleven limits in three inventory trials of

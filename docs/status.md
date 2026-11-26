@@ -49,7 +49,10 @@ asset and uploaded only the new PNG. Independent replay checked all
 each architecture. This repeats the Fedora x64 result. Both earlier
 Ubuntu runs at `0bb39bf` had stopped in the Python 3.12 directory-read
 observer. All 24 PR checks outside the separate desktop assessment
-passed at `3d67a46`.
+passed at `3d67a46`. Both Ubuntu desktop jobs also completed successfully.
+Both targets met all eleven resource limits. All 173 x64 and 178 ARM64
+Rust window requests counted during file activity also finished within it.
+[Ubuntu resource measurements](rust/rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
 [Two native Ubuntu archives](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
 [Original observer failure](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
 [PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
