@@ -38,6 +38,37 @@ the calibration reopens, idle intervals, scan requests and successful
 full-frame transfers with the edited screen images. Qualification of a
 shipping renderer requires the three ordinary trials.
 
+### Reusing the mapped readback buffer
+
+In the `5efe1f1` scan the first complete GDI transfer began a median
+50.92 ms after the observer saw the reopened HWND. The transfer and
+flush took 0.14 ms. The ordinary one-frame Mailbox trial on that host
+started its first observed DXGI present after 4.82 ms. At `f155b65` the
+corresponding GDI start was 16.44 ms. These timings locate the delay
+before the blit. The earlier presenter allocated a new 1,024,000-byte
+staging buffer for each 640 × 400 frame. Its logs do not time that
+allocation or the subsequent GPU readback.
+[Earlier Windows measurements](../../../docs/rust/rw02-windows-window.md#native-results-at-5efe1f1).
+
+The GDI root now retains one unmapped buffer on its device. Each frame
+checks it out exclusively. A different width or height replaces it, even
+when padding gives both frames the same byte count. After the submission
+completes, the renderer presents the mapped pixels and fulfills any screen
+capture using those same pixels. It returns the buffer after unmapping
+and successful presentation handling. A root or device rebuild discards
+the slot.
+
+Each `STAGING_COPY` record includes the layout, allocation or reuse, and
+QPC times. The first interval measures checkout or buffer creation. The
+second begins before mapping and ends when the CPU can read the pixels.
+The independent readback matches each full or partial transfer to that
+mapping and reports the allocation count and p95 times for idle, inventory
+and editor trials. A mapped frame that produces no visible transfer earns
+no presentation credit. The scan still requires five complete transfers
+during observed work, each entirely between the original HWND reopening
+and the following close request. Replaying a historical archive requires
+the observer and renderer sources from that run's revision.
+
 Keep `gdi-build.json`, `source.zip`, `compiler.jsonl`, `gdi.exe`, the
 original reports and logs, and `retained-edit/` together under
 `gdi-present/`. Also retain the sibling ordinary build, compiler stream,

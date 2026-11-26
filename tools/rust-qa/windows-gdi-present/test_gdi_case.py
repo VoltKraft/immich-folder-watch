@@ -41,6 +41,29 @@ def calibration():
 
 
 class FrameTests(unittest.TestCase):
+    def test_staging_requires_return_before_reuse_and_binds_each_transfer_to_its_mapping(self):
+        first = ("STAGING_COPY seq=1 reused=0 width=400 height=240 bytes=430080 "
+                 "begin=1 prepared=3 map=4 ready=6 returned=10 transfers=1")
+        second = ("STAGING_COPY seq=2 reused=1 width=400 height=240 bytes=430080 "
+                  "begin=11 prepared=12 map=13 ready=19 returned=22 transfers=0")
+        resized = ("STAGING_COPY seq=3 reused=0 width=399 height=240 bytes=430080 "
+                   "begin=24 prepared=25 map=26 ready=27 returned=29 transfers=0")
+        rows = [line(1,7,9), first, second, resized, "STAGING_END copies=3"]
+        result = gdi.staging_observation("\n".join(rows), 1000)
+        self.assertEqual((result["allocations"], result["reuses"], result["copies"]), (2, 1, 3))
+        self.assertEqual(result["mapAndWaitP95Ms"], 6)
+        for original, replacement in (
+                (second, second.replace("reused=1", "reused=0")),
+                (resized, resized.replace("reused=0", "reused=1")),
+                (first, first.replace("ready=6", "ready=8")),
+                (second, second.replace("begin=11", "begin=8")),
+                (first, first.replace("transfers=1", "transfers=0")),
+                (first, first.replace("bytes=430080", "bytes=422400")),
+                (rows[0], ""),
+                (rows[-1], "STAGING_END copies=2")):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                gdi.staging_observation("\n".join(rows).replace(original, replacement), 1000)
+
     def test_source_and_sequence_are_bound_to_one_gui_and_final_aggregate(self):
         events = [line(1, 6, 8), line(1, 9, 10, "PARTIAL", 0), line(2, 11, 12, "PARTIAL", 240), line(2, 13, 14)]
         raw = receipt(*events, full=2, partial=2)

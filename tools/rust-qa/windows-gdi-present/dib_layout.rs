@@ -4,12 +4,28 @@ use std::io;
 const MAX_EDGE: u32 = 8192;
 const MAX_BYTES: u32 = 32 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Layout {
     pub width: u32,
     pub height: u32,
     pub row_bytes: u32,
     pub mapped_bytes: u32,
+}
+
+/// A readback returns here only after all mapped views are dropped and the buffer is unmapped.
+pub(super) struct ReturnedBuffer<T>(pub Layout, pub T);
+
+impl<T> ReturnedBuffer<T> {
+    pub fn checkout(
+        slot: &mut Option<Self>,
+        layout: Layout,
+        allocate: impl FnOnce() -> T,
+    ) -> (T, bool) {
+        match slot.take().filter(|previous| previous.0 == layout) {
+            Some(previous) => (previous.1, true),
+            None => (allocate(), false),
+        }
+    }
 }
 
 impl Layout {
@@ -96,6 +112,27 @@ impl Order {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reuse_requires_a_returned_buffer_with_the_exact_image_layout() {
+        let original = Layout::new(639, 400, 256).unwrap();
+        let resized = Layout::new(640, 400, 256).unwrap();
+        assert_eq!(original.mapped_bytes, resized.mapped_bytes);
+        let mut slot = None;
+        let (first, reused) = ReturnedBuffer::checkout(&mut slot, original, || 11);
+        assert!(!reused);
+        assert!(slot.is_none());
+        slot = Some(ReturnedBuffer(original, first));
+        let (again, reused) =
+            ReturnedBuffer::checkout(&mut slot, original, || panic!("allocated on reuse"));
+        assert!(reused);
+        assert_eq!(again, 11);
+        slot = Some(ReturnedBuffer(original, again));
+        let (new, reused) = ReturnedBuffer::checkout(&mut slot, resized, || 12);
+        assert!(!reused);
+        assert_eq!(new, 12);
+        assert!(slot.is_none());
+    }
 
     #[test]
     fn includes_copy_padding_and_preserves_visible_extents() {

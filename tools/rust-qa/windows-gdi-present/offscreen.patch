@@ -1,31 +1,37 @@
 --- a/artifacts/gdi/egui-wgpu/src/winit.rs
 +++ b/artifacts/gdi/egui-wgpu/src/winit.rs
-@@ -11,0 +12,16 @@
+@@ -11,0 +12,22 @@
 +#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 +#[path = "gdi_present.rs"]
 +mod gdi_present;
 +
 +#[derive(Default)]
 +struct GdiFrames {
++    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++    staging: gdi_present::Staging,
++    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++    readbacks: u64,
 +    full: u64,
 +    partial: u64,
 +}
 +impl Drop for GdiFrames {
 +    fn drop(&mut self) {
 +        use std::io::Write as _;
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        let _ = writeln!(std::io::stdout().lock(), "STAGING_END copies={}", self.readbacks);
 +        let _ = writeln!(std::io::stdout().lock(), "GDI_PRESENT_END frames={} partial={}", self.full, self.partial);
 +    }
 +}
 +
-@@ -12,0 +29 @@
+@@ -12,0 +35 @@
 +    gdi_frame: Option<GdiFrames>,
-@@ -116,0 +134,5 @@
+@@ -116,0 +140,5 @@
 +        if surface_state.gdi_frame.is_some() {
 +            // This real HWND surface supplies adapter capabilities. The GDI route never
 +            // configures a flip chain or acquires one of its back buffers.
 +            return;
 +        }
-@@ -304,0 +327,7 @@
+@@ -304,0 +333,7 @@
 +        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 +        let gdi_frame = self.render_state.as_ref().and_then(|render| {
 +            gdi_present::selected(viewport_id, &render.adapter, self.support_transparent_backbuffer)
@@ -33,54 +39,79 @@
 +        });
 +        #[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
 +        let gdi_frame = None;
-@@ -308,0 +338 @@
+@@ -308,0 +344 @@
 +                gdi_frame,
-@@ -352,0 +383,4 @@
+@@ -352,0 +389,4 @@
 +        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 +        if surface_state.gdi_frame.is_some() {
 +            gdi_present::check_size(width, height).expect("Invalid dimensions for the GDI readback");
 +        }
-@@ -524 +557,0 @@
+@@ -524 +563,0 @@
 -        let capture = !capture_data.is_empty();
-@@ -552,0 +586,2 @@
+@@ -552,0 +592,2 @@
 +        let gdi = surface_state.gdi_frame.is_some();
 +        let capture = gdi || !capture_data.is_empty();
-@@ -594 +629 @@
+@@ -594 +635 @@
 -        let output_frame = {
 +        let output_frame = (!gdi).then(|| {
-@@ -601 +636 @@
+@@ -601 +642 @@
 -        };
 +        });
-@@ -607,2 +642,3 @@
+@@ -607,2 +648,3 @@
 -            wgpu::CurrentSurfaceTexture::Success(frame) => Some(frame),
 -            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
 +            None => None,
 +            Some(wgpu::CurrentSurfaceTexture::Success(frame)) => Some(frame),
 +            Some(wgpu::CurrentSurfaceTexture::Suboptimal(frame)) => {
-@@ -612 +648 @@
+@@ -612 +654 @@
 -            other => {
 +            Some(other) => {
-@@ -756 +792 @@
+@@ -636,0 +679,2 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        let mut gdi_preparation = None;
+@@ -742,5 +786,15 @@
+-                capture_buffer = Some(capture_state.copy_textures(
+-                    &render_state.device,
+-                    output_frame.as_ref(),
+-                    &mut encoder,
+-                ));
++                #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++                if let Some(frame) = &mut surface_state.gdi_frame {
++                    let (buffer, preparation) = gdi_present::encode_copy(
++                        &render_state.device, &mut encoder, &capture_state.texture, frame,
++                    ).expect("Could not encode the GDI root readback");
++                    capture_buffer = Some(buffer);
++                    gdi_preparation = Some(preparation);
++                }
++                if capture_buffer.is_none() {
++                    capture_buffer = Some(capture_state.copy_textures(
++                        &render_state.device,
++                        output_frame.as_ref(),
++                        &mut encoder,
++                    ));
++                }
+@@ -756 +810 @@
 -        {
 +        let submission = {
-@@ -760,3 +796 @@
+@@ -760,3 +814 @@
 -            render_state
 -                .queue
 -                .submit(core::iter::chain(user_cmd_bufs, [encoded]));
 +            let index = render_state.queue.submit(core::iter::chain(user_cmd_bufs, [encoded]));
-@@ -764 +798,4 @@
+@@ -764 +816,4 @@
 -        };
 +            index
 +        };
 +        #[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
 +        let _ = submission;
-@@ -782,0 +820,12 @@
+@@ -782,0 +838,13 @@
 +            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 +            if let Some(frame) = &mut surface_state.gdi_frame {
 +                let readback = gdi_present::Readback {
 +                    device: render_state.device.clone(),
 +                    submission,
 +                    buffer: capture_buffer,
++                    preparation: gdi_preparation.expect("Missing GDI copy preparation"),
 +                    size: [surface_state.width, surface_state.height],
 +                    format: screen_capture_state.texture.format(),
 +                };

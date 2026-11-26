@@ -23,6 +23,8 @@ from scan import completion_count, coverage
 
 MODE = "GDI_PRESENT_MODE backend=Dx12 device=Cpu"
 FRAME = re.compile(r"GDI_(PRESENT|PARTIAL) frame=(\d+) hwnd=(\d+) tid=(\d+) start=(\d+) end=(\d+) width=(\d+) height=(\d+) lines=(\d+)")
+COPY = re.compile(r"STAGING_COPY seq=(\d+) reused=([01]) width=(\d+) height=(\d+) bytes=(\d+) "
+                  r"begin=(\d+) prepared=(\d+) map=(\d+) ready=(\d+) returned=(\d+) transfers=([01])")
 TARGET = "x86_64-pc-windows-msvc"
 
 
@@ -109,6 +111,58 @@ def no_swapchain(text, pid, frequency):
     if (type(pid) != int or pid <= 0 or type(frequency) != int or frequency <= 0
             or text.splitlines() != ["READY", f"QPC {pid} {frequency}", "COMPLETE"]):
         raise ValueError("A different process or clock, a failed session, or a successful DXGI/D3D9 present was recorded")
+
+
+def staging_observation(text, frequency):
+    """Match each actual transfer to its mapped copy and verify reuse before reporting stage costs."""
+    allocation, reuse, mapping = [], [], []
+    previous_size = previous_return = None
+    transfers = []
+    ended = False
+    for line in text.splitlines():
+        frame = FRAME.fullmatch(line)
+        if frame:
+            if ended or transfers:
+                raise ValueError("Unmatched GDI transfer in the staging timeline")
+            transfers.append(tuple(map(int, frame.groups()[4:8])))
+            continue
+        if not line.startswith("STAGING_"):
+            continue
+        if ended:
+            raise ValueError("Staging continued after shutdown")
+        if line == f"STAGING_END copies={len(mapping)}" and not transfers and reuse:
+            ended = True
+            continue
+        match = COPY.fullmatch(line)
+        if not match:
+            raise ValueError("Invalid staging copy or final count")
+        seq, reused, width, height, size, begin, prepared, map_begin, ready, returned, count = map(int, match.groups())
+        if (seq != len(mapping) + 1 or reused != ((width, height) == previous_size)
+                or not (0 < width <= 8192 and 0 < height <= 8192)
+                or size != ((width * 4 + 255) // 256) * 256 * height or size > 32 * 1024 * 1024
+                or not (0 < begin <= prepared <= map_begin <= ready <= returned)
+                or (previous_return is not None and begin < previous_return) or count != len(transfers)
+                or any(not (ready <= lo <= hi <= returned and (w, h) == (width, height))
+                       for lo, hi, w, h in transfers)):
+            raise ValueError("The staging allocation, layout or native call order differs from its frame")
+        previous_size, previous_return = (width, height), returned
+        (reuse if reused else allocation).append((prepared-begin) * 1000 / frequency)
+        mapping.append((ready-map_begin) * 1000 / frequency)
+        transfers.clear()
+    if not ended:
+        raise ValueError("Missing completed staging timeline")
+    return dict(copies=len(mapping), allocations=len(allocation), reuses=len(reuse),
+                allocationP95Ms=recorder.p95(allocation), checkoutP95Ms=recorder.p95(reuse),
+                mapAndWaitP95Ms=recorder.p95(mapping))
+
+
+def staging_records(out):
+    frequency = json.loads((out / "rust-1-scan-requests.json").read_bytes())["frequency"]
+    if type(frequency) != int or frequency <= 0:
+        raise ValueError("Missing native QPC frequency")
+    return {phase: staging_observation((out / name).read_text(encoding="utf-8"), frequency)
+            for phase, name in (("idle", "rust-1.log"), ("scan", "rust-1-scan.log"),
+                                ("edit", "retained-edit/subject.log"))}
 
 
 def inside(frames, span):
@@ -321,6 +375,8 @@ def measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, to
     drive(api, fixture, gui, out / "retained-edit", "retained-edit", evidence=record["edit"], gdi_frame_observer=observe_root)
     record["nativeTraces"] = {name: sha(out / name) for name in TRACE_FILES}
     record["gdiObserver"] = sha(Path(__file__))
+    record["staging"] = staging_records(out)
+    recorder.write(out / "result.json", record)
     record["checks"] = readback(out, record)
 
 
@@ -329,6 +385,8 @@ TRACE_FILES = ("rust-1.log", "rust-1-idle-presents.log", "rust-1-scan.log", "rus
 
 
 def readback(out, record):
+    if staging_records(out) != record["staging"]:
+        raise ValueError("The original GDI buffer timings or allocation counts changed")
     base = out.parent
     load = lambda path: json.loads(path.read_bytes())
     paired = load(base / "measured/result.json")

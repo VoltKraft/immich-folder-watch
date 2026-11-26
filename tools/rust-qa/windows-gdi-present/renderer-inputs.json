@@ -2,18 +2,18 @@
   "files": {
     "artifacts/gdi/egui-wgpu/src/winit.rs": [
       "3f9f39150119a4ef071ab9e0ed9384edbebad36cc72bc35a90ac1639d165be51",
-      "3282b85b103627d887b4f516e1ed20fcf432faf8e8c07de11bb36e6df99f36ce"
+      "7df4e150a8ff723a0034ba06a01803af2b3c75dc08083ac9c8742a7126d81cad"
     ]
   },
   "copies": {
     "artifacts/gdi/egui-wgpu/src/gdi_present.rs": {
       "source": "gdi_present.rs",
-      "sha256": "2ed0a90a18bc9bedeee8ee6bd771a3070c30daad4e31e2afde2fb3aed639a659"
+      "sha256": "9db522e3ed2a6637781527e073c8a8546e097fa5a09263fa429c16f88a4136d1"
     },
     "artifacts/gdi/egui-wgpu/src/dib_layout.rs": {
       "source": "dib_layout.rs",
-      "sha256": "61e3fbc8499c0fccc1fe6af85327026659f50b1c5328722bffd93327e81476b3"
+      "sha256": "011227c8ffb6beeeeaa6f8e764f60deb4d473d6cfab4fe7da78c5cebedc37c32"
     }
   },
-  "patchSha256": "efcb27639b3ce0a6e1a9108f0dbb789a4b508250e9beb47bd17b31133df4c122"
+  "patchSha256": "1d6eb620ce65fba61cf84bec4cfbcc3bacca1fec31af22612de8f413e3f0aaaf"
 }

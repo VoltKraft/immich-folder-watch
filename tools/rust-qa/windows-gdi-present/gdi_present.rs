@@ -8,7 +8,10 @@ use winit::window::Window;
 
 #[path = "dib_layout.rs"]
 mod dib_layout;
-use dib_layout::{Clip, Layout, Order};
+use dib_layout::{Clip, Layout, Order, ReturnedBuffer};
+
+#[derive(Default)]
+pub(super) struct Staging(Option<ReturnedBuffer<wgpu::Buffer>>);
 
 #[repr(C)]
 struct BitmapInfo {
@@ -255,6 +258,47 @@ pub(super) struct Readback {
     pub buffer: wgpu::Buffer,
     pub size: [u32; 2],
     pub format: wgpu::TextureFormat,
+    pub preparation: Preparation,
+}
+
+pub(super) struct Preparation {
+    begin: i64,
+    end: i64,
+    reused: bool,
+}
+
+/// Encode the same padded texture copy as a normal screenshot into the root's returned buffer.
+pub(super) fn encode_copy(
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+    texture: &wgpu::Texture,
+    frames: &mut super::GdiFrames,
+) -> io::Result<(wgpu::Buffer, Preparation)> {
+    let size = texture.size();
+    let layout = Layout::new(size.width, size.height, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)?;
+    let begin = ticks()?;
+    let (buffer, reused) = ReturnedBuffer::checkout(&mut frames.staging.0, layout, || {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("egui GDI readback"),
+            size: layout.mapped_bytes.into(),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        })
+    });
+    let end = ticks()?;
+    encoder.copy_texture_to_buffer(
+        texture.as_image_copy(),
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(layout.row_bytes),
+                rows_per_image: None,
+            },
+        },
+        size,
+    );
+    Ok((buffer, Preparation { begin, end, reused }))
 }
 
 impl Readback {
@@ -278,6 +322,7 @@ impl Readback {
         }
         let slice = self.buffer.slice(..);
         let (done, result) = mpsc::sync_channel(1);
+        let map_begin = ticks()?;
         slice.map_async(wgpu::MapMode::Read, move |status| {
             let _ = done.try_send(status);
         });
@@ -294,6 +339,8 @@ impl Readback {
             .map_err(io::Error::other)?
             .map_err(io::Error::other)?;
         let mapped = slice.get_mapped_range().map_err(io::Error::other)?;
+        let ready = ticks()?;
+        let before = frames.full + frames.partial;
         let draw = blit(window, layout, order, &mapped, frames);
         // Ordinary screenshot requests receive the same premultiplied RGBA pixels as
         // CaptureState::read_screen_rgba, including for a currently hidden root.
@@ -323,6 +370,19 @@ impl Readback {
                 callback.complete(Arc::clone(&image));
             }
         }
-        draw
+        draw?;
+        frames.staging.0 = Some(ReturnedBuffer(layout, self.buffer));
+        let released = ticks()?;
+        frames.readbacks += 1;
+        writeln!(
+            io::stdout().lock(),
+            "STAGING_COPY seq={} reused={} width={width} height={height} bytes={} begin={} prepared={} map={map_begin} ready={ready} returned={released} transfers={}",
+            frames.readbacks,
+            u8::from(self.preparation.reused),
+            layout.mapped_bytes,
+            self.preparation.begin,
+            self.preparation.end,
+            frames.full + frames.partial - before
+        )
     }
 }

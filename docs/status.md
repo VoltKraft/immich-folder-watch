@@ -39,6 +39,17 @@ archives also reproduced all sixteen C# restarts at `e2f161b`.
 [Recorder](rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget) ·
 [Native backup replay](rust/acceptance.md#native-evidence-matrix).
 
+The earlier Windows x64 full-GDI scan spent a median 50.92 ms from window
+reopen to first full transfer and 0.14 ms in the transfer and flush. The
+private GDI presenter now reuses its readback buffer for frames with the
+same dimensions. The native observer separately times preparation, mapping
+and display. Eleven Python tests, five Rust controls, x64 MSVC-target Clippy
+on Linux and independent source review passed. The twice-reconstructed
+source archive has SHA-256
+`5016b74fe6aab44510535574d4f50d39c0bb57c293a84653581f0bdb797002a4`.
+The effect on native Windows frame timings remains unmeasured.
+[Original measurements and new trial](../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02
