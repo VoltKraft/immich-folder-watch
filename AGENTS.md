@@ -243,6 +243,8 @@ to reconcile project decisions, defaults, and recorded state.
   with observed screen pixels and independent file activity.
   Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)
   to diagnose scan response delays. Compare the ordinary GUI with the same-host WPF limits.
+  Replay the [frame-ready message wait](tools/rust-qa/windows-frame-cost/README.md#one-shot-frame-readiness-in-the-windows-message-loop)
+  against the original close, file reads, DXGI presents and reopened editor on that host.
   For the [Windows x64 transition comparison](tools/rust-qa/windows-warm-window/dwm-transitions.md),
   retain the per-window API outcome, file and frame timings, and editor pixels
   alongside the three WPF and ordinary retained trials on the same host.

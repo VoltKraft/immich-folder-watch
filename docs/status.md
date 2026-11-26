@@ -119,9 +119,11 @@ original HWND. Each leg requires native file reads, completed DXGI presents
 and a visible edit after reopening. The source review, five portable
 regressions and x64 MSVC-target Clippy passed. Replaying the three original
 Mailbox scans at `ead9fb3` found 584, 553 and 585 qualifying reopens
-with complete presents. The effect of the per-window setting still
-requires native execution.
-[Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md) ·
+with complete presents. At `de3eec4` the native workflow and detached
+replay passed. The ordinary and disabled windows closed in 41.40 and
+41.34 ms and reopened in 30.41 and 30.49 ms. Both exceeded the WPF
+limits of 30.71 and 21.94 ms on this host.
+[Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4) ·
 [Native x64 workflow](../.github/workflows/rust-windows-transitions.yaml).
 
 On the `ead9fb3` x64 foreground keyboard trial, the original HWND obtained
@@ -140,6 +142,15 @@ in 257 of 276 reopens. The per-window transition comparison at `de3eec4`
 uses the ordinary DXGI renderer.
 [Windows receipts](rust/rw02-windows-window.md#windows-results-at-0bb39bf) ·
 [Focused native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538844).
+
+In the x64 trace at `0bb39bf`, the observer issued 59 close requests while
+the window thread was already in the DX12 wait that dominated their
+latency. The new private build waits for the next frame inside winit's
+message loop. Offline reconstruction matched all 136 feature rows.
+Seven portable Rust lifecycle tests and the Windows x64 target Clippy
+check passed. Native input, presentation and resource results for this
+new executable are pending.
+[Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
 
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 

@@ -178,10 +178,7 @@ def compiler_units(messages, gui, rows, build):
     return libraries
 
 
-def build(out, base, metadata):
-    if metadata["target"] != TARGET:
-        raise ValueError("The measured regression concerns the native x64 WARP subject")
-    gui, rows, sources = stage(out)
+def paired_inputs(base, gui, sources):
     paired = json.loads((base / "build.json").read_bytes())
     if (paired["compilerInputs"] != sources["ordinaryInputs"] or paired["eframeSource"]["archiveSha256"] != sources["ordinarySource"]
             or sha(base / "eframe-source.zip") != sources["ordinarySource"] or sha(base / "compiler.jsonl") != paired["compilerEvidence"]["sha256"]):
@@ -191,6 +188,14 @@ def build(out, base, metadata):
             or paired["baseFonts"] != {p.name:sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))}
             or paired["fallbackFonts"] != {name:asset["sha256"] for name, asset in approved["fonts"].items()}):
         raise ValueError("The original text sources or fonts differ from the paired native build")
+    return paired
+
+
+def build(out, base, metadata):
+    if metadata["target"] != TARGET:
+        raise ValueError("The measured regression concerns the native x64 WARP subject")
+    gui, rows, sources = stage(out)
+    paired = paired_inputs(base, gui, sources)
     native = subprocess.check_output([sys.executable, str(QA / "check-toolchain.py"), TARGET], env=environment(out), text=True)
     if native.strip() != paired["nativeCompiler"]:
         raise ValueError("Different native compiler")

@@ -274,12 +274,13 @@ def release_outputs(files, expected, app, target):
     return len(libraries) == 1 and relative == set(expected)
 
 
-def compiler_receipt(out, report):
+def compiler_receipt(out, report, *, prefix="diagnostic", receipt_key="diagBuildSha256"):
     base = out.parent
     ordinary = json.loads((base / "build.json").read_bytes())
-    receipt = json.loads((out / "diagnostic-build.json").read_bytes())
+    receipt_path = out / (prefix + "-build.json")
+    receipt = json.loads(receipt_path.read_bytes())
     sources = receipt["source"]
-    binary = out / "diagnostic.exe"
+    binary = out / (prefix + ".exe")
     stream = out / "compiler.jsonl"
     archive = out / "source.zip"
     if (sha(base / "build.json") != report["buildReceipt"] or receipt["pairedBuildSha256"] != report["buildReceipt"]
@@ -289,7 +290,7 @@ def compiler_receipt(out, report):
             or sha(base / "compiler.jsonl") != ordinary["compilerEvidence"]["sha256"]
             or receipt["pairedCompiler"] != ordinary["compilerEvidence"]["sha256"]
             or receipt["compilerSha256"] != sha(stream) or sources["archive"] != sha(archive)
-            or sha(out / "diagnostic-build.json") != report["diagBuildSha256"]
+            or sha(receipt_path) != report[receipt_key]
             or report["binary"] != sha(binary) or report["binary"] == report["pairedBinary"]
             or recorder.pe_machine(binary) != 0x8664
             or sources["ordinaryInputs"] != ordinary["compilerInputs"]

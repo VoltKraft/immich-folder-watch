@@ -149,12 +149,25 @@ class TransitionTests(unittest.TestCase):
         observed = dict(common, dwmObserver={n: sha(dwm.HERE / n) for n in dwm.INPUTS})
         trials = [inventory_trial(ordinary_dir, idx, 1) for idx in range(1, 4)]
         rows = dwm.recorder.comparison(budget["maximums"], dwm.recorder.summarize(trials))
-        save(ordinary_dir / "result.json", dict(common, diagnosticControl=False, trials=trials, comparison=rows))
+        ordinary = dict(common, status="over-budget", diagnosticControl=False, trials=trials, comparison=rows)
+        save(ordinary_dir / "result.json", ordinary)
         checked = dwm.references(out, observed, wpf)
         self.assertEqual(checked["ordinaryThree"]["scan_reopen_p95_ms"], dict(maximum=11, candidate=22, passed=False))
+        experiment = deepcopy(observed)
+        experiment.update(binary="experimental-pe", pairedBinary=binary, scanObserver=experiment.pop("dwmObserver"))
+        experiment["inputs"]["inventory"]["gui"] = experiment["binary"]
+        self.assertEqual(dwm.references(out, experiment, wpf, separate_gui=True), checked)
+        for changes in ({"pairedBinary": "another-control"}, {"binary": binary}):
+            with self.subTest(changes=changes.keys()), self.assertRaises(ValueError):
+                dwm.references(out, {**experiment, **changes}, wpf, separate_gui=True)
         for key, wrong in (("referenceBudgetSha256", "other"), ("run", "wrong"), ("binary", "other subject")):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 dwm.references(out, dict(observed, **{key: wrong}), wpf)
+        for changes in ({"status": "measured-metrics-passed"}, {"status": "error"}, {"trials": trials[:2]}):
+            save(ordinary_dir / "result.json", {**ordinary, **changes})
+            with self.subTest(changes=changes.keys()), self.assertRaises(ValueError):
+                dwm.references(out, observed, wpf)
+        save(ordinary_dir / "result.json", ordinary)
         budget["maximums"]["scan_reopen_p95_ms"] = 99
         save(wpf / "reference-budget.json", budget)
         with self.assertRaisesRegex(ValueError, "frozen"):

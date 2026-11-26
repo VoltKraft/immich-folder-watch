@@ -70,6 +70,7 @@ def main(target, variant="mailbox"):
         "dispatch": ("dispatch", "Mailbox", 1),
         "dwm-transitions": ("dwm-transitions", "Mailbox", 1),
         "frame-cost": ("frame-cost", "Mailbox", 1),
+        "frame-ready": ("frame-ready", "Mailbox", 1),
         "deferred-frame": ("deferred-frame", "Mailbox", 1),
         "gdi-present": ("gdi-present", "GDI", None),
         "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
@@ -95,9 +96,13 @@ def main(target, variant="mailbox"):
             import gdi_build
             import gdi_case
             binary = gdi_build.build(out, base, record)
-        if variant in ("deferred-frame", "frame-cost"):
+        if variant in ("deferred-frame", "frame-cost", "frame-ready"):
             sys.path.insert(0, str(QA / "windows-frame-cost"))
-            if variant == "deferred-frame":
+            if variant == "frame-ready":
+                import frame_ready_build
+                import frame_ready_case
+                binary = frame_ready_build.build(out, base, record)
+            elif variant == "deferred-frame":
                 import deferred_build
                 import deferred_case
                 if target != "x86_64-pc-windows-msvc":
@@ -167,6 +172,12 @@ def main(target, variant="mailbox"):
                     if sha(budget) != before:
                         raise ValueError("The WPF budget changed during the DWM comparison")
                     record["status"] = "dwm-transitions-observed"
+                    return 0
+                if variant == "frame-ready":
+                    frame_ready_case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, budget)
+                    if sha(budget) != before:
+                        raise ValueError("The WPF budget changed during the frame-ready trial")
+                    record["status"] = "frame-ready-recorded"
                     return 0
                 if variant in ("deferred-frame", "gdi-present"):
                     case = gdi_case if variant == "gdi-present" else deferred_case
@@ -243,6 +254,8 @@ if __name__ == "__main__":
                       help="build and trace the additional x64 root-repaint diagnostic after ordinary dispatch")
     mode.add_argument("--deferred-frame", dest="variant", action="store_const", const="deferred-frame",
                       help="compare one native x64 trial with timed redraws on an unready DX12 frame")
+    mode.add_argument("--frame-ready", dest="variant", action="store_const", const="frame-ready",
+                      help="compare a native one-shot frame-ready event with the ordinary Windows x64 GUI")
     mode.add_argument("--gdi-present", dest="variant", action="store_const", const="gdi-present",
                       help="measure the retained egui view rendering offscreen with WARP and presenting through GDI")
     mode.add_argument("--dwm-transitions", dest="variant", action="store_const", const="dwm-transitions",

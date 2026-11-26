@@ -193,10 +193,12 @@ def scan_result(out, idx, mode, row):
     return dict(mode=mode, root=root, editor=view, frames=frames, metrics=scan["metrics"])
 
 
-def references(out, record, baseline):
+def references(out, record, baseline, *, separate_gui=False):
     base = out.parent
     ordinary_path = base / "measured/result.json"
     ordinary = read(ordinary_path)
+    expected_gui = record["pairedBinary"] if separate_gui else record["binary"]
+    common_fields = tuple(k for k in HOST_BUILD if k != "binary")
     fixed = read(baseline / "reference-budget.json")
     wpf = read(baseline / "result.json")
     inputs = read(baseline / "inputs.json")
@@ -206,25 +208,29 @@ def references(out, record, baseline):
     canonical = read(canonical_path)
     if (record["target"] != TARGET or record["presentMode"] != "Mailbox" or record["desiredMaximumFrameLatency"] != 1
             or record["diagnosticControl"] is not True
-            or record["dwmObserver"] != {name: sha(HERE / name) for name in INPUTS}
+            or record["scanObserver" if separate_gui else "dwmObserver"] != {name: sha(HERE / name) for name in INPUTS}
             or record["observerInputs"] != {name: sha(HERE / name) for name in ("measure.py", "frame_latency.py", "inputs.py", "scan_present.py")}
-            or any(ordinary[k] != record[k] for k in (*HOST_BUILD, "referenceBudgetSha256", "observerInputs"))
+            or any(ordinary[k] != record[k] for k in (*common_fields, "referenceBudgetSha256", "observerInputs"))
+            or ordinary["binary"] != expected_gui or ordinary["inputs"]["inventory"]["gui"] != expected_gui
+            or ordinary["status"] not in ("over-budget", "measured-metrics-passed") or len(ordinary["trials"]) != recorder.TRIALS
+            or (separate_gui and expected_gui == record["binary"])
             or ordinary["presentMode"] != "Mailbox" or ordinary["desiredMaximumFrameLatency"] != 1 or ordinary["diagnosticControl"]
             or ordinary["inputs"]["workload"] != record["inputs"]["workload"]
             or any(ordinary["inputs"]["inventory"][k] != record["inputs"]["inventory"][k]
-                   for k in ("gui", "compiledEntry", "approvedBundle", "packages", "sources"))):
+                   for k in ("compiledEntry", "approvedBundle", "packages", "sources"))):
         raise ValueError("The three ordinary trials and the transition pair differ in host, build, workload or observers")
     if (sha(base / "build.json") != record["buildReceipt"]
-            or any(build[k] != record[k] for k in ("binary", "target", "revision", "baseline", "baselineReceipt"))
+            or build["binary"] != expected_gui
+            or any(build[k] != record[k] for k in ("target", "revision", "baseline", "baselineReceipt"))
             or build["variantInputs"] != {name: sha(HERE / name) for name in VARIANT_INPUTS}
             or any(build["compilerInputs"][n] != sha(HERE / n) for n in ("windows_present.rs", "dwm_transitions.rs"))
-            or sha(base / "build/release/native-gui-assessment.exe") != record["binary"]
+            or sha(base / "build/release/native-gui-assessment.exe") != expected_gui
             or sha(art / "gui-build/release/native-gui-assessment.exe") != record["baseline"]
             or sha(canonical_path) != record["baselineReceipt"] or canonical["binarySha256"] != record["baseline"]
             or (canonical["source"], canonical["target"]) != (record["revision"], TARGET)
             or (canonical["lockSha256"], canonical["graphSha256"]) != (build["canonicalLock"], build["canonicalGraph"])
             or build["compilerEvidence"]["application"] != dict(target="native-gui-assessment", crateRoot="src/main.rs",
-                                                                 output="native-gui-assessment.exe", sha256=record["binary"])
+                                                                 output="native-gui-assessment.exe", sha256=expected_gui)
             or sha(base / "compiler.jsonl") != build["compilerEvidence"]["sha256"]
             or sha(base / "eframe-source.zip") != build["eframeSource"]["archiveSha256"]
             or record["inputs"]["inventory"]["gui"] != record["binary"]):
@@ -241,7 +247,8 @@ def references(out, record, baseline):
             or recorder.summarize(wpf["trials"]["wpf"]) != fixed["reference"] or recorder.budgets(fixed["reference"]) != fixed["maximums"]):
         raise ValueError("The three native WPF trials, frozen limits or inventory inputs differ")
     rows = recorder.comparison(fixed["maximums"], recorder.summarize(ordinary["trials"]))
-    if ordinary["comparison"] != rows or any(rows[k]["passed"] is None for k in METRICS):
+    outcome = "over-budget" if any(r["passed"] is False for r in rows.values()) else "measured-metrics-passed"
+    if ordinary["comparison"] != rows or ordinary["status"] != outcome or any(rows[k]["passed"] is None for k in METRICS):
         raise ValueError("The three ordinary trials do not cover the eleven original WPF metrics")
     for idx, row in enumerate(ordinary["trials"], 1):
         name = f"rust-{idx}"

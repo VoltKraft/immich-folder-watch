@@ -177,9 +177,11 @@ both apphosts' logs. The Fedora x64 regression and its independent
 row-by-row readback are recorded in the [installed storage contract](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 The [desktop workflow](../.github/workflows/rust-desktop-assessment.yaml) produced the
 [two native Ubuntu restorations](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
-The four desktop jobs queue by branch and native target. A completed
-Ubuntu lane can start the next revision while Windows measures a previous
-one. Each job uses its own same-host baseline and records its source SHA.
+The four desktop jobs queue by branch and native target. Each target
+retains pending revisions when another push arrives. Ubuntu can start
+its next revision while Windows measures a previous one. Each job uses
+its own same-host baseline and records its source SHA.
+[GitHub Actions concurrency and queue limits](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
 ## Rust feasibility workspace
 
@@ -378,6 +380,14 @@ captures. A complete over-budget reference comparison can supply data for
 this diagnostic. Its recorded limit failures remain part of the stack decision.
 [Window-level API](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute) ·
 [Diagnostic commands and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md).
+
+The same workflow builds a separate Windows x64 executable with
+`--frame-ready`. Its window thread can service input while DXGI is still
+waiting for the next frame. The replay joins the actual close message to an
+observed hide during inventory, and a later redraw to a native presentation
+on the visible window. It reports all eleven resource measurements alongside
+the three ordinary trial medians and frozen WPF limits.
+[Build, replay and retained originals](../tools/rust-qa/windows-frame-cost/README.md#one-shot-frame-readiness-in-the-windows-message-loop).
 
 The WPF recorder queries the shipping tray icon after each idle trial and
 retains the HRESULT and rectangle with the receiver identity.

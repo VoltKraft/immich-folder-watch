@@ -11,6 +11,8 @@ on:
       - '!tools/rust-qa/windows-warm-window/dwm_transitions.py'
       - '!tools/rust-qa/windows-warm-window/test_dwm_transitions.py'
       - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
+      - '!tools/rust-qa/windows-frame-cost/frame*ready*'
+      - '!tools/rust-qa/windows-frame-cost/test_frame_ready.py'
       - 'tools/RustCompatibilityOracle/installed/interop/**'
       - 'tools/RustCompatibilityOracle/installed/launch/**'
       - 'tools/RustCompatibilityOracle/installed/run.py'
@@ -30,7 +32,7 @@ jobs:
     # Each host owns its synthetic profile, same-host baseline and artifacts.
     concurrency:
       group: rust-desktop-assessment-${{ github.ref }}-${{ matrix.target }}
-      cancel-in-progress: false
+      queue: max
     # Each Windows profile uses three independent 100,000-file trials.
     timeout-minutes: ${{ contains(matrix.target, 'windows') && 190 || 95 }}
     strategy:

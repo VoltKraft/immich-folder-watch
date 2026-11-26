@@ -1094,3 +1094,27 @@ keyboard launch passed. An ordinary second launch reopened the original
 window in the background. The application requested foreground and the
 observer found no focus in 41 samples over 2.02 seconds.
 [Windows ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15149575448).
+
+### Closing the window during a DXGI wait
+
+In the x64 frame-cost trace at `0bb39bf`, 59 of the 63 slow closes spent
+at least half their elapsed time in a DX12 frame wait. For all 59 the
+external observer started its close request after the wait began and before
+it returned. In 58 cases the GUI had already presented a frame since the
+preceding reopen. The per-request replay at
+`artifacts/rust/hosted-desktop-storage/45874234228/windows/x64-close-during-wait.json`
+has SHA-256 `1e05f7611ab8453c6634c9451ffa853ebf47e4bb9bd717c4772b6206ba2a93b1`.
+In the separate 16 ms deferred-redraw
+trial, scan close took 14.22 ms against the 16.11 ms limit, while reopening
+took 40.23 ms against 18.97 ms. At `ead9fb3` that policy exceeded both
+limits. [Original x64 trials](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15148738386) ·
+[Earlier comparison](#windows-results-at-ead9fb3).
+
+The one-shot trial registers the configured swapchain's frame-latency
+handle in winit's existing message wait. A pending frame can then yield to
+an actual window close. To demonstrate this, the recorder must observe
+that message before DXGI grants a frame slot, see the original window
+hide during independent file activity and observe a successful resumed
+presentation on the reopened window. The separate executable retains the
+ordinary window transitions and the same synthetic inventory worker.
+[Experiment, controls and commands](../../tools/rust-qa/windows-frame-cost/README.md#one-shot-frame-readiness-in-the-windows-message-loop).

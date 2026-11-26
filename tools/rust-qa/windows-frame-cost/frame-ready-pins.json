@@ -1,0 +1,50 @@
+{
+  "files": {
+    "src/graphics.rs": [
+      "459f1e45a16ed837c3d4015d29129dc897bd24b6c8d52b37a9dbd8b82d6aaaeb",
+      "c2a4cb14b074e9f11c5b0243a239aa9290c19652299ed230d3d7d34392cc457b"
+    ],
+    "src/main.rs": [
+      "0fd4f8b218ee3807b737d6220114dac3a6d96e0946495b72461da59b8148948c",
+      "4f78b6e6b8e67f5c5c337d3c156d9fe6827898098824be1e76dc16eb75b8828d"
+    ],
+    "src/native_window.rs": [
+      "e0138d08a17335801ff00372841060acae2e6371edbb07340563f58b0d9c20e8",
+      "778d33932b744cb0a172b29125b464d87a16feaf53d0a176125ca8d64ed750dc"
+    ],
+    "artifacts/cost/ifw-frame-timing/src/lib.rs": [
+      "4e77ab15cab9c7296338e02ab793ce0aecf19aaecb8aa891633514ce777fba17",
+      "767ad2502dae30c26d784f7c93db7e2b20b6097d6cf857b188c174b7a0898975"
+    ],
+    "artifacts/cost/egui-wgpu/src/winit.rs": [
+      "9f18a68875268389ad72a49a93f4d63868c2156926bb0cc190f90fe0ecc6bd1b",
+      "804f6280b1428d59c73372733e0f2e13f12e8b1f78b7c29f6218685177cd31b2"
+    ],
+    "artifacts/retained/eframe/src/native/wgpu_integration.rs": [
+      "3ee72a452d08260907351f95532c9da34c4204c9f37de9508436c6fcc536f03d",
+      "a2d3d7cf482af8241776759afb45f618e1d5048ed37737ae1e9980060e73feb3"
+    ],
+    "artifacts/retained/winit/src/platform_impl/windows/event_loop.rs": [
+      "d88d69413291f83a371f7283ae8db52ceac2a600a67f3aa96167d23de2b6e211",
+      "f9dd024c3c7c1412bb66a9b1175f1b74b03b2156aa2ca618f0ae35ac11f7af62"
+    ]
+  },
+  "libraries": {
+    "eframe": {
+      "files": 36,
+      "sha256": "9af90024b25ed6140f2596972ab6f6ddbccf6addb7a8d8fd795d8f9aa34f21ca"
+    },
+    "winit": {
+      "files": 217,
+      "sha256": "18bff457fa661a789b72f6f043fe68eadc71bd3bff0d27c3a1328c4a71b0d6fa"
+    },
+    "egui-wgpu": {
+      "files": 12,
+      "sha256": "4d1f12f49de0085fd7fda67db1c6ab2da78554f14406ce0f70bb5bb6f89402aa"
+    },
+    "ifw-frame-timing": {
+      "files": 4,
+      "sha256": "56cc5d4b8637c041147d91733be689980cd35739e59d7647fd42f60cbe34187f"
+    }
+  }
+}

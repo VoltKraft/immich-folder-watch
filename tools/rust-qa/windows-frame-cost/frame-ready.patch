@@ -1,0 +1,255 @@
+--- a/src/graphics.rs
++++ b/src/graphics.rs
+@@ -82,7 +82,8 @@
+         #[cfg(target_os = "windows")]
+         {
+             let original = Arc::clone(&setup.device_descriptor);
+-            let dx12 = &setup.instance_descriptor.backend_options.dx12;
++            let dx12 = &mut setup.instance_descriptor.backend_options.dx12;
++            dx12.latency_waitable_object = wgpu::Dx12UseFrameLatencyWaitableObject::DontWait;
+             println!(
+                 "GRAPHICS_DX12_WAIT generation={} policy={:?}",
+                 self.generation, dx12.latency_waitable_object
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -454,6 +454,7 @@
+     if std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1") {
+         return Err("Use the synthetic isolated native QA launcher".into());
+     }
++    let _ready_evidence = ifw_frame_timing::frame_ready::Session::start();
+     let background = match std::env::args().nth(1).as_deref() {
+         Some("--background") => true,
+         #[cfg(windows)]
+--- a/src/native_window.rs
++++ b/src/native_window.rs
+@@ -94,6 +94,7 @@
+     fn hide(&self, window: &Window) {
+         #[cfg(target_os = "windows")]
+         {
++            ifw_frame_timing::frame_ready::cancel_window(u64::from(window.id()));
+             self.hidden_root.store(true, Ordering::Relaxed);
+             crate::ui_trace::visibility(window, false);
+         }
+@@ -201,6 +202,7 @@
+                 }
+                 #[cfg(target_os = "windows")]
+                 WindowEvent::Destroyed => {
++                    ifw_frame_timing::frame_ready::cancel_window(u64::from(id));
+                     event_loop.exit();
+                     return;
+                 }
+--- a/artifacts/cost/ifw-frame-timing/src/lib.rs
++++ b/artifacts/cost/ifw-frame-timing/src/lib.rs
+@@ -6,6 +6,7 @@
+ use std::rc::Rc;
+ use std::sync::{Mutex, OnceLock};
+ 
++pub mod frame_ready;
+ mod window_messages;
+ pub use window_messages::{default_proc, wndproc};
+ 
+--- a/artifacts/cost/egui-wgpu/src/winit.rs
++++ b/artifacts/cost/egui-wgpu/src/winit.rs
+@@ -11,6 +11,8 @@
+ use std::sync::Arc;
+ 
+ struct SurfaceState {
++    // Retire the wait registration before the original swapchain is dropped.
++    ifw_gate: ifw_frame_timing::frame_ready::SurfaceGate,
+     surface: wgpu::Surface<'static>,
+     alpha_mode: wgpu::CompositeAlphaMode,
+     width: u32,
+@@ -78,6 +80,57 @@
+         }
+     }
+ 
++    /// Register the configured CPU swapchain before a full root pass consumes input or textures.
++    pub fn ifw_root_frame_deadline(
++        &mut self,
++        id: ViewportId,
++        window: &Arc<winit::window::Window>,
++    ) -> std::io::Result<Option<std::time::Instant>> {
++        use std::io::Error;
++        use std::os::windows::io::BorrowedHandle;
++
++        let state = self.surfaces.get_mut(&id).ok_or_else(|| Error::other("Missing root surface"))?;
++        let render = self.render_state.as_ref().ok_or_else(|| Error::other("Missing root renderer"))?;
++        let adapter = render.adapter.get_info();
++        if adapter.backend != wgpu::Backend::Dx12 || adapter.device_type != wgpu::DeviceType::Cpu {
++            return Err(Error::other("The frame-ready trial requires a DX12 CPU adapter"));
++        }
++        if state.needs_recreate || state.needs_reconfigure
++            || self.config.surface.present_mode != wgpu::PresentMode::Mailbox
++        {
++            state.ifw_gate.invalidate();
++            return Ok(None);
++        }
++        if self.config.surface.desired_maximum_frame_latency != Some(1) {
++            return Err(Error::other("The frame-ready trial requires Mailbox depth one"));
++        }
++        let hwnd = u64::from(window.id());
++        let weak = Arc::downgrade(window);
++        state.ifw_gate.admit(
++            hwnd,
++            std::time::Instant::now(),
++            || {
++                // The UI thread exclusively owns this configured SurfaceState. The HAL guard and
++                // swapchain remain alive until the zero-time probe and optional DuplicateHandle return.
++                let surface = unsafe { state.surface.as_hal::<wgpu::hal::api::Dx12>() }
++                    .ok_or_else(|| Error::other("No DX12 root surface"))?;
++                let handle = unsafe { surface.waitable_handle() }
++                    .filter(|handle| !handle.is_invalid())
++                    .ok_or_else(|| Error::other("Missing configured frame-latency handle"))?;
++                ifw_frame_timing::frame_ready::probe(unsafe { BorrowedHandle::borrow_raw(handle.0) })
++            },
++            move || {
++                if let Some(root) = weak.upgrade()
++                    && root.is_visible() == Some(true)
++                {
++                    root.request_redraw();
++                } else {
++                    ifw_frame_timing::frame_ready::cancel_window(hwnd);
++                }
++            },
++        )
++    }
++
+     /// Get the [`RenderState`].
+     ///
+     /// Will return [`None`] if the render state has not been initialized yet.
+@@ -104,17 +157,19 @@
+ 
+         #[expect(clippy::iter_over_hash_type)]
+         for surface in self.surfaces.values_mut() {
++            surface.ifw_gate.invalidate();
+             surface.needs_reconfigure = true;
+         }
+     }
+ 
+     fn configure_surface(
+-        surface_state: &SurfaceState,
++        surface_state: &mut SurfaceState,
+         render_state: &RenderState,
+         config: &SurfaceConfig,
+     ) {
+         profiling::function_scope!();
+ 
++        surface_state.ifw_gate.invalidate();
+         let SurfaceConfig {
+             present_mode,
+             desired_maximum_frame_latency,
+@@ -306,6 +361,7 @@
+         self.surfaces.insert(
+             viewport_id,
+             SurfaceState {
++                ifw_gate: Default::default(),
+                 surface,
+                 width,
+                 height,
+@@ -799,7 +855,7 @@
+             // wgpu doesn't document where vsync can happen. Maybe here?
+             let start = web_time::Instant::now();
+             let present = ifw_frame_timing::span("present", 0);
+-            render_state.queue.present(output_frame);
++            surface_state.ifw_gate.present(|| render_state.queue.present(output_frame));
+             drop(present);
+             vsync_sec += start.elapsed().as_secs_f32();
+         }
+--- a/artifacts/retained/eframe/src/native/wgpu_integration.rs
++++ b/artifacts/retained/eframe/src/native/wgpu_integration.rs
+@@ -712,6 +712,13 @@
+             let Some(egui_winit) = egui_winit.as_mut() else {
+                 return Ok(EventResult::Wait);
+             };
++            if viewport_id == ViewportId::ROOT && mode == PassMode::Full && is_visible
++                && window.is_visible() == Some(true)
++                && let Some(deadline) = painter.ifw_root_frame_deadline(viewport_id, window)
++                    .map_err(|err| crate::Error::AppCreation(Box::new(err)))?
++            {
++                return Ok(EventResult::RepaintAt(window.id(), deadline));
++            }
+             let mut raw_input = egui_winit.take_egui_input(window);
+ 
+             let show_ui = mode == PassMode::Full
+--- a/artifacts/retained/winit/src/platform_impl/windows/event_loop.rs
++++ b/artifacts/retained/winit/src/platform_impl/windows/event_loop.rs
+@@ -689,6 +689,7 @@
+     control_flow: ControlFlow,
+     timeout: Option<Duration>,
+ ) {
++    let frame_ready = ifw_frame_timing::frame_ready::wait_lease();
+     let timeout = {
+         let control_flow_timeout = match control_flow {
+             ControlFlow::Wait => None,
+@@ -699,7 +700,7 @@
+             },
+         };
+         let timeout = min_timeout(timeout, control_flow_timeout);
+-        if timeout == Some(Duration::ZERO) {
++        if timeout == Some(Duration::ZERO) && frame_ready.is_none() {
+             // Do not wait if we don't have time.
+             return;
+         }
+@@ -709,10 +710,11 @@
+             .map(|t| t.min(FIFTY_DAYS))
+             // If timeout is less than minimally supported by Windows,
+             // increase it to that minimum. Who want less than microsecond delays anyway?
+-            .map(|t| t.max(MIN_WAIT))
++            .map(|t| if t.is_zero() { t } else { t.max(MIN_WAIT) })
+     };
+ 
+-    if timeout.is_some() && high_resolution_timer.is_none() {
++    let timer_timeout = timeout.filter(|t| !t.is_zero());
++    if timer_timeout.is_some() && high_resolution_timer.is_none() {
+         *high_resolution_timer = create_high_resolution_timer();
+     }
+ 
+@@ -720,7 +722,7 @@
+         high_resolution_timer.as_ref().map(OwnedHandle::as_raw_handle);
+ 
+     let use_timer: bool;
+-    if let (Some(handle), Some(timeout)) = (high_resolution_timer, timeout) {
++    if let (Some(handle), Some(timeout)) = (high_resolution_timer, timer_timeout) {
+         let res = unsafe {
+             // Safety: handle can be Some only if we succeeded in creating high resolution
+             // timer. We properly clamped timeout so it can be used as argument
+@@ -745,18 +747,27 @@
+         //  2. We failed to get and set high resolution timer and we need something instead of it.
+         let wait_duration_ms = timeout.map(dur2timeout).unwrap_or(INFINITE);
+ 
+-        let (num_handles, raw_handles) =
+-            if use_timer { (1, [high_resolution_timer.unwrap()]) } else { (0, [ptr::null_mut()]) };
++        let mut raw_handles = [ptr::null_mut(); 2];
++        let mut num_handles = usize::from(use_timer);
++        if use_timer {
++            raw_handles[0] = high_resolution_timer.unwrap();
++        }
++        if let Some(frame) = &frame_ready {
++            raw_handles[num_handles] = frame.handle();
++            num_handles += 1;
++        }
+ 
+         // We must use `QS_ALLINPUT` to wake on accessibility messages.
+         let result = MsgWaitForMultipleObjectsEx(
+-            num_handles,
++            num_handles as u32,
+             raw_handles.as_ptr() as *const _,
+             wait_duration_ms,
+             QS_ALLINPUT,
+             MWMO_INPUTAVAILABLE,
+         );
+-        if result == WAIT_FAILED {
++        if let Some(frame) = frame_ready {
++            frame.returned(result, use_timer).expect("Frame-ready root message wait failed");
++        } else if result == WAIT_FAILED {
+             // Well, nothing smart to do in such case.
+             // Treat it as spurious wake up.
+             tracing::warn!("Failed to MsgWaitForMultipleObjectsEx: error code {}", GetLastError(),);
+@@ -1252,6 +1263,7 @@
+ 
+         WM_CLOSE => {
+             use crate::event::WindowEvent::CloseRequested;
++            ifw_frame_timing::frame_ready::native_close(window as usize as u64);
+             userdata.send_event(Event::WindowEvent {
+                 window_id: RootWindowId(WindowId(window)),
+                 event: CloseRequested,
