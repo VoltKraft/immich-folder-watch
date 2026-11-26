@@ -18,15 +18,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: rust-desktop-assessment-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   assess:
     if: github.ref == 'refs/heads/rewrite/rust'
     name: Native assessment (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
+    # Each host owns its synthetic profile, same-host baseline and artifacts.
+    concurrency:
+      group: rust-desktop-assessment-${{ github.ref }}-${{ matrix.target }}
+      cancel-in-progress: false
     # Each Windows profile uses three independent 100,000-file trials.
     timeout-minutes: ${{ contains(matrix.target, 'windows') && 190 || 95 }}
     strategy:

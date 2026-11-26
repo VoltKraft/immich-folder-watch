@@ -176,6 +176,9 @@ SQLite main file and WAL, returned backup, restarted database and
 both apphosts' logs. The Fedora x64 regression and its independent
 row-by-row readback are recorded in the [installed storage contract](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 The [desktop workflow](../.github/workflows/rust-desktop-assessment.yaml) owns the Ubuntu runs.
+The four desktop jobs queue by branch and native target. A completed
+Ubuntu lane can start the next revision while Windows measures a previous
+one. Each job uses its own same-host baseline and records its source SHA.
 
 ## Rust feasibility workspace
 
