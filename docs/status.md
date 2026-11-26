@@ -155,6 +155,17 @@ budget. Native input, presentation and resource results for this new
 executable are pending.
 [Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
 
+The installed Windows second-launch trial now uses the original 3.0.4
+MSI in an existing hosted session. The prepared Rust variant can receive
+the shipping application's ordinary launch while its inventory worker
+runs. The test follows the original HWND and the same worker through a
+new file read, then checks the uninstall. Local PowerShell controls passed
+for the empty initial state, package identity and cleanup. Seven Python
+controls passed. Detached replay verified the original installation and
+removal logs for 439 x64 and 438 ARM64 installed files. Native x64 and
+ARM64 activation observations for this pairing are pending.
+[Installed Windows activation](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

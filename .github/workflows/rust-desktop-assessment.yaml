@@ -13,6 +13,7 @@ on:
       - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
       - '!tools/rust-qa/windows-frame-cost/frame*ready*'
       - '!tools/rust-qa/windows-frame-cost/test_frame_ready.py'
+      - '!tools/rust-qa/windows-msi-interop/**'
       - 'tools/RustCompatibilityOracle/installed/interop/**'
       - 'tools/RustCompatibilityOracle/installed/launch/**'
       - 'tools/RustCompatibilityOracle/installed/run.py'

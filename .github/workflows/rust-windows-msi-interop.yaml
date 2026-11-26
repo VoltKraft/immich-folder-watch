@@ -1,0 +1,94 @@
+name: Rust Windows installed application activation
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-msi-interop.yaml'
+      - 'tools/rust-qa/windows-msi-interop/**'
+      - '!tools/rust-qa/windows-msi-interop/**/*.md'
+      - 'tools/rust-qa/gui/src/windows_launcher.rs'
+      - 'tools/rust-qa/windows-performance/native.py'
+      - 'tools/rust-qa/windows-inventory/subject.py'
+      - 'tools/rust-qa/windows-inventory/file-observer.cpp'
+      - 'tools/rust-qa/performance/worker-inputs.json'
+      - 'tools/RustCompatibilityOracle/installed/run.py'
+      - 'tools/RustCompatibilityOracle/installed/windows.ps1'
+      - 'tools/RustCompatibilityOracle/installed/release.json'
+      - 'packaging/windows/Test-InstallerUpgradeContract.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activation:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Installed Windows activation (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-2025, arch: x64, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+      NATIVE_ARCH: ${{ matrix.arch }}
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned native Rust compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Reconstruct the inventory worker dependencies and canonical GUI
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Build the ordinary retained Rust GUI
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Check installed product ownership and activation readback
+        shell: pwsh
+        run: |
+          ./tools/rust-qa/windows-msi-interop/test_install.ps1
+          Push-Location tools/rust-qa/windows-msi-interop
+          python -B -m unittest test_msi_interop
+          exit $LASTEXITCODE
+
+      - name: Launch the installed shipping application while the Rust window is hidden
+        id: activation
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-msi-interop/run.py $env:NATIVE_TARGET
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-msi-interop/readback.py "artifacts/rust/windows-msi-interop/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Retain the original package, activation and cleanup observations
+        if: ${{ !cancelled() && steps.activation.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-windows-msi-activation-${{ matrix.arch }}-${{ github.sha }}
+          path: artifacts/rust/windows-msi-interop/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14

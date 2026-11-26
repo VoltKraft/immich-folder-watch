@@ -67,6 +67,45 @@ The legacy writer ignored the new lock on every target. Cross-session ownership
 for the same Windows SID and prevention of legacy restarts during installed
 handover remain open.
 
+### Ordinary launch of the installed Windows application with Rust running
+
+The earlier native tests covered both message directions using the pinned
+shipping coordinator. Separate trials exercised WPF-to-WPF and Rust-to-Rust
+window activation. The original MSI install, repair and removal trials
+kept the application stopped at their package checkpoints.
+[Four-target coordinator](#native-results-on-all-four-targets) ·
+[Ordinary WPF and Rust launches](#retained-windows-second-launches-at-989bb33) ·
+[Original packages](rw01-installed-packages.md).
+
+The Windows MSI comparison starts a private Rust build in one existing
+session of the hosted installer account and then launches the installed
+3.0.4 executable with no arguments. The installer requires an elevated
+runner on both architectures.
+The Rust primary uses the shipping single-instance names and authenticates
+the second process. The observer follows the original hidden HWND, the
+actual installed process, and the inventory worker through the reopen.
+The watch directory is initially empty. The observer then makes a new
+`.jpg` name visible and checks the same worker's subsequent file reads.
+The installer must verify
+and remove its own product on the disposable runner.
+[Native x64 and ARM64 workflow](../../.github/workflows/rust-windows-msi-interop.yaml).
+
+Detached replay uses Python and PowerShell 7 on `PATH`. It checks the
+original installer logs against the recorded package identity and the
+completed install and removal actions. This reader reproduced both
+transactions from each architecture's original 3.0.4 package archive
+at `5b6cebf`. The installed and repaired apphost digests matched on each
+architecture. The local result at
+`artifacts/rust/hosted-windows-msi-interop/first-shipping-log-replay.json`
+has SHA-256 `b6b87b3c044c3824bef539e11b80cbdc85e723970c3b9939dc0ee98e35fdc3a3`.
+[x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15141724559) ·
+[ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15142827580).
+
+This trial covers the installed WPF secondary with Rust already running.
+Starting Rust while an installed WPF primary is active, writer exclusion
+across sessions, and an upgrade that prevents an old worker from restarting
+have separate acceptance requirements.
+
 ### Shipping Flatpak and Rust probe in two installed refs
 
 On two private Fedora x64 X11 desktops the original, signature-verified

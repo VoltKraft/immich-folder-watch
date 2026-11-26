@@ -183,6 +183,15 @@ its next revision while Windows measures a previous one. Each job uses
 its own same-host baseline and records its source SHA.
 [GitHub Actions concurrency and queue limits](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
+The Windows installed-application comparison uses a fresh hosted desktop
+per architecture. It starts the retained Rust feasibility GUI as the
+primary, hides its original window and launches the installed .NET 3.0.4
+executable with its normal command line. The expected observations are the
+original HWND reopening and the same inventory worker reading a new
+synthetic file. The [native workflow](../.github/workflows/rust-windows-msi-interop.yaml)
+builds the Rust variant privately and retains the package and cleanup observations.
+[Same-session scope](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running).
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

@@ -1113,7 +1113,7 @@ limits. [Original x64 trials](https://github.com/VoltKraft/immich-folder-watch/a
 The one-shot trial registers the configured swapchain's frame-latency
 handle in winit's existing message wait. A pending frame can then yield to
 an actual window close. To demonstrate this, the recorder must observe
-that message before DXGI grants a frame slot, see the original window
+that message before the window thread consumes the DXGI frame signal, see the original window
 hide during independent file activity and observe a successful resumed
 presentation on the reopened window. The separate executable retains the
 ordinary window transitions and the same synthetic inventory worker.

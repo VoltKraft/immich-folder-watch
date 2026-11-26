@@ -20,6 +20,12 @@ visible edits. Keep the ordinary window policy. The next comparison tests
 whether the window thread can handle a close during its DXGI frame wait.
 [Native comparison and originals](../../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4).
 
+The installed Noble backport completed the requested Ubuntu package
+feasibility trial. The user left distribution and ongoing package
+maintenance undecided. The stock portal's refusal to lock a file still
+affects the operating requirements for a candidate on that system.
+[Installed upgrade, contention and rollback](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest).
+
 At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
 Windows jobs ended before a complete comparison. The x64 scan that did
 finish exceeded both window-response limits. The Windows contrast adapter
