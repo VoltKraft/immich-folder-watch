@@ -158,17 +158,13 @@ eleven WPF limits. During the scan its p95 close and reopen were 22.03 and
 [Native one-shot result](rust/rw02-windows-window.md#one-shot-frame-readiness-on-windows-x64-at-c52da2d).
 [Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
 
-The installed Windows second-launch trial now uses the original 3.0.4
-MSI in an existing hosted session. The prepared Rust variant can receive
-the shipping application's ordinary launch while its inventory worker
-runs. The test follows the original HWND and the same worker through a
-new file read, then checks the uninstall. Local PowerShell controls passed
-for the empty initial state, package identity and cleanup. Seven Python
-controls passed. Detached replay verified the original installation and
-removal logs for 439 x64 and 438 ARM64 installed files. Native x64 and
-ARM64 activation observations for this pairing are pending in the
-[native run at `1d3af9a`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45893039720).
-[Installed Windows activation](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running).
+At `1d3af9a`, starting the installed Windows 3.0.4 application reopened
+the original Rust window on x64 and ARM64. Each inventory worker kept its
+identity and read the new synthetic file on two successive passes.
+Both Rust jobs drained on Quit. Both original MSIs uninstalled cleanly.
+Independent replay verified the two archives. The ARM64 foreground request
+was declined even though the window became visible.
+[Native activation, file observations and installer receipts](rust/rw02-instance.md#installed-windows-secondary-at-1d3af9a).
 
 The reverse Windows trial starts the installed WPF application first and
 launches Rust while the original WPF window is hidden. The observer saves

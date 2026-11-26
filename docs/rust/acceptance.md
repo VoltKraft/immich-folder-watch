@@ -64,6 +64,14 @@ remains an RW-07 requirement.
 [Native Ubuntu handover](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
 [Fedora handover and earlier Ubuntu failure](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 
+At `1d3af9a` a normal start of the installed WPF 3.0.4 executable on
+Windows x64 and ARM64 reopened the retained Rust primary in the same
+session. Each original Rust inventory worker read the new file twice.
+Both installations were removed. On ARM64 the foreground request was
+declined. The other start order and standard-user cross-session writer
+exclusion have separate checks.
+[Native Windows activation and independent readbacks](rw02-instance.md#installed-windows-secondary-at-1d3af9a).
+
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known
 values retain their own anchors when later unknown properties reuse a

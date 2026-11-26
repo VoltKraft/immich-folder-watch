@@ -101,6 +101,33 @@ has SHA-256 `b6b87b3c044c3824bef539e11b80cbdc85e723970c3b9939dc0ee98e35fdc3a3`.
 [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15141724559) ·
 [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15142827580).
 
+### Installed Windows secondary at 1d3af9a
+
+Both original 3.0.4 packages reopened the hidden Rust window at
+`1d3af9af152c9ad82c4c2d21664464cd21d7312e`. The observer matched
+the installed WPF process to the IPC connection. Its secondary process
+exited zero without descendants. ETW then recorded the same Rust worker
+reading the newly introduced file during two successive inventory passes.
+The file was changed on pass 2 and stable on pass 3.
+
+| Native host | Original HWND | WPF secondary / Rust primary PID | Worker PID | Reopen after resume | Time between file reads |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Windows x64 | 262530 | 980 / 5448 | 7344 | 93 ms | 5.001 s |
+| Windows ARM64 | 262168 | 6300 / 5248 | 5544 | 437 ms | 5.009 s |
+
+Both original windows became visible. Windows accepted the separate
+foreground request on x64 and declined it on ARM64. Control-Q drained
+the Rust job on both hosts. Both MSIs installed and uninstalled with
+exit 0. The hosted scratch directories and synthetic profiles were removed.
+Each archive contains 19 CRC-verified entries. Detached readback from the
+measured commit verified the native compilation, installer logs, window,
+process and kernel file observations.
+
+| Native archive | ZIP SHA-256 |
+| --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45893039720/artifacts/15153695057) | `c601576fdfc9e10ceb327b268185a9eef1093978094fe281698c63e1b100bdfc` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45893039720/artifacts/15153312140) | `57f7034e6d42c4503e445212a303a0305eb09903df7f7490d656f8c4167ad85d` |
+
 ### Rust second launch while the installed Windows application is running
 
 The reverse trial starts the installed WPF GUI on a separate disposable
