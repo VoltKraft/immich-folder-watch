@@ -229,6 +229,17 @@ python -B tools/rust-qa/windows-msi-interop/upload/run.py TARGET --rust-backup a
 python -B tools/rust-qa/windows-msi-interop/upload/readback.py artifacts/rust/windows-msi-interop/upload/TARGET
 ```
 
+A third workflow job uses a fresh Windows ARM64 runner and sets
+`TRIAL_VARIANT=arm64-private-input`. It adds `--private-input-desktop`
+to the installed worker run and its readback. After the MSI installation,
+the supervisor retains the original input desktop and selects a newly
+created desktop in the same session. Both installed WPF processes and
+the two native Quit helpers start on that desktop. A complete result
+requires the original WPF roots, actual Quit selections, empty jobs,
+both uploads and return to the original unlocked console. This trial
+measures installed worker recovery. The two ordinary console jobs and
+the [Explorer tests](rust/rw02-windows-services.md) retain their own results.
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

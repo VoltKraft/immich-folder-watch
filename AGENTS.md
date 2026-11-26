@@ -293,6 +293,9 @@ to reconcile project decisions, defaults, and recorded state.
   on its own runner and retain the original WPF activation evidence before Quit.
   For the [installed Windows worker backup](docs/development.md#installed-windows-worker-backup),
   preserve the original main/WAL pair and both WPF processes' PNG requests.
+  The additional ARM64 private-desktop trial must bind both installed
+  processes and Quit helpers to its desktop and verify return to the
+  original unlocked console.
   The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
   For [native Ubuntu launch trials](docs/rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64),
   retain the signed application and both runtime receipts with the original

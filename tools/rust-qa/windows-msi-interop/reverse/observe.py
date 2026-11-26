@@ -71,7 +71,7 @@ def owned_root(windows, hwnd, pid, tid=None):
     return int(thread)
 
 
-def invoke_quit(launch, api, windows, primary, out, row):
+def invoke_quit(launch, api, windows, primary, out, row, *, start_helper=None):
     from native import wpf_tray_receiver
     receiver = wpf_tray_receiver(primary.pid)
     if not receiver or receiver[1] != row["root"]["tid"] or primary.poll() is not None:
@@ -86,10 +86,13 @@ def invoke_quit(launch, api, windows, primary, out, row):
     pwsh = shutil.which("pwsh")
     if not pwsh:
         raise ValueError("The installed test runner needs PowerShell 7 for the original Quit helper")
-    subprocess.run([pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
-                    "-ProcessId", str(primary.pid), "-Created", str(row["primary"]["created"]),
-                    "-Receiver", str(hwnd), "-Root", str(root), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"],
-                   cwd=out, check=True, timeout=35, creationflags=subprocess.CREATE_NO_WINDOW)
+    command = [pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
+               "-ProcessId", str(primary.pid), "-Created", str(row["primary"]["created"]), "-Receiver", str(hwnd),
+               "-Root", str(root), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"]
+    if start_helper is None:
+        subprocess.run(command, cwd=out, check=True, timeout=35, creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        start_helper(api, row, command, out)
     code = launch.wait_for_exit(primary, windows.pump, 30)
     if code:
         raise ValueError(f"The shipping WPF Quit command exited with {code}")

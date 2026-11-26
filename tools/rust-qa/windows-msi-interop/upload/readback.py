@@ -6,6 +6,7 @@ from pathlib import Path, PureWindowsPath
 
 from shared import INSTALLED, TARGETS, backup, configuration, endpoint_port, module, observer_sources, peer, read, require, sha
 from database import main_rows, replay_pair
+import private_desktop
 from owners import decode_connection
 from msi_evidence import payload_details, verify_transactions
 from reverse.evidence import engine_lines, shutdown
@@ -136,10 +137,17 @@ def verify(out, report, live_only):
             and 512 <= page_size <= 65536 and not page_size & (page_size - 1)
             and frames > 0 and not rest, "Malformed original WAL")
     result = dict(liveBackup=sha(returned), walFrames=frames, firstAsset=peer.ASSET_ID)
+    private = report.get("desktopMode")
+    require(private in (None, private_desktop.MODE) and bool(private) == ("privateRoot" in first)
+            == (out / "private-desktop.json").is_file(), "Different desktop selection for the installed worker")
     if live_only:
+        if private:
+            result["desktop"] = private_desktop.replay(out, report, first, [])
         return result
     row = read(out / "upload-observation.json")
     original, second = row["original"], row["restored"]
+    if private:
+        result["desktop"] = private_desktop.replay(out, report, first, [original, second])
     process_image(second, installed, machine)
     require(row["status"] == "observed" and all(original[k] == v for k,v in first.items())
             and second["primary"]["created"] > first["primary"]["created"]
@@ -188,8 +196,10 @@ def verify(out, report, live_only):
     return dict(**result, secondAsset=backup.NEW_ID, rowIds=[r[0] for r in final["tables"]["sync_entries"]], stops=stops)
 
 
-def replay(out, live_only=False):
+def replay(out, live_only=False, expect_private=False):
     report = read(out / "result.json")
+    require(expect_private == (report.get("desktopMode") == private_desktop.MODE),
+            "The requested and recorded input desktop modes differ")
     checks = verify(out, report, live_only)
     if not live_only:
         release = module("ifw_upload_package_files", INSTALLED / "run.py")
@@ -204,5 +214,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--live-only", action="store_true")
+    parser.add_argument("--private-input-desktop", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(replay(args.output.resolve(), args.live_only), indent=2))
+    print(json.dumps(replay(args.output.resolve(), args.live_only, args.private_input_desktop), indent=2))

@@ -11,11 +11,13 @@ from tempfile import TemporaryDirectory, mkdtemp
 from shared import backup, require, sha
 
 
-def run_helper(work, out, profile, marker, port, build, stem):
+def run_helper(work, out, profile, marker, port, build, stem, *, headless=False):
     helper = work / "installed_upload_backup.exe"
     config = sha(profile / "config.yaml")
     require(sha(helper) == build["sha256"], "The pinned Windows backup helper changed")
-    result = subprocess.run([helper, str(port), config, marker, work], cwd=work, capture_output=True, timeout=20)
+    flags = subprocess.CREATE_NO_WINDOW if headless else 0
+    result = subprocess.run([helper, str(port), config, marker, work], cwd=work, capture_output=True, timeout=20,
+                            creationflags=flags)
     for name in ("stdout", "stderr"):
         (out / (stem + "." + name)).write_bytes(getattr(result, name))
     return result.returncode

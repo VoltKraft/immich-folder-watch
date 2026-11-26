@@ -11,6 +11,7 @@ import tempfile
 
 from shared import AREA, HERE, INSTALLED, ROOT, TARGETS, configuration, module, observer_sources, read, require, sha, write
 from common import launcher
+from private_desktop import ARM, MODE
 
 
 def exclusive_port():
@@ -37,7 +38,7 @@ def scratch(recorder):
         shutil.rmtree(work)
 
 
-def run(target, package, build):
+def run(target, package, build, private=False):
     from backup_build import stage_backup
     launch = launcher()
     release = module("ifw_upload_release", INSTALLED / "run.py")
@@ -46,11 +47,15 @@ def run(target, package, build):
             and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust"
             and release.git("rev-parse", release.RELEASE["tag"] + "^{commit}").decode().strip() == release.RELEASE["commit"],
             "Use the matching disposable native rewrite runner and original release tag")
+    require(not private or target == ARM and os.getenv("TRIAL_VARIANT") == "arm64-private-input",
+            "The separate private input trial requires its own native ARM64 runner")
     out = AREA / "upload" / target
     out.mkdir(parents=True)
     revision = os.environ["GITHUB_SHA"]
     record = dict(format="ifw-installed-wpf-upload-v1", status="incomplete", target=target, revision=revision,
                   run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"])
+    if private:
+        record["desktopMode"] = MODE
     try:
         record["observerSources"] = observer_sources(out, revision, freeze=True)
         with scratch(launch.recorder) as work:
@@ -105,5 +110,6 @@ if __name__ == "__main__":
     parser.add_argument("target", choices=TARGETS)
     parser.add_argument("--rust-backup", required=True, type=Path)
     parser.add_argument("--package", type=Path)
+    parser.add_argument("--private-input-desktop", action="store_true")
     args = parser.parse_args()
-    run(args.target, args.package, args.rust_backup)
+    run(args.target, args.package, args.rust_backup, args.private_input_desktop)

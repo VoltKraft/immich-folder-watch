@@ -1,5 +1,5 @@
 """Observe real uploads from two lifetimes of the original installed WPF."""
-from contextlib import ExitStack, closing, contextmanager
+from contextlib import ExitStack, closing, contextmanager, nullcontext
 from http.server import ThreadingHTTPServer
 import os
 from pathlib import Path
@@ -7,7 +7,6 @@ import re
 import shutil
 import socket
 import sqlite3
-import sys
 import threading
 import time
 
@@ -16,6 +15,7 @@ from common import launcher
 from database import live_backup, restore, run_helper
 from msi_evidence import payload_details
 from owners import client_connection, database_owner
+import private_desktop
 from reverse import observe as wpf
 
 
@@ -47,26 +47,38 @@ def serving(port, out):
 
 
 @contextmanager
-def process(launch, api, desk, image, work, folder, row, machine):
+def process(launch, api, desk, image, work, folder, row, machine, private):
     recorder = launch.recorder
     desktop = launch.check(desk.thread_desktop(desk.thread()), "GetThreadDesktop")
     name = desk.name(desktop)
-    require(name == "Default" and launch.ordinary_console(desk.context(), name), "Expected the runner's ordinary desktop")
+    require(name == (private.name if private else "Default") and launch.ordinary_console(desk.context(), name),
+            "Expected the originally selected input desktop")
     api.ensure_no_primary(recorder.sid())
     folder.mkdir()
     log = folder / "wpf.log"
     with ExitStack() as stack:
         stream = stack.enter_context(log.open("xb", buffering=0))
-        proc = recorder.start_owned_subject(stack, api, image, work, dict(os.environ), stream, False, recorder.stop_subject)
+        fixture = recorder.load_windows_fixture()
+        fixture.TITLE = "Immich Folder Watch"
+        windows = None
+
+        def watch(suspended):
+            nonlocal windows
+            windows = fixture.Windows(suspended.pid, desktop)
+            stack.callback(windows.close)
+
+        if private:
+            started = api.clock()
+            proc, job, _ = stack.enter_context(private.child(api, image, [], work, stream, before_resume=watch))
+            proc.benchmark_job, proc.benchmark_start_qpc = job, started
+        else:
+            proc = recorder.start_owned_subject(stack, api, image, work, dict(os.environ), stream, False, recorder.stop_subject)
+            watch(proc)
         handle = int(proc._handle)
         row["primary"] = dict(pid=proc.pid, created=api.process_identity(handle), image=str(image), sha256=sha(image),
                               arguments=[], machine=list(api.machine(handle)), startQpc=proc.benchmark_start_qpc)
         api.verify_job_member(proc.benchmark_job, proc.pid, handle)
         require(api.machine(handle) == (machine, machine), "The installed process is not native to the target")
-        fixture = recorder.load_windows_fixture()
-        fixture.TITLE = "Immich Folder Watch"
-        windows = fixture.Windows(proc.pid, desktop)
-        stack.callback(windows.close)
         def wait(check, label, seconds=30):
             def poll():
                 windows.pump()
@@ -74,19 +86,27 @@ def process(launch, api, desk, image, work, folder, row, machine):
                 return check()
             return recorder.await_value(poll, label, timeout=seconds, delay=.05)
         try:
-            api.resume_owned_process(proc.pid)
+            if not private:
+                api.resume_owned_process(proc.pid)
             hwnd = wait(lambda: windows.visible(waiting_for_first=True), "Missing installed WPF window")
             row["root"] = dict(hwnd=hwnd, pid=proc.pid, tid=wpf.owned_root(windows, hwnd, proc.pid))
+            if private:
+                row["privateRoot"] = private.root(row)
             yield proc, wait, log
             row["after"] = {"qpc": api.clock()}
             row["quit"] = {}
-            wpf.invoke_quit(launch, api, windows, proc, folder, row)
+            if private:
+                row["beforeQuitDesktop"] = private.root(row)
+            wpf.invoke_quit(launch, api, windows, proc, folder, row, start_helper=private.quit if private else None)
             row["quit"]["empty"] = api.wait_job_empty(proc.benchmark_job, 5)
             row["quit"]["jobDrainedQpc"] = api.clock()
             require(row["quit"]["empty"], "The installed primary job did not empty after Quit")
         finally:
             if proc.poll() is None:
-                row["fallback"] = recorder.stop_subject(proc, False)
+                if private:
+                    row["fallback"] = "launcher-owned job cleanup after incomplete observation"
+                else:
+                    row["fallback"] = recorder.stop_subject(proc, False)
     api.ensure_no_primary(recorder.sid())
     row["mutexReleased"] = True
     row["mutexReleasedQpc"] = api.clock()
@@ -107,15 +127,11 @@ def receive(server, proc, wait, row, media, out, name, content):
     server.release.set()
 
 
-def exercise(launch, api, desk, image, work, out, report, row, profile, marker):
+def exercise(launch, api, desk, image, work, out, report, row, profile, marker, private):
     inputs = report["profile"]
     media, database = work / "wpf-media", profile / "sync-state.db"
     port = endpoint_port(inputs["endpoint"])
     machine = TARGETS[report["target"]][1]
-    installed = read(out / "installed.json")
-    require(Path(installed["exe"]) == image and installed["exeSha256"] == sha(image)
-            == payload_details(read(out / "payload-installed.json"), TARGETS[report["target"]][0]),
-            "Expected the original installed WPF apphost and cabinet")
     require(Path(inputs["directory"]) == profile and Path(inputs["media"]) == media and not list(media.iterdir())
             and marker.name == inputs["marker"] and marker.read_text(encoding="ascii") == marker.name.removeprefix(".rw02-owned-")
             and not wpf.profile_outputs(profile) and inputs["configSha256"] == sha(profile / "config.yaml")
@@ -126,13 +142,13 @@ def exercise(launch, api, desk, image, work, out, report, row, profile, marker):
     expected_sweep = f"Persistent reconciliation for uploadAll queued 0 changed file(s) from {media}."
     helper = work / "installed_upload_backup.exe"
     def run(stem):
-        return run_helper(work, out, profile, marker, port, report["backupBuild"], stem)
+        return run_helper(work, out, profile, marker, port, report["backupBuild"], stem, headless=private is not None)
     with ExitStack() as pins:
         for file in (helper, image, profile / "config.yaml", marker):
             pins.enter_context(launch.recorder.pin_path(api, file, False))
         server = pins.enter_context(serving(port, out))
         first = row["original"] = {}
-        with process(launch, api, desk, image, work, out / "original", first, machine) as (proc, wait, log):
+        with process(launch, api, desk, image, work, out / "original", first, machine, private) as (proc, wait, log):
             wait(lambda: expected_sweep in log.read_text(encoding="utf-8", errors="replace"), "Missing first empty original sweep")
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as reader:
                 reader.execute("BEGIN")
@@ -169,7 +185,7 @@ def exercise(launch, api, desk, image, work, out, report, row, profile, marker):
             server.received.clear()
             server.release.clear()
             server.assets[backup.NEW_NAME] = (backup.NEW_IMAGE, backup.NEW_ID)
-            with process(launch, api, desk, image, work, out / "restored", second, machine) as (proc, wait, log):
+            with process(launch, api, desk, image, work, out / "restored", second, machine, private) as (proc, wait, log):
                 wait(lambda: expected_sweep in log.read_text(encoding="utf-8", errors="replace"),
                      "No restored startup reconciliation of the unchanged PNG")
                 second["fileOwner"] = wait(lambda: database_owner(database, proc, second["primary"]["created"]),
@@ -208,7 +224,7 @@ def exercise(launch, api, desk, image, work, out, report, row, profile, marker):
         row["profileFiles"] = wpf.save_outputs(profile, out, api, launch.recorder)
 
 
-def run(target, out, work, image):
+def run(target, out, work, image, name=None):
     launch = launcher()
     from native import known_folder
     require(launch.recorder.hosted() and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch"
@@ -223,9 +239,21 @@ def run(target, out, work, image):
     require(report["revision"] == os.environ["GITHUB_SHA"] and report["run"] == os.environ["GITHUB_RUN_ID"]
             and report["target"] == target and re.fullmatch(r"\.rw02-owned-[a-f0-9]{32}", marker.name),
             "The upload observer is bound to another run or profile")
+    installed = read(out / "installed.json")
+    require(Path(installed["exe"]) == image and installed["exeSha256"] == sha(image)
+            == payload_details(read(out / "payload-installed.json"), TARGETS[target][0]),
+            "Expected the original installed WPF apphost and cabinet")
+    mode = report.get("desktopMode")
+    require(mode is None and name is None or mode == private_desktop.MODE and target == private_desktop.ARM,
+            "Unexpected input desktop mode for the installed trial")
+    if mode:
+        require(os.getenv("TRIAL_VARIANT") == "arm64-private-input", "The isolated GitHub desktop job is required")
+    if mode and name is None:
+        return private_desktop.supervisor(launch, target, out, work, image)
     row = {"status": "incomplete"}
     try:
-        exercise(launch, api, desk, image, work, out, report, row, profile, marker)
+        with (private_desktop.worker(launch, desk, out, target, name) if mode else nullcontext()) as private:
+            exercise(launch, api, desk, image, work, out, report, row, profile, marker, private)
         row["status"] = "observed"
     except Exception as exc:
         row["error"] = f"{type(exc).__name__}: {exc}"
@@ -240,4 +268,11 @@ def run(target, out, work, image):
 
 
 if __name__ == "__main__":
-    run(sys.argv[1], *(Path(a).resolve() for a in sys.argv[2:]))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=TARGETS)
+    for arg in ("out", "work", "image"):
+        parser.add_argument(arg, type=Path)
+    parser.add_argument("--owned-desktop")
+    args = parser.parse_args()
+    run(args.target, args.out.resolve(), args.work.resolve(), args.image.resolve(), args.owned_desktop)

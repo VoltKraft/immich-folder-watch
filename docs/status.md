@@ -227,6 +227,16 @@ ETL header. Both query passes must still complete without event loss.
 [Original activation receipts](rust/rw02-instance.md#installed-windows-activation-at-f8cf6b1) ·
 [Native observation and acceptance](../tools/rust-qa/windows-msi-interop/file-trace.md).
 
+The additional installed-worker trial for Windows ARM64 selects a new
+input desktop on its own hosted runner. It uses the two original WPF
+processes, the original menu helper and the existing synthetic peer.
+The private desktop and return to the unlocked console require native
+readback. The two ordinary desktop trials retain independent results.
+On Fedora x64 the five-crate Rust workspace passed 38 frozen tests
+and its Cargo dependency boundary check. Clippy passed for all workspace
+targets with warnings denied.
+[Native run and evidence](development.md#installed-windows-worker-backup).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

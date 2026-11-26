@@ -45,7 +45,7 @@ def observer_sources(out, revision, *, freeze=False):
     for folder, modules in {
         "windows-performance": ("run", "native", "build", "metrics"),
         "windows-inventory": ("scan", "subject"),
-        "windows-desktop": ("win32", "job"),
+        "windows-desktop": ("win32", "job", "run", "worker"),
         "windows-launcher": ("observe", "named_process", "window_readback", "retained_subject", "retained_window"),
     }.items():
         paths.update(QA / folder / (name + ".py") for name in modules)
