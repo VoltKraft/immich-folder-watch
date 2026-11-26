@@ -86,12 +86,22 @@ class ReverseTests(unittest.TestCase):
         hit = dict(hwnd=70, root=70, pid=11, tid=150, rootPid=11, rootTid=150)
         point = dict(x=301, y=172)
         menu.update(root=70, stage="original-close", anchor=dict(dpiContext="per-monitor-v2", clientRect=dict(left=1, top=22, right=401, bottom=222),
-                    point=point, before=hit, after=hit, cursor=point, physicalCursor=point))
+                    point=point, before=hit, after=hit, cursor=point, physicalCursor=point, probes=[hit]))
         suffix = "info: ImmichFolderWatch.Core.Services.FolderWatchWorker[0] Flushing pending uploads before shutdown."
         self.assertTrue(shutdown(row, messages, menu, suffix)["flushStarted"])
         self.assertEqual(shutdown(row, messages, menu, suffix)["flushCompletion"], "unobserved")
         self.assertFalse(shutdown(row, messages, menu, "")["flushStarted"])
         self.assertFalse(shutdown(row, messages[:1], menu, suffix)["flushStarted"])
+        missing = {k: v for k, v in menu["anchor"].items() if k != "probes"}
+        with self.assertRaisesRegex(ValueError, "tray menu anchor"):
+            shutdown(row, messages, {**menu, "anchor": missing}, suffix)
+        exposed = dict(x=201, y=172)
+        alternate = {**menu["anchor"], "probes": [{**hit, "root": 99}, hit],
+                     "point": exposed, "cursor": exposed, "physicalCursor": exposed}
+        self.assertTrue(shutdown(row, messages, {**menu, "anchor": alternate}, suffix)["orderlyProcessExit"])
+        for probes in ([], [hit, hit], [hit, {**hit, "hwnd": 99}], [hit] * 17):
+            with self.assertRaisesRegex(ValueError, "tray menu anchor"):
+                shutdown(row, messages, {**menu, "anchor": {**alternate, "probes": probes}}, suffix)
         for override in ({"physicalCursor": dict(x=300, y=172)}, {"after": {**hit, "root": 71}}, {"before": {**hit, "rootPid": 19}},
                          {"point": dict(x=401, y=222)}, {"dpiContext": "virtualized"}):
             with self.assertRaisesRegex(ValueError, "tray menu anchor"):

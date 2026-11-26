@@ -57,6 +57,7 @@ public sealed class InstalledQuitReceiver
         public Rect? clientRect;
         public Point? point, cursor, physicalCursor;
         public Window before, after;
+        public readonly List<Window> probes = new List<Window>();
     }
     public sealed class Popup
     {
@@ -147,15 +148,27 @@ public sealed class InstalledQuitReceiver
 
     public static Point Interior(Rect rect)
     {
+        return Interior(rect, 0);
+    }
+
+    // Try the original position first, then other interior points on this client.
+    // Reading a covering HWND never moves the cursor or sends input to it.
+    private static readonly int[] Eighths = { 6, 4, 7, 2 };
+    public static Point Interior(Rect rect, int index)
+    {
         long width = (long)rect.right - rect.left, height = (long)rect.bottom - rect.top;
         if (width < 4 || height < 4) throw new InvalidOperationException("The original client rectangle has no interior menu anchor.");
-        // The shipping menu opens above and to the left of GetCursorPos().
-        return new Point { x = (int)(rect.left + 3 * width / 4), y = (int)(rect.top + 3 * height / 4) };
+        return new Point { x = (int)(rect.left + Eighths[index % 4] * width / 8),
+                           y = (int)(rect.top + Eighths[index / 4] * height / 8) };
     }
 
     public bool Confirmed(Rect current, long root, uint pid, uint tid)
     {
-        return anchor.clientRect.Equals(current) && anchor.point.Equals(Interior(current)) &&
+        int count = anchor.probes.Count;
+        if (count == 0 || count > 16 || !IsOwnedHit(anchor.probes[count - 1], root, pid, tid) ||
+            anchor.probes[count - 1].hwnd != anchor.before?.hwnd) return false;
+        for (int i = 0; i < count - 1; i++) if (IsOwnedHit(anchor.probes[i], root, pid, tid)) return false;
+        return anchor.clientRect.Equals(current) && anchor.point.Equals(Interior(current, count - 1)) &&
             anchor.cursor.Equals(anchor.point) && anchor.physicalCursor.Equals(anchor.point) &&
             IsOwnedHit(anchor.before, root, pid, tid) && IsOwnedHit(anchor.after, root, pid, tid);
     }
@@ -226,11 +239,17 @@ public sealed class InstalledQuitReceiver
             stage = "anchor-before";
             var rect = ClientScreenRect(root);
             anchor.clientRect = rect;
-            var point = Interior(rect);
-            anchor.point = point;
-            anchor.before = Identify(WindowFromPoint(point));
+            Point point = default;
+            for (int i = 0; i < 16; i++)
+            {
+                point = Interior(rect, i);
+                anchor.point = point;
+                anchor.before = Identify(WindowFromPoint(point));
+                anchor.probes.Add(anchor.before);
+                if (IsOwnedHit(anchor.before, root.ToInt64(), pid, tid)) break;
+            }
             if (!IsOwnedHit(anchor.before, root.ToInt64(), pid, tid))
-                throw new InvalidOperationException("The menu anchor does not hit the original WPF client.");
+                throw new InvalidOperationException("No sampled point hits the original WPF client.");
             stage = "anchor-position";
             if (!SetCursorPos(point.x, point.y)) throw new InvalidOperationException("Cannot position the cursor on the original WPF client.");
             stage = "anchor-after";

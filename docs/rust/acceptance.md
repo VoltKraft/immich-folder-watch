@@ -69,6 +69,11 @@ Rust backup after a real upload. Only the second PNG was uploaded at
 restart. Native ARM64 confirmed the first upload and live backup before
 its Quit observer stopped. Both original Windows MSIs were removed.
 [Installed Windows recovery and source archives](rw01-storage-contract.md#installed-windows-worker-restart-at-2dd5f93).
+The second x64 run at `f8cf6b1` passed the complete installed worker
+restart again. The ARM64 observer captured a foreign foreground window
+over its selected point before the first Quit.
+[Second Windows recovery run](rw01-storage-contract.md#installed-windows-worker-restart-at-f8cf6b1).
+
 
 At `1d3af9a` a normal start of the installed WPF 3.0.4 executable on
 Windows x64 and ARM64 reopened the retained Rust primary in the same

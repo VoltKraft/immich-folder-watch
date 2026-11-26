@@ -497,3 +497,27 @@ the x64 full result and the ARM64 live-only result.
 | --- | --- | --- |
 | [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825745/artifacts/15155041349) | `51fe553ac73d0dd7e0e7bb84a0b8b635d75052b851b85ee1966cd5a86b9d717e` | `c0e4061210df6af078b560f6a0d6ed1efd61817a20145b386abc88e19536f39a` |
 | [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825745/artifacts/15154303301) | `6c487bf78164eae1afdbf3e686b0299083b5a29f39da80d5805ddba292dbafbe` | `60721a7f047b30d4801168e14ae6aa48b76fabe5e0e80394e569c6854d018ee4` |
+
+## Installed Windows worker restart at f8cf6b1
+
+A second Windows x64 run completed both installed uploads and opened
+Rust's live backup in a fresh WPF process. At each Quit the observer
+verified the original WPF client at physical point (751, 551) and the
+unmodified upgrade fixture selected the highlighted Quit item. Detached
+replay checked the original observer sources, native processes, peer
+requests, restored database and both removals.
+
+On Windows ARM64 the original WPF worker again uploaded the first PNG
+and Rust returned its live backup. At Quit the WPF client extended from
+(-20, 11) to (1008, 732). Its test point (751, 551) belonged to the
+foreground window of another process. No menu opened and the observer
+issued no cursor movement or click. The ARM64 replay passed through
+backup and failed full restart. Both installations and synthetic profiles
+were removed. The next observer launches its helper without a console
+window and checks other points inside the same original client for a
+verified WPF hit.
+
+| Original archive | ZIP SHA-256 | Returned SQLite SHA-256 |
+| --- | --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285120/artifacts/15155246528) | `1f141434ef85ed4ecd8e7230c1e05be9cfb6ca4c8e2fdd0a4392efc4c70b0ed2` | `dde53977b7bc2d3fa89b977806bbed915137acaccf10b65a2a8254935fcfc1c3` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285120/artifacts/15155800388) | `413ca579ac3a65947f9e17887710c4306e45ef888fbb21ea70281b27ce1292dd` | `354c2d39c7cfc6d3fa2cbfc2b7792283cd1515a05a165b1858af6d03615d99f2` |

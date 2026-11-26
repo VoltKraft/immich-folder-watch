@@ -89,7 +89,7 @@ def invoke_quit(launch, api, windows, primary, out, row):
     subprocess.run([pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
                     "-ProcessId", str(primary.pid), "-Created", str(row["primary"]["created"]),
                     "-Receiver", str(hwnd), "-Root", str(root), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"],
-                   cwd=out, check=True, timeout=35)
+                   cwd=out, check=True, timeout=35, creationflags=subprocess.CREATE_NO_WINDOW)
     code = launch.wait_for_exit(primary, windows.pump, 30)
     if code:
         raise ValueError(f"The shipping WPF Quit command exited with {code}")

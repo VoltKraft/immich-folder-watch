@@ -113,14 +113,22 @@ def verify_menu_anchor(menu, root):
     anchor = menu["anchor"]
     rect, point = anchor["clientRect"], anchor["point"]
     width, height = rect["right"] - rect["left"], rect["bottom"] - rect["top"]
-    expected = dict(x=rect["left"] + 3 * width // 4, y=rect["top"] + 3 * height // 4)
+    def owned(hit):
+        return (hit["hwnd"] > 0 and hit["root"] == root["hwnd"] and hit["pid"] == hit["rootPid"] == root["pid"]
+                and hit["tid"] == hit["rootTid"] == root["tid"])
+    probes = anchor.get("probes")
+    if (not isinstance(probes, list) or not 1 <= len(probes) <= 16 or probes[-1] != anchor["before"] or not owned(probes[-1])
+            or any(owned(hit) for hit in probes[:-1])):
+        raise ValueError("The tray menu anchor did not use the first owned point")
+    column, row = (len(probes) - 1) % 4, (len(probes) - 1) // 4
+    eighths = (6, 4, 7, 2)
+    expected = dict(x=rect["left"] + eighths[column] * width // 8, y=rect["top"] + eighths[row] * height // 8)
     if (menu["root"] != root["hwnd"] or menu["stage"] != "original-close" or anchor["dpiContext"] != "per-monitor-v2"
             or min(width, height) < 4 or point != expected
             or point != anchor["cursor"] or point != anchor["physicalCursor"]):
         raise ValueError("The tray menu anchor is outside the original WPF client or changed DPI coordinates")
     for hit in (anchor["before"], anchor["after"]):
-        if (hit["hwnd"] <= 0 or (hit["root"], hit["pid"], hit["tid"]) != (root["hwnd"], root["pid"], root["tid"])
-                or (hit["rootPid"], hit["rootTid"]) != (root["pid"], root["tid"])):
+        if not owned(hit):
             raise ValueError("The tray menu anchor belongs to a different WPF window or thread")
 
 

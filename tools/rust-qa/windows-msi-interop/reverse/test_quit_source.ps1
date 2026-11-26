@@ -67,6 +67,7 @@ $hit = [InstalledQuitReceiver+Window]@{ hwnd=101; root=100; pid=20; tid=21; root
 $observer.anchor.clientRect = $rc
 $observer.anchor.point = $point
 $observer.anchor.before = $hit
+$observer.anchor.probes.Add($hit)
 $observer.anchor.after = $hit
 $observer.anchor.cursor = $point
 $observer.anchor.physicalCursor = $point
@@ -95,6 +96,15 @@ foreach ($name in @('cursor','physicalCursor','point')) {
 }
 $rc.right += 1
 if ($observer.Confirmed($rc, 100, 20, 21)) { throw 'Accepted a changed client rectangle.' }
+$rc.right -= 1
+$observer.anchor.probes.Insert(0, $foreign)
+$point = [InstalledQuitReceiver]::Interior($rc, 1)
+$observer.anchor.point = $point
+$observer.anchor.cursor = $point
+$observer.anchor.physicalCursor = $point
+if ($point.x -ne -1406 -or -not $observer.Confirmed($rc, 100, 20, 21)) { throw 'Failed to select an exposed client point.' }
+$observer.anchor.probes[0] = $hit
+if ($observer.Confirmed($rc, 100, 20, 21)) { throw 'Skipped the first original client hit.' }
 try {
     $null = [InstalledQuitReceiver]::Interior([InstalledQuitReceiver+Rect]@{ left=10; top=10; right=11; bottom=11 })
     throw 'Accepted an empty interior.'

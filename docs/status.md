@@ -194,6 +194,18 @@ and ownership check. The ARM64 restore and second upload remain open.
 [Native commands](development.md#installed-windows-worker-backup) ·
 [Original Ubuntu databases](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
 
+At `2dd5f93` the full installed WPF-primary activation passed on Windows
+x64 and the full Rust-primary repeat passed on ARM64. The x64 Rust
+repeat lost 134 kernel file events. The ARM64 WPF primary reopened but
+the shipping helper refused the covered Quit item. At `f8cf6b1` the x64
+worker again restored its live upload history and uploaded only the new
+PNG. The ARM64 backup passed. A different foreground window covered the
+selected point on the WPF client. The observer now samples up to 16
+interior points and only moves the cursor after verifying the original
+WPF root and UI thread. The native ARM64 restart is still outstanding.
+[Activation results](rust/rw02-instance.md#both-installed-windows-launch-orders-at-2dd5f93) ·
+[Second upload and restore run](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-f8cf6b1).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

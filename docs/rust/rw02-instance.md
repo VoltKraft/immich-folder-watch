@@ -1067,3 +1067,28 @@ has SHA-256 `8ffa18aea8bb5963ec8d007249a71ace51728071597409061875b36ca10351b0`.
 A separate review also reproduced the x64 success at `0bb39bf`. All
 28 targeted tests passed. The full launcher suite passed 107 tests on
 Linux and skipped three native cases.
+
+## Both installed Windows launch orders at 2dd5f93
+
+On x64, Rust activated the original WPF window (HWND 262256, PID 5104,
+UI thread 6056) and exited zero. The shipping helper selected Quit on
+popup 196986. WPF exited zero, its job emptied and its logs recorded the
+shutdown signal and start of flushing. The ARM64 WPF window also
+reopened (HWND 262434, PID 4352, thread 8740). The native helper
+declined to click the covered menu entry and the observer reaped its
+owned process. Independent replay established activation on both hosts
+and orderly WPF shutdown on x64.
+
+The ARM64 Rust primary passed both file observations, activation and
+shutdown. On x64 the original Rust worker completed both inventory
+cycles, but ETW reported 134 lost events. Independent replay could
+not verify that file trace or the scratch-directory cleanup. All four
+MSIs installed and uninstalled with exit zero. The post-uninstall checks
+found no installed application process, package registration or payload.
+
+| Native original | ZIP SHA-256 |
+| --- | --- |
+| [x64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15155176905) | `e3a49cd76cd9325cf9385ad234b497ab49cbd315d13279f4bdcfec01ece7e19e` |
+| [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15155431066) | `5799dfb0026c5483a87135e0e418ddb83d8c49ed14bc859186cb7e43fad6975d` |
+| [x64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15154599378) | `abf53ba873af848b4c89b21dc34454e23c8fd3375222080cfb451828a20844d9` |
+| [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15155376181) | `ab6ffed21def514155262ec1ec7f522157d19d85cd27780895a01b81dd21c230` |

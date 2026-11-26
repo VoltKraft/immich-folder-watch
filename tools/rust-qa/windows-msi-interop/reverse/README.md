@@ -23,7 +23,9 @@ compiles the checksum-pinned C# menu helper from the original
 The helper opens the product's context menu, locates command 3 in the
 owned popup, checks the cursor and highlighted item, and selects Quit
 with a mouse click. WPF positions the menu at the cursor. The observer
-places the cursor inside the original visible WPF client, verifies the
+opens its PowerShell observer without a console window. It samples up to
+16 points inside the original WPF client and places the cursor at the first
+point owned by the original window and UI thread. It verifies the
 physical screen position and owning UI thread, and runs the helper in
 the same per-monitor DPI context. The receipt retains the original
 window and anchor, the helper's result and the popup handle. A refusal
