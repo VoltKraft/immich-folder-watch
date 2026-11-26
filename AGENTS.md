@@ -196,7 +196,8 @@ to reconcile project decisions, defaults, and recorded state.
   when changing the candidate desktop profile.
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
   the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders),
-  [physical Unicode separators saved by .NET](docs/rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) and the
+  [physical Unicode separators saved by .NET](docs/rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves),
+  [alias scope across skipped configuration properties](docs/rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Compare [Linux file modification ticks](docs/rust/rw02-legacy.md#linux-file-modification-times)
   using metadata from the held file. For realtime changes, verify the

@@ -102,6 +102,18 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
             or f"albumName: {album}" not in [line.strip() for line in marked["written"].splitlines()]
             or (profile / "saved-album-format-mark.yaml").read_bytes() != codecs.BOM_UTF8 + marked["written"].encode("utf-8")):
         raise ValueError("The saved plain album or its file preamble differs")
+    for name in ("anchor-skipped-only", "anchor-on-key", "alias-as-key", "unknown-alias"):
+        if inputs[name]["accepted"]:
+            raise ValueError("The shipping loader accepted a missing typed anchor or an alias key")
+    for name, path, album, filters in (
+        ("anchor-shadow", "Pictures", "Pictures", []),
+        ("alias-in-skipped-map", "Pictures", "Pictures", []),
+        ("anchor-known-reassigned", "Neu", "Pictures", ["Neu"]),
+        ("anchor-separator-shadow", "Pictures", "Foto\u2028Nord", ["Foto\u2028Nord"]),
+    ):
+        source = inputs[name]["editable"]["watch"]["sources"][0]
+        if (source["path"], source["albumName"], source["excludeDirectories"]) != (path, album, filters):
+            raise ValueError("The shipping loader selected an unexpected anchor definition")
     if inputs["format-mark-in-key"]["editable"]["retry"]["maxAttempts"] != 7:
         raise ValueError("A key prefixed with U+FEFF replaced the ordinary key")
     for stem, separator in (("line", "\u2028"), ("paragraph", "\u2029")):

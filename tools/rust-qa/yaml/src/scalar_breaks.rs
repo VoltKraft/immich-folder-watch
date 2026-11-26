@@ -9,13 +9,17 @@ const BREAKS: [char; 5] = ['\r', '\n', '\u{85}', '\u{2028}', '\u{2029}'];
 // The 1.2 scanner recognizes LF/CR as syntax. Give it the physical line boundaries
 // seen by YamlDotNet and map token byte positions back to the untouched decoded input.
 // Scalar content is recovered from the original spelling before typed deserialization.
-struct Lines {
-    syntax: String,
+pub(super) struct Lines {
+    pub(super) syntax: String,
     offsets: Vec<(usize, usize)>,
     block_controls: Vec<usize>,
 }
 
 impl Lines {
+    pub(super) fn for_input(original: &str) -> Option<Self> {
+        original.contains(SEPARATORS).then(|| Self::new(original))
+    }
+
     fn new(original: &str) -> Self {
         let mut syntax = String::with_capacity(original.len());
         let mut offsets = Vec::new();
@@ -40,27 +44,13 @@ impl Lines {
         }
     }
 
-    fn original(&self, index: usize) -> usize {
+    pub(super) fn original(&self, index: usize) -> usize {
         let n = self.offsets.partition_point(|&(end, _)| end <= index);
         index + n.checked_sub(1).map_or(0, |i| self.offsets[i].1)
     }
 }
 
-pub fn compatible_input<'a>(
-    input: &'a str,
-    options: &serde_saphyr::Options,
-) -> Result<Cow<'a, str>, Failure> {
-    if !input.contains(SEPARATORS) {
-        return Ok(Cow::Borrowed(input));
-    }
-    let lines = Lines::new(input);
-    let syntax = lines.syntax.as_str();
-    // Check nesting, node, alias and replay limits before inspecting individual token spans.
-    serde_saphyr::from_str_with_options::<serde::de::IgnoredAny>(syntax, options.clone())
-        .map_err(classify)?;
-    // The admitted original is bounded at the codec entry. A generated YAML escape can
-    // take up to six bytes per input byte, independently of the decoded scalar budget.
-    let limit = 6 * input.len() + 2;
+pub(super) fn parser_options(options: &serde_saphyr::Options) -> granit_parser::Options {
     let mut parser_options = granit_parser::options! {
         bom_inside_document_as_content: options.bom_inside_document_as_content,
         strict_indentation: options.strict_indentation,
@@ -69,11 +59,28 @@ pub fn compatible_input<'a>(
         parser_options.flow_nesting_limit = budget.flow_nesting_limit;
         parser_options.simple_key_max_lookahead = budget.simple_key_max_lookahead;
     }
+    parser_options
+}
+
+pub fn compatible_input<'a>(
+    input: &'a str,
+    options: &serde_saphyr::Options,
+) -> Result<Cow<'a, str>, Failure> {
+    let Some(lines) = Lines::for_input(input) else {
+        return Ok(Cow::Borrowed(input));
+    };
+    let syntax = lines.syntax.as_str();
+    // Check nesting, node, alias and replay limits before inspecting individual token spans.
+    serde_saphyr::from_str_with_options::<serde::de::IgnoredAny>(syntax, options.clone())
+        .map_err(classify)?;
+    // The admitted original is bounded at the codec entry. A generated YAML escape can
+    // take up to six bytes per input byte, independently of the decoded scalar budget.
+    let limit = 6 * input.len() + 2;
     let mut output = String::new();
     let mut copied = 0;
     let mut previous = 0;
     let mut controls = lines.block_controls.as_slice();
-    for token in Scanner::with_options(StrInput::new(syntax), parser_options) {
+    for token in Scanner::with_options(StrInput::new(syntax), parser_options(options)) {
         let (span, kind) = token.map_err(|_| Failure::InvalidYaml)?.into_parts();
         let start = span.start.byte_offset().ok_or(Failure::InvalidYaml)?;
         let end = span.end.byte_offset().ok_or(Failure::InvalidYaml)?;

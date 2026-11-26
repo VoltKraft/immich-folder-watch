@@ -66,11 +66,12 @@ pub(super) fn classify(error: serde_saphyr::Error) -> Failure {
     }
 }
 
-pub fn parse(input: &str, options: Options, max_bytes: usize) -> Result<RawConfig, Failure> {
+pub fn parse(input: &str, mut options: Options, max_bytes: usize) -> Result<RawConfig, Failure> {
     if input.len() > max_bytes {
         return Err(Failure::InputBytes);
     }
-    let view = crate::scalar_breaks::compatible_input(input, &options)?;
+    let anchors = crate::anchors::compatible_input(input, &mut options)?;
+    let view = crate::scalar_breaks::compatible_input(&anchors, &options)?;
     serde_saphyr::from_str_with_options::<Option<RawConfig>>(&view, options)
         .map_err(classify)?
         .ok_or(Failure::InvalidDocument)
@@ -183,6 +184,44 @@ mod tests {
             "watch: {sources: [&s {path: \"owned\\nscalar\"}, *s]}",
             |options| options.budget.as_mut().unwrap().max_recorded_anchor_bytes = 2,
         );
+    }
+
+    #[test]
+    fn skipped_symbols_still_consume_alias_anchor_replay_and_content_budgets() {
+        let input = "future: [&item [one, two], *unbound, *item]";
+        budget_pair(input, |options| {
+            options.budget.as_mut().unwrap().max_aliases = 1
+        });
+        budget_pair(input, |options| {
+            options.alias_limits.max_total_replayed_events = 2
+        });
+        budget_pair(input, |options| {
+            options.budget.as_mut().unwrap().max_recorded_anchor_events = 2
+        });
+        budget_pair("future: {*missing : value, other: *unknown}", |options| {
+            options.budget.as_mut().unwrap().alias_anchor_min_aliases = 2
+        });
+        budget_pair("future: [*unbound, &a 1, &b 2]", |options| {
+            options.budget.as_mut().unwrap().max_anchors = 1
+        });
+        budget_pair("future: {child: [*unbound, [one]]}", |options| {
+            options.budget.as_mut().unwrap().max_depth = 3
+        });
+        budget_pair("future: [*unbound, large-scalar]", |options| {
+            options.budget.as_mut().unwrap().max_total_scalar_bytes = 10
+        });
+        budget_pair("future: [*unbound, one, two]", |options| {
+            options.budget.as_mut().unwrap().max_nodes = 4
+        });
+        budget_pair("future: [*unbound, one, two]", |options| {
+            options.budget.as_mut().unwrap().max_events = 5
+        });
+        for yaml in [
+            "future: [*unbound, !include synthetic]",
+            "future: [*unbound, &recursive [*recursive]]",
+        ] {
+            assert!(parse(yaml, options(), MAX_TEXT_BYTES).is_err());
+        }
     }
 
     #[test]

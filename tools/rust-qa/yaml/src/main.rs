@@ -1,6 +1,7 @@
 //! Development-only bounded YAML compatibility assessment.
 #![forbid(unsafe_code)]
 
+mod anchors;
 mod codec;
 mod encoding;
 mod model;

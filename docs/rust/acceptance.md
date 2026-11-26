@@ -41,14 +41,15 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 ## Overall acceptance
 
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
-separators written by .NET 3.0.4 in paths, album names and filters. All 67
-profiles and 188 C# readback assertions passed. The Windows and Linux managed
-release assemblies each reopened 34 unchanged or edited Rust outputs on that
-Linux host. Native coverage of the change on the other targets is pending.
-A separate difference in alias resolution across an ignored mapping property
-remains open under RI-AC03.
+separators written by .NET 3.0.4 in paths, album names and filters. Known
+values retain their own anchors when later unknown properties reuse a
+name. All 74 profiles and 204 C# readbacks passed. The Windows and Linux
+managed release assemblies each reopened 34 Unicode outputs and 22 alias
+outputs on that Linux host. Native coverage on the other targets is pending.
+Three compact mapping inputs that the shipping reader rejects remain
+accepted by Rust.
 [Physical separators](rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
-[Ignored property](rw02-yaml.md#an-anchor-inside-an-ignored-property).
+[Property and alias controls](rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 
 At `e2f161b` each of the four native hosts passed 59 YAML cases including
 160 C# readback comparisons. All four preserved the leading U+FEFF in a

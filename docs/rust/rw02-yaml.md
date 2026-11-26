@@ -456,18 +456,78 @@ and three rejected indentation cases. The three respective reports under
 and `2f6384935eea5ed040d8bed3976f2001d451a8b4d478ec0bcb92e12572361d20`.
 Native Windows and Linux ARM64 execution of the updated adapter is pending.
 
-### An anchor inside an ignored property
+### Anchors on recognized and skipped properties
 
-The shipping reader skips unknown configuration properties. In a separate
-602-byte ASCII profile, an unknown top-level property defines `&a` and a
-known album name later uses `*a`. The released reader raises
-`AnchorNotFoundException`. Both the earlier Rust reader and the separator
-adapter accept the alias. An anchor defined on an ordinary recognized field
-works in both readers. This difference remains open. The original profile
-and the two Rust comparisons are under
-`artifacts/rust/yaml-assessment/ignored-mapping-anchor/`. Its
-`comparison.json` has SHA-256
-`eb2767d980b4a1dd4400471e42281bcf601edf1fea3dfb70d942c7bfc9696623`.
+The shipped reader rejects an album alias whose only declaration occurs
+in an unknown property or on a property key. When a recognized path
+defines `&a Pictures` and a later unknown property defines `&a Ghost`,
+the shipped reader still sets `albumName: *a` to `Pictures`. The earlier
+Rust adapter set it to `Ghost`. The original 602-byte missing-anchor case
+and the signed role comparisons are under
+`artifacts/rust/yaml-assessment/ignored-mapping-anchor/`.
+The 12-case `roles-first/comparison.json` has SHA-256
+`20d59943a6cf81df7262b2ebcb74a67332d15d047e4e4e54595e79fa217bd61e`.
+
+The adapter uses mapping and sequence events from the existing parser
+to identify the values the shipping loader visits. It assigns each
+declaration its own internal name and resolves a recognized alias to the
+last recognized value with that name. A repeated recognized property
+can therefore supply different values to earlier and later references.
+Aliases used as property keys on a typed object fail. The original
+tokens and file hashes remain available for the byte-level checks.
+[Anchor handling](../../tools/rust-qa/yaml/src/anchors.rs) ·
+[Shipping configuration model](../../src/ImmichFolderWatch.Core/Configuration/AppConfig.cs).
+
+Ignored subtrees still go through the native depth, node, event, scalar,
+unsupported-tag and anchor recording checks. Resolved aliases in ignored
+data still consume replay work. An unresolved alias in skipped data
+has no target. The adapter counts its token against the alias allowances
+and supplies an empty scalar to the typed reader. The same structural
+pass uses the shipping physical line boundaries when an input also
+contains a Unicode separator.
+
+The Fedora x64 run `artifacts/rust/yaml-assessment/runs/typed-anchors-fedorax64-02/`
+passed 74 profiles, 222 input-byte checks, 359 differential assertions and
+204 C# readback assertions. All 74 original files retained their hashes.
+Eleven Rust tests passed, including limits for skipped data. The result
+SHA-256 is `6bd917b517de6a064c5417495bd93355717a7385dd95a0f074c110456c8d7fa3`.
+The exact release binary matched the signed loader on two profiles combining
+a Unicode separator with an ignored anchor redeclaration and one case-sensitive
+property profile. The original Flatpak 3.0.4 assemblies read, validated,
+saved and reopened all six unchanged/edited Rust outputs.
+The `signed-release-02/signed-readback.json` SHA-256 is
+`145180f9268611cfab838f7d18fbd0fe3189157415d9597cda022b3bf602be22`.
+
+An independent build from the same Rust sources matched the original
+shipping results for 17 inputs and all 11 accepted C# resaves. The signed
+Flatpak and MSI-delivered Core assemblies running on Linux x64 passed 44
+checks of the resulting Rust files. The earlier 76 physical-separator
+comparisons also passed. The role and readback report
+`independent-02/summary.json` has SHA-256
+`10e8eb99da2721fafc21963afe2930939fc4b301625ec5e407e45a88f68e7567`.
+Native execution of this change on the other three targets remains pending.
+
+The frozen release executable from the complete 74-profile run has SHA-256
+`ad02d0e907f7ed6e5446070682d9005ab2dbd07b9112954266732861e5641588`.
+The independent package readers repeated all 28 input and resave comparisons
+and 44 readbacks of its alias outputs. The same release build also passed
+the 20 field-placement and 48 encoding readbacks with the same two readers.
+Under `artifacts/rust/yaml-assessment/` the original receipts are
+`ignored-mapping-anchor/frozen-release-02/summary.json`,
+`shipping-package-assembly-comparison/fields-gmsqzokq/result.json` and
+`shipping-package-assembly-comparison/encoded-vlf4e8ry/rust-readback.json`.
+Their SHA-256 values are
+`7b5d227fb67db0426503d2ddc0928a789e746e861caacce0a125b4e82d08e82f`,
+`43b4757faced67935354c05eb002e982e9d373273cda37aa20a7d136bb66ded8`
+and `af152cef9ec7aa97c4080bed869600a4fe011ab592cb4a9ec5f6833bc180fa0f`.
+
+The released parser also rejects three compact flow mappings where a
+property follows an anchored plain path on the same line. The previous
+and current Rust readers accept these inputs, including the example using
+only recognized fields. Both readers accept the neutral unanchored
+controls. This syntax difference remains open. The independent report
+`compact-extended/compare-candidate-02.json` has SHA-256
+`2921353a514010512934e8462df7b3dc7ac12e3cf90ce6ef53b56324c3e87423`.
 
 ## Native runner and observed results
 

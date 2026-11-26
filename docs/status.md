@@ -8,13 +8,16 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
-The Fedora x64 YAML adapter now preserves U+2028 and U+2029 in the watch
-path, album name, log directory and filters. All 67 profiles passed. Two
-different managed assemblies from the .NET 3.0.4 release read and resaved
-the same 34 Rust outputs on Fedora. The four-host repeat and an independent
-finding about anchors inside ignored properties are open.
+The Fedora x64 YAML adapter preserves U+2028 and U+2029 in the watch
+path, album name, log directory and filters. It also resolves aliases
+against declarations on recognized configuration values when an ignored
+property reuses the name. All 74 profiles and 204 C# readbacks passed.
+The two managed assemblies from .NET 3.0.4 each read and resaved 34
+Unicode outputs and 22 alias outputs from the same frozen Rust build.
+A hosted four-target repeat is pending. Both Rust revisions also accept
+three compact mapping inputs rejected by the shipping reader.
 [Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
-[Anchor witness](rust/rw02-yaml.md#an-anchor-inside-an-ignored-property).
+[Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 
 At `ead9fb3` all 20 regular PR checks passed, including all four native
 feasibility jobs. The separate desktop workflow is measuring this revision
