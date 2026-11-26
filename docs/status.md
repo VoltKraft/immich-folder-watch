@@ -19,16 +19,17 @@ three compact mapping inputs rejected by the shipping reader.
 [Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
 [Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 
-The signed Linux 3.0.4 launch fixture now supports both native architectures.
-The Fedora x64 regression reopened the original X window and completed both
-normal exits and uninstall. The original ARM64 bundle and both external GL
-deployments passed independent signature verification. The installer workflow
-will exercise both Ubuntu desktops.
-[Shipping launch inputs and readbacks](rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64).
+At `5b6cebf` both native Ubuntu hosts reopened the original signed 3.0.4
+Flatpak window on an ordinary second launch. Both processes exited zero
+and the private uninstall completed. All four reference packages also passed
+installation, repair, removal and retained-profile readback.
+[Installed launch and repair results](rust/rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf).
 
 At `ead9fb3` all 20 regular PR checks passed, including all four native
-feasibility jobs. The separate desktop workflow is measuring this revision
-on its own hosts.
+feasibility jobs. The two Ubuntu desktops met all eleven resource limits.
+All 120 x64 and 186 ARM64 window requests issued during file reads completed
+while reads were still in progress. Windows measurements are in progress.
+[Ubuntu observations](rust/rw02-native-gui.md#ubuntu-native-results-at-ead9fb3) ·
 [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602415) ·
 [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688).
 

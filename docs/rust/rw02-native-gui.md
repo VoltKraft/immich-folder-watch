@@ -856,6 +856,18 @@ operations. The combined desktop readback has SHA-256
 `0c70111c32486bacc884134738a343082c4196ed5454325aaadd16b0f1caa60a`.
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993553466) · [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993788718).
 
+### Ubuntu native results at ead9fb3
+
+Both Ubuntu desktops met all eleven same-host resource limits. The x64 GUI
+completed all 120 requests issued during observed file reads and ARM64 all
+186. Each ordinary second launch reopened the original window during
+inventory. The replay checked the original host-specific .NET reference,
+Rust build and independent file observations. The combined readback in
+`artifacts/rust/hosted-desktop-storage/45865602688/ubuntu-four-target-run-linux-desktop-readback.json`
+has SHA-256 `7fe27b50e5548be94e1f99a2299ce84d42fe60b78b29eb0bbca6f778b478ba73`.
+[x64 measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15143181045) ·
+[ARM64 measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15142177818).
+
 ### Ubuntu native results at e2f161b
 
 Both Ubuntu desktops met all eleven limits in three inventory trials of

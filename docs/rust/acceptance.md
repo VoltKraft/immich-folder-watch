@@ -40,6 +40,14 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+Both native Ubuntu architectures reopened the same signed shipping window
+after an ordinary secondary Flatpak launch at `5b6cebf`. All four original
+3.0.4 packages also passed installation, repair, removal and retained-profile
+readback. The paired Ubuntu Rust desktop measurements at `ead9fb3` met all
+eleven resource limits on each architecture.
+[Shipping packages](rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf) ·
+[Linux measurements](rw02-native-gui.md#ubuntu-native-results-at-ead9fb3).
+
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known
 values retain their own anchors when later unknown properties reuse a

@@ -159,7 +159,31 @@ completed. Independent readback verified all 16 indexed artifacts and
 `45fe6f958a362cfb65842f2b3fb5cfa29b8814328988b988e61da98c28741bc9`
 and `gl-metadata-_rxwgfas/summary.json` has SHA-256
 `c0952b5e3f5ec797cef329669384b5fcd4f51b8b960e38c2f12a206d905c8b04`.
-Native Ubuntu desktop outcomes are pending.
+
+### Two signed launches on both Ubuntu architectures at 5b6cebf
+
+Both native Ubuntu 24.04 hosts ran the installed 3.0.4 application twice with
+Flatpak 1.14.6 on Xvfb. On each private desktop, the second process (PID 101)
+reopened the original process's window (PID 55, XID 4194316). Both processes
+exited zero and the test installation was empty after uninstall. The actual
+apphost had ELF machine 62 on x64 and 183 on ARM64. Its bytes and the managed
+application DLL matched independent extraction of the corresponding bundle.
+Both launch archives contained the same 13 frozen observer sources, plus
+the eight revision-matched staging sources and both Flathub signature checks.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15141904395) ·
+[ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15143162730).
+
+The same four-host job matrix completed installation, repair and uninstall
+of the published reference packages. All 785 entries per Flatpak and all
+439 x64 or 438 ARM64 MSI payload files matched the original packages after
+repair. The four synthetic profiles retained their original YAML and all
+SQLite rows and row IDs. Under `artifacts/rust/hosted-shipping-install/45871571606/`,
+the SHA-256 values of `linux-x64-hosted-review.json`,
+`linux-arm64-hosted-review.json` and `installer-readback.json` are
+`4ffc38a79b59536c7d4b64deb69780633d0cd500e74b0962372b68ca62725fe4`,
+`9704cf2186407f08e95ab0d2fec8ccb5cd9483d1d8a807e9c50c72cdc0436147`
+and `424dc4872733d9a23ab6f52f0cc185098943e806e63c740eaadeddd5b2650470`.
+[Four native installer jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606).
 
 ## Installed reference on all four hosts
 
