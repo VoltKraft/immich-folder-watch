@@ -56,8 +56,53 @@ $check = [InstalledQuitReceiver].GetMethod('Matches', [type[]]@([IntPtr], [uint3
 if ($null -eq $check -or -not $check.IsStatic -or $check.ReturnType -ne [bool]) {
     throw 'Missing compiled receiver identity check.'
 }
+# Compile the exact delegate used by the native observer without invoking the native helper on this desktop.
+$close = $type[0].GetMethod('Close', [type[]]@([int])).CreateDelegate([Func[int,string]])
+if ($close.Method.DeclaringType -ne $type[0] -or $close.Method.Name -cne 'Close') { throw 'Incorrect Quit delegate.' }
+$observer = [InstalledQuitReceiver]::new()
+$rc = [InstalledQuitReceiver+Rect]@{ left=-1920; top=-100; right=-891; bottom=675 }
+$point = [InstalledQuitReceiver]::Interior($rc)
+if ($point.x -ne -1149 -or $point.y -ne 481) { throw 'Incorrect physical anchor on a monitor with negative coordinates.' }
+$hit = [InstalledQuitReceiver+Window]@{ hwnd=101; root=100; pid=20; tid=21; rootPid=20; rootTid=21 }
+$observer.anchor.clientRect = $rc
+$observer.anchor.point = $point
+$observer.anchor.before = $hit
+$observer.anchor.after = $hit
+$observer.anchor.cursor = $point
+$observer.anchor.physicalCursor = $point
+if (-not $observer.Confirmed($rc, 100, 20, 21)) { throw 'Refused the original root and its owned child.' }
+$observer.anchor.dpiContext = 'per-monitor-v2'
+$wire = ($observer.anchor | ConvertTo-Json -Depth 8) | ConvertFrom-Json -AsHashtable
+if ($wire.point.x -isnot [long] -or $wire.after.rootTid -ne 21 -or $wire.clientRect.left -ne -1920 -or
+    $wire.physicalCursor.y -ne 481 -or $wire.dpiContext -cne 'per-monitor-v2') { throw 'Lost the physical anchor in JSON.' }
+foreach ($field in @('hwnd', 'root', 'pid', 'tid', 'rootPid', 'rootTid')) {
+    $value = $hit.$field
+    $hit.$field = 0
+    if ($observer.Confirmed($rc, 100, 20, 21)) { throw "Accepted an unbound hit field: $field" }
+    $hit.$field = $value
+}
+$foreign = [InstalledQuitReceiver+Window]@{ hwnd=102; root=99; pid=20; tid=21; rootPid=20; rootTid=21 }
+foreach ($name in @('before','after')) {
+    $observer.anchor.$name = $foreign
+    if ($observer.Confirmed($rc, 100, 20, 21)) { throw "Accepted a different root at $name." }
+    $observer.anchor.$name = $hit
+}
+$shifted = [InstalledQuitReceiver+Point]@{ x=$point.x+1; y=$point.y }
+foreach ($name in @('cursor','physicalCursor','point')) {
+    $observer.anchor.$name = $shifted
+    if ($observer.Confirmed($rc, 100, 20, 21)) { throw "Accepted an altered $name." }
+    $observer.anchor.$name = $point
+}
+$rc.right += 1
+if ($observer.Confirmed($rc, 100, 20, 21)) { throw 'Accepted a changed client rectangle.' }
+try {
+    $null = [InstalledQuitReceiver]::Interior([InstalledQuitReceiver+Rect]@{ left=10; top=10; right=11; bottom=11 })
+    throw 'Accepted an empty interior.'
+} catch [Management.Automation.MethodInvocationException] {
+    if ($_.Exception.InnerException.Message -cne 'The original client rectangle has no interior menu anchor.') { throw }
+}
 $tokens = $null
 $errors = $null
 $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'quit.ps1'), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw $errors[0].Message }
-Write-Output "Validated both checkout line endings, altered-source refusals and native C# compilation. SHA-256 $expectedHash"
+Write-Output "Validated both checkout line endings, altered-source refusals, native C# compilation and owned physical anchor controls. SHA-256 $expectedHash"

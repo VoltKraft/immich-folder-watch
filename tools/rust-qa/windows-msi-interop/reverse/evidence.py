@@ -109,6 +109,21 @@ def worker_files(out, expected):
     return messages
 
 
+def verify_menu_anchor(menu, root):
+    anchor = menu["anchor"]
+    rect, point = anchor["clientRect"], anchor["point"]
+    width, height = rect["right"] - rect["left"], rect["bottom"] - rect["top"]
+    expected = dict(x=rect["left"] + 3 * width // 4, y=rect["top"] + 3 * height // 4)
+    if (menu["root"] != root["hwnd"] or menu["stage"] != "original-close" or anchor["dpiContext"] != "per-monitor-v2"
+            or min(width, height) < 4 or point != expected
+            or point != anchor["cursor"] or point != anchor["physicalCursor"]):
+        raise ValueError("The tray menu anchor is outside the original WPF client or changed DPI coordinates")
+    for hit in (anchor["before"], anchor["after"]):
+        if (hit["hwnd"] <= 0 or (hit["root"], hit["pid"], hit["tid"]) != (root["hwnd"], root["pid"], root["tid"])
+                or (hit["rootPid"], hit["rootTid"]) != (root["pid"], root["tid"])):
+            raise ValueError("The tray menu anchor belongs to a different WPF window or thread")
+
+
 def shutdown(row, messages, menu, post_quit_console):
     q = row["quit"]
     if q["empty"] is not True:
@@ -118,6 +133,7 @@ def shutdown(row, messages, menu, post_quit_console):
             raise ValueError("Missing evidence of owned cleanup after unavailable Quit")
         return dict(method=q["method"], orderlyProcessExit=False, reason=q["error"])
     root = row["root"]
+    verify_menu_anchor(menu, root)
     popup = menu["menuHwnd"]
     interaction = f"tray-menu-quit; popup={popup}; verifiedHighlightedCommandId=3; nativeMouseClick"
     if (q["method"] != "shipping tray Quit" or q["exit"] != 0 or menu["status"] != "invoked"

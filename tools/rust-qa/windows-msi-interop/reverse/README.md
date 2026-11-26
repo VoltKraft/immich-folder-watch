@@ -22,8 +22,12 @@ compiles the checksum-pinned C# menu helper from the original
 [3.0.4 upgrade test](../../../../packaging/windows/Test-InstalledUpgrade.ps1).
 The helper opens the product's context menu, locates command 3 in the
 owned popup, checks the cursor and highlighted item, and selects Quit
-with a mouse click. The receipt retains the helper's original result
-and the popup handle.
+with a mouse click. WPF positions the menu at the cursor. The observer
+places the cursor inside the original visible WPF client, verifies the
+physical screen position and owning UI thread, and runs the helper in
+the same per-monitor DPI context. The receipt retains the original
+window and anchor, the helper's result and the popup handle. A refusal
+also captures the observed foreground window and owned popup geometry.
 The genuine interaction with the Explorer notification icon has its own
 [Windows Shell test](../../../../docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback).
 

@@ -465,3 +465,35 @@ ROWIDs 1 and 2 in the final database. The local review files are under
 The combined `comparison.json` has SHA-256
 `2fbe453f1342b12e84fddc3992e3ee7e9ecdadce6985db25354b7a2c85dc0678`.
 Both hosts recorded the same two image byte sequences as the Fedora run.
+
+### Installed Windows worker restart at 2dd5f93
+
+Both original Windows 3.0.4 packages uploaded the first synthetic PNG to
+the private peer. On each host the held HTTP request matched the installed
+WPF process's native IPv4 connection. The original database main file
+alone contained no upload row. Its 16 WAL frames restored the committed
+first row. Rust refused the empty pre-upload state, then returned a
+standalone database with the same schema, rows and ROWIDs as the live
+main/WAL pair.
+
+On x64 the original process (PID 4720) quit via the verified native
+menu. The next installed process (PID 6016) opened the returned database
+and uploaded only the second PNG. Both image requests received HTTP 201.
+The final database preserved the first mapping at ROWID 1 and added
+the second at ROWID 2. Both original jobs drained with exit zero and
+the workers recorded the shutdown signal and start of flushing. The
+shipping worker has no independent flush-completion message.
+
+On ARM64 the first worker (PID 2268) completed the upload and live
+backup. The original upgrade test refused to click because its test of
+the Quit item's screen point and popup ownership failed. Its error
+does not identify which condition failed. The observer reaped its own
+process. This run ended before restoring the database or starting
+a second worker. Both MSIs uninstalled successfully and both synthetic
+profiles were removed. Detached replay at the measured commit confirmed
+the x64 full result and the ARM64 live-only result.
+
+| Original archive | ZIP SHA-256 | Returned SQLite SHA-256 |
+| --- | --- | --- |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825745/artifacts/15155041349) | `51fe553ac73d0dd7e0e7bb84a0b8b635d75052b851b85ee1966cd5a86b9d717e` | `c0e4061210df6af078b560f6a0d6ed1efd61817a20145b386abc88e19536f39a` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825745/artifacts/15154303301) | `6c487bf78164eae1afdbf3e686b0299083b5a29f39da80d5805ddba292dbafbe` | `60721a7f047b30d4801168e14ae6aa48b76fabe5e0e80394e569c6854d018ee4` |

@@ -84,10 +84,10 @@ def run(target, package, build):
                                 or transaction.get("checkpoints", {}).get("after", {}).get("appProcesses") != 0):
                             raise launch.recorder.CleanupUnconfirmed("Owned installed WPF cleanup could not be confirmed")
                 record["profileRemoved"] = not profile.exists()
-                result.check_returncode()
         record["scratchRemoved"] = not work.exists()
         record["msiTransactions"] = {name: dict(nativePath=str(out / name), sha256=sha(out / name))
-                                     for name in ("install.log", "uninstall.log")}
+                                     for name in ("install.log", "uninstall.log") if (out / name).is_file()}
+        result.check_returncode()
         from upload.readback import verify
         record["checks"] = verify(out, record, False)
         record["status"] = "observed"

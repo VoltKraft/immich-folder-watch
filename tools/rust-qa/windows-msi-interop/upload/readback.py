@@ -67,16 +67,18 @@ def original_wpf(out, report, live_only):
         verify_transactions(out, {"install.log": tx}, [tx["operation"]], installed["identity"], target, install_only=True)
     else:
         end = read(out / "msi-result.json")
-        require(end["status"] == "passed" and end["target"] == report["target"] and end["sourceCommit"] == report["revision"]
+        require(end["target"] == report["target"] and end["sourceCommit"] == report["revision"]
                 and str(end["workflowRun"]) == report["run"] and end["releaseCommit"] == release["commit"]
                 and end["format"] == "ifw-msi-interop-operations-v1" and end["package"] == installed["package"]
-                and end["identity"] == installed["identity"] and end["checkpoints"]["installed"] == installed["state"]
-                and end["cleanup"]["msiRemoved"] and end["cleanup"]["packageCode"] == installed["identity"]["packageCode"]
+                and end["identity"] == installed["identity"] and end["checkpoints"]["installed"] == installed["state"],
+                "The final installer record belongs to a different package, process or observation")
+        require(end["cleanup"]["msiRemoved"] and end["cleanup"]["packageCode"] == installed["identity"]["packageCode"]
                 and end["operations"][0] == tx["operation"] and tx["sha256"] == report["msiTransactions"]["install.log"]["sha256"]
                 and all(not any(end["checkpoints"][key][field] for field in
                                 ("installDirectory", "appProcesses", "relatedProducts", "registered")) for key in ("before", "after"))
                 and report["profileRemoved"] and report["scratchRemoved"], "Installed WPF removal and cleanups did not finish")
         verify_transactions(out, report["msiTransactions"], end["operations"], installed["identity"], target)
+        require(end["status"] == "passed", "The WPF observation was incomplete before uninstall. See upload-observation.json.")
     return installed
 
 

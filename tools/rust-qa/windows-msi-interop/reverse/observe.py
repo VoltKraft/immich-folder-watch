@@ -77,6 +77,10 @@ def invoke_quit(launch, api, windows, primary, out, row):
     if not receiver or receiver[1] != row["root"]["tid"] or primary.poll() is not None:
         raise ValueError("The shipping tray receiver is unavailable on the original UI thread")
     hwnd, tid = receiver
+    root = row["root"]["hwnd"]
+    owned_root(windows, root, primary.pid, tid)
+    if not windows.is_visible(root):
+        raise ValueError("The original WPF root must be visible for the tray menu anchor")
     q = row["quit"]
     q.update(receiver=hwnd, tid=tid, issuedQpc=api.clock())
     pwsh = shutil.which("pwsh")
@@ -84,7 +88,7 @@ def invoke_quit(launch, api, windows, primary, out, row):
         raise ValueError("The installed test runner needs PowerShell 7 for the original Quit helper")
     subprocess.run([pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
                     "-ProcessId", str(primary.pid), "-Created", str(row["primary"]["created"]),
-                    "-Receiver", str(hwnd), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"],
+                    "-Receiver", str(hwnd), "-Root", str(root), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"],
                    cwd=out, check=True, timeout=35)
     code = launch.wait_for_exit(primary, windows.pump, 30)
     if code:

@@ -184,8 +184,12 @@ each archived return. The Windows entry point passed type checking on
 both MSVC targets. At `f5322ff` the native builds and 40 C# checks per
 host passed. On both Windows architectures a portable test opened its
 UTF-8 fixture with code page 1252 and failed before MSI installation.
-The reader now specifies UTF-8. Installed Windows upload and restart
-results are pending.
+At `2dd5f93` both installed Windows workers uploaded a PNG and Rust
+returned their committed history from 16 WAL frames. On x64 the restarted
+WPF process opened that backup and uploaded only the second PNG. On ARM64
+the native menu helper declined the first Quit selection during its hit
+and ownership check. The ARM64 restore and second upload remain open.
+[Both native Windows backups and the x64 restart](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-2dd5f93) ·
 [Original Windows build and test logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45896231136) ·
 [Native commands](development.md#installed-windows-worker-backup) ·
 [Original Ubuntu databases](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).

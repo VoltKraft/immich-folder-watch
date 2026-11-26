@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 # Use the original installer test's own menu selection on the observer's held WPF process.
 param([Parameter(Mandatory)][int]$ProcessId, [Parameter(Mandatory)][long]$Created,
-      [Parameter(Mandatory)][long]$Receiver, [Parameter(Mandatory)][int]$ThreadId,
+      [Parameter(Mandatory)][long]$Receiver, [Parameter(Mandatory)][long]$Root, [Parameter(Mandatory)][int]$ThreadId,
       [Parameter(Mandatory)][string]$Evidence)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -11,12 +11,13 @@ if (-not $IsWindows -or -not [Environment]::Is64BitProcess -or $env:GITHUB_ACTIO
     $env:GITHUB_REPOSITORY -ine 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') {
     throw 'Expected native PowerShell 7 on the disposable Windows rewrite runner.'
 }
-if ($ProcessId -le 0 -or $Created -le 0 -or $Receiver -le 0 -or $ThreadId -le 0) {
-    throw 'Expected the original process, creation time, receiver HWND and UI thread.'
+if ($ProcessId -le 0 -or $Created -le 0 -or $Receiver -le 0 -or $Root -le 0 -or $Root -eq $Receiver -or $ThreadId -le 0) {
+    throw 'Expected the original process, creation time, distinct root and receiver HWNDs and UI thread.'
 }
 . (Join-Path $PSScriptRoot 'quit-source.ps1')
-$record = [ordered]@{ pid = $ProcessId; created = $Created; receiver = $Receiver; tid = $ThreadId; status = 'incomplete' }
+$record = [ordered]@{ pid = $ProcessId; created = $Created; root = $Root; receiver = $Receiver; tid = $ThreadId; status = 'incomplete'; stage = 'identity' }
 $process = $null
+$observer = $null
 try {
     $source = Get-InstalledUpgradeQuitSource
     $record.sourceSha256 = $source.Sha256
@@ -32,7 +33,9 @@ try {
         -not [InstalledQuitReceiver]::Matches([IntPtr]$Receiver, [uint32]$ProcessId, [uint32]$ThreadId) -or $process.HasExited) {
         throw 'The installed WPF process, creation time, tray receiver, thread or input desktop changed.'
     }
-    $result = [UpgradeTestTrayQuit]::Close($ProcessId)
+    $observer = [InstalledQuitReceiver]::new()
+    $close = [UpgradeTestTrayQuit].GetMethod('Close', [type[]]@([int])).CreateDelegate([Func[int,string]])
+    $result = $observer.Invoke([IntPtr]$Root, [IntPtr]$Receiver, [uint32]$ProcessId, [uint32]$ThreadId, $close)
     $record.rawInteraction = $result
     if ($result -cnotmatch '\Atray-menu-quit; popup=([1-9][0-9]*); verifiedHighlightedCommandId=3; nativeMouseClick\z') {
         throw 'Missing the original checked Quit command and mouse selection.'
@@ -42,8 +45,14 @@ try {
 }
 catch { $record.error = $_.Exception.Message; throw }
 finally {
+    if ($null -ne $observer) {
+        $record.stage = $observer.stage
+        $record.anchor = $observer.anchor
+        if ($null -ne $observer.diagnostic) { $record.diagnostic = $observer.diagnostic }
+        if ($observer.diagnosticError) { $record.diagnosticError = $observer.diagnosticError }
+    }
     if ($null -ne $process) { $process.Dispose() }
-    $bytes = [Text.Encoding]::UTF8.GetBytes(($record | ConvertTo-Json -Depth 4))
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($record | ConvertTo-Json -Depth 8))
     $file = [IO.File]::Open($Evidence, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
     try { $file.Write($bytes, 0, $bytes.Length) } finally { $file.Dispose() }
 }

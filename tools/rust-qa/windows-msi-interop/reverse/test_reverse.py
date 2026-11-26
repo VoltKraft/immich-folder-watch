@@ -83,11 +83,19 @@ class ReverseTests(unittest.TestCase):
         q = row["quit"] = dict(receiver=135, tid=150, issuedQpc=230, exitedQpc=260, method="shipping tray Quit", exit=0, empty=True)
         menu = dict(status="invoked", pid=11, created=100, receiver=135, tid=150, menuHwnd=170,
                     sourceSha256=QUIT_SOURCE, rawInteraction="tray-menu-quit; popup=170; verifiedHighlightedCommandId=3; nativeMouseClick")
+        hit = dict(hwnd=70, root=70, pid=11, tid=150, rootPid=11, rootTid=150)
+        point = dict(x=301, y=172)
+        menu.update(root=70, stage="original-close", anchor=dict(dpiContext="per-monitor-v2", clientRect=dict(left=1, top=22, right=401, bottom=222),
+                    point=point, before=hit, after=hit, cursor=point, physicalCursor=point))
         suffix = "info: ImmichFolderWatch.Core.Services.FolderWatchWorker[0] Flushing pending uploads before shutdown."
         self.assertTrue(shutdown(row, messages, menu, suffix)["flushStarted"])
         self.assertEqual(shutdown(row, messages, menu, suffix)["flushCompletion"], "unobserved")
         self.assertFalse(shutdown(row, messages, menu, "")["flushStarted"])
         self.assertFalse(shutdown(row, messages[:1], menu, suffix)["flushStarted"])
+        for override in ({"physicalCursor": dict(x=300, y=172)}, {"after": {**hit, "root": 71}}, {"before": {**hit, "rootPid": 19}},
+                         {"point": dict(x=401, y=222)}, {"dpiContext": "virtualized"}):
+            with self.assertRaisesRegex(ValueError, "tray menu anchor"):
+                shutdown(row, messages, {**menu, "anchor": {**menu["anchor"], **override}}, suffix)
         for key, bad in (("menuHwnd", 0), ("menuHwnd", 171), ("status", "incomplete"), ("pid", 99),
                          ("sourceSha256", "other"), ("rawInteraction", menu["rawInteraction"].replace("Id=3", "Id=2"))):
             with self.assertRaises(ValueError):

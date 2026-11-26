@@ -64,6 +64,12 @@ remains an RW-07 requirement.
 [Native Ubuntu handover](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
 [Fedora handover and earlier Ubuntu failure](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 
+At `2dd5f93` the installed Windows x64 worker reopened its live
+Rust backup after a real upload. Only the second PNG was uploaded at
+restart. Native ARM64 confirmed the first upload and live backup before
+its Quit observer stopped. Both original Windows MSIs were removed.
+[Installed Windows recovery and source archives](rw01-storage-contract.md#installed-windows-worker-restart-at-2dd5f93).
+
 At `1d3af9a` a normal start of the installed WPF 3.0.4 executable on
 Windows x64 and ARM64 reopened the retained Rust primary in the same
 session. Each original Rust inventory worker read the new file twice.
