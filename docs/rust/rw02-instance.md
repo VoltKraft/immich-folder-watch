@@ -1092,3 +1092,28 @@ found no installed application process, package registration or payload.
 | [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15155431066) | `5799dfb0026c5483a87135e0e418ddb83d8c49ed14bc859186cb7e43fad6975d` |
 | [x64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15154599378) | `abf53ba873af848b4c89b21dc34454e23c8fd3375222080cfb451828a20844d9` |
 | [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45897825893/artifacts/15155376181) | `ab6ffed21def514155262ec1ec7f522157d19d85cd27780895a01b81dd21c230` |
+
+## Installed Windows activation at f8cf6b1
+
+The x64 WPF primary reopened its original window (HWND 589850, PID
+9720, thread 9884) and exited zero after the shipping helper selected
+Quit. The Rust secondary (PID 9504) exited zero. The original worker
+logged the shutdown signal and the start of flushing. The ARM64 WPF
+primary (HWND 459236, PID 1208, thread 8000) also reopened. The test
+stopped before moving the cursor because its planned Quit point belonged
+to a different foreground process. The separate replay confirmed
+activation on both hosts.
+
+With Rust primary, the ARM64 original worker completed both observed
+file queries. WPF exited after its second launch, Rust quit normally
+and the job emptied. On x64 the application recorded both inventories
+but the kernel tracer reported 1,273 lost events. The independent file
+and full-cleanup proof for that run is incomplete. The four original
+MSI install and uninstall transactions all returned zero.
+
+| Original native archive | ZIP SHA-256 |
+| --- | --- |
+| [x64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15155267748) | `c032cdb25a97f4276359924d46b1200c11ec7a511a275e41b6195d2f203cfc42` |
+| [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15155143034) | `d09885f560b4405b404842f52225c67feb57e7ba2471484ea7e41a181261e41b` |
+| [x64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15156305512) | `8c41c642e85c88cf1592de5a126bd957e3e5298e96170d9de46973bb2244d8f8` |
+| [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15155987051) | `627b11ef91e997760e8387c0f2fe97b273d1e1f0432121e81fdc6db9fcb8b30a` |

@@ -261,6 +261,29 @@ struct TraceProperties {
     }
 };
 
+// Loss counters from this sparse trial's own session, before and after the two observed passes.
+static bool sparse_counters(const char* phase, const EVENT_TRACE_PROPERTIES& p) {
+    LARGE_INTEGER at{};
+    if (!QueryPerformanceCounter(&at)) return false;
+    std::printf("MSI_ETW %s pid=%lu qpc=%lld mode=%lu eventsLost=%lu logLost=%lu realtimeLost=%lu allocated=%lu written=%lu\n",
+                phase, owner, at.QuadPart, p.LogFileMode, p.EventsLost, p.LogBuffersLost, p.RealTimeBuffersLost,
+                p.NumberOfBuffers, p.BuffersWritten);
+    constexpr ULONG modes = EVENT_TRACE_FILE_MODE_SEQUENTIAL | EVENT_TRACE_INDEPENDENT_SESSION_MODE;
+    return (p.LogFileMode & modes) == modes && !p.EventsLost && !p.LogBuffersLost && !p.RealTimeBuffersLost;
+}
+
+static bool sparse_query(TRACEHANDLE session, const GUID& id, const char* phase) {
+    TraceProperties snapshot;
+    snapshot.p.Wnode.Guid = id;
+    snapshot.p.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+    ULONG result = ControlTraceW(session, nullptr, &snapshot.p, EVENT_TRACE_CONTROL_QUERY);
+    if (result != ERROR_SUCCESS) {
+        std::printf("MSI_QUERY_ERROR %s %lu\n", phase, result);
+        return false;
+    }
+    return IsEqualGUID(snapshot.p.Wnode.Guid, id) && sparse_counters(phase, snapshot.p);
+}
+
 int wmain(int argc, wchar_t** argv) {
     if (argc < 4) return 2;
     if (!wcscmp(argv[1], L"--stop-owned") && argc == 4)
@@ -268,7 +291,8 @@ int wmain(int argc, wchar_t** argv) {
     if (argc != 6) return 2;
     const std::wstring name = argv[2], etl = argv[3], subject = argv[5];
     GUID guid{};
-    if (!ifw_etw::identity(name, L"IFW-Files-", guid) || (subject != L"wpf" && subject != L"rust")) return 2;
+    const bool sparse = subject == L"msi-rust";
+    if (!ifw_etw::identity(name, L"IFW-Files-", guid) || (!sparse && subject != L"wpf" && subject != L"rust")) return 2;
     wpf = subject == L"wpf";
     owner = std::wcstoul(argv[1], nullptr, 10);
     const std::wstring dos = argv[4];
@@ -287,19 +311,31 @@ int wmain(int argc, wchar_t** argv) {
     p.MaximumBuffers = 512;
     p.MaximumFileSize = 3072;
     p.LogFileMode = EVENT_TRACE_FILE_MODE_SEQUENTIAL;
+    if (sparse) p.LogFileMode |= EVENT_TRACE_INDEPENDENT_SESSION_MODE;
     std::copy(name.begin(), name.end(), q.logger);
     std::copy(etl.begin(), etl.end(), q.filename);
     TRACEHANDLE session{};
     ULONG status = StartTraceW(&session, name.c_str(), &p);
     if (status != ERROR_SUCCESS) { std::printf("START_ERROR %lu\n", status); return 3; }
     status = enable(session);
-    if (status == ERROR_SUCCESS) {
+    bool intact = true;
+    if (status == ERROR_SUCCESS && sparse) intact = sparse_query(session, guid, "attached");
+    if (status == ERROR_SUCCESS && intact) {
         std::printf("READY %lu %s\n", owner, wpf ? "wpf" : "rust");
         std::fflush(stdout);
         (void)std::getchar();
     }
+    if (status == ERROR_SUCCESS && sparse) {
+        const bool captured = sparse_query(session, guid, "captured");
+        // Stop delivery to this handle while its buffers are still live, after the parent's second acknowledgment.
+        status = EnableTraceEx2(session, &kernel_file, EVENT_CONTROL_CODE_DISABLE_PROVIDER, 0, 0, 0, 5000, nullptr);
+        std::printf("MSI_DISABLE %lu\n", status);
+        const bool disabled = sparse_query(session, guid, "disabled");
+        intact = intact && captured && disabled;
+    }
     ULONG stopped = ControlTraceW(session, nullptr, &p, EVENT_TRACE_CONTROL_STOP);
-    if (status || stopped || p.EventsLost || p.LogBuffersLost) {
+    if (sparse && stopped == ERROR_SUCCESS) intact = sparse_counters("stopped", p) && intact;
+    if (status || stopped || !intact || p.EventsLost || p.LogBuffersLost) {
         std::printf("TRACE_ERROR %lu %lu %lu %lu\n", status, stopped, p.EventsLost, p.LogBuffersLost);
         if (stopped == ERROR_SUCCESS) {
             std::printf("BUFFER_STATS sizeKiB=%lu minimum=%lu maximum=%lu allocated=%lu written=%lu\n",
@@ -313,9 +349,17 @@ int wmain(int argc, wchar_t** argv) {
     input.EventRecordCallback = event_record;
     TRACEHANDLE trace = OpenTraceW(&input);
     if (trace == INVALID_PROCESSTRACE_HANDLE) return 5;
+    const ULONG header_events_lost = input.LogfileHeader.EventsLost;
+    const ULONG header_buffers_lost = input.LogfileHeader.BuffersLost;
     status = ProcessTrace(&trace, 1, nullptr, nullptr);
     CloseTrace(trace);
-    if (status || input.EventsLost) { std::printf("DECODE_ERROR %lu %lu\n", status, input.EventsLost); return 6; }
+    if (sparse) {
+        std::printf("MSI_DECODE %lu %lu %lu\n", status, header_events_lost, header_buffers_lost);
+        if (status || header_events_lost || header_buffers_lost) return 6;
+    } else if (status || input.EventsLost) {
+        std::printf("DECODE_ERROR %lu %lu\n", status, input.EventsLost);
+        return 6;
+    }
     std::printf("COUNTS %llu %llu %llu %llu %llu %zu %u %u\n", starts, ends, failed, unmatched, schema_errors,
                 pending.size(), duplicates, impossible_order);
     for (unsigned pass = 0; pass < sweeps.size(); ++pass) {

@@ -18,12 +18,13 @@ def verify_suspended_secondary(api, second):
 
 
 @contextmanager
-def file_trace(recorder, helper, trial, out, worker, record):
+def file_trace(recorder, helper, trial, out, worker, record, *, independent):
     name = "IFW-Files-" + uuid.uuid4().hex
     etl = trial / "files.etl"
     path = out / "files.log"
     with path.open("xb", buffering=0) as stream:
-        child = subprocess.Popen([helper, str(worker), name, etl, trial / "empty", "rust"], cwd=trial,
+        subject = "msi-rust" if independent else "rust"
+        child = subprocess.Popen([helper, str(worker), name, etl, trial / "empty", subject], cwd=trial,
                                  stdin=subprocess.PIPE, stdout=stream, stderr=subprocess.STDOUT)
         try:
             recorder.await_value(lambda: child.poll() is not None or f"READY {worker} rust".encode() in path.read_bytes().splitlines(),
@@ -33,9 +34,11 @@ def file_trace(recorder, helper, trial, out, worker, record):
             yield
         finally:
             recorder.finish_owned_trace(child, helper, trial, etl, name, 45)
-        if child.returncode or not etl.stat().st_size:
-            raise ValueError("The original worker file events could not be decoded")
-        record.update(etlBytes=etl.stat().st_size, etlSha256=sha(etl))
+            record["traceExit"] = child.returncode
+            if etl.is_file():
+                record.update(etlBytes=etl.stat().st_size, etlSha256=sha(etl))
+        if child.returncode or not record.get("etlBytes"):
+            raise ValueError(f"The original worker file trace was incomplete (decoder exit {child.returncode})")
         etl.unlink()
 
 
@@ -126,7 +129,8 @@ def exercise(launch, desk, api, gui, trial, env, image, work, out, row):
         challenge = row["challenge"] = {}
         helper = work / "subject/file-observer.exe"
         stack.enter_context(recorder.pin_path(api, helper, False))
-        with file_trace(recorder, helper, trial, out, worker, challenge):
+        with file_trace(recorder, helper, trial, out, worker, challenge,
+                        independent=original["target"] == "x86_64-pc-windows-msvc"):
             staged = trial / "new-file"
             staged.mkdir()
             path = staged / "f0000.jpg"

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from common import AFTER, BEFORE, HERE, QA, launcher, module, sha
 from msi_evidence import activation, sparse_inventory, verify_transactions
@@ -39,7 +40,7 @@ def sample():
                          reopened={**root,"events":events}, afterInventory={**root,"events":events},
                          msiShow=dict(showEvent=show,earliestMs=21,releasedByMs=22,observedMs=25,showMs=24,distinctTicks=True),
                          lifetimeBeforeQuit=[[55,"create",10]]),
-               challenge=dict(introducedAfterQpc=300,observedByQpc=600,etlBytes=64,etlSha256="a"*64,sha256="b"*64))
+               challenge=dict(introducedAfterQpc=300,observedByQpc=600,etlBytes=64,etlSha256="a"*64,sha256="b"*64,traceExit=0))
     log = "\n".join(["LAUNCHER_PRIMARY pid=40", "INVENTORY_WORKER pid=41", "INVENTORY_COMPLETE files=0 changed=0 pass=0",
                      "INVENTORY_COMPLETE files=0 changed=0 pass=1", "WINDOW_HIDDEN", "LAUNCHER_OPEN client=50",
                      "INVENTORY_COMPLETE files=1 changed=1 pass=2", "INVENTORY_COMPLETE files=1 changed=0 pass=3", "DRAINED passes=7"])
@@ -158,3 +159,71 @@ assert Path(sys.modules[verify.__module__].__file__).resolve() == base / 'msi_ev
         row["reopenedByQpc"] = 401
         with self.assertRaises(ValueError):
             activation(row,log,trace,"c"*64)
+
+    def test_independent_x64_trace_requires_zero_loss_from_attach_to_etl_decode(self):
+        row, log, trace = sample()
+        ready, ledger = trace.split("\n", 1)
+        def phase(name, at):
+            return f"MSI_ETW {name} pid=41 qpc={at} mode=134217729 eventsLost=0 logLost=0 realtimeLost=0 allocated=128 written=32"
+        snapshots = [phase("attached",290), ready, phase("captured",610), "MSI_DISABLE 0",
+                     phase("disabled",620), phase("stopped",630), "MSI_DECODE 0 0 0"]
+        original = "\n".join([*snapshots, ledger])
+        def check(text):
+            return activation(row, log, text, "c"*64, independent=True)
+        result = check(original)
+        self.assertEqual(result["fileTracePhases"]["captured"]["qpc"], 610)
+        self.assertEqual([x["fileQpc"] for x in result["kernelFileQueries"]], [420, 570])
+        for index in (0, 2, 4, 5):
+            for old, new in (("eventsLost=0","eventsLost=134"), ("logLost=0","logLost=1"),
+                             ("realtimeLost=0","realtimeLost=1"), ("mode=134217729","mode=1"), ("pid=41","pid=42")):
+                damaged = [*snapshots]
+                damaged[index] = damaged[index].replace(old,new)
+                with self.subTest(index=index, field=old), self.assertRaises(ValueError):
+                    check("\n".join([*damaged,ledger]))
+        for changed in (trace, original.replace("MSI_DECODE 0 0 0","MSI_DECODE 0 1273 0"),
+                        original.replace("MSI_DECODE 0 0 0","MSI_DECODE 0 0 1"),
+                        original.replace("MSI_DISABLE 0","MSI_DISABLE 1460"), original.replace("qpc=610","qpc=599"),
+                        original.replace("B 1 570 570 1", "B 1 0 0 0")):
+            with self.assertRaises(ValueError):
+                check(changed)
+        row["challenge"]["traceExit"] = 4
+        with self.assertRaises(ValueError):
+            check(original)
+
+    def test_file_trace_selects_its_mode_and_records_a_failed_decoder_exit(self):
+        from observe import file_trace
+        for independent, code in ((False,0), (True,0), (True,4)):
+            with self.subTest(independent=independent, exit=code), tempfile.TemporaryDirectory() as tmp:
+                trial = Path(tmp)
+                out = trial / "evidence"
+                out.mkdir()
+                helper = trial / "file-observer.exe"
+                record = {}
+                child = SimpleNamespace(returncode=None, poll=lambda: None)
+                def start(args, **kwargs):
+                    self.assertEqual(args[:2], [helper,"41"])
+                    self.assertEqual(args[3:], [trial / "files.etl",trial / "empty","msi-rust" if independent else "rust"])
+                    kwargs["stdout"].write(b"READY 41 rust\n")
+                    return child
+                def finish(process, observer, area, etl, name, timeout):
+                    self.assertIs(process,child)
+                    self.assertEqual((observer,area,timeout), (helper,trial,45))
+                    self.assertTrue(name.startswith("IFW-Files-"))
+                    etl.write_bytes(b"owned test ETL")
+                    process.returncode = code
+                recorder = SimpleNamespace(await_value=lambda test, *_, **kw: self.assertTrue(test()),
+                                           finish_owned_trace=finish)
+                with patch("observe.subprocess.Popen", side_effect=start):
+                    def capture():
+                        with file_trace(recorder, helper, trial, out, 41, record, independent=independent):
+                            pass
+                    if code:
+                        with self.assertRaisesRegex(ValueError, "decoder exit 4"):
+                            capture()
+                    else:
+                        capture()
+                self.assertEqual(record["traceExit"], code)
+                self.assertEqual(record["etlBytes"], len(b"owned test ETL"))
+                self.assertEqual((trial / "files.etl").exists(), bool(code))
+                if code:
+                    self.assertEqual(record["etlSha256"], sha(trial / "files.etl"))

@@ -26,6 +26,7 @@ def run(target, package, *, wpf_primary=False):
     if wpf_primary:
         record["direction"] = "wpf-primary"
         verify_source_inputs(record["inputs"], record["revision"], True)
+    work = None
     try:
         ordinary = {}
         with tempfile.TemporaryDirectory(dir=os.environ["RUNNER_TEMP"], prefix="ifw-msi-") as raw:
@@ -78,6 +79,8 @@ def run(target, package, *, wpf_primary=False):
         record["files"] = {p.name: sha(p) for p in out.iterdir() if p.is_file() and p.name != "result.json"}
         record["status"] = "observed"
     finally:
+        if work is not None:
+            record["scratchRemoved"] = not work.exists()
         write(out / "result.json", record)
 
 

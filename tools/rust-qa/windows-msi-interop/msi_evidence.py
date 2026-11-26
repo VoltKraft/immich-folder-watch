@@ -11,6 +11,30 @@ from zipfile import ZipFile
 from common import BEFORE, HERE, INSTALLED, QA, ROOT, TARGETS, launcher_variant, read, sha, verify_source_inputs
 
 
+def independent_session(text, worker, earliest, latest):
+    """Join the sparse x64 session's native snapshots to the actual two-pass challenge."""
+    rows = text.splitlines()
+    if (len(rows) < 8 or rows[1] != f"READY {worker} rust" or rows[3] != "MSI_DISABLE 0"
+            or rows[6] != "MSI_DECODE 0 0 0"):
+        raise ValueError("Missing the independent ETW session, provider disable or loss-free ETL decode")
+    phases = {}
+    for name, index in (("attached", 0), ("captured", 2), ("disabled", 4), ("stopped", 5)):
+        match = re.fullmatch(rf"MSI_ETW {name} pid={worker} qpc=(\d+) mode=(\d+) eventsLost=0 logLost=0 "
+                             r"realtimeLost=0 allocated=(\d+) written=(\d+)", rows[index])
+        if not match:
+            raise ValueError("Missing or lossy ETW phase: " + name)
+        qpc, mode, allocated, written = map(int, match.groups())
+        # Sequential file logging with EVENT_TRACE_INDEPENDENT_SESSION_MODE. The SDK may
+        # report additional flags. A circular/overwriting ETL cannot attest the two passes.
+        if mode & 0x08000001 != 0x08000001 or mode & (0x02 | 0x400):
+            raise ValueError("The ETW session did not use independent sequential file logging")
+        phases[name] = dict(qpc=qpc, mode=mode, allocated=allocated, written=written)
+    if not (0 < phases["attached"]["qpc"] <= earliest < latest <= phases["captured"]["qpc"]
+            <= phases["disabled"]["qpc"] <= phases["stopped"]["qpc"] and phases["stopped"]["written"] > 0):
+        raise ValueError("The ETW session counters did not enclose both file reconciliations")
+    return "\n".join(rows[1:2] + rows[7:]), phases
+
+
 def sparse_inventory(text, worker, earliest, latest):
     rows = text.splitlines()
     if len(rows) != 205 or rows[0] != f"READY {worker} rust" or rows[-1] != "COMPLETE":
@@ -163,7 +187,7 @@ def verify_build(out, result):
     return b
 
 
-def activation(row, log, etw, exe_digest):
+def activation(row, log, etw, exe_digest, *, independent=False):
     primary, creation = row["primary"]
     worker, worker_creation = row["worker"]
     sec, root = row["secondary"], row["root"]
@@ -223,8 +247,14 @@ def activation(row, log, etw, exe_digest):
     if (not 0 < sec["releasedAfterQpc"] <= row["reopenedByQpc"] <= challenge["introducedAfterQpc"] < challenge["observedByQpc"]
             or challenge["etlBytes"] <= 0 or not all(re.fullmatch(r"[0-9a-f]{64}", challenge[k]) for k in ("etlSha256","sha256"))):
         raise ValueError("Incomplete post-activation challenge")
-    scans = sparse_inventory(etw, worker, challenge["introducedAfterQpc"], challenge["observedByQpc"])
-    return dict(primary=primary, secondary=client, hwnd=hwnd, worker=worker, workerCreation100ns=worker_creation, kernelFileQueries=scans)
+    earliest, latest = challenge["introducedAfterQpc"], challenge["observedByQpc"]
+    result = dict(primary=primary, secondary=client, hwnd=hwnd, worker=worker, workerCreation100ns=worker_creation)
+    if challenge.get("traceExit") != 0:
+        raise ValueError("The original worker file observer did not exit successfully")
+    if independent:
+        etw, result["fileTracePhases"] = independent_session(etw, worker, earliest, latest)
+    result["kernelFileQueries"] = sparse_inventory(etw, worker, earliest, latest)
+    return result
 
 
 def verify(out, result):
@@ -258,4 +288,5 @@ def verify(out, result):
             or row["stagedProfile"]["worker"] != b["assets"]["ifw-performance-worker.exe"]):
         raise ValueError("Observed image bindings differ from the installed or compiled programs")
     return activation(row, (out / "primary.log").read_text(encoding="utf-8"),
-                      (out / "files.log").read_text(encoding="ascii"), digest)
+                      (out / "files.log").read_text(encoding="ascii"), digest,
+                      independent=result["target"] == "x86_64-pc-windows-msvc")

@@ -74,7 +74,6 @@ restart again. The ARM64 observer captured a foreign foreground window
 over its selected point before the first Quit.
 [Second Windows recovery run](rw01-storage-contract.md#installed-windows-worker-restart-at-f8cf6b1).
 
-
 At `1d3af9a` a normal start of the installed WPF 3.0.4 executable on
 Windows x64 and ARM64 reopened the retained Rust primary in the same
 session. Each original Rust inventory worker read the new file twice.
@@ -84,6 +83,11 @@ each architecture. The reverse WPF trials stopped at the subsequent Quit
 selection. Standard-user cross-session writer exclusion remains open.
 [Native Windows activation and independent readbacks](rw02-instance.md#installed-windows-secondary-at-1d3af9a).
 [Both start orders and native Quit outcome](rw02-instance.md#both-installed-windows-launch-orders-at-ef28520).
+The installed x64 WPF primary passed through orderly Quit at both
+`2dd5f93` and `f8cf6b1`. ARM64 reopened the WPF window at both
+commits. With Rust primary the ARM64 worker passed twice and the two
+recent x64 kernel traces lost events.
+[Repeated native measurements](rw02-instance.md#installed-windows-activation-at-f8cf6b1).
 
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known

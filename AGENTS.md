@@ -287,6 +287,8 @@ to reconcile project decisions, defaults, and recorded state.
   For the [installed Windows second launch](docs/rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running),
   follow the installed executable, original Rust HWND and inventory worker
   through the close and reopen on the same disposable desktop.
+  For the [x64 single-file trace](tools/rust-qa/windows-msi-interop/file-trace.md),
+  retain the four session counter samples and both completed worker queries.
   Run the [opposite start order](tools/rust-qa/windows-msi-interop/reverse/README.md)
   on its own runner and retain the original WPF activation evidence before Quit.
   For the [installed Windows worker backup](docs/development.md#installed-windows-worker-backup),

@@ -214,6 +214,19 @@ a separate executable and retains its compiler stream, library outputs
 and original sources. Its window response under inventory remains open.
 [Pixel counts and native trial](rust/rw02-windows-window.md#cpu-rendering-of-the-original-editor-meshes).
 
+At `d7c084c` both WPF Quit selections and the return of the live
+backup passed for a third time on Windows x64. On the ARM64 runner all
+16 tested points in the original client hit the same foreign foreground
+window. The first upload and 16-frame backup passed. Restore remains open.
+[Native originals](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-d7c084c).
+
+The `f8cf6b1` x64 Rust-primary activation recorded 1,273 lost kernel
+events after an earlier repeat lost 134. The new single-file diagnostic
+records its own session counters at four points and checks the finalized
+ETL header. Both query passes must still complete without event loss.
+[Original activation receipts](rust/rw02-instance.md#installed-windows-activation-at-f8cf6b1) ·
+[Native observation and acceptance](../tools/rust-qa/windows-msi-interop/file-trace.md).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

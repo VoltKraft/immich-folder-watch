@@ -521,3 +521,26 @@ verified WPF hit.
 | --- | --- | --- |
 | [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285120/artifacts/15155246528) | `1f141434ef85ed4ecd8e7230c1e05be9cfb6ca4c8e2fdd0a4392efc4c70b0ed2` | `dde53977b7bc2d3fa89b977806bbed915137acaccf10b65a2a8254935fcfc1c3` |
 | [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285120/artifacts/15155800388) | `413ca579ac3a65947f9e17887710c4306e45ef888fbb21ea70281b27ce1292dd` | `354c2d39c7cfc6d3fa2cbfc2b7792283cd1515a05a165b1858af6d03615d99f2` |
+
+## Installed Windows worker restart at d7c084c
+
+On the hosted x64 desktop both WPF processes again uploaded the expected
+PNG. The first returned mapping kept ROWID 1, and the new mapping used
+ROWID 2. The worker and its replacement each exited via the original
+highlighted Quit command. Both WPF windows owned the very first
+observed menu point. The detached live and full comparisons passed.
+
+On the original ARM64 input desktop, all 16 points sampled across the
+installed client's rectangle belonged to the same foreground window
+(HWND 66052, PID 9008, UI thread 1904). The WPF worker (PID 2600) had
+already uploaded its first PNG. Rust returned the live backup from 16 WAL
+frames. The observer moved no cursor, opened no popup and issued no
+click. The independent live check passed and the full comparison failed
+before restore. Both runners removed the original MSI and synthetic
+profile. The original desktop's owner and geometry receipts are included
+in each archive.
+
+| Windows host | Original ZIP SHA-256 | Returned SQLite SHA-256 |
+| --- | --- | --- |
+| [x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725198/artifacts/15155363507) | `4162fe0a585b303fc4d54d139ffde71df2d28efa772fb19f57793beae46afd53` | `cc3e244a8f8de53c854b81b43e3fff996cb0cb94fd2f9c574964f371a078f3a2` |
+| [ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725198/artifacts/15155657463) | `fca5778b100c5a7156f94af6622a96ab56e547d2388a2d26633fdb5247dad276` | `2205ef38b3a353b7e1d5ef5c7e8b77cdafb9987e4215104c2ba744976b99a990` |
