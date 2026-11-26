@@ -50,6 +50,9 @@ tools/rust-qa/windows-frame-cost/** text eol=lf
 tools/rust-qa/windows-msi-interop/reverse/launcher.patch text eol=lf whitespace=-blank-at-eol
 tools/rust-qa/windows-frame-cost/frame-ready.patch text eol=lf whitespace=-blank-at-eol
 tools/rust-qa/windows-gdi-present/** text eol=lf
+tools/rust-qa/windows-cpu-paint/** text eol=lf
+tools/rust-qa/windows-cpu-paint/notices/** -text
+tools/rust-qa/windows-cpu-paint/cpu-paint.patch text eol=lf whitespace=-blank-at-eol
 tools/rust-qa/observe-windows-gui.py text eol=lf
 tools/rust-qa/observe-windows-input.ps1 text eol=lf
 tools/rust-qa/windows_observer.py text eol=lf

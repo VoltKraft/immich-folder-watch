@@ -453,6 +453,12 @@ GDI. It uses the earlier WPF limits, records the actual bitmap transfers,
 and verifies edits in the reopened filename field.
 [Full-view renderer and offline replay](../tools/rust-qa/windows-gdi-present/README.md).
 
+The Windows x64 transition workflow also compares a private CPU rasterizer
+on the same original editor and measures GDI transfers during both inventory
+passes. It retains the native libraries, GUI, compiler output and source
+archive for replay against the same WPF limits.
+[CPU renderer commands and evidence](../tools/rust-qa/windows-cpu-paint/README.md).
+
 The x64 and ARM64 import-library jobs rebuild the selected native library
 and exercise its respective winit or transport consumer. [Import-library reconstruction](rust/rw02-windows-imports.md).
 

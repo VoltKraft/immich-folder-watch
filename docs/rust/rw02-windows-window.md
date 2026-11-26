@@ -1124,3 +1124,22 @@ ordinary window transitions and the same synthetic inventory worker.
 The original window processed 238 of 245 eligible close requests while its frame registration was pending. The external observer confirmed the hide before a grant, then verified 32 resumed DXGI submissions on visible reopens during file work. A further presented frame reused a slot held over a hide. The original worker completed both 100,000-file passes, and the independent pixel reader found 177 changed editor pixels on the reopened HWND. [Native build and measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45890992463/artifacts/15152852412).
 
 The one-shot trial met nine of eleven same-host WPF limits. Scan close p95 was 22.0323 ms against 19.774 ms, and scan reopen p95 was 45.8779 ms against 21.702 ms. The ordinary GUI medians were 23.1095 and 33.0625 ms respectively. Idle CPU and presentation rates were zero in both visibility states. Of 73 individual reopens slower than the WPF p95 limit, 53 had no overlap with an armed registration. The 22 that overlapped a native DXGI present spent a combined 2.6072 ms inside those calls. Windows x64 scan responsiveness therefore remains open. [Complete comparison, trace costs and original hashes](../../tools/rust-qa/windows-frame-cost/README.md#native-one-shot-trial-at-c52da2d).
+
+## CPU rendering of the original editor meshes
+
+The Fedora x64 offscreen comparison used the real retained editor view,
+the existing five font files and the same three frames at scale 1 and
+1.5. The CPU painter and original egui-wgpu renderer produced 4,986,360
+identical pixels in 4,992,000 comparisons. A single pixel in the direct
+mode differed by two channel values out of 255. Both painters restored
+the original frame byte for byte at both scales. The offline rerun
+reproduced all 18 original BGRA files. [Full per-frame observations and
+reproduction](../../tools/rust-qa/windows-cpu-paint/headless/README.md).
+
+The additional Windows x64 trial draws into a CPU buffer on the original
+HWND. The same-host WPF and ordinary retained trials supply its eleven
+limits. The native test records actual transfers, worker inventory
+events, process resources and visible edits on the reopened window.
+The Linux offscreen result establishes image fidelity for those six
+frames. Windows window response and resource acceptance require native
+observations. [Native build and readback](../../tools/rust-qa/windows-cpu-paint/README.md).

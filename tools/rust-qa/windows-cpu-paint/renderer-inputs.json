@@ -1,0 +1,23 @@
+{
+  "files": {
+    "artifacts/gdi/egui-wgpu/src/winit.rs": [
+      "3f9f39150119a4ef071ab9e0ed9384edbebad36cc72bc35a90ac1639d165be51",
+      "040c01cf6e6c523e1cac5268c4f5f346ce3a097ce77b589588b11d502351b95d"
+    ]
+  },
+  "copies": {
+    "artifacts/gdi/egui-wgpu/src/cpu_present.rs": {
+      "source": "cpu_present.rs",
+      "sha256": "35d8d4a2c4376132ac7e71c5c8b461f9a58c325f6a2f062cab1287e81543653e"
+    },
+    "artifacts/gdi/egui-wgpu/src/cpu_raster.rs": {
+      "source": "cpu_raster.rs",
+      "sha256": "f81c18e9f080cdb7e2ae119ad65ad594868fa636c4400e7347c700a960508eff"
+    },
+    "artifacts/gdi/egui-wgpu/src/dib_layout.rs": {
+      "source": "../windows-gdi-present/dib_layout.rs",
+      "sha256": "011227c8ffb6beeeeaa6f8e764f60deb4d473d6cfab4fe7da78c5cebedc37c32"
+    }
+  },
+  "patchSha256": "51411b1e9d5e90e2ad001fccd4386b56505bed598c408be6e14250cf6c913d75"
+}

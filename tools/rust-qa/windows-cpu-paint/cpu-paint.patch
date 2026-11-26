@@ -1,0 +1,43 @@
+--- a/artifacts/gdi/egui-wgpu/src/winit.rs
++++ b/artifacts/gdi/egui-wgpu/src/winit.rs
+@@ -10,0 +11,4 @@
++
++#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++#[path = "cpu_present.rs"]
++mod cpu_present;
+@@ -32,0 +37,2 @@
++    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++    cpu: Option<cpu_present::Presenter>,
+@@ -69,0 +76,2 @@
++            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++            cpu: None,
+@@ -304,0 +313,13 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        {
++            if self.cpu.is_none() {
++                self.cpu = cpu_present::Presenter::new(
++                    viewport_id, &self.render_state.as_ref().unwrap().adapter,
++                    self.support_transparent_backbuffer,
++                );
++            }
++            if self.cpu.is_some() {
++                assert!(viewport_id == ViewportId::ROOT && self.options.msaa_samples <= 1
++                    && self.options.depth_stencil_format.is_none(), "CPU trial requires a single ordinary root");
++            }
++        }
+@@ -354,0 +376,5 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if self.cpu.is_some() {
++            return; // The root's physical dimensions are current; no flip chain or GPU attachments.
++        }
++
+@@ -500,0 +527,9 @@
++
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if let Some(cpu) = &mut self.cpu {
++            assert_eq!(viewport_id, ViewportId::ROOT);
++            let surface = self.surfaces.get(&viewport_id).expect("Missing CPU root surface");
++            cpu.paint(window, [surface.width, surface.height], pixels_per_point, clear_color,
++                clipped_primitives, textures_delta, capture_data).expect("CPU root paint failed");
++            return 0.0;
++        }

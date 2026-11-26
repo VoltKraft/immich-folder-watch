@@ -206,6 +206,14 @@ WPF root and UI thread. The native ARM64 restart is still outstanding.
 [Activation results](rust/rw02-instance.md#both-installed-windows-launch-orders-at-2dd5f93) ·
 [Second upload and restore run](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-f8cf6b1).
 
+The Fedora x64 offscreen CPU painter reproduced all six real editor frames
+within two color levels. An independent rebuild reproduced all 18 raw
+images byte for byte. Both modes used the pinned font atlas, including
+the partial texture update during the edit. The native x64 trial stages
+a separate executable and retains its compiler stream, library outputs
+and original sources. Its window response under inventory remains open.
+[Pixel counts and native trial](rust/rw02-windows-window.md#cpu-rendering-of-the-original-editor-meshes).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

@@ -3,6 +3,7 @@ import argparse
 from contextlib import ExitStack
 from functools import partial
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -73,6 +74,7 @@ def main(target, variant="mailbox"):
         "frame-ready": ("frame-ready", "Mailbox", 1),
         "deferred-frame": ("deferred-frame", "Mailbox", 1),
         "gdi-present": ("gdi-present", "GDI", None),
+        "cpu-paint": ("cpu-paint", "CPU-GDI", None),
         "mailbox-two": ("measured-mailbox-two", "Mailbox", 2),
     }[variant]
     out = base / folder
@@ -84,13 +86,23 @@ def main(target, variant="mailbox"):
         if any(k in os.environ for k in ("IFW_QA_WINDOWS_RESIDENCY", "IFW_QA_WINDOWS_PRESENT_CONTROL",
                                          "IFW_QA_WINDOWS_DISPATCH", "IFW_QA_WINDOWS_SINGLE_WAKE",
                                          "IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL", "IFW_QA_WINDOWS_FRAME_COST",
-                                         "IFW_QA_WINDOWS_GDI_PRESENT", "IFW_QA_DWM_TRANSITIONS")):
+                                         "IFW_QA_WINDOWS_GDI_PRESENT", "IFW_QA_CPU_PAINT", "IFW_QA_DWM_TRANSITIONS")):
             raise ValueError("Select the requested diagnosis using the recorder option")
         if variant == "dwm-transitions" and target != "x86_64-pc-windows-msvc":
             raise ValueError("The DWM comparison requires native Windows x64")
         budget, fixed, original, record["ordinaryComparison"] = reference(target, record)
         before = sha(budget)
         record["referenceBudgetSha256"] = before
+        if variant == "cpu-paint":
+            if target != "x86_64-pc-windows-msvc":
+                raise ValueError("The CPU renderer comparison requires native Windows x64")
+            directory = QA / "windows-cpu-paint"
+            sys.path.insert(0, str(directory))
+            import cpu_build
+            spec = importlib.util.spec_from_file_location("ifw_cpu_measure", directory / "measure.py")
+            cpu_case = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(cpu_case)
+            binary = cpu_build.build(out, base, record)
         if variant == "gdi-present":
             sys.path.insert(0, str(QA / "windows-gdi-present"))
             import gdi_build
@@ -112,6 +124,9 @@ def main(target, variant="mailbox"):
                 import frame_case
                 binary = frame_case.prepare_subject(base, out, budget, record)
         with ExitStack() as scope:
+            if variant == "cpu-paint":
+                os.environ["IFW_QA_CPU_PAINT"] = "1"
+                scope.callback(os.environ.pop, "IFW_QA_CPU_PAINT")
             if variant == "gdi-present":
                 os.environ["IFW_QA_WINDOWS_GDI_PRESENT"] = "1"
                 scope.callback(os.environ.pop, "IFW_QA_WINDOWS_GDI_PRESENT")
@@ -179,8 +194,11 @@ def main(target, variant="mailbox"):
                         raise ValueError("The WPF budget changed during the frame-ready trial")
                     record["status"] = "frame-ready-recorded"
                     return 0
-                if variant in ("deferred-frame", "gdi-present"):
-                    case = gdi_case if variant == "gdi-present" else deferred_case
+                if variant in ("deferred-frame", "gdi-present", "cpu-paint"):
+                    if variant == "cpu-paint":
+                        case = cpu_case
+                    else:
+                        case = gdi_case if variant == "gdi-present" else deferred_case
                     case.measure(api, fixture, gui, files, present, area, endpoint, user_sid, out, token, record, budget)
                     if sha(budget) != before:
                         raise ValueError("The WPF budget changed during the renderer comparison")
@@ -258,6 +276,8 @@ if __name__ == "__main__":
                       help="compare a native one-shot frame-ready event with the ordinary Windows x64 GUI")
     mode.add_argument("--gdi-present", dest="variant", action="store_const", const="gdi-present",
                       help="measure the retained egui view rendering offscreen with WARP and presenting through GDI")
+    mode.add_argument("--cpu-paint", dest="variant", action="store_const", const="cpu-paint",
+                      help="rasterize the retained egui editor on the CPU and observe its native GDI transfers")
     mode.add_argument("--dwm-transitions", dest="variant", action="store_const", const="dwm-transitions",
                       help="compare two native Windows x64 inventories on the ordinary and transitions-disabled root")
     args = parser.parse_args()

@@ -40,7 +40,7 @@ def root_marker(text, mode, root):
         raise ValueError("The DWM operation, adapter or independently observed root differs")
 
 
-def capture_editor(api, fixture, output, lifetime, windows, proc, area, env, log, hwnd):
+def capture_editor(api, fixture, output, lifetime, windows, proc, area, env, log, hwnd, *, field_observer=capture_field):
     """Run after the two passes and after both ETW sessions have been closed and decoded."""
     output.mkdir()
     def owner():
@@ -80,7 +80,7 @@ def capture_editor(api, fixture, output, lifetime, windows, proc, area, env, log
     recorder.write(output / "hosts.json", attempts)
     if not shell:
         raise ValueError("The native UI Automation input and pixel observer is unavailable")
-    before = capture_field(shell, area, env, output, hwnd, proc.pid, log, "before")
+    before = field_observer(shell, area, env, output, hwnd, proc.pid, log, "before")
     generation = generations()
     windows.pump()
     start = len(windows.events)
@@ -92,7 +92,7 @@ def capture_editor(api, fixture, output, lifetime, windows, proc, area, env, log
     reopen()
     wait(lambda: event(start, "show"))
     visible = api.clock()
-    after = capture_field(shell, area, env, output, hwnd, proc.pid, log, "after")
+    after = field_observer(shell, area, env, output, hwnd, proc.pid, log, "after")
     windows.pump()
     if owner() != root:
         raise ValueError("The reopened scan editor lost its owner")
@@ -193,7 +193,7 @@ def scan_result(out, idx, mode, row):
     return dict(mode=mode, root=root, editor=view, frames=frames, metrics=scan["metrics"])
 
 
-def references(out, record, baseline, *, separate_gui=False):
+def references(out, record, baseline, *, separate_gui=False, candidate_presentation=("Mailbox", 1)):
     base = out.parent
     ordinary_path = base / "measured/result.json"
     ordinary = read(ordinary_path)
@@ -206,7 +206,7 @@ def references(out, record, baseline, *, separate_gui=False):
     build = read(base / "build.json")
     canonical_path = art / "gui-native" / TARGET / "build.json"
     canonical = read(canonical_path)
-    if (record["target"] != TARGET or record["presentMode"] != "Mailbox" or record["desiredMaximumFrameLatency"] != 1
+    if (record["target"] != TARGET or (record["presentMode"], record["desiredMaximumFrameLatency"]) != candidate_presentation
             or record["diagnosticControl"] is not True
             or record["scanObserver" if separate_gui else "dwmObserver"] != {name: sha(HERE / name) for name in INPUTS}
             or record["observerInputs"] != {name: sha(HERE / name) for name in ("measure.py", "frame_latency.py", "inputs.py", "scan_present.py")}

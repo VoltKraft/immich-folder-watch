@@ -8,6 +8,11 @@ on:
       - 'tools/rust-qa/windows-inventory/scan.py'
       - 'tools/rust-qa/windows-frame-cost/**'
       - '!tools/rust-qa/windows-frame-cost/*.md'
+      - 'tools/rust-qa/windows-cpu-paint/**'
+      - '!tools/rust-qa/windows-cpu-paint/**/*.md'
+      - 'tools/rust-qa/windows-cpu-paint/notices/**'
+      - '!tools/rust-qa/windows-cpu-paint/headless/**'
+      - 'tools/rust-qa/windows-gdi-present/gdi_build.py'
       - 'tools/rust-qa/windows-warm-window/**'
       - '!tools/rust-qa/windows-warm-window/**/*.md'
   workflow_dispatch:
@@ -19,7 +24,7 @@ jobs:
   compare:
     if: github.ref == 'refs/heads/rewrite/rust'
     runs-on: windows-2025
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       NATIVE_TARGET: x86_64-pc-windows-msvc
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
@@ -112,6 +117,21 @@ jobs:
           }
           exit $LASTEXITCODE
 
+      - name: Compare CPU-painted editor frames and real inventory responses on the same desktop
+        if: ${{ !cancelled() && steps.baseline.outcome == 'success' }}
+        timeout-minutes: 35
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-cpu-paint/upstream.py artifacts/rust/cpu-paint-cache --fetch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tools/rust-qa/windows-cpu-paint
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --cpu-paint
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-cpu-paint/measure.py "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/cpu-paint"
+          exit $LASTEXITCODE
+
       - name: Retain original comparisons, frame observations and native build inputs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -138,3 +158,10 @@ jobs:
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-ready/source.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-ready/frame-ready-source.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-ready/scan-editor/
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/*.json
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/*.log
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/compiler.jsonl
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu.exe
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/source.zip
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu-libraries.zip
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/scan-editor/

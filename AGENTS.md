@@ -255,6 +255,9 @@ to reconcile project decisions, defaults, and recorded state.
   on the same x64 desktop and retain its real editor pixels, GDI transfers,
   [buffer reuse and map timings](tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer)
   and file observations.
+  The separate [CPU paint comparison](tools/rust-qa/windows-cpu-paint/README.md)
+  uses the retained meshes and atlas. Preserve its original crate notices,
+  native compiler outputs, real editor pixels and same-host WPF limits.
   For the separate [deferred-frame trial](tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter),
   retain the native renderer trace and the changed pixels on the reopened window.
   Keep the integrated Linux and Windows inventory subjects bound to the

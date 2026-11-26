@@ -23,6 +23,36 @@ def inventory(root):
     return {p.relative_to(root).as_posix(): sha(p) for p in root.rglob("*") if p.is_file()}
 
 
+def apply_renderer(gui, out, package, members, pins, patch_path):
+    """Apply only the pinned edits and additions to a pristine egui-wgpu source tree."""
+    ordinary_app = inventory(gui / "src")
+    expected = inventory(package)
+    for name, (before, after) in pins["files"].items():
+        relative = Path(name).relative_to(PRESENTER).as_posix()
+        if expected.get(relative) != before:
+            raise ValueError(f"Different original renderer input: {relative}")
+        expected[relative] = after
+    patch = prepare.checked(patch_path, pins["patchSha256"])
+    git_env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")}
+    git_env["GIT_CEILING_DIRECTORIES"] = str(out.resolve())
+    subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--unidiff-zero", "--whitespace=error", "-"],
+                   cwd=gui, env=git_env, input=patch, check=True)
+    for name, item in pins["copies"].items():
+        relative = Path(name).relative_to(PRESENTER).as_posix()
+        if relative in expected or (gui / name).exists():
+            raise ValueError("The GDI module would replace an existing renderer input")
+        data = prepare.checked(patch_path.parent / item["source"], item["sha256"])
+        (gui / name).write_bytes(data)
+        member = Path(item["source"]).name
+        if member in members:
+            raise ValueError("Duplicate renderer source archive entry")
+        members[member] = data
+        expected[relative] = item["sha256"]
+    if inventory(package) != expected or inventory(gui / "src") != ordinary_app:
+        raise ValueError("Unexpected change to the retained application or renderer source")
+    return ordinary_app, patch
+
+
 def stage(out):
     gui = warm.stage(out / "project")
     original = warm.eframe_source.source_bundle(gui, out / "ordinary-source.zip")
@@ -40,29 +70,8 @@ def stage(out):
     env = prepare.environment(out)
     manifest = gui / "Cargo.toml"
     selected = warm.feature_rows(manifest, prepare.TARGET, env)
-    ordinary_app = inventory(gui / "src")
-    expected = inventory(package)
     pins = json.loads((HERE / "renderer-inputs.json").read_bytes())
-    for name, (before, after) in pins["files"].items():
-        relative = Path(name).relative_to(PRESENTER).as_posix()
-        if expected.get(relative) != before:
-            raise ValueError(f"Different original renderer input: {relative}")
-        expected[relative] = after
-    patch = prepare.checked(HERE / "offscreen.patch", pins["patchSha256"])
-    git_env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")}
-    git_env["GIT_CEILING_DIRECTORIES"] = str(out.resolve())
-    subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--unidiff-zero", "--whitespace=error", "-"],
-                   cwd=gui, env=git_env, input=patch, check=True)
-    for name, item in pins["copies"].items():
-        relative = Path(name).relative_to(PRESENTER).as_posix()
-        if relative in expected or (gui / name).exists():
-            raise ValueError("The GDI module would replace an existing renderer input")
-        data = prepare.checked(HERE / item["source"], item["sha256"])
-        (gui / name).write_bytes(data)
-        members[item["source"]] = data
-        expected[relative] = item["sha256"]
-    if inventory(package) != expected or inventory(gui / "src") != ordinary_app:
-        raise ValueError("Unexpected change to the retained application or renderer source")
+    ordinary_app, patch = apply_renderer(gui, out, package, members, pins, HERE / "offscreen.patch")
     for path, pins_key in ((warm.eframe_source.PACKAGE, "pins"), (warm.eframe_source.WINIT_PACKAGE, "winitPins")):
         if warm.source_profile.tree_info(gui / path) != original[pins_key]["compilerTree"]:
             raise ValueError("The GDI presenter changed a paired window or input library")
@@ -86,7 +95,7 @@ def stage(out):
     return gui, selected, sources
 
 
-def compilation(stream, *, gdi):
+def compilation(stream, *, gdi, extra_local=None):
     """Read original native Cargo messages on either OS, independent of the hosted build path."""
     from collections import Counter
 
@@ -108,6 +117,8 @@ def compilation(stream, *, gdi):
              **{n: gui / "artifacts/text" / n for n in ("egui", "epaint", "unicode-bidi")}}
     if gdi:
         local["egui-wgpu"] = gui / PRESENTER
+    if extra_local:
+        local.update({name: gui / path for name, path in extra_local.items()})
     signatures = Counter()
     for unit in units:
         origin, suffix = unit["package_id"].rsplit("#", 1)
@@ -160,11 +171,8 @@ def verify(out, record):
     return dict(archive=sources["archive"], binary=record["binary"], compilerUnits=len(units), pairedBinary=record["pairedBinary"])
 
 
-def build(out, base, record):
-    if record["target"] != prepare.TARGET:
-        raise ValueError("The GDI presentation comparison needs the native Windows x64 WARP target")
-    ordinary = json.loads((base / "build.json").read_bytes())
-    gui, selected, sources = stage(out)
+def native_build_inputs(out, base, record, ordinary, gui, sources):
+    """Check the common GUI, font, compiler and WPF-paired native source receipts."""
     if (ordinary["revision"] != record["revision"] or sha(base / "build.json") != record["buildReceipt"]
             or ordinary["binary"] != record["binary"] or ordinary["compilerInputs"] != sources["ordinaryApp"]
             or sha(base / "compiler.jsonl") != ordinary["compilerEvidence"]["sha256"]
@@ -181,6 +189,15 @@ def build(out, base, record):
                                      env=env, text=True).strip()
     if native != ordinary["nativeCompiler"]:
         raise ValueError("The two native GUI builds use different compilers")
+    return env, native
+
+
+def build(out, base, record):
+    if record["target"] != prepare.TARGET:
+        raise ValueError("The GDI presentation comparison needs the native Windows x64 WARP target")
+    ordinary = json.loads((base / "build.json").read_bytes())
+    gui, selected, sources = stage(out)
+    env, native = native_build_inputs(out, base, record, ordinary, gui, sources)
     stream = out / "compiler.jsonl"
     with stream.open("xb") as log:
         subprocess.run(["cargo", "build", "--release", "--frozen", "--message-format=json-render-diagnostics"],
