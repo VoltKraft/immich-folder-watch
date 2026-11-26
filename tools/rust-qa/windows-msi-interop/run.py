@@ -1,4 +1,4 @@
-"""Build the private Rust primary and run one original installed WPF secondary."""
+"""Run one argument-free cross-version activation with a freshly installed WPF executable."""
 import argparse
 import os
 from pathlib import Path
@@ -7,11 +7,11 @@ import subprocess
 import sys
 import tempfile
 
-from common import AREA, HERE, INSTALLED, ROOT, TARGETS, inputs, launcher, module, read, sha, write
+from common import AREA, HERE, INSTALLED, ROOT, TARGETS, inputs, launcher, module, read, sha, verify_source_inputs, write
 from msi_subject import build
 
 
-def run(target, package):
+def run(target, package, *, wpf_primary=False):
     launch = launcher()
     release = module("ifw_shipping_package", INSTALLED / "run.py")
     if (not launch.recorder.hosted() or release.native_target() != TARGETS[target][0]
@@ -19,16 +19,19 @@ def run(target, package):
             or os.environ.get("GITHUB_REF") != "refs/heads/rewrite/rust"
             or release.git("rev-parse", release.RELEASE["tag"] + "^{commit}").decode().strip() != release.RELEASE["commit"]):
         raise ValueError("Use the matching disposable native rewrite runner and original release tag")
-    out = AREA / target
+    out = (AREA / "reverse" if wpf_primary else AREA) / target
     out.mkdir(parents=True)
     record = dict(target=target, status="incomplete", revision=os.environ["GITHUB_SHA"],
-                  run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"], inputs=inputs())
+                  run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"], inputs=inputs(wpf_primary))
+    if wpf_primary:
+        record["direction"] = "wpf-primary"
+        verify_source_inputs(record["inputs"], record["revision"], True)
     try:
         ordinary = {}
         with tempfile.TemporaryDirectory(dir=os.environ["RUNNER_TEMP"], prefix="ifw-msi-") as raw:
             work = Path(raw).resolve()
             with launch.native_subject(target, out, ordinary, subject="retained") as (api, _, gui, inventory, _):
-                build(target, work, out, ordinary, gui, inventory)
+                build(target, work, out, ordinary, gui, inventory, wpf_primary=wpf_primary)
             asset = release.prepare_package(TARGETS[target][0], work, package)
             media = work / "wpf-media"
             media.mkdir()
@@ -47,7 +50,17 @@ def run(target, package):
                             "-Package", str(asset), "-Evidence", str(out), "-Work", str(work), "-Target", target,
                             "-Profile", str(profile), "-Marker", str(marker), "-ConfigSha256", record["wpfProfile"]["configSha256"],
                             "-Python", sys.executable]
+                    if wpf_primary:
+                        args.append("-WpfPrimary")
                     invocation = subprocess.run(args, cwd=ROOT, env=env)
+                    if wpf_primary and invocation.returncode and (out / "installed.json").is_file():
+                        # Preserve the owned KnownFolder if the supervisor could not verify
+                        # that the installed primary has gone away on this disposable VM.
+                        outcome = out / "msi-result.json"
+                        transaction = read(outcome) if outcome.is_file() else {}
+                        if (transaction.get("cleanup", {}).get("msiRemoved") is not True
+                                or transaction.get("checkpoints", {}).get("after", {}).get("appProcesses") != 0):
+                            raise launch.recorder.CleanupUnconfirmed("Cannot confirm the installed WPF primary was reaped")
                     if invocation.returncode == 0:
                         record["msiTransactions"] = {
                             name: dict(sha256=sha(out / name), nativePath=str(out / name))
@@ -72,5 +85,6 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser(description=__doc__)
     args.add_argument("target", choices=TARGETS)
     args.add_argument("--package", type=Path)
+    args.add_argument("--wpf-primary", action="store_true", help="Start the installed WPF application first in a separate fresh trial")
     opts = args.parse_args()
-    run(opts.target, opts.package)
+    run(opts.target, opts.package, wpf_primary=opts.wpf_primary)

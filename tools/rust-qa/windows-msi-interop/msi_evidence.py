@@ -8,7 +8,7 @@ import subprocess
 from urllib.parse import unquote
 from zipfile import ZipFile
 
-from common import AFTER, BEFORE, HERE, INSTALLED, QA, ROOT, TARGETS, inputs, read, sha
+from common import BEFORE, HERE, INSTALLED, QA, ROOT, TARGETS, launcher_variant, read, sha, verify_source_inputs
 
 
 def sparse_inventory(text, worker, earliest, latest):
@@ -65,15 +65,17 @@ def bytes_sha(data):
     return sha256(data).hexdigest()
 
 
-def verify_transactions(out, recorded, operations, identity, target):
-    expected = [("/i", "install.log"), ("/x", "uninstall.log")]
+def verify_transactions(out, recorded, operations, identity, target, *, install_only=False):
+    expected = [("/i", "install.log")]
+    if not install_only:
+        expected.append(("/x", "uninstall.log"))
     if ([(op["operation"], op["log"]) for op in operations] != expected
             or set(recorded) != {name for _, name in expected}
             or any(op["timedOut"] or op["exitCode"] != 0 for op in operations)):
         raise ValueError("A successful install followed by an owned uninstall is required")
     package = PureWindowsPath(operations[0]["subject"])
     asset = read(INSTALLED / "release.json")["assets"][target]
-    if not package.is_absolute() or package.name != asset["name"] or operations[1]["subject"].lower() != identity["productCode"].lower():
+    if not package.is_absolute() or package.name != asset["name"] or (not install_only and operations[1]["subject"].lower() != identity["productCode"].lower()):
         raise ValueError("The Windows Installer transaction used an unexpected package or product")
     paths = []
     for _, name in expected:
@@ -82,11 +84,11 @@ def verify_transactions(out, recorded, operations, identity, target):
         if not path.is_absolute() or path.name != name or not original.is_file() or sha(original) != recorded[name]["sha256"]:
             raise ValueError("Missing or unbound original MSI log: " + name)
         paths.append(path.parent)
-    if paths[0] != paths[1]:
+    if len(set(paths)) != 1:
         raise ValueError("The installer logs came from different native directories")
     request = dict(identity=identity, arch=target.removeprefix("windows-"), logs=recorded)
     replay = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-File", str(HERE / "transaction-logs.ps1"),
-                             "-Directory", str(out.resolve())], input=json.dumps(request), encoding="utf-8", capture_output=True)
+                             "-Directory", str(out.resolve()), *(["-InstallOnly"] if install_only else [])], input=json.dumps(request), encoding="utf-8", capture_output=True)
     if replay.returncode:
         raise ValueError("Original MSI transaction replay failed: " + replay.stderr.strip())
     checks = json.loads(replay.stdout)
@@ -113,6 +115,7 @@ def compiler_rows(lines):
 
 
 def verify_build(out, result):
+    patch, after = launcher_variant(result.get("direction") == "wpf-primary")
     b = read(out / "build.json")
     if (b["source"], b["target"]) != (result["revision"], result["target"]) or (
             b["sourceArchive"], b["compiler"]) != (sha(out / "sources.zip"), sha(out / "compiler.jsonl")):
@@ -122,9 +125,9 @@ def verify_build(out, result):
         ordinary = json.loads(z.read("ordinary/build.json"))
         raw = z.read("after/windows_launcher.rs")
         base = b["base"]
-        if (bytes_sha(z.read("before/windows_launcher.rs")) != BEFORE or bytes_sha(raw) != AFTER
-                or sha(QA / "gui/src/windows_launcher.rs") != BEFORE or z.read("launcher.patch") != (HERE / "launcher.patch").read_bytes()
-                or b["sources"] != {**ordinary["compilerInputs"], "windows_launcher.rs": AFTER}
+        if (bytes_sha(z.read("before/windows_launcher.rs")) != BEFORE or bytes_sha(raw) != after
+                or sha(QA / "gui/src/windows_launcher.rs") != BEFORE or z.read("launcher.patch") != patch.read_bytes()
+                or b["sources"] != {**ordinary["compilerInputs"], "windows_launcher.rs": after}
                 or ordinary["compilerInputs"]["windows_launcher.rs"] != BEFORE
                 or ordinary["revision"] != b["source"] or ordinary["target"] != b["target"]
                 or canonical["target"] != b["target"] or canonical["source"] != b["source"]
@@ -225,8 +228,7 @@ def activation(row, log, etw, exe_digest):
 
 
 def verify(out, result):
-    if result["inputs"] != inputs() or result["revision"] != subprocess.check_output(["git","rev-parse","HEAD"], cwd=ROOT, text=True).strip():
-        raise ValueError("Use the exact source revision that recorded this trial")
+    verify_source_inputs(result["inputs"], result["revision"], result.get("direction") == "wpf-primary")
     release = read(INSTALLED / "release.json")
     target, machine = TARGETS[result["target"]]
     b = verify_build(out, result)
@@ -247,6 +249,9 @@ def verify(out, result):
             or len(end["operations"]) != 2 or any(op["timedOut"] or op["exitCode"] for op in end["operations"])):
         raise ValueError("Wrong shipping MSI, profile, install state or cleanup")
     verify_transactions(out, result["msiTransactions"], end["operations"], state["identity"], target)
+    if result.get("direction") == "wpf-primary":
+        from reverse.evidence import verify_activation
+        return verify_activation(out, result, b, state)
     row = read(out / "activation.json")
     if (sha(out / "challenge.jpg") != row["challenge"]["sha256"] or (out / "challenge.jpg").stat().st_size != 16
             or row["secondary"]["executable"] != state["exe"] or row["stagedProfile"]["gui"] != b["application"]["sha256"]

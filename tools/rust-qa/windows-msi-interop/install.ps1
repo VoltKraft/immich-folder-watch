@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param([string]$Package, [string]$Evidence, [string]$Work, [string]$Target,
-      [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python)
+      [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -21,7 +21,7 @@ function Assert-ChildDirectory([string]$Parent, [string]$Child) {
 }
 
 function Assert-InteropProfile([string]$KnownProfile, [string]$ProfilePath, [string]$MarkerPath,
-                               [string]$ConfigSha256, [string]$Work) {
+                               [string]$ConfigSha256, [string]$Work, [string[]]$VerifiedOutputs = @()) {
     if ($KnownProfile -ine $ProfilePath -or [IO.Path]::GetDirectoryName($MarkerPath) -ine $ProfilePath -or
         [IO.Path]::GetFileName($MarkerPath) -cnotmatch '^\.rw02-owned-([a-f0-9]{32})$') {
         throw 'Expected the original synthetic profile and its ownership marker.'
@@ -29,7 +29,7 @@ function Assert-InteropProfile([string]$KnownProfile, [string]$ProfilePath, [str
     $token = $Matches[1]
     Assert-PlainPath $ProfilePath
     $config = Join-Path $ProfilePath 'config.yaml'
-    $entries = @(Get-ChildItem -Force -LiteralPath $ProfilePath)
+    $entries = @(Get-ChildItem -Force -LiteralPath $ProfilePath | Where-Object { $_.Name -cnotin $VerifiedOutputs })
     if ($entries.Count -ne 2 -or @($entries | Where-Object {
         $_.PSIsContainer -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)
     }).Count -or -not [IO.File]::Exists($config) -or -not [IO.File]::Exists($MarkerPath) -or
@@ -93,7 +93,7 @@ function Complete-InteropRemoval($Paths, $Identity, [string]$Evidence, $Receipt)
 }
 
 function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [string]$Target,
-                           [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python) {
+                           [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary) {
     $arch = Get-HostedArchitecture
     if ($Target -cne @{ x64 = 'x86_64-pc-windows-msvc'; arm64 = 'aarch64-pc-windows-msvc' }[$arch]) {
         throw 'The Rust target differs from the native runner and PowerShell.'
@@ -162,12 +162,23 @@ function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [
                 workflowRun = $env:GITHUB_RUN_ID; releaseCommit = $release.commit; package = $asset; identity = $msi.identity
                 exe = $paths.exe; exeSha256 = $digest; peMachine = $native; payloadSha256 = $payload.sha256
                 configSha256 = $ConfigSha256; state = $state }
+            if ($WpfPrimary) {
+                $installLog = Join-Path $evidence 'install.log'
+                $installed.installTransaction = [ordered]@{ operation = $receipt.operations[0]; nativePath = $installLog
+                    sha256 = Get-FileDigest $installLog }
+            }
             Write-Record (Join-Path $evidence 'installed.json') $installed
-            & $Python -B (Join-Path $PSScriptRoot 'observe.py') $Target $evidence $work $paths.exe
+            $observer = if ($WpfPrimary) { 'reverse/observe.py' } else { 'observe.py' }
+            & $Python -B (Join-Path $PSScriptRoot $observer) $Target $evidence $work $paths.exe
             if ($LASTEXITCODE -ne 0) { throw "The installed WPF secondary observation returned $LASTEXITCODE." }
         }
         finally { $image.Dispose() }
-        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work
+        $outputs = @()
+        if ($WpfPrimary) {
+            . (Join-Path $PSScriptRoot 'reverse/profile.ps1')
+            $outputs = @(Get-ReverseProfileEntries $Profile $evidence)
+        }
+        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work $outputs
         if ((Get-FileDigest $package) -cne $asset.sha256) { throw 'The release MSI changed during observation.' }
     }
     catch { $receipt.error = $_.Exception.Message }

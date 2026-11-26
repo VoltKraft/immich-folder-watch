@@ -184,13 +184,16 @@ its own same-host baseline and records its source SHA.
 [GitHub Actions concurrency and queue limits](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
 The Windows installed-application comparison uses a fresh hosted desktop
-per architecture. It starts the retained Rust feasibility GUI as the
-primary, hides its original window and launches the installed .NET 3.0.4
-executable with its normal command line. The expected observations are the
-original HWND reopening and the same inventory worker reading a new
-synthetic file. The [native workflow](../.github/workflows/rust-windows-msi-interop.yaml)
-builds the Rust variant privately and retains the package and cleanup observations.
-[Same-session scope](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running).
+for each architecture and start order. With Rust primary, the installed
+.NET 3.0.4 executable must reopen the original Rust HWND while the same
+inventory worker reads a new file. With WPF primary,
+the Rust process must activate the original installed window and exit.
+The observer saves the activation evidence before requesting Quit from
+the WPF application and checking its worker shutdown. Each trial installs
+and removes its own MSI.
+[Native workflow](../.github/workflows/rust-windows-msi-interop.yaml) ·
+[Rust primary](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running) ·
+[WPF primary](../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
 ## Rust feasibility workspace
 

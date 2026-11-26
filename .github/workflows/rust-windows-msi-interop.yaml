@@ -24,12 +24,14 @@ permissions:
 jobs:
   activation:
     if: github.ref == 'refs/heads/rewrite/rust'
-    name: Installed Windows activation (${{ matrix.arch }})
+    name: Installed Windows activation (${{ matrix.arch }}, ${{ matrix.primary }} primary)
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
+        arch: [x64, arm64]
+        primary: [Rust, WPF]
         include:
           - { runner: windows-2025, arch: x64, target: x86_64-pc-windows-msvc }
           - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
@@ -74,8 +76,17 @@ jobs:
           python -B -m unittest test_msi_interop
           exit $LASTEXITCODE
 
+      - name: Check the WPF primary's isolated profile and activation observer
+        if: matrix.primary == 'WPF'
+        shell: pwsh
+        run: |
+          ./tools/rust-qa/windows-msi-interop/reverse/test_profile.ps1
+          python -B -m unittest discover -s tools/rust-qa/windows-msi-interop/reverse
+          exit $LASTEXITCODE
+
       - name: Launch the installed shipping application while the Rust window is hidden
-        id: activation
+        id: rust_primary
+        if: matrix.primary == 'Rust'
         shell: pwsh
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
@@ -84,11 +95,29 @@ jobs:
           python -B tools/rust-qa/windows-msi-interop/readback.py "artifacts/rust/windows-msi-interop/$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
-      - name: Retain the original package, activation and cleanup observations
-        if: ${{ !cancelled() && steps.activation.outcome != 'skipped' }}
+      - name: Launch Rust while the installed WPF window is hidden
+        id: wpf_primary
+        if: matrix.primary == 'WPF'
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          $result = "artifacts/rust/windows-msi-interop/reverse/$env:NATIVE_TARGET"
+          python -B tools/rust-qa/windows-msi-interop/run.py $env:NATIVE_TARGET --wpf-primary
+          $observerExit = $LASTEXITCODE
+          if ($observerExit -ne 0) {
+            if (Test-Path -LiteralPath (Join-Path $result 'before-quit.json')) {
+              python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result --before-quit
+            }
+            exit $observerExit
+          }
+          python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result
+          exit $LASTEXITCODE
+
+      - name: Retain package verification, activation and cleanup observations
+        if: ${{ !cancelled() && (steps.rust_primary.outcome != 'skipped' || steps.wpf_primary.outcome != 'skipped') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rust-windows-msi-activation-${{ matrix.arch }}-${{ github.sha }}
-          path: artifacts/rust/windows-msi-interop/${{ matrix.target }}/
+          name: rust-windows-msi-activation-${{ matrix.arch }}-${{ matrix.primary }}-primary-${{ github.sha }}
+          path: artifacts/rust/windows-msi-interop/${{ matrix.primary == 'WPF' && 'reverse/' || '' }}${{ matrix.target }}/
           if-no-files-found: error
           retention-days: 14

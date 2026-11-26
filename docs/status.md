@@ -163,8 +163,20 @@ new file read, then checks the uninstall. Local PowerShell controls passed
 for the empty initial state, package identity and cleanup. Seven Python
 controls passed. Detached replay verified the original installation and
 removal logs for 439 x64 and 438 ARM64 installed files. Native x64 and
-ARM64 activation observations for this pairing are pending.
+ARM64 activation observations for this pairing are pending in the
+[native run at `1d3af9a`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45893039720).
 [Installed Windows activation](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running).
+
+The reverse Windows trial starts the installed WPF application first and
+launches Rust while the original WPF window is hidden. The observer saves
+the pipe owner, window events and process exits before invoking the
+installed application's Quit command. Independent review verified the
+window event ordering and the distinction between a clean process exit
+and the worker's recorded start of flushing. Thirteen Python controls,
+the two PowerShell fixture checks and all sixteen workflow-security tests
+passed locally. Each start order and architecture gets a separate hosted
+desktop. Both trials exercise one Windows session.
+[Reverse native trial and readback](../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 

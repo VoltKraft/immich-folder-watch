@@ -281,6 +281,8 @@ to reconcile project decisions, defaults, and recorded state.
   For the [installed Windows second launch](docs/rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running),
   follow the installed executable, original Rust HWND and inventory worker
   through the close and reopen on the same disposable desktop.
+  Run the [opposite start order](tools/rust-qa/windows-msi-interop/reverse/README.md)
+  on its own runner and retain the original WPF activation evidence before Quit.
   The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
   For [native Ubuntu launch trials](docs/rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64),
   retain the signed application and both runtime receipts with the original

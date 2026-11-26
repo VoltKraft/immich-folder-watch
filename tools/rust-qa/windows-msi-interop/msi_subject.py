@@ -6,10 +6,11 @@ import subprocess
 import sys
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from common import AFTER, BEFORE, HERE, QA, ROOT, module, read, sha, write
+from common import BEFORE, QA, ROOT, launcher_variant, module, read, sha, write
 
 
-def stage(work):
+def stage(work, wpf_primary=False):
+    patch, expected = launcher_variant(wpf_primary)
     warm = module("ifw_installed_warm_build", QA / "windows-warm-window/build.py")
     gui = warm.stage(work / "project")
     path = gui / "src/windows_launcher.rs"
@@ -20,17 +21,18 @@ def stage(work):
     for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         env.pop(key, None)
     subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--whitespace=error", "-"],
-                   cwd=gui, input=(HERE / "launcher.patch").read_bytes(), env=env, check=True)
-    if sha(path) != AFTER:
+                   cwd=gui, input=patch.read_bytes(), env=env, check=True)
+    if sha(path) != expected:
         raise ValueError("The private launcher does not match its reviewed patch")
     return warm, gui, original
 
 
-def build(target, work, out, base, ordinary_gui, inventory):
-    warm, gui, original = stage(work)
+def build(target, work, out, base, ordinary_gui, inventory, *, wpf_primary=False):
+    patch, expected = launcher_variant(wpf_primary)
+    warm, gui, original = stage(work, wpf_primary)
     paired = base["pairedBuild"]
     compiled = {p.name: sha(p) for p in (gui / "src").iterdir() if p.is_file()}
-    if (compiled != {**paired["compilerInputs"], "windows_launcher.rs": AFTER}
+    if (compiled != {**paired["compilerInputs"], "windows_launcher.rs": expected}
             or sha(gui / "Cargo.lock") != paired["lock"] or sha(ordinary_gui) != paired["binary"]):
         raise ValueError("The private subject changed outside the reviewed launcher")
     env = dict(os.environ, CARGO_HOME=str(ROOT / "artifacts/rust/assessment-cache"),
@@ -79,7 +81,7 @@ def build(target, work, out, base, ordinary_gui, inventory):
     with ZipFile(out / "sources.zip", "x", ZIP_DEFLATED) as z:
         z.writestr("before/windows_launcher.rs", original)
         z.write(gui / "src/windows_launcher.rs", "after/windows_launcher.rs")
-        z.write(HERE / "launcher.patch", "launcher.patch")
+        z.write(patch, "launcher.patch")
         z.write(gui / "Cargo.lock", "Cargo.lock")
         z.write(gui / "Cargo.toml", "Cargo.toml")
         for n in ("build.json", "compiler.jsonl", "eframe-source.zip"):

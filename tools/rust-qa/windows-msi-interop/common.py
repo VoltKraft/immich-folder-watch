@@ -1,8 +1,10 @@
 """Shared source and evidence paths for the installed WPF secondary trial."""
-from hashlib import file_digest
+from hashlib import file_digest, sha256
 from importlib.util import module_from_spec, spec_from_file_location
+from io import BytesIO
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
@@ -41,10 +43,45 @@ def launcher():
     return module("ifw_installed_secondary_observer", QA / "windows-launcher/observe.py")
 
 
-def inputs():
+def launcher_variant(wpf_primary):
+    if wpf_primary:
+        return HERE / "reverse/launcher.patch", "7a7f5efbcddff0b17a77aed5d69ffe34cefdfda693ad020dc1a2f12154b20941"
+    return HERE / "launcher.patch", AFTER
+
+
+def inputs(wpf_primary=False):
     paths = [*sorted(HERE.glob("*.py")), *sorted(HERE.glob("*.ps1")), HERE / "launcher.patch",
              INSTALLED / "windows.ps1", INSTALLED / "release.json", INSTALLED / "run.py",
              ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1",
              QA / "windows-inventory/scan.py", QA / "windows-inventory/file-observer.cpp",
              QA / "windows-warm-window/build.py", QA / "windows-warm-window/compiler_units.py"]
+    if wpf_primary:
+        reverse = HERE / "reverse"
+        paths.extend([*sorted(reverse.glob("*.py")), *sorted(reverse.glob("*.ps1")), reverse / "launcher.patch"])
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in paths}
+
+
+def verify_source_inputs(recorded, revision, wpf_primary=False):
+    local = inputs(wpf_primary)
+    if set(recorded) != set(local) or revision != subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip():
+        raise ValueError("Use the exact source revision that recorded this trial")
+    # These four release tools have no EOL attribute. Git for Windows normally checks
+    # them out as CRLF. Keep native byte digests and verify each against its Git blob.
+    checkout_text = {p.relative_to(ROOT).as_posix() for p in (
+        INSTALLED / "windows.ps1", INSTALLED / "release.json", INSTALLED / "run.py",
+        ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1")}
+    queries = "".join(f"{revision}:{path}\n" for path in local).encode()
+    blobs = BytesIO(subprocess.check_output(["git", "cat-file", "--batch"], cwd=ROOT, input=queries))
+    for path, digest in local.items():
+        header = blobs.readline().split()
+        if len(header) != 3 or header[1] != b"blob":
+            raise ValueError(f"Missing committed MSI observer source: {path}")
+        data = blobs.read(int(header[2]))
+        if blobs.read(1) != b"\n":
+            raise ValueError("Incomplete committed MSI observer source")
+        permitted = {sha256(data).hexdigest()}
+        if path in checkout_text:
+            permitted.add(sha256(data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest())
+        if digest not in permitted or recorded[path] not in permitted:
+            raise ValueError(f"An MSI observer source differs from the committed bytes: {path}")

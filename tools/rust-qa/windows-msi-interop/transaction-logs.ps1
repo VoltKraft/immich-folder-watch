@@ -1,5 +1,5 @@
 # Replay the original Windows Installer logs without reading host registration or running msiexec.
-param([Parameter(Mandatory)][string]$Directory)
+param([Parameter(Mandatory)][string]$Directory, [switch]$InstallOnly)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../../RustCompatibilityOracle/installed/windows.ps1')
@@ -16,6 +16,7 @@ if ($identity.packageCode -ine $expected.packageCode -or $identity.productCode -
 $checks = [ordered]@{}
 foreach ($entry in @(@('install.log', '/i'), @('uninstall.log', '/x'))) {
     $name, $switch = $entry
+    if ($InstallOnly -and $switch -eq '/x') { continue }
     $text = [IO.File]::ReadAllText((Join-Path $Directory $name))
     $checks[$name] = Read-MsiOperationLog $text $request.logs[$name].nativePath $switch $identity
 }

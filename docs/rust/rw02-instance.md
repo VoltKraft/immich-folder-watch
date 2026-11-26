@@ -101,10 +101,24 @@ has SHA-256 `b6b87b3c044c3824bef539e11b80cbdc85e723970c3b9939dc0ee98e35fdc3a3`.
 [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15141724559) ·
 [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571606/artifacts/15142827580).
 
-This trial covers the installed WPF secondary with Rust already running.
-Starting Rust while an installed WPF primary is active, writer exclusion
-across sessions, and an upgrade that prevents an old worker from restarting
-have separate acceptance requirements.
+### Rust second launch while the installed Windows application is running
+
+The reverse trial starts the installed WPF GUI on a separate disposable
+runner. After its original window hides, the Rust secondary opens the
+existing session mutex and checks the server PID on its connected pipe
+against the still-running installed process. It sends the shipping
+`SHOW_GUI` message and exits. The observer checks the original WPF
+window and the secondary's process job. Before starting WPF, it also
+checks the private sender's behavior when no primary exists.
+
+The recorder saves the activation observations before it asks the actual
+WPF popup menu to quit. Its readback can report activation even when a
+later shutdown step fails. The full trial also requires the process to exit
+cleanly and its worker to log the shutdown signal or the start of flushing.
+The shipping worker does not log when the flush completes. Cross-session writer exclusion
+and an installed upgrade preventing an old worker from restarting remain
+separate acceptance requirements.
+[Native commands, evidence and quit behavior](../../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
 ### Shipping Flatpak and Rust probe in two installed refs
 
