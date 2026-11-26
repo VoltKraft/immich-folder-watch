@@ -13,6 +13,13 @@ ownership remain open.
 [Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
+On Windows x64 at `de3eec4`, disabling DWM transitions on the retained
+window changed scan close and reopen p95 by less than 0.1 ms on that host.
+Both variants exceeded the WPF limits despite successful presentation and
+visible edits. Keep the ordinary window policy. The next comparison tests
+whether the window thread can handle a close during its DXGI frame wait.
+[Native comparison and originals](../../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4).
+
 At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
 Windows jobs ended before a complete comparison. The x64 scan that did
 finish exceeded both window-response limits. The Windows contrast adapter

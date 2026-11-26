@@ -108,6 +108,12 @@ limits and the installed handover.
 [Windows repeat](rw02-windows-window.md#windows-results-at-0bb39bf) ·
 [Ubuntu repeat](rw02-native-gui.md#ubuntu-native-results-at-3d67a46).
 
+At `de3eec4` the focused x64 workflow completed both native DWM trials.
+Disabling transitions on the original HWND left scan close and reopen
+above their WPF ceilings. The three ordinary retained trials met eight of
+eleven limits. RW-02 remains open.
+[WPF limits, file activity, editor pixels and archive](../../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4).
+
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
 ROWID and every existing row. Independent readback covered 32 SQLite
