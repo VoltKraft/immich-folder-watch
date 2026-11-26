@@ -226,6 +226,9 @@ to reconcile project decisions, defaults, and recorded state.
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
   ARM64. Run its native GUI and panel on the matching architecture.
   Use the dedicated native service fixtures with disposable profiles.
+  For [installed Windows activation](tools/rust-qa/windows-msi-interop/reverse/README.md)
+  and [live worker backup](docs/development.md#installed-windows-worker-backup),
+  use the pinned 3.0.4 menu helper and verify the worker's own shutdown log.
   The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
   owned desktop, a visible synthetic icon and a matching native Shell callback.
   Use the [tray rectangle and HICON measurements](docs/rust/rw02-windows-services.md#sampling-the-explorer-tray-rectangle-at-989bb33)

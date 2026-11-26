@@ -9,7 +9,7 @@ from unittest.mock import patch
 from hashlib import sha256
 import unittest
 
-from evidence import pipe_and_window, sha, shutdown, verify_prequit, worker_files
+from evidence import QUIT_SOURCE, pipe_and_window, sha, shutdown, verify_prequit, worker_files
 import common
 
 
@@ -81,14 +81,15 @@ class ReverseTests(unittest.TestCase):
         messages = ["Folder watcher started with 1 source(s).", "Flushing pending uploads before shutdown."]
         row = sample()
         q = row["quit"] = dict(receiver=135, tid=150, issuedQpc=230, exitedQpc=260, method="shipping tray Quit", exit=0, empty=True)
-        menu = dict(status="invoked", pid=11, created=100, receiver=135, tid=150, menu=160, menuHwnd=170,
-                    commands=[1, 0, 2, 0, 3], label="Quit", runtimeId=[142, 1], bounds=[4, 6, 20, 22])
+        menu = dict(status="invoked", pid=11, created=100, receiver=135, tid=150, menuHwnd=170,
+                    sourceSha256=QUIT_SOURCE, rawInteraction="tray-menu-quit; popup=170; verifiedHighlightedCommandId=3; nativeMouseClick")
         suffix = "info: ImmichFolderWatch.Core.Services.FolderWatchWorker[0] Flushing pending uploads before shutdown."
         self.assertTrue(shutdown(row, messages, menu, suffix)["flushStarted"])
         self.assertEqual(shutdown(row, messages, menu, suffix)["flushCompletion"], "unobserved")
         self.assertFalse(shutdown(row, messages, menu, "")["flushStarted"])
         self.assertFalse(shutdown(row, messages[:1], menu, suffix)["flushStarted"])
-        for key, bad in (("menuHwnd", 0), ("status", "incomplete"), ("pid", 99), ("commands", [1, 0, 3, 0, 2])):
+        for key, bad in (("menuHwnd", 0), ("menuHwnd", 171), ("status", "incomplete"), ("pid", 99),
+                         ("sourceSha256", "other"), ("rawInteraction", menu["rawInteraction"].replace("Id=3", "Id=2"))):
             with self.assertRaises(ValueError):
                 shutdown(row, messages, {**menu, key: bad}, suffix)
         q.update(method="owned cleanup", error="menu unavailable", cleanup={"method":"owned process terminated after sampling"})

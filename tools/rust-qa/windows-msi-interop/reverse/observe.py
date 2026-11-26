@@ -73,21 +73,19 @@ def owned_root(windows, hwnd, pid, tid=None):
 
 def invoke_quit(launch, api, windows, primary, out, row):
     from native import wpf_tray_receiver
-    recorder = launch.recorder
     receiver = wpf_tray_receiver(primary.pid)
     if not receiver or receiver[1] != row["root"]["tid"] or primary.poll() is not None:
         raise ValueError("The shipping tray receiver is unavailable on the original UI thread")
     hwnd, tid = receiver
     q = row["quit"]
     q.update(receiver=hwnd, tid=tid, issuedQpc=api.clock())
-    # The product's ordinary context-menu callback opens its TrackPopupMenuEx on the receiver thread.
-    if not windows.post(hwnd, 0x401, 0, (1 << 16) | 0x007b):
-        raise c.WinError(c.get_last_error())
-    legacy_ps = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
-    subprocess.run([legacy_ps, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
+    pwsh = shutil.which("pwsh")
+    if not pwsh:
+        raise ValueError("The installed test runner needs PowerShell 7 for the original Quit helper")
+    subprocess.run([pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File", HERE / "quit.ps1",
                     "-ProcessId", str(primary.pid), "-Created", str(row["primary"]["created"]),
                     "-Receiver", str(hwnd), "-ThreadId", str(tid), "-Evidence", out / "quit-menu.json"],
-                   cwd=out, check=True, timeout=25)
+                   cwd=out, check=True, timeout=35)
     code = launch.wait_for_exit(primary, windows.pump, 30)
     if code:
         raise ValueError(f"The shipping WPF Quit command exited with {code}")

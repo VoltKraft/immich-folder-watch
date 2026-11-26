@@ -35,10 +35,11 @@ def endpoint_port(endpoint):
 
 def observer_sources(out, revision, *, freeze=False):
     paths = {HERE / n for n in ("common.py", "install.ps1", "msi_evidence.py", "transaction-logs.ps1",
-                                "reverse/observe.py", "reverse/quit.ps1", "reverse/profile.ps1", "reverse/evidence.py")}
+                                "reverse/observe.py", "reverse/quit.ps1", "reverse/quit-source.ps1",
+                                "reverse/profile.ps1", "reverse/evidence.py")}
     paths.update(INSTALLED / n for n in ("windows.ps1", "release.json", "run.py", "interop/installed_backup.py",
                                          "interop/shipping_upload.py", "interop/assess.py"))
-    paths.update([ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1",
+    paths.update([ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1", ROOT / "packaging/windows/Test-InstalledUpgrade.ps1",
                   QA / "observe-windows-gui.py", QA / "windows_observer.py"])
     paths.update(p for p in UPLOAD.glob("*.py") if not p.name.startswith("test_"))
     for folder, modules in {

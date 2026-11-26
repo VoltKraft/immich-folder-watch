@@ -17,6 +17,7 @@ on:
       - 'tools/RustCompatibilityOracle/installed/windows.ps1'
       - 'tools/RustCompatibilityOracle/installed/release.json'
       - 'packaging/windows/Test-InstallerUpgradeContract.ps1'
+      - 'packaging/windows/Test-InstalledUpgrade.ps1'
   workflow_dispatch:
 
 permissions:
@@ -82,6 +83,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/rust-qa/windows-msi-interop/reverse/test_profile.ps1
+          ./tools/rust-qa/windows-msi-interop/reverse/test_quit_source.ps1
           python -B -m unittest discover -s tools/rust-qa/windows-msi-interop/reverse
           exit $LASTEXITCODE
 

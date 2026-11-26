@@ -16,13 +16,16 @@ window. The observer saves the WinEvent sequence, the cursor measured before
 releasing the suspended secondary, both process identities, the Rust log and
 the empty secondary job in `before-quit.json` and its associated logs.
 
-To request a regular exit, the observer posts the product's context-menu
-callback to its verified message-only tray receiver. It identifies command 3
-in the WPF UI thread's original popup menu. It invokes the visible UI
-Automation item at the command's rectangle after checking its ancestry, text,
-process and native menu again. This exercises the application's Quit command.
+To request a regular exit, the observer verifies the original process,
+creation time, UI thread and message-only tray receiver. PowerShell 7
+compiles the checksum-pinned C# menu helper from the original
+[3.0.4 upgrade test](../../../../packaging/windows/Test-InstalledUpgrade.ps1).
+The helper opens the product's context menu, locates command 3 in the
+owned popup, checks the cursor and highlighted item, and selects Quit
+with a mouse click. The receipt retains the helper's original result
+and the popup handle.
 The genuine interaction with the Explorer notification icon has its own
-[Windows Shell test](../../windows-services/README.md).
+[Windows Shell test](../../../../docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback).
 
 The result records the exit method, worker shutdown signal and start of the
 shutdown flush separately. The 3.0.4 worker emits its flush message before
@@ -49,4 +52,5 @@ Run the portable checks from the repository root.
 ```sh
 python -B -m unittest discover -s tools/rust-qa/windows-msi-interop/reverse
 pwsh -NoProfile -NonInteractive -File tools/rust-qa/windows-msi-interop/reverse/test_profile.ps1
+pwsh -NoProfile -NonInteractive -File tools/rust-qa/windows-msi-interop/reverse/test_quit_source.ps1
 ```

@@ -147,6 +147,38 @@ and an installed upgrade preventing an old worker from restarting remain
 separate acceptance requirements.
 [Native commands, evidence and quit behavior](../../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
+### Both installed Windows launch orders at ef28520
+
+At `ef2852093abab540acc430d6099f9711bef0ef41` all four independent
+hosted runs reopened the original hidden window. With WPF primary, Rust
+sent eight bytes on the connected pipe owned by the original installed
+process and exited zero with an empty job. On each host the original
+WPF window became visible 16 ms after resume, on a distinct Windows
+tick. The original worker had completed two scans of its empty synthetic
+source. With Rust primary both full trials passed again, including the
+original worker's reads of the new file.
+
+| WPF primary | Rust PID | WPF PID | Original HWND | UI thread |
+| --- | ---: | ---: | ---: | ---: |
+| Windows x64 | 1732 | 2356 | 131448 | 2212 |
+| Windows ARM64 | 6012 | 8444 | 196794 | 3924 |
+
+Both WPF observers found the native menu. UI Automation failed the
+check for the Quit item at its screen point. Both observers terminated
+their owned WPF process and both MSIs uninstalled successfully. Detached
+replay from the measured revision verified the four Actions digests,
+both full Rust-primary trials and both WPF activations with
+`--before-quit`. Both full WPF-primary readbacks failed. These trials
+exercised one session on each disposable host. The next native run
+uses the original upgrade test's menu helper to exercise normal Quit.
+
+| Original archive | ZIP SHA-256 |
+| --- | --- |
+| [x64, Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45894171914/artifacts/15154041685) | `4b821c64ef788550db227e08412fb55c35810a5eec8c7658fe22e6243612546d` |
+| [ARM64, Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45894171914/artifacts/15153921166) | `428cc410ffaf4af898961d52ebb3ece143046a6247ca0c929d20c0c140de3298` |
+| [x64, WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45894171914/artifacts/15154385866) | `ffeb635f7b103c867fc3a8b1a91c14b7f50ede9ed2f62101caac6227d4d83868` |
+| [ARM64, WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45894171914/artifacts/15153906608) | `4a733511b5336dc8849820e2dd337f960c3690c95ab8c8ed0c35f6be6e86cbc5` |
+
 ### Shipping Flatpak and Rust probe in two installed refs
 
 On two private Fedora x64 X11 desktops the original, signature-verified

@@ -16,6 +16,7 @@ on:
       - 'tools/RustCompatibilityOracle/installed/run.py'
       - 'tools/RustCompatibilityOracle/installed/release.json'
       - 'packaging/windows/Test-InstallerUpgradeContract.ps1'
+      - 'packaging/windows/Test-InstalledUpgrade.ps1'
   workflow_dispatch:
 
 permissions:
@@ -68,6 +69,7 @@ jobs:
           $root = 'tools/rust-qa/windows-msi-interop'
           & "$root/test_install.ps1"
           & "$root/upload/test_profile.ps1"
+          & "$root/reverse/test_quit_source.ps1"
           python -B -m unittest discover -s "$root/upload"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $evidence = "artifacts/rust/windows-msi-interop/upload/$env:NATIVE_TARGET"

@@ -58,6 +58,7 @@ def inputs(wpf_primary=False):
     if wpf_primary:
         reverse = HERE / "reverse"
         paths.extend([*sorted(reverse.glob("*.py")), *sorted(reverse.glob("*.ps1")), reverse / "launcher.patch"])
+        paths.append(ROOT / "packaging/windows/Test-InstalledUpgrade.ps1")
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in paths}
 
 
@@ -66,11 +67,11 @@ def verify_source_inputs(recorded, revision, wpf_primary=False):
     if set(recorded) != set(local) or revision != subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip():
         raise ValueError("Use the exact source revision that recorded this trial")
-    # These four release tools have no EOL attribute. Git for Windows normally checks
+    # These release tools have no EOL attribute. Git for Windows normally checks
     # them out as CRLF. Keep native byte digests and verify each against its Git blob.
     checkout_text = {p.relative_to(ROOT).as_posix() for p in (
         INSTALLED / "windows.ps1", INSTALLED / "release.json", INSTALLED / "run.py",
-        ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1")}
+        ROOT / "packaging/windows/Test-InstallerUpgradeContract.ps1", ROOT / "packaging/windows/Test-InstalledUpgrade.ps1")}
     queries = "".join(f"{revision}:{path}\n" for path in local).encode()
     blobs = BytesIO(subprocess.check_output(["git", "cat-file", "--batch"], cwd=ROOT, input=queries))
     for path, digest in local.items():

@@ -68,9 +68,11 @@ At `1d3af9a` a normal start of the installed WPF 3.0.4 executable on
 Windows x64 and ARM64 reopened the retained Rust primary in the same
 session. Each original Rust inventory worker read the new file twice.
 Both installations were removed. On ARM64 the foreground request was
-declined. The other start order and standard-user cross-session writer
-exclusion have separate checks.
+declined. At `ef28520` both start orders reopened the original window on
+each architecture. The reverse WPF trials stopped at the subsequent Quit
+selection. Standard-user cross-session writer exclusion remains open.
 [Native Windows activation and independent readbacks](rw02-instance.md#installed-windows-secondary-at-1d3af9a).
+[Both start orders and native Quit outcome](rw02-instance.md#both-installed-windows-launch-orders-at-ef28520).
 
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known

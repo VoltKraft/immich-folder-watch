@@ -10,6 +10,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from common import QA, module, read, sha
 
+QUIT_SOURCE = "f50baad6accfd09afc3e86beb9908027b8498525f6a787f35d217841c86c9e5c"
+
 def show_order(row):
     root, sec = row["root"], row["secondary"]
     events = row["events"]
@@ -115,16 +117,16 @@ def shutdown(row, messages, menu, post_quit_console):
         if not q.get("error") or q["cleanup"]["method"] not in ("already exited", "owned process terminated after sampling"):
             raise ValueError("Missing evidence of owned cleanup after unavailable Quit")
         return dict(method=q["method"], orderlyProcessExit=False, reason=q["error"])
-    bounds = menu["bounds"]
     root = row["root"]
+    popup = menu["menuHwnd"]
+    interaction = f"tray-menu-quit; popup={popup}; verifiedHighlightedCommandId=3; nativeMouseClick"
     if (q["method"] != "shipping tray Quit" or q["exit"] != 0 or menu["status"] != "invoked"
             or not row["after"]["qpc"] <= q["issuedQpc"] <= q["exitedQpc"]
             or (menu["pid"], menu["created"], menu["receiver"], menu["tid"]) != (
                 root["pid"], row["primary"]["created"], q["receiver"], root["tid"])
-            or q["tid"] != root["tid"] or q["receiver"] <= 0 or menu["menu"] <= 0 or menu["menuHwnd"] <= 0
-            or not menu["label"] or not menu["runtimeId"] or len(menu["commands"]) != 5
-            or menu["commands"][::2] != [1, 2, 3] or len(bounds) != 4 or not bounds[0] < bounds[2] or not bounds[1] < bounds[3]):
-        raise ValueError("The ordinary shipping Quit provider, timing or process identity differs")
+            or q["tid"] != root["tid"] or q["receiver"] <= 0 or type(popup) is not int or popup <= 0
+            or menu["sourceSha256"] != QUIT_SOURCE or menu["rawInteraction"] != interaction):
+        raise ValueError("The original native Quit selection, timing or process identity differs")
     started = messages.index("Folder watcher started with 1 source(s).")
     def seen(message):
         return message in messages[started+1:] and f"FolderWatchWorker[0] {message}" in post_quit_console

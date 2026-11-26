@@ -189,7 +189,9 @@ for each architecture and start order. With Rust primary, the installed
 inventory worker reads a new file. With WPF primary,
 the Rust process must activate the original installed window and exit.
 The observer saves the activation evidence before requesting Quit from
-the WPF application and checking its worker shutdown. Each trial installs
+the WPF application. PowerShell 7 compiles the pinned native menu helper
+from the shipping upgrade test. A separate check reads the worker's own
+shutdown log after the selected Quit command. Each trial installs
 and removes its own MSI.
 [Native workflow](../.github/workflows/rust-windows-msi-interop.yaml) ·
 [Rust primary](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running) ·

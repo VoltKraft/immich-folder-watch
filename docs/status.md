@@ -166,23 +166,27 @@ Independent replay verified the two archives. The ARM64 foreground request
 was declined even though the window became visible.
 [Native activation, file observations and installer receipts](rust/rw02-instance.md#installed-windows-secondary-at-1d3af9a).
 
-The reverse Windows trial starts the installed WPF application first and
-launches Rust while the original WPF window is hidden. The observer saves
-the pipe owner, window events and process exits before invoking the
-installed application's Quit command. Independent review verified the
-window event ordering and the distinction between a clean process exit
-and the worker's recorded start of flushing. Thirteen Python controls,
-the two PowerShell fixture checks and all sixteen workflow-security tests
-passed locally. Each start order and architecture gets a separate hosted
-desktop. Both trials exercise one Windows session.
-[Reverse native trial and readback](../tools/rust-qa/windows-msi-interop/reverse/README.md).
+At `ef28520`, both Windows x64 and ARM64 passed the activation check
+in both directions. The Rust secondary reopened the original installed
+WPF window in 16 ms on both hosts. Its process exited zero each time.
+UI Automation failed to confirm the Quit command at its native menu
+point on both architectures. The observers terminated their own WPF
+processes and both MSIs uninstalled. Detached replay confirmed two full
+Rust-primary runs and two WPF activations before Quit. The next test
+uses the original 3.0.4 upgrade fixture's verified native menu click.
+[Original archives and process identities](rust/rw02-instance.md#both-installed-windows-launch-orders-at-ef28520).
 
 The installed Windows upload trial now has a native Rust helper for
 the original WPF profile and a separate loopback PNG peer. On Fedora x64,
 the rebuilt helper returned byte-identical backups from the two original
 Ubuntu main/WAL pairs at `3d67a46`. The four tables and ROWIDs matched
 each archived return. The Windows entry point passed type checking on
-both MSVC targets. Installed Windows upload and restart results are pending.
+both MSVC targets. At `f5322ff` the native builds and 40 C# checks per
+host passed. On both Windows architectures a portable test opened its
+UTF-8 fixture with code page 1252 and failed before MSI installation.
+The reader now specifies UTF-8. Installed Windows upload and restart
+results are pending.
+[Original Windows build and test logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45896231136) ·
 [Native commands](development.md#installed-windows-worker-backup) ·
 [Original Ubuntu databases](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
 
