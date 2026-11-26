@@ -544,3 +544,46 @@ in each archive.
 | --- | --- | --- |
 | [x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725198/artifacts/15155363507) | `4162fe0a585b303fc4d54d139ffde71df2d28efa772fb19f57793beae46afd53` | `cc3e244a8f8de53c854b81b43e3fff996cb0cb94fd2f9c574964f371a078f3a2` |
 | [ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725198/artifacts/15155657463) | `fca5778b100c5a7156f94af6622a96ab56e547d2388a2d26633fdb5247dad276` | `2205ef38b3a353b7e1d5ef5c7e8b77cdafb9987e4215104c2ba744976b99a990` |
+
+## Installed Windows worker restart at c4d05b6
+
+The installed 3.0.4 WPF worker resumed from a live Rust backup on the x64
+Default desktop and on a private ARM64 input desktop. Three fresh runners
+each uploaded `signed-worker.png` to their own loopback peer and received
+HTTP 201. The SQLite main file alone contained zero upload rows. Replaying
+its 16 WAL frames reproduced the single committed row in Rust's standalone
+return. Each original ZIP matched its GitHub Actions digest. Detached replay
+at `c4d05b6929d9112de8b6e05f38ab99597782928b` verified the native build
+and evaluated the live-backup and full-restart checks separately.
+
+| Original archive | Live backup / full restart | WPF PIDs in launch order | ZIP SHA-256 | Returned SQLite SHA-256 |
+| --- | --- | --- | --- | --- |
+| [x64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45902841251/artifacts/15156648938) | Passed / passed | 664 → 848 | `b8acb104c96914286c5670a34795034618a92710a20cd19cc0f6422bc43927b5` | `a62f1ae020b3fe87133b3291fad4951089cd634b4d9ecb4e81b2d6a30ed735ad` |
+| [ARM64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45902841251/artifacts/15156752398) | Passed / failed before restart | 3292 | `04f1a68f231d3d1c10f53b759132a73345bf3ce4a1a47c71b64e3d0c97c95512` | `f1b69d3b3f867709e904183b90db9ab5543602573a594a39b43acf59f8bd9a68` |
+| [ARM64 private input](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45902841251/artifacts/15156941151) | Passed / passed | 3664 → 1092 | `8508621a85b18793ec767d555c4c4d71a2495b113466da2976bbc8866bbbe433` | `521167dd9f8c772d4b0719d69ffbded6b1f23b5135a4122e83e883328d0f1cd0` |
+
+On both completed restarts, the second installed process opened the
+returned database, kept the first asset at ROWID 1 and uploaded only
+`after-restore.png`. Its HTTP 201 response matched the new asset at
+ROWID 2. In each lifetime the first tested point belonged to the original
+WPF client. Selecting the highlighted Quit command (ID 3) produced exit 0
+and an empty WPF job. The logs recorded the shutdown signal and the
+start of flushing. Flush completion remains unobserved.
+
+In ARM64 console session 2, supervisor PID 1952 retained the original
+`WinSta0\Default` handle and switched input to the newly created
+`IfwQa_f1ec01be36014552bd0496fb450588a5` desktop. Observer PID 908
+recorded the original WPF windows (HWNDs 131554 and 327926) and the two
+native Quit helpers (PIDs 9976 and 5352) on that desktop. After the second
+Quit, the observer exited with code 0. The supervisor switched back to
+the original unlocked Default desktop in session 2 and closed both
+desktop handles. This trial exercised the installed worker and its
+application menu. Ordinary Explorer tray and RDP behavior have separate
+acceptance checks.
+
+On the ARM64 Default desktop, the first worker completed its upload and
+live backup. All 16 points across its client hit HWND 66050, owned by
+PID 8348. The observer stopped before moving the cursor or opening the
+menu, then reaped its own WPF process. Database replacement and the
+second launch were never reached. All three runners uninstalled the MSI
+and removed the synthetic profile and scratch directory.

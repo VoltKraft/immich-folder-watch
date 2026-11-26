@@ -1117,3 +1117,26 @@ MSI install and uninstall transactions all returned zero.
 | [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15155143034) | `d09885f560b4405b404842f52225c67feb57e7ba2471484ea7e41a181261e41b` |
 | [x64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15156305512) | `8c41c642e85c88cf1592de5a126bd957e3e5298e96170d9de46973bb2244d8f8` |
 | [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45899285022/artifacts/15155987051) | `627b11ef91e997760e8387c0f2fe97b273d1e1f0432121e81fdc6db9fcb8b30a` |
+
+## Installed Windows activation at d7c084c
+
+Both native Rust-primary trials passed. With the original recorder the x64
+worker (PID 4208) and ARM64 worker (PID 11172) each made the two required
+kernel-observed file queries. Window reactivation, orderly Quit, job
+drain and cleanup also passed. This x64 run predates the independent ETW
+session at `69b3ddd`. The two earlier loss reports remain valid.
+
+With WPF primary, both argument-free Rust launches reopened the original
+window on distinct native ticks and exited zero. On x64 the ordinary
+menu Quit completed. On ARM64 each of 16 interior points belonged to
+foreground HWND 66052 (PID 8284, thread 8480). The observer stopped
+before moving the cursor. The partial activation replay passed, and the
+full orderly shutdown comparison failed. All four original MSIs were
+removed.
+
+| Original native archive | ZIP SHA-256 |
+| --- | --- |
+| [x64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15155259912) | `028604d5ff45eabcb630d7103e3998021a055d919f95a2df3feb613132fa1b2b` |
+| [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15155698711) | `b3a875a8fb39b91a63054c00af9ec913fe993b135636ec5b15d261e96a5fe3a1` |
+| [x64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15156502752) | `d8b39527024d17af2c128020ff495f209acba4cab74f468ef7663888e44a5bbe` |
+| [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15155494029) | `b82106dff6674e9ad95dd5ae85b3cb53790418f72a48d0c7e6e0e5bb548ff56b` |

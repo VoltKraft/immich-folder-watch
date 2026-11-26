@@ -8,6 +8,20 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+The installed Windows 3.0.4 worker restarted from its Rust-returned live
+backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
+original database included 16 WAL frames. In both trials a new WPF worker
+kept the first mapping and uploaded only the second PNG. On ARM64 the
+original input desktop was restored. The separate ARM64 Default trial
+verified the live backup, then stopped before a covered Quit. The three
+MSI uninstalls passed. At `69b3ddd` both installed WPF secondary launches
+reactivated the Rust primary. The x64 recorder captured both native file
+queries and reported zero losses at all four snapshots and in the finished
+trace. Ordinary ARM64 WPF-primary shutdown and standard-user cross-session
+writer exclusion remain open.
+[Windows restore archives](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6) ·
+[Native Windows file traces](../tools/rust-qa/windows-msi-interop/file-trace.md).
+
 At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
 each passed 82 YAML profiles and 224 C# readbacks. Independent replay
 verified all 448 output files, including edits to profiles with Unicode
@@ -236,6 +250,13 @@ On Fedora x64 the five-crate Rust workspace passed 38 frozen tests
 and its Cargo dependency boundary check. Clippy passed for all workspace
 targets with warnings denied.
 [Native run and evidence](development.md#installed-windows-worker-backup).
+
+At `d7c084c` the installed Rust-primary runs passed on both Windows
+architectures. The x64 worker produced both required file events with
+the original recorder, before the changes to ETW collection. The x64
+WPF-primary run passed. ARM64 WPF reactivated but all 16 tested Quit
+points were covered by the same foreign window. All four MSIs were removed.
+[Four original archives and native outcomes](rust/rw02-instance.md#installed-windows-activation-at-d7c084c).
 
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 

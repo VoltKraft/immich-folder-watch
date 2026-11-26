@@ -239,6 +239,8 @@ requires the original WPF roots, actual Quit selections, empty jobs,
 both uploads and return to the original unlocked console. This trial
 measures installed worker recovery. The two ordinary console jobs and
 the [Explorer tests](rust/rw02-windows-services.md) retain their own results.
+For the measured desktop switches, both uploads and the ARM64 Default
+partial result, see the [installed Windows restart receipts at c4d05b6](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6).
 
 ## Rust feasibility workspace
 

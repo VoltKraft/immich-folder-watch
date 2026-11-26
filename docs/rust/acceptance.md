@@ -40,6 +40,25 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+At `c4d05b6` the installed 3.0.4 Windows worker consumed the Rust-returned
+database on both architectures. On the x64 Default desktop and the ARM64
+private input desktop, the second WPF process preserved ROWID 1 and
+uploaded only the new PNG as ROWID 2. Both processes quit through the
+shipping menu on each desktop. The ARM64 Default trial verified the
+first upload and live backup, then stopped with another process covering
+all 16 candidate points for Quit. All three MSIs were removed.
+[Native runs and independent SQLite readbacks](rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6).
+
+At `d7c084c` the installed WPF secondary reopened the original Rust window
+on both Windows architectures. Both Rust inventory workers completed the
+two file queries. The opposite order passed on x64. On ARM64 the Rust
+secondary reactivated WPF and exited normally, but the observer could
+not select Quit on that Default desktop. Both Rust-primary runs passed
+again at `69b3ddd`. All four x64 ETW snapshots and the completed trace
+reported zero loss. Standard-user cross-session writer exclusion remains open.
+[Both launch orders](rw02-instance.md#installed-windows-activation-at-d7c084c) ·
+[Native trace evidence](../../tools/rust-qa/windows-msi-interop/file-trace.md).
+
 At `0bb39bf` all sixteen native C# worker restarts used the expected
 Rust-returned SQLite backup. Detached replay matched the four original
 tables and the external state for each activity on each target.
