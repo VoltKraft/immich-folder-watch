@@ -1118,3 +1118,9 @@ hide during independent file activity and observe a successful resumed
 presentation on the reopened window. The separate executable retains the
 ordinary window transitions and the same synthetic inventory worker.
 [Experiment, controls and commands](../../tools/rust-qa/windows-frame-cost/README.md#one-shot-frame-readiness-in-the-windows-message-loop).
+
+### One-shot frame readiness on Windows x64 at c52da2d
+
+The original window processed 238 of 245 eligible close requests while its frame registration was pending. The external observer confirmed the hide before a grant, then verified 32 resumed DXGI submissions on visible reopens during file work. A further presented frame reused a slot held over a hide. The original worker completed both 100,000-file passes, and the independent pixel reader found 177 changed editor pixels on the reopened HWND. [Native build and measurements](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45890992463/artifacts/15152852412).
+
+The one-shot trial met nine of eleven same-host WPF limits. Scan close p95 was 22.0323 ms against 19.774 ms, and scan reopen p95 was 45.8779 ms against 21.702 ms. The ordinary GUI medians were 23.1095 and 33.0625 ms respectively. Idle CPU and presentation rates were zero in both visibility states. Of 73 individual reopens slower than the WPF p95 limit, 53 had no overlap with an armed registration. The 22 that overlapped a native DXGI present spent a combined 2.6072 ms inside those calls. Windows x64 scan responsiveness therefore remains open. [Complete comparison, trace costs and original hashes](../../tools/rust-qa/windows-frame-cost/README.md#native-one-shot-trial-at-c52da2d).

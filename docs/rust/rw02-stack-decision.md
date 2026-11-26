@@ -16,9 +16,15 @@ ownership remain open.
 On Windows x64 at `de3eec4`, disabling DWM transitions on the retained
 window changed scan close and reopen p95 by less than 0.1 ms on that host.
 Both variants exceeded the WPF limits despite successful presentation and
-visible edits. Keep the ordinary window policy. The next comparison tests
-whether the window thread can handle a close during its DXGI frame wait.
+visible edits. Keep the ordinary window policy.
 [Native comparison and originals](../../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4).
+
+The private build at `c52da2d` processed window input while waiting for
+DXGI on x64. It met nine of eleven WPF limits. The median ordinary
+scan-reopen p95 on this host was 33.06 ms. The private build took
+45.88 ms against a limit of 21.70 ms. This renderer change does not
+qualify for adoption.
+[Frame timing, resource limits and editor pixels](rw02-windows-window.md#one-shot-frame-readiness-on-windows-x64-at-c52da2d).
 
 The installed Noble backport completed the requested Ubuntu package
 feasibility trial. The user left distribution and ongoing package

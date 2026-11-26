@@ -151,8 +151,11 @@ Seven portable Rust lifecycle tests and the Windows x64 target Clippy
 check passed. Independent review replayed 744 original Windows job
 resource samples and rejected all twelve controls with a foreign PID.
 The detached comparison preserves a measured idle present rate over
-budget. Native input, presentation and resource results for this new
-executable are pending.
+budget. At `c52da2d` the original x64 window hid before
+the frame was available on 238 requests. The private GUI passed nine of
+eleven WPF limits. During the scan its p95 close and reopen were 22.03 and
+45.88 ms against 19.77 and 21.70 ms. Both processes exited cleanly.
+[Native one-shot result](rust/rw02-windows-window.md#one-shot-frame-readiness-on-windows-x64-at-c52da2d).
 [Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
 
 The installed Windows second-launch trial now uses the original 3.0.4

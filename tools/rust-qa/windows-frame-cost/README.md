@@ -50,3 +50,29 @@ The visible WARP root uses a depth-one Mailbox swapchain. Its painter queries th
 Hiding the HWND cancels its pending redraw. If DXGI already granted a slot for the same swapchain, the next full paint can use it once. A real present spends the slot. Reconfiguration and surface destruction retire the generation and its credit. The token and generation prevent a superseded registration from waking a later window. The portable Rust tests cover timer and queue results, overdue signals, hide before drawing, hide during present and swapchain replacement.
 
 Keep both source archives, the native compiler stream, the diagnostic PE, both subject logs, original file and DXGI traces, HWND requests and editor images under `frame-ready`, together with the workflow’s ordinary and WPF outputs. Replay matches a pending registration to a real `WM_CLOSE` on the original UI thread during inventory. It also looks for an independently visible reopen with a successful DXGI call completed inside the resumed renderer submission before the next close. It reports any reuse of a previously granted slot separately. The editor control checks changed pixels on the reopened HWND. An unobserved opportunity leaves the mechanism unverified. The eleven single-trial resource measurements are reported against the frozen WPF limits and the three ordinary trial medians.
+
+### Native one-shot trial at c52da2d
+
+The one-shot Windows x64 trial at `c52da2d2e33b9946871c5696727a3d4e4bb6c80f` serviced 238 of 245 file-qualified close requests issued while the original frame registration was pending. In each of the 238 cases the UI thread entered `WM_CLOSE`, cancelled the ungranted token and the external observer saw the same HWND hidden. The scan recorded 302 registrations, 62 grants, one reused slot and 941 message-queue returns while armed. Thirty-two resumed submissions contained a successful DXGI present after an externally observed reopen during file work. One further submission reused a slot granted before a confirmed hide. [Original source](https://github.com/VoltKraft/immich-folder-watch/tree/c52da2d2e33b9946871c5696727a3d4e4bb6c80f/tools/rust-qa/windows-frame-cost) · [Native archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45890992463/artifacts/15152852412).
+
+The original GUI used HWND 2032162, PID 2400 and TID 2056. Worker PID 8828 completed both 100,000-file passes. The external observer recorded 521 successful DXGI pairs, 238 file-qualified first frames after a reopen, and zero presents during 257 hidden intervals. The editor preserved its draft and focus on the same window. Typing after the reopen changed 177 pixels across 28 columns and 18 rows at 96 DPI. The native subject exited through its normal quit command with code zero.
+
+| Metric | Three ordinary trials, median | One-shot trial | WPF maximum |
+| --- | ---: | ---: | ---: |
+| Startup (ms) | 136.4134 | 153.6636 | 683.811 |
+| Visible CPU (% of one core) | 0 | 0 | 3.702 |
+| Hidden CPU (% of one core) | 0 | 0 | 4.221 |
+| Visible working set (MiB) | 60.7031 | 62.2422 | 143.026 |
+| Hidden working set (MiB) | 59.4844 | 61.0234 | 140.624 |
+| Idle close p95 (ms) | 15.9681 | 4.7535 | 13.731 |
+| Idle reopen p95 (ms) | 5.5214 | 5.8066 | 17.665 |
+| Scan close p95 (ms) | 23.1095 | **22.0323** | **19.774** |
+| Scan reopen p95 (ms) | 33.0625 | **45.8779** | **21.702** |
+| Visible idle presents/s | 0 | 0 | 0.134 |
+| Hidden idle presents/s | 0 | 0 | 0.067 |
+
+Nine of the eleven measurements met the frozen same-host limits. The single experimental trial includes the instrumented event loop and renderer. Its step took 4 min 21 s for the private build, measurement and replay combined. The run provides no separate measurement of instrumentation overhead.
+
+Among 253 file-qualified reopens, 73 individual request-to-visible times exceeded the 21.702 ms WPF p95 limit. Those 73 intervals totaled 2,530.9571 ms. Twenty overlapped an armed registration for a combined 169.2054 ms. None received a frame grant during the request. Twenty-two overlapped a native DXGI present for a combined 2.6072 ms. Of these 73 reopens, 68 had a file-qualified first present after visibility, with a further median delay of 1.9744 ms. The readiness intervals can also service window input. The time spent inside `ShowWindow`, in dispatch and in the external visibility poll cannot be separated with this trace.
+
+The source-bound detached reader returned 0 for the observed mechanism and recorded `over-limit` for resources. Actions archive 15152852412 contains 112 CRC-verified entries and 64,690,760 bytes, with SHA-256 `181b806f08feaeba5479aa4bef38cc45ab7d1784512df54907116fb85c1f28af`. The independent request-by-request calculation is retained in `artifacts/rust/hosted-windows-transitions/45890992463/reopen-intervals.json` with SHA-256 `d00687ae376d8358fc44c2d9b39f2b8824ef1b178f71ab1c35c9128d3fe3dc84`. [Original native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45890992463/job/140153319371).

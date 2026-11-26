@@ -114,6 +114,14 @@ above their WPF ceilings. The three ordinary retained trials met eight of
 eleven limits. RW-02 remains open.
 [WPF limits, file activity, editor pixels and archive](../../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4).
 
+At `c52da2d` the x64 GUI processed 238 close requests during a pending
+frame wait and hid the original window before the frame was available.
+It met nine of eleven same-host WPF limits. Under inventory load, close
+p95 was 22.03 ms against 19.77 ms and reopen was 45.88 ms against
+21.70 ms. The Rust worker completed two scans of 100,000 files. The
+archive also confirms the reopened editor's pixels and clean shutdown.
+[Native measurement and original traces](rw02-windows-window.md#one-shot-frame-readiness-on-windows-x64-at-c52da2d).
+
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
 ROWID and every existing row. Independent readback covered 32 SQLite
