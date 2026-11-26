@@ -587,3 +587,13 @@ PID 8348. The observer stopped before moving the cursor or opening the
 menu, then reaped its own WPF process. Database replacement and the
 second launch were never reached. All three runners uninstalled the MSI
 and removed the synthetic profile and scratch directory.
+
+After the WPF startup and desktop code was shared with the activation
+trial at `972adc6`, independent replay of all three new archives gave
+the same three outcomes. The x64 Default and ARM64 private workers
+each uploaded both PNGs across the restore and preserved ROWIDs 1 and 2.
+On ARM64 Default, the first worker committed the upload and all 16 Quit
+points hit another window. All three MSI uninstalls passed.
+[x64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15158022801) ·
+[ARM64 private](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15158295634) ·
+[ARM64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15157364158).

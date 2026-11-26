@@ -40,6 +40,12 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+At `dddb21a` the private Windows x64 CPU renderer met all eleven WPF
+limits. All 421 file-qualified reopens drew a complete editor frame
+before the next close. The ordinary retained renderer met eight limits
+on that host. This is one native CPU-renderer trial.
+[Raw timing, pixels and original archive](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
+
 At `c4d05b6` the installed 3.0.4 Windows worker consumed the Rust-returned
 database on both architectures. On the x64 Default desktop and the ARM64
 private input desktop, the second WPF process preserved ROWID 1 and
@@ -195,7 +201,7 @@ file reads. [Ubuntu desktop evidence](rw02-native-gui.md#ubuntu-native-results-a
 | RI-AC02 | Open | Four native candidate executables and dependency/runtime inventory |
 | RI-AC03 | Open | [Exact-row updates on copies of three C# writer profiles](rw02-legacy.md#updating-a-known-row-on-finalized-copies), WAL/crash and native full-volume results. [New Rust insertions](rw02-legacy.md#c-readback-of-newly-inserted-rust-rows) showed a lookup mismatch across casing profiles on Linux x64. The [first C# writes after rollback](rw02-legacy.md#first-c-upsert-after-rollback) produced eight duplicate entries across four synthetic copies. A [three-profile insertion check](rw02-legacy.md#inserting-a-new-row-across-three-qualified-rollback-profiles) then preserved 24 new rows through 144 C# upserts without duplicates. [Detached YAML readback](rw02-yaml.md#reading-the-original-yaml-file-bytes) covers BOM selection and malformed data. On all four targets the [shipping worker resumed from a Rust backup](rw01-storage-contract.md#four-worker-restarts-on-each-native-target) after download, upload, deletion and interrupted timestamp repair. Production write policy, migration and rollback after Rust engine activity remain open. |
 | RI-AC04 | Open | Independent native safe-fs and integration reviews, adversarial failures and sentinels |
-| RI-AC05 | Open | Both start orders passed with active inventory and upload workers on [Fedora](rw02-instance.md#rust-startup-during-a-signed-worker-upload) and [native Ubuntu x64 and ARM64](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46). On [both Windows targets](rw02-instance.md#installed-windows-activation-at-d7c084c) the ordinary secondary reactivated the original primary in either order. Both Rust-primary and the x64 WPF-primary trials included orderly shutdown. The ARM64 Default WPF-primary trial stopped before the shipping Quit. Complete candidate handover, standard-user cross-session ownership and durable product shutdown remain open. |
+| RI-AC05 | Open | Both start orders passed with active inventory and upload workers on [Fedora](rw02-instance.md#rust-startup-during-a-signed-worker-upload) and [native Ubuntu x64 and ARM64](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46). On [both Windows targets](rw02-instance.md#installed-windows-activation-at-d7c084c) the ordinary secondary reactivated the original primary in either order. Both Rust-primary and the x64 WPF-primary trials included orderly shutdown. The [ARM64 private WPF-primary trial](rw02-instance.md#installed-arm64-wpf-activation-and-quit-at-972adc6) completed through the shipping Quit and desktop restoration. On ARM64 Default the Quit was covered. Complete candidate handover, standard-user cross-session ownership and durable product shutdown remain open. |
 | RI-AC06 | Open | Native desktop and assistive technology evidence, measured budgets and tested graphics behavior |
 | RI-AC07 | Open | Independent consumer on four targets and dependency/profile isolation verification |
 | RI-AC08 | Open | The [installed 3.0.4 reference](rw01-installed-packages.md#installed-reference-on-all-four-hosts) passed native install, repair and uninstall on Windows and Ubuntu x64/ARM64. After a real upload, installed shipping workers resumed from Rust's live backup on both [Ubuntu](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) and [Windows](rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6) architectures. Four Rust candidate packages, offline reconstruction, native upgrades and rollback after Rust sync activity remain open. |

@@ -13,10 +13,15 @@ ownership remain open.
 [Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
-For the private CPU renderer trial, six real editor frames at two scales
-matched the egui-wgpu reference within two levels per color channel on
-Fedora x64. The reviewed additions are scoped to the trial. Windows x64
-close/reopen and resource limits remain open pending native measurements.
+On a Windows x64 WARP adapter, the private CPU renderer met all eleven
+same-host WPF limits at `dddb21a`. All 421 file-qualified reopens showed
+a full editor frame before the next close. Scan close/reopen p95 was
+5.71/9.66 ms. The ordinary retained renderer met eight limits on the
+same host. This makes the CPU path viable for the tested software
+adapter. Repeatability and ordinary renderer selection are still under
+assessment. On Fedora x64 six real editor frames at two scales matched
+the egui-wgpu reference within two levels per color channel.
+[Native measurements](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
 [Source inventory and pixel comparison](rw02-windows-window.md#cpu-rendering-of-the-original-editor-meshes).
 
 On Windows x64 at `de3eec4`, disabling DWM transitions on the retained

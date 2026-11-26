@@ -8,6 +8,14 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+At `dddb21a` the first native Windows x64 CPU-painter trial passed all
+eleven same-host WPF limits. Under inventory load, close/reopen p95 was
+5.71/9.66 ms and every one of the 421 eligible reopens drew the full
+editor before the next close. From the request to a completed GDI flush
+the p95 was 24.04 ms. The ordinary retained renderer met eight limits.
+A second native CPU comparison at `972adc6` is in progress.
+[Native comparison and archived compiler and window evidence](rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
+
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
 original database included 16 WAL frames. In both trials a new WPF worker
@@ -31,12 +39,12 @@ rejected for this timing trial. All 18 portable checks and three Rust
 raster tests passed.
 [CPU measurement and readback](../tools/rust-qa/windows-cpu-paint/README.md).
 
-A fifth Windows activation job pairs the installed ARM64 WPF primary with
-the argument-free Rust secondary on a private input desktop. It records
-the original WPF window before hiding, after hiding and after reactivation,
-then checks the menu Quit, worker shutdown and input desktop restoration.
-The native result for this combined trial is pending.
-[Run and independent readback](../tools/rust-qa/windows-msi-interop/reverse/README.md#wpf-activation-and-quit-on-one-private-arm64-input-desktop).
+At `972adc6` the argument-free Rust secondary reactivated the original
+installed WPF window on the ARM64 private desktop. The same WPF process
+then quit via its own menu, and the supervisor restored the original
+input desktop in session 2. The separate ARM64 Default trial reactivated
+WPF and stopped before the covered Quit. Both MSIs were removed.
+[Both native archives and process identities](rust/rw02-instance.md#installed-arm64-wpf-activation-and-quit-at-972adc6).
 
 At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
 each passed 82 YAML profiles and 224 C# readbacks. Independent replay

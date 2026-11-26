@@ -1143,3 +1143,40 @@ events, process resources and visible edits on the reopened window.
 The Linux offscreen result establishes image fidelity for those six
 frames. Windows window response and resource acceptance require native
 observations. [Native build and readback](../../tools/rust-qa/windows-cpu-paint/README.md).
+
+### Native Windows x64 CPU renderer at dddb21a
+
+The private CPU painter met all eleven resource limits in its first
+native timing trial. Three WPF trials supplied the limits on the same
+host. The ordinary retained renderer met eight. Each candidate used the
+same editor, WARP adapter and workload of 100,000 synthetic files.
+Detached replay at `dddb21a8ddeb06fe5fbc3653f9c0b34ccf6ce89f` checked
+the original compiler stream, source and library archives, executable,
+ETW file events, HWND transitions and editor captures. The original ZIP
+is 87,530,049 bytes with SHA-256
+`302303a5c63a77c69b55e4b63c4ab99142c0beaba27c9acf95114b04d2b63d04`.
+[Native archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45901012141/artifacts/15157628525).
+
+| Same-host metric | WPF limit | Ordinary Rust median | CPU trial |
+| --- | ---: | ---: | ---: |
+| Startup (ms) | 1005.63 | 210.12 | 201.30 |
+| Visible / hidden idle CPU (% of one core) | 4.845 / 5.676 | 0 / 0 | 0 / 0 |
+| Visible / hidden working set (MiB) | 142.72 / 140.32 | 60.36 / 59.18 | 53.52 / 52.42 |
+| Idle close / reopen p95 (ms) | 14.19 / 14.37 | 19.98 / 6.12 | 3.72 / 5.99 |
+| Scan close / reopen p95 (ms) | 29.83 / 21.03 | 35.54 / 29.96 | 5.71 / 9.66 |
+| Visible / hidden idle presentations per second | 0.134 / 0.067 | 0 / 0 | 0 / 0 |
+
+The inventory worker (PID 944) completed both passes while the GUI
+(PID 5500) kept HWND 983560. During the first pass, 422 close and 421
+reopen requests met the independent file-activity criteria. Each of
+the 421 reopens had a full editor-mesh transfer before the next close.
+The p95 from the request to the completed GDI flush was 24.04 ms.
+Measured from the first visible HWND sample it was 18.85 ms. The WPF
+reopen limit in the table applies to HWND visibility. The editor
+readback found 209 changed pixels after the reopen. The process quit
+through Control-Q with exit 0. Both original process logs also passed
+the later check for one WARP device with no active loss through Quit.
+
+This result qualifies one explicitly selected CPU-painter trial on a
+Windows x64 software adapter. Repeatability, ordinary renderer selection,
+RDP and mixed-DPI operation remain to be qualified.

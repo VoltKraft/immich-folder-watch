@@ -1140,3 +1140,31 @@ removed.
 | [ARM64 Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15155698711) | `b3a875a8fb39b91a63054c00af9ec913fe993b135636ec5b15d261e96a5fe3a1` |
 | [x64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15156502752) | `d8b39527024d17af2c128020ff495f209acba4cab74f468ef7663888e44a5bbe` |
 | [ARM64 WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45900725255/artifacts/15155494029) | `b82106dff6674e9ad95dd5ae85b3cb53790418f72a48d0c7e6e0e5bb548ff56b` |
+
+## Installed ARM64 WPF activation and Quit at 972adc6
+
+On a private input desktop in session 2, the original installed 3.0.4
+WPF process (PID 11120, UI thread 960) retained HWND 197088. The
+argument-free Rust secondary (PID 1684) activated that same window and
+exited zero. The observer saw the original window still hidden after
+resuming Rust and visible after the request. Both Windows events had the
+same millisecond timestamp. The hidden sample ended at QPC 20720725870,
+before the visible sample at 20720952002. The shipping menu helper
+(PID 8640) selected Quit on the same desktop. WPF logged the worker
+shutdown signal and start of flushing, exited zero and left its job empty.
+The observer exited zero. The supervisor restored the original Default
+input desktop and released both handles. WPF's log does not record
+flush completion.
+
+On the separate ARM64 Default desktop, Rust PID 4312 reactivated the
+original HWND 131710 of WPF PID 6260. All 16 sampled Quit points hit
+HWND 66052 of a different process (PID 9036). The observer
+stopped before moving the cursor. Both runners removed the original
+MSI. Detached replay passed both checks for the private trial and only
+the activation check for Default. These trials exercise same-session activation. Standard-user
+cross-session writer exclusion and visible Explorer activation remain open.
+
+| Original archive | ZIP SHA-256 |
+| --- | --- |
+| [ARM64 private input](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250552/artifacts/15157584251) | `e99177b32271f68b12ecbc3c85239ecebbd9ebe0ac917ca3164d6dc4169d964e` |
+| [ARM64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250552/artifacts/15156964970) | `ba1744ebefc2e5ba60b4c50d20c2aad5e40291be0f72e7403004e282abb8acbf` |
