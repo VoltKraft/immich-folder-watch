@@ -31,6 +31,13 @@ rejected for this timing trial. All 18 portable checks and three Rust
 raster tests passed.
 [CPU measurement and readback](../tools/rust-qa/windows-cpu-paint/README.md).
 
+A fifth Windows activation job pairs the installed ARM64 WPF primary with
+the argument-free Rust secondary on a private input desktop. It records
+the original WPF window before hiding, after hiding and after reactivation,
+then checks the menu Quit, worker shutdown and input desktop restoration.
+The native result for this combined trial is pending.
+[Run and independent readback](../tools/rust-qa/windows-msi-interop/reverse/README.md#wpf-activation-and-quit-on-one-private-arm64-input-desktop).
+
 At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
 each passed 82 YAML profiles and 224 C# readbacks. Independent replay
 verified all 448 output files, including edits to profiles with Unicode

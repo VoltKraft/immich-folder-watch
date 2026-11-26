@@ -8,7 +8,8 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from common import QA, module, read, sha
+from common import QA, TARGETS, module, read, require, sha
+import private_desktop
 
 QUIT_SOURCE = "f50baad6accfd09afc3e86beb9908027b8498525f6a787f35d217841c86c9e5c"
 
@@ -159,6 +160,42 @@ def shutdown(row, messages, menu, post_quit_console):
                 shutdownSignal=seen("Folder watch worker received shutdown signal."))
 
 
+def activation_desktop(out, report, row, log, *, completed):
+    mode = report.get("desktopMode")
+    private = mode == private_desktop.MODE
+    require(mode in (None, private_desktop.MODE)
+            and all((key in row) == private for key in ("privateRoot", "hiddenDesktop", "beforeQuitDesktop"))
+            and all((out / name).is_file() == private for name in ("desktop-start.json", "private-worker.json", "private-desktop.json")),
+            "The activation desktop or its original evidence differs")
+    context = module("reverse_desktop_readback", QA / "windows-desktop/win32.py")
+    if private:
+        desktop = private_desktop.replay(out, report, row, [row] if completed else [])
+        name, session = desktop["name"], desktop["session"]
+        observer = row["privateRoot"]["observerPid"]
+        private_desktop.check_root(row["hiddenDesktop"], name, row, observer, hidden=True)
+        private_desktop.check_root(row["beforeQuitDesktop"], name, row, observer)
+        initial, hidden, reopened = (row[key] for key in ("privateRoot", "hiddenDesktop", "beforeQuitDesktop"))
+        require(0 < initial["beginQpc"] <= initial["endQpc"] <= row["before"]["qpc"]
+                <= hidden["beginQpc"] <= hidden["endQpc"] <= row["secondary"]["releaseQpc"]
+                <= row["after"]["qpc"] <= reopened["beginQpc"] <= reopened["endQpc"]
+                and (not completed or reopened["endQpc"] <= row["quit"]["issuedQpc"] <= row["quit"]["exitedQpc"]
+                     <= row["quit"]["jobDrainedQpc"] <= row["mutexReleasedQpc"]),
+                "The private desktop snapshots are outside the original hide, Rust release, reopen or Quit interval")
+        wpf = row["primary"]["pid"]
+        # Both grant and denial follow the original Rust client's successful UOI_IO check.
+        require(re.fullmatch(rf"LAUNCHER_FOREGROUND_GRANT server={wpf} state=(?:granted|denied hresult=-?\d+)",
+                             log.splitlines()[2]) and row["profile"] == row["stagedProfile"]["inventoryToken"] == name.removeprefix("IfwQa_")
+                and row["primary"]["machine"] == row["secondary"]["machine"] == [TARGETS[report["target"]][1]] * 2
+                and row["hiddenDesktop"]["context"]["session"] == row["beforeQuitDesktop"]["context"]["session"] == session,
+                "The original Rust input desktop, native process or bound profile differs")
+    else:
+        name, session, desktop = "Default", row["desktopBefore"]["session"], None
+    for key in (("desktopBefore", "desktopAfter") if completed else ("desktopBefore",)):
+        require(context.ordinary_console(row[key], name) and row[key]["session"] == session,
+                "The original shipping and Rust processes require the same unlocked input session")
+    return desktop
+
+
 def verify_prequit(out, report, build, installed):
     row = read(out / "before-quit.json")
     prefix = (out / "wpf-before-quit.log").read_bytes()
@@ -169,8 +206,12 @@ def verify_prequit(out, report, build, installed):
             or ((out / "wpf.log").exists() and not (out / "wpf.log").read_bytes().startswith(prefix))
             or prefix.count(b"Folder watcher started with 1 source(s).") != 1 or prefix.count(sweep) < 2):
         raise ValueError("The pre-Quit observation or original shipping worker startup differs")
-    return pipe_and_window(row, (out / "rust.log").read_text(encoding="utf-8"),
-                           installed["exeSha256"], build["application"]["sha256"])
+    rust_log = (out / "rust.log").read_text(encoding="utf-8")
+    result = pipe_and_window(row, rust_log, installed["exeSha256"], build["application"]["sha256"])
+    desktop = activation_desktop(out, report, row, rust_log, completed=False)
+    if desktop is not None:
+        result["privateDesktop"] = desktop
+    return result
 
 
 def verify_activation(out, report, build, installed):
@@ -181,10 +222,6 @@ def verify_activation(out, report, build, installed):
             or row["stagedProfile"]["gui"] != build["assets"]["native-gui-assessment.exe"]
             or row["stagedProfile"]["worker"] != build["assets"]["ifw-performance-worker.exe"]):
         raise ValueError("The reverse assessment does not belong to the measured build or discarded profile")
-    context = module("reverse_desktop_readback", QA / "windows-desktop/win32.py")
-    if (any(not context.ordinary_console(row[k], "Default") for k in ("desktopBefore", "desktopAfter"))
-            or row["desktopBefore"]["session"] != row["desktopAfter"]["session"]):
-        raise ValueError("The shipping and Rust processes require the same unlocked Windows session")
     absent = row["missingWpf"]
     absent_log = (out / "missing-wpf.log").read_text(encoding="utf-8")
     if (not 0 < absent["created"] < row["primary"]["created"] or absent["pid"] <= 0
@@ -193,7 +230,10 @@ def verify_activation(out, report, build, installed):
         raise ValueError("The argument-free executable did not reject a missing WPF installation owner")
     response = verify_prequit(out, report, build, installed)
     before = read(out / "before-quit.json")
-    if any(row[k] != before[k] for k in ("primary", "secondary", "root", "events", "lifetimes", "before", "after", "missingWpf")):
+    fields = ["primary", "secondary", "root", "events", "lifetimes", "before", "after", "missingWpf", "desktopBefore"]
+    if report.get("desktopMode") == private_desktop.MODE:
+        fields.extend(("privateRoot", "hiddenDesktop", "beforeQuitDesktop", "profile", "stagedProfile"))
+    if any(row[k] != before[k] for k in fields):
         raise ValueError("The completed activation differs from the capture saved before Quit")
     worker = worker_files(out, row["profileFiles"])
     raw = (out / "wpf.log").read_text(encoding="utf-8", errors="replace")
@@ -203,7 +243,9 @@ def verify_activation(out, report, build, installed):
     prefix = (out / "wpf-before-quit.log").read_bytes()
     suffix = (out / "wpf.log").read_bytes()[len(prefix):].decode("utf-8", errors="replace")
     stop = shutdown(row, worker, read(menu_path) if menu_path.exists() else {}, suffix)
-    if not stop["orderlyProcessExit"] or not (stop["shutdownSignal"] or stop["flushStarted"]):
+    if ("fallback" in row or "cleanup" in row["quit"] or not stop["orderlyProcessExit"]
+            or not (stop["shutdownSignal"] or stop["flushStarted"])):
         raise ValueError("Incomplete WPF worker shutdown; replay the original activation with --before-quit")
+    activation_desktop(out, report, row, (out / "rust.log").read_text(encoding="utf-8"), completed=True)
     response["workerStop"] = stop
     return response

@@ -270,6 +270,9 @@ to reconcile project decisions, defaults, and recorded state.
   distinguish the D-Bus proxy PID from the GUI's outer and sandbox PIDs.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
+  For [Windows WPF-primary activation](tools/rust-qa/windows-msi-interop/reverse/README.md),
+  keep the two ordinary console results and the private ARM64 result identifiable.
+  Follow the original WPF window and verify restoration of the input desktop.
   For Linux installed worker continuity, run the [signed second launch while
   the Rust GUI inventories synthetic files](docs/rust/rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
   Exercise the opposite launch order during a [configured shipping upload](docs/rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload)

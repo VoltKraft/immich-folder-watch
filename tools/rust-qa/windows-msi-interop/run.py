@@ -9,9 +9,10 @@ import tempfile
 
 from common import AREA, HERE, INSTALLED, ROOT, TARGETS, inputs, launcher, module, read, sha, verify_source_inputs, write
 from msi_subject import build
+import private_desktop
 
 
-def run(target, package, *, wpf_primary=False):
+def run(target, package, *, wpf_primary=False, private=False):
     launch = launcher()
     release = module("ifw_shipping_package", INSTALLED / "run.py")
     if (not launch.recorder.hosted() or release.native_target() != TARGETS[target][0]
@@ -19,10 +20,14 @@ def run(target, package, *, wpf_primary=False):
             or os.environ.get("GITHUB_REF") != "refs/heads/rewrite/rust"
             or release.git("rev-parse", release.RELEASE["tag"] + "^{commit}").decode().strip() != release.RELEASE["commit"]):
         raise ValueError("Use the matching disposable native rewrite runner and original release tag")
+    if private and (not wpf_primary or target != private_desktop.ARM or os.getenv("TRIAL_VARIANT") != "arm64-private-input"):
+        raise ValueError("The private activation requires its separate native ARM64 WPF-primary runner")
     out = (AREA / "reverse" if wpf_primary else AREA) / target
     out.mkdir(parents=True)
     record = dict(target=target, status="incomplete", revision=os.environ["GITHUB_SHA"],
                   run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"], inputs=inputs(wpf_primary))
+    if private:
+        record["desktopMode"] = private_desktop.MODE
     if wpf_primary:
         record["direction"] = "wpf-primary"
         verify_source_inputs(record["inputs"], record["revision"], True)
@@ -89,5 +94,6 @@ if __name__ == "__main__":
     args.add_argument("target", choices=TARGETS)
     args.add_argument("--package", type=Path)
     args.add_argument("--wpf-primary", action="store_true", help="Start the installed WPF application first in a separate fresh trial")
+    args.add_argument("--private-input-desktop", action="store_true", help="Use the separate ARM64 WPF-primary desktop trial")
     opts = args.parse_args()
-    run(opts.target, opts.package, wpf_primary=opts.wpf_primary)
+    run(opts.target, opts.package, wpf_primary=opts.wpf_primary, private=opts.private_input_desktop)

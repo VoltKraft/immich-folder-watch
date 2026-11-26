@@ -5,12 +5,14 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import subprocess
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from hashlib import sha256
 import unittest
 
-from evidence import QUIT_SOURCE, pipe_and_window, sha, shutdown, verify_prequit, worker_files
+from evidence import QUIT_SOURCE, activation_desktop, pipe_and_window, sha, shutdown, verify_prequit, worker_files
+import private_desktop
 import common
+from reverse.observe import capture_quit_refusal
 
 
 def sample():
@@ -57,6 +59,60 @@ class ReverseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "undestroyed"):
             pipe_and_window(row, LOG, "wpf", "rust")
 
+    def test_private_reopen_requires_the_same_hidden_window_profile_process_and_native_times(self):
+        name = "IfwQa_" + "a" * 32
+        row = sample()
+        state = dict(windowStation="WinSta0", stationVisible=True, session=2, activeConsoleSession=2,
+                     wts=dict(session=2, connectionState=0, lockFlags=1), threadDesktop=name, inputDesktop=name,
+                     threadReceivesInput=True, inputObjectReceivesInput=True)
+        def point(begin, hidden=False):
+            result = dict(desktop=name, receivesInput=True, observerPid=15, context=state, root=row["root"],
+                          beginQpc=begin, endQpc=begin + 1,
+                          surfaces=dict(witnessCount=1, rootCount=int(not hidden), otherVisible=0))
+            if hidden:
+                result.update(visible=False, membership=1)
+            return result
+        row.update(profile="a" * 32, stagedProfile=dict(inventoryToken="a" * 32), privateRoot=point(140),
+                   hiddenDesktop=point(181, hidden=True), beforeQuitDesktop=point(225), desktopBefore=state,
+                   desktopAfter=state, quit=dict(issuedQpc=240, exitedQpc=260, jobDrainedQpc=262), mutexReleasedQpc=270)
+        for proc in (row["primary"], row["secondary"]):
+            proc["machine"] = [0xaa64, 0xaa64]
+        report = dict(target=private_desktop.ARM, desktopMode=private_desktop.MODE)
+        selection = dict(name=name, session=2, originalRestored=True)
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            for file in ("private-desktop.json", "private-worker.json", "desktop-start.json"):
+                (out / file).write_text("{}")
+            # The separate desktop tests verify supervisor restoration, worker exit and both job handles.
+            with patch.object(private_desktop, "replay", return_value=selection) as supervisor:
+                self.assertEqual(activation_desktop(out, report, row, LOG, completed=False), selection)
+                supervisor.assert_called_once_with(out, report, row, [])
+                self.assertEqual(activation_desktop(out, report, row, LOG, completed=True), selection)
+                supervisor.assert_called_with(out, report, row, [row])
+                for obj, changes in (
+                        (row["hiddenDesktop"], {"membership":0}), (row["hiddenDesktop"], {"visible":True}),
+                        (row["hiddenDesktop"], {"root":{**row["root"], "hwnd":78}}),
+                        (row["hiddenDesktop"], {"endQpc":205}), (row["beforeQuitDesktop"], {"beginQpc":200}),
+                        (row["beforeQuitDesktop"]["surfaces"], {"otherVisible":1}),
+                        (row["quit"], {"issuedQpc":215}), (row, {"mutexReleasedQpc":258}), (row["stagedProfile"], {"inventoryToken":"b"*32}),
+                        (row["secondary"], {"machine":[0x8664, 0x8664]})):
+                    with self.subTest(changes=changes), patch.dict(obj, changes), self.assertRaises(ValueError):
+                        activation_desktop(out, report, row, LOG, completed=True)
+                with self.assertRaisesRegex(ValueError, "Rust input desktop"):
+                    activation_desktop(out, report, row, LOG.replace("denied hresult=-5", "unavailable reason=input-desktop"), completed=False)
+                with self.assertRaisesRegex(ValueError, "activation desktop"):
+                    activation_desktop(out, {"target":report["target"]}, row, LOG, completed=False)
+
+    def test_cli_disallows_substitution_between_default_and_private_in_both_modes(self):
+        from reverse.readback import replay
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            for reported, requested in (({}, True), ({"desktopMode":private_desktop.MODE}, False)):
+                (out / "result.json").write_text(json.dumps(dict(direction="wpf-primary", **reported)))
+                for partial in (True, False):
+                    with self.subTest(partial=partial, requested=requested), self.assertRaisesRegex(ValueError, "desktop modes differ"):
+                        replay(out, partial, requested)
+
     def test_native_checkout_hash_is_bound_to_git_with_only_known_eol_conversion(self):
         paths = ["tools/RustCompatibilityOracle/installed/windows.ps1", "tools/rust-qa/windows-msi-interop/launcher.patch"]
         revision = subprocess.check_output(["git","rev-parse","HEAD"], cwd=common.ROOT, text=True).strip()
@@ -76,6 +132,28 @@ class ReverseTests(unittest.TestCase):
                     LOG.replace("MSI_REVERSE_CONNECTED", "PIPE_DISCOVERY"), LOG + "LAUNCHER_PRIMARY pid=31\n"):
             with self.assertRaisesRegex(ValueError, "connected pipe"):
                 pipe_and_window(sample(), bad, "wpf", "rust")
+
+    def test_quit_refusal_preserves_uncertain_helper_cleanup_through_exception_chains(self):
+        recorder = common.module("reverse_test_cleanup_type", common.QA / "windows-performance/native.py")
+        uncertain = recorder.CleanupUnconfirmed("private Quit helper job is still active")
+        wrapped = OSError("could not close test job")
+        wrapped.__cause__ = uncertain
+        contextual = RuntimeError("failed to finish measurement")
+        contextual.__context__ = wrapped
+        for error in (uncertain, wrapped, contextual):
+            receipt, reap = {}, Mock()
+            with self.subTest(error=error), self.assertRaises(type(error)) as caught:
+                with capture_quit_refusal(recorder, receipt, reap):
+                    raise error
+            self.assertIs(caught.exception, error)
+            self.assertEqual(receipt, {})
+            reap.assert_not_called()
+        receipt, reap = {}, Mock(return_value={"method":"owned process terminated after sampling", "exitCode":1})
+        with capture_quit_refusal(recorder, receipt, reap):
+            raise ValueError("The original WPF root did not own the menu point")
+        self.assertEqual(receipt, dict(method="owned cleanup", error="The original WPF root did not own the menu point",
+                                       cleanup=reap.return_value))
+        reap.assert_called_once_with()
 
     def test_real_quit_provider_and_worker_drain_are_separate(self):
         messages = ["Folder watcher started with 1 source(s).", "Flushing pending uploads before shutdown."]
@@ -121,7 +199,10 @@ class ReverseTests(unittest.TestCase):
             out = Path(tmp)
             row = sample()
             row["primary"]["image"] = "WPF"
-            row.update(status="reactivated", revision="abc", target="native")
+            row.update(status="reactivated", revision="abc", target="native",
+                       desktopBefore=dict(windowStation="WinSta0", stationVisible=True, session=2, activeConsoleSession=2,
+                                          wts=dict(session=2, connectionState=0, lockFlags=1), threadDesktop="Default",
+                                          inputDesktop="Default", inputObjectReceivesInput=True, threadReceivesInput=True))
             (out / "rust.log").write_text(LOG)
             original = b"Folder watcher started with 1 source(s).\n" + 2 * b"Persistent reconciliation for uploadNew queued 0 changed file(s) from photos.\n"
             (out / "wpf-before-quit.log").write_bytes(original)
@@ -131,6 +212,12 @@ class ReverseTests(unittest.TestCase):
             args = (out, dict(revision="abc", target="native", wpfProfile={"media":"photos"}), dict(application=dict(sha256="rust")),
                     dict(exe="WPF", exeSha256="wpf"))
             self.assertEqual(verify_prequit(*args)["hwnd"], 70)
+            for field, other in (("inputDesktop", "Other"), ("threadDesktop", "Other"), ("activeConsoleSession", 3)):
+                with self.subTest(field=field), patch.dict(row["desktopBefore"], {field:other}):
+                    (out / "before-quit.json").write_text(json.dumps(row))
+                    with self.assertRaisesRegex(ValueError, "unlocked input session"):
+                        verify_prequit(*args)
+            (out / "before-quit.json").write_text(json.dumps(row))
             (out / "wpf.log").unlink()
             self.assertEqual(verify_prequit(*args)["hwnd"], 70)
             (out / "wpf.log").write_bytes(b"another run")

@@ -1,5 +1,5 @@
 """Launch one argument-free Rust secondary while the original MSI WPF GUI owns the production pipe."""
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager, nullcontext
 import ctypes as c
 from ctypes import wintypes as w
 import os
@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from common import AREA, QA, ROOT, TARGETS, launcher, module, read, sha, write
 from msi_evidence import payload_details
+import private_desktop
 
 START = "Folder watcher started with 1 source(s)."
 STOP = "Folder watch worker received shutdown signal."
@@ -99,7 +100,18 @@ def invoke_quit(launch, api, windows, primary, out, row, *, start_helper=None):
     q.update(method="shipping tray Quit", exit=code, exitedQpc=api.clock())
 
 
-def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile):
+@contextmanager
+def capture_quit_refusal(recorder, quit_receipt, reap):
+    try:
+        yield
+    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as exc:
+        if recorder.CleanupUnconfirmed.in_chain(exc):
+            raise
+        quit_receipt.update(method="owned cleanup", error=str(exc))
+        quit_receipt["cleanup"] = reap()
+
+
+def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile, private):
     recorder = launch.recorder
     original = read(out / "installed.json")
     digest = payload_details(read(out / "payload-installed.json"), TARGETS[row["target"]][0])
@@ -110,7 +122,7 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
     desktop = launch.check(desk.thread_desktop(desk.thread()), "GetThreadDesktop")
     name = desk.name(desktop)
     row["desktopBefore"] = desk.context()
-    if name != "Default" or not launch.ordinary_console(row["desktopBefore"], name):
+    if name != (private.name if private else "Default") or not launch.ordinary_console(row["desktopBefore"], name):
         raise ValueError("The original unlocked Windows test desktop is required")
     fixture = recorder.load_windows_fixture()
     fixture.TITLE = "Immich Folder Watch"
@@ -124,7 +136,8 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
             or profile_outputs(profile) or not Path(baseline["media"]).is_relative_to(work)):
         raise ValueError("The shipping profile, loopback proxy or media directory differs")
     with (out / "missing-wpf.log").open("xb", buffering=0) as stream:
-        with launch.child(api, desk, name, gui, [], trial, env, stream, False, private=False) as (missing, job, _):
+        with launch.child(api, desk, name, gui, [], trial, env, stream, False, private=False,
+                          named_input=private is not None) as (missing, job, _):
             code = missing.wait(timeout=10)
             counts = api.job_accounting(job)
             row["missingWpf"] = dict(pid=missing.pid, created=api.process_identity(int(missing._handle)), exit=code,
@@ -140,13 +153,29 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
             raise ValueError("The executable differs from the pinned installed payload")
         wpf_log = out / "wpf.log"
         stream = stack.enter_context(wpf_log.open("xb", buffering=0))
-        primary = recorder.start_owned_subject(stack, api, image, work, dict(os.environ), stream, False, recorder.stop_subject)
+        windows = life = None
+
+        def watch(suspended):
+            nonlocal windows, life
+            windows = fixture.Windows(suspended.pid, desktop)
+            stack.callback(windows.close)
+            life = lifetime_type(suspended.pid)
+            stack.callback(life.close)
+
+        primary = private_desktop.start_wpf(stack, launch, api, image, work, stream, watch, private)
         first = row["primary"] = dict(pid=primary.pid, created=api.process_identity(int(primary._handle)),
                                       image=str(image), sha256=digest, arguments=[])
-        windows = fixture.Windows(primary.pid, desktop)
-        stack.callback(windows.close)
-        life = lifetime_type(primary.pid)
-        stack.callback(life.close)
+        if private:
+            machine = api.machine(int(primary._handle))
+            if machine != (TARGETS[row["target"]][1],) * 2:
+                raise ValueError("Expected the original native ARM64 WPF process")
+            first["machine"] = list(machine)
+
+        def reap():
+            if private and primary.poll() is None:
+                primary.kill()
+                return dict(method="owned process terminated after sampling", exitCode=primary.wait(timeout=15))
+            return recorder.stop_subject(primary, False)
 
         def wait(check, label):
             def poll():
@@ -155,11 +184,16 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
                 return check()
             return recorder.await_value(poll, label, timeout=25, delay=.025)
 
+        def desktop_root(*, hidden=False):
+            start = api.clock()
+            sample = private.root(row, hidden=hidden)
+            sample.update(beginQpc=start, endQpc=api.clock())
+            return sample
+
         def root_events():
             return [e["event"] for e in windows.events if e["hwnd"] == hwnd]
 
         try:
-            api.resume_owned_process(primary.pid)
             hwnd = wait(lambda: windows.visible(waiting_for_first=True), "Missing initial WPF window")
             tid = owned_root(windows, hwnd, primary.pid)
             row["root"] = dict(hwnd=hwnd, tid=tid, pid=primary.pid)
@@ -168,6 +202,8 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
                 return START in text and text.count(empty_sweep) >= 2
             wait(lambda: root_events() == ["show"] and any(x[:2] == (hwnd, "create") for x in life.events)
                  and worker_ready(), "Missing original WPF SHOW, CREATE or two initial worker reconciliations")
+            if private:
+                row["privateRoot"] = desktop_root()
             windows.close_window(hwnd)
             wait(lambda: windows.visible() is None and not windows.is_visible(hwnd) and root_events() == ["show", "hide"],
                  "The WPF primary did not retain and hide its original root")
@@ -185,12 +221,19 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
                         or api.process_identity(int(primary._handle)) != first["created"]):
                     raise ValueError("The original WPF process or hidden root changed before ResumeThread")
                 owned_root(windows, hwnd, primary.pid, tid)
-                row["secondary"] = dict(pid=proc.pid, created=api.process_identity(int(proc._handle)), sha256=sha(gui),
+                details = {}
+                if private:
+                    row["hiddenDesktop"] = desktop_root(hidden=True)
+                    machine = api.machine(int(proc._handle))
+                    if list(machine) != first["machine"]:
+                        raise ValueError("The suspended Rust secondary is not native to the WPF target")
+                    details["machine"] = list(machine)
+                row["secondary"] = dict(**details, pid=proc.pid, created=api.process_identity(int(proc._handle)), sha256=sha(gui),
                                         arguments=[], cursor=len(windows.events), releaseQpc=api.clock(), releaseTick=tick())
 
             rust_log = stack.enter_context((out / "rust.log").open("xb", buffering=0))
             with launch.child(api, desk, name, gui, [], trial, env, rust_log, False, private=False,
-                              before_resume=before_resume) as (second, job, _):
+                              named_input=private is not None, before_resume=before_resume) as (second, job, _):
                 sec = row["secondary"]
                 sec["resumedTick"] = tick()
                 check = sec["afterResume"] = dict(hwnd=hwnd, pid=primary.pid, tid=owned_root(windows, hwnd, primary.pid, tid),
@@ -214,6 +257,8 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
             row["lifetimes"] = list(life.events)
             # Persist the already completed activation and original logs even if the menu
             # provider or the worker later fails to finish. Keep the two verdicts independent.
+            if private:
+                row["beforeQuitDesktop"] = desktop_root()
             prefix = wpf_log.read_bytes()
             (out / "wpf-before-quit.log").write_bytes(prefix)
             from reverse.evidence import show_order
@@ -225,26 +270,28 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
             write(out / "before-quit.json", {**row, "status": status, "rustLog": sha(out / "rust.log"),
                                              "wpfPrefix": sha(out / "wpf-before-quit.log")})
             row["quit"] = {}
-            try:
-                invoke_quit(launch, api, windows, primary, out, row)
-            except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as exc:
-                row["quit"].update(method="owned cleanup", error=str(exc))
-                row["quit"]["cleanup"] = recorder.stop_subject(primary, False)
+            with capture_quit_refusal(recorder, row["quit"], reap):
+                invoke_quit(launch, api, windows, primary, out, row, start_helper=private.quit if private else None)
             row["quit"]["empty"] = api.wait_job_empty(primary.benchmark_job, 5)
             if not row["quit"]["empty"]:
                 raise ValueError("The shipping process job did not empty")
+            if private:
+                row["quit"]["jobDrainedQpc"] = api.clock()
             row["profileFiles"] = save_outputs(profile, out, api, recorder)
         finally:
             if primary.poll() is None:
-                row["fallback"] = recorder.stop_subject(primary, False)
+                row["fallback"] = reap()
     api.ensure_no_primary(sid)
+    if private:
+        row["mutexReleasedQpc"] = api.clock()
     row["desktopAfter"] = desk.context()
     if not launch.ordinary_console(row["desktopAfter"], name):
         raise ValueError("The ordinary test desktop changed")
 
 
-def run(target, out, work, image):
-    if out != AREA / "reverse" / target or not work.is_relative_to(Path(os.environ["RUNNER_TEMP"]).resolve()):
+def run(target, out, work, image, name=None):
+    if (out != AREA / "reverse" / target or work.parent != Path(os.environ["RUNNER_TEMP"]).resolve()
+            or not work.name.startswith("ifw-msi-")):
         raise ValueError("Unexpected reverse observation directory")
     launch = launcher()
     if (not launch.recorder.hosted() or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
@@ -260,11 +307,26 @@ def run(target, out, work, image):
         raise ValueError("Expected a target-native Windows observer")
     from native import known_folder
     profile = known_folder("f1b32785-6fba-4fcf-9d55-7b8e7f157091") / "Immich Folder Watch"
+    report = read(out / "result.json")
+    mode = report.get("desktopMode")
+    if (report.get("direction") != "wpf-primary" or report["run"] != os.environ["GITHUB_RUN_ID"]
+            or report["revision"] != build["source"] or report["target"] != target
+            or not (mode is None and name is None or mode == private_desktop.MODE and target == private_desktop.ARM
+                    and os.getenv("TRIAL_VARIANT") == "arm64-private-input")):
+        raise ValueError("Unexpected desktop or source for the installed activation")
+    if mode and name is None:
+        original = read(out / "installed.json")
+        if (Path(original["exe"]) != image or original["exeSha256"] != sha(image)
+                or sha(image) != payload_details(read(out / "payload-installed.json"), TARGETS[target][0])):
+            raise ValueError("Switching input requires the original installed ARM64 WPF package")
+        return private_desktop.supervisor(launch, target, out, work, image, reverse=True)
     row = dict(target=target, revision=build["source"], frequency=api.frequency, status="incomplete")
     inventory = dict(build["base"]["inventory"], gui=build["assets"]["native-gui-assessment.exe"])
     try:
-        with launch.staged_profile(row, api, staged / "native-gui-assessment.exe", inventory) as (gui, trial, env):
-            exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile)
+        with (private_desktop.worker(launch, desk, out, target, name) if mode else nullcontext()) as private:
+            token = name.removeprefix("IfwQa_") if private else None
+            with launch.staged_profile(row, api, staged / "native-gui-assessment.exe", inventory, token=token) as (gui, trial, env):
+                exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile, private)
         row["status"] = "observed"
     except Exception as exc:
         row["error"] = f"{type(exc).__name__}: {exc}"
@@ -274,4 +336,11 @@ def run(target, out, work, image):
 
 
 if __name__ == "__main__":
-    run(sys.argv[1], *(Path(a).resolve() for a in sys.argv[2:]))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=TARGETS)
+    for arg in ("out", "work", "image"):
+        parser.add_argument(arg, type=Path)
+    parser.add_argument("--owned-desktop")
+    args = parser.parse_args()
+    run(args.target, args.out.resolve(), args.work.resolve(), args.image.resolve(), args.owned_desktop)

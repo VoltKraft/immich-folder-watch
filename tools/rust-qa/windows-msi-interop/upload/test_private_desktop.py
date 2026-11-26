@@ -100,7 +100,7 @@ class DesktopTests(unittest.TestCase):
                 trial.finish_restoration(SimpleNamespace(context=lambda: bad), self.supervisor, RuntimeError)
             self.assertEqual(self.supervisor["restorationStatus"], "unconfirmed")
 
-    def run_supervisor(self, scenario):
+    def run_supervisor(self, scenario, *, reverse=False):
         calls = []
         selected = "Other" if scenario == "early" else "Default"
         native = module("ifw_upload_original_desktop_contract", QA / "windows-desktop/run.py")
@@ -146,6 +146,7 @@ class DesktopTests(unittest.TestCase):
         def run_worker(script, args, desktop, cwd, record, **_):
             nonlocal selected
             calls.append("worker")
+            self.assertEqual(script, QA / "windows-msi-interop" / ("reverse" if reverse else "upload") / "observe.py")
             self.assertEqual(desktop, selected)
             self.assertEqual(args[-2:], ["--owned-desktop", desktop])
             if scenario == "timeout":
@@ -159,10 +160,10 @@ class DesktopTests(unittest.TestCase):
         with (patch.object(trial, "module", return_value=native), patch.object(native, "run_worker", side_effect=run_worker),
               patch.object(native.c, "set_last_error", create=True), patch.object(trial, "name_present", return_value=False)):
             if scenario == "success":
-                trial.supervisor(launch, trial.ARM, self.out, self.out, self.out / "original.exe")
+                trial.supervisor(launch, trial.ARM, self.out, self.out, self.out / "original.exe", reverse=reverse)
             else:
                 with self.assertRaises((TimeoutError, RuntimeError)):
-                    trial.supervisor(launch, trial.ARM, self.out, self.out, self.out / "original.exe")
+                    trial.supervisor(launch, trial.ARM, self.out, self.out, self.out / "original.exe", reverse=reverse)
         return calls, read(self.out / "private-desktop.json")
 
     def test_original_switch_and_restore_under_success_or_worker_timeout(self):
@@ -173,6 +174,9 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual((result["status"], result["restorationStatus"]), (status, "restored"))
 
     def test_invalid_initial_or_unrelated_later_input_desktop_is_never_switched(self):
+        calls, result = self.run_supervisor("timeout", reverse=True)
+        self.assertEqual(calls, ["create", "private", "worker", "original"])
+        self.assertEqual((result["status"], result["restorationStatus"]), ("incomplete", "restored"))
         calls, result = self.run_supervisor("early")
         self.assertEqual(calls, [])
         self.assertEqual(result["restorationStatus"], "fixture-not-selected")

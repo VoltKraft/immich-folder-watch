@@ -53,6 +53,39 @@ python -B tools/rust-qa/windows-msi-interop/reverse/readback.py artifacts/rust/w
 python -B tools/rust-qa/windows-msi-interop/reverse/readback.py artifacts/rust/windows-msi-interop/reverse/TARGET --before-quit
 ```
 
+### WPF activation and Quit on one private ARM64 input desktop
+
+A fifth workflow job uses a fresh Windows ARM64 host. It sets
+`TRIAL_VARIANT=arm64-private-input` and passes `--private-input-desktop`
+to both commands below. The MSI still installs into the empty disposable
+runner and the WPF starts without arguments. A supervisor holds the
+original Default input desktop. It selects a newly created desktop in
+that unlocked session, launches the observer there and restores the
+original input desktop when the observer exits or fails.
+
+The private desktop name contains the Rust launch profile's token. Both
+argument-free Rust runs use that desktop explicitly. Before releasing the
+real secondary, the observer verifies that the hidden original WPF root
+still belongs to its UI thread on the private desktop. The Rust pipe
+client validates the connected WPF process and reads its own native
+input-desktop flag. The WPF root must reopen on that same desktop. The
+original menu helper selects Quit on the same WPF process. The full reader
+checks the worker shutdown evidence, both process jobs, MSI removal and
+the return to the original console. The separate artifact is named
+`rust-windows-msi-activation-arm64-private-input-WPF-primary-<commit>`.
+Its scope covers cross-version activation and the application's normal
+Quit. Explorer tray activation has a separate fixture.
+
+```sh
+python -B tools/rust-qa/windows-msi-interop/run.py aarch64-pc-windows-msvc --wpf-primary --private-input-desktop
+python -B tools/rust-qa/windows-msi-interop/reverse/readback.py artifacts/rust/windows-msi-interop/reverse/aarch64-pc-windows-msvc --private-input-desktop
+```
+
+Add `--before-quit` to the private readback to check the completed
+activation when the subsequent menu or worker shutdown fails. This mode
+also requires evidence that the supervisor restored the original desktop.
+The Default and private readers each require the matching desktop mode.
+
 Run the portable checks from the repository root.
 
 ```sh

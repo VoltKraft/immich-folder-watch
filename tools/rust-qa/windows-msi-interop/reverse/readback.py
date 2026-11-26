@@ -9,10 +9,14 @@ sys.path.insert(0, str(HERE.parent))
 from common import INSTALLED, TARGETS, read, sha, verify_source_inputs
 from msi_evidence import payload_details, verify, verify_build, verify_transactions
 from reverse.evidence import verify_prequit
+import private_desktop
 
 
-def replay(out, before_quit):
+def replay(out, before_quit, expect_private=False):
     report = read(out / "result.json")
+    if (report.get("desktopMode") not in (None, private_desktop.MODE)
+            or expect_private != (report.get("desktopMode") == private_desktop.MODE)):
+        raise ValueError("The requested and recorded activation desktop modes differ")
     if report.get("direction") != "wpf-primary":
         raise ValueError("Expected a separate installed WPF primary trial")
     verify_source_inputs(report["inputs"], report["revision"], True)
@@ -43,5 +47,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--before-quit", action="store_true", help="Replay the activation saved before the menu and cleanup")
+    parser.add_argument("--private-input-desktop", action="store_true", help="Require the separate private ARM64 observation")
     opts = parser.parse_args()
-    print(json.dumps(replay(opts.output, opts.before_quit), indent=2))
+    print(json.dumps(replay(opts.output, opts.before_quit, opts.private_input_desktop), indent=2))

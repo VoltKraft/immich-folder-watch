@@ -197,6 +197,14 @@ and removes its own MSI.
 [Rust primary](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running) ·
 [WPF primary](../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
+The ARM64 workflow also pairs WPF and its Rust secondary on a fresh input
+desktop in the same logon session. The observer follows the original WPF
+window from visible to hidden and back, then requests Quit through the
+shipping menu. This job and its detached reader both use
+`--private-input-desktop`. The other four jobs keep their ordinary
+console and individual outcomes. The private trial checks restoration of
+the original console before reporting a complete activation.
+
 ### Installed Windows worker backup
 
 The separate [MSI upload workflow](../.github/workflows/rust-windows-installed-upload.yaml)

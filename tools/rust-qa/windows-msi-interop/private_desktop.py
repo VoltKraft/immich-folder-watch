@@ -1,4 +1,4 @@
-"""Run only the two owned WPF lifetimes on one fresh ARM64 input desktop."""
+"""Run the installed WPF activation or upload trial on one fresh ARM64 input desktop."""
 from contextlib import contextmanager
 import ctypes as c
 from ctypes import wintypes as w
@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 
-from shared import QA, ROOT, UPLOAD, module, read, require, write
+from common import HERE, QA, ROOT, module, read, require, write
 
 ARM = "aarch64-pc-windows-msvc"
 MODE = "owned-private-input"
@@ -34,8 +34,8 @@ def name_present(desk, name):
     return found
 
 
-def supervisor(launch, target, out, work, image):
-    native = module("ifw_upload_input_desktop", QA / "windows-desktop/run.py")
+def supervisor(launch, target, out, work, image, *, reverse=False):
+    native = module("ifw_msi_input_desktop", QA / "windows-desktop/run.py")
     receipt = {"supervisorPid": os.getpid(), "status": "incomplete"}
 
     class FreshDesktop(launch.Desktop):
@@ -54,9 +54,10 @@ def supervisor(launch, target, out, work, image):
             ticket = dict(name=name, parent=os.getpid(), session=state["session"], target=target)
             write(out / "desktop-start.json", ticket)
             worker = receipt["worker"] = {}
-            code = native.run_worker(UPLOAD / "observe.py", [target, out, work, image, "--owned-desktop", name],
+            observer = HERE / ("reverse" if reverse else "upload") / "observe.py"
+            code = native.run_worker(observer, [target, out, work, image, "--owned-desktop", name],
                                      name, ROOT, worker, timeout_seconds=420)
-            require(code == 0, "The private WPF upload observer failed; see upload-observation.json")
+            require(code == 0, "The private WPF observer failed; see its activation or upload receipt")
         receipt["status"] = "observed"
     except Exception as exc:
         receipt["error"] = f"{type(exc).__name__}: {exc}"
@@ -145,13 +146,15 @@ class PrivateInput:
     def __init__(self, launch, desk, name, witness):
         self.launch, self.desk, self.name, self.witness = launch, desk, name, witness
 
-    def root(self, row):
+    def root(self, row, *, hidden=False):
         native = self.desk
         info = row["root"]
         handle = self.launch.check(native.thread_desktop(info["tid"]), "GetThreadDesktop(original WPF UI)")
         result = dict(desktop=native.name(handle), receivesInput=native.receiving_input(handle), context=native.context(),
                       root=dict(info), observerPid=os.getpid(), surfaces=surfaces(native, handle, self.witness, info))
-        check_root(result, self.name, row, os.getpid())
+        if hidden:
+            result.update(visible=bool(native.visible(info["hwnd"])), membership=native.count_top_level_window(handle, info["hwnd"]))
+        check_root(result, self.name, row, os.getpid(), hidden=hidden)
         return result
 
     def child(self, api, exe, args, area, stream, before_resume=None):
@@ -180,12 +183,31 @@ class PrivateInput:
                 require(helper["exit"] == 0, "The original Quit helper failed; see quit-menu.json and quit-helper.log")
 
 
-def check_root(sample, name, row, observer):
+def start_wpf(stack, launch, api, image, work, stream, before_resume, private):
+    recorder = launch.recorder
+    def watch(suspended):
+        require(api.machine(int(suspended._handle)) == api.machine(-1), "The suspended WPF image must match the native observer")
+        before_resume(suspended)
+
+    if private is not None:
+        started = api.clock()
+        proc, job, _ = stack.enter_context(private.child(api, image, [], work, stream, before_resume=watch))
+        proc.benchmark_job, proc.benchmark_start_qpc = job, started
+    else:
+        proc = recorder.start_owned_subject(stack, api, image, work, dict(os.environ), stream, False, recorder.stop_subject)
+        watch(proc)
+        api.resume_owned_process(proc.pid)
+    return proc
+
+
+def check_root(sample, name, row, observer, *, hidden=False):
     from win32 import ordinary_console
     require(sample["desktop"] == name and sample["receivesInput"] is True and sample["observerPid"] == observer
             and ordinary_console(sample["context"], name) and sample["root"] == row["root"]
             and observer != row["primary"]["pid"], "WPF root, observer or input desktop changed")
-    check_surfaces(sample["surfaces"], root=True)
+    if hidden:
+        require(sample["membership"] == 1 and sample["visible"] is False, "Missing retained hidden WPF window")
+    check_surfaces(sample["surfaces"], root=not hidden)
 
 
 def replay(out, report, first, phases):

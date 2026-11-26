@@ -10,6 +10,8 @@ if __name__ == "__main__":
     parser.add_argument("output", type=Path)
     out = parser.parse_args().output
     result = read(out / "result.json")
+    if result.get("direction") or result.get("desktopMode"):
+        raise ValueError("Expected the ordinary Rust-primary installed activation")
     files = {p.name: sha(p) for p in out.iterdir() if p.is_file() and p.name != "result.json"}
     if result["status"] != "observed" or result["files"] != files or result["checks"] != verify(out, result):
         raise ValueError("The recorded installed secondary trial could not be independently verified")

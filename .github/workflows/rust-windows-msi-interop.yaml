@@ -10,6 +10,10 @@ on:
       - '!tools/rust-qa/windows-msi-interop/**/*.md'
       - 'tools/rust-qa/gui/src/windows_launcher.rs'
       - 'tools/rust-qa/windows-performance/native.py'
+      - 'tools/rust-qa/windows-desktop/*.py'
+      - 'tools/rust-qa/windows-launcher/observe.py'
+      - 'tools/rust-qa/windows-launcher/named_process.py'
+      - 'tools/rust-qa/windows-warm-window/window_lifetime.py'
       - 'tools/rust-qa/windows-inventory/subject.py'
       - 'tools/rust-qa/windows-inventory/file-observer.cpp'
       - 'tools/rust-qa/performance/worker-inputs.json'
@@ -37,9 +41,11 @@ jobs:
         include:
           - { runner: windows-2025, arch: x64, target: x86_64-pc-windows-msvc }
           - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
+          - { runner: windows-11-arm, arch: arm64-private-input, sdkArch: arm64, primary: WPF, target: aarch64-pc-windows-msvc }
     env:
       NATIVE_TARGET: ${{ matrix.target }}
-      NATIVE_ARCH: ${{ matrix.arch }}
+      NATIVE_ARCH: ${{ matrix.sdkArch || matrix.arch }}
+      TRIAL_VARIANT: ${{ matrix.arch }}
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +60,7 @@ jobs:
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.401
-          architecture: ${{ matrix.arch }}
+          architecture: ${{ env.NATIVE_ARCH }}
 
       - name: Reconstruct the inventory worker dependencies and canonical GUI
         shell: bash
@@ -105,15 +111,17 @@ jobs:
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
           $result = "artifacts/rust/windows-msi-interop/reverse/$env:NATIVE_TARGET"
-          python -B tools/rust-qa/windows-msi-interop/run.py $env:NATIVE_TARGET --wpf-primary
+          $desktopArgs = @()
+          if ($env:TRIAL_VARIANT -ceq 'arm64-private-input') { $desktopArgs = @('--private-input-desktop') }
+          python -B tools/rust-qa/windows-msi-interop/run.py $env:NATIVE_TARGET --wpf-primary @desktopArgs
           $observerExit = $LASTEXITCODE
           if ($observerExit -ne 0) {
             if (Test-Path -LiteralPath (Join-Path $result 'before-quit.json')) {
-              python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result --before-quit
+              python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result --before-quit @desktopArgs
             }
             exit $observerExit
           }
-          python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result
+          python -B tools/rust-qa/windows-msi-interop/reverse/readback.py $result @desktopArgs
           exit $LASTEXITCODE
 
       - name: Retain package verification, activation and cleanup observations

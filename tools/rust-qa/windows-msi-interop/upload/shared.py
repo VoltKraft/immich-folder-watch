@@ -8,15 +8,10 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 UPLOAD = Path(__file__).resolve().parent
 sys.path.insert(0, str(UPLOAD.parent))
-from common import AREA, HERE, INSTALLED, QA, ROOT, TARGETS, module, read, sha, write
+from common import AREA, HERE, INSTALLED, QA, ROOT, TARGETS, module, read, require, sha, write
 
 peer = module("ifw_signed_upload_peer", INSTALLED / "interop/shipping_upload.py")
 backup = module("ifw_signed_upload_snapshot", INSTALLED / "interop/installed_backup.py")
-
-
-def require(condition, message):
-    if not condition:
-        raise ValueError(message)
 
 
 def configuration(media, endpoint):
@@ -34,7 +29,7 @@ def endpoint_port(endpoint):
 
 
 def observer_sources(out, revision, *, freeze=False):
-    paths = {HERE / n for n in ("common.py", "install.ps1", "msi_evidence.py", "transaction-logs.ps1",
+    paths = {HERE / n for n in ("common.py", "private_desktop.py", "install.ps1", "msi_evidence.py", "transaction-logs.ps1",
                                 "reverse/observe.py", "reverse/quit.ps1", "reverse/quit-source.ps1",
                                 "reverse/profile.ps1", "reverse/evidence.py")}
     paths.update(INSTALLED / n for n in ("windows.ps1", "release.json", "run.py", "interop/installed_backup.py",

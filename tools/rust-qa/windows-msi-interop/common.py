@@ -18,6 +18,11 @@ BEFORE = "a4587fa61645df77f456d5e5ebe77985d835a71cca8880785bde6826d5ebdb95"
 AFTER = "58c04d0ea71fd89846499c79214572db3645eff933c0197e0f80034a1f526c01"
 
 
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
 def sha(path):
     with path.open("rb") as stream:
         return file_digest(stream, "sha256").hexdigest()
@@ -58,7 +63,14 @@ def inputs(wpf_primary=False):
     if wpf_primary:
         reverse = HERE / "reverse"
         paths.extend([*sorted(reverse.glob("*.py")), *sorted(reverse.glob("*.ps1")), reverse / "launcher.patch"])
-        paths.append(ROOT / "packaging/windows/Test-InstalledUpgrade.ps1")
+        paths.extend([ROOT / "packaging/windows/Test-InstalledUpgrade.ps1", QA / "observe-windows-gui.py",
+                      QA / "windows_observer.py", QA / "windows-warm-window/window_lifetime.py"])
+        for folder, names in {
+            "windows-desktop": ("run", "worker", "job", "win32"),
+            "windows-launcher": ("observe", "named_process", "retained_subject", "retained_window", "window_readback"),
+            "windows-performance": ("run", "native", "metrics", "build"),
+        }.items():
+            paths.extend(QA / folder / (name + ".py") for name in names)
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in paths}
 
 

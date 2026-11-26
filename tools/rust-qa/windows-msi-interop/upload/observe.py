@@ -67,13 +67,7 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
             windows = fixture.Windows(suspended.pid, desktop)
             stack.callback(windows.close)
 
-        if private:
-            started = api.clock()
-            proc, job, _ = stack.enter_context(private.child(api, image, [], work, stream, before_resume=watch))
-            proc.benchmark_job, proc.benchmark_start_qpc = job, started
-        else:
-            proc = recorder.start_owned_subject(stack, api, image, work, dict(os.environ), stream, False, recorder.stop_subject)
-            watch(proc)
+        proc = private_desktop.start_wpf(stack, launch, api, image, work, stream, watch, private)
         handle = int(proc._handle)
         row["primary"] = dict(pid=proc.pid, created=api.process_identity(handle), image=str(image), sha256=sha(image),
                               arguments=[], machine=list(api.machine(handle)), startQpc=proc.benchmark_start_qpc)
@@ -86,8 +80,6 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
                 return check()
             return recorder.await_value(poll, label, timeout=seconds, delay=.05)
         try:
-            if not private:
-                api.resume_owned_process(proc.pid)
             hwnd = wait(lambda: windows.visible(waiting_for_first=True), "Missing installed WPF window")
             row["root"] = dict(hwnd=hwnd, pid=proc.pid, tid=wpf.owned_root(windows, hwnd, proc.pid))
             if private:
