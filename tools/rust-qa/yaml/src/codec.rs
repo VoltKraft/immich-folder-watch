@@ -187,6 +187,35 @@ mod tests {
     }
 
     #[test]
+    fn shipping_flow_mapping_lookahead_applies_to_anchored_scalar_values() {
+        for yaml in [
+            "logging: {logDirectory: &dir logs, level: Information}",
+            "future: {child: &a '', next: other}",
+            "future: {child: !!str &a value, # next key\n next: *a}",
+        ] {
+            assert!(matches!(
+                parse(yaml, options(), MAX_TEXT_BYTES),
+                Err(Failure::InvalidYaml)
+            ));
+            assert!(matches!(
+                parse(yaml, options(), yaml.len() - 1),
+                Err(Failure::InputBytes)
+            ));
+        }
+        for yaml in [
+            "logging: {level: Information, logDirectory: &dir logs,}",
+            "future: {child: &a , next: other}",
+            "future: {&a key: value, another: !!str text}",
+            "future: {seq: &a [one, two], another: [&b one, two]}",
+            "future: [sub: &a value, next: other]",
+            "future: {child: {item: &a value}, next: other}",
+            "logging:\n  logDirectory: &dir logs\n  level: Information",
+        ] {
+            assert!(parse(yaml, options(), yaml.len()).is_ok(), "{yaml}");
+        }
+    }
+
+    #[test]
     fn skipped_symbols_still_consume_alias_anchor_replay_and_content_budgets() {
         let input = "future: [&item [one, two], *unbound, *item]";
         budget_pair(input, |options| {

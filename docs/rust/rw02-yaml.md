@@ -522,12 +522,42 @@ Their SHA-256 values are
 and `af152cef9ec7aa97c4080bed869600a4fe011ab592cb4a9ec5f6833bc180fa0f`.
 
 The released parser also rejects three compact flow mappings where a
-property follows an anchored plain path on the same line. The previous
-and current Rust readers accept these inputs, including the example using
-only recognized fields. Both readers accept the neutral unanchored
-controls. This syntax difference remains open. The independent report
+property follows an anchored plain path on the same line. Through `5b6cebf`,
+Rust accepted these inputs, including the example using only recognized
+fields. Both readers accepted the neutral unanchored controls. The report
 `compact-extended/compare-candidate-02.json` has SHA-256
 `2921353a514010512934e8462df7b3dc7ac12e3cf90ce6ef53b56324c3e87423`.
+
+### Anchored scalars in compact mappings
+
+In a flow mapping, YamlDotNet 18.1.0 looks ahead twice after an anchored
+scalar value. The next property therefore causes a syntax error. The same
+value as the last property is accepted, including a trailing comma. The
+rule also applies when the value is quoted or the next key is on a later
+line. An anchored collection, a mapping key and an implicit empty value
+follow different parser paths. The Rust reader now distinguishes these
+cases using the style, anchor and span from its bounded parser.
+[Shipping parser](https://github.com/aaubry/YamlDotNet/blob/v18.1.0/YamlDotNet/Core/Parser.cs#L503-L541) ·
+[Rust compatibility pass](../../tools/rust-qa/yaml/src/anchors.rs).
+
+The Fedora x64 assessment `runs/compact-flow-fedorax64-01/result.json`
+passed 82 profiles, 246 byte checks, 392 semantic comparisons and 224
+C# readbacks. Twelve Rust tests passed. The result SHA-256 is
+`cbe73af5104e87085bc4fcd441b78ba5598c34b130c240f7607bb51b5c67dde6`.
+The release executable has SHA-256
+`ee8f2f8ac0fcb687955d90c209d0ef5bea285f37dd2d272987130b0af101670a`.
+
+Both 3.0.4 Core assemblies from the MSI and Flatpak, running on the
+Linux x64 .NET 10.0.12 runtime, accepted 15 of 27 original profiles and
+rejected the other 12. Rust matched every result, read the 15 signed
+resaves and produced unchanged and edited YAML that passed all 60
+package readbacks. `ignored-mapping-anchor/compact-independent-01/summary.json`
+has SHA-256 `c5f3fad343c204370d67da752901691705542c9569a4e2d92d8527a224b8343c`.
+A separate replay including all three original compact failures checked
+23 source profiles, 12 signed resaves and 48 package readbacks against
+the same release executable. Its `compact-two-packages-01/summary.json`
+has SHA-256 `9e4be498e564bc18b2df8bbc56f5257e46689163da0127b8e59db21956a6f1dd`.
+Native Windows and Linux ARM64 results for these cases are pending.
 
 ## Native runner and observed results
 

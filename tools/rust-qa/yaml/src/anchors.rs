@@ -1,7 +1,7 @@
-//! YamlDotNet registers anchors only while deserializing a recognized value.
+//! Match YamlDotNet's typed anchor bindings and flow mapping scalar handling.
 use crate::codec::Failure;
 use crate::scalar_breaks::Lines;
-use serde_saphyr::granit_parser::{Event, Parser};
+use serde_saphyr::granit_parser::{Event, Parser, StructureStyle};
 use std::{borrow::Cow, collections::BTreeMap, fmt::Write};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -66,6 +66,7 @@ enum Container {
     Sequence(Role),
     Mapping {
         role: Role,
+        style: StructureStyle,
         next_value: Option<Role>,
     },
 }
@@ -74,7 +75,9 @@ fn next_role(parent: Option<&mut Container>, key: Option<&str>) -> Role {
     match parent {
         None => Role::Config,
         Some(Container::Sequence(element)) => *element,
-        Some(Container::Mapping { role, next_value }) => {
+        Some(Container::Mapping {
+            role, next_value, ..
+        }) => {
             if let Some(value) = next_value.take() {
                 value
             } else {
@@ -93,7 +96,8 @@ pub fn compatible_input<'a>(
     input: &'a str,
     options: &mut serde_saphyr::Options,
 ) -> Result<Cow<'a, str>, Failure> {
-    if !input.contains('*') {
+    let has_alias_marker = input.contains('*');
+    if !(has_alias_marker || input.contains('&') && input.contains('{')) {
         return Ok(Cow::Borrowed(input));
     }
     // Interpret marker positions in the same physical lines as the shipping reader,
@@ -114,6 +118,7 @@ pub fn compatible_input<'a>(
     let mut aliases = 0;
     let mut unresolved_skipped = 0;
     let mut anchors = 0;
+    let mut expect_mapping_end = false;
     for event in Parser::new_from_str_with_options(syntax, settings) {
         let (event, span) = event.map_err(|_| Failure::InvalidYaml)?;
         // Bound the structural pass before the downstream reader checks the complete
@@ -136,6 +141,10 @@ pub fn compatible_input<'a>(
             {
                 return Err(Failure::Budget);
             }
+            if expect_mapping_end && !matches!(event, Event::MappingEnd) {
+                return Err(Failure::InvalidYaml);
+            }
+            expect_mapping_end = false;
         }
         let marker = match event {
             Event::DocumentStart(..) => {
@@ -151,9 +160,10 @@ pub fn compatible_input<'a>(
                 {
                     return Err(Failure::Budget);
                 }
-                stack.push(if matches!(event, Event::MappingStart(..)) {
+                stack.push(if let Event::MappingStart(style, ..) = event {
                     Container::Mapping {
                         role: last_role,
+                        style,
                         next_value: None,
                     }
                 } else {
@@ -161,7 +171,20 @@ pub fn compatible_input<'a>(
                 });
                 continue;
             }
-            Event::Scalar(value, ..) => {
+            Event::Scalar(value, _, anchor, _) => {
+                // YamlDotNet 18.1 reads past the comma after an anchored scalar
+                // value in a flow mapping. A trailing comma may precede its end.
+                // An implicit empty value has no scalar token to read past.
+                expect_mapping_end = anchor != 0
+                    && !span.is_empty()
+                    && matches!(
+                        stack.last(),
+                        Some(Container::Mapping {
+                            style: StructureStyle::Flow,
+                            next_value: Some(_),
+                            ..
+                        })
+                    );
                 last_role = next_role(stack.last_mut(), Some(&value));
                 continue;
             }
@@ -177,6 +200,9 @@ pub fn compatible_input<'a>(
                     .is_some_and(|b| anchors > b.max_anchors)
                 {
                     return Err(Failure::Budget);
+                }
+                if !has_alias_marker {
+                    continue;
                 }
                 if !matches!(last_role, Role::Key | Role::Skipped) {
                     visible.insert(name.into_owned(), id);

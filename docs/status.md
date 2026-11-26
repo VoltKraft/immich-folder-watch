@@ -8,14 +8,19 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
-The Fedora x64 YAML adapter preserves U+2028 and U+2029 in the watch
+The Fedora x64 codec now matches .NET 3.0.4 on the three compact YAML
+mappings that previously loaded only in Rust. All 82 profiles and 224
+C# readbacks passed. The two release assemblies agreed with Rust on all
+27 additional complete profiles. This revision awaits native Windows and
+Linux ARM64 results. [Compact mapping checks](rust/rw02-yaml.md#anchored-scalars-in-compact-mappings).
+
+At `5b6cebf` the Fedora x64 YAML adapter preserved U+2028 and U+2029 in the watch
 path, album name, log directory and filters. It also resolves aliases
 against declarations on recognized configuration values when an ignored
 property reuses the name. All 74 profiles and 204 C# readbacks passed.
 The two managed assemblies from .NET 3.0.4 each read and resaved 34
 Unicode outputs and 22 alias outputs from the same frozen Rust build.
-A hosted four-target repeat is pending. Both Rust revisions also accept
-three compact mapping inputs rejected by the shipping reader.
+A hosted four-target repeat of this 74-profile run is pending.
 [Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
 [Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 

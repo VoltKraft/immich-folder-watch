@@ -61,10 +61,12 @@ values retain their own anchors when later unknown properties reuse a
 name. All 74 profiles and 204 C# readbacks passed. The Windows and Linux
 managed release assemblies each reopened 34 Unicode outputs and 22 alias
 outputs on that Linux host. Native coverage on the other targets is pending.
-Three compact mapping inputs that the shipping reader rejects remain
-accepted by Rust.
+The subsequent Fedora x64 correction matched the shipping reader on
+all three compact mappings it rejected. Its full run passed 82
+profiles and 224 C# readbacks.
 [Physical separators](rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
-[Property and alias controls](rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
+[Property and alias controls](rw02-yaml.md#anchors-on-recognized-and-skipped-properties) ·
+[Compact mapping controls](rw02-yaml.md#anchored-scalars-in-compact-mappings).
 
 At `e2f161b` each of the four native hosts passed 59 YAML cases including
 160 C# readback comparisons. All four preserved the leading U+FEFF in a
