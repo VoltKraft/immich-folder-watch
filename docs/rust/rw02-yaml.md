@@ -454,7 +454,8 @@ and three rejected indentation cases. The three respective reports under
 `ca223aa0f5d1173d5708de1eb37481d7f21599a193a7e3eab2ea14bbb77e0803`,
 `0086f4fd1d24febf3470007363ee96d6abd437a3ebc61e6ee642be68c5cec1f3`
 and `2f6384935eea5ed040d8bed3976f2001d451a8b4d478ec0bcb92e12572361d20`.
-Native Windows and Linux ARM64 execution of the updated adapter is pending.
+The subsequent [four-target run at 5b6cebf](#four-native-yaml-exchanges-at-5b6cebf)
+exercised these separators in the saved watch path, album name and filename filter.
 
 ### Anchors on recognized and skipped properties
 
@@ -505,7 +506,6 @@ checks of the resulting Rust files. The earlier 76 physical-separator
 comparisons also passed. The role and readback report
 `independent-02/summary.json` has SHA-256
 `10e8eb99da2721fafc21963afe2930939fc4b301625ec5e407e45a88f68e7567`.
-Native execution of this change on the other three targets remains pending.
 
 The frozen release executable from the complete 74-profile run has SHA-256
 `ad02d0e907f7ed6e5446070682d9005ab2dbd07b9112954266732861e5641588`.
@@ -527,6 +527,27 @@ Rust accepted these inputs, including the example using only recognized
 fields. Both readers accepted the neutral unanchored controls. The report
 `compact-extended/compare-candidate-02.json` has SHA-256
 `2921353a514010512934e8462df7b3dc7ac12e3cf90ce6ef53b56324c3e87423`.
+
+### Four native YAML exchanges at 5b6cebf
+
+On Windows and Ubuntu, both x64 and ARM64 passed 74 profiles, 222 input-byte
+checks, 359 semantic checks and 204 C# file assertions per target with
+.NET 10.0.15. Each host passed eleven Rust tests and three source-filter
+tests. Independent replay verified 324 indexed files per archive and matched
+126 source files to `5b6cebf74c6df3f4c5bcc2edb1a15421f41e8b23`.
+It decoded all 408 unchanged and edited Rust outputs, confirming the alias
+values and the U+2028 and U+2029 characters observed by the C# readers.
+
+| Native host | Original Actions archive |
+| --- | --- |
+| Windows x64 | [15148526045](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571603/artifacts/15148526045) |
+| Windows ARM64 | [15148416207](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571603/artifacts/15148416207) |
+| Ubuntu x64 | [15146874559](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571603/artifacts/15146874559) |
+| Ubuntu ARM64 | [15148575786](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45871571603/artifacts/15148575786) |
+
+The archive digests and decoded profiles are in
+`artifacts/rust/hosted-yaml/45871571603/four-host-anchors.json`, SHA-256
+`1a3e4f3182d1fdbeed831da88d75d9519ef2f55375d83ba425bde6c5350959f7`.
 
 ### Anchored scalars in compact mappings
 

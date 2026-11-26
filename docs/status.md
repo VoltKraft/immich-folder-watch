@@ -28,7 +28,10 @@ against declarations on recognized configuration values when an ignored
 property reuses the name. All 74 profiles and 204 C# readbacks passed.
 The two managed assemblies from .NET 3.0.4 each read and resaved 34
 Unicode outputs and 22 alias outputs from the same frozen Rust build.
-A hosted four-target repeat of this 74-profile run is pending.
+Windows and Ubuntu each passed all 74 profiles on x64 and ARM64.
+Independent replay verified the 102 unchanged and edited Rust outputs per
+target against the native C# observations.
+[Original archives and replay](rust/rw02-yaml.md#four-native-yaml-exchanges-at-5b6cebf) ·
 [Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
 [Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 
