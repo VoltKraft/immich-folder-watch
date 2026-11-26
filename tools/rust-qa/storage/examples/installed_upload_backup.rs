@@ -22,12 +22,17 @@ fn run() -> Result<()> {
     };
     let port: u16 = port.parse()?;
     if port == 0
-        || !cfg!(all(target_os = "linux", target_arch = "x86_64"))
+        || !cfg!(all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "aarch64")
+        ))
         || std::env::current_dir()? != Path::new("/qa")
         || std::env::var("HOME")? != "/tmp/home"
         || fs::read_to_string("/proc/net/route")?.lines().count() != 1
     {
-        return Err("the installed upload requires the private offline Linux x64 desktop".into());
+        return Err(
+            "the installed upload requires the private offline Linux x64 or ARM64 desktop".into(),
+        );
     }
     let directory = Path::new(PROFILE).join("config/immich-folder-watch");
     let path = directory.join("sync-state.db");

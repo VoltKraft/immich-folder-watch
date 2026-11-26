@@ -73,6 +73,19 @@ account history. The second worker opens that returned backup and reconciles
 the same files. The peer records every unexpected download, membership change,
 album mutation and trash request through worker shutdown.
 
+### Backup helper for the installed Flatpak
+
+On native Linux x64 or ARM64, add `--installed-upload-backup --offline` to
+the storage assessment command to retain the release executable
+`installed_upload_backup` and its SHA-256 in `result.json`. The
+[installed handover fixture](../../RustCompatibilityOracle/installed/interop/installed_backup.py)
+uses it inside the isolated Flatpak desktop with the synthetic upload
+configuration, original loopback peer and the signed worker's live SQLite
+store. The helper opens that store read-only, checks the committed upload
+and account history, and creates the bounded backup at
+`/qa/installed-returned.db`. The installed handover records the subsequent
+worker restart separately from the build.
+
 ### Restore after a deletion or interrupted repair
 
 The other two exchanges use the same shipping worker. For deletion, the

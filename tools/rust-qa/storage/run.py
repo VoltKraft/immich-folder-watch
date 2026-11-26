@@ -101,10 +101,10 @@ def main() -> int:
     parser.add_argument("--worker-activity", action="store_true",
                         help="Return native Rust backups to the shipping worker after a synthetic download, upload, deletion and interrupted timestamp repair")
     parser.add_argument("--installed-upload-backup", action="store_true",
-                        help="Build and retain the native backup helper for the installed Fedora x64 upload trial")
+                        help="Build and retain the native backup helper for the installed Flatpak upload trial on Linux x64 or ARM64")
     args = parser.parse_args()
-    if args.installed_upload_backup and args.target != "x86_64-unknown-linux-gnu":
-        parser.error("the installed Flatpak upload trial requires native Linux x64")
+    if args.installed_upload_backup and args.target not in {"x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"}:
+        parser.error("the installed Flatpak upload trial requires native Linux x64 or ARM64")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
     cargo_home = isolated_path(args.cargo_home)
