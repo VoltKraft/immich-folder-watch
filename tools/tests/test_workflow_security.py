@@ -96,7 +96,8 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
     def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
-        for name in ("rust-windows-transitions.yaml", "rust-windows-msi-interop.yaml"):
+        for name in ("rust-windows-transitions.yaml", "rust-windows-msi-interop.yaml",
+                     "rust-windows-installed-upload.yaml"):
             with self.subTest(workflow=name):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 

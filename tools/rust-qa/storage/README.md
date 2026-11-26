@@ -86,6 +86,12 @@ and account history, and creates the bounded backup at
 `/qa/installed-returned.db`. The installed handover records the subsequent
 worker restart separately from the build.
 
+On Windows the same build option produces `installed_upload_backup.exe`.
+Its Windows entry point requires the disposable runner, exact config digest,
+owned profile marker and fresh installer scratch directory. The installed
+WPF worker and signed Linux worker share the same SQLite backup operation.
+[Native Windows runner and readback](../../../docs/development.md#installed-windows-worker-backup).
+
 ### Restore after a deletion or interrupted repair
 
 The other two exchanges use the same shipping worker. For deletion, the

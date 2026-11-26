@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param([string]$Package, [string]$Evidence, [string]$Work, [string]$Target,
-      [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary)
+      [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary, [switch]$Upload)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -21,7 +21,7 @@ function Assert-ChildDirectory([string]$Parent, [string]$Child) {
 }
 
 function Assert-InteropProfile([string]$KnownProfile, [string]$ProfilePath, [string]$MarkerPath,
-                               [string]$ConfigSha256, [string]$Work, [string[]]$VerifiedOutputs = @()) {
+                               [string]$ConfigSha256, [string]$Work, [string[]]$VerifiedOutputs = @(), [switch]$Upload) {
     if ($KnownProfile -ine $ProfilePath -or [IO.Path]::GetDirectoryName($MarkerPath) -ine $ProfilePath -or
         [IO.Path]::GetFileName($MarkerPath) -cnotmatch '^\.rw02-owned-([a-f0-9]{32})$') {
         throw 'Expected the original synthetic profile and its ownership marker.'
@@ -46,10 +46,15 @@ function Assert-InteropProfile([string]$KnownProfile, [string]$ProfilePath, [str
         '      syncMode: uploadNew', '      includeSubdirectories: true', '      deleteAfterUpload: false',
         '      extensions: \["\.jpg"\]', 'logging:', '  target: file', '  level: Information', '  logDirectory: engine-logs', '\z'
     ) -join "`n"
+    if ($Upload) {
+        $configPattern = $configPattern.Replace('synthetic-benchmark', 'synthetic-installed-upload').Replace('uploadNew', 'uploadAll').Replace('\.jpg', '\.png')
+    }
     if ($text -cnotmatch $configPattern -or [int]$Matches[1] -gt 65535) {
         throw 'Expected the complete loopback-only synthetic WPF config.'
     }
-    Assert-ChildDirectory $Work ($Matches[2].Replace("''", "'"))
+    $media = $Matches[2].Replace("''", "'")
+    Assert-ChildDirectory $Work $media
+    if ($Upload -and $media -ine (Join-Path $Work 'wpf-media')) { throw 'Expected the fixed upload media directory.' }
 }
 
 function Assert-VacantHost($State) {
@@ -93,8 +98,9 @@ function Complete-InteropRemoval($Paths, $Identity, [string]$Evidence, $Receipt)
 }
 
 function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [string]$Target,
-                           [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary) {
+                           [string]$Profile, [string]$Marker, [string]$ConfigSha256, [string]$Python, [switch]$WpfPrimary, [switch]$Upload) {
     $arch = Get-HostedArchitecture
+    if ($WpfPrimary -and $Upload) { throw 'Choose one installed observation.' }
     if ($Target -cne @{ x64 = 'x86_64-pc-windows-msvc'; arm64 = 'aarch64-pc-windows-msvc' }[$arch]) {
         throw 'The Rust target differs from the native runner and PowerShell.'
     }
@@ -130,7 +136,7 @@ function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [
         $receipt.identity = $msi.identity
         $receipt.integration = $msi.integration
         $paths = Get-HostPaths
-        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work
+        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work -Upload:$Upload
         foreach ($name in @('install', 'legacy', 'startup', 'desktop', 'publicDesktop')) {
             Assert-PlainPath $paths[$name]
             Assert-Absent $paths[$name]
@@ -145,7 +151,7 @@ function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [
         $receipt.checkpoints.installed = $state
         Assert-InstalledState $state $paths $msi.identity
         $state.packageCode = Get-InstalledPackageCode $msi.identity
-        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work
+        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work -Upload:$Upload
         $payload = Get-VerifiedPayload $paths.bin $msi.layout $expected
         Write-Record (Join-Path $evidence 'payload-installed.json') $payload
         $native = [ordered]@{}
@@ -162,23 +168,23 @@ function Invoke-MsiInterop([string]$Package, [string]$Evidence, [string]$Work, [
                 workflowRun = $env:GITHUB_RUN_ID; releaseCommit = $release.commit; package = $asset; identity = $msi.identity
                 exe = $paths.exe; exeSha256 = $digest; peMachine = $native; payloadSha256 = $payload.sha256
                 configSha256 = $ConfigSha256; state = $state }
-            if ($WpfPrimary) {
+            if ($WpfPrimary -or $Upload) {
                 $installLog = Join-Path $evidence 'install.log'
                 $installed.installTransaction = [ordered]@{ operation = $receipt.operations[0]; nativePath = $installLog
                     sha256 = Get-FileDigest $installLog }
             }
             Write-Record (Join-Path $evidence 'installed.json') $installed
-            $observer = if ($WpfPrimary) { 'reverse/observe.py' } else { 'observe.py' }
+            $observer = if ($Upload) { 'upload/observe.py' } elseif ($WpfPrimary) { 'reverse/observe.py' } else { 'observe.py' }
             & $Python -B (Join-Path $PSScriptRoot $observer) $Target $evidence $work $paths.exe
-            if ($LASTEXITCODE -ne 0) { throw "The installed WPF secondary observation returned $LASTEXITCODE." }
+            if ($LASTEXITCODE -ne 0) { throw "The installed WPF observation returned $LASTEXITCODE." }
         }
         finally { $image.Dispose() }
         $outputs = @()
-        if ($WpfPrimary) {
+        if ($WpfPrimary -or $Upload) {
             . (Join-Path $PSScriptRoot 'reverse/profile.ps1')
-            $outputs = @(Get-ReverseProfileEntries $Profile $evidence)
+            $outputs = @(Get-ReverseProfileEntries $Profile $evidence -Upload:$Upload)
         }
-        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work $outputs
+        Assert-InteropProfile $paths.profile $Profile $Marker $ConfigSha256 $work $outputs -Upload:$Upload
         if ((Get-FileDigest $package) -cne $asset.sha256) { throw 'The release MSI changed during observation.' }
     }
     catch { $receipt.error = $_.Exception.Message }

@@ -177,6 +177,15 @@ passed locally. Each start order and architecture gets a separate hosted
 desktop. Both trials exercise one Windows session.
 [Reverse native trial and readback](../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
+The installed Windows upload trial now has a native Rust helper for
+the original WPF profile and a separate loopback PNG peer. On Fedora x64,
+the rebuilt helper returned byte-identical backups from the two original
+Ubuntu main/WAL pairs at `3d67a46`. The four tables and ROWIDs matched
+each archived return. The Windows entry point passed type checking on
+both MSVC targets. Installed Windows upload and restart results are pending.
+[Native commands](development.md#installed-windows-worker-backup) ·
+[Original Ubuntu databases](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

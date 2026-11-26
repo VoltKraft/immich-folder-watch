@@ -195,6 +195,36 @@ and removes its own MSI.
 [Rust primary](rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running) ·
 [WPF primary](../tools/rust-qa/windows-msi-interop/reverse/README.md).
 
+### Installed Windows worker backup
+
+The separate [MSI upload workflow](../.github/workflows/rust-windows-installed-upload.yaml)
+uses a fresh Windows x64 or ARM64 runner and the original 3.0.4 package.
+It seeds the reviewed Cargo and .NET inputs, then builds the native Rust
+SQLite helper. Only the private loopback peer receives the synthetic PNGs.
+The trial holds the first request while it identifies the installed WPF
+process and checks that Rust refuses the earlier SQLite state. Once the
+upload commits it retains the original main file and WAL, plus Rust's
+standalone return. Before replacing the database it checks that the first
+WPF process quit and archives the original profile database files. The
+second WPF process must open the returned database, preserve the first
+entry and upload only the new PNG.
+
+The runner hashes the staged helper before use. Its evidence ZIP retains
+the PE header fields, source files, dependency graph, compiler output and
+original build digest. The actual upload bodies and SQLite files are
+available for independent readback alongside that ZIP.
+
+On a prepared disposable runner, use the native target triple in place of
+`TARGET`. The full readback requires positive observations from both WPF
+lifetimes and verified removal of the original MSI. If only the first
+upload and live backup completed, add `--live-only` to the readback.
+
+```sh
+python -B tools/rust-qa/storage/run.py TARGET --offline --installed-upload-backup --output artifacts/rust/storage-native/TARGET
+python -B tools/rust-qa/windows-msi-interop/upload/run.py TARGET --rust-backup artifacts/rust/storage-native/TARGET
+python -B tools/rust-qa/windows-msi-interop/upload/readback.py artifacts/rust/windows-msi-interop/upload/TARGET
+```
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

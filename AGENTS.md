@@ -283,6 +283,8 @@ to reconcile project decisions, defaults, and recorded state.
   through the close and reopen on the same disposable desktop.
   Run the [opposite start order](tools/rust-qa/windows-msi-interop/reverse/README.md)
   on its own runner and retain the original WPF activation evidence before Quit.
+  For the [installed Windows worker backup](docs/development.md#installed-windows-worker-backup),
+  preserve the original main/WAL pair and both WPF processes' PNG requests.
   The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
   For [native Ubuntu launch trials](docs/rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64),
   retain the signed application and both runtime receipts with the original

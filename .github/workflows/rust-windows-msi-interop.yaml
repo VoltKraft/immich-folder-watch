@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/rust-windows-msi-interop.yaml'
       - 'tools/rust-qa/windows-msi-interop/**'
+      - '!tools/rust-qa/windows-msi-interop/upload/**'
       - '!tools/rust-qa/windows-msi-interop/**/*.md'
       - 'tools/rust-qa/gui/src/windows_launcher.rs'
       - 'tools/rust-qa/windows-performance/native.py'

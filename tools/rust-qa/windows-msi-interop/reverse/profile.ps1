@@ -1,7 +1,9 @@
 # Return the top-level profile entries that the verified WPF primary produced.
-function Get-ReverseProfileEntries([string]$ProfilePath, [string]$Evidence) {
-    $row = Get-Content -Raw -LiteralPath (Join-Path $Evidence 'reverse-activation.json') | ConvertFrom-Json -AsHashtable
-    if ($row.status -cne 'observed' -or $row.quit.empty -ne $true -or -not $row.profileFiles.Contains('sync-state.db')) {
+function Get-ReverseProfileEntries([string]$ProfilePath, [string]$Evidence, [switch]$Upload) {
+    $observation = if ($Upload) { 'upload-observation.json' } else { 'reverse-activation.json' }
+    $row = Get-Content -Raw -LiteralPath (Join-Path $Evidence $observation) | ConvertFrom-Json -AsHashtable
+    $quit = if ($Upload) { $row.restored.quit } else { $row.quit }
+    if ($row.status -cne 'observed' -or $quit.empty -ne $true -or -not $row.profileFiles.Contains('sync-state.db')) {
         throw 'Missing completed original WPF job or retained SQLite evidence.'
     }
     $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)

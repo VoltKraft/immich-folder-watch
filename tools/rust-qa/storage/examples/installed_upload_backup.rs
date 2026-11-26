@@ -1,4 +1,4 @@
-//! Copy a committed upload from the signed Flatpak's private, running SQLite store.
+//! Copy one committed upload from the installed reference application's live synthetic profile.
 #![forbid(unsafe_code)]
 
 use ifw_sqlite_assessment::{Result, digest, limited, verify_backup};
@@ -6,14 +6,31 @@ use rusqlite::backup::Backup;
 use rusqlite::{Connection, OpenFlags, params};
 use serde_json::json;
 use std::fs::{self, File};
+#[cfg(target_os = "linux")]
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
+#[cfg(target_os = "linux")]
 const PROFILE: &str = "/tmp/home/.var/app/io.github.voltkraft.immich-folder-watch";
-const RETURNED: &str = "/qa/installed-returned.db";
 const LIMIT: u64 = 16 * 1024 * 1024;
 
-fn run() -> Result<()> {
+struct Profile {
+    port: u16,
+    directory: PathBuf,
+    media: PathBuf,
+    returned: PathBuf,
+    config_hash: String,
+    #[cfg(windows)]
+    _pins: Vec<File>,
+}
+
+#[cfg(windows)]
+#[path = "installed_upload_backup/windows.rs"]
+mod windows;
+
+#[cfg(target_os = "linux")]
+fn profile() -> Result<Profile> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let [port, config_hash] = args.as_slice() else {
         return Err(
@@ -22,10 +39,7 @@ fn run() -> Result<()> {
     };
     let port: u16 = port.parse()?;
     if port == 0
-        || !cfg!(all(
-            target_os = "linux",
-            any(target_arch = "x86_64", target_arch = "aarch64")
-        ))
+        || !cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
         || std::env::current_dir()? != Path::new("/qa")
         || std::env::var("HOME")? != "/tmp/home"
         || fs::read_to_string("/proc/net/route")?.lines().count() != 1
@@ -35,13 +49,31 @@ fn run() -> Result<()> {
         );
     }
     let directory = Path::new(PROFILE).join("config/immich-folder-watch");
-    let path = directory.join("sync-state.db");
-    let config = directory.join("config.yaml");
-    if path.canonicalize()? != path
-        || config.canonicalize()? != config
-        || !fs::symlink_metadata(&path)?.is_file()
+    for name in ["sync-state.db", "config.yaml"] {
+        let path = directory.join(name);
+        if path.canonicalize()? != path {
+            return Err("unexpected live synthetic upload profile".into());
+        }
+    }
+    Ok(Profile {
+        port,
+        directory,
+        media: Path::new(PROFILE).join("data/interop-upload"),
+        returned: Path::new("/qa/installed-returned.db").to_owned(),
+        config_hash: config_hash.clone(),
+    })
+}
+
+#[cfg(windows)]
+use windows::profile;
+
+fn run() -> Result<()> {
+    let profile = profile()?;
+    let path = profile.directory.join("sync-state.db");
+    let config = profile.directory.join("config.yaml");
+    if !fs::symlink_metadata(&path)?.is_file()
         || path.metadata()?.len() > LIMIT
-        || digest(&limited(File::open(config)?, 4096)?) != *config_hash
+        || digest(&limited(File::open(config)?, 4096)?) != profile.config_hash
     {
         return Err("unexpected live synthetic upload profile".into());
     }
@@ -50,6 +82,7 @@ fn run() -> Result<()> {
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
     source.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA query_only=ON; BEGIN")?;
+    let port = profile.port;
     let scope =
         digest(format!("http://127.0.0.1:{port}/api\nsynthetic-installed-upload").as_bytes());
     let read_i64 = |sql| source.query_one::<i64, _, _>(sql, [], |row| row.get(0));
@@ -61,13 +94,19 @@ fn run() -> Result<()> {
              WHERE e.account_scope=?1 AND source_path=?2 AND relative_path='signed-worker.png'
              AND asset_id='85a783ae-f459-41e9-ad2a-9f1fdc123742' AND file_size=69
              AND direction=0 AND status=0 AND a.last_successful_sync_utc IS NOT NULL",
-            params![scope, format!("{PROFILE}/data/interop-upload")],
+            params![
+                scope,
+                profile
+                    .media
+                    .to_str()
+                    .ok_or("invalid synthetic source path")?
+            ],
             |row| row.get(0),
         )? != 1
     {
         return Err("expected the signed worker's committed upload and account history".into());
     }
-    let returned = Path::new(RETURNED);
+    let returned = profile.returned.as_path();
     File::create_new(returned)?;
     let mut output = Connection::open_with_flags(
         returned,
