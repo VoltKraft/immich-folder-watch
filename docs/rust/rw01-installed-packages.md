@@ -115,6 +115,52 @@ and both ordinary exits. Its SHA-256 is
 For reproduction use the pinned bundle, detached metadata and installed
 public Platform and Mesa deployment specified by the [native launch driver](../../tools/RustCompatibilityOracle/installed/launch/run.py).
 
+### Signed native launch inputs on Ubuntu x64 and ARM64
+
+The [installer workflow](../../.github/workflows/rust-legacy-install.yaml)
+also runs the original application twice on a private X11 desktop on each
+Ubuntu architecture. At launch it checks the apphost ELF machine, the X
+server's client PID, the Flatpak sandbox and outer PIDs and the selected
+application, Platform and GL commits. The primary must hide, reopen its
+original window, quit normally and allow ordinary uninstall. These are
+shipping 3.0.4 executions with an unconfigured synthetic profile.
+
+The original ARM64 release bundle has SHA-256
+`b5bb588a93ca8ac95875321d528adfc35e5fa5ed773b6c80eddbef6713c2bda4`.
+Its commit `762ff33e2a50f85a2ab670c4ad7463b2af288c2e512ac90d819619ddbc1a9f6a`
+verified against the separately published metadata and the original release
+key on Fedora. The detached metadata has SHA-256
+`9987aa51fdaf0ffc9ee3ff8d35ad85b7fe246e6941ed5b22cee700c02dcef2d4`.
+[ARM64 detached metadata](https://voltkraft.github.io/immich-folder-watch/repo/objects/76/2ff33e2a50f85a2ab670c4ad7463b2af288c2e512ac90d819619ddbc1a9f6a.commitmeta) ·
+[Original release](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4).
+
+The hosted trial installs the pinned public GL extension alongside the
+[signed Platform](rw02-portal-dialog.md#signed-runtime-on-hosted-linux) in
+the runner's disposable Flatpak installation. Both architectures' actual
+GL deployments passed Flathub signature checks. The ARM64 commit is
+`ab6ebce8bf5a62d9393fca493a08c45fe669a8f73527bccec6ad3dbf62748b41`.
+The x64 commit is
+`5aec1b8281d53c91bdac451eb577ec5331ca0e34d89cf0dcc8dba2360171eae6`.
+Their Mesa, LLVM and libclc license files remain in the external system
+extensions. The private desktop mounts each deployment read-only.
+The `shipping-3.0.4-launch-<target>-<revision>` archive retains the two
+raw Flathub signature checks, native inputs, observer sources, process and
+window observations and the application's own detached signature check.
+[Graphics pins](../../tools/RustCompatibilityOracle/installed/launch/graphics.py) ·
+[Launch observer](../../tools/RustCompatibilityOracle/installed/launch/observe.py).
+
+The generalized launcher passed on Fedora x64. The second process reopened
+the first process's X window. Both exited zero and the private uninstall
+completed. Independent readback verified all 16 indexed artifacts and
+13 frozen source files. Under `artifacts/rust/shipping-flatpak-launch/`,
+`verified-launch-5tc243jg/readback.json` has SHA-256
+`b801619de26a36b9b3da558d256f21473db664b692eb8c456a7cf5a176756ad9`,
+`arm64-release-m4cci0g0/receipt.json` has SHA-256
+`45fe6f958a362cfb65842f2b3fb5cfa29b8814328988b988e61da98c28741bc9`
+and `gl-metadata-_rxwgfas/summary.json` has SHA-256
+`c0952b5e3f5ec797cef329669384b5fcd4f51b8b960e38c2f12a206d905c8b04`.
+Native Ubuntu desktop outcomes are pending.
+
 ## Installed reference on all four hosts
 
 At `0f29659`, all four native jobs installed the original shipping package,

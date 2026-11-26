@@ -19,6 +19,13 @@ three compact mapping inputs rejected by the shipping reader.
 [Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
 [Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
 
+The signed Linux 3.0.4 launch fixture now supports both native architectures.
+The Fedora x64 regression reopened the original X window and completed both
+normal exits and uninstall. The original ARM64 bundle and both external GL
+deployments passed independent signature verification. The installer workflow
+will exercise both Ubuntu desktops.
+[Shipping launch inputs and readbacks](rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64).
+
 At `ead9fb3` all 20 regular PR checks passed, including all four native
 feasibility jobs. The separate desktop workflow is measuring this revision
 on its own hosts.

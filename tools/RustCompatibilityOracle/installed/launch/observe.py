@@ -5,13 +5,14 @@ from contextlib import ExitStack
 import ctypes as c
 import os
 from pathlib import Path
+import platform
 import select
 import subprocess
 import sys
 import time
 
 from gi.repository import Gio, GLib
-from run import APP, COMMIT, require, sha
+from run import APP, COMMIT, COMMITS, native_elf_machine, require, sha
 from session import checked_start, check_alive, wait_for
 from x11 import WindowAttributes, bind
 sys.path.insert(0, '/driver/worker')
@@ -55,17 +56,23 @@ def app_identity(launcher, pid, inputs, report, out, tag):
     info.read_string(info_bytes.decode('utf-8'))
     (out / (tag + '.flatpak-info')).write_bytes(info_bytes)
     instance = info['Instance']
-    platform = inputs['platform']
-    installed = Path(os.environ['FLATPAK_USER_DIR']) / 'app' / APP / 'x86_64/master' / COMMIT / 'files'
-    runtime = Path(os.environ['FLATPAK_SYSTEM_DIR']) / platform['ref'] / platform['commit'] / 'files'
+    arch = platform.machine()
+    # The installed interop recorder uses the original x64 receipt format.
+    commit = inputs.get('ostree', COMMIT)
+    require(arch in COMMITS and commit == COMMITS[arch] and inputs.get('architecture', 'x86_64') == arch,
+            'The observation pins must identify the original release for this host')
+    runtime_pin = inputs['platform']
+    installed = Path(os.environ['FLATPAK_USER_DIR']) / 'app' / APP / arch / 'master' / commit / 'files'
+    runtime = Path(os.environ['FLATPAK_SYSTEM_DIR']) / runtime_pin['ref'] / runtime_pin['commit'] / 'files'
     extension = inputs['glRef'].split('/')[1] + '=' + inputs['glCommit']
     namespace_pids = [int(x) for x in next(s for s in (proc / 'status').read_text().splitlines() if s.startswith('NSpid:')).split()[1:]]
     sandbox = identity(image['parent'])
-    require(info['Application']['name'] == APP and info['Application']['runtime'] == platform['ref']
-            and instance['app-commit'] == COMMIT and instance['app-path'] == str(installed)
-            and instance['runtime-commit'] == platform['commit'] and instance['runtime-path'] == str(runtime)
+    machine = native_elf_machine(proc / 'exe', arch)
+    require(info['Application']['name'] == APP and info['Application']['runtime'] == runtime_pin['ref']
+            and instance['app-commit'] == commit and instance['app-path'] == str(installed)
+            and instance['runtime-commit'] == runtime_pin['commit'] and instance['runtime-path'] == str(runtime)
             and instance['runtime-extensions'] == extension
-            and instance['arch'] == 'x86_64' and instance['branch'] == 'master' and instance.getboolean('session-bus-proxy')
+            and instance['arch'] == arch and instance['branch'] == 'master' and instance.getboolean('session-bus-proxy')
             and len(namespace_pids) == 2 and namespace_pids[0] == pid and image['executable'] == HOST and sha(proc / 'exe') == report['apphost']
             and sandbox['parent'] == launcher.pid and os.readlink(proc / 'ns/net') == report['namespaces']['net'],
             'The live X11 client, sandbox, Flatpak instance, network or executable differs')
@@ -78,6 +85,7 @@ def app_identity(launcher, pid, inputs, report, out, tag):
         s = (proc / 'root' / locations[key].lstrip('/')).stat()
         roots[key] = [s.st_dev, s.st_ino]
     return dict(gui=image, wrapper=identity(launcher.pid), sandbox=sandbox, instance=instance['instance-id'],
+                architecture=arch, apphostElfMachine=machine,
                 namespaces={n: os.readlink(proc / 'ns' / n) for n in ('pid', 'mnt', 'net')}, paths=locations,
                 directoryIdentity=roots, namespacePids=namespace_pids)
 

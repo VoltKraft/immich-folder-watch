@@ -271,6 +271,9 @@ to reconcile project decisions, defaults, and recorded state.
   The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses
   original release packages, disposable installs and the synthetic legacy corpus.
   The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
+  For [native Ubuntu launch trials](docs/rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64),
+  retain the signed application and both runtime receipts with the original
+  sandbox, apphost and X11 observations.
   The [two installed refs](docs/rust/rw02-instance.md#shipping-flatpak-and-rust-probe-in-two-installed-refs)
   distinguish a shared socket name from verified activation across Flatpak PID namespaces.
   Exercise [Rust startup with the signed legacy Flatpak running](docs/rust/rw02-instance.md#rust-startup-while-the-shipping-flatpak-is-running) before changing Linux instance admission.

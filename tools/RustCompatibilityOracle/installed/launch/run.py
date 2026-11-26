@@ -1,10 +1,12 @@
-"""Launch the unmodified Fedora x64 Flatpak 3.0.4 twice on an offline private X11 desktop.
+"""Launch the native x64 or ARM64 Flatpak 3.0.4 twice on an offline private X11 desktop.
 
 Run from the checkout with python3 -B tools/RustCompatibilityOracle/installed/launch/run.py.
 Place the release bundle in artifacts/rust/legacy-installer-inputs/v3.0.4 and the public
-Pages commit metadata in artifacts/rust/shipping-flatpak-launch/signature/3.0.4.commitmeta.
+Pages commit metadata in artifacts/rust/shipping-flatpak-launch/signature/3.0.4[-arm64].commitmeta.
+On a hosted runner, pass --hosted-runtime PATH to its verified native Platform deployment.
 """
 
+import argparse
 from contextlib import ExitStack
 import hashlib
 import json
@@ -14,12 +16,14 @@ import platform
 import subprocess
 import sys
 import tempfile
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 HERE = Path(__file__).resolve().parent
 APP = 'io.github.voltkraft.immich-folder-watch'
 COMMIT = 'abeebe13b83cc4b8246fb4a8715daddce7f3dd4bf52861ae4ca33b06755104da'
 SIGNATURE = '739b5ddb83a090eab38111bdeb5a7a55e7dbb803622bf883061136adbca8b426'
+COMMITS = {'x86_64': COMMIT, 'aarch64': '762ff33e2a50f85a2ab670c4ad7463b2af288c2e512ac90d819619ddbc1a9f6a'}
+SIGNATURES = {'x86_64': SIGNATURE, 'aarch64': '9987aa51fdaf0ffc9ee3ff8d35ad85b7fe246e6941ed5b22cee700c02dcef2d4'}
 KEY = '4ED65AC1C14D559C721C7A8B44B33451708EAD7D'
 NS = ('mnt', 'net', 'user', 'ipc', 'pid')
 
@@ -42,6 +46,15 @@ def require(value, message):
         raise RuntimeError(message)
 
 
+def native_elf_machine(path, arch):
+    with path.open('rb') as stream:
+        header = stream.read(64)
+    require(len(header) == 64 and header[:7] == b'\x7fELF\x02\x01\x01'
+            and int.from_bytes(header[18:20], 'little') == {'x86_64': 62, 'aarch64': 183}[arch],
+            'The executable must be a 64-bit little-endian ELF for the native host')
+    return int.from_bytes(header[18:20], 'little')
+
+
 def require_original_reopen(report):
     first, launch, reopened = report['first'], report['secondLaunch'], report['second']
     require(report['firstHidden'] and report['outcome'] == 'existing-primary-reopened'
@@ -56,44 +69,61 @@ def require_original_reopen(report):
             'Both ordinary exits and removal of the private installation are required')
 
 
-def outer():
+def outer(hosted_runtime):
     root = HERE.parents[3]
     qa = root / 'tools/rust-qa'
-    sys.path[:0] = [str(qa / 'portal-dialog'), str(qa / 'performance')]
+    drivers = [HERE / 'run.py', HERE / 'observe.py', HERE / 'graphics.py', HERE.parent / 'release.json',
+               root / 'packaging/flatpak/repository-signing-key.asc', qa / 'gui/watcher.py',
+               *(qa / 'performance' / p for p in ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
+               *(qa / 'portal-dialog' / p for p in ('runtime_pin.py', 'flatpak_fixture.py'))]
+    dest = root / 'artifacts/rust/shipping-flatpak-launch'
+    dest.mkdir(parents=True, exist_ok=True)
+    out = Path(tempfile.mkdtemp(dir=dest, prefix='x11-'))
+    print(out, flush=True)
+    with tempfile.TemporaryDirectory(prefix='ifw-shipping-launch-') as directory:
+        frozen = Path(directory)
+        sources = {}
+        with ZipFile(out / 'observer-source.zip', 'x') as archive:
+            for path in sorted(drivers):
+                name = path.relative_to(root).as_posix()
+                data = path.read_bytes()
+                sources[name] = hashlib.sha256(data).hexdigest()
+                archive.writestr(ZipInfo(name), data, compress_type=ZIP_DEFLATED)
+                copy = frozen / name
+                copy.parent.mkdir(parents=True, exist_ok=True)
+                copy.write_bytes(data)
+        run_frozen(root, frozen, out, sources, hosted_runtime)
+
+
+def run_frozen(root, frozen, out, sources, hosted_runtime):
+    qa = frozen / 'tools/rust-qa'
+    launch = frozen / HERE.relative_to(root)
+    sys.path[:0] = [str(launch), str(qa / 'portal-dialog'), str(qa / 'performance')]
     from linux import namespace
     from flatpak_fixture import SYS_DIRS
     from runtime_pin import deployment
-    import runpy
-    gl_driver = runpy.run_path(str(qa / 'gui/flatpak/run.py'))
-    release = json.loads((HERE.parent / 'release.json').read_bytes())
-    asset = release['assets']['linux-x64']
+    from graphics import graphics_deployment
+    arch = platform.machine()
+    require(arch in COMMITS, 'Expected a native Linux x64 or ARM64 host')
+    release = json.loads((launch.parent / 'release.json').read_bytes())
+    asset = release['assets']['linux-x64' if arch == 'x86_64' else 'linux-arm64']
+    commit, signature = COMMITS[arch], SIGNATURES[arch]
     art = root / 'artifacts/rust'
     original = art / 'legacy-installer-inputs/v3.0.4' / asset['name']
-    dest = art / 'shipping-flatpak-launch'
-    metadata = dest / 'signature/3.0.4.commitmeta'
-    key = root / 'packaging/flatpak/repository-signing-key.asc'
-    require(platform.machine() == 'x86_64' and sha(original) == asset['sha256'] and original.stat().st_size == asset['bytes']
-            and sha(metadata) == SIGNATURE, 'Original release or detached signature differs from the source pins')
-    runtime, runtime_receipt = deployment(None)
-    gl_ref = Path('runtime', gl_driver['GL'], 'x86_64/26.08')
-    gl = Path('/var/lib/flatpak') / gl_ref / gl_driver['GL_COMMIT']
-    require(gl.resolve(strict=True) == gl and sha(gl / 'metadata') == gl_driver['GL_METADATA'], 'Unexpected GL extension')
-    drivers = [HERE / 'run.py', HERE / 'observe.py', HERE.parent / 'release.json', key, qa / 'gui/flatpak/run.py', qa / 'gui/watcher.py',
-               *(qa / 'performance' / p for p in ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
-               *(qa / 'portal-dialog' / p for p in ('runtime_pin.py', 'flatpak_fixture.py'))]
-    out = Path(tempfile.mkdtemp(dir=dest, prefix='x11-'))
-    print(out, flush=True)
-    with ZipFile(out / 'observer-source.zip', 'x', ZIP_DEFLATED) as archive:
-        for path in drivers:
-            archive.write(path, path.relative_to(root))
+    metadata = out.parent / 'signature' / ('3.0.4.commitmeta' if arch == 'x86_64' else '3.0.4-arm64.commitmeta')
+    key = frozen / 'packaging/flatpak/repository-signing-key.asc'
+    require(sha(original) == asset['sha256'] and original.stat().st_size == asset['bytes']
+            and sha(metadata) == signature, 'Original release or detached signature differs from the source pins')
+    runtime, runtime_receipt = deployment(hosted_runtime)
+    gl, graphics = graphics_deployment(hosted_runtime)
     inputs = dict(revision=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
-                  sources={str(p.relative_to(root)): sha(p) for p in drivers}, observerArchive=sha(out / 'observer-source.zip'),
-                  release=release['commit'], tag=release['tag'], asset=asset, ostree=COMMIT, outerNamespaces=namespaces(),
-                  signatureUrl='https://voltkraft.github.io/immich-folder-watch/repo/objects/' + COMMIT[:2] + '/' + COMMIT[2:] + '.commitmeta',
-                  signatureSha256=SIGNATURE, publicKeySha256=sha(key), platform=runtime_receipt,
-                  glRef=str(gl_ref), glCommit=gl_driver['GL_COMMIT'], glMetadata=gl_driver['GL_METADATA'])
+                  sources=sources, observerArchive=sha(out / 'observer-source.zip'), architecture=arch,
+                  release=release['commit'], tag=release['tag'], asset=asset, ostree=commit, outerNamespaces=namespaces(),
+                  signatureUrl='https://voltkraft.github.io/immich-folder-watch/repo/objects/' + commit[:2] + '/' + commit[2:] + '.commitmeta',
+                  signatureSha256=signature, publicKeySha256=sha(key), platform=runtime_receipt, graphics=graphics,
+                  glRef=graphics['ref'], glCommit=graphics['commit'], glMetadata=graphics['metadata_sha256'])
     save(out / 'inputs.json', inputs)
-    command = namespace(out, HERE, None)
+    command = namespace(out, launch, None)
     (out / 'etc/passwd').write_text('root:x:0:0:Synthetic user:/tmp/home:/bin/false\n')
     (out / 'etc/group').write_text('root:x:0:\n')
     private = Path('/tmp/private-flatpak-system')
@@ -101,7 +131,7 @@ def outer():
         '--cap-add', 'CAP_NET_ADMIN', '--dev-bind', '/dev/fuse', '/dev/fuse', '--tmpfs', '/sys', '--dir', '/var/tmp',
         *(arg for d in SYS_DIRS for arg in ('--dir', d)),
         '--ro-bind', str(runtime), str(private / runtime_receipt['ref'] / runtime_receipt['commit']),
-        '--ro-bind', str(gl), str(private / gl_ref / gl_driver['GL_COMMIT']), '--ro-bind', str(original), '/original.flatpak',
+        '--ro-bind', str(gl), str(private / graphics['ref'] / graphics['commit']), '--ro-bind', str(original), '/original.flatpak',
         '--ro-bind', str(metadata), '/original.commitmeta', '--ro-bind', str(key), '/public-key.asc',
         '--ro-bind', str(qa / 'gui/watcher.py'), '/watcher.py', '--ro-bind', str(qa / 'portal-dialog'), '/portal-fixture', '--setenv', 'FLATPAK_SYSTEM_DIR', str(private),
         '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak', '--dir', '/run/user/0',
@@ -123,6 +153,11 @@ def inside():
     inputs = json.loads((out / 'inputs.json').read_bytes())
     report = dict(passed=False, inputs=sha(out / 'inputs.json'), namespaces=namespaces())
     try:
+        arch = platform.machine()
+        require(arch in COMMITS and inputs['architecture'] == arch and inputs['ostree'] == COMMITS[arch]
+                and inputs['signatureSha256'] == SIGNATURES[arch], 'Private host or release pins differ')
+        release_commit = COMMITS[arch]
+        report['nativeMachine'] = arch
         require(os.getuid() == 0 and Path.home() == Path('/tmp/home') and not Path.home().exists()
                 and not Path('/var/lib/flatpak').exists() and all(report['namespaces'][k] != inputs['outerNamespaces'][k] for k in NS)
                 and not Path('/proc/net/route').read_text().splitlines()[1:], 'A fresh offline private namespace is required')
@@ -133,7 +168,7 @@ def inside():
         gl = Path('/tmp/private-flatpak-system') / inputs['glRef'] / inputs['glCommit']
         require(sha(gl / 'metadata') == inputs['glMetadata'], 'Unexpected private GL runtime')
         (gl.parent / 'active').symlink_to(gl.name)
-        require(sha(Path('/original.flatpak')) == inputs['asset']['sha256'] and sha(Path('/original.commitmeta')) == SIGNATURE
+        require(sha(Path('/original.flatpak')) == inputs['asset']['sha256'] and sha(Path('/original.commitmeta')) == SIGNATURES[arch]
                 and sha(Path('/public-key.asc')) == inputs['publicKeySha256'], 'Unexpected mounted input')
         with ExitStack() as stack:
             display, report['xserver'] = private_session(stack)
@@ -142,12 +177,12 @@ def inside():
             os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = LAUNCH_BUS
             setup_command(['flatpak', '--user', 'install', '--noninteractive', '--no-deps', '--no-related', '--bundle', '/original.flatpak'])
             try:
-                ref = 'app/' + APP + '/x86_64/master'
+                ref = f'app/{APP}/{arch}/master'
                 result = subprocess.check_output(['flatpak', '--user', 'info', '--show-commit', ref], text=True).strip()
-                require(result == COMMIT, 'Installed commit differs from the published release')
-                repo = Path(os.environ['FLATPAK_USER_DIR']) / 'repo/objects' / COMMIT[:2]
-                commit = repo / (COMMIT[2:] + '.commit')
-                require(sha(commit) == COMMIT, 'The installed commit object differs')
+                require(result == release_commit, 'Installed commit differs from the published release')
+                repo = Path(os.environ['FLATPAK_USER_DIR']) / 'repo/objects' / release_commit[:2]
+                commit = repo / (release_commit[2:] + '.commit')
+                require(sha(commit) == release_commit, 'The installed commit object differs')
                 signed = GLib.Variant.new_from_bytes(GLib.VariantType.new('a{sv}'), GLib.Bytes.new(Path('/original.commitmeta').read_bytes()), False)
                 signature, = signed.unpack()['ostree.gpgsigs']
                 (out / 'commit.sig').write_bytes(bytes(signature))
@@ -160,7 +195,9 @@ def inside():
                         'Expected the original repository key as signer and primary key')
                 report['verifiedSigningKey'] = signatures[0][2]
                 files = Path(subprocess.check_output(['flatpak', '--user', 'info', '--show-location', ref], text=True).strip()) / 'files'
-                report['apphost'] = sha(files / 'lib/immich-folder-watch/immich-folder-watch')
+                apphost = files / 'lib/immich-folder-watch/immich-folder-watch'
+                report['apphostElfMachine'] = native_elf_machine(apphost, arch)
+                report['apphost'] = sha(apphost)
                 report['managedAssembly'] = sha(files / 'lib/immich-folder-watch/immich-folder-watch.dll')
                 observe.run(display, bus, inputs, report, out)
             finally:
@@ -180,7 +217,7 @@ def inside():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--inside']:
         inside()
-    elif len(sys.argv) == 1:
-        outer()
     else:
-        raise SystemExit(__doc__)
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument('--hosted-runtime', type=Path, help='verified native Platform deployment on a disposable runner')
+        outer(parser.parse_args().hosted_runtime)
