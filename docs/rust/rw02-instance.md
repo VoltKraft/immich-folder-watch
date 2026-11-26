@@ -926,3 +926,32 @@ millisecond. The first sample after the trigger already showed a visible
 window. The observer returned unavailable for their ordering. Those two
 timestamps had been 16 ms apart in the successful `f155b65` trial.
 [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).
+
+### Ordering a fast foreground keyboard launch
+
+At `ead9fb3` the Windows x64 F24 trial reopened HWND 8454480 with
+keyboard focus and retained the worker. The primary accepted the correct secondary
+PID. Its SHOW and the recorded secondary resume both fell in uptime
+millisecond 7,428,421. The first post-IPC sample already saw the window.
+The native ordering outcome remains unavailable for this run.
+[Original x64 foreground keyboard records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15147426906).
+
+The keyboard-launch observer samples the original root’s `WS_VISIBLE`
+state immediately after the suspended secondary resumes and before the
+observer pumps queued events. A hidden sample followed by exactly one
+SHOW on the same live root can resolve a tied timestamp. The observer
+records the process creation times, window thread and the sample’s
+performance-counter interval. An already visible sample leaves the
+existing ordering checks in effect. Only a fresh native run can supply
+this additional observation.
+[Native keyboard recorder](../../tools/rust-qa/windows-launcher/observe.py) ·
+[Windows visibility query](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowvisible) ·
+[Windows event timestamp](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wineventproc).
+
+Detached replay of six archived trials preserved four ordered successes
+and both unresolved x64 ties. The replay report in
+`artifacts/rust/windows-launcher-input/keyboard-resume-controls/original-orders.json`
+has SHA-256 `8ffa18aea8bb5963ec8d007249a71ace51728071597409061875b36ca10351b0`.
+A separate review also reproduced the x64 success at `0bb39bf`. All
+28 targeted tests passed. The full launcher suite passed 107 tests on
+Linux and skipped three native cases.

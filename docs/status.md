@@ -124,6 +124,13 @@ requires native execution.
 [Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md) ·
 [Native x64 workflow](../.github/workflows/rust-windows-transitions.yaml).
 
+On the `ead9fb3` x64 foreground keyboard trial, the original HWND obtained
+focus, but Windows timestamped its SHOW and the secondary process resume
+in the same millisecond. The keyboard observer now queries the window’s
+visibility immediately after resume. Historical tied events remain
+unqualified. A native repeat must record the new sample.
+[Input timing and original archive](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

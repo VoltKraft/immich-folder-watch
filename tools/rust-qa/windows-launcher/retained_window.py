@@ -25,6 +25,105 @@ def event_uptime(tick, near):
     return near + delta
 
 
+def check_keyboard_resume(cycle):
+    """Bind the passive query to the original desktop root and the F24 handler's suspended child."""
+    retained = cycle["retainedWindow"]
+    probe = retained["afterKeyboardResume"]
+    root = probe["root"]
+    start = cycle["suspendedSecondary"]
+    child = cycle["inputGesture"]["created"]
+    events = retained["reopened"]["events"]
+    if (root["pid"] != cycle["primaryPid"] or root["hwnd"] != cycle["reopenedWindow"]
+            or root["hwnd"] != cycle["initialWindow"] or root["tid"] <= 0
+            or any(retained[phase][key] != root[key] for phase in ("first", "hidden", "reopened")
+                   for key in ("hwnd", "pid", "tid"))
+            or [(e["event"], e["hwnd"], e["root"]) for e in events] != [
+                ("hide", root["hwnd"], True), ("show", root["hwnd"], True)]
+            or [item[:2] for item in retained["lifetimeBeforeQuit"]] != [[root["hwnd"], "create"]]
+            or probe["primaryCreation100ns"] != cycle["primaryCreation100ns"]
+            or (probe["secondaryPid"], probe["secondaryCreation100ns"]) != (child["pid"], child["creation100ns"])
+            or (child["pid"], child["creation100ns"]) != (start["pid"], start["creation100ns"])
+            or (start["pid"], start["creation100ns"]) != (cycle["secondaryPid"], cycle["secondaryCreation100ns"])
+            or not 0 < min(probe["primaryCreation100ns"], probe["secondaryCreation100ns"])
+            or probe["secondaryPid"] == root["pid"]):
+        raise ValueError("The F24 resume query identified a different process or root")
+    if (probe["state"] not in ("visible", "retainedRootHidden")
+            or not 0 <= child["tick"] <= start["tick"] <= probe["resumeReturnedMs"]
+            or not probe["resumeReturnedMs"] <= probe["queryBeganMs"] <= start["resumeReturnedMs"]
+            or not 0 < probe["queryBeganQpc"] <= probe["queryEndedQpc"] or probe["qpcFrequency"] <= 0
+            or not 0 <= start["events"] <= probe["cursorBeforeQuery"] <= probe["eventCursor"]):
+        raise ValueError("The F24 visibility query did not follow the successful secondary resume")
+
+
+def check_keyboard_show(cycle):
+    """Recompute the ordering of the external root SHOW from the recorded F24 observations."""
+    retained = cycle["retainedWindow"]
+    show = retained["secondaryShow"]
+    start = cycle["suspendedSecondary"]
+    hwnd = cycle["reopenedWindow"]
+    original = retained["first"]
+    if (original["hwnd"] != hwnd or original["pid"] != cycle["primaryPid"] or original["tid"] <= 0
+            or any(retained[phase][k] != original[k] for phase in ("hidden", "reopened")
+                   for k in ("pid", "tid", "hwnd", "title", "desktop"))):
+        raise ValueError("The original keyboard launch window changed during reopening")
+    if "keyboardHook" in retained:
+        count = retained["keyboardHook"]["count"]
+        captured = retained["keyboardHook"]["rootEvents"]
+    else:
+        # The original snapshot saved the last sixteen events without their absolute offsets.
+        recent = cycle["windowReadbacks"]["reopen"]["recentPrimaryEvents"]
+        if len(recent) >= 16:
+            raise ValueError("The original F24 receipt lacks an absolute hook cursor")
+        count = len(recent)
+        captured = [{"index": i, "event": e} for i, e in enumerate(recent) if e["hwnd"] == hwnd]
+    events = [r["event"] for r in captured]
+    if (events != [retained["first"]["showEvent"], retained["hidden"]["hideEvent"], show["showEvent"]]
+            or events[1:] != retained["reopened"]["events"]
+            or [(e["hwnd"], e["event"], e["root"]) for e in events] != [
+                (hwnd, "show", True), (hwnd, "hide", True), (hwnd, "show", True)]):
+        raise ValueError("The keyboard launcher did not observe exactly one original root reopen")
+    first, hidden, reopened = [r["index"] for r in captured]
+    earliest, release, observed = show["earliestMs"], show["releasedByMs"], show["observedMs"]
+    stamp = event_uptime(events[-1]["winEventTimeMs"], earliest)
+    if (not 0 <= first < hidden < start["events"] <= reopened < count
+            or (earliest, release) != (start["tick"], start["resumeReturnedMs"])
+            or not 0 <= earliest <= release <= observed <= earliest + 35_000
+            or stamp is None or not earliest <= stamp <= observed or stamp != show["showMs"]
+            or show["distinctTicks"] is not (stamp > release)):
+        raise ValueError("The root SHOW lies outside the recorded secondary or hook interval")
+
+    expected = "distinctTicks" if stamp > release else None
+    resume = retained.get("afterKeyboardResume")
+    if resume is not None:
+        check_keyboard_resume(cycle)
+        if resume["eventCursor"] > count:
+            raise ValueError("The post-resume cursor exceeds the original hook stream")
+        if resume["state"] == "retainedRootHidden":
+            if resume["eventCursor"] > reopened or resume["queryBeganMs"] > stamp:
+                raise ValueError("The root SHOW predates the post-resume hidden observation")
+            if stamp == release and resume["cursorBeforeQuery"] == resume["eventCursor"]:
+                expected = "hiddenAfterSecondaryResume"
+
+    acknowledged = retained.get("afterTrigger")
+    if acknowledged is not None:
+        if (acknowledged["field"] != "secondaryShow" or acknowledged["pid"] != cycle["primaryPid"]
+                or acknowledged["trigger"] != {"secondaryPid": cycle["secondaryPid"]}):
+            raise ValueError("The post-IPC observation belongs to another launcher")
+        if acknowledged["state"] == "retainedRootHidden":
+            root = acknowledged["root"]
+            if (any(root[k] != retained["reopened"][k] for k in ("pid", "tid", "hwnd", "title", "desktop"))
+                    or not release <= acknowledged["queryBeganMs"] <= stamp
+                    or not start["events"] <= acknowledged["eventCursor"] <= reopened):
+                raise ValueError("The root SHOW predates or differs from the post-IPC hidden observation")
+            expected = "observedHiddenAfterTrigger"
+        elif acknowledged["state"] != "visible":
+            raise ValueError("The post-IPC observation did not identify the retained keyboard root")
+    if show["status"] != "ordered" or expected is None or show.get("basis") != expected:
+        raise ValueError("The original keyboard SHOW is not ordered by the claimed observation")
+    if expected == "hiddenAfterSecondaryResume" and show["rootEventsAfterResumeQuery"] != [events[-1]]:
+        raise ValueError("The post-resume cursor did not precede this original root SHOW")
+
+
 class GuiThreadInfo(c.Structure):
     _fields_ = [("size", w.DWORD), ("flags", w.DWORD), ("active", w.HWND), ("focus", w.HWND),
                 ("capture", w.HWND), ("menu", w.HWND), ("moveSize", w.HWND), ("caret", w.HWND), ("rect", w.RECT)]
@@ -212,9 +311,28 @@ class RetainedWindow:
             row["lifetimeCursor"] = len(self.lifetime.events)
         row["eventCursor"] = len(self.windows.events)
 
+    def sample_keyboard_resume(self, api, primary, secondary, clock):
+        # Read WS_VISIBLE before a message pump, desktop enumeration or log read can delay the sample.
+        resumed = clock()
+        cursor = len(self.windows.events)
+        tick = clock()
+        begin = api.clock()
+        visible = self.windows.is_visible(self.hwnd)
+        end = api.clock()
+        after = len(self.windows.events)
+        owner = w.DWORD()
+        tid = self.windows.owner(self.hwnd, c.byref(owner))
+        if not tid or owner.value != primary.pid or self.windows.ancestor(self.hwnd, 2) != self.hwnd:
+            raise ValueError("The sampled keyboard-launch window lost its primary owner or root")
+        self.record["afterKeyboardResume"] = dict(
+            state="visible" if visible else "retainedRootHidden", resumeReturnedMs=resumed, queryBeganMs=tick, queryBeganQpc=begin,
+            queryEndedQpc=end, qpcFrequency=api.frequency, cursorBeforeQuery=cursor, eventCursor=after,
+            root=dict(hwnd=self.hwnd, pid=owner.value, tid=tid), primaryCreation100ns=api.process_identity(int(primary._handle)),
+            secondaryPid=secondary.pid, secondaryCreation100ns=api.process_identity(int(secondary._handle)))
+
     def confirm_probe(self, probe, row, start):
         """An out-of-context hook may deliver an old event after a newer native window query."""
-        trigger_observed = (probe["trigger"].get("observedMs") if probe["field"] == "callbackShow"
+        trigger_observed = (probe["trigger"].get("observedMs") if probe.get("field") == "callbackShow"
                             else row["releasedByMs"])
         query = probe.get("queryBeganMs")
         cursor = probe["eventCursor"]
@@ -256,15 +374,32 @@ class RetainedWindow:
         own_root = probe.get("state") == "retainedRootHidden" and probe["root"]["hwnd"] == self.hwnd
         if probe.get("state") == "noGuiRoot":
             own_root = all(w["hwnd"] != self.hwnd for w in probe["desktopWindows"]["windows"])
-        if own_root and probe["field"] == field and probe["pid"] == self.windows.pid:
+        acknowledged = own_root and probe["field"] == field and probe["pid"] == self.windows.pid
+        if acknowledged:
             contradiction = self.confirm_probe(probe, row, start)
             if contradiction is not None:
                 row.update(status="inconclusive", reason=contradiction)
                 return False
-            row.update(status="ordered", basis="observedHiddenAfterTrigger")
-            return True
         if show < earliest:
             raise ValueError("The retained window show was outside its native activation interval")
+        resume = self.record.get("afterKeyboardResume") if field == "secondaryShow" else None
+        if resume:
+            self.record["keyboardHook"] = dict(count=len(self.windows.events), rootEvents=[
+                {"index": i, "event": e} for i, e in enumerate(self.windows.events) if e["hwnd"] == self.hwnd])
+        if resume and resume["state"] == "retainedRootHidden":
+            contradiction = self.confirm_probe(resume, {**row, "releasedByMs": resume["resumeReturnedMs"]}, start)
+            if contradiction:
+                row.update(status="inconclusive", reason=contradiction)
+                return False
+            subsequent = self.events(resume["eventCursor"])
+            if (not acknowledged and show == latest and resume["cursorBeforeQuery"] == resume["eventCursor"]
+                    and subsequent == [event] and event["root"]):
+                row["rootEventsAfterResumeQuery"] = subsequent
+                row.update(status="ordered", basis="hiddenAfterSecondaryResume")
+                return True
+        if acknowledged:
+            row.update(status="ordered", basis="observedHiddenAfterTrigger")
+            return True
         if row["distinctTicks"]:
             row.update(status="ordered", basis="distinctTicks")
             return True

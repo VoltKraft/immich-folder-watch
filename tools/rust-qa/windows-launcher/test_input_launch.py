@@ -15,8 +15,17 @@ def event(msg, **changes):
 
 
 def completed():
+    root = dict(pid=12, tid=9, hwnd=52, title="Desktop input probe", desktop="IfwQa_test")
+    events = [dict(event=name, hwnd=52, root=True, winEventTimeMs=tick)
+              for name, tick in (("show", 600), ("hide", 650), ("show", 730))]
     return dict(stage="drained", secondaryLaunch=dict(api="CreateProcessW", source="foreground-key-handler", callerPid=17),
-                secondaryPid=21, secondaryCreation100ns=823, initialWindow=52, reopenedWindow=52,
+                primaryPid=12, secondaryPid=21, secondaryCreation100ns=823, initialWindow=52, reopenedWindow=52,
+                suspendedSecondary=dict(events=2, tick=713, resumeReturnedMs=714),
+                windowReadbacks={"reopen": {"recentPrimaryEvents": events}},
+                retainedWindow=dict(first=dict(root, showEvent=events[0]), hidden=dict(root, hideEvent=events[1]),
+                                    reopened=dict(root, events=events[1:]), secondaryShow=dict(earliestMs=713,
+                                    releasedByMs=714, observedMs=740, distinctTicks=True, status="ordered",
+                                    showEvent=events[-1], showMs=730, basis="distinctTicks")),
                 foregroundHandoff=dict(grant="granted", requestAccepted=True), foregroundObservation=dict(observed=True),
                 keyboardFocus=dict(observed=True, lastSample=dict(foreground=True, active=True, focused=True)),
                 inputGesture=dict(hwnd=51, callerPid=17, callerThread=103, marker=912, keys=[event(DOWN), event(UP)],
@@ -29,6 +38,49 @@ def completed():
 
 
 class InputLaunchTests(unittest.TestCase):
+    def test_detached_post_ipc_receipt_requires_a_hidden_owned_root_before_the_original_show(self):
+        cycle = completed()
+        retained = cycle["retainedWindow"]
+        root = {k: retained["first"][k] for k in ("pid", "tid", "hwnd", "title", "desktop")}
+        retained["afterTrigger"] = dict(field="secondaryShow", pid=12, root=root, trigger={"secondaryPid": 21},
+                                        queryBeganMs=720, eventCursor=2, state="retainedRootHidden")
+        retained["secondaryShow"]["basis"] = "observedHiddenAfterTrigger"
+        input_launch.check_handoff(cycle, 17)
+        for key, bad in (("eventCursor", 3), ("queryBeganMs", 731), ("trigger", {"secondaryPid": 22})):
+            damaged = deepcopy(cycle)
+            damaged["retainedWindow"]["afterTrigger"][key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                input_launch.check_handoff(damaged, 17)
+
+    def test_secondary_queries_visibility_only_after_successful_resume_and_before_returning_to_the_handler(self):
+        observe = input_launch.observe
+        name = "IfwQa_" + "1" * 32
+        for resume_ok in (True, False):
+            with self.subTest(resume_ok=resume_ok):
+                api, desk, proc = Mock(), Mock(), Mock()
+                actions = []
+                desk.name.side_effect = ["WinSta0", name, name]
+                desk.receiving_input.return_value = True
+                def resume():
+                    actions.append("resume")
+                    if not resume_ok:
+                        raise ValueError("ResumeThread failed")
+                proc.resume.side_effect = resume
+                def witness(child):
+                    self.assertIs(child, proc)
+                    actions.append("query")
+                with (patch.object(observe, "start_named", return_value=proc),
+                      patch.object(observe, "ordinary_console", return_value=True)):
+                    trial = observe.child(api, desk, name, None, [], None, {"IFW_QA_INVENTORY_TOKEN": "1" * 32},
+                                          None, False, private=False, named_input=True, after_resume=witness)
+                    if resume_ok:
+                        with trial:
+                            actions.append("handler")
+                    else:
+                        with self.assertRaisesRegex(ValueError, "ResumeThread"), trial:
+                            self.fail("A failed resume returned a child")
+                self.assertEqual(actions, ["resume", "query", "handler"] if resume_ok else ["resume"])
+
     def test_keyboard_target_or_modifier_change_never_submits_input_or_starts_the_secondary(self):
         for target, modifier in (([False], 0), ([True, False], 0), ([True], -32768)):
             with self.subTest(target=target, modifier=modifier):

@@ -11,6 +11,7 @@ import observe
 from input_gesture import InputUnavailable, accept_key, keyboard_launcher
 from job import run_worker
 from named_process import Kernel, environment_block
+from retained_window import check_keyboard_show
 from win32 import Desktop, check, ordinary_console
 
 HERE, QA, ROOT = observe.HERE, observe.QA, observe.ROOT
@@ -59,6 +60,7 @@ def check_handoff(cycle, worker):
         if event["dispatchThread"] != gesture["callerThread"]:
             raise ValueError("The key did not reach the original foreground UI thread")
         accept_key(rows, gesture["hwnd"], gesture["marker"], event)
+    check_keyboard_show(cycle)
 
 
 def worker(target, name, out):

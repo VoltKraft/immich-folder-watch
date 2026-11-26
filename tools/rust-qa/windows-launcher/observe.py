@@ -24,7 +24,7 @@ from named_process import start as start_named
 from win32 import Desktop, bind, check, ordinary_console
 from window_readback import PrivateMembership, check_private_snapshot, paint_control, snapshot
 import retained_subject
-from retained_window import LIFETIME, RetainedWindow, ShowOrderUnavailable, graphics as retained_graphics
+from retained_window import LIFETIME, RetainedWindow, ShowOrderUnavailable, check_keyboard_resume, graphics as retained_graphics
 
 TARGETS = {"x86_64-pc-windows-msvc": 0x8664, "aarch64-pc-windows-msvc": 0xaa64}
 SUBJECTS = ("canonical", "retained")
@@ -131,7 +131,9 @@ def release_handle(close, label, handle):
 
 @contextmanager
 def child(api, desk, name, exe, arguments, area, env, stream, primary, *, private=True, before_resume=None,
-          named_input=False, before_create=None):
+          named_input=False, before_create=None, after_resume=None):
+    if after_resume is not None and (primary or not named_input):
+        raise ValueError("The post-resume visibility query requires the keyboard launcher's ordinary secondary")
     job = api.new_job()
     proc = None
     try:
@@ -158,6 +160,8 @@ def child(api, desk, name, exe, arguments, area, env, stream, primary, *, privat
         if before_resume is not None:
             before_resume(proc)
         proc.resume()
+        if after_resume is not None:
+            after_resume(proc)
         yield proc, job, thread_id
     finally:
         try:
@@ -347,6 +351,10 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                     result["suspendedSecondary"] = dict(pid=secondary.pid, creation100ns=api.process_identity(int(secondary._handle)),
                                                        events=len(windows.events), tick=clock())
                 resume_options["before_resume"] = before_resume
+                if gesture is not None:
+                    def after_resume(secondary):
+                        retained.sample_keyboard_resume(api, proc, secondary, clock)
+                    resume_options["after_resume"] = after_resume
             with second_log.open("xb") as second_stream, ExitStack() as secondary_scope:
                 def start_secondary():
                     return secondary_scope.enter_context(child(api, desk, name, exe, [], trial, env, second_stream,
@@ -378,6 +386,8 @@ def cycle(api, desk, name, desktop, witness, fixture, exe, console, trial, env, 
                 start = result["suspendedSecondary"]
                 if (start["pid"], start["creation100ns"]) != (result["secondaryPid"], result["secondaryCreation100ns"]):
                     raise ValueError("The resumed launcher secondary was not the original suspended process")
+                if gesture is not None:
+                    check_keyboard_resume(result)
                 show_ordered = retained.activated_show(start["events"], start["tick"], clock(), "secondaryShow",
                                                        released_by=start["resumeReturnedMs"])
             else:

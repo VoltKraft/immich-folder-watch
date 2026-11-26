@@ -1,9 +1,12 @@
 """Exercise native HWND/renderer/keyboard evidence for the retained launch and Shell cases."""
 import unittest
+from copy import deepcopy
 from unittest.mock import Mock, patch
 
 import observe
+import input_launch
 import retained_window as retained
+from test_input_launch import completed
 
 TITLE = "Grüße – retained GUI"
 FIRST_RENDER = ("GRAPHICS_ATTEMPT generation=1 policy=preferred\nGRAPHICS_MEMORY generation=1 hint=MemoryUsage\n"
@@ -70,6 +73,97 @@ class RetainedWindowTests(unittest.TestCase):
     def wait(self, observation, reason):
         if not observation():
             raise TimeoutError(reason)
+
+    def keyboard_trial(self, *, visible=False, generated=100, lookup=100, ack_hidden=False, released=100):
+        self.trial.close_window()
+        self.assertTrue(self.trial.hidden(FIRST_RENDER + "WINDOW_HIDDEN\n"))
+        start = len(self.gui.events)
+        primary, secondary = Mock(pid=12, _handle=12), Mock(pid=21, _handle=21)
+        api = Mock(frequency=10_000_000)
+        api.clock.side_effect = (1500, 1510)
+        api.process_identity.side_effect = (821, 823)
+        if visible:
+            self.gui.show(generated)
+        with patch.object(self.gui, "pump", side_effect=AssertionError("Unexpected pump during visibility query")):
+            self.trial.sample_keyboard_resume(api, primary, secondary, Mock(side_effect=(100, lookup)))
+        if ack_hidden:
+            self.trial.sample_after_trigger("secondaryShow", {"secondaryPid": 21}, lambda: generated + 1)
+        if not visible:
+            self.gui.show(generated)
+        if not ack_hidden:
+            self.trial.sample_after_trigger("secondaryShow", {"secondaryPid": 21}, lambda: generated)
+        self.trial.opened(99, lambda: FIRST_RENDER + "WINDOW_HIDDEN\n", self.wait)
+        cycle = completed()
+        cycle["inputGesture"]["beforeCreate"]["tick"] = 95
+        cycle["inputGesture"]["created"]["tick"] = 96
+        cycle.update(initialWindow=99, reopenedWindow=99, primaryPid=12, primaryCreation100ns=821,
+                     retainedWindow=self.record, suspendedSecondary=dict(pid=21, creation100ns=823, events=start,
+                                                                         tick=98, resumeReturnedMs=released))
+        retained.check_keyboard_resume(cycle)
+        ordered = self.trial.activated_show(start, 98, 120, "secondaryShow", released_by=released)
+        return cycle, ordered
+
+    def test_hidden_after_keyboard_resume_precedes_only_one_native_show_on_the_same_tick(self):
+        cycle, ordered = self.keyboard_trial()
+        self.assertTrue(ordered)
+        self.assertEqual(self.record["secondaryShow"]["basis"], "hiddenAfterSecondaryResume")
+        self.assertEqual(self.record["afterTrigger"]["state"], "visible")
+        input_launch.check_handoff(cycle, 17)
+        for key, value in (("hwnd", 53), ("pid", 99), ("tid", 15)):
+            damaged = deepcopy(cycle)
+            damaged["retainedWindow"]["afterKeyboardResume"]["root"][key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "different process or root"):
+                input_launch.check_handoff(damaged, 17)
+        for key, value in (("primaryCreation100ns", 828), ("secondaryCreation100ns", 825),
+                           ("queryEndedQpc", 1400), ("cursorBeforeQuery", 1), ("state", "visible")):
+            damaged = deepcopy(cycle)
+            damaged["retainedWindow"]["afterKeyboardResume"][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                input_launch.check_handoff(damaged, 17)
+        damaged = deepcopy(cycle)
+        damaged["retainedWindow"]["secondaryShow"]["rootEventsAfterResumeQuery"] = []
+        with self.assertRaises(ValueError):
+            input_launch.check_handoff(damaged, 17)
+        damaged = deepcopy(cycle)
+        damaged["retainedWindow"]["afterTrigger"].update(state="retainedRootHidden", queryBeganMs=110)
+        damaged["retainedWindow"]["afterTrigger"].update(root=self.record["afterKeyboardResume"]["root"] |
+                                                        {"title": TITLE, "desktop": "Default"}, eventCursor=2)
+        with self.assertRaises(ValueError):
+            input_launch.check_handoff(damaged, 17)
+        damaged = deepcopy(cycle)
+        damaged["retainedWindow"]["afterKeyboardResume"].update(cursorBeforeQuery=1000000, eventCursor=1000000)
+        with self.assertRaisesRegex(ValueError, "cursor"):
+            input_launch.check_handoff(damaged, 17)
+
+    def test_already_visible_after_keyboard_resume_leaves_a_tied_show_inconclusive(self):
+        cycle, ordered = self.keyboard_trial(visible=True)
+        self.assertFalse(ordered)
+        self.assertEqual(self.record["afterKeyboardResume"]["state"], "visible")
+        with self.assertRaisesRegex(ValueError, "not ordered"):
+            input_launch.check_handoff(cycle, 17)
+
+    def test_keyboard_resume_preserves_later_distinct_native_tick(self):
+        cycle, ordered = self.keyboard_trial(generated=116)
+        self.assertTrue(ordered)
+        self.assertEqual(self.record["secondaryShow"]["basis"], "distinctTicks")
+        input_launch.check_handoff(cycle, 17)
+        self.record["secondaryShow"]["status"] = "inconclusive"
+        with self.assertRaisesRegex(ValueError, "not ordered"):
+            input_launch.check_handoff(cycle, 17)
+
+    def test_keyboard_resume_cannot_override_a_contradictory_post_acknowledgment_query(self):
+        _, ordered = self.keyboard_trial(ack_hidden=True)
+        self.assertFalse(ordered)
+        self.assertIn("before the post-trigger window query", self.record["secondaryShow"]["reason"])
+
+    def test_delayed_event_from_before_the_keyboard_query_stays_inconclusive(self):
+        _, ordered = self.keyboard_trial(generated=99)
+        self.assertFalse(ordered)
+        self.assertIn("before the post-trigger window query", self.record["secondaryShow"]["reason"])
+
+    def test_keyboard_resume_preserves_uncertainty_inside_the_original_resume_interval(self):
+        _, ordered = self.keyboard_trial(generated=100, released=115)
+        self.assertFalse(ordered)
 
     def test_close_show_uses_the_same_hidden_title_kernel_events_and_renderer(self):
         self.trial.close_window()
