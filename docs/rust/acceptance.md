@@ -99,6 +99,15 @@ contrast, standard-user cross-session ownership, mixed DPI and RDP
 remain open.
 [Windows timing and archive details](rw02-windows-window.md#windows-results-at-ead9fb3).
 
+The `0bb39bf` repeat gave eleven of eleven limits for both Windows ARM64
+Mailbox profiles and eight for each x64 profile. The x64 idle close also
+exceeded its limit on this host. Both foreground keyboard trials passed.
+The ordinary ARM64 second launch reopened the window without foreground
+focus. Both Ubuntu desktop jobs at `3d67a46` passed the eleven resource
+limits and the installed handover.
+[Windows repeat](rw02-windows-window.md#windows-results-at-0bb39bf) ·
+[Ubuntu repeat](rw02-native-gui.md#ubuntu-native-results-at-3d67a46).
+
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
 ROWID and every existing row. Independent readback covered 32 SQLite

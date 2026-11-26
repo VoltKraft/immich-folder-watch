@@ -131,6 +131,16 @@ visibility immediately after resume. Historical tied events remain
 unqualified. A native repeat must record the new sample.
 [Input timing and original archive](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
 
+At `0bb39bf` both Windows foreground keyboard trials passed. ARM64 met
+all eleven resource limits in both retained Mailbox profiles. Both x64
+profiles exceeded three limits, including idle close on this host.
+None of 144 GDI reopens during verified file activity delivered a full
+frame before the next close. The ordinary one-frame Mailbox trial did so
+in 257 of 276 reopens. The per-window transition comparison at `de3eec4`
+uses the ordinary DXGI renderer.
+[Windows receipts](rust/rw02-windows-window.md#windows-results-at-0bb39bf) ·
+[Focused native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538844).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

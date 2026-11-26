@@ -1063,3 +1063,34 @@ The median wait was 42.59 ms. The whole first frame completed in a median
 readback still occupied the GUI thread during rendering.
 [Frame and source archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15147426906) ·
 [Native recorder](../../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
+
+### Windows results at 0bb39bf
+
+On x64 both retained Mailbox profiles met eight of the eleven WPF limits.
+Alongside the two inventory limits, idle close exceeded its 13.45 ms limit.
+It took 27.79 ms at p95 with one queued frame and 16.73 ms with two.
+The one-frame scan closed in 22.29 ms and reopened in 28.06 ms against
+limits of 16.11 and 18.97 ms. Both the ordinary and reopened filename
+editors completed their three edits. The foreground keyboard trial passed.
+In the frame-cost trace all 111 slow reopens spent at least half their
+elapsed time inside `ShowWindow` but outside the measured window procedure.
+Those intervals accounted for 2,495.89 of 2,652.82 ms in total.
+
+The ordinary one-frame trial delivered a complete DXGI present during
+257 of 276 file-qualified reopens. In the separate GDI trial the inventory
+worker completed both passes and the GUI made 153 full scan transfers.
+None fell entirely between an observed reopen during file activity and
+the following close request across the 144 eligible reopens. Checkout of
+the reused buffer took 0.0005 ms at p95. Mapping and waiting for CPU-readable
+pixels took 49.13 ms. This repeat supports continuing the investigation on
+the ordinary DXGI path.
+[Windows x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15148738386).
+
+Both ARM64 Mailbox profiles met all eleven WPF limits. With one queued
+frame the scan closed in 8.78 ms and reopened in 4.86 ms at p95, against
+limits of 14.52 and 15.52 ms. With two queued frames the corresponding
+values were 8.63 and 4.82 ms. Both filename editors and the foreground
+keyboard launch passed. An ordinary second launch reopened the original
+window in the background. The application requested foreground and the
+observer found no focus in 41 samples over 2.02 seconds.
+[Windows ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15149575448).

@@ -1,16 +1,16 @@
 # RW-02 stack decision
 
 **Keep egui/eframe with wgpu as the preferred candidate. RW-02 remains open.**
-At `ead9fb3` both native Ubuntu desktops and the two retained Windows
-ARM64 Mailbox profiles met all eleven same-host limits. The Windows x64
-recorder completed all three WPF trials. Both retained x64 Mailbox profiles
-exceeded the scan-close and scan-reopen limits. Both Windows filename
+Both native Ubuntu desktops met all eleven same-host limits at `3d67a46`.
+At `0bb39bf` the two retained Windows ARM64 Mailbox profiles met all
+eleven WPF limits. On x64 both profiles exceeded the idle-close, scan-close
+and scan-reopen limits across three trials per profile. Both Windows filename
 editors passed. The ARM64 ordinary second launch reopened the window in
 the background. Windows Shell activation, visible notifications, a
 reversible contrast change, mixed DPI, RDP and ordinary-user cross-session
 ownership remain open.
-[Windows measurements](rw02-windows-window.md#windows-results-at-ead9fb3) ·
-[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-ead9fb3) ·
+[Windows measurements](rw02-windows-window.md#windows-results-at-0bb39bf) ·
+[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
 At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
