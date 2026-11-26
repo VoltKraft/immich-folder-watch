@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
-from installed_backup import open_database_handle, snapshot
+from installed_backup import build_input, open_database_handle, snapshot
 from shipping_upload import empty_permission_probe, endpoint_tuple, FILENAME, IMAGE, multipart_image, verify_asset_posts
 
 
@@ -57,6 +57,22 @@ class ConfiguredUploadTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Unexpected shipping tables'):
                 snapshot(db, standalone=True)
 
+    def test_installed_backup_rejects_another_target_and_online_acquisition(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            build = root / 'artifacts/rust/storage-native/test'
+            build.mkdir(parents=True)
+            spec = root / 'tools/rust-qa/storage/inputs.json'
+            spec.parent.mkdir(parents=True)
+            spec.write_text('{}')
+            target = 'aarch64-unknown-linux-gnu'
+            for recorded_target, offline in [('x86_64-unknown-linux-gnu', True), (target, False)]:
+                record = {'target': recorded_target, 'offline': offline, 'status': 'passed'}
+                (build / 'result.json').write_text(json.dumps(record))
+                with self.subTest(target=recorded_target, offline=offline), self.assertRaisesRegex(RuntimeError, 'audited build'):
+                    build_input(build, root, 'revision', root, target)
+                self.assertFalse((root / 'installed-backup-build.zip').exists())
+
     def test_loopback_connection_matches_both_ipv4_and_mapped_socket_addresses(self):
         self.assertEqual(endpoint_tuple('0100007F:C234'), ('127.0.0.1', 49716))
         self.assertEqual(endpoint_tuple('0000000000000000FFFF00000100007F:0050'), ('127.0.0.1', 80))
@@ -84,12 +100,15 @@ class IdentityTests(unittest.TestCase):
             (subject / 'ifw-performance-worker').write_bytes(worker)
             digest = hashlib.sha256(worker).hexdigest()
             build = dict(worker_sha256=digest, gui_sha256='original-gui', sources={'source': 'digest'})
-            with patch('assess.EXPECTED_WORKER', digest), patch('assess.subprocess.check_output', return_value=b'{"source":"digest"}'):
+            with patch('assess.subprocess.check_output', return_value=b'{"source":"digest"}'):
                 for field, wrong in [('worker_sha256', 'another-worker'), ('gui_sha256', 'another-gui'), ('sources', {})]:
                     (subject / 'worker.inputs.json').write_text(json.dumps({**build, field: wrong}))
                     with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'worker, native GUI or pinned source'):
-                        inventory_inputs(subject, root, 'revision', 'original-gui', 'release', root)
+                        inventory_inputs(subject, root, 'revision', 'original-gui', 'release', root, digest)
                     self.assertFalse((root / 'inventory-sources.zip').exists())
+                (subject / 'worker.inputs.json').write_text(json.dumps(build))
+                with self.assertRaisesRegex(RuntimeError, 'worker, native GUI or pinned source'):
+                    inventory_inputs(subject, root, 'revision', 'original-gui', 'release', root, 'other-host-worker')
 
     def test_receipt_cannot_select_files_for_the_native_gui_archive(self):
         with TemporaryDirectory() as tmp:
@@ -103,6 +122,29 @@ class IdentityTests(unittest.TestCase):
                 # The other required files do not exist. Reject the names before trying to open any of them.
                 with self.subTest(names=names), self.assertRaisesRegex(RuntimeError, 'source inventory'):
                     gui_source_snapshot(root, dict.fromkeys(names, ''))
+
+    def test_hosted_gui_compares_every_archived_file_with_the_selected_commit(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            files = {
+                'tools/rust-qa/gui/src/linux_legacy.rs', 'tools/rust-qa/gui/src/tray-icon.argb',
+                'tools/rust-qa/gui/Cargo.toml', 'tools/rust-qa/gui/Cargo.lock', 'rust/Cargo.toml',
+                'rust/crates/desktop-lifecycle/Cargo.toml', 'rust/crates/desktop-lifecycle/src/lib.rs',
+            }
+            contents = {name: name.encode() for name in files}
+            for name, original in contents.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(original)
+            digests = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
+            git_blobs = {'reference:' + name: original for name, original in contents.items()}
+            with patch('assess.subprocess.check_output', side_effect=lambda cmd, cwd: git_blobs[cmd[2]]) as git:
+                self.assertEqual(gui_source_snapshot(root, digests, 'reference'), contents)
+                self.assertEqual({call.args[0][2] for call in git.call_args_list}, set(git_blobs))
+                git_blobs['reference:tools/rust-qa/gui/src/linux_legacy.rs'] = b'different committed source'
+                with self.assertRaisesRegex(RuntimeError, 'hosted revision'):
+                    gui_source_snapshot(root, digests, 'reference')
+                self.assertEqual(gui_source_snapshot(root, digests), contents)
 
     def test_shared_id_needs_both_original_identities(self):
         verify_paths(True, [21, 5], [21, 5], [21, 9], 'NORMAL_ENDPOINT visible 21 9')

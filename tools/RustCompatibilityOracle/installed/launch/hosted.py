@@ -58,14 +58,16 @@ def prepare(hosted_platform):
     shutil.copyfile(hosted_platform / 'metadata', evidence / 'platform.metadata')
     shutil.copyfile(graphics / 'metadata', evidence / 'graphics.metadata')
     shutil.copyfile(signed / name, evidence / name)
+    workflow_ref = os.environ['GITHUB_WORKFLOW_REF']
+    workflow = Path(workflow_ref.partition('@')[0]).name
     for source in (Path(__file__), HERE / 'run.py', HERE / 'graphics.py', HERE.parent / 'run.py',
                    HERE.parent / 'release.json', ROOT / 'tools/rust-qa/portal-dialog/hosted_runtime.py',
-                   ROOT / 'tools/rust-qa/portal-dialog/runtime_pin.py', ROOT / '.github/workflows/rust-legacy-install.yaml'):
+                   ROOT / 'tools/rust-qa/portal-dialog/runtime_pin.py', ROOT / '.github/workflows' / workflow):
         copy = evidence / 'source' / source.relative_to(ROOT)
         copy.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, copy)
     receipt = {'target': target, 'revision': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
-               'attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'asset': installer['RELEASE']['assets'][target],
+               'attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'workflow': workflow_ref, 'asset': installer['RELEASE']['assets'][target],
                'commit': commit, 'signatureUrl': url,
                'files': {p.relative_to(evidence).as_posix(): sha256(p.read_bytes()).hexdigest()
                          for p in sorted(evidence.rglob('*')) if p.is_file()}}

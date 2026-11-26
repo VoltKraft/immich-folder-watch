@@ -156,6 +156,27 @@ permission probes, original main/WAL, source build receipt, returned
 database and the database after the signed application's second Quit.
 [Executed trial and digests](rust/rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
 
+### Installed worker handover on native Ubuntu runners
+
+The Linux desktop assessment uses the same installed application ID and
+two private Flatpak branches on x64 and ARM64. It builds the Rust backup
+helper offline from the inputs cached by the native storage job. The GUI
+build, its inventory worker, the helper and the signed .NET 3.0.4 apphost
+must match the runner architecture. The observer checks the GUI sources
+against the checkout's Git objects and the worker against its native build
+digest. It verifies the detached signatures before the two applications
+share a disposable profile and loopback peer.
+
+The workflow passes `--hosted-runtime` with the verified Platform
+deployment and `--rust-backup` with the completed offline storage result
+to the preceding `assess.py` command. In the `rust-installed-handover`
+artifact, `inputs.json` identifies the executables, signed release and
+source archives. `evidence.sha256` covers the original HTTP bodies,
+SQLite main file and WAL, returned backup, restarted database and
+both apphosts' logs. The Fedora x64 regression and its independent
+row-by-row readback are recorded in the [installed storage contract](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer).
+The [desktop workflow](../.github/workflows/rust-desktop-assessment.yaml) owns the Ubuntu runs.
+
 ## Rust feasibility workspace
 
 Use `rust/Cargo.toml` on `rewrite/rust`. Development crates use the unpublished

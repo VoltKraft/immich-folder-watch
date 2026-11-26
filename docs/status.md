@@ -25,6 +25,14 @@ and the private uninstall completed. All four reference packages also passed
 installation, repair, removal and retained-profile readback.
 [Installed launch and repair results](rust/rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf).
 
+All 28 PR checks at `5b6cebf` passed. In the extended Fedora x64 installed
+handover, the signed worker opened Rust's live backup, kept the first asset
+mapping, uploaded a second PNG and preserved both SQLite ROWIDs. The native
+Ubuntu x64 and ARM64 handover is prepared. The existing Ubuntu results above
+cover the two ordinary starts of the shipping package.
+[Installed backup and original requests](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
+[PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
+
 At `ead9fb3` all 20 regular PR checks passed, including all four native
 feasibility jobs. The two Ubuntu desktops met all eleven resource limits.
 All 120 x64 and 186 ARM64 window requests issued during file reads completed

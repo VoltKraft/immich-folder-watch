@@ -7,6 +7,11 @@ on:
       - '.github/workflows/rust-desktop-assessment.yaml'
       - 'rust/**'
       - 'tools/rust-qa/**'
+      - 'tools/RustCompatibilityOracle/installed/interop/**'
+      - 'tools/RustCompatibilityOracle/installed/launch/**'
+      - 'tools/RustCompatibilityOracle/installed/run.py'
+      - 'tools/RustCompatibilityOracle/installed/release.json'
+      - 'packaging/flatpak/repository-signing-key.asc'
       - '.gitattributes'
   workflow_dispatch:
 
@@ -175,7 +180,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
             gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
-            xvfb libx11-6 libxdamage1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config \
+            xvfb libx11-6 libxdamage1 libxres1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config gpg gpgv \
             xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin gir1.2-gtk-3.0
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
 
@@ -474,6 +479,47 @@ jobs:
       - name: Reopen the Linux GUI by launching its ordinary executable while the inventory worker runs
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' }}
         run: python3 -B tools/rust-qa/performance/worker/check_hidden.py graphics-ci --second-launch
+
+      - name: Rebuild the native installed-worker backup helper from cached inputs
+        id: installed_backup
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.storage.outcome == 'success' }}
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/storage/run.py "$NATIVE_TARGET" --offline --installed-upload-backup \
+            --output "artifacts/rust/storage-native/installed-$NATIVE_TARGET"
+
+      - name: Stage the signed shipping Flatpak and native graphics extension
+        id: shipping
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/launch/hosted.py "$PLATFORM_DEPLOYMENT"
+
+      - name: Exercise both installed launch orders and restore a signed worker after an upload
+        id: installed_handover
+        if: ${{ !cancelled() && steps.shipping.outcome == 'success' && steps.worker.outcome == 'success' && steps.installed_backup.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: |
+          /usr/bin/python3 -B -m unittest discover -s tools/RustCompatibilityOracle/installed/interop -p test_assess.py
+          /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py \
+            --gui-build artifacts/rust/gui-build --inventory-subject artifacts/rust/performance/subjects/graphics-ci \
+            --shipping-upload --rust-backup "artifacts/rust/storage-native/installed-$NATIVE_TARGET" \
+            --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Retain the installed handover, original WAL and returned database
+        if: ${{ !cancelled() && (steps.installed_handover.outcome == 'success' || steps.installed_handover.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-installed-handover-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/shipping-flatpak-launch/hosted-inputs/
+            artifacts/rust/shipping-flatpak-interop/same-id-*/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Release the original staged Windows image after a temporary sharing violation
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}

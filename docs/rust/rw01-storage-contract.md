@@ -355,3 +355,26 @@ rollback after the Rust synchronization engine's own activity remains open.
 [Reproduction](../development.md#installed-flatpak-worker-backup-on-fedora-x64) ·
 [Installed process and restore observer](../../tools/RustCompatibilityOracle/installed/interop/installed_backup.py) ·
 [Native Rust helper](../../tools/rust-qa/storage/examples/installed_upload_backup.rs).
+
+### Native Linux handover and backup observer
+
+The observer now supports native Ubuntu x64 and ARM64 as well as the
+existing Fedora x64 fixture. In the Fedora regression the Rust primary
+and its direct inventory worker retained their identities at five checks
+across the signed secondary's launch. In the opposite order the signed
+primary held its upload connection when the Rust secondary exited.
+The first mapping was visible in the live WAL when Rust took its backup.
+On ordinary startup the next signed apphost opened the returned database,
+kept the first mapping and uploaded the second synthetic PNG.
+
+The `same-id-0cv5enwx/result.json` SHA-256 is
+`9921248c5e1d148a18ebbabc2a618a9155487f45fb23c669042ce2a17f5c152e`.
+The returned database has SHA-256
+`9e43543311106644ba7db874c36bb5bbba3883f5e3e889d7b82f9426c4c9f172`.
+Detached readback verified 52 indexed files, both image bodies, 16 WAL
+frames and the two final mappings with ROWIDs 1 and 2. Its report under
+`detached-worker-tl1r89h2/readback.json` has SHA-256
+`22580006cb1b2c68c9d0c4d353fc7d5c4d006060419de58d0ba89ca1b7e71d36`.
+Both branches were uninstalled. The Ubuntu runs for this installed
+handover and restart are pending.
+[Native workflow and archive layout](../development.md#installed-worker-handover-on-native-ubuntu-runners).

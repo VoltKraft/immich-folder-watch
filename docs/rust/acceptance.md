@@ -48,6 +48,13 @@ eleven resource limits on each architecture.
 [Shipping packages](rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf) ·
 [Linux measurements](rw02-native-gui.md#ubuntu-native-results-at-ead9fb3).
 
+The extended Fedora x64 installed-worker regression verified the two
+launch orders, both original image requests and the signed worker's
+restart from the Rust backup. All 16 WAL frames and the final SQLite
+ROWIDs 1 and 2 were independently checked. Ubuntu x64 and ARM64
+execution of this handover is pending.
+[Installed storage evidence](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
+
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known
 values retain their own anchors when later unknown properties reuse a

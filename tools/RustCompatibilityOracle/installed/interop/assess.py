@@ -5,18 +5,19 @@ Use --gui-build artifacts/rust/GUI_BUILD to exercise the actual candidate agains
 Add --inventory-subject artifacts/rust/performance/subjects/SUBJECT to run its reviewed worker on synthetic read-only inputs.
 Append --shipping-upload to exercise the original signed worker's upload while a worker-enabled Rust launch is refused.
 After --shipping-upload, supply --rust-backup artifacts/rust/storage-native/BUILD to return a live Rust backup to the installed worker.
-Use the published 3.0.4 bundle and detached signature described by ../launch/run.py and its
-pinned x64 Platform and GL runtimes. No previous trial output is required.
+Use the published 3.0.4 bundle, detached signature and native Platform and GL deployments from ../launch/run.py.
+On Ubuntu CI, pass --hosted-runtime PATH to the verified native Platform. The separate probe uses Fedora x64.
 """
 
+import argparse
 from contextlib import ExitStack
 import configparser
 import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import re
-import runpy
 import select
 import shutil
 import subprocess
@@ -29,6 +30,10 @@ HERE = Path(__file__).resolve().parent
 PROBE = 'org.example.IfwInteropProbe'
 EXPECTED_PROBE = '941d9567ad6c827e1b3b668aef6933d93133421b1de25c87c73f7fad75cb341b'
 EXPECTED_WORKER = '1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0'
+HOSTED_WORKERS = {
+    'x86_64': 'b6dca5baf73e334819c5aa7984b163b5ced423f0be8f43927e3622982caf0650',
+    'aarch64': '18cffe1c63a297d1ac3cc533609ba1281d5cf556bd1299c9e407e8e1b8fdd2ba',
+}
 WORKER_CONFIG = '/qa/worker-profile/config'
 WORKER_LAUNCH = '#!/bin/sh\nset -eu\nexport XDG_CONFIG_HOME=' + WORKER_CONFIG + '\nexec /app/bin/ifw-performance-worker\n'
 QUALIFIED_SOURCES = {
@@ -77,7 +82,7 @@ def pidfd(stack, pid):
     return poll
 
 
-def gui_source_snapshot(root, recorded):
+def gui_source_snapshot(root, recorded, revision=None):
     qa = root / 'tools/rust-qa/gui'
     paths = [*sorted((qa / 'src').glob('*.rs')), qa / 'src/tray-icon.argb',
              qa / 'Cargo.toml', qa / 'Cargo.lock', root / 'rust/Cargo.toml',
@@ -91,11 +96,14 @@ def gui_source_snapshot(root, recorded):
         require(path.resolve(strict=True) == path and path.is_file(), 'Expected a regular local GUI source')
         contents = path.read_bytes()
         require(hashlib.sha256(contents).hexdigest() == recorded[name], 'The native GUI source binding differs')
+        if revision is not None:
+            require(contents == subprocess.check_output(['git', 'show', revision + ':' + name], cwd=root),
+                    'The native GUI source differs from the hosted revision: ' + name)
         snapshot[name] = contents
     return snapshot
 
 
-def inventory_inputs(subject, root, revision, gui_hash, release, out):
+def inventory_inputs(subject, root, revision, gui_hash, release, out, expected_worker):
     subjects = root / 'artifacts/rust/performance/subjects'
     directory = subject.absolute()
     require(directory.resolve(strict=True) == directory and directory.parent == subjects, 'Expected a local native worker subject')
@@ -106,7 +114,7 @@ def inventory_inputs(subject, root, revision, gui_hash, release, out):
     def original(rev, name):
         return subprocess.check_output(['git', 'show', rev + ':' + name], cwd=root)
     pins = json.loads(original(revision, manifest))
-    require(build['sources'] == pins and build['worker_sha256'] == sha(worker) == EXPECTED_WORKER and
+    require(build['sources'] == pins and build['worker_sha256'] == sha(worker) == expected_worker and
             build['gui_sha256'] == gui_hash, 'The worker, native GUI or pinned source set differs')
     archive_path = out / 'inventory-sources.zip'
     with ZipFile(archive_path, 'x', ZIP_DEFLATED) as archive:
@@ -123,10 +131,16 @@ def inventory_inputs(subject, root, revision, gui_hash, release, out):
                         launcher=hashlib.sha256(WORKER_LAUNCH.encode()).hexdigest())
 
 
-def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False, backup_build=None):
+def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False, backup_build=None, hosted_runtime=None):
     root = HERE.parents[3]
     art = root / 'artifacts/rust'
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    arch = platform.machine()
+    require(arch in HOSTED_WORKERS and (gui_build is not None or arch == 'x86_64' and hosted_runtime is None),
+            'Expected native Linux x64 or ARM64 for the GUI, or the qualified local x64 probe')
+    target = arch + '-unknown-linux-gnu'
+    if hosted_runtime is not None:
+        require(revision == os.environ.get('GITHUB_SHA'), 'The hosted fixture must match the checked out revision')
     result_dir = art / 'shipping-flatpak-interop'
     result_dir.mkdir(exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix='same-id-' if same_id else 'different-id-', dir=result_dir))
@@ -134,11 +148,15 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
     frozen = out / 'source'
     shared = ['packaging/flatpak/repository-signing-key.asc', 'rust/toolchain-inputs.json',
               'tools/RustCompatibilityOracle/installed/release.json',
-              *(f'tools/RustCompatibilityOracle/installed/launch/{name}.py' for name in ('run', 'observe')),
-              *(f'tools/rust-qa/{name}' for name in ('instance/main.rs', 'instance/unix.rs', 'check-toolchain.py',
-                'gui/flatpak/run.py', 'gui/watcher.py', 'portal-dialog/flatpak_fixture.py', 'portal-dialog/runtime_pin.py',
+              *(f'tools/RustCompatibilityOracle/installed/launch/{name}.py' for name in ('run', 'observe', 'graphics')),
+              *(f'tools/rust-qa/{name}' for name in ('check-toolchain.py',
+                'gui/watcher.py', 'portal-dialog/flatpak_fixture.py', 'portal-dialog/runtime_pin.py',
                 'performance/session.py', 'performance/linux.py', 'performance/observations.py',
                 'performance/x11.py', 'performance/worker/second_launch.py'))]
+    if gui_build is None:
+        shared.extend('tools/rust-qa/instance/' + name for name in QUALIFIED_SOURCES)
+    else:
+        shared.extend(('rust/audit/gui-profile.json', 'rust/audit/gui-text-inputs.json', 'tools/rust-qa/gui/source_profile.py'))
     snapshot = {}
     with ZipFile(out / 'observer-source.zip', 'x', ZIP_DEFLATED) as archive:
         for name in shared:
@@ -147,47 +165,54 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
             path.write_bytes(subprocess.check_output(['git', 'show', f'{revision}:{name}'], cwd=root))
             archive.write(path, name)
             snapshot[name] = sha(path)
-        driver_names = ['assess.py', 'hold.sh', 'test_assess.py', 'shipping_upload.py', 'installed_backup.py']
+        driver_names = ['assess.py', 'test_assess.py', 'shipping_upload.py', 'installed_backup.py']
         if gui_build is not None:
             driver_names.extend(['gui_refusal.py', 'gui-launch.sh'])
+        else:
+            driver_names.append('hold.sh')
         for name in driver_names:
             driver = HERE / name
             relative = driver.relative_to(root).as_posix()
             dest = frozen / relative
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(driver, dest)
+            if hosted_runtime is not None:
+                require(dest.read_bytes() == subprocess.check_output(['git', 'show', revision + ':' + relative], cwd=root),
+                        'Hosted interop source differs from the revision: ' + relative)
             archive.write(dest, relative)
             snapshot[relative] = sha(dest)
     frozen_qa = frozen / 'tools/rust-qa'
     legacy = frozen / 'tools/RustCompatibilityOracle/installed/launch'
     sys.path[:0] = [str(legacy), str(frozen_qa / 'portal-dialog'), str(frozen_qa / 'performance')]
-    from run import save, namespaces, APP, SIGNATURE
+    from run import save, namespaces, APP, COMMITS, SIGNATURES, native_elf_machine
+    from graphics import graphics_deployment
     from linux import namespace
     from flatpak_fixture import SYS_DIRS
     from runtime_pin import deployment
 
     release = json.loads((legacy.parent / 'release.json').read_bytes())
-    asset = release['assets']['linux-x64']
+    asset = release['assets']['linux-x64' if arch == 'x86_64' else 'linux-arm64']
     bundle = art / 'legacy-installer-inputs/v3.0.4' / asset['name']
-    signed = art / 'shipping-flatpak-launch/signature/3.0.4.commitmeta'
+    signed = art / 'shipping-flatpak-launch/signature' / ('3.0.4.commitmeta' if arch == 'x86_64' else '3.0.4-arm64.commitmeta')
     key = frozen / 'packaging/flatpak/repository-signing-key.asc'
-    require(sha(bundle) == asset['sha256'] and bundle.stat().st_size == asset['bytes'] and sha(signed) == SIGNATURE,
+    require(sha(bundle) == asset['sha256'] and bundle.stat().st_size == asset['bytes'] and sha(signed) == SIGNATURES[arch],
             'The original release asset and its public detached signature are required')
-    runtime, platform = deployment(None)
-    graphics = runpy.run_path(str(frozen_qa / 'gui/flatpak/run.py'))
-    pins = dict(asset=asset, release=release['commit'], platform=platform, signature=SIGNATURE, publicKey=sha(key),
-                glRef=f"runtime/{graphics['GL']}/x86_64/26.08", glCommit=graphics['GL_COMMIT'], glMetadata=graphics['GL_METADATA'])
-    gl = Path('/var/lib/flatpak') / pins['glRef'] / pins['glCommit']
-    require(gl.resolve(strict=True) == gl and sha(gl / 'metadata') == pins['glMetadata'], 'Unexpected public GL deployment')
+    runtime, runtime_pin = deployment(hosted_runtime)
+    gl, graphics = graphics_deployment(hosted_runtime)
+    pins = dict(asset=asset, release=release['commit'], platform=runtime_pin, signature=SIGNATURES[arch], publicKey=sha(key),
+                architecture=arch, ostree=COMMITS[arch], graphics=graphics,
+                glRef=graphics['ref'], glCommit=graphics['commit'], glMetadata=graphics['metadata_sha256'])
     compiler = art / 'toolchain/bin/rustc'
-    probe_sources = frozen_qa / 'instance'
-    require(all(sha(probe_sources / name) == expected for name, expected in QUALIFIED_SOURCES.items()),
-            'Source of the prior Fedora interoperability probe changed')
-    subprocess.run([sys.executable, frozen_qa / 'check-toolchain.py', 'x86_64-unknown-linux-gnu', '--rustc', compiler], check=True)
-    binary = out / 'instance'
-    # Relative source names keep compiler diagnostics embedded in the executable independent of the clone's path.
-    subprocess.run([compiler, '--edition=2024', '-Dwarnings', '-O', 'main.rs', '-o', binary], cwd=probe_sources, check=True)
-    require(sha(binary) == EXPECTED_PROBE, 'The compiler did not reproduce the path-independent probe binary')
+    rustc = subprocess.check_output([sys.executable, frozen_qa / 'check-toolchain.py', target, '--rustc', compiler], text=True).strip()
+    print(rustc, flush=True)
+    if gui_build is None:
+        probe_sources = frozen_qa / 'instance'
+        require(all(sha(probe_sources / name) == expected for name, expected in QUALIFIED_SOURCES.items()),
+                'Source of the prior Fedora interoperability probe changed')
+        binary = out / 'instance'
+        # The reviewed probe was compiled with checkout-independent source filenames.
+        subprocess.run([compiler, '--edition=2024', '-Dwarnings', '-O', 'main.rs', '-o', binary], cwd=probe_sources, check=True)
+        require(sha(binary) == EXPECTED_PROBE, 'The compiler did not reproduce the path-independent probe binary')
     gui_hash = None
     gui_files = None
     if gui_build is not None:
@@ -197,8 +222,15 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
         receipt = gui.with_suffix('.inputs.json')
         require(all(p.resolve(strict=True) == p and p.is_file() for p in (gui, receipt)), 'Expected local build files')
         evidence = json.loads(receipt.read_bytes())
-        require(evidence['target'] == 'x86_64-unknown-linux-gnu' and evidence['binary_sha256'] == sha(gui), 'The native GUI binary differs')
-        gui_sources = gui_source_snapshot(root, evidence['sources'])
+        native_elf_machine(gui, arch)
+        graph = json.loads((frozen / 'rust/audit/gui-profile.json').read_bytes())
+        require(evidence['target'] == target and evidence['binary_sha256'] == sha(gui) and evidence['rustc'] == rustc
+                and evidence['graphSha256'] == graph['targetReportSha256'][target]
+                and evidence['sources']['tools/rust-qa/gui/Cargo.lock'] == graph['lockSha256']
+                and evidence['sourceProfileSha256'] == sha(frozen / 'rust/audit/gui-text-inputs.json')
+                and evidence['sourceReconstructionSha256'] == sha(frozen_qa / 'gui/source_profile.py'),
+                'The native GUI binary, compiler or reviewed input profile differs')
+        gui_sources = gui_source_snapshot(root, evidence['sources'], revision if hosted_runtime is not None else None)
         with ZipFile(out / 'gui-sources.zip', 'x', ZIP_DEFLATED) as archive:
             for name, contents in sorted(gui_sources.items()):
                 archive.writestr(name, contents)
@@ -208,13 +240,19 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
     worker = worker_files = None
     if inventory_subject is not None:
         require(same_id and gui_hash, 'The installed worker requires the same-ID native GUI trial')
-        worker, worker_files = inventory_inputs(inventory_subject, root, revision, gui_hash, release['commit'], out)
+        expected_worker = HOSTED_WORKERS[arch] if hosted_runtime is not None else EXPECTED_WORKER
+        worker, worker_files = inventory_inputs(inventory_subject, root, revision, gui_hash, release['commit'], out, expected_worker)
+        native_elf_machine(worker, arch)
     backup = backup_files = None
     if backup_build:
         from installed_backup import build_input
-        backup, backup_files = build_input(backup_build, root, revision, out)
+        backup, backup_files = build_input(backup_build, root, revision, out, target)
+        if hosted_runtime is not None:
+            require(backup_files['buildRevision'] == revision, 'Hosted backup helper must come from this source revision')
+        native_elf_machine(backup, arch)
     save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, inventory=worker_files, installedBackup=backup_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
-                                   sameId=same_id, shippingUpload=shipping_upload, revision=revision, rustc=sha(compiler), probe=EXPECTED_PROBE,
+                                   sameId=same_id, shippingUpload=shipping_upload, revision=revision, rustc=sha(compiler), target=target,
+                                   probe=EXPECTED_PROBE if gui_build is None else None,
                                    sources=snapshot, archive=sha(out / 'observer-source.zip')))
     command = namespace(out, frozen / HERE.relative_to(root), None)
     (out / 'etc/passwd').write_text('root:x:0:0:Synthetic user:/tmp/home:/bin/false\n')
@@ -222,7 +260,7 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
     private = Path('/tmp/private-flatpak-system')
     command[command.index('--chdir'):] = ['--uid', '0', '--gid', '0', '--cap-add', 'CAP_SYS_ADMIN', '--cap-add', 'CAP_SETFCAP', '--cap-add', 'CAP_NET_ADMIN',
         '--dev-bind', '/dev/fuse', '/dev/fuse', '--tmpfs', '/sys', '--dir', '/var/tmp', *(arg for p in SYS_DIRS for arg in ('--dir', p)),
-        '--ro-bind', str(runtime), str(private / platform['ref'] / platform['commit']), '--ro-bind', str(gl), str(private / pins['glRef'] / pins['glCommit']),
+        '--ro-bind', str(runtime), str(private / runtime_pin['ref'] / runtime_pin['commit']), '--ro-bind', str(gl), str(private / pins['glRef'] / pins['glCommit']),
         '--ro-bind', str(bundle), '/original.flatpak', '--ro-bind', str(signed), '/original.commitmeta',
         '--ro-bind', str(key), '/public-key.asc', '--ro-bind', str(legacy), '/legacy-launch',
         '--ro-bind', str(frozen_qa / 'gui/watcher.py'), '/watcher.py', '--ro-bind', str(frozen_qa / 'portal-dialog'), '/portal-fixture',
@@ -251,7 +289,7 @@ def verify_uninstalled(report):
 
 def inside():
     sys.path[:0] = ['/legacy-launch', '/driver', '/portal-fixture']
-    from run import require, save, sha, namespaces, COMMIT, APP, KEY
+    from run import require, save, sha, namespaces, COMMITS, SIGNATURES, native_elf_machine, APP, KEY
     from observe import identity, window, witness
     from session import checked_start, check_alive, wait_for, private_session, stop
     from flatpak_fixture import prepare_runtime, export_install, setup_command, start_launch_bus, LAUNCH_BUS
@@ -260,13 +298,21 @@ def inside():
     out = Path('/qa')
     i = json.loads((out / 'inputs.json').read_bytes())
     pins = i['base']
+    arch = platform.machine()
     probe_app = i['probeAppId']
     r = dict(passed=False, inputs=sha(out / 'inputs.json'), namespaces=namespaces(), sameId=i['sameId'],
              observerSentLegacySignal=False, installedHandoverQualified=False, peerCredentialsMeasured=False)
     try:
+        require(arch in COMMITS and pins['architecture'] == arch and i['target'] == arch + '-unknown-linux-gnu'
+                and pins['ostree'] == COMMITS[arch] and pins['signature'] == SIGNATURES[arch],
+                'Interop target or signed release pins differ from the native host')
         require(os.getuid() == 0 and Path.home() == Path('/tmp/home') and not Path.home().exists() and not Path('/var/lib/flatpak').exists()
                 and all(v != i['namespaces'][k] for k, v in r['namespaces'].items()) and not Path('/proc/net/route').read_text().splitlines()[1:]
-                and sha(Path('/original.flatpak')) == pins['asset']['sha256'] and sha(out / 'instance') == EXPECTED_PROBE, 'Invalid isolated inputs')
+                and sha(Path('/original.flatpak')) == pins['asset']['sha256'], 'Invalid isolated inputs')
+        if i['guiHash'] is None:
+            require(arch == 'x86_64' and sha(out / 'instance') == i['probe'] == EXPECTED_PROBE, 'Unexpected standalone probe')
+        else:
+            require(i['probe'] is None, 'The GUI pairing requires its own executable')
         os.umask(0o077)
         Path.home().mkdir()
         Path('/run/user/0').chmod(0o700)
@@ -279,13 +325,14 @@ def inside():
             bus = Gio.bus_get_sync(Gio.BusType.SESSION)
             r['launchBus'] = start_launch_bus(stack, bus)
             os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = LAUNCH_BUS
-            oldref = 'app/' + APP + '/x86_64/master'
+            oldref = f'app/{APP}/{arch}/master'
             setup_command(['flatpak', '--user', 'install', '--noninteractive', '--no-deps', '--no-related', '--bundle', '/original.flatpak'])
             stack.callback(setup_command, ['flatpak', '--user', 'uninstall', '--noninteractive', oldref])
-            require(subprocess.check_output(['flatpak', '--user', 'info', '--show-commit', oldref], text=True).strip() == COMMIT, 'Unexpected installed old ref')
-            repo = Path(os.environ['FLATPAK_USER_DIR']) / 'repo/objects' / COMMIT[:2]
-            commit = repo / (COMMIT[2:] + '.commit')
-            require(sha(commit) == COMMIT and sha(Path('/original.commitmeta')) == pins['signature']
+            expected = COMMITS[arch]
+            require(subprocess.check_output(['flatpak', '--user', 'info', '--show-commit', oldref], text=True).strip() == expected, 'Unexpected installed old ref')
+            repo = Path(os.environ['FLATPAK_USER_DIR']) / 'repo/objects' / expected[:2]
+            commit = repo / (expected[2:] + '.commit')
+            require(sha(commit) == expected and sha(Path('/original.commitmeta')) == pins['signature']
                     and sha(Path('/public-key.asc')) == pins['publicKey'], 'Installed commit or trust inputs changed')
             metadata = GLib.Variant.new_from_bytes(GLib.VariantType.new('a{sv}'), GLib.Bytes.new(Path('/original.commitmeta').read_bytes()), False)
             signature, = metadata.unpack()['ostree.gpgsigs']
@@ -300,12 +347,14 @@ def inside():
                     'The installed original commit does not have the expected signing and primary key')
             r['verifiedSigningKey'] = KEY
             deployment = Path(subprocess.check_output(['flatpak', '--user', 'info', '--show-location', oldref], text=True).strip())
-            r['apphost'] = sha(deployment / 'files/lib/immich-folder-watch/immich-folder-watch')
+            apphost = deployment / 'files/lib/immich-folder-watch/immich-folder-watch'
+            r['apphostElfMachine'] = native_elf_machine(apphost, arch)
+            r['apphost'] = sha(apphost)
             app = Path('/tmp/interop-build')
             bin_dir = app / 'files/bin'
             bin_dir.mkdir(parents=True)
             (app / 'var').mkdir()
-            (app / 'metadata').write_text(f'[Application]\nname={probe_app}\nruntime=org.freedesktop.Platform/x86_64/26.08\nsdk=org.freedesktop.Sdk/x86_64/26.08\n')
+            (app / 'metadata').write_text(f'[Application]\nname={probe_app}\nruntime=org.freedesktop.Platform/{arch}/26.08\nsdk=org.freedesktop.Sdk/{arch}/26.08\n')
             if i['guiHash']:
                 require(sha(Path('/candidate-gui')) == i['guiHash'], 'Unexpected staged GUI')
                 shutil.copy2('/candidate-gui', bin_dir / 'native-gui-assessment')
@@ -407,14 +456,22 @@ def inside():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--inside']:
         inside()
-    elif len(sys.argv) == 3 and sys.argv[1] == '--gui-build':
-        outer(True, Path(sys.argv[2]))
-    elif (len(sys.argv) >= 5 and sys.argv[1] == '--gui-build' and sys.argv[3] == '--inventory-subject'
-          and (sys.argv[5:] in ([], ['--shipping-upload']) or
-               (len(sys.argv) == 8 and sys.argv[5:7] == ['--shipping-upload', '--rust-backup']))):
-        outer(True, Path(sys.argv[2]), Path(sys.argv[4]), shipping_upload=bool(sys.argv[5:]),
-              backup_build=Path(sys.argv[7]) if len(sys.argv) == 8 else None)
-    elif sys.argv[1:] in (['--same-id'], ['--different-id']):
-        outer(sys.argv[1] == '--same-id')
     else:
-        raise SystemExit(__doc__)
+        parser = argparse.ArgumentParser(description=__doc__)
+        mode = parser.add_mutually_exclusive_group(required=True)
+        mode.add_argument('--same-id', action='store_true')
+        mode.add_argument('--different-id', action='store_true')
+        mode.add_argument('--gui-build', type=Path)
+        parser.add_argument('--inventory-subject', type=Path)
+        parser.add_argument('--shipping-upload', action='store_true')
+        parser.add_argument('--rust-backup', type=Path)
+        parser.add_argument('--hosted-runtime', type=Path)
+        args = parser.parse_args()
+        if (args.inventory_subject or args.hosted_runtime) and not args.gui_build:
+            parser.error('The inventory subject and hosted runtime options require --gui-build')
+        if args.shipping_upload and not args.inventory_subject:
+            parser.error('--shipping-upload requires --inventory-subject')
+        if args.rust_backup and not args.shipping_upload:
+            parser.error('--rust-backup requires --shipping-upload')
+        outer(not args.different_id, args.gui_build, args.inventory_subject, args.shipping_upload,
+              args.rust_backup, args.hosted_runtime)

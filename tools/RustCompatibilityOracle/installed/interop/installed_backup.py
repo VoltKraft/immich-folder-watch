@@ -15,14 +15,13 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from assess import require, sha
 
 
-TARGET = 'x86_64-unknown-linux-gnu'
 TABLES = ('owned_albums', 'sync_entries', 'sync_account_status', 'sync_timestamp_repairs')
 NEW_NAME = 'after-restore.png'
 NEW_IMAGE = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOYYaIBAAJcAPX1O4XIAAAAAElFTkSuQmCC')
 NEW_ID = '07902e81-208e-4989-ac89-f3a61debaef2'
 
 
-def build_input(build, root, revision, out):
+def build_input(build, root, revision, out, target):
     directory = build.absolute()
     require(directory.resolve(strict=True) == directory and directory.parent == root / 'artifacts/rust/storage-native',
             'Expected a completed, local native storage assessment')
@@ -30,9 +29,9 @@ def build_input(build, root, revision, out):
     storage = json.loads((directory / 'result.json').read_bytes())
     inputs = json.loads((root / 'tools/rust-qa/storage/inputs.json').read_bytes())
     binary = storage.get('installedUploadBackup')
-    require(storage['target'] == TARGET and storage['status'] == 'passed' and storage['offline'] and
+    require(storage['target'] == target and storage['status'] == 'passed' and storage['offline'] is True and
             storage['modifiedSources'] == [] and storage['lockSha256'] == inputs['lock_sha256'] and
-            json.loads((directory / 'native-graph.json').read_bytes()) == inputs['target_graphs'][TARGET] and
+            json.loads((directory / 'native-graph.json').read_bytes()) == inputs['target_graphs'][target] and
             storage['rust']['SQLiteSourceId'] == inputs['sqlite']['source_id'] and
             storage['nativeBuildLogs'] == 2 and storage['verifiedArchives'] == len(inputs['packages']) and
             storage['steps']['installed-backup-build']['exitCode'] == 0 and sha(executable) == binary and
@@ -55,7 +54,7 @@ def build_input(build, root, revision, out):
         originals += [p.relative_to(directory).as_posix() for p in sorted((directory / 'native-build-logs').rglob('std*'))]
         for name in originals:
             archive.write(directory / name, name)
-    return executable, dict(binary=binary, buildRevision=storage['source'], sqlite=inputs['sqlite']['source_id'],
+    return executable, dict(binary=binary, buildRevision=storage['source'], target=target, sqlite=inputs['sqlite']['source_id'],
                             archive=sha(out / 'installed-backup-build.zip'))
 
 
