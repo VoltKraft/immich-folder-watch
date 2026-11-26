@@ -62,7 +62,7 @@ def idle(api, fixture, gui, trial, endpoint, out, token, machine):
         scope.callback(windows.close)
         api.resume_owned_process(proc.pid)
         worker = recorder.owned_worker(api, proc, log, recorder.await_value)
-        handle = recorder.checked(api.open(0x0410, False, worker))
+        handle = api.open_job_member(proc.benchmark_job, worker)
         scope.callback(api.close, handle)
         if api.machine(handle) != (machine, machine):
             raise ValueError("The GDI control worker is not native")
@@ -90,15 +90,17 @@ def idle(api, fixture, gui, trial, endpoint, out, token, machine):
             witness("after", action, hwnd, proc.pid)
 
         # Use the original WPF runner's visible/hidden settling, sampling and two calibration reopens.
-        tree = recorder.SubjectTree(api, scope, proc.pid, {proc.pid, worker})
+        tree = recorder.SubjectTree(api, scope, proc.benchmark_job, {proc.pid: int(proc._handle), worker: handle})
         transition("close")
         transition("reopen")
         time.sleep(.75)
+        idle_samples = {}
         for visible in (True, False):
             if not visible:
                 transition("close")
             time.sleep(recorder.SETTLE_SECONDS)
-            recorder.sample_idle(api, proc, tree, windows, visible)
+            _, samples = recorder.sample_idle(api, proc, tree, windows, visible)
+            idle_samples["visible" if visible else "hidden"] = samples
         transition("reopen")
         time.sleep(.75)
         warmup = len(requests)
@@ -119,7 +121,7 @@ def idle(api, fixture, gui, trial, endpoint, out, token, machine):
         metrics = {"idle_" + kind + "_p95_ms": recorder.p95([
             (row["responseQpc"] - row["issuedQpc"]) * 1000 / api.frequency for row in requests[warmup:] if row["action"] == kind
         ]) for kind in ("close", "reopen")}
-        return dict(metrics=metrics, nativeWitness=observed, allRequests=requests, worker=worker,
+        return dict(metrics=metrics, nativeWitness=observed, allRequests=requests, worker=worker, idleSamples=idle_samples,
                     workerCreation100ns=identity, warmupRequests=warmup, rootWindowEvents=windows.events)
 
 

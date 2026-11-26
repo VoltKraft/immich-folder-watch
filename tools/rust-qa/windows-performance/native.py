@@ -175,6 +175,7 @@ def start_owned_subject(stack, api, exe, area, env, log, rust, stop_subject):
 
     stack.callback(finish)
     proc.benchmark_start_qpc = started
+    proc.benchmark_job = job
     return proc
 
 
@@ -392,6 +393,7 @@ class Win32:
     def __init__(self):
         self.kernel = k = c.WinDLL("kernel32", use_last_error=True)
         self.open = bind(k, "OpenProcess", w.HANDLE, w.DWORD, w.BOOL, w.DWORD)
+        self.process_id = bind(k, "GetProcessId", w.DWORD, w.HANDLE)
         self.close = bind(k, "CloseHandle", w.BOOL, w.HANDLE)
         self.times = bind(k, "GetProcessTimes", w.BOOL, w.HANDLE, *[c.POINTER(w.FILETIME)] * 4)
         self.memory = bind(k, "K32GetProcessMemoryInfo", w.BOOL, w.HANDLE, c.POINTER(Memory), w.DWORD)
@@ -443,9 +445,51 @@ class Win32:
             raise
 
     def active_job_processes(self, job):
+        return self.job_accounting(job).active
+
+    def job_accounting(self, job):
         counts = JobAccounting()
         checked(self.query_job(job, 1, c.byref(counts), c.sizeof(counts), None))
-        return counts.active
+        return counts
+
+    def job_pids(self, job):
+        # JobObjectBasicProcessIdList has two DWORD counts followed by ULONG_PTR PIDs.
+        capacity = 16
+        while capacity <= 65536:
+            buffer = c.create_string_buffer(8 + capacity * c.sizeof(c.c_size_t))
+            returned = w.DWORD()
+            if not self.query_job(job, 3, buffer, c.sizeof(buffer), c.byref(returned)):
+                if (error := c.get_last_error()) != 234:  # ERROR_MORE_DATA
+                    raise c.WinError(error)
+                capacity *= 2
+                continue
+            assigned, listed = (c.c_uint32 * 2).from_buffer(buffer)
+            if listed < assigned:
+                capacity = max(capacity * 2, assigned)
+                continue
+            if (listed != assigned or listed > capacity
+                    or returned.value < 8 + listed * c.sizeof(c.c_size_t)):
+                raise ValueError("Invalid process list returned for the trial job")
+            pids = set((c.c_size_t * listed).from_buffer(buffer, 8))
+            if len(pids) != listed or any(not 0 < pid <= 0xffffffff for pid in pids):
+                raise ValueError("Invalid process identifier in the trial job")
+            return pids
+        raise ValueError("Could not obtain a complete process list for the trial job")
+
+    def verify_job_member(self, job, pid, handle):
+        member = w.BOOL()
+        checked(self.in_job(handle, job, c.byref(member)))
+        if not member.value or checked(self.process_id(handle)) != pid:
+            raise ValueError(f"Process handle does not identify trial job member {pid}")
+
+    def open_job_member(self, job, pid):
+        handle = checked(self.open(0x1000, False, pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        try:
+            self.verify_job_member(job, pid, handle)
+            return handle
+        except BaseException:
+            checked(self.close(handle))
+            raise
 
     def assign_suspended(self, job, proc, exe):
         # Popen retains the original process handle. Its PID cannot be recycled while that object is live.
@@ -562,17 +606,11 @@ class Win32:
         if c.get_last_error() != 2:
             raise c.WinError(c.get_last_error())
 
-    def usage(self, handle, *, working_set=True):
-        creation, end, kernel, user = [w.FILETIME() for _ in range(4)]
-        checked(self.times(handle, *map(c.byref, (creation, end, kernel, user))))
-        ticks = sum((part.dwHighDateTime << 32) + part.dwLowDateTime for part in (kernel, user))
-        memory = 0.
-        if working_set:
-            data = Memory()
-            data.cb = c.sizeof(data)
-            checked(self.memory(handle, c.byref(data), data.cb))
-            memory = data.working / 1_048_576
-        return ticks / 10_000_000, memory
+    def working_set_bytes(self, handle):
+        data = Memory()
+        data.cb = c.sizeof(data)
+        checked(self.memory(handle, c.byref(data), data.cb))
+        return data.working
 
     def activate_wpf(self, user_sid, pid):
         path = "\\\\.\\pipe\\ifw-" + user_sid

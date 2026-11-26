@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 import uuid
 
 import native
-from run import idle_complete, pin_images, wpf_second_launch
+from run import SubjectTree, await_value, idle_complete, pin_images, wpf_second_launch
 
 
 class JobTests(unittest.TestCase):
@@ -32,6 +32,7 @@ class JobTests(unittest.TestCase):
         self.assertEqual(spawn.call_args.kwargs["creationflags"], 4)
         self.assertIs(got, self.proc)
         self.assertEqual(got.benchmark_start_qpc, 42)
+        self.assertEqual(got.benchmark_job, 123)
         self.api.assign_suspended.assert_called_once_with(123, self.proc, Path("gui.exe"))
         self.api.resume_owned_process.assert_not_called()
 
@@ -73,6 +74,44 @@ class JobTests(unittest.TestCase):
                                                 native.UnicodeString, native.ObjectAttributes)], [144, 48, 52, 16, 48])
         self.assertEqual(native.JobAccounting.active.offset, 40)
         self.assertEqual(native.JobLimits.io_counters.offset, 64)
+
+    def test_native_handle_validation_rejects_a_different_pid_or_job(self):
+        api = object.__new__(native.Win32)
+        def membership(handle, job, member):
+            member._obj.value = job == 123
+            return 1
+        api.in_job = membership
+        api.process_id = lambda _: 456
+        api.open, api.close = Mock(return_value=400), Mock(return_value=1)
+        self.assertEqual(api.open_job_member(123, 456), 400)
+        api.open.assert_called_once_with(0x1000, False, 456)
+        for job, pid in ((789, 456), (123, 999)):
+            with self.assertRaisesRegex(ValueError, "does not identify trial job member"):
+                api.open_job_member(job, pid)
+        self.assertEqual(api.close.call_count, 2)
+
+    def test_job_process_list_resizes_and_rejects_incomplete_or_invalid_results(self):
+        api = object.__new__(native.Win32)
+        members = list(range(1, 21))
+        def query(job, info, buffer, size, returned):
+            self.assertEqual((job, info), (123, 3))
+            if size < 8 + len(members) * c.sizeof(c.c_size_t):
+                return 0
+            header = (c.c_uint32 * 2).from_buffer(buffer)
+            header[:] = (len(members), len(members))
+            (c.c_size_t * len(members)).from_buffer(buffer, 8)[:] = members
+            returned._obj.value = 8 + len(members) * c.sizeof(c.c_size_t)
+            return 1
+        api.query_job = Mock(side_effect=query)
+        with patch.object(c, "get_last_error", return_value=234, create=True):
+            self.assertEqual(api.job_pids(123), set(members))
+            self.assertEqual(api.query_job.call_count, 2)
+            members[:] = [4, 4]
+            with self.assertRaisesRegex(ValueError, "Invalid process identifier"):
+                api.job_pids(123)
+            api.query_job.side_effect = lambda *args: 0
+            with self.assertRaisesRegex(ValueError, "complete process list"):
+                api.job_pids(123)
 
 
 class FixtureTests(unittest.TestCase):
@@ -302,6 +341,50 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0)
             self.assertEqual((area / "exit.log").read_text().strip(), "OWNED_SUBJECT_EXIT")
         self.assertFalse(area.exists())
+
+    @unittest.skipUnless(native.hosted(), "requires a disposable native GitHub Windows runner")
+    def test_native_job_keeps_departed_child_cpu_and_measures_only_live_working_sets(self):
+        api = native.Win32()
+        parent = Path(os.environ["RUNNER_TEMP"])
+        with native.owned_directory(api, parent, "ifw-rw02-" + uuid.uuid4().hex) as area:
+            bootstrap = ("import os, sys, subprocess, time\nfrom pathlib import Path\n"
+                         "def wait_marker(name):\n"
+                         "    deadline = time.monotonic() + 20\n"
+                         "    while not Path(name).exists():\n"
+                         "        if time.monotonic() > deadline: raise TimeoutError(name)\n"
+                         "        time.sleep(.01)\n")
+            child = (bootstrap + "Path('child-ready').touch()\nwait_marker('release-child')\n"
+                     "start = time.process_time()\nwhile time.process_time() - start < .25: pass\n"
+                     "sys.exit(259)\n")
+            program = (bootstrap + f"child = subprocess.Popen([sys.executable, '-I', '-S', '-c', {child!r}])\n"
+                       "assert child.wait(timeout=25) == 259\n"
+                       "Path('child-exited').touch()\nwait_marker('release-gui')\n")
+            with ExitStack() as stack:
+                stream = stack.enter_context((area / "trial.log").open("wb"))
+                env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PYTHON")}
+                env.update(PYTHONNOUSERSITE="1", PYTHONSAFEPATH="1")
+                proc = native.start_owned_subject(stack, api, Path(sys.executable), area, env, stream, True,
+                                                  lambda proc, rust: proc.wait(timeout=10))
+                api.resume_owned_process(proc.pid)
+                proc.stdin.write(program.encode("ascii"))
+                proc.stdin.close()
+                # These are released even if a measurement raises, before teardown awaits the subject.
+                stack.callback((area / "release-gui").touch)
+                stack.callback((area / "release-child").touch)
+                await_value((area / "child-ready").is_file, "Child did not start", timeout=10)
+                tree = SubjectTree(api, stack, proc.benchmark_job, {proc.pid: int(proc._handle)})
+                cpu, _ = tree.usage()
+                initial = tree.samples[-1]
+                self.assertEqual(len(initial["workingSetBytes"]), 2)
+                self.assertTrue(all(n > 0 for n in initial["workingSetBytes"].values()))
+                (area / "release-child").touch()
+                await_value((area / "child-exited").is_file, "Child did not exit", timeout=10)
+                final_cpu, _ = tree.usage()
+                final = tree.samples[-1]
+                self.assertEqual(set(final["workingSetBytes"]), {proc.pid})
+                self.assertEqual(initial["totalProcesses"], final["totalProcesses"])
+                self.assertGreaterEqual(final_cpu - cpu, .24)
+            self.assertEqual(proc.returncode, 0)
 
 
 if __name__ == "__main__":

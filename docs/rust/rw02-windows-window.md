@@ -982,3 +982,26 @@ Replaying the original PNGs and input records verified eight distinct
 glyphs and all three filename edits in both the ordinary and reopened
 editors on each architecture. Each runner had one 1024 × 768 display at
 96 DPI on a console session. Neither supplied a mixed-DPI or RDP trial.
+
+### Process accounting for the same-host WPF budget
+
+The [paired recorder](../../tools/rust-qa/windows-performance/run.py) starts
+each WPF or Rust subject in its own Windows job. Idle CPU is the change in
+the job's cumulative user and kernel time. This includes work by members
+that exit between samples. Each working-set sample sums the live members'
+bytes and records the PID, byte count and cumulative CPU ticks for replay.
+The sampler retains the GUI's original process handle and the required
+inventory worker's handle. It rechecks membership around each observation.
+A member entering or leaving invalidates the partial sample. Failure to
+read an active member or loss of a required process invalidates the trial.
+[Windows job accounting](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information) ·
+[Job member list](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list) ·
+[Process working set](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo).
+
+The fifteen-second interval starts after the first complete sample. The
+native regression observes a child in its parent's job, releases it to
+consume CPU and exit with code 259, and checks the surviving parent's
+working set and the job's retained CPU time. The resource limits still
+come from three complete WPF trials on the candidate's host.
+[Native child and portable controls](../../tools/rust-qa/windows-performance/test_owned_subject.py) ·
+[Interval and membership checks](../../tools/rust-qa/windows-performance/test_recorder.py).

@@ -193,6 +193,16 @@ platform-specific skips on each Windows host. [Native jobs](https://github.com/V
 
 ## Native evidence matrix
 
+At `e2f161b` all fourteen recorded foundation steps passed on every target.
+The native workspace ran 34 tests per Windows host and 38 per Ubuntu host.
+Separate replay of the downloaded worker-backup archives matched all sixteen
+C# restarts to the databases returned by Rust after download, upload, deletion
+and interrupted timestamp repair. Each archive included 161 first-party
+sources. The four-host exchange index has SHA-256
+`ef9ac7d6257c70e0e74bab2bedc4fcf480488c5979c9017ae3661a7cdef68fff`.
+[Foundation and backup archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563616) ·
+[Worker restart contract](rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
 At `13e4af8` all four native runners passed the filesystem watch and
 rescan checks and restarted the shipping worker from Rust backups after
 download, upload, deletion and interrupted timestamp repair. Both Windows
@@ -270,8 +280,8 @@ remain open. [Native feasibility](https://github.com/VoltKraft/immich-folder-wat
 | --- | --- | --- | --- | --- |
 | Windows x64 | Core and worker reference passed (562 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 recovery, Startup, NVDA, Unicode editing, masking, clipboard and Japanese IME passed. At `4e3dbc4` both retained Mailbox profiles met all eleven WPF limits, both ordinary and keyboard launches restored focus, and the native WinRT history trial passed. At `989bb33` each Mailbox profile met nine limits, and none of the 256 sampled Explorer points showed the registered tray icon’s marker. Actual Shell activation, visible notifications, contrast, mixed DPI and RDP remain open. | Original 3.0.4 MSI passed native install, repair and removal with 439 files verified. Candidate pending. |
 | Windows ARM64 | Core and worker reference passed (562 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 recovery, Startup, NVDA, Unicode editing, masking, clipboard and Japanese IME passed. At `4e3dbc4` and `989bb33` both retained Mailbox profiles met all eleven WPF limits and WinRT history passed. A keyboard launch restored focus. The ordinary WPF and retained Rust windows reopened in the background. At `989bb33` Explorer declined icon registration. Visible notifications, contrast, mixed DPI and RDP remain open. | Original 3.0.4 MSI passed native install, repair and removal with 438 files verified. Candidate pending. |
-| Linux x64 | Core and worker reference passed (571 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Original 3.0.4 Flatpak installed, repaired and removed on Fedora and Ubuntu. Candidate pending. |
-| Linux ARM64 | Core and worker reference passed (571 passed) | 37 workspace tests, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. At `1b95ba0` X11 passed all eleven resource limits and two clicks on the Plasma panel reopened the same GUI window. | Original 3.0.4 Flatpak installed, repaired and removed on Ubuntu. Candidate pending. |
+| Linux x64 | Core and worker reference passed (571 passed) | 38 workspace tests at `e2f161b`, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Original 3.0.4 Flatpak installed, repaired and removed on Fedora and Ubuntu. Candidate pending. |
+| Linux ARM64 | Core and worker reference passed (571 passed) | 38 workspace tests at `e2f161b`, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. At `1b95ba0` X11 passed all eleven resource limits and two clicks on the Plasma panel reopened the same GUI window. | Original 3.0.4 Flatpak installed, repaired and removed on Ubuntu. Candidate pending. |
 
 At `6af7100` all four feasibility jobs passed and both Ubuntu desktops met
 all eleven limits during independent readback. The original Windows x64

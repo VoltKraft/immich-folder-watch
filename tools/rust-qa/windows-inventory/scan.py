@@ -1,8 +1,6 @@
 """Measure real HWND transitions within independently observed file opens on the private Windows fixture."""
 from contextlib import ExitStack
 from bisect import bisect_left
-import ctypes as c
-from ctypes import wintypes as w
 import hashlib
 import json
 import os
@@ -13,7 +11,7 @@ import subprocess
 import time
 import uuid
 
-from native import checked, hosted, synthetic_config, wpf_profile
+from native import hosted, synthetic_config, wpf_profile
 
 
 DIRECTORIES = 100
@@ -93,37 +91,58 @@ def owned_worker(api, proc, logfile, await_value):
 
 
 class SubjectTree:
-    def __init__(self, api, stack, pid, expected):
-        self.api, self.stack, self.root = api, stack, pid
-        self.expected, self.handles, self.records = expected, {}, {}
+    def __init__(self, api, stack, job, required_handles):
+        self.api, self.stack, self.job = api, stack, job
+        self.expected = set(required_handles)
+        self.handles = dict(required_handles)
+        self.records = {}
+        self.samples = []
+        for pid, handle in required_handles.items():
+            api.verify_job_member(job, pid, handle)
+
+    def member_memory(self, pid):
+        if pid not in self.handles:
+            handle = self.api.open_job_member(self.job, pid)
+            self.stack.callback(self.api.close, handle)
+            self.handles[pid] = handle
+        handle = self.handles[pid]
+        if pid not in self.records:
+            # Toolhelp supplies labels only, after the original member is pinned.
+            entries = self.api.processes()
+            if pid not in entries:
+                raise ValueError("The process was absent from the image and parent snapshot")
+            parent, image = entries[pid]
+            self.records[pid] = dict(parent=parent, image=image, creation100ns=self.api.process_identity(handle))
+        return self.api.working_set_bytes(handle)
 
     def usage(self):
-        api = self.api
-        entries = api.processes()
-        active = {self.root}
-        while True:
-            extended = active | {child for child, (parent, _) in entries.items() if parent in active}
-            if extended == active:
-                break
-            active = extended
-        if not self.expected.issubset(active & entries.keys()):
-            raise ValueError("A measured GUI or required inventory process disappeared")
-        for pid in active - self.handles.keys():
-            handle = checked(api.open(0x0410, False, pid))
-            self.stack.callback(api.close, handle)
-            self.handles[pid] = handle
-            self.records[pid] = dict(parent=entries[pid][0], image=entries[pid][1], creation100ns=api.process_identity(handle))
-        cpu, memory = 0., 0.
-        for pid, handle in self.handles.items():
-            status = w.DWORD()
-            checked(api.exit_code(handle, c.byref(status)))
-            time_used, working = api.usage(handle, working_set=status.value == 259)
-            cpu += time_used
-            if pid in active and status.value == 259:
-                memory += working
-            elif pid in self.expected:
-                raise ValueError("The required subject exited during its measurement")
-        return cpu, memory
+        api, job = self.api, self.job
+        for attempt in range(1, 9):
+            initial = api.job_accounting(job)
+            members = api.job_pids(job)
+            if missing := self.expected - members:
+                raise ValueError(f"Required trial job members disappeared: {sorted(missing)}")
+            working = {}
+            try:
+                for pid in sorted(members):
+                    working[pid] = self.member_memory(pid)
+            except (OSError, ValueError) as exc:
+                if pid in self.expected or pid in api.job_pids(job):
+                    raise ValueError(f"Cannot measure trial job member {pid}, required={pid in self.expected}, "
+                                     f"sample={len(self.samples) + 1}: {exc}") from exc
+                # This optional member left during observation. Discard the entire partial working set.
+                continue
+            after = api.job_pids(job)
+            final = api.job_accounting(job)
+            if (members != after or initial.total != final.total
+                    or not initial.active == final.active == len(members)):
+                continue
+            # The job totals include CPU from children which ran and exited between samples.
+            ticks = final.times[0] + final.times[1]
+            self.samples.append(dict(cpu100ns=ticks, totalProcesses=final.total, workingSetBytes=working,
+                                     membershipAttempts=attempt))
+            return ticks / 10_000_000, sum(working.values()) / 1_048_576
+        raise ValueError(f"No stable membership for working-set sample {len(self.samples) + 1} of the trial job")
 
 
 def completion_count(text, subject, media):
@@ -229,9 +248,13 @@ def measure(api, fixture, subject, exe, observer, area, endpoint, user_sid, outp
         proc = start_owned_subject(stack, api, exe, area, env, log, rust, stop_subject)
         if rust:
             api.resume_owned_process(proc.pid)
-        target = owned_worker(api, proc, target_log, await_value) if rust else proc.pid
-        target_handle = checked(api.open(0x0410, False, target))
-        stack.callback(api.close, target_handle)
+        if rust:
+            target = owned_worker(api, proc, target_log, await_value)
+            target_handle = api.open_job_member(proc.benchmark_job, target)
+            stack.callback(api.close, target_handle)
+        else:
+            target, target_handle = proc.pid, int(proc._handle)
+            api.verify_job_member(proc.benchmark_job, target, target_handle)
         identity = api.process_identity(target_handle)
         presentation = presentation_trace(stack, proc, area, output) if presentation_trace else None
         stream = stack.enter_context(observer_log.open("wb", buffering=0))

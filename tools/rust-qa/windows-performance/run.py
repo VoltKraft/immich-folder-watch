@@ -84,8 +84,9 @@ def wait_running(proc):
 
 def sample_idle(api, proc, tree, windows, visible):
     memory = []
-    start = api.clock()
+    first_sample = len(tree.samples)
     cpu = tree.usage()[0]
+    start = api.clock()
     while True:
         wait_running(proc)
         if bool(windows.visible()) != visible:
@@ -98,7 +99,8 @@ def sample_idle(api, proc, tree, windows, visible):
         time.sleep(.25)
     seconds = (now - start) / api.frequency
     return [start, now], {"cpu_one_core_pct": (now_cpu - cpu) * 100 / seconds,
-                          "working_set_mib": median(memory), "samples": memory, "seconds": seconds}
+                          "working_set_mib": median(memory), "samples": memory, "seconds": seconds,
+                          "jobSamples": tree.samples[first_sample:]}
 
 
 def load_windows_fixture():
@@ -239,16 +241,16 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         if frame_observer:
             frame_window = frame_observer(initial_window, proc.pid)
             transitions = []
-        handle = checked(api.open(0x0410, False, proc.pid))
-        stack.callback(api.close, handle)
+        handle = int(proc._handle)  # Popen owns the GUI's original process handle until teardown.
+        api.verify_job_member(proc.benchmark_job, proc.pid, handle)
         if api.machine(handle) != (expected_machine, expected_machine):
             raise ValueError("Subject process is emulated or belongs to a different native target")
-        expected_pids = {proc.pid}
+        required_handles = {proc.pid: handle}
         if rust:
             child = owned_worker(api, proc, phase_log, await_value)
-            expected_pids.add(child)
-            child_handle = checked(api.open(0x0410, False, child))
+            child_handle = api.open_job_member(proc.benchmark_job, child)
             stack.callback(api.close, child_handle)
+            required_handles[child] = child_handle
             if api.machine(child_handle) != (expected_machine, expected_machine):
                 raise ValueError("The comparison worker is not native to this runner")
             await_value(lambda: wait_running(proc) or idle_complete(phase_log.read_text(errors="replace")),
@@ -299,7 +301,7 @@ def trial(api, windows_fixture, subject, exe, observer, area, endpoint, user_sid
         transition("close")
         controls = [calibrate()]
         spans = {}
-        tree = SubjectTree(api, stack, proc.pid, expected_pids)
+        tree = SubjectTree(api, stack, proc.benchmark_job, required_handles)
         for name in ("visible", "hidden"):
             if name == "hidden":
                 transition("close")

@@ -235,7 +235,8 @@ to reconcile project decisions, defaults, and recorded state.
   scopes posting, readback and removal to the test shortcut's app identity.
   Match a [visible WinRT popup](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup)
   to the ordinary sender's timed call and the exact title and body shown by the Shell.
-  Compare Windows renderer timings with the same host's WPF reference and
+  Preserve the [original job CPU and member working sets](docs/rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget)
+  in the three-trial WPF budget. Compare Windows renderer timings with the same host's WPF reference and
   qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)
   with observed screen pixels and independent file activity.
   Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)

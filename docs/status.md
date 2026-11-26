@@ -30,6 +30,15 @@ The Ubuntu package trial establishes feasibility. Distribution is undecided.
 [Windows receipts and failure](rust/rw02-windows-window.md#native-results-at-e2f161b) ·
 [Completed desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795).
 
+The Windows resource recorder now samples the original trial job and verifies
+a complete set of live working sets. Its portable timing and membership tests
+passed. The new child-exit test and the three-trial comparison need Windows
+execution. Independent review covered CPU after member exit, incomplete
+samples, and the canonical and GDI callers. The earlier native worker-backup
+archives also reproduced all sixteen C# restarts at `e2f161b`.
+[Recorder](rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget) ·
+[Native backup replay](rust/acceptance.md#native-evidence-matrix).
+
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
 
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02

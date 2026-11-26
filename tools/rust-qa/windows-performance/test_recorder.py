@@ -17,9 +17,117 @@ import uuid
 import build
 import metrics
 import native
-from run import present_counts, stop_subject
+from run import present_counts, sample_idle, stop_subject
 import scan
 import subject
+
+
+class SubjectTreeTests(unittest.TestCase):
+    def setUp(self):
+        self.api = Mock()
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        self.entries = {10: (2, "gui"), 11: (10, "worker"), 12: (11, "optional"), 99: (10, "outside-job")}
+        self.members = {10, 11, 12}
+        self.api.processes.side_effect = self.entries.copy
+        self.api.job_pids.side_effect = lambda job: self.members.copy()
+        self.api.job_accounting.side_effect = self.accounting
+        self.api.open_job_member.side_effect = lambda job, pid: pid
+        self.api.process_identity.side_effect = lambda handle: handle * 100
+        self.api.working_set_bytes.side_effect = lambda handle: handle * 1048576
+        self.tree = scan.SubjectTree(self.api, self.stack, 45, {10: 10, 11: 11})
+
+    def accounting(self, job):
+        counts = native.JobAccounting()
+        counts.active, counts.total = len(self.members), 4
+        counts.times[0], counts.times[1] = 20_000_000, 30_000_000
+        return counts
+
+    def test_cpu_includes_departed_members_and_memory_only_uses_the_complete_live_job(self):
+        self.assertEqual(self.tree.usage(), (5, 33))
+        self.members.remove(12)
+        self.assertEqual(self.tree.usage(), (5, 21))
+        self.api.open_job_member.assert_called_once_with(45, 12)
+        self.assertEqual(self.tree.records[11], dict(parent=10, image="worker", creation100ns=1100))
+        self.assertEqual(self.tree.samples[-1]["workingSetBytes"], {10: 10 * 1048576, 11: 11 * 1048576})
+        self.assertNotIn(99, self.tree.records)
+        self.stack.close()
+        self.api.close.assert_called_once_with(12)
+
+    def test_missing_required_member_rejects_the_whole_sample(self):
+        self.members.remove(11)
+        with self.assertRaisesRegex(ValueError, "Required trial job members disappeared"):
+            self.tree.usage()
+        self.assertEqual(self.tree.samples, [])
+
+    def test_open_or_accounting_failure_on_a_still_listed_member_fails_the_sample(self):
+        for operation in ("open_job_member", "working_set_bytes"):
+            with self.subTest(operation=operation):
+                with patch.object(self.api, operation, side_effect=PermissionError("query denied")):
+                    with self.assertRaisesRegex(ValueError, r"trial job member (10|12).*query denied"):
+                        self.tree.usage()
+                self.assertEqual(self.tree.samples, [])
+
+    def test_missing_member_during_measurement_retries_the_whole_sample(self):
+        def memory(pid):
+            if pid == 12:
+                self.members.remove(pid)
+                raise OSError("exited")
+            return 1048576
+        self.api.working_set_bytes.side_effect = memory
+        self.assertEqual(self.tree.usage(), (5, 2))
+        self.assertEqual(self.tree.samples[0]["membershipAttempts"], 2)
+        self.assertEqual(self.api.working_set_bytes.call_count, 5)
+
+    def test_job_assignment_count_change_detects_children_that_finish_between_enumerations(self):
+        def accounting_sequence(job):
+            value = self.accounting(job)
+            if self.api.job_accounting.call_count == 1:
+                value.total -= 1
+            return value
+        self.api.job_accounting.side_effect = accounting_sequence
+        self.assertEqual(self.tree.usage(), (5, 33))
+        self.assertEqual(self.tree.samples[0]["membershipAttempts"], 2)
+
+    def test_incomplete_active_membership_is_never_accepted(self):
+        counts = self.accounting(45)
+        counts.active += 1
+        self.api.job_accounting.side_effect = None
+        self.api.job_accounting.return_value = counts
+        with self.assertRaisesRegex(ValueError, "No stable membership"):
+            self.tree.usage()
+        self.assertEqual(self.tree.samples, [])
+
+    def test_idle_interval_starts_after_the_initial_complete_job_measurement(self):
+        # A slow first snapshot must not count toward the baseline duration.
+        now = 0
+        def usage():
+            nonlocal now
+            now += 20 if not tree.samples else 5
+            tree.samples.append({"cpu100ns": now * 10_000_000})
+            return now, 12.
+        tree, proc, windows = Mock(), Mock(), Mock()
+        tree.samples, tree.usage.side_effect = [], usage
+        proc.poll.return_value = None
+        windows.visible.return_value = True
+        self.api.frequency = 1
+        self.api.clock.side_effect = lambda: now
+        with patch("run.IDLE_SECONDS", 15), patch("run.time.sleep"):
+            span, samples = sample_idle(self.api, proc, tree, windows, True)
+        self.assertEqual(span, [20, 35])
+        self.assertEqual(samples["cpu_one_core_pct"], 100.)
+        self.assertEqual(samples["seconds"], 15)
+        self.assertEqual(len(samples["jobSamples"]), 4)
+
+    def test_mismatched_held_or_new_members_are_rejected_before_resource_queries(self):
+        self.api.verify_job_member.side_effect = ValueError("wrong job")
+        with self.assertRaisesRegex(ValueError, "wrong job"):
+            scan.SubjectTree(self.api, self.stack, 45, {10: 1000})
+        self.api.open_job_member.side_effect = ValueError("wrong job")
+        with self.assertRaisesRegex(ValueError, "trial job member 12.*wrong job"):
+            self.tree.usage()
+        self.assertEqual(self.tree.samples, [])
+        self.assertNotIn(12, self.tree.records)
 
 
 def remove_ledger_image(api, exe, original, timeout=10):
@@ -281,35 +389,6 @@ class RecorderTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "reviewed worker profile"):
                         subject.stage_workspace(project)
                     self.assertFalse(project.exists())
-
-    def test_process_totals_follow_the_supervisor_and_its_verified_descendants(self):
-        class Snapshot:
-            def __init__(self):
-                self.entries = {10: (2, "gui"), 11: (10, "worker"), 12: (11, "child"), 99: (2, "other")}
-            def processes(self):
-                return self.entries
-            def open(self, flags, inherit, pid):
-                return pid
-            def close(self, handle):
-                return True
-            def process_identity(self, handle):
-                return 100 * handle
-            def exit_code(self, handle, result):
-                result._obj.value = 259 if handle in self.entries else 0
-                return True
-            def usage(self, handle, *, working_set):
-                return handle, handle * 2 if working_set else 0
-
-        api = Snapshot()
-        with ExitStack() as stack:
-            tree = scan.SubjectTree(api, stack, 10, {10, 11})
-            self.assertEqual(tree.usage(), (33, 66))
-            self.assertEqual(set(tree.records), {10, 11, 12})
-            del api.entries[12]
-            self.assertEqual(tree.usage(), (33, 42))
-            del api.entries[11]
-            with self.assertRaises(ValueError):
-                tree.usage()
 
     def test_reference_archive_and_pe_machine(self):
         with tempfile.TemporaryDirectory() as temp:

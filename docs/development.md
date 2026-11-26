@@ -317,6 +317,10 @@ launch the same GUI executable a second time without arguments. The results and 
 are available in `rust-launcher-<target>-<commit>` as soon as that step
 finishes, and under `windows-launcher/<target>/` in the final desktop archive.
 [Windows launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
+The Windows recorder retains the measured job's CPU ticks and the working-set
+bytes of its live members. Replay these samples with the three completed WPF
+trials when comparing resources on a new machine.
+[Job accounting and child-lifetime test](rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget).
 The Windows desktop job first records the WPF budget and the regular Mailbox
 and FIFO trials. Its subsequent `--dispatch` trace compares both retained
 window wake paths and the original hidden-paint policy with the same executable,
