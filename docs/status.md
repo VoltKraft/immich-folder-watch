@@ -8,11 +8,19 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
-The Fedora x64 codec now matches .NET 3.0.4 on the three compact YAML
-mappings that previously loaded only in Rust. All 82 profiles and 224
-C# readbacks passed. The two release assemblies agreed with Rust on all
-27 additional complete profiles. This revision awaits native Windows and
-Linux ARM64 results. [Compact mapping checks](rust/rw02-yaml.md#anchored-scalars-in-compact-mappings).
+At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
+each passed 82 YAML profiles and 224 C# readbacks. Independent replay
+verified all 448 output files, including edits to profiles with Unicode
+separators and shared anchors. On Fedora x64 the two 3.0.4 release
+assemblies agreed with Rust on all 27 additional compact profiles.
+[Four native archives](rust/rw02-yaml.md#four-native-anchor-and-compact-mapping-exchanges-at-0bb39bf) ·
+[Original package comparisons](rust/rw02-yaml.md#anchored-scalars-in-compact-mappings).
+
+All four native feasibility jobs passed at `0bb39bf`. Independent replay
+matched all 16 restarted C# workers to the backup returned by Rust after
+a download, upload, deletion or interrupted timestamp repair. Files,
+peer requests and SQLite history matched their expected state.
+[Four native worker archives](rust/rw01-storage-contract.md#native-worker-recovery-at-0bb39bf).
 
 At `5b6cebf` the Fedora x64 YAML adapter preserved U+2028 and U+2029 in the watch
 path, album name, log directory and filters. It also resolves aliases
@@ -32,9 +40,10 @@ installation, repair, removal and retained-profile readback.
 
 All 28 PR checks at `5b6cebf` passed. In the extended Fedora x64 installed
 handover, the signed worker opened Rust's live backup, kept the first asset
-mapping, uploaded a second PNG and preserved both SQLite ROWIDs. The native
-Ubuntu x64 and ARM64 handover is prepared. The existing Ubuntu results above
-cover the two ordinary starts of the shipping package.
+mapping, uploaded a second PNG and preserved both SQLite ROWIDs. At
+`0bb39bf` the two Ubuntu handover trials stopped in the Python 3.12
+directory-read observer after the Rust GUI had started its inventory
+worker. The configured upload and SQLite restore need a repeat there.
 [Installed backup and original requests](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
 [PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
 

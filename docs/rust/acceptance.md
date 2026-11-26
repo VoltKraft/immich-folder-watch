@@ -40,6 +40,11 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+At `0bb39bf` all sixteen native C# worker restarts used the expected
+Rust-returned SQLite backup. Detached replay matched the four original
+tables and the external state for each activity on each target.
+[Native recovery and archived inputs](rw01-storage-contract.md#native-worker-recovery-at-0bb39bf).
+
 Both native Ubuntu architectures reopened the same signed shipping window
 after an ordinary secondary Flatpak launch at `5b6cebf`. All four original
 3.0.4 packages also passed installation, repair, removal and retained-profile
@@ -51,8 +56,10 @@ eleven resource limits on each architecture.
 The extended Fedora x64 installed-worker regression verified the two
 launch orders, both original image requests and the signed worker's
 restart from the Rust backup. All 16 WAL frames and the final SQLite
-ROWIDs 1 and 2 were independently checked. Ubuntu x64 and ARM64
-execution of this handover is pending.
+ROWIDs 1 and 2 were independently checked. The first Ubuntu x64 and
+ARM64 runs reached the hidden Rust GUI and its active worker. Both
+stopped when Python 3.12 lacked a constant for the real directory-read
+observer. The Ubuntu upload and restart remain unverified.
 [Installed storage evidence](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
@@ -60,13 +67,14 @@ separators written by .NET 3.0.4 in paths, album names and filters. Known
 values retain their own anchors when later unknown properties reuse a
 name. All 74 profiles and 204 C# readbacks passed. The Windows and Linux
 managed release assemblies each reopened 34 Unicode outputs and 22 alias
-outputs on that Linux host. Native coverage on the other targets is pending.
-The subsequent Fedora x64 correction matched the shipping reader on
-all three compact mappings it rejected. Its full run passed 82
-profiles and 224 C# readbacks.
+outputs on that Linux host.
+The correction at `0bb39bf` matched the shipping reader on the three
+compact mappings it rejected. Windows and Ubuntu x64 and ARM64 each
+passed all 82 profiles and 224 C# readbacks. Independent replay checked
+all 448 generated YAML files.
 [Physical separators](rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
 [Property and alias controls](rw02-yaml.md#anchors-on-recognized-and-skipped-properties) ·
-[Compact mapping controls](rw02-yaml.md#anchored-scalars-in-compact-mappings).
+[Four native compact mapping runs](rw02-yaml.md#four-native-anchor-and-compact-mapping-exchanges-at-0bb39bf).
 
 At `e2f161b` each of the four native hosts passed 59 YAML cases including
 160 C# readback comparisons. All four preserved the leading U+FEFF in a

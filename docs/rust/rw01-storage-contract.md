@@ -317,6 +317,28 @@ or interrupted timestamp repair. The combined readback SHA-256 is
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14982193656) ·
 [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394/artifacts/14981499821).
 
+### Native worker recovery at 0bb39bf
+
+All sixteen C# worker restarts passed on the two Windows and two Ubuntu
+hosts at `0bb39bf`. Each worker consumed the exact `returned.db` from
+the native Rust executable after a download, upload, deletion or
+interrupted timestamp repair. Detached replay checked the original
+database identity, all four tables, HTTP requests, retained media or
+trash bytes and the completed timestamp repair. The two casing profiles
+also retained the committed WAL with the original main file still in
+place when Rust took its online backup. There were 40 C# storage readback
+checks on each host.
+
+Each Windows archive indexed 366 files and each Ubuntu archive 367.
+All 161 first-party sources per archive matched the checkout. Under
+`artifacts/rust/hosted-worker-backup/45874234282/`, the combined report
+`source-bound-four-exchanges.json` has SHA-256
+`b6e90060b46105cc2b26c6f8e66c111edfb599d9843710e52b7179ddf0ca0fa0`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234282/artifacts/15145060676) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234282/artifacts/15144930870) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234282/artifacts/15144143135) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234282/artifacts/15144328383).
+
 ### Installed Fedora worker resumes from a live Rust backup
 
 On Fedora x64 at `3709869` the original signed 3.0.4 Flatpak uploaded
@@ -375,6 +397,22 @@ Detached readback verified 52 indexed files, both image bodies, 16 WAL
 frames and the two final mappings with ROWIDs 1 and 2. Its report under
 `detached-worker-tl1r89h2/readback.json` has SHA-256
 `22580006cb1b2c68c9d0c4d353fc7d5c4d006060419de58d0ba89ca1b7e71d36`.
-Both branches were uninstalled. The Ubuntu runs for this installed
-handover and restart are pending.
+Both branches were uninstalled. A clean-checkout repeat at `0bb39bf`
+again retained the first asset, committed the second and passed SQLite
+`quick_check` on both the returned and final databases. Its result under
+`same-id-_burq258/` has SHA-256
+`86596a8f631e2a5ef6babc3dce0239e868a3e2ab5ce6ab737900f3340f116746`.
 [Native workflow and archive layout](../development.md#installed-worker-handover-on-native-ubuntu-runners).
+
+On Ubuntu x64 and ARM64 at `0bb39bf`, both signed primaries opened and
+quit. Both Rust GUIs subsequently started their inventory worker and
+hid their original window. The observer then tried to arm its directory
+descriptor to observe a real worker read. Ubuntu's Python 3.12 lacked
+`fcntl.F_SETOWN_EX`. Both trials exited at that point and removed their
+two Flatpak refs. Neither reached the configured upload or backup.
+The native Linux command selects the observer thread for signal delivery.
+Python added those constant names in 3.13.
+[Python fcntl versions](https://docs.python.org/3/library/fcntl.html) ·
+[Linux UAPI](https://github.com/torvalds/linux/blob/v6.8/include/uapi/asm-generic/fcntl.h) ·
+[Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15145705117) ·
+[Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15144839474).

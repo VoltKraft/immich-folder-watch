@@ -557,7 +557,32 @@ A separate replay including all three original compact failures checked
 23 source profiles, 12 signed resaves and 48 package readbacks against
 the same release executable. Its `compact-two-packages-01/summary.json`
 has SHA-256 `9e4be498e564bc18b2df8bbc56f5257e46689163da0127b8e59db21956a6f1dd`.
-Native Windows and Linux ARM64 results for these cases are pending.
+
+### Four native anchor and compact mapping exchanges at 0bb39bf
+
+The Windows and Ubuntu x64 and ARM64 jobs each passed all 82 profiles,
+246 byte checks, 392 semantic comparisons and 224 readbacks with the
+native .NET 10.0.15 runtime. Each archive contained the expected 112
+unchanged or edited YAML files. All 448 products were independently
+decoded and checked. The excluded files for rejected or lossy inputs
+were absent. On each host twelve Rust tests and three source-filter tests
+passed. The readback matched all 342 indexed files and all 126 source
+inputs to the checkout `0bb39bff547b649e4b4f4bf7647e8cbd1b91fe47`.
+
+| Native host | Original Actions archive |
+| --- | --- |
+| Windows x64 | [15144287783](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15144287783) |
+| Windows ARM64 | [15144996577](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15144996577) |
+| Ubuntu x64 | [15145045928](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15145045928) |
+| Ubuntu ARM64 | [15145015810](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15145015810) |
+
+The archive digests, native observations and decoded products are indexed
+in `artifacts/rust/hosted-yaml/45874234228/four-host-anchors.json`, SHA-256
+`2a265c8e41381b76a59fedacb48b0f702ad7e92efa46b4530948b28e06dfcf9e`.
+The clean offline Fedora build at this revision also reproduced the
+filtered source tar and all 112 YAML outputs byte for byte. Its result
+under `runs/compact-flow-clean-0bb39bf-fedorax64/` has SHA-256
+`a986d61e739b0e2c7170abe54a47d38e66b4d4113fe0547f86a09b7e75884fca`.
 
 ## Native runner and observed results
 
