@@ -1,38 +1,98 @@
 """Measure owners of a held IPv4 connection and the restored database on Windows."""
 import ctypes as c
 from ctypes import wintypes as w
+from ipaddress import IPv6Address
 import socket
 import struct
 
 from shared import require
 
 
+# MIB_TCPROW_OWNER_PID and MIB_TCP6ROW_OWNER_PID in the Windows SDK tcpmib.h.
+ROW4 = struct.Struct("<I4sI4sII")
+ROW6 = struct.Struct("<16sII16sIIII")
+
+
+def ipv6_endpoint(address, scope):
+    ip = IPv6Address(address)
+    if scope:
+        return f"{ip}%{socket.ntohl(scope)}"
+    return str(ip.ipv4_mapped or ip)
+
+
 def decode_connection(raw):
-    state, local, local_port, remote, remote_port, pid = struct.unpack("<6I", raw)
-    def address(value, port):
-        return [socket.inet_ntoa(struct.pack("<I", value)), socket.ntohs(port & 0xffff)]
-    return dict(state=state, client=address(local, local_port), server=address(remote, remote_port), pid=pid)
+    if len(raw) == ROW4.size:
+        state, local, local_port, remote, remote_port, pid = ROW4.unpack(raw)
+        client, server = socket.inet_ntoa(local), socket.inet_ntoa(remote)
+    elif len(raw) == ROW6.size:
+        local, local_scope, local_port, remote, remote_scope, remote_port, state, pid = ROW6.unpack(raw)
+        client, server = ipv6_endpoint(local, local_scope), ipv6_endpoint(remote, remote_scope)
+    else:
+        raise ValueError("Expected a complete native IPv4 or IPv6 owner row")
+    return dict(state=state, client=[client, socket.ntohs(local_port & 0xffff)],
+                server=[server, socket.ntohs(remote_port & 0xffff)], pid=pid)
+
+
+def native_table(query, family):
+    size = w.DWORD()
+    for _ in range(4):
+        data = c.create_string_buffer(size.value) if size.value else None
+        code = query(data, c.byref(size), False, family, 4, 0)  # TCP_TABLE_OWNER_PID_CONNECTIONS
+        if code == 122 and 0 < size.value <= 4 * 1024 * 1024:
+            continue
+        if code == 50 and family == socket.AF_INET6:  # ERROR_NOT_SUPPORTED on an IPv4-only host
+            return None
+        if code:
+            raise OSError(code, f"GetExtendedTcpTable({family.name}) failed")
+        require(data is not None and len(data) >= size.value >= 4, "Incomplete native TCP owner table")
+        return data.raw[:size.value]
+    raise ValueError(f"The native {family.name} table changed throughout the bounded observation")
+
+
+def select_connection(tables, pid, observed):
+    client, server = list(observed["client"]), list(observed["server"])
+    require(client[0] == server[0] == "127.0.0.1" and client != server
+            and all(type(port) is int and 0 < port <= 65535 for port in (client[1], server[1])),
+            "Expected the accepted private IPv4 asset connection")
+    selected = []
+    ambiguous = False
+    diagnostics = []
+    for family, size in ((socket.AF_INET, ROW4.size), (socket.AF_INET6, ROW6.size)):
+        data = tables[family]
+        if data is None and family == socket.AF_INET6:
+            diagnostics.append("AF_INET6 unsupported")
+            continue
+        require(data is not None and len(data) >= 4, "Missing native TCP owner table")
+        count, = struct.unpack_from("<I", data)
+        require(4 + count * size <= len(data), f"Truncated native {family.name} owner table")
+        owned = hits = matched = 0
+        for i in range(count):
+            raw = data[4 + i * size:4 + (i + 1) * size]
+            row = decode_connection(raw)
+            if row["state"] != 5:  # ESTABLISHED
+                continue
+            owned += row["pid"] == pid
+            if row["client"] == client and row["server"] == server:
+                hits += 1
+                if row["pid"] == pid:
+                    matched += 1
+                    selected.append(raw)
+        # Both tables may represent the same held dual-mode connection. Each
+        # representation must uniquely identify the same observed process.
+        ambiguous |= hits != matched or hits > 1
+        diagnostics.append(f"{family.name} WPF-established={owned} tuple-hits={hits} owned-hits={matched}")
+    require(selected and not ambiguous, "No unique WPF owner of the held asset connection (" + ", ".join(diagnostics) + ")")
+    return selected[0].hex()
 
 
 def client_connection(proc, observed):
     from native import bind
     query = bind(c.WinDLL("iphlpapi"), "GetExtendedTcpTable", w.DWORD, c.c_void_p, c.POINTER(w.DWORD),
                  w.BOOL, w.ULONG, c.c_int, w.ULONG)
-    size = w.DWORD()
-    for _ in range(4):
-        data = c.create_string_buffer(size.value) if size.value else None
-        code = query(data, c.byref(size), False, socket.AF_INET, 4, 0)  # TCP_TABLE_OWNER_PID_CONNECTIONS
-        if code == 122 and size.value <= 4 * 1024 * 1024:
-            continue
-        if code:
-            raise c.WinError(code)
-        count, = struct.unpack_from("<I", data.raw)
-        require(4 + count * 24 <= len(data), "Incomplete native connected IPv4 table")
-        expected = dict(pid=proc.pid, state=5, client=list(observed["client"]), server=list(observed["server"]))
-        matches = [r for r in struct.iter_unpack("24s", data.raw[4:4+24*count]) if decode_connection(r[0]) == expected]
-        require(len(matches) == 1 and proc.poll() is None, "No unique live WPF connection to the held asset request")
-        return matches[0][0].hex()
-    raise ValueError("The native TCP table changed throughout the bounded observation")
+    tables = {family: native_table(query, family) for family in (socket.AF_INET, socket.AF_INET6)}
+    selected = select_connection(tables, proc.pid, observed)
+    require(proc.poll() is None, "The original WPF process exited during the TCP observation")
+    return selected
 
 
 class UniqueProcess(c.Structure):

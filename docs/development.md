@@ -203,8 +203,10 @@ The separate [MSI upload workflow](../.github/workflows/rust-windows-installed-u
 uses a fresh Windows x64 or ARM64 runner and the original 3.0.4 package.
 It seeds the reviewed Cargo and .NET inputs, then builds the native Rust
 SQLite helper. Only the private loopback peer receives the synthetic PNGs.
-The trial holds the first request while it identifies the installed WPF
-process and checks that Rust refuses the earlier SQLite state. Once the
+Before the upload the trial verifies that Rust refuses the empty SQLite
+state. For each uploaded PNG it holds the request and matches the peer's
+two loopback endpoints to the installed WPF PID in the native TCP tables,
+including IPv4-mapped IPv6 sockets. Once the first
 upload commits it retains the original main file and WAL, plus Rust's
 standalone return. Before replacing the database it checks that the first
 WPF process quit and archives the original profile database files. The

@@ -14,6 +14,7 @@ from unittest.mock import patch
 from shared import ROOT, backup, configuration, endpoint_port, peer
 from database import main_rows, replay_pair, restore
 from upload.readback import asset_history, database_rows
+from owners import decode_connection, select_connection
 
 
 class UploadTests(unittest.TestCase):
@@ -29,7 +30,7 @@ class UploadTests(unittest.TestCase):
     def start_store(self):
         store = sqlite3.connect(self.db)
         self.addCleanup(store.close)
-        sql = (ROOT / "rust/tests/fixtures/legacy/windows/sqlite/sensitive.sql").read_text()
+        sql = (ROOT / "rust/tests/fixtures/legacy/windows/sqlite/sensitive.sql").read_text(encoding="utf-8")
         store.executescript(sql.split("INSERT INTO")[0] + "PRAGMA user_version=1; COMMIT;")
         store.execute("PRAGMA journal_mode=WAL")
         return store
@@ -124,6 +125,11 @@ class UploadTests(unittest.TestCase):
         def check(subject):
             asset_history(self.out, posts, [("original", name, peer.IMAGE, subject)], 3321)
         check(row)
+        alternate = deepcopy(row)
+        mapped = bytes.fromhex("00000000000000000000ffff7f000001")
+        alternate["connection"] = struct.pack("<16sII16sIIII", mapped, 0, socket.htons(42001),
+                                              mapped, 0, socket.htons(3321), 5, 42).hex()
+        check(alternate)
         for key, invalid in (("sampleNs", 6), ("primary", {"pid": 43})):
             alternate = deepcopy(row)
             alternate[key] = invalid
@@ -134,6 +140,44 @@ class UploadTests(unittest.TestCase):
         (self.out / "asset-post-1.body").write_bytes(body[:-1])
         with self.assertRaises(ValueError):
             check(row)
+
+    def test_native_tcp4_and_mapped_tcp6_return_the_same_held_connection(self):
+        # SDK network-order addresses and ports. The upper half of each port
+        # DWORD is deliberately nonzero, while the state and PID are little-endian.
+        mapped = bytes.fromhex("00000000000000000000ffff7f000001")
+        port1, port2 = bytes.fromhex("c000abcd"), bytes.fromhex("1f90eeff")
+        state, owner = bytes.fromhex("05000000"), bytes.fromhex("56341200")
+        raw4 = state + bytes.fromhex("7f000001") + port1 + bytes.fromhex("7f000001") + port2 + owner
+        raw6 = mapped + bytes(4) + port1 + mapped + bytes(4) + port2 + state + owner
+        accepted = dict(client=["127.0.0.1", 49152], server=["127.0.0.1", 8080])
+        expected = dict(**accepted, state=5, pid=0x123456)
+        self.assertEqual(decode_connection(raw4), expected)
+        self.assertEqual(decode_connection(raw6), expected)
+        def table(*rows):
+            return struct.pack("<I", len(rows)) + b"".join(rows)
+        def pick(v4, v6):
+            return select_connection({socket.AF_INET: v4, socket.AF_INET6: v6}, expected["pid"], accepted)
+        self.assertEqual(pick(table(raw4), None), raw4.hex())
+        self.assertEqual(pick(table(), table(raw6)), raw6.hex())
+        self.assertEqual(pick(table(raw4), table(raw6)), raw4.hex())
+        with self.assertRaisesRegex(ValueError, "owned-hits=2"):
+            pick(table(), table(raw6, raw6))
+        foreign = raw6[:-4] + bytes.fromhex("65000000")
+        with self.assertRaisesRegex(ValueError, "tuple-hits=1 owned-hits=0") as error:
+            pick(table(raw4), table(foreign))
+        self.assertNotIn("101", str(error.exception))
+        with self.assertRaisesRegex(ValueError, "Truncated native"):
+            pick(table(), table(raw6[:-1]))
+        for start, stop, value in ((0, 16, bytes.fromhex("00000000000000000000000000000001")),
+                                    (24, 40, bytes.fromhex("00000000000000000000000000000001")),
+                                    (16, 20, bytes.fromhex("00000007")), (40, 44, bytes.fromhex("00000008")),
+                                    (20, 24, port2), (44, 48, port1), (48, 52, bytes.fromhex("08000000"))):
+            changed = raw6[:start] + value + raw6[stop:]
+            with self.subTest(start=start), self.assertRaisesRegex(ValueError, "owned-hits=0"):
+                pick(table(), table(changed))
+        self.assertTrue(decode_connection(raw6[:16] + bytes.fromhex("00000007") + raw6[20:])["client"][0].endswith("%7"))
+        with self.assertRaisesRegex(ValueError, "complete native"):
+            decode_connection(raw6[:-1])
 
     def test_upload_profile_uses_only_loopback(self):
         self.assertEqual(endpoint_port("http://127.0.0.1:57321"), 57321)
