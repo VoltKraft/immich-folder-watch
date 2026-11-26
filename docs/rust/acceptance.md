@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-e2f161b), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-e2f161b) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#windows-results-at-ead9fb3), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-ead9fb3) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -53,14 +53,16 @@ eleven resource limits on each architecture.
 [Shipping packages](rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf) ·
 [Linux measurements](rw02-native-gui.md#ubuntu-native-results-at-ead9fb3).
 
-The extended Fedora x64 installed-worker regression verified the two
-launch orders, both original image requests and the signed worker's
-restart from the Rust backup. All 16 WAL frames and the final SQLite
-ROWIDs 1 and 2 were independently checked. The first Ubuntu x64 and
-ARM64 runs reached the hidden Rust GUI and its active worker. Both
-stopped when Python 3.12 lacked a constant for the real directory-read
-observer. The Ubuntu upload and restart remain unverified.
-[Installed storage evidence](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
+On Fedora x64 and on both native Ubuntu architectures the installed
+Flatpak trial exercised both launch orders. On Ubuntu at `3d67a46`
+five observations followed each Rust inventory worker. The signed
+3.0.4 worker reopened Rust’s backup after a real upload to the isolated
+peer, kept the original row and uploaded only the new image. Independent
+replay checked both request bodies, 16 WAL frames and final ROWIDs 1
+and 2 on each host. Installed migration of the complete Rust sync engine
+remains an RW-07 requirement.
+[Native Ubuntu handover](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
+[Fedora handover and earlier Ubuntu failure](rw01-storage-contract.md#native-linux-handover-and-backup-observer).
 
 On Fedora x64 the Rust YAML adapter preserved the physical line and paragraph
 separators written by .NET 3.0.4 in paths, album names and filters. Known
@@ -86,16 +88,16 @@ the expected sub-microsecond timestamp from the held file.
 [Four-host transport](rw02-realtime-transport.md#four-native-transport-results-at-e2f161b) ·
 [Offline relinks](rw02-combined-profile.md).
 
-Both retained Windows ARM64 Mailbox profiles met all eleven same-host
-WPF limits at `e2f161b`. The original window reopened on an ordinary
-second launch but stayed in the background. On x64 the third WPF trial
-stopped during idle sampling, so this revision has no x64 budget.
-At `5efe1f1` the x64 profiles had each exceeded two limits. Both
-architectures passed the ordinary and reopened filename controls at
-`e2f161b`. Visible tray activation and notification, a reversible
-contrast change, ordinary-user cross-session ownership, mixed DPI and
-RDP still require native evidence.
-[Windows measurements](rw02-windows-window.md#native-results-at-e2f161b).
+At `ead9fb3` each Windows host completed all three WPF reference trials.
+Both retained ARM64 Mailbox profiles met all eleven same-host limits.
+An ordinary second launch reopened the original ARM64 window in the
+background. Both retained x64 Mailbox profiles exceeded the scan-close
+and scan-reopen limits. On x64 an ordinary second launch focused the
+retained window. Both architectures passed the ordinary and reopened
+filename trials. Visible tray activation and notification, reversible
+contrast, standard-user cross-session ownership, mixed DPI and RDP
+remain open.
+[Windows timing and archive details](rw02-windows-window.md#windows-results-at-ead9fb3).
 
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its

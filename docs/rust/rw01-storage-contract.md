@@ -427,3 +427,41 @@ controls passed under Noble and Fedora, and the full Fedora installed
 handover passed. Under `artifacts/rust/hosted-installed-handover/45874234228/`,
 `noble-fd.json` has SHA-256
 `2813b98170b1f86616efddadf3ce90343bcfc8792347b7ebf2bdcf04270e1777`.
+
+At `3d67a46` the entire x64 handover also passed inside an isolated
+Noble userspace with its own Python 3.12.3, Flatpak 1.14.6 and system
+libraries. This used the Fedora host kernel and local native x64 builds
+of the Rust GUI, inventory worker and backup helper. The original worker
+survived the signed launch. The two real directory reads reached the
+selected thread. After restarting from Rust's backup, the signed app
+retained the original upload and committed the second one. Both installed
+refs were removed. Under `artifacts/rust/shipping-flatpak-interop/`,
+`noble-userspace-bgdqbgvu/trials/same-id-smagh1_l/result.json` has SHA-256
+`fd50defb6eeb7d5ddeb1324ff3bc96856006eafea78c8b488809c8a835e28f77`.
+The detached replay of both multipart requests, all 16 WAL frames and
+the final ROWIDs has SHA-256
+`b760ac22946ea03795856a473e92d3e016d9f9f68c9d6b07c6eb6892a7c33d46`.
+
+### Installed Ubuntu worker restart at 3d67a46
+
+On the native Ubuntu 24.04 x64 and ARM64 runners, Flatpak 1.14.6 installed the
+original signed 3.0.4 app and the test branch. Five observations followed
+the same Rust GUI and inventory worker through a shipping launch. In the
+reverse order the signed worker uploaded `signed-worker.png` to the isolated
+peer. Rust backed up its live SQLite database. After restart the shipping
+worker kept that asset and uploaded `after-restore.png`. Both refs were
+removed from the private installation.
+
+Independent replay verified the signed commit, native executable architectures,
+52 indexed evidence files, both multipart image bodies, 16 WAL frames, and
+ROWIDs 1 and 2 in the final database. The local review files are under
+`artifacts/rust/hosted-installed-handover/45877580663/`.
+
+| Native archive | Rust GUI / worker PID | Installed result SHA-256 | Detached review SHA-256 |
+| --- | --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45877580663/artifacts/15148705376) | 181 / 192 | `8ff16a133822d98bed5b8ac69fb8f9ca22311365ad374de2a1ab9547e2ad2199` | `1a01bd30c084c31a0dd07023213a0f33c1d2c11e8b22813b3af3864bbd8f7946` |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45877580663/artifacts/15146774111) | 179 / 190 | `45aff5eb6dec079fc647aed77d46b3dc1d64ea43dd1fbb875dee0b694108f4a1` | `a55948eb7da40682c2d6412462da675f9f1f1e9e61f32f47bdb408fe8f8e3921` |
+
+The combined `comparison.json` has SHA-256
+`2fbe453f1342b12e84fddc3992e3ee7e9ecdadce6985db25354b7a2c85dc0678`.
+Both hosts recorded the same two image byte sequences as the Fedora run.

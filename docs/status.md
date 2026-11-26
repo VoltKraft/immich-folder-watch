@@ -38,22 +38,28 @@ and the private uninstall completed. All four reference packages also passed
 installation, repair, removal and retained-profile readback.
 [Installed launch and repair results](rust/rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf).
 
-All 28 PR checks at `5b6cebf` passed. In the extended Fedora x64 installed
-handover, the signed worker opened Rust's live backup, kept the first asset
-mapping, uploaded a second PNG and preserved both SQLite ROWIDs. At
-`0bb39bf` the two Ubuntu handover trials stopped in the Python 3.12
-directory-read observer after the Rust GUI had started its inventory
-worker. The corrected observer passed its kernel test under Noble
-Python 3.12.3 and the full Fedora handover. The configured upload and
-SQLite restore need a repeat on both Ubuntu runners.
-[Installed backup and original requests](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
+At `3d67a46` the installed worker handover passed on Ubuntu x64 and
+ARM64. In both launch orders the active worker kept its identity. The
+signed 3.0.4 worker restarted from Rust’s live backup, kept the first
+asset and uploaded only the new PNG. Independent replay checked all
+16 WAL frames, both original request bodies and the final ROWIDs on
+each architecture. This repeats the Fedora x64 result. Both earlier
+Ubuntu runs at `0bb39bf` had stopped in the Python 3.12 directory-read
+observer. All 24 PR checks outside the separate desktop assessment
+passed at `3d67a46`.
+[Two native Ubuntu archives](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
+[Original observer failure](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
 [PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
 
 At `ead9fb3` all 20 regular PR checks passed, including all four native
 feasibility jobs. The two Ubuntu desktops met all eleven resource limits.
 All 120 x64 and 186 ARM64 window requests issued during file reads completed
-while reads were still in progress. Windows measurements are in progress.
+while reads were still in progress. Both Windows hosts completed all three
+WPF reference trials and passed the native child-exit control. Both retained
+ARM64 Mailbox profiles met all eleven limits. Both x64 profiles exceeded
+the scan-close and scan-reopen limits.
 [Ubuntu observations](rust/rw02-native-gui.md#ubuntu-native-results-at-ead9fb3) ·
+[Windows observations](rust/rw02-windows-window.md#windows-results-at-ead9fb3) ·
 [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602415) ·
 [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688).
 
@@ -70,8 +76,7 @@ Both Windows desktop assessments failed. On ARM64 both retained Mailbox
 profiles met all eleven WPF limits. An ordinary second launch reopened the
 original window in the background. On x64 the third WPF trial failed while
 opening a process to sample idle resources. Two complete trials survive,
-but no x64 reference budget was produced. The next measurement needs a
-complete three-trial reference on its own host. Both Windows filename
+but no x64 reference budget was produced. Both Windows filename
 editors passed. Visible Shell activation and notification, a reversible
 contrast change, mixed DPI, RDP and standard-user cross-session ownership
 remain open. A dedicated Windows medium or test VM is currently unavailable.
@@ -81,8 +86,8 @@ The Ubuntu package trial establishes feasibility. Distribution is undecided.
 
 The Windows resource recorder now samples the original trial job and verifies
 a complete set of live working sets. Its portable timing and membership tests
-passed. The new child-exit test and the three-trial comparison need Windows
-execution. Independent review covered CPU after member exit, incomplete
+passed. At `ead9fb3` independent replay verified 4,340 Windows working-set
+snapshots across 70 idle intervals on the two hosts. Independent review covered CPU after member exit, incomplete
 samples, and the canonical and GDI callers. The earlier native worker-backup
 archives also reproduced all sixteen C# restarts at `e2f161b`.
 [Recorder](rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget) ·
@@ -96,7 +101,10 @@ and display. Eleven Python tests, five Rust controls, x64 MSVC-target Clippy
 on Linux and independent source review passed. The twice-reconstructed
 source archive has SHA-256
 `5016b74fe6aab44510535574d4f50d39c0bb57c293a84653581f0bdb797002a4`.
-The effect on native Windows frame timings remains unmeasured.
+At `ead9fb3` the x64 scan reused one buffer 354 times. During the 341
+observed reopens the median wait for CPU-readable pixels was 42.59 ms.
+Only five reopens completed their first blit before the next close.
+[Native GDI timings](rust/rw02-windows-window.md#native-gdi-readback-phases) ·
 [Original measurements and new trial](../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
 
 ## Compatibility fixes and earlier desktop runs (2026-11-25)

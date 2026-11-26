@@ -1005,3 +1005,61 @@ working set and the job's retained CPU time. The resource limits still
 come from three complete WPF trials on the candidate's host.
 [Native child and portable controls](../../tools/rust-qa/windows-performance/test_owned_subject.py) ·
 [Interval and membership checks](../../tools/rust-qa/windows-performance/test_recorder.py).
+
+### Windows results at ead9fb3
+
+On ARM64 the child-exit regression passed on the native Windows runner.
+Independent replay recovered job CPU and working-set values from all
+1,860 snapshots in 30 idle intervals. Each of the WPF, canonical Rust,
+Mailbox with one or two queued frames, and FIFO profiles completed
+three trials. Both retained Mailbox profiles met all eleven WPF limits.
+During inventory, closing and reopening took 7.60 and 4.52 ms at p95
+for the one-frame profile and 4.27 and 4.65 ms for two frames. The
+limits on this host were 14.03 and 15.18 ms. The canonical profile
+met six limits. FIFO met ten, with a scan close of 19.67 ms.
+
+The ordinary and reopened filename checks passed. The foreground keyboard
+launch focused the original window. The ordinary second launch reopened
+it in the background. The complete ARM64 desktop assessment remains red.
+The renderer replay under `artifacts/rust/hosted-desktop-storage/45865602688/windows/`
+has SHA-256 `d2246db7af4cecd62cf5a936c25be030719d330d9fa9fc24860ee5431a2eabaa`.
+[Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15144959389).
+
+On Windows Server 2025 x64 all three WPF reference trials completed, including
+native process accounting after child exit. Independent replay verified 2,480
+working-set snapshots across 40 idle intervals. During inventory the reference
+limits were 30.11 ms to close and 21.49 ms to reopen. The retained DX12
+Mailbox profiles met nine of eleven limits. Both filename checks passed.
+An ordinary second launch focused the retained HWND. The separate foreground
+keyboard trial did not pass on this host.
+
+| x64 profile | Trials | Scan close p95, ms | Scan reopen p95, ms |
+| --- | ---: | ---: | ---: |
+| Retained Mailbox, one queued frame | 3 | 39.80 | 27.08 |
+| Retained Mailbox, two queued frames | 3 | 44.43 | 45.62 |
+| Deferred redraw diagnostic | 1 | 40.52 | 42.07 |
+| Full egui GDI diagnostic | 1 | 38.49 | 11.06 |
+
+The separately instrumented retained window spent at least half of 81 of 98
+slow closes in the DX12 wait. For all 82 slow reopens, at least half the time
+was inside `ShowWindow`. For 78 of those reopens at least half was inside
+that call and outside the measured window procedure. The trace cannot attribute
+that time to a specific Windows component. In the ordinary one-frame trial,
+584 of 593 reopens during independently observed file work reached a
+presentation before the next close. The full-view GDI trial reached five
+of 341. Its editor test independently observed 209 changed pixels.
+The x64 renderer replay has SHA-256
+`93ea510511fc76f727865c2bf7ea84fb5084e5b96c251326dde56abd4fbcfbb5`.
+[Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15147426906).
+
+#### Native GDI readback phases
+
+The x64 GDI presenter allocated one buffer and reused it 354 times during
+the scan. Of the 341 reopens with independent file activity, all 341 spent
+at least half their time waiting for mapped pixels to become CPU-readable.
+The median wait was 42.59 ms. The whole first frame completed in a median
+53.98 ms. Buffer checkout took 0.0001 ms and the GDI transfer and flush took
+0.155 ms. The buffer reuse removed repeated allocation. The synchronous
+readback still occupied the GUI thread during rendering.
+[Frame and source archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688/artifacts/15147426906) ·
+[Native recorder](../../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
