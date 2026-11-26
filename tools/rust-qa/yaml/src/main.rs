@@ -4,6 +4,7 @@
 mod codec;
 mod encoding;
 mod model;
+mod scalar_breaks;
 
 use model::{Casing, TextRules};
 use serde_json::{Value, json};

@@ -53,7 +53,7 @@ pub fn options() -> Options {
     options
 }
 
-fn classify(error: serde_saphyr::Error) -> Failure {
+pub(super) fn classify(error: serde_saphyr::Error) -> Failure {
     use serde_saphyr::Error;
     match error {
         Error::Budget { .. }
@@ -70,7 +70,8 @@ pub fn parse(input: &str, options: Options, max_bytes: usize) -> Result<RawConfi
     if input.len() > max_bytes {
         return Err(Failure::InputBytes);
     }
-    serde_saphyr::from_str_with_options::<Option<RawConfig>>(input, options)
+    let view = crate::scalar_breaks::compatible_input(input, &options)?;
+    serde_saphyr::from_str_with_options::<Option<RawConfig>>(&view, options)
         .map_err(classify)?
         .ok_or(Failure::InvalidDocument)
 }
@@ -182,6 +183,45 @@ mod tests {
             "watch: {sources: [&s {path: \"owned\\nscalar\"}, *s]}",
             |options| options.budget.as_mut().unwrap().max_recorded_anchor_bytes = 2,
         );
+    }
+
+    #[test]
+    fn legacy_breaks_charge_original_bytes_and_the_full_decoded_scalar() {
+        let input = "future: >-\n  a\u{2028}  b\n";
+        assert!(matches!(
+            parse(input, options(), input.len() - 1),
+            Err(Failure::InputBytes)
+        ));
+        // The key uses six bytes and the recovered scalar uses five. The syntax
+        // view alone would count just three bytes for its folded value.
+        budget_pair(input, |options| {
+            options.budget.as_mut().unwrap().max_total_scalar_bytes = 10
+        });
+        let mut exact = options();
+        exact.budget.as_mut().unwrap().max_total_scalar_bytes = 11;
+        assert!(parse(input, exact, input.len()).is_ok());
+        let padded = format!(
+            "future: >-\n  {}\u{2028}  z\n#{}",
+            "\\x".repeat(24),
+            ".".repeat(128)
+        );
+        assert!(parse(&padded, options(), padded.len()).is_ok());
+    }
+
+    #[test]
+    fn raw_c1_from_a_shipping_block_is_confined_to_that_scalar() {
+        let saved = "future: >-\n  A\u{7f}\u{86}B\u{2028}  C\n";
+        assert!(parse(saved, options(), MAX_TEXT_BYTES).is_ok());
+        for doc in [
+            format!("unknown: bad\u{86}\n{saved}"),
+            format!("{saved}unknown: bad\u{7f}\n"),
+            format!("{saved}# bad\u{86}\n"),
+        ] {
+            assert!(matches!(
+                parse(&doc, options(), MAX_TEXT_BYTES),
+                Err(Failure::InvalidYaml)
+            ));
+        }
     }
 
     #[test]

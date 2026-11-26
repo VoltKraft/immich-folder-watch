@@ -92,9 +92,15 @@ internal static class Program
             ["trailing-path-separator"] = "watch: {sources: [{path: 'media/'}]}\nlogging: {logDirectory: 'logs/'}\n",
             ["unknown-property-casing"] = "Immich: {apiKey: ignored}\nimmich: {ApiKey: ignored-too}\n",
             ["format-mark-in-key"] = "retry:\n  maxAttempts: 7\n  \uFEFFmaxAttempts: 11\n",
+            ["separator-folding"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: |-\n      A\n      \u2028      B\n",
+            ["separator-alias"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: &name >2-\n      Foto\u2028        Nord\n  - path: More\n    albumName: *name\n",
+            ["separator-escaped"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: \"Foto\\L      Nord\"\n",
+            ["separator-controls"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: \"A\\x7fB\\x86C\u2028      Nord\"\n",
+            ["separator-new-key"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: Foto\u2028    extra: one\n",
+            ["separator-underindent"] = "watch:\n  sources:\n  - path: Pictures\n    albumName: >-\n      Foto\u2028    Nord\n",
         };
         foreach (var entry in additional) cases.Add(entry.Key, Encoding.UTF8.GetBytes(entry.Value));
-        var encodingSamples = YamlFileEncodings.Samples().Concat(SavedFolderLists()).Append(SavedAlbumWithFormatMark())
+        var encodingSamples = YamlFileEncodings.Samples().Concat(SavedFolderLists()).Concat(SavedUnicodeProfiles())
             .ToDictionary(sample => sample.Name, StringComparer.Ordinal);
         foreach (var sample in encodingSamples.Values) cases.Add(sample.Name, sample.Bytes);
         var loader = new AppConfigLoader();
@@ -149,16 +155,25 @@ internal static class Program
         Console.WriteLine($"C# YAML reference exported: {rows.Count} cases, {corpusAssertions} accepted-corpus assertions, all Unicode scalars.");
     }
 
-    private static YamlFileEncodings.Sample SavedAlbumWithFormatMark()
+    private static IEnumerable<YamlFileEncodings.Sample> SavedUnicodeProfiles()
     {
         var config = new AppConfig
         {
             Immich = new ImmichSettings { ServerApiUrl = "https://example.invalid/api", ApiKey = "synthetic-example" },
         };
         config.Watch.Sources.Add(new WatchSourceSettings { Path = "Pictures", AlbumName = "\uFEFFFoto", Extensions = [".jpg"] });
-        var saved = new AppConfigWriter().Serialize(config);
+        var writer = new AppConfigWriter();
+        var saved = writer.Serialize(config);
         var encoding = new UTF8Encoding(true);
-        return new("saved-album-format-mark", [.. encoding.GetPreamble(), .. encoding.GetBytes(saved)], encoding.CodePage);
+        yield return new("saved-album-format-mark", [.. encoding.GetPreamble(), .. encoding.GetBytes(saved)], encoding.CodePage);
+        foreach (var (name, separator) in new[] { ("line", "\u2028"), ("paragraph", "\u2029") })
+        {
+            var source = config.Watch.Sources[0];
+            source.Path = "Pictures" + separator + "Nord";
+            source.AlbumName = "Foto" + separator + "Nord";
+            source.ExcludeFileNames = ["Cover" + separator + "Nord.jpg"];
+            yield return new($"saved-{name}-separator", Encoding.UTF8.GetBytes(writer.Serialize(config)), Encoding.UTF8.CodePage);
+        }
     }
 
     private static IEnumerable<YamlFileEncodings.Sample> SavedFolderLists()

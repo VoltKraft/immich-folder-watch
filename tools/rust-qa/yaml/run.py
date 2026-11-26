@@ -104,6 +104,21 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
         raise ValueError("The saved plain album or its file preamble differs")
     if inputs["format-mark-in-key"]["editable"]["retry"]["maxAttempts"] != 7:
         raise ValueError("A key prefixed with U+FEFF replaced the ordinary key")
+    for stem, separator in (("line", "\u2028"), ("paragraph", "\u2029")):
+        name = f"saved-{stem}-separator"
+        case = inputs[name]
+        source = case["editable"]["watch"]["sources"][0]
+        if (source["albumName"] != "Foto" + separator + "Nord"
+                or source["path"] != "Pictures" + separator + "Nord"
+                or source["excludeFileNames"] != ["Cover" + separator + "Nord.jpg"]
+                or case["yaml"] != case["written"]
+                or (profile / (name + ".yaml")).read_bytes() != case["written"].encode("utf-8")):
+            raise ValueError(f"Shipping scalar save differs for {name}")
+    if (inputs["separator-underindent"]["accepted"]
+            or inputs["separator-folding"]["editable"]["watch"]["sources"][0]["albumName"] != "A\n\u2028B"
+            or inputs["separator-escaped"]["editable"]["watch"]["sources"][0]["albumName"] != "Foto\u2028      Nord"
+            or [s["albumName"] for s in inputs["separator-alias"]["editable"]["watch"]["sources"]] != ["Foto\u2028  Nord"] * 2):
+        raise ValueError("The shipping block, escape or alias controls differ")
     for name, count, codec, bom in (
         ("folders-100-utf8", 100, "utf-8", b""),
         ("folders-300-utf8", 300, "utf-8", b""),

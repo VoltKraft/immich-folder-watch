@@ -8,6 +8,20 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+The Fedora x64 YAML adapter now preserves U+2028 and U+2029 in the watch
+path, album name, log directory and filters. All 67 profiles passed. Two
+different managed assemblies from the .NET 3.0.4 release read and resaved
+the same 34 Rust outputs on Fedora. The four-host repeat and an independent
+finding about anchors inside ignored properties are open.
+[Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
+[Anchor witness](rust/rw02-yaml.md#an-anchor-inside-an-ignored-property).
+
+At `ead9fb3` all 20 regular PR checks passed, including all four native
+feasibility jobs. The separate desktop workflow is measuring this revision
+on its own hosts.
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602415) ·
+[Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688).
+
 At `e2f161b`, all 20 regular PR checks passed. Both Ubuntu desktop
 assessments passed all eleven resource limits. Each of the four native
 hosts passed 59 YAML cases with 160 C# readbacks and all 20 realtime

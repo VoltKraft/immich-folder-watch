@@ -388,6 +388,87 @@ SHA-256 `f1b739fe6ea8ab4f600caa5654e9df4c98ffa4e6699e6b0474479b88d00aef21`.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999932815) ·
 [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999349523).
 
+### Physical Unicode breaks in shipping saves
+
+The signed Linux x64 3.0.4 writer saved `Foto\u2028Nord` and
+`Foto\u2029Nord` as 609-byte profiles. In each folded YAML block it
+emitted the actual Unicode separator followed by six indentation spaces.
+Its loader returned the original album name. At `e2f161b` Rust included
+those six spaces in the name. The original files and the comparisons
+are under `artifacts/rust/yaml-assessment/signed-album-separators-x64/first`.
+Its `result.json` has SHA-256
+`614a17e927783f3d60d7b1e4de4092af82c7f20353a3ffe4047a37868d3132ea`.
+
+The adapter uses a separate view of physical line boundaries for the
+pinned scanner. It maps each scalar's byte span back to the original
+decoded file and uses the reported scalar style and block indentation to
+recover its value. This lets an ordinary dedented key end the previous
+value. Extra indentation inside a literal or folded block survives, as
+do spaces after an escaped `\L` or `\P`. The ordinary YAML serializer
+quotes the reconstructed value for the final typed parse, which enforces
+the document, alias and decoded-scalar budgets. The original input-byte
+limit applies before this processing. Both the parser and serializer come
+from the existing filtered sources.
+[Rust scalar handling](../../tools/rust-qa/yaml/src/scalar_breaks.rs) ·
+[Shipping scanner](https://github.com/aaubry/YamlDotNet/blob/v18.1.0/YamlDotNet/Core/Scanner.cs).
+
+For `Foto\u0085Nord` the 3.0.4 writer itself produced a save that its
+loader reopened as `Foto\nNord`. The comparison follows that observed
+value. A tab and the punctuation control `Fotos 2026 – 日本語: #1`
+survived unchanged. The original installed Windows x64 and ARM64 packages
+contained the same Core DLL, and the two Linux packages shared their own
+Core DLL. All four contained identical YamlDotNet bytes. A separate
+Fedora x64 test exercised the managed Windows Core DLL with .NET 10.0.12
+and reproduced the five original readbacks. Its receipt at
+`artifacts/rust/yaml-assessment/shipping-package-assembly-comparison/comparison-9t1snsjs/comparison.json`
+has SHA-256 `4a2e0afc02f3cb1e76a5d7b9ab4c49ebb62d6e9c625045b8c2ada81178ea89e4`.
+
+On Fedora x64 the pinned release build completed all 13 native assessment
+steps. The 67 inputs passed 201 byte comparisons, 332 Rust semantic checks
+and 188 C# readback assertions. Ten inputs with decoding errors remained
+read-only. The two new shipping saves exercise the watch path, album name
+and excluded filename in the same profile. Both the original and changed
+Rust outputs passed the shipping reader. The local native `result.json` at
+`artifacts/rust/yaml-assessment/runs/scalar-separators-fedorax64-03/` has
+SHA-256 `a268585164e42cc0e9f1a19177352f3a196fc7b1bb46c94462718bf87208362e`.
+All 308 indexed files and 125 first-party source hashes matched on replay.
+The signed Fedora five-label exchange with this release binary is at
+`artifacts/rust/yaml-assessment/signed-album-separators-x64/frozen-readback/result.json`,
+SHA-256 `d958b224f5febdaac45efb9f609b6ac12142225f27625522d435fbc6d64afefc`.
+
+The frozen Fedora executable has SHA-256
+`78c63f0fe5e14142ff7bb248019786a7a06fcaf047b43ebf5af0f469ae335c97`.
+The original Windows and Linux managed assemblies each read, saved and
+reopened 34 outputs from that executable on Linux x64. Ten outputs exercise a
+watch path, log directory, excluded directory, excluded filename and extension.
+The other 24 cover both separators in UTF-8 with and without a BOM, UTF-16LE/BE
+and UTF-32LE/BE, before and after a Rust edit. Each original retained its hash.
+Under `artifacts/rust/yaml-assessment/shipping-package-assembly-comparison/`,
+`fields-tn22dsyh/result.json` and `encoded-smbdhp6b/rust-readback.json`
+have SHA-256 `df8ac420dcfbb5fa753b481ec6ed0d85c533753cb7731d33a346fefdbdeec46c`
+and `39701df03730f55b81dde0bb68e7abcb0d15940534c1feb3b7b82360f64c8729`.
+Independent review also checked 38 synthetic profiles and their signed
+resaves with the same adapter source, 76 signed readbacks of Rust output,
+and three rejected indentation cases. The three respective reports under
+`signed-album-separators-x64/independent-04/` have SHA-256
+`ca223aa0f5d1173d5708de1eb37481d7f21599a193a7e3eab2ea14bbb77e0803`,
+`0086f4fd1d24febf3470007363ee96d6abd437a3ebc61e6ee642be68c5cec1f3`
+and `2f6384935eea5ed040d8bed3976f2001d451a8b4d478ec0bcb92e12572361d20`.
+Native Windows and Linux ARM64 execution of the updated adapter is pending.
+
+### An anchor inside an ignored property
+
+The shipping reader skips unknown configuration properties. In a separate
+602-byte ASCII profile, an unknown top-level property defines `&a` and a
+known album name later uses `*a`. The released reader raises
+`AnchorNotFoundException`. Both the earlier Rust reader and the separator
+adapter accept the alias. An anchor defined on an ordinary recognized field
+works in both readers. This difference remains open. The original profile
+and the two Rust comparisons are under
+`artifacts/rust/yaml-assessment/ignored-mapping-anchor/`. Its
+`comparison.json` has SHA-256
+`eb2767d980b4a1dd4400471e42281bcf601edf1fea3dfb70d942c7bfc9696623`.
+
 ## Native runner and observed results
 
 From the repository root with the pinned native toolchains:
