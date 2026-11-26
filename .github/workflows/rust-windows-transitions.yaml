@@ -107,7 +107,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B tools/rust-qa/windows-frame-cost/frame_ready_case.py "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/frame-ready"
           if ($LASTEXITCODE -eq 2) {
-            Write-Output '::notice::The native trace did not show a close serviced while a frame was pending.'
+            Write-Output '::notice::The native trace did not establish both the pending close and the resumed DXGI frame. See the mechanism and resource results.'
             exit 2
           }
           exit $LASTEXITCODE

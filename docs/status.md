@@ -148,8 +148,11 @@ the window thread was already in the DX12 wait that dominated their
 latency. The new private build waits for the next frame inside winit's
 message loop. Offline reconstruction matched all 136 feature rows.
 Seven portable Rust lifecycle tests and the Windows x64 target Clippy
-check passed. Native input, presentation and resource results for this
-new executable are pending.
+check passed. Independent review replayed 744 original Windows job
+resource samples and rejected all twelve controls with a foreign PID.
+The detached comparison preserves a measured idle present rate over
+budget. Native input, presentation and resource results for this new
+executable are pending.
 [Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
 
 ## Compatibility fixes and earlier desktop runs (2026-11-25)
