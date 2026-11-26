@@ -416,3 +416,14 @@ Python added those constant names in 3.13.
 [Linux UAPI](https://github.com/torvalds/linux/blob/v6.8/include/uapi/asm-generic/fcntl.h) ·
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15145705117) ·
 [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15144839474).
+
+The observer now uses the Linux x64 and ARM64 ABI values when the Python
+names are absent. On the existing x64 Noble 24.04 userspace, Python
+3.12.3 reproduced the original exception. With the correction, the
+kernel returned the selected thread ID for the opened directory. Reading
+the directory delivered one `SIGRTMIN` to that thread. Reading the parent
+or reading the watched directory again delivered none. Fourteen local
+controls passed under Noble and Fedora, and the full Fedora installed
+handover passed. Under `artifacts/rust/hosted-installed-handover/45874234228/`,
+`noble-fd.json` has SHA-256
+`2813b98170b1f86616efddadf3ce90343bcfc8792347b7ebf2bdcf04270e1777`.

@@ -1,18 +1,60 @@
 """Check that the two Flatpak prerequisite outcomes cannot be interchanged."""
 
 from copy import deepcopy
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import sqlite3
+import struct
+import sys
 from tempfile import TemporaryDirectory
+import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
 from installed_backup import build_input, open_database_handle, snapshot
 from shipping_upload import empty_permission_probe, endpoint_tuple, FILENAME, IMAGE, multipart_image, verify_asset_posts
+
+
+class DirectoryReadTests(unittest.TestCase):
+    def test_thread_receives_one_access_from_the_held_directory_with_either_fcntl_interface(self):
+        here = Path(__file__).resolve().parent
+        performance = here.parents[2] / 'rust-qa/performance'
+        with patch.object(sys, 'path', [str(here.parent / 'launch'), str(performance), str(performance / 'worker'), *sys.path]):
+            import gui_refusal
+        # Python 3.12 supplies these operations without exporting the extended ownership names.
+        older = SimpleNamespace(fcntl=fcntl.fcntl, F_SETSIG=fcntl.F_SETSIG, F_NOTIFY=fcntl.F_NOTIFY, DN_ACCESS=fcntl.DN_ACCESS)
+        with TemporaryDirectory() as tmp:
+            original = Path(tmp) / 'album'
+            original.mkdir()
+            for api in (fcntl, older):
+                with self.subTest(extended_names=hasattr(api, 'F_SETOWN_EX')), patch.object(gui_refusal, 'fcntl', api):
+                    mask = {signal.SIGRTMIN}
+                    saved = signal.pthread_sigmask(signal.SIG_BLOCK, mask)
+                    fd = os.open(original, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+                    try:
+                        gui_refusal.watch_directory_read(fd)
+                        # Linux F_GETOWN_EX returns the owner type and the actual receiving thread ID.
+                        owner = fcntl.fcntl(fd, getattr(fcntl, 'F_GETOWN_EX', 16), bytes(8))
+                        self.assertEqual(struct.unpack('=ii', owner), (0, threading.get_native_id()))
+                        os.listdir(tmp)
+                        self.assertIsNone(signal.sigtimedwait(mask, 0))
+                        os.listdir(fd)
+                        event = signal.sigtimedwait(mask, 2)
+                        self.assertIsNotNone(event)
+                        self.assertEqual(event.si_signo, signal.SIGRTMIN)
+                        self.assertGreater(event.si_code, 0)
+                        os.listdir(fd)
+                        self.assertIsNone(signal.sigtimedwait(mask, 0))
+                    finally:
+                        os.close(fd)
+                        signal.sigtimedwait(mask, 0)
+                        signal.pthread_sigmask(signal.SIG_SETMASK, saved)
 
 
 class ConfiguredUploadTests(unittest.TestCase):

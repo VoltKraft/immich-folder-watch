@@ -43,7 +43,9 @@ handover, the signed worker opened Rust's live backup, kept the first asset
 mapping, uploaded a second PNG and preserved both SQLite ROWIDs. At
 `0bb39bf` the two Ubuntu handover trials stopped in the Python 3.12
 directory-read observer after the Rust GUI had started its inventory
-worker. The configured upload and SQLite restore need a repeat there.
+worker. The corrected observer passed its kernel test under Noble
+Python 3.12.3 and the full Fedora handover. The configured upload and
+SQLite restore need a repeat on both Ubuntu runners.
 [Installed backup and original requests](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
 [PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
 

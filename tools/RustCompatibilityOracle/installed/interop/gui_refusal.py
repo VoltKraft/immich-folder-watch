@@ -22,6 +22,15 @@ NAME = APP + '.RustAssessment'
 WORKER_EXE = '/app/bin/ifw-performance-worker'
 
 
+def watch_directory_read(fd):
+    # Linux x86_64 and aarch64 use these UAPI values. Python 3.12 omits both names.
+    set_owner = getattr(fcntl, 'F_SETOWN_EX', 15)
+    thread_owner = getattr(fcntl, 'F_OWNER_TID', 0)
+    fcntl.fcntl(fd, set_owner, struct.pack('=ii', thread_owner, threading.get_native_id()))
+    fcntl.fcntl(fd, fcntl.F_SETSIG, signal.SIGRTMIN)
+    fcntl.fcntl(fd, fcntl.F_NOTIFY, fcntl.DN_ACCESS)
+
+
 def workers():
     found = []
     for proc in Path('/proc').iterdir():
@@ -101,9 +110,7 @@ class Inventory:
         signals = {signal.SIGRTMIN}
         saved = signal.pthread_sigmask(signal.SIG_BLOCK, signals)
         try:
-            fcntl.fcntl(fd, fcntl.F_SETOWN_EX, struct.pack('=ii', fcntl.F_OWNER_TID, threading.get_native_id()))
-            fcntl.fcntl(fd, fcntl.F_SETSIG, signal.SIGRTMIN)
-            fcntl.fcntl(fd, fcntl.F_NOTIFY, fcntl.DN_ACCESS)
+            watch_directory_read(fd)
             start = time.monotonic()
             with (self.leaf / (phase + '.jpg')).open('xb') as file:
                 file.write(phase.encode())
