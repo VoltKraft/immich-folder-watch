@@ -1,17 +1,17 @@
 # RW-02 stack decision
 
 **Keep egui/eframe with wgpu as the preferred candidate. RW-02 remains open.**
-At `5efe1f1` both Ubuntu X11 hosts and both retained Windows ARM64
-Mailbox profiles met all eleven same-host limits. Both x64 profiles
-exceeded the scan-close and scan-reopen budgets. They had met them
-at `f155b65` and exceeded them at `989bb33`. The ordinary and reopened
-filename editors, NVDA, Japanese IME and WinRT history passed on both
-Windows hosts. Both captured the original palette for the unnamed
-system scheme without changing it. A visible Shell activation and banner, an actual
-contrast change, mixed DPI and RDP remain open. Both Windows consoles
-supplied one 96-DPI display.
-[Windows measurements](rw02-windows-window.md#native-results-at-5efe1f1) ·
-[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) ·
+At `e2f161b` both Ubuntu desktops and both retained Windows ARM64 Mailbox
+profiles met all eleven same-host limits. The third WPF reference trial
+on Windows x64 stopped during idle resource sampling, leaving that
+comparison unavailable. Both x64 profiles exceeded the scan-close and
+scan-reopen limits in the preceding run at `5efe1f1`. Both Windows hosts
+passed the ordinary and reopened filename trials. The ARM64 ordinary
+second launch reopened the window in the background. Windows Shell
+activation, visible notifications, a reversible contrast change, mixed
+DPI, RDP and ordinary-user cross-session ownership remain open.
+[Windows measurements](rw02-windows-window.md#native-results-at-e2f161b) ·
+[Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-e2f161b) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
 At `e796d30` both Ubuntu desktops again met all eleven X11 budgets. The
@@ -51,8 +51,8 @@ keep the stack selection open. [Stage exit criteria](../rust-rewrite-plan.md#sta
 · [Distribution availability](rw02-portal-upstream.md#additional-distribution-sources-checked-on-2026-11-22).
 
 - **Desktop.** Rust 1.100.0, egui/eframe 0.37.0, winit 0.30.13 and wgpu 30.0.0 are pinned. The four verified normal/build profiles contain 235 packages per Linux target and 135 per Windows target, with AccessKit, clipboard, Vulkan on Linux and DX12 on Windows. The desktop spikes use zbus 5.19.0 on Linux and windows 0.62.2 for Windows Shell/COM. The maintained egui/epaint change uses unicode-bidi 0.3.18. Five unmodified OFL-1.1 Noto assets supply Sans, Mono, Symbols 2, Arabic and CJK JP. Default fonts, optional emoji and inspection are excluded. Retain the source/notice and Wayland relink obligations in the combined candidate. [Manifest](../../tools/rust-qa/gui/Cargo.toml) · [Exact sources, features and fonts](rw02-gui-dependencies.md)
-- **Filesystem and state.** Four hosts passed handle-bound primitives, 5,844 scalar comparisons per casing mode at `93ecc35`, two live-WAL backups and 40 C# storage readbacks each. At `8566f81` each passed 162 YAML byte comparisons, 259 semantic comparisons and 140 C# readbacks using serde-saphyr 2.2.0. Storage uses rusqlite 0.43.0 with SQLite 3.54.1. Windows also passed encrypted loopback SMB. On tested distro Documents portals the required cooperating upload lock returned `ENOSYS`. The private backport enforced it on both architectures. Native x64 also passed an actual package upgrade and rollback with the installed Flatpak. Distribution and package maintenance remain open. The candidate guard passed on both Windows architectures across two sessions of one elevated account. The standard-user trial and old/new installed handover remain open under RI-AC05/08. [Filesystem](rw02-filesystem.md) · [YAML](rw02-yaml.md) · [Storage](rw02-storage-inputs.md) · [Portal control](rw02-portal-upstream.md) · [Writer ownership](rw02-cross-session.md)
-- **Transport and watch events.** All four targets passed sixteen loopback scenarios at `8091469`, including real TLS endpoint-name rejection. Windows ARM64 also ran the transport with its reconstructed import library. Each Ubuntu target passed fifteen watch scenarios and each Windows target passed fourteen. Both Windows hosts observed actual kernel notification loss, replaced the registration and recovered all 514 files. [Transport](rw02-realtime-transport.md#tls-endpoint-identity) · [ARM64 relink](rw02-windows-imports.md) · [Watch events](rw02-watch-events.md)
+- **Filesystem and state.** Four hosts passed handle-bound primitives, 5,844 scalar comparisons per casing mode at `93ecc35`, two live-WAL backups and 40 C# storage readbacks each. At `e2f161b` each passed 177 YAML byte comparisons, 289 semantic comparisons and 160 C# readbacks using serde-saphyr 2.2.0. Storage uses rusqlite 0.43.0 with SQLite 3.54.1. Windows also passed encrypted loopback SMB. On tested distro Documents portals the required cooperating upload lock returned `ENOSYS`. The private backport enforced it on both architectures. Native x64 also passed an actual package upgrade and rollback with the installed Flatpak. Distribution and package maintenance remain open. The candidate guard passed on both Windows architectures across two sessions of one elevated account. The standard-user trial and old/new installed handover remain open under RI-AC05/08. [Filesystem](rw02-filesystem.md) · [YAML](rw02-yaml.md) · [Storage](rw02-storage-inputs.md) · [Portal control](rw02-portal-upstream.md) · [Writer ownership](rw02-cross-session.md)
+- **Transport and watch events.** All four targets passed twenty loopback scenarios at `e2f161b`, including TLS endpoint-name rejection, delayed namespace acknowledgement, continued polling during a stalled WebSocket probe and peer-observed shutdown. Windows ARM64 also ran the transport with its reconstructed import library. Each Ubuntu target passed fifteen watch scenarios and each Windows target passed fourteen. Both Windows hosts observed actual kernel notification loss, replaced the registration and recovered all 514 files. [Transport](rw02-realtime-transport.md#tls-endpoint-identity) · [ARM64 relink](rw02-windows-imports.md) · [Watch events](rw02-watch-events.md)
 - **Native logging and combined inputs.** The Windows Event Log passed on both targets. Both Ubuntu journals returned six records at the expected priorities. The combined development profile resolves 351 active external inputs across the four architectures, including three reconstructed sources. Both Ubuntu hosts built offline and relinked a modified Wayland binding. Both Windows hosts passed the combined native smoke. All eleven canonical graph and inventory files matched across the four targets. The packaged candidate inventories, notices and SBOM remain open. [Platform logs](rw02-platform-logs.md) · [Combined graph and reconstruction](rw02-combined-profile.md) · [Dependency rules](../rust-desktop-standard.md#rds-07-dependencies-and-licensing)
 
 At `72fff40`, all four new archives matched their published digests. Both

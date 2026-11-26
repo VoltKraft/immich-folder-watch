@@ -110,6 +110,42 @@ handler was identical in both comparisons. The full native suite's
 `sessions.json` has SHA-256
 `769508629866d3efe0f9befdd2212bdc36f1b31a2a84a8634e14f3ef3b779ddf`.
 
+### Four native transport results at e2f161b
+
+The native Windows and Ubuntu x64 and ARM64 clients each passed all 20
+loopback scenarios. On every host, the peer recorded six polling
+disconnects and five WebSocket disconnects in their expected namespaces.
+Each WebSocket disconnect was followed by close code 1000 with the reason
+`io client disconnect`. Four peers replied. The fifth deliberately
+withheld its reply and the client reported a timeout after one attempt.
+The table gives total process times including the 850 ms fixture budget.
+[Native assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795).
+
+| Host and original archive | Polling pongs during stalled probe | Stop before namespace ACK | Stop with close reply withheld |
+| --- | ---: | ---: | ---: |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15000092332) | 8 | 853 ms | 2,855 ms |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15000400813) | 8 | 853 ms | 2,854 ms |
+| [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999848146) | 14 | 860 ms | 2,891 ms |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15000601243) | 14 | 878 ms | 2,886 ms |
+
+When the probe stalled, all four clients received one subscribed event on
+their original polling session, answered every heartbeat and sent the final
+polling disconnect. The early-ACK case delivered an event on either side of
+the upgrade. The late-ACK case drained its pending polling pong, upgraded,
+received its namespace acknowledgement on WebSocket and delivered the
+event. Stopping before acknowledgement sent no disconnect packet.
+[Peer assertions](../../tools/rust-qa/realtime/verify.py).
+
+Independent readback matched the four ZIP digests to GitHub, verified all
+ten output hashes per archive and reconstructed each native dependency
+graph digest. All 19 source hashes per host matched the recorded revision
+with its checkout line endings. Both Windows hosts used CRLF for
+`rust/toolchain-inputs.json`, `audit-graph.py` and `check-toolchain.py`.
+The local comparison under `artifacts/rust/hosted-realtime/45565563795/`
+retains the original archives, API metadata and replay script. Its
+`four-host-realtime.json` has SHA-256
+`2c740c04b931d06d067fd28ba5b8c92bb5c741ca11cc22926262cb5f4171c297`.
+
 ### TLS endpoint identity
 
 The TLS observer now distinguishes a trusted issuer from a certificate that

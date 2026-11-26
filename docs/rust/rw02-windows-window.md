@@ -954,3 +954,31 @@ required interval between a confirmed reopen and the next close request.
 The minimum was five. This run therefore has no qualified full GDI
 comparison. The small GDI color control met its four timing limits.
 [x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).
+
+### Native results at e2f161b
+
+On ARM64 both retained Mailbox profiles passed all eleven same-host WPF
+limits across three trials each. With one queued frame, close and reopen
+during inventory took 3.27 and 3.85 ms at p95. With two they took 3.51
+and 4.02 ms. The limits were 13.53 and 14.52 ms. FIFO exceeded the
+scan-close limit at 18.33 ms. Replay of the original file-read and
+presentation traces reproduced the measurements. In the ordinary
+second-launch trial the original window reopened and the inventory
+worker kept its process identity. After 41 samples over 2.02 seconds
+the window still lacked foreground and keyboard focus. Launching from
+the foreground keyboard fixture passed on the same runner.
+[ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15004635906).
+
+On x64 the first two WPF trials completed. During the third trial the
+idle resource sampler called `OpenProcess(0x0410)` on a process selected
+by the process-tree observer and received Windows error 5 (access denied).
+The traceback records the failed call but omits the PID and executable.
+The runner produced no reference budget or Rust timing comparison.
+Ordinary second launch and the foreground keyboard launch both passed.
+[x64 job and traceback](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/job/139039365305) ·
+[x64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15003283547).
+
+Replaying the original PNGs and input records verified eight distinct
+glyphs and all three filename edits in both the ordinary and reopened
+editors on each architecture. Each runner had one 1024 × 768 display at
+96 DPI on a console session. Neither supplied a mixed-DPI or RDP trial.

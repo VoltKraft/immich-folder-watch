@@ -365,6 +365,29 @@ unchanged configuration reproduced the 590 original bytes. The local
 receipt at `artifacts/rust/yaml-assessment/format-mark-original-signed-x64/result.json`
 has SHA-256 `2befca957f6b93bfb6a6a694bfc449b2850f7f4cc7496161a3d6f458370a960e`.
 
+### Native format mark exchange at e2f161b
+
+With a UTF-8 file preamble, the C# save occupied 593 bytes on both Linux
+hosts and 621 bytes on both Windows hosts. Each file contained a second
+`EF BB BF` sequence at the beginning of the album name. On all four hosts
+Rust preserved that character through a read, write and edit. The unchanged
+615-byte and edited 869-byte Rust outputs matched the two inputs read by
+the signed 3.0.4 Flatpak assemblies above, byte for byte. In the separate
+45-byte input the unknown property `\uFEFFmaxAttempts` left the ordinary
+retry limit at seven. C# also read back its deliberate edit to nine.
+
+Each native host completed 59 cases on .NET 10.0.15, with 177 byte
+comparisons, 289 semantic comparisons and 160 C# readback assertions.
+All ten inputs with decoding errors remained read-only. Detached replay
+verified the Actions digest, 285 indexed files and 124 first-party source
+hashes per archive. The combined receipt at
+`artifacts/rust/hosted-yaml/45565563795/four-host-format-mark.json` has
+SHA-256 `f1b739fe6ea8ab4f600caa5654e9df4c98ffa4e6699e6b0474479b88d00aef21`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999328017) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15000251627) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999932815) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/14999349523).
+
 ## Native runner and observed results
 
 From the repository root with the pinned native toolchains:

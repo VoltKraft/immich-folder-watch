@@ -29,7 +29,7 @@ The [RW-01 feature/lifecycle mapping](rw01-parity.md),
 | Package | State | Required evidence / next dependency |
 | --- | --- | --- |
 | RW-01 | Accepted 2026-11-20 | [Four native reference runs and reviewed corpora](rw01-native-reference.md), plus the feature, security and lifecycle cases above |
-| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-5efe1f1), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
+| RW-02 | In progress | [Four native filesystem, lifecycle-policy and scalar runs](rw02-filesystem.md#four-native-hosts), [legacy codecs](rw02-legacy.md), [storage and WAL](rw02-storage-inputs.md), [fault recovery](rw02-storage-faults.md), [combined graph and offline relink](rw02-combined-profile.md), [native Windows](rw02-windows-window.md#native-results-at-e2f161b), [native Ubuntu](rw02-native-gui.md#ubuntu-native-results-at-e2f161b) and [realtime transport](rw02-realtime-transport.md). The [Documents grant trials](rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) completed all 110 operations per architecture. The [installed Ubuntu x64 comparison](rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest) passed upgrade, contention and rollback. The [stack decision](rw02-stack-decision.md) records the remaining native requirements. |
 | RW-03 | Not started | RW-02 accepted; two-way codecs, WAL backup/recovery, writer exclusion, independent safe-fs review and adversarial native tests |
 | RW-04 | Not started | RW-03 accepted; all upload modes/order/filter/retry/history and differential protocol/crash evidence |
 | RW-05 | Not started | RW-04 accepted; complete bidirectional reconciliation, repairs, tombstones, realtime and deletion gates |
@@ -40,27 +40,26 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
-The Fedora x64 qualification now includes a C#-saved album with leading
-U+FEFF, observation of sub-tick Linux file times through the native file
-handles in each implementation, namespace acknowledgement on either
-transport, and the peer's actual disconnect packets on normal shutdown.
-[YAML and shipped readback](rw02-yaml.md#leading-ufeff-in-a-saved-album-name) ·
-[Native file time](rw02-legacy.md#linux-file-modification-times) ·
-[Session shutdown](rw02-realtime-transport.md#stopping-an-established-session) ·
-[Upgrade and polling fallback](rw02-realtime-transport.md#namespace-acknowledgement-during-a-transport-upgrade).
+At `e2f161b` each of the four native hosts passed 59 YAML cases including
+160 C# readback comparisons. All four preserved the leading U+FEFF in a
+saved album and passed 20 realtime scenarios, including namespace
+acknowledgement over either transport and peer-observed disconnects.
+On both Ubuntu architectures the original and relinked Rust builds read
+the expected sub-microsecond timestamp from the held file.
+[Four-host YAML](rw02-yaml.md#native-format-mark-exchange-at-e2f161b) ·
+[Four-host transport](rw02-realtime-transport.md#four-native-transport-results-at-e2f161b) ·
+[Offline relinks](rw02-combined-profile.md).
 
-At `5efe1f1` both retained Windows ARM64 Mailbox profiles met all eleven
-same-host WPF limits. Both x64 profiles met nine and exceeded close and
-reopen during inventory. The ordinary and reopened filename controls,
-NVDA, Japanese IME and WinRT history passed on both. A real visible
-Windows tray activation and notification remain open. The corrected
-contrast trials captured the unnamed original palettes without changing
-them. Both hosts supplied one 96-DPI console display. Mixed DPI, RDP
-and ordinary-user cross-session exclusion remain open.
-[Timings](rw02-windows-window.md#native-results-at-5efe1f1) ·
-[Filename edits](rw02-windows-text.md#ordinary-and-reopened-filenames-at-5efe1f1) ·
-[Contrast](rw02-appearance.md#native-read-only-contrast-baseline-at-5efe1f1) ·
-[Tray and notifications](rw02-windows-services.md#native-notification-observations-at-5efe1f1).
+Both retained Windows ARM64 Mailbox profiles met all eleven same-host
+WPF limits at `e2f161b`. The original window reopened on an ordinary
+second launch but stayed in the background. On x64 the third WPF trial
+stopped during idle sampling, so this revision has no x64 budget.
+At `5efe1f1` the x64 profiles had each exceeded two limits. Both
+architectures passed the ordinary and reopened filename controls at
+`e2f161b`. Visible tray activation and notification, a reversible
+contrast change, ordinary-user cross-session ownership, mixed DPI and
+RDP still require native evidence.
+[Windows measurements](rw02-windows-window.md#native-results-at-e2f161b).
 
 Every native host at `4e3dbc4` added one case-compatible Rust row in
 each of its two C# databases. Both subsequent C# upserts preserved its
@@ -81,9 +80,9 @@ image once across both lifetimes. This adds installed evidence for a
 shipping worker consuming Rust's backup under RI-AC03.
 [Installed backup, restart and readback](rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
 
-At `5efe1f1` both Ubuntu desktops passed all eleven same-host performance
-checks. The x64 GUI responded to all 319 requests made during observed file
-reads. ARM64 answered all 178. [Linux desktop evidence](rw02-native-gui.md#ubuntu-native-results-at-5efe1f1).
+At `e2f161b` both Ubuntu desktops passed all eleven resource checks. The
+GUI answered all 117 x64 and 184 ARM64 requests issued during observed
+file reads. [Ubuntu desktop evidence](rw02-native-gui.md#ubuntu-native-results-at-e2f161b).
 
 | Criteria | Current result | Evidence needed for completion |
 | --- | --- | --- |

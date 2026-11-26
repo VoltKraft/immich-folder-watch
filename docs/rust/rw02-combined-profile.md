@@ -88,6 +88,14 @@ source hashes matched `c51491b`. The local result at
 `artifacts/rust/combined-profile/runs/mtime-fingerprint-02/result.json`
 has SHA-256 `1a82fbdc3a1076fa5c76d7052f4ad9ce6b8561602ec66a6630c105f8f711b0a3`.
 
+Both native Ubuntu hosts at `e2f161b` reported
+`2026-11-21T00:00:00.0000001+00:00` for the synthetic file in the
+original and relinked executables. Detached replay checked 74 first-party
+inputs against Git and all 21 indexed outputs per host. The x64 compiler
+reported 402 units and ARM64 reported 401. Both relinks recovered the
+same SQLite value after the Wayland interface changed from version 1 to 2.
+[x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001344710) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001819213).
+
 ## Reproduction
 
 Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the disposable GitHub-hosted x64 or ARM64 host, the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)

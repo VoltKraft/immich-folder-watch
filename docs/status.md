@@ -8,6 +8,30 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+At `e2f161b`, all 20 regular PR checks passed. Both Ubuntu desktop
+assessments passed all eleven resource limits. Each of the four native
+hosts passed 59 YAML cases with 160 C# readbacks and all 20 realtime
+scenarios. Both Ubuntu offline relinks preserved the exact SQLite timestamp
+read from the held file. [YAML originals](rust/rw02-yaml.md#native-format-mark-exchange-at-e2f161b) ·
+[Realtime originals](rust/rw02-realtime-transport.md#four-native-transport-results-at-e2f161b) ·
+[Ubuntu measurements](rust/rw02-native-gui.md#ubuntu-native-results-at-e2f161b) ·
+[Four-target feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563616).
+
+Both Windows desktop assessments failed. On ARM64 both retained Mailbox
+profiles met all eleven WPF limits. An ordinary second launch reopened the
+original window in the background. On x64 the third WPF trial failed while
+opening a process to sample idle resources. Two complete trials survive,
+but no x64 reference budget was produced. The next measurement needs a
+complete three-trial reference on its own host. Both Windows filename
+editors passed. Visible Shell activation and notification, a reversible
+contrast change, mixed DPI, RDP and standard-user cross-session ownership
+remain open. A dedicated Windows medium or test VM is currently unavailable.
+The Ubuntu package trial establishes feasibility. Distribution is undecided.
+[Windows receipts and failure](rust/rw02-windows-window.md#native-results-at-e2f161b) ·
+[Completed desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795).
+
+## Compatibility fixes and earlier desktop runs (2026-11-25)
+
 On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02
 compatibility findings. A saved album beginning with U+FEFF now survives
 Rust read, edit and C# save at `83fd2d0`. At `c51491b` Rust matched all

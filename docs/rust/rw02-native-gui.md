@@ -856,6 +856,25 @@ operations. The combined desktop readback has SHA-256
 `0c70111c32486bacc884134738a343082c4196ed5454325aaadd16b0f1caa60a`.
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993553466) · [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14993788718).
 
+### Ubuntu native results at e2f161b
+
+Both Ubuntu desktops met all eleven limits in three inventory trials of
+100,000 files each. Every request issued during observed file reads also
+completed during those reads. Two ordinary secondary launches reopened the
+original window and preserved the running inventory worker on each host.
+
+| Native archive | Rust / Avalonia startup (ms) | Scan reopen p95 / limit (ms) | Scan close p95 / limit (ms) | Requests completed during reads |
+| --- | ---: | ---: | ---: | ---: |
+| [x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001344710) | 172.50 / 908.98 | 1.17 / 15.84 | 0.46 / 15.84 | 117 of 117 |
+| [ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001819213) | 208.84 / 1,283.77 | 0.96 / 16.26 | 0.37 / 15.60 | 184 of 184 |
+
+The original archive bytes matched the Actions digests. Detached replay
+recomputed the budgets and the trial summaries, and checked the Plasma panel
+clicks, Orca audio, Japanese composition, portal grants, GPU recovery and
+the 110 Documents-portal operations per host. The joint readback at
+`artifacts/rust/hosted-desktop-storage/45565563795/ubuntu-four-target-run-linux-desktop-readback.json`
+has SHA-256 `50394b535af8da80aca7e2cfc649ea46f689f4b8cf2bc7c43f9fa33df2e18c5e`.
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop
