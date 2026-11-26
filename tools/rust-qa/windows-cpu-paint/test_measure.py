@@ -9,8 +9,9 @@ spec = importlib.util.spec_from_file_location("ifw_cpu_case_test", Path(__file__
 case = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(case)
 ROOT = dict(pid=47, hwnd=500, tid=19, width=640, height=480)
-DEVICE = ("ADAPTER Dx12 Cpu Microsoft Basic Render Driver\nGRAPHICS_READY generation=1\n"
-          "GRAPHICS_MEMORY generation=1 hint=MemoryUsage\nDRAINED passes=2")
+DEVICE = ("GRAPHICS_ATTEMPT generation=1 policy=preferred\nGRAPHICS_MEMORY generation=1 hint=MemoryUsage\n"
+          "GRAPHICS_READY generation=1\nADAPTER Dx12 Cpu Microsoft Basic Render Driver\n"
+          "WINDOW_RELEASED passes=2\nDRAINED passes=2")
 
 
 def transfer(seq, count, begin, *, partial=False, lines=480, geometry=True):
@@ -69,6 +70,26 @@ class FrameEvidence(unittest.TestCase):
                          source+"\nSTAGING_COPY"):
                 with self.subTest(text=text), self.assertRaises(ValueError):
                     path.write_text(text)
+                    case.generation(path)
+
+    def test_active_device_loss_cannot_pass_as_normal_quit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "subject.log"
+            source = receipt() + "\n" + DEVICE
+            for reason in ("Unknown", "Destroyed"):
+                for boundary in ("WINDOW_RELEASED", "DRAINED"):
+                    with self.subTest(reason=reason, boundary=boundary):
+                        loss = f"GRAPHICS_LOST generation=1 reason={reason}"
+                        path.write_text(source.replace(boundary, loss + "\n" + boundary))
+                        with self.assertRaisesRegex(ValueError, "without loss or retry"):
+                            case.generation(path)
+            for changed in (source.replace("GRAPHICS_READY generation=1", "GRAPHICS_READY generation=2"),
+                            source.replace("GRAPHICS_ATTEMPT generation=1", "GRAPHICS_ATTEMPT generation=2"),
+                            source + "\nGRAPHICS_LOST generation=2 reason=Unknown",
+                            source + "\nGRAPHICS_RETRY generation=1",
+                            source + "\nGRAPHICS_ERROR device_lost=true detail=None"):
+                with self.subTest(changed=changed), self.assertRaisesRegex(ValueError, "without loss or retry"):
+                    path.write_text(changed)
                     case.generation(path)
 
     def test_all_eleven_limits_use_original_comparisons_including_a_real_failure(self):

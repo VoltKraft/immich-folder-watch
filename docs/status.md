@@ -22,6 +22,15 @@ writer exclusion remain open.
 [Windows restore archives](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6) ·
 [Native Windows file traces](../tools/rust-qa/windows-msi-interop/file-trace.md).
 
+An independent review found that the x64 CPU renderer reader accepted a
+late WARP device loss when the process then quit. The reader now checks
+the first device's attempt, memory policy and readiness in order, and
+rejects an active loss, error or retry. Twelve ordinary native log files
+passed the device check. A native device-recovery log was correctly
+rejected for this timing trial. All 18 portable checks and three Rust
+raster tests passed.
+[CPU measurement and readback](../tools/rust-qa/windows-cpu-paint/README.md).
+
 At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
 each passed 82 YAML profiles and 224 C# readbacks. Independent replay
 verified all 448 output files, including edits to profiles with Unicode

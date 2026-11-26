@@ -13,7 +13,9 @@ clamped edges, opaque surface and mesh primitives. It checks dimensions,
 indices and texture updates before drawing. The observer binds each
 completed transfer to the HWND, UI thread and QPC clock, counts idle
 frames and verifies that edits on both sides of a close and reopen
-produced new visible pixels. ETW observes the separate worker reading
+produced new visible pixels. The idle and scan processes must each keep
+their first WARP device through Quit, with no active device loss or retry.
+ETW observes the separate worker reading
 100,000 synthetic inputs twice. All eleven same-host budgets apply.
 [Original offscreen pixel comparisons](headless/README.md).
 

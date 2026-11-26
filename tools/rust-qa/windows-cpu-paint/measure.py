@@ -41,11 +41,21 @@ def verify_build(out, record):
     cpu_build.verify(out, record)
 
 
+def check_device_lifetime(lines):
+    # Graphics::finish marks the generation RELEASED before dropping its device.
+    # The lost callback reports only when it changes ACTIVE to LOST, even for reason=Destroyed.
+    phases = ("GRAPHICS_ATTEMPT ", "GRAPHICS_MEMORY ", "GRAPHICS_READY ", "GRAPHICS_LOST ",
+              "GRAPHICS_ERROR ", "GRAPHICS_RETRY ", "GRAPHICS_UNAVAILABLE ")
+    observed = [line for line in lines if line.startswith(phases)]
+    if observed != ["GRAPHICS_ATTEMPT generation=1 policy=preferred", "GRAPHICS_MEMORY generation=1 hint=MemoryUsage",
+                    "GRAPHICS_READY generation=1"]:
+        raise ValueError(f"Expected one retained WARP device without loss or retry, observed {observed}")
+
+
 def generation(log):
     lines = log.read_text(encoding="utf-8").splitlines()
-    for prefix, expected in (("CPU_PAINT_MODE", MODE), ("ADAPTER ", "ADAPTER Dx12 Cpu Microsoft Basic Render Driver"),
-                             ("GRAPHICS_READY ", "GRAPHICS_READY generation=1"),
-                             ("GRAPHICS_MEMORY ", "GRAPHICS_MEMORY generation=1 hint=MemoryUsage")):
+    check_device_lifetime(lines)
+    for prefix, expected in (("CPU_PAINT_MODE", MODE), ("ADAPTER ", "ADAPTER Dx12 Cpu Microsoft Basic Render Driver")):
         if [line for line in lines if line.startswith(prefix)] != [expected]:
             raise ValueError("Missing the retained CPU painter or the original WARP adapter initialization")
     if (sum(line.startswith("DRAINED passes=") for line in lines) != 1
