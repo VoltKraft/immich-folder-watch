@@ -1,5 +1,8 @@
 # RW-02 same-account writer ownership across Windows sessions
 
+The [Server 2025 x64 console and RDP trial](#standard-user-console-and-rdp-handover-on-windows-server-2025-x64)
+passed under an ordinary account. The corresponding ARM64 result remains open.
+
 The native writer opens one pre-existing empty file and calls Rust’s `File::try_lock`. The test requires two processes with the same account SID in distinct Windows OS sessions, refusal in both directions and orderly release followed by reacquisition. The historical old/new coordinator and installed handover have their own evidence. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Old/new activation](rw02-instance.md)
 
 ## What the hosted machines established
@@ -339,3 +342,75 @@ has SHA-256 `e206e1c3a63b58f16b670b24f850ddb98602091e45f31f453cc3b1af5de6d420`.
 | --- | --- |
 | [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14965426353) | `d0a944240bac0f67e11a52f857654f927174e726d5000e7728700b80ef7f45b4` |
 | [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14964748110) | `7073381142cc72bd54948cd1d6ac37f31ca6909c363ea11014a46afb819beb21` |
+
+## Standard-user console and RDP handover on Windows Server 2025 x64
+
+On November 27, 2026, the same ordinary account held two active sessions in
+a disposable Server 2025 x64 guest. Windows Terminal Services reported
+session 1 on the console (protocol 0) and session 2 over RDP (protocol 2).
+The controller independently identified each suspended native writer before
+letting it run. All five had the same account SID, a non-elevated primary
+token at Medium integrity, zero enabled administrative groups, zero
+privileges outside the ordinary set, zero capabilities and no UIAccess.
+
+| Order | Console session 1 | RDP session 2 |
+| --- | --- | --- |
+| 1–3 | PID 4116 acquired the file and released it after the refusal | PID 8404 received `WRITER_BUSY` |
+| 4–6 | PID 576 received `WRITER_BUSY` | PID 5536 acquired the file and released it after the refusal |
+| 7–8 | A new PID 2068 acquired and released the file | |
+
+All eight events identified the same volume `13001045781266693700` and
+file `844424930293195`. Each exit succeeded. The controller verified
+participant exit and removed the synthetic profile. The five processes ran
+the same Rust file-lock probe. The C# oracle ran its read-only `identity`
+command and returned the Windows account SID. Installed legacy/candidate
+handover and the ARM64 standard-user guard retain their own acceptance
+checks. [Rust writer](../../tools/rust-qa/instance/main.rs) ·
+[C# oracle](../../tools/rust-qa/instance/Program.cs) ·
+[Installed handover observations](rw02-instance.md)
+
+### Repeating the x64 run
+
+1. Use a disposable Server 2025 Desktop Experience guest with RDP enabled
+   for the synthetic ordinary account. In the guest copy, set the Remote
+   Desktop Session Host policy **Restrict Remote Desktop Services users to a
+   single Remote Desktop Services session** to Disabled. Sign in as that
+   account on the console and over RDP. Run `query user` and confirm two
+   distinct, active session IDs for the same account.
+2. Use the source checkout at `c1867dbecad51fc69a07649259b5331293d98596`
+   with unmodified source bytes in both sessions. Put the same native Python
+   and Microsoft x64 .NET 10 runtime on the path in both. The trial verified
+   the 10.0.12 runtime ZIP against Microsoft's SHA-512. Preserve the original
+   x64 ZIP from Actions run `46062734833` at
+   `1c9a7ee6388450a0bcbf9afa947ea4138a6441df`. Its SHA-256 was
+   `e432f3837570752f9806891195def9e88bc0befef82375a1327953d3a403bf95`.
+   [Native writer artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46062734833/artifacts/15230355213)
+3. From the standard-user console, create a fresh test directory as shown
+   below. Set `$WriterZip` to the original ZIP's local path and run the
+   archived-build controller command above with the Actions digest.
+   From the RDP session run the peer command with the printed directory.
+
+```powershell
+$MarkedVmScratch = Join-Path $env:LOCALAPPDATA ("IfwWriter-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory $MarkedVmScratch | Out-Null
+$marker = Join-Path $MarkedVmScratch ".ifw-existing-session-test"
+[IO.File]::WriteAllBytes($marker, [Text.Encoding]::UTF8.GetBytes("Immich Folder Watch isolated Windows test VM; synthetic data only`n"))
+$ActionsDigest = "e432f3837570752f9806891195def9e88bc0befef82375a1327953d3a403bf95"
+```
+
+The first attempt stopped before `WRITER_HELD`. The harness had dropped the
+local fixture flag from the child environment. At `c1867db` it forwards the
+selected fixture identity and retains both participants' completion records.
+The retry used the original Rust binary and oracle. All 33 portable
+cross-session tests passed. An independent replay checked four native files,
+nine native source files, eleven observer source files and all seven indexed
+guest observations. The local evidence directory
+`artifacts/rust/local-windows-server-2025-x64/20261127/writer-c1867db/`
+contains both attempts, the original build ZIP, guest session receipts and
+`replay.py`. Run the replay from the repository root.
+
+| Successful run | SHA-256 |
+| --- | --- |
+| Original observation ZIP | `bea955d0b5fc9c60afc84723c728020fccfbbed624e1daebc3e1d03fd1b1a94f` |
+| Guest `result.json` | `fffc44bd377fce4c996ed4e49d92a2d00de057a2ae41dee1bbb15357836b968c` |
+| Independent `replay.json` | `e490c9afa9d4e17251d36a82a37d48adf343602f99b636f16c932308eb6fd517` |
