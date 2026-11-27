@@ -284,6 +284,8 @@ to reconcile project decisions, defaults, and recorded state.
   with the isolated loopback peer and retain the final SQLite row.
   For the [signed worker's restart from Rust's live backup](docs/development.md#installed-flatpak-worker-backup-on-fedora-x64),
   retain the original main/WAL pair and both installed processes' asset requests.
+  Bind each [signed Flatpak Quit](docs/rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore)
+  to its menu owner, sandbox proxy and original process exit.
   The [Ubuntu installed handover](docs/development.md#installed-worker-handover-on-native-ubuntu-runners)
   uses the signed native Platform and GL extension with source-bound GUI,
   worker and backup executables on the matching runner.

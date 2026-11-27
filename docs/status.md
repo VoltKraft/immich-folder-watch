@@ -84,7 +84,10 @@ On Fedora x64 the revised test bound each of four menu replies to the
 original signed GUI's Flatpak proxy. Both configured workers logged
 shutdown, the two mappings survived restart and the installation was empty
 at the end. A private bus test covered the precise disconnected-recipient
-reply. [Installed Quit observations](rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore).
+reply. At `cd15d1c`, both native Ubuntu hosts also passed all four Quit
+observations. Each restarted worker kept ROWID 1, uploaded the new PNG as
+ROWID 2 and exited normally. Both private installs were empty after removal.
+[Installed Quit observations](rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore).
 
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The

@@ -503,6 +503,22 @@ result has SHA-256 `6cdd171686a03aad6b5dd35f485f6b8198669a3e8238634b2200809a4875
 and the observer source ZIP has SHA-256
 `0279a18cb9e12e6c676091ff7eacb0476fb1767529d8c70f992c5182674e059c`.
 
+At `cd15d1c` both native Ubuntu 24.04 hosts completed the signed
+handover. All four menu owners on each architecture returned a positive
+reply to their own click. Each configured worker logged shutdown. Detached
+replay verified the 16 WAL frames, the original mapping at ROWID 1 and
+the newly uploaded file at ROWID 2 on both hosts. Each run removed both
+Flatpak refs and released its processes, sockets and bus names.
+
+| Native archive | Original ZIP SHA-256 | Quit call serials, in run order |
+| --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765/artifacts/15191566144) | `8f6abbf6d1c5ab7d256a25891d517121ab849958db0cca8ac1831deb3b5b2b78` | 9, 168, 176, 184 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765/artifacts/15191331698) | `f83ce900dffad90a252c2017781f96fbd981d66463abed9b32bc463566072375` | 9, 182, 190, 198 |
+
+The two-architecture readback under
+`artifacts/rust/hosted-installed-handover/45980883765/comparison.json`
+has SHA-256 `a2f9f428df05f99ca9f8e94914821a7e268ac5ddb69e231d1c03d9cde1c89ff9`.
+
 ### Installed Windows worker restart at 2dd5f93
 
 Both original Windows 3.0.4 packages uploaded the first synthetic PNG to
