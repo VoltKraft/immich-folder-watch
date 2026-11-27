@@ -19,8 +19,10 @@ Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
 `6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
 identifiers and retry bodies from the open file. Their upload reports
 match the Fedora report byte for byte. The 22 transport cases and four
-unit tests passed on Windows x64 and ARM64 as well. The two Windows Rust
-upload readbacks at that revision are pending.
+unit tests passed on Windows x64 and ARM64 as well. Windows ARM64 also
+passed all five held-file upload cases and reproduced the 22 wire cases
+after offline reconstruction of its import library. The Windows x64
+combined upload readback at that revision is pending.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
@@ -46,9 +48,12 @@ connection. Native Fedora x64 passed all 33 wire scenarios and five unit
 tests. Root and named subscriptions recovered, including after a refused
 direct request. A redirected direct request sent zero traffic to the other
 origin. The original polling-only path also recovered.
-On the same pre-admission upgrade refusal the signed client delivered
-zero events. Rust delivered one on polling and a second after a later
-transport loss. This initial refusal remains under comparison.
+On an initial upgrade refusal the signed client delivered zero events.
+Rust at `91ca61b` delivered one on polling and a second after a later
+transport loss. Pausing polling during promotion corrected this difference
+on Fedora x64. Six refusal trials across both namespaces delivered zero
+events and completed 59 REST requests each. Both successful promotion
+controls recovered after abrupt loss.
 [Direct reconnect and signed reference](rust/rw02-realtime-transport.md#opening-the-next-session-after-an-abrupt-disconnect).
 
 The signed 3.0.4 client accepted both the initial and direct WebSocket
@@ -56,6 +61,14 @@ reconnect handshakes when the server omitted `maxPayload`. Rust now
 accepts this input with the local 4 MiB bound. All 34 transport cases
 and six unit tests passed on Fedora x64.
 [Original packets and limits](rust/rw02-realtime-transport.md#opening-a-session-without-maxpayload).
+
+The revised upgrade passed the 35-case native wire suite and six unit tests
+on Fedora x64. A separate comparison used the original Socket.IO and
+Engine.IO server versions from Immich 3.4.2. Both signed .NET 3.0.4 and
+Rust connected, received an event, reconnected after abrupt loss and
+received another event in both tested namespaces. Hosted repeats for
+these changes are pending.
+[Upgrade, refusal and recovery](rust/rw02-realtime-transport.md#pausing-polling-before-the-initial-websocket-upgrade).
 
 On Fedora x64 the full offline build reproduced the same five Rust upload
 results. All 78 source inputs matched `6cd7757`. The modified Wayland

@@ -29,7 +29,9 @@ For an advertised WebSocket upgrade, the client checks the HTTP 101 response,
 the Connection and Upgrade fields, and the RFC 6455 challenge. Unrequested
 extensions or subprotocols fail negotiation. The same HTTP/TLS connection
 becomes a bounded tokio-tungstenite stream. The client exchanges
-`2probe`/`3probe` before sending `5`. A refused probe leaves polling usable.
+`2probe`/`3probe` before sending `5`. During initial promotion it pauses
+SID-bound polling. On failure before namespace admission, periodic REST
+inventory continues without admitting buffered Socket.IO events.
 An uncertain final upgrade write ends the session. A server heartbeat determines
 the next deadline, capped at 120 seconds. The initial handshake and the upgrade
 have ten-second ceilings. Shutdown cancels an outstanding read or reconnect delay
@@ -208,9 +210,9 @@ before namespace admission. In both signed trials the polling connection
 closed before that response. The server saw no later SID-bound polling
 GET, application event or retry during 95 seconds. Separate runs cancelled
 cleanly after 42 seconds and completed two requested REST inventory reads.
-On the same peer the Fedora Rust client admitted an event over polling,
+On the same peer the Fedora Rust client at `91ca61b` admitted an event over polling,
 then admitted a second after direct recovery from a later polling failure.
-Initial upgrade admission therefore still differs. The paired comparison
+The paired comparison of that difference
 has SHA-256 `ee5362d9df916405ea5690ad0976fc0fef07f9547569fc9c8c6b87ac1f507977`.
 
 The same pre-admission difference appeared after an HTTP 302 response and
@@ -221,6 +223,51 @@ All eight loopback redirect receivers saw zero client connections. On the
 101 path the signed client sent `5` first. Rust sent the Engine.IO
 `2probe` before attempting to commit the upgrade.
 [Engine.IO upgrade protocol](https://socket.io/docs/v4/engine-io-protocol/#upgrade).
+
+### Pausing polling before the initial WebSocket upgrade
+
+The initial polling GET and namespace POST have completed when this client
+starts its WebSocket probe. The corrected client starts no SID-bound GET
+during the probe. A server can therefore hold its acknowledgement and album
+event and deliver them after it receives the upgrade packet on WebSocket.
+Rust uses the specified `2probe`, `3probe`, `5` exchange. The signed
+client sent `5` immediately after HTTP 101 in the comparison above.
+[Engine.IO upgrade protocol](https://socket.io/docs/v4/engine-io-protocol/#upgrade).
+
+The Fedora x64 client repeated eight trials against the original peers,
+using both the root and named namespace. Each initial refusal (HTTP 302,
+HTTP 503 or HTTP 101 followed immediately by a close frame) produced one
+attempt, zero SID-bound polling GETs and zero delivered events. Authenticated
+REST inventory continued for 59 requests per trial until normal Stop. After
+a successful initial promotion and abrupt TCP loss, both positive controls
+delivered two events, recovered directly after a refused reconnect and
+stopped with the namespace disconnect and WebSocket close code 1000.
+The eight-trial receipt has SHA-256
+`bf0dc832fcbd72b1b2e8ae55185b5d659448c4c7bd534b718bcadc4d28284e56`.
+[Native fixture and observations](../../tools/rust-qa/realtime/README.md).
+
+The frozen Fedora x64 suite passed all 35 wire cases, six unit tests,
+formatting and Clippy. The ordinary refusal cases each completed eight
+authenticated inventory reads after the refusal. A stalled probe allowed
+17 reads before Stop, and the polling-only cancellation control interrupted
+its outstanding GET. The native receipt has SHA-256
+`ffed38e65f0fc9971f25604dbf26063e04e194119c6812a6590c9eb2f394ecb3`.
+
+The server versions pinned by Immich 3.4.2 also exercised the ordinary
+upgrade without any packet scripting. Socket.IO 4.8.4 with Engine.IO 6.6.11
+queued the namespace acknowledgement and first event during polling and
+flushed both over WebSocket after the upgrade. Each client then recovered
+from an abrupt disconnect with a fresh direct WebSocket, received the second
+event and sent the namespace disconnect and normal close. This passed with
+signed .NET 3.0.4 and the corrected Rust executable in both the root and
+`/collection` namespaces on Fedora x64. Each trial ran with only a private
+loopback interface. The independent server used 23 packages checked against
+the upstream lockfile. All 363 extracted files matched the archives and
+each server loaded the same 73 module files. The four-trial readback has SHA-256
+`c19d22a02b6f691194f1320fe65362a8b46aa17c5d9997f5e9a00f4b33d37646`.
+[Immich server lockfile](https://github.com/immich-app/immich/blob/b6b4b80df113656bfa4872cab31c7319e89438a9/pnpm-lock.yaml#L26540) ·
+[Engine.IO upgrade](https://github.com/socketio/socket.io/blob/973833304c7c195c2d0d99b72e4ac9f149e3ca94/packages/engine.io/lib/socket.ts#L338) ·
+[Engine.IO flush](https://github.com/socketio/socket.io/blob/973833304c7c195c2d0d99b72e4ac9f149e3ca94/packages/engine.io/lib/socket.ts#L521).
 
 ### Opening a session without maxPayload
 
@@ -276,8 +323,8 @@ On the same peer, the signed 3.0.4 Linux x64 assemblies upgraded, accepted
 the acknowledgement on WebSocket and received the event in both the default
 and `/collection` namespaces.
 
-The corrected client receives polling packets while qualifying the new
-transport. After a positive probe it stops issuing GETs and drains the
+The client in the following historical run received polling packets while
+qualifying the new transport. After a positive probe it stopped issuing GETs and drained the
 current GET and its writes before sending the Engine.IO upgrade packet.
 The original namespace deadline applies on either transport. In the
 Fedora x64 trial the peer released a held polling GET with a heartbeat

@@ -244,6 +244,10 @@ impl Transport {
                 Message::Text(text) if text == "3probe" => return Ok(ws),
                 Message::Ping(_) => ws.flush().await?,
                 Message::Pong(_) => {}
+                Message::Close(_) => {
+                    ws.flush().await?;
+                    return Err(Error::Disconnected);
+                }
                 _ => return Err(Error::Protocol),
             }
         }

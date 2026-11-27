@@ -1,6 +1,5 @@
 use futures_util::{SinkExt, StreamExt};
 use ifw_immich::realtime::{EnginePacket, polling_packets, websocket_packet};
-use std::task::Poll;
 use tokio::sync::{mpsc, watch};
 use tokio::time::{Instant, timeout_at};
 use tokio_tungstenite::tungstenite::Message;
@@ -210,54 +209,24 @@ impl Session<'_> {
         connect_deadline: Instant,
         stopping: &mut watch::Receiver<bool>,
     ) -> Result<bool, Error> {
-        let deadline = Instant::now() + CONNECT_TIMEOUT;
-        let sid = self.open.sid.clone();
-        let probe = timeout_at(deadline, self.transport.probe(&sid));
-        let mut probe_stop = stopping.clone();
-        let observe = self.observe;
-        let qualification = async {
-            match until_stop(&mut probe_stop, probe).await {
-                Some(Ok(Ok(ws))) => return Some(ws),
-                Some(Ok(Err(error))) => observe(Observation::UpgradeDeclined(error)),
-                Some(Err(_)) => observe(Observation::UpgradeDeclined(Error::Timeout)),
-                None => {}
-            }
-            None
-        };
-        tokio::pin!(qualification);
-        let socket = loop {
-            // Pause new GETs as soon as the websocket probe succeeds.
-            let ready =
-                std::future::poll_fn(|cx| Poll::Ready(qualification.as_mut().poll(cx))).await;
-            if let Poll::Ready(done) = ready {
-                break done;
-            }
-            let poll = timeout_at(self.read_deadline(connect_deadline), self.receive(stopping));
-            tokio::pin!(poll);
-            tokio::select! {
-                biased;
-                // Poll this GET first so the other branch can only drain a
-                // request already under way. Its reply can include a pong POST.
-                active = &mut poll => if !active?? { return Ok(false); },
-                done = &mut qualification => {
-                    let active = if done.is_some() {
-                        timeout_at(deadline, poll).await?
-                    } else {
-                        poll.await
-                    };
-                    if !active?? { return Ok(false); }
-                    break done;
-                }
-            }
-        };
-        if *stopping.borrow() {
+        // The initial polling GET and namespace POST have already finished. Pause
+        // polling during promotion. The server can deliver its buffered ACK and
+        // events on the WebSocket once it receives the upgrade packet.
+        let probe = timeout_at(connect_deadline, self.transport.probe(&self.open.sid));
+        let Some(result) = until_stop(stopping, probe).await else {
             return Ok(false);
-        }
-        if let Some(mut ws) = socket {
-            timeout_at(deadline, ws.send(Message::text("5"))).await??;
-            self.socket = Some(ws);
-            observe(Observation::Upgraded);
-        }
+        };
+        let mut socket = match result.map_err(Error::from).and_then(|probe| probe) {
+            Ok(socket) => socket,
+            Err(error) => {
+                (self.observe)(Observation::UpgradeDeclined(error));
+                // Only an already admitted namespace can resume polling.
+                return Ok(self.namespace != NamespaceState::Joining);
+            }
+        };
+        timeout_at(connect_deadline, socket.send(Message::text("5"))).await??;
+        self.socket = Some(socket);
+        (self.observe)(Observation::Upgraded);
         Ok(true)
     }
 

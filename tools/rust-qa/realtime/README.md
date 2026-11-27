@@ -22,7 +22,7 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 34 wire scenarios. Two strict polling peers accept only the
+build and all 35 wire scenarios. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
@@ -37,13 +37,15 @@ second polling session. The HTTPS redirect case uses the isolated test CA.
 Another named reconnect keeps both original OPEN packets and omits
 `maxPayload` in each, matching the shipping client's accepted input.
 
-The upgrade trials exercise the namespace
-acknowledgement on either transport. The polling case delivers an event
-before cutover. In the other case the peer releases a held poll after the
-WebSocket probe and checks the polling heartbeat reply before sending the
-namespace acknowledgement on WebSocket. A stalled upgrade probe checks that
-polling continues to receive the namespace acknowledgement, events and
-heartbeats. The peer records the namespace disconnect
+After the namespace join on the opening polling transport, an upgrading client
+pauses polling. The peer queues the namespace acknowledgement and events until
+the client completes the WebSocket probe and sends the upgrade packet. The
+refusal cases return an HTTP redirect, HTTP 503 or a WebSocket close before
+admission. They check that the client starts no SID-bound poll or new session,
+delivers no event and continues authenticated REST inventory requests. A stalled
+probe checks inventory progress and timely cancellation, and a polling-only
+control exercises cancellation of an outstanding GET.
+The peer records the namespace disconnect
 for an established polling or WebSocket session. On WebSocket it also checks
 the normal close code, the reason and completion of the reply. Two stop controls
 withhold the namespace acknowledgement or the WebSocket close reply.
