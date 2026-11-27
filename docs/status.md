@@ -16,8 +16,10 @@ and ARM64 at `6cd7757`. The realtime subject also passed
 22 loopback scenarios after correcting the namespace of encoded API paths.
 Ten URL comparisons against signed 3.0.4 assemblies matched. On native
 Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
-`6cd7757`. The Windows transport and four hosted Rust upload comparisons
-are pending.
+`6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
+identifiers and retry bodies from the open file. Their upload reports
+match the Fedora report byte for byte. Windows transport and Rust upload
+readbacks at that revision are pending.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
@@ -40,6 +42,13 @@ offline x64 replay with the prepared Noble guest and the current GUI sources,
 two panel clicks reopened the original window, and Quit removed the item.
 [Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
 [Noble x64 replay](rust/rw02-plasma.md#two-panel-activations-with-the-current-gui-at-6cd7757).
+
+The pre-fix run at `6cd7757` also received HTTP 503 during both Ubuntu
+panel setups and during the ARM64 portal package setup. Both integrated
+Linux inventory trials stopped at the worker-receipt check in that run.
+The subsequent source pins and retry fixes are on `47fe26d`.
+[Ubuntu x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/job/140581122907) ·
+[Ubuntu ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/job/140581122971).
 
 On Windows Server 2022 x64 at `47fe26d`, Explorer displayed the registered
 Rust tray icon and its color change at the same physical point. The

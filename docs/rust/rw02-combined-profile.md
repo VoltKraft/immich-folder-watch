@@ -113,6 +113,19 @@ has SHA-256 `955437b27ad61587329d4f7d073a0cc72efc2105cef820543c9c550d26d37f05`.
 [Five shipping multipart cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Development SBOM scope](rw02-combined-sbom.md).
 
+At the same revision the two native Ubuntu jobs produced the same five
+upload results as Fedora, including both streamed bodies and the original
+file's identifiers. Each of the ten archived process logs matched its
+per-case digest. The input corpus, original and replacement file bytes,
+78 source inputs and 27 indexed outputs were checked separately on each
+architecture. The x64 compiler reported 337 packages and 402 units. The
+ARM64 compiler reported 336 packages and 401 units. Each modified Wayland
+binding reported interface version 2 after the original reported version 1.
+The three Linux upload reports share SHA-256
+`9566c011122e9a568338013265ab4aeaa02cc0be2a378f64b9528407d54ac054`.
+[Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15213091920) ·
+[Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15213152399).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
