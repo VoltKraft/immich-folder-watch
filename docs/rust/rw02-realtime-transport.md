@@ -47,6 +47,46 @@ ticks. The fixture consumer performs an authenticated HTTP read of its
 synthetic empty album inventory. [Framing](../../rust/crates/ifw-immich/src/realtime.rs)
 and [Socket.IO parser](../../tools/rust-qa/realtime/src/protocol.rs).
 
+### Escaped API paths and Socket.IO namespaces
+
+The shipping client takes the normalized `System.Uri.AbsolutePath` before
+stripping a terminal `api` component case-insensitively. Before the correction,
+Rust copied the original percent escapes into the namespace. For
+`/%63ollection/api` it sent `40/%63ollection,` to a peer listening on
+`/collection`. That peer received two Rust connection attempts and delivered
+no event. The signed client sent `40/collection,` and received the event on its
+first connection. The same mismatch affected `/collection/%61pi` and `/%61pi`.
+[Shipping namespace construction](../../src/ImmichFolderWatch.Immich/ImmichRealtimeClient.cs) ·
+[Rust endpoint construction](../../tools/rust-qa/realtime/src/transport.rs).
+
+The paired Fedora x64 check ran the Rust executable and the signed 3.0.4
+Linux x64 Flatpak's original realtime and album clients on ten synthetic
+loopback URLs each. Both clients received an event, issued the same
+authenticated album GET and sent the expected disconnect for each URL. The
+inputs covered plain and escaped root and named paths, a mixed-case terminal
+API component, a space, raw and escaped UTF-8, an escaped slash and a
+double-encoded slash. The signed OSTree commit was
+`abeebe13b83cc4b8246fb4a8715daddce7f3dd4bf52861ae4ca33b06755104da`.
+The paired wire record has SHA-256
+`01ac25d9ccea6b491abbc0adb42aba7300b610a169be913cfa8c81c3e46e57d6`.
+[Shipping album request](../../src/ImmichFolderWatch.Immich/ImmichAssetClient.cs).
+
+Two cases now run in the regular transport suite. The polling peer requires
+these exact packets and HTTP paths. The Engine.IO endpoint is `/socket.io/`
+in both cases.
+
+| Configured API path | Socket.IO CONNECT and DISCONNECT | Album GET path |
+| --- | --- | --- |
+| `/%61pi` | `40`, `41` | `/api/albums` |
+| `/%63ollection/caf%c3%a9/%7esummer%2fphotos/%61PI` | `40/collection/caf%C3%A9/~summer%2fphotos,`, `41/collection/caf%C3%A9/~summer%2fphotos,` | `/collection/caf%C3%A9/~summer%2fphotos/aPI/albums` |
+
+The native Fedora x64 run passed all 22 wire scenarios and four Rust unit
+tests. Its session record has SHA-256
+`aff962d22265f3e14f4a6d361006ea8e4b3d92a7505217fb63d042ae80486d51`.
+The earlier four-target run at `e2f161b` exercised the original 20 scenarios.
+[Strict peers](../../tools/rust-qa/realtime/verify.py) ·
+[Earlier native results](#four-native-transport-results-at-e2f161b).
+
 ### Stopping an established session
 
 The signed Linux x64 Flatpak 3.0.4 assemblies ran on their delivered .NET

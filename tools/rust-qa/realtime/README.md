@@ -22,7 +22,12 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 20 wire scenarios. The upgrade trials exercise the namespace
+build and all 22 wire scenarios. Two strict polling peers accept only the
+Socket.IO namespace derived by the shipping client from an escaped API URL.
+They check CONNECT, the authenticated album request and DISCONNECT for the
+root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
+
+The upgrade trials exercise the namespace
 acknowledgement on either transport. The polling case delivers an event
 before cutover. In the other case the peer releases a held poll after the
 WebSocket probe and checks the polling heartbeat reply before sending the

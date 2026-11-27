@@ -25,6 +25,12 @@ SUBSCRIPTIONS = (
     "on_upload_success", "on_asset_trash", "on_asset_delete", "on_asset_update",
     "on_asset_restore", "on_album_create", "on_album_update", "on_album_delete", "on_album_invite",
 )
+# Input URL and independent network path observed with System.Uri in signed 3.0.4.
+ESCAPED_PATHS = {
+    "escaped-namespace": ("/%63ollection/caf%c3%a9/%7esummer%2fphotos/%61PI",
+                          "/collection/caf%C3%A9/~summer%2fphotos/aPI"),
+    "escaped-root-api": ("/%61pi", "/api"),
+}
 
 
 def send_frame(stream, opcode, data=b"", final=True):
@@ -63,6 +69,7 @@ class Peer(ThreadingHTTPServer):
         self.counts = Counter()
         self.errors = []
         self.close_packets = []
+        self.namespace_posts = []
         self.stopping = threading.Event()
         self.poll_started = threading.Event()
         self.probe_answered = threading.Event()
@@ -141,6 +148,7 @@ class Handler(BaseHTTPRequestHandler):
         packet = self.rfile.read(size)
         if packet == ("40" + self.server.ns).encode():
             self.server.mark("namespacePosts")
+            self.server.namespace_posts.append(packet.decode("ascii"))
         elif packet == b"3":
             self.server.mark("pollingPongs")
             if self.server.scenario == "ack-after-upgrade":
@@ -380,10 +388,12 @@ def run_scenario(executable, name, directory, contexts, redirect):
     encrypted = rejected_tls or name in {"tls", "upgrade-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
     api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade"} else "/api"
-    with peer(name, api, contexts[certificate_address] if encrypted else None) as origin:
+    input_path, api = ESCAPED_PATHS.get(name, (api, api))
+    scenario = "polling" if name in ESCAPED_PATHS else name
+    with peer(scenario, api, contexts[certificate_address] if encrypted else None) as origin:
         origin.redirect_port = redirect.server_port
         protocol = "https" if encrypted else "http"
-        url = f"{protocol}://127.0.0.1:{origin.server_port}{api}"
+        url = f"{protocol}://127.0.0.1:{origin.server_port}{input_path}"
         trust = directory / ("other.crt" if name == "untrusted-tls" else "ca.crt")
         mode = "https" if encrypted or name == "http-default" else "allow-http"
         budget = 1300 if name in {"tls", "reconnect", "exact-size", "ws-size", "poll-size"} else 850
@@ -411,10 +421,14 @@ def run_scenario(executable, name, directory, contexts, redirect):
                 assert trace["Lost Transport"] == 1 and not stats and not trace["Connected"], (events, stats)
             else:
                 assert stats["inventoryRequests"] >= 1 and trace["Inventory"] >= 1, (events, stats)
-            check_protocol(name, trace, stats, events)
+            check_protocol(scenario, trace, stats, events)
         assert not origin.errors, origin.errors
         result = {"client": dict(trace), "peer": dict(stats), "closePacketsAtPeer": origin.close_packets.copy(),
                   "budgetMs": budget, "processElapsedMs": elapsed}
+        if name in ESCAPED_PATHS:
+            assert origin.namespace_posts == ["40" + origin.ns], origin.namespace_posts
+            result.update(configuredPath=input_path, inventoryPathAtPeer=api + "/albums",
+                          namespacePostsAtPeer=origin.namespace_posts.copy())
         if encrypted:
             result.update(tlsClientHelloObserved=True, certificateAddress=certificate_address,
                           endpointAddress="127.0.0.1", httpRequests=stats["httpRequests"],
@@ -484,7 +498,7 @@ def main():
     cases = ("polling", "websocket", "tls", "untrusted-tls", "wrong-host-tls", "http-default", "upgrade-redirect",
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
              "reconnect", "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
-             "stalled-probe")
+             "stalled-probe", *ESCAPED_PATHS)
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

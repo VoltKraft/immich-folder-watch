@@ -23,9 +23,68 @@ pub(crate) struct Transport {
     pub namespace: String,
 }
 
+fn escaped_byte(path: &str) -> Option<u8> {
+    let digits = path.strip_prefix('%')?.get(..2)?;
+    if !digits.bytes().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    u8::from_str_radix(digits, 16).ok()
+}
+
+/// System.Uri re-escapes valid IRI path characters in uppercase. Escapes for
+/// private-use, control, noncharacter or invalid UTF-8 bytes retain their spelling.
+fn iri_escape_length(path: &str, first: u8) -> Option<usize> {
+    let size = match first {
+        0xc2..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf4 => 4,
+        _ => return None,
+    };
+    let mut scalar = [first; 4];
+    for (index, byte) in scalar[..size].iter_mut().enumerate().skip(1) {
+        *byte = escaped_byte(path.get(index * 3..)?)?;
+    }
+    let value = std::str::from_utf8(&scalar[..size]).ok()?.chars().next()? as u32;
+    let eligible = match value {
+        0xa0..=0xd7ff | 0xf900..=0xfdcf | 0xfdf0..=0xffef => true,
+        0x10000..=0xdfffd | 0xe1000..=0xefffd => value & 0xffff <= 0xfffd,
+        _ => false,
+    };
+    eligible.then_some(3 * size)
+}
+
+/// Translate the ASCII serialization of an HTTP(S) URL path to the spelling
+/// used by the shipping System.Uri reader. Preserve escaped path separators.
+fn shipping_path(mut path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    while let Some(&first) = path.as_bytes().first() {
+        if let Some(byte) = escaped_byte(path) {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                out.push(char::from(byte));
+            } else if let Some(len) = iri_escape_length(path, byte) {
+                out.push_str(&path[..len].to_ascii_uppercase());
+                path = &path[len..];
+                continue;
+            } else {
+                out.push_str(&path[..3]);
+            }
+            path = &path[3..];
+        } else {
+            match first {
+                b'%' => out.push_str("%25"),
+                b'|' => out.push_str("%7C"),
+                b'^' => out.push_str("%5E"),
+                _ => out.push(char::from(first)),
+            }
+            path = &path[1..];
+        }
+    }
+    out
+}
+
 impl Transport {
     pub fn new(
-        api: Url,
+        mut api: Url,
         allow_http: bool,
         api_key: &str,
         roots: Option<Vec<Certificate>>,
@@ -39,6 +98,7 @@ impl Transport {
         }
         // SocketIOClient uses the URL path (minus terminal "api") as its
         // namespace; Engine.IO always uses the distinct default transport path.
+        api.set_path(&shipping_path(api.path()));
         let segments: Vec<_> = api
             .path_segments()
             .ok_or(Error::Origin)?
@@ -272,5 +332,20 @@ mod tests {
             "session&transport=other"
         );
         assert!(transport.request(Method::GET, safe).is_ok());
+    }
+
+    #[test]
+    fn shipping_paths_decode_unreserved_characters_once_and_keep_escaped_separators() {
+        for (path, expected) in [
+            ("/%63ollection/caf%c3%a9/%61PI", "/collection/caf%C3%A9/aPI"),
+            ("/t%2Fr%3fp%23s/%252f", "/t%2Fr%3fp%23s/%252f"),
+            ("/%7e%2d%2e%5f/%20", "/~-._/%20"),
+            ("/%f0%9f%8e%9e", "/%F0%9F%8E%9E"),
+            ("/%c2%80/%ee%80%80/%ff", "/%c2%80/%ee%80%80/%ff"),
+            ("/%f0%9f%bf%bf/%c3%2f", "/%f0%9f%bf%bf/%c3%2f"),
+            ("/discount%/rate|fee", "/discount%25/rate%7Cfee"),
+        ] {
+            assert_eq!(shipping_path(path), expected);
+        }
     }
 }
