@@ -186,8 +186,8 @@ rebuilds the umbrella archive. A native Rust observer checks
 and ring's exact ID against the actual system API. The full transport uses
 the LLVM reconstruction in a fresh offline build. The checks require the
 absolute input path in MSVC's link response, the original PE imports and all
-15 loopback cases. Each result distinguishes original library bytes, linked
-image bytes and native execution. [Driver](../../tools/rust-qa/windows-imports/run.py),
+loopback cases from the same revision's native build. Each result distinguishes
+original library bytes, linked image bytes and native execution. [Driver](../../tools/rust-qa/windows-imports/run.py),
 [isolated full transport relink](../../tools/rust-qa/windows-imports/relink.py)
 and [MSVC response file](https://learn.microsoft.com/en-us/cpp/build/reference/link-repro-full-path-rsp?view=msvc-170).
 
@@ -217,3 +217,11 @@ Its import table retained 145 entries, and all 15 native loopback cases
 passed. The result SHA-256 was
 `6c5363923a64b1683c12cb89a2855224fcb2512626b2281913fe87ef32afb1e5`.
 [Native reconstruction and relink](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264/job/136618468330).
+
+At `6cd7757` the native ARM64 run repeated the offline relink with the
+22-case suite, including both escaped API paths. The independent readback
+matched the 13 harness files, ten compiled source files, 152 locked
+archives and the original native compiler receipt. The rebuilt executable
+retained all 145 PE imports and completed all 22 wire cases. The relink
+result has SHA-256 `cb0ac2b550f267aadfe026edc4e440839f1646f15d485b4017be20b82b4b20b9`.
+[Original ARM64 build and relink](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15219815690).

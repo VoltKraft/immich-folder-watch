@@ -126,6 +126,17 @@ The three Linux upload reports share SHA-256
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15213091920) ·
 [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15213152399).
 
+The native Windows ARM64 build at the same revision reported 249 packages
+and 280 compiler units. All five synthetic filenames were replaced while
+the original upload file was open. Each retry rewound to position zero
+and returned the original device ID and bytes, including the 70,679-byte
+case. Independent replay checked 78 source inputs and 22 output hashes.
+All 23 files in the dedicated archive matched their copies in the desktop
+archive. Its native build receipt has SHA-256
+`f7b2df12b63764d3cc8d2e9e76aae68847986c8febd2fea6e53958b2bcd74f8c`.
+[Windows ARM64 compiler and upload receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15218516011) ·
+[Windows ARM64 original files](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15219815690).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
