@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        arch: [arm64]
         primary: [Rust, WPF]
         include:
           - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }

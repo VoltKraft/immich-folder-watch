@@ -124,6 +124,9 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 runners = re.findall(r"runner: ([\w.-]+)", (WORKFLOWS / (name + ".yaml")).read_text())
                 self.assertCountEqual(runners, ["ubuntu-24.04", "ubuntu-24.04-arm", "windows-11-arm"])
+        activation = (WORKFLOWS / "rust-windows-msi-interop.yaml").read_text()
+        self.assertIn("        arch: [arm64]\n        primary: [Rust, WPF]", activation)
+        self.assertIn("arch: arm64-private-input, sdkArch: arm64, primary: WPF", activation)
 
     def test_native_linux_notification_workflow_is_branch_bound_and_cannot_publish(self):
         self.check_rust_workflow("rust-linux-notification.yaml", {"actions/checkout", "actions/upload-artifact"})
