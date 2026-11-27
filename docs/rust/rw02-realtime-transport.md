@@ -213,6 +213,30 @@ then admitted a second after direct recovery from a later polling failure.
 Initial upgrade admission therefore still differs. The paired comparison
 has SHA-256 `ee5362d9df916405ea5690ad0976fc0fef07f9547569fc9c8c6b87ac1f507977`.
 
+The same pre-admission difference appeared after an HTTP 302 response and
+after HTTP 101 followed by WebSocket close 1000 before a namespace ACK.
+For each namespace the signed client emitted zero events and stopped on
+cancellation at 42 seconds. Rust processed a polling event in each case.
+All eight loopback redirect receivers saw zero client connections. On the
+101 path the signed client sent `5` first. Rust sent the Engine.IO
+`2probe` before attempting to commit the upgrade.
+[Engine.IO upgrade protocol](https://socket.io/docs/v4/engine-io-protocol/#upgrade).
+
+### Opening a session without maxPayload
+
+The shipping transport test omits `maxPayload` in its Engine.IO OPEN.
+On Fedora x64 the signed client accepted an initial OPEN and a direct
+reconnect OPEN with this field absent. Each namespace delivered two
+album events and both clients stopped normally. Rust now uses the local
+4 MiB ceiling when the field is missing and honors a smaller declared
+limit. Explicit zero and null remain invalid. The named wire case kept
+both original OPEN packets, both events and the final namespace
+disconnect and normal close. All 34 wire cases and six unit tests
+passed. The frozen build receipt has SHA-256
+`a6288aeb2f613747941a07218ad18a7b34fd2e85bf0182e3c93408498baab6a1`.
+[Shipping transport test](../../src/ImmichFolderWatch.Tests.Core/Immich/RealtimeTransportSecurityTests.cs) ·
+[Parser and bound](../../tools/rust-qa/realtime/src/protocol.rs).
+
 ### Stopping an established session
 
 The signed Linux x64 Flatpak 3.0.4 assemblies ran on their delivered .NET

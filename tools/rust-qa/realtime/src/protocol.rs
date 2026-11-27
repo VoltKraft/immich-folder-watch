@@ -16,7 +16,12 @@ pub(crate) struct Open {
     pub websocket: bool,
     ping_interval: u64,
     ping_timeout: u64,
+    #[serde(default = "local_payload_limit")]
     pub max_payload: usize,
+}
+
+fn local_payload_limit() -> usize {
+    MAX_MESSAGE_BYTES
 }
 
 impl Open {
@@ -180,5 +185,16 @@ mod tests {
         ));
         let open = Open::parse(r#"{"sid":"eio","upgrades":[],"pingInterval":18446744073709551615,"pingTimeout":20,"maxPayload":4096}"#).unwrap();
         assert_eq!(open.heartbeat_window(), Duration::from_secs(120));
+    }
+
+    #[test]
+    fn a_missing_payload_limit_uses_the_local_ceiling() {
+        let fields = r#""sid":"eio","upgrades":[],"pingInterval":25000,"pingTimeout":20000"#;
+        let parse = |extra| Open::parse(&format!("{{{fields}{extra}}}"));
+        assert_eq!(parse("").unwrap().max_payload, MAX_MESSAGE_BYTES);
+        assert_eq!(parse(r#","maxPayload":128"#).unwrap().max_payload, 128);
+        for invalid in [r#","maxPayload":0"#, r#","maxPayload":null"#] {
+            assert!(matches!(parse(invalid), Err(Error::Protocol)));
+        }
     }
 }

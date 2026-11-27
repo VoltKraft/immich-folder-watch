@@ -51,6 +51,12 @@ zero events. Rust delivered one on polling and a second after a later
 transport loss. This initial refusal remains under comparison.
 [Direct reconnect and signed reference](rust/rw02-realtime-transport.md#opening-the-next-session-after-an-abrupt-disconnect).
 
+The signed 3.0.4 client accepted both the initial and direct WebSocket
+reconnect handshakes when the server omitted `maxPayload`. Rust now
+accepts this input with the local 4 MiB bound. All 34 transport cases
+and six unit tests passed on Fedora x64.
+[Original packets and limits](rust/rw02-realtime-transport.md#opening-a-session-without-maxpayload).
+
 On Fedora x64 the full offline build reproduced the same five Rust upload
 results. All 78 source inputs matched `6cd7757`. The modified Wayland
 binding was rebuilt and its new interface version observed. The native

@@ -34,7 +34,7 @@ ESCAPED_PATHS = {
 }
 PEER_CLOSE_PATHS = {"peer-close-root": "/api", "peer-close-namespace": "/collection/api"}
 PEER_CLOSE_REASON = b"synthetic maintenance"
-DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect"}
+DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-no-max-payload"}
 
 
 def send_frame(stream, opcode, data=b"", final=True):
@@ -91,6 +91,17 @@ class Peer(ThreadingHTTPServer):
         with self.lock:
             self.counts[name] += 1
             return self.counts[name]
+
+    def open_packet(self, sid, upgrades, heartbeat_ms):
+        fields = dict(sid=sid, upgrades=upgrades, pingInterval=heartbeat_ms, pingTimeout=heartbeat_ms)
+        if self.scenario != "reconnect-no-max-payload":
+            fields["maxPayload"] = LIMIT
+        packet = "0" + json.dumps(fields)
+        if self.open_requests:
+            self.open_requests[-1]["engineOpen"] = fields
+            if self.scenario == "reconnect-no-max-payload":
+                self.open_requests[-1]["engineOpenPacket"] = packet
+        return packet.encode("utf-8")
 
     def handle_error(self, request, address):
         import sys
@@ -201,9 +212,7 @@ class Handler(BaseHTTPRequestHandler):
                                         "engine-close-ws", "peer-close-ws"}
             heartbeat_timeout = {"missed-heartbeat": 150, "stalled-probe": 400,
                                  "server-disconnect-ws": 550}.get(peer.scenario, 3000)
-            handshake = dict(sid=sid, upgrades=["websocket"] if upgrade else [],
-                             pingInterval=heartbeat_timeout, pingTimeout=heartbeat_timeout, maxPayload=LIMIT)
-            self.body(b"0" + json.dumps(handshake).encode())
+            self.body(peer.open_packet(sid, ["websocket"] if upgrade else [], heartbeat_timeout))
         elif mode == "websocket":
             assert sid in peer.polls
             self.upgrade()
@@ -319,9 +328,7 @@ class Handler(BaseHTTPRequestHandler):
                 assert client_frame(self.rfile) == (10, b"before-direct-open")
                 peer.mark("directPreOpenPongs")
                 offers = ["websocket"]
-            handshake = dict(sid="synthetic-direct", upgrades=offers, pingInterval=3000, pingTimeout=3000, maxPayload=LIMIT)
-            peer.open_requests[-1]["engineOpen"] = handshake
-            send_frame(self.wfile, 1, b"0" + json.dumps(handshake).encode())
+            send_frame(self.wfile, 1, peer.open_packet("synthetic-direct", offers, 3000))
             opcode, join = client_frame(self.rfile)
             assert (opcode, join) == (1, ("40" + peer.ns).encode()), "expected a direct masked namespace join"
             peer.direct_joins.append(join.decode("ascii"))
@@ -481,7 +488,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
     encrypted = rejected_tls or name in {"tls", "upgrade-redirect", "reconnect-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
     api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade", "server-disconnect-poll",
-                                        "reconnect-namespace"} else "/api"
+                                        "reconnect-namespace", "reconnect-no-max-payload"} else "/api"
     api = PEER_CLOSE_PATHS.get(name, api)
     input_path, api = ESCAPED_PATHS.get(name, (api, api))
     scenario = "polling" if name in ESCAPED_PATHS else name
@@ -539,6 +546,12 @@ def run_scenario(executable, name, directory, contexts, redirect):
                 refusal = {"reconnect-refused": [503], "reconnect-redirect": [302]}.get(name, [])
                 statuses = [200, *refusal, 101]
             assert [request["status"] for request in origin.open_requests] == statuses
+            if name == "reconnect-no-max-payload":
+                for request, sid, offers in zip(origin.open_requests, ("synthetic-1", "synthetic-direct"),
+                                                (["websocket"], []), strict=True):
+                    packet = request["engineOpenPacket"]
+                    assert packet.startswith("0") and json.loads(packet[1:]) == request["engineOpen"] == {
+                        "sid": sid, "upgrades": offers, "pingInterval": 3000, "pingTimeout": 3000}
             expected_close = ([{"websocketText": "41" + origin.ns}, {"websocketCloseCode": 1000, "reason": "io client disconnect"}]
                               if direct else [{"httpPost": "41" + origin.ns}])
             assert origin.close_packets == expected_close
@@ -654,6 +667,7 @@ def main():
     cases = ("polling", "websocket", "tls", "untrusted-tls", "wrong-host-tls", "http-default", "upgrade-redirect",
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
              "reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-polling",
+             "reconnect-no-max-payload",
              "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
              "stalled-probe", "server-disconnect-poll", "server-disconnect-ws", "server-disconnect-then-close",
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
