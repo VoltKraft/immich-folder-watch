@@ -92,6 +92,13 @@ def primary_job_members(api, desk, job, primary, worker, exe, console, record):
 
 
 def qualify(secondary_lines, primary_lines, receipt):
+    if receipt["initialWindowPid"] != receipt["primaryPid"]:
+        raise ValueError("The original visible window did not belong to the primary")
+    qualify_secondary(secondary_lines, primary_lines, receipt, receipt["reopenedWindow"], receipt["reopenedWindowPid"])
+
+
+def qualify_secondary(secondary_lines, primary_lines, receipt, visible_hwnd, visible_pid):
+    """Verify both ends of an ordinary launch, including a primary displaying its first window."""
     pid = receipt["primaryPid"]
     if len(secondary_lines) != 2 or secondary_lines[1] != f"LAUNCHER_SECONDARY server={pid}":
         raise ValueError("The no-argument secondary did not exit through the launcher")
@@ -99,19 +106,18 @@ def qualify(secondary_lines, primary_lines, receipt):
                          r"(granted|denied hresult=(-?\d+)|unavailable reason=(legacy-pid|input-desktop|process-handle|process-identity))",
                          secondary_lines[0])
     requests = [line for line in primary_lines if line.startswith("WINDOW_FOREGROUND_REQUEST ")]
-    request = (re.fullmatch(rf"WINDOW_FOREGROUND_REQUEST pid={pid} hwnd={receipt['reopenedWindow']} accepted=(true|false)",
+    request = (re.fullmatch(rf"WINDOW_FOREGROUND_REQUEST pid={pid} hwnd={visible_hwnd} accepted=(true|false)",
                             requests[0]) if len(requests) == 1 else None)
     if grant is None or request is None:
-        raise ValueError("The foreground handoff did not match one explicit request on the reopened primary HWND")
-    receipt["foregroundHandoff"] = dict(server=pid, grant=grant[1].split()[0], hwnd=receipt["reopenedWindow"],
+        raise ValueError("The foreground handoff did not match one explicit request on the visible primary HWND")
+    receipt["foregroundHandoff"] = dict(server=pid, grant=grant[1].split()[0], hwnd=visible_hwnd,
                                        hresult=int(grant[2]) if grant[2] else None,
                                        unavailableReason=grant[3], requestAccepted=request[1] == "true")
     signals = [line for line in primary_lines if line.startswith("LAUNCHER_OPEN ")]
     if signals != [f"LAUNCHER_OPEN client={receipt['secondaryPid']}"]:
         raise ValueError("The primary did not receive the ordinary secondary's local request")
     if (receipt["primaryPid"] == receipt["secondaryPid"] or not receipt["hiddenBeforeLaunch"]
-            or receipt["initialWindowPid"] != receipt["primaryPid"]
-            or receipt["reopenedWindowPid"] != receipt["primaryPid"]
+            or visible_pid != receipt["primaryPid"]
             or receipt["workerBefore"] != receipt["workerAfter"] or not receipt["workerBefore"]
             or receipt["secondaryExit"] != 0 or not receipt["secondaryJobEmpty"]
             or receipt["secondaryTotalProcesses"] != 1):

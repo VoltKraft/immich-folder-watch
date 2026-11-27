@@ -166,6 +166,14 @@ through normal Quit. The second GUI still lacked a usable icon rectangle.
 [Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30) ·
 [Qualified reopen on x64](rust/rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
+For a registered icon without a usable rectangle, the native observer now
+starts the ordinary executable on the same desktop while the original GUI
+and inventory worker are running. It records whether that launcher opens
+and focuses the window and checks both processes through Quit. Across
+123 local launcher tests, 120 passed and three platform cases skipped.
+The native result is pending.
+[Ordinary launcher when the icon has no rectangle](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
+
 The ARM64 IME observer at `9313f39` lost its filename field during Japanese
 layout selection. It exited before composing text and restored the layout
 and test profile. It now waits for the same focused field and records the

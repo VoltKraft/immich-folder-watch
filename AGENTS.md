@@ -206,6 +206,8 @@ to reconcile project decisions, defaults, and recorded state.
   using metadata from the held file. Verify [legacy upload identities](docs/rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file)
   and the rewound retry body against the C# multipart cases. For realtime changes, verify the
   [disconnect packets observed by the peer](docs/rust/rw02-realtime-transport.md#stopping-an-established-session).
+  Use the [private bundle and directory](docs/rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates)
+  for the Linux platform-verifier trials.
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
   Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)
@@ -244,6 +246,8 @@ to reconcile project decisions, defaults, and recorded state.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
   match the accessible button and physical marker before its default action.
+  For a registered icon without a rectangle, follow the [ordinary second launch](docs/rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle)
+  on the same hidden primary.
   Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
   The separate [WinRT history trial](tools/rust-qa/windows-services/toast-history.md)

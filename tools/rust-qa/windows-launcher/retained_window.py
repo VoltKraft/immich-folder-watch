@@ -419,7 +419,7 @@ class RetainedWindow:
         row.update(status="inconclusive", reason="The SHOW and activation could not be ordered within the Windows timer tick")
         return False
 
-    def focus(self, record, *, named_input=False):
+    def focus(self, record, *, named_input=False, required=True):
         if self.name != "Default" and not named_input:
             record.update(applicable=False, reason="Private non-input desktop")
             return
@@ -437,4 +437,5 @@ class RetainedWindow:
             if time.monotonic() >= end:
                 break
             time.sleep(.05)
-        raise ValueError("The retained GUI did not acquire foreground and keyboard focus on its original input desktop")
+        if required:
+            raise ValueError("The retained GUI did not acquire foreground and keyboard focus on its original input desktop")

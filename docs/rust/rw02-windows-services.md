@@ -1156,6 +1156,22 @@ made no change. The archive SHA-256 is
 `c3bd6532972befc11294b0fa907fa2fd486ddc291b7b9052e87981ea743de714`.
 [Original Windows desktop and GUI logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46037576951/artifacts/15219980415).
 
+### Ordinary launch when the registered icon has no rectangle
+
+The second, hidden GUI on the desktop at `29ce1c0` exited at Quit before
+any ordinary second launch. The launcher observer now starts the same
+executable with no arguments while that original primary is still running.
+It requires the original receiver and an independent `S_FALSE` readback
+immediately before the second process resumes. It observes the primary's
+window SHOW, the secondary's IPC request and exit, and the original
+worker through normal Quit. For an initially visible GUI it requires
+the same HWND that was closed. For an initially hidden GUI it observes
+the primary's first window. The observer compares the original SHOW
+timestamp with the second process's release and samples actual foreground,
+active window and keyboard focus. A delayed hook event alone cannot
+establish that the launch opened the window. The ordinary launch is
+recorded separately from Shell activation. Native execution is pending.
+[Launcher observer](../../tools/rust-qa/windows-launcher/native_tray.py).
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

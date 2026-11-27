@@ -197,6 +197,8 @@ class ResidentTests(unittest.TestCase):
                  tied_sample=None, root_show=True):
         api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
+        unpresented = bool(refusal and refusal.startswith("fallback-"))
+        windows.desktop = 44
         proc.poll.return_value = None
         api.process_identity.return_value = 101
         api.wait_job_empty.return_value = True
@@ -253,6 +255,8 @@ class ResidentTests(unittest.TestCase):
             proc.stdin.write.side_effect = send
             def receive(stage):
                 if stage == "first":
+                    if unpresented:
+                        raise tray.Unavailable("No verified presentation")
                     if compare:
                         return None
                     return {"surface": visible_surface | {"shellPid": 87} if refusal == "foreign-provider" else visible_surface}
@@ -287,30 +291,82 @@ class ResidentTests(unittest.TestCase):
             helper.stdin.write.side_effect = requests.append
 
             @contextmanager
-            def child(*_, **_kw):
-                yield proc, 1, 2
+            def child(_api, _desk, desktop, exe, args, trial, env, stream, primary, **kwargs):
+                if primary:
+                    yield proc, 1, 2
+                    return
+                self.assertEqual((desktop, exe, args, trial, kwargs["private"]), ("Default", out / "gui.exe", [], out, False))
+                secondary = Mock(pid=19, _handle=41)
+                secondary.poll.return_value = 0
+                kwargs["before_resume"](secondary)
+                stream.write(b"LAUNCHER_FOREGROUND_GRANT server=18 state=granted\nLAUNCHER_SECONDARY server=18\n")
+                stream.flush()
+                append("LAUNCHER_OPEN client=19\nWINDOW_FOREGROUND_REQUEST pid=18 hwnd=99 accepted=true\n")
+                if refusal == "fallback-other-callback":
+                    append(callback())
+                if not reopen:
+                    append(FIRST_RENDER)
+                if refusal == "fallback-replaced-window":
+                    windows.hwnd = 100
+                if refusal in ("fallback-delayed-stale", "fallback-tied-witness"):
+                    # Deliver the out-of-context hook only after the observer samples the resumed secondary.
+                    if refusal == "fallback-delayed-stale":
+                        windows.shown = True
+                    def deliver_show():
+                        windows.show(21 if refusal == "fallback-delayed-stale" else 23, create=not reopen)
+                        return 0
+                    secondary.poll.side_effect = deliver_show
+                else:
+                    windows.show(23 if refusal == "fallback-tied-visible" else 24, create=not reopen)
+                yield secondary, 2, None
 
             @contextmanager
-            def provider(*_):
-                yield helper, receive
+            def provider(*args):
+                try:
+                    yield helper, receive
+                finally:
+                    if unpresented:
+                        args[-2].update(exit=2, jobEmpty=True, flyoutHistory=[
+                            dict(stage="baseline"), dict(stage="hint", surface=None, markerObserved=False,
+                                reason="Independent Shell_NotifyIconGetRect returned 00000001"),
+                            dict(stage="cleanup", attempted=False, iconAttempted=refusal == "fallback-invoked")])
+
+            def read_rect(_hwnd):
+                if refusal == "fallback-reappeared" and "ordinaryLauncherFallback" in state and proc.poll() is None:
+                    return dict(hresult=0, rect=RECT)
+                return dict(hresult=1 if unpresented and proc.poll() is None else -1, rect=None)
+
+            def query_job(job, level, dest, *args):
+                self.assertEqual((job, level), (2, 1))
+                dest._obj.total = 2 if refusal == "fallback-extra-child" else 1
+                return True
+
+            api.query_job.side_effect = query_job
 
             witness = Mock(markers=0, confirmed=refusal != "unbound", original=(81, 51))
             witness.live.side_effect = lambda stage: stage != refusal
+            clock = lambda: 28
+            if compare:
+                clock = Mock(side_effect=[26, 28, 35])
+            elif unpresented:
+                clock = Mock(side_effect=[22, 23, 23, 28] if refusal == "fallback-tied-witness" else [22, 23, 28])
             with (patch.object(tray, "ShellWitness", return_value=witness),
                   patch.object(retained_window, "WindowLifetime", return_value=Mock(events=windows.life)),
                   patch.object(retained_window, "visible_surface", side_effect=lambda *a: tray.visible_surface(
                       *a, monitor_area=lambda _: [-20, 0, 100, 100])),
-                  patch.object(retained_window, "focus_sample", return_value=dict(foreground=True, active=True, focused=True)),
-                  patch.object(tray, "bind", return_value=Mock(side_effect=[26,28,35]) if compare else lambda: 28),
+                  patch.object(retained_window, "desktop_windows", return_value=dict(desktop="Default", ownedCount=0, windows=[])),
+                  patch.object(retained_window, "focus_sample", return_value=dict(foreground=True, active=True,
+                                                                                focused=refusal != "fallback-no-focus")),
+                  patch.object(tray, "bind", return_value=clock),
                   patch.object(tray, "ordinary_console", return_value=True),
                   patch.object(tray.launcher, "child", child), patch.object(tray.launcher, "snapshot", return_value={}),
                   patch.object(tray.launcher, "system_console_path"), patch.object(tray.recorder, "load_windows_fixture") as fixture,
                   patch.object(tray.recorder, "idle_complete", return_value=True), patch.object(tray.recorder, "owned_worker", return_value=28),
                   patch.object(tray.launcher, "primary_job_members",
-                               side_effect=[[28, 201], [28, 302] if refusal == "different-worker" else [28, 201]]),
+                               side_effect=[[28, 201], [28, 302] if refusal in ("different-worker", "fallback-worker") else [28, 201]]),
                   patch.object(tray, "provider", provider),
                   patch.object(tray, "monitor_work_area", return_value=[-20, 0, 100, 100]),
-                  patch.object(tray, "shell_rect", return_value=dict(hresult=-1, rect=None))):
+                  patch.object(tray, "shell_rect", side_effect=read_rect)):
                 fixture.return_value.Windows.return_value = windows
                 fixture.return_value.TITLE = TITLE
                 env = {"IFW_QA_INVENTORY_TOKEN": TOKEN, "IFW_QA_TASKBAR_COMPARISON": "1" if compare else "0"}
@@ -328,6 +384,13 @@ class ResidentTests(unittest.TestCase):
                         operation()
                 elif tied_sample is not None and ("visible=false tick=23" not in tied_sample or not root_show):
                     with self.assertRaises(tray.launcher.ShowOrderUnavailable):
+                        operation()
+                elif refusal == "fallback-tied-visible":
+                    with self.assertRaises(tray.launcher.ShowOrderUnavailable):
+                        operation()
+                elif refusal in ("fallback-worker", "fallback-other-callback", "fallback-extra-child", "fallback-replaced-window",
+                                 "fallback-no-focus", "fallback-delayed-stale"):
+                    with self.assertRaises(ValueError):
                         operation()
                 elif refusal:
                     with self.assertRaises(tray.Unavailable):
@@ -397,6 +460,73 @@ class ResidentTests(unittest.TestCase):
                 actual, sent, state = self.exercise(reason)
                 self.assertEqual((actual, sent), (commands, requests))
                 self.assertNotIn("delivery", state)
+
+    def test_ordinary_secondary_presents_the_same_primary_when_explorer_returns_s_false(self):
+        for reopen in (False, True):
+            with self.subTest(reopen=reopen):
+                commands, requests, state = self.exercise("fallback-unpresented", subject="retained", reopen=reopen)
+                self.assertEqual((commands, requests), ([b"B", b"Q"], []))
+                self.assertNotIn("delivery", state)
+                self.assertEqual(state["shellActivation"], dict(status="unavailable", reason="No verified presentation"))
+                self.assertEqual(state["initialGuiRect"], RECT)
+                receipt = state["ordinaryLauncherFallback"]
+                self.assertEqual(receipt["status"], "passed")
+                self.assertEqual(receipt["initialGuiWindow"], 99 if reopen else None)
+                self.assertEqual(receipt["rootShow"]["hwnd"], state["retainedWindow"]["first"]["hwnd"])
+                self.assertEqual(receipt["secondaryArguments"], [])
+                self.assertEqual(receipt["workerBefore"], receipt["workerAfter"])
+                self.assertTrue(receipt["keyboardFocus"]["observed"])
+                self.assertEqual(state["retainedWindow"]["secondaryShow"]["basis"], "distinctTicks")
+                self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+
+    def test_fallback_show_order_for_stale_and_tied_native_events(self):
+        for reopen in (False, True):
+            for reason in ("fallback-delayed-stale", "fallback-tied-visible", "fallback-tied-witness"):
+                with self.subTest(reopen=reopen, reason=reason):
+                    _, _, state = self.exercise(reason, subject="retained", reopen=reopen)
+                    receipt, root = state["ordinaryLauncherFallback"], state["retainedWindow"]
+                    row = root["secondaryShow"]
+                    self.assertEqual((row["earliestMs"], row["releasedByMs"], row["observedMs"]), (22, 23, 28))
+                    if reason == "fallback-delayed-stale":
+                        self.assertLess(row["showMs"], receipt["beforeResumeMs"])
+                        self.assertEqual((receipt["status"], row["status"]), ("failed", "outsideInterval"))
+                    elif reason == "fallback-tied-visible":
+                        self.assertEqual((receipt["status"], row["status"]), ("inconclusive", "inconclusive"))
+                    else:
+                        self.assertEqual(receipt["status"], "passed")
+                        self.assertEqual(row["basis"], "observedHiddenAfterTrigger")
+                        self.assertEqual(root["afterTrigger"]["state"], "retainedRootHidden" if reopen else "noGuiRoot")
+                        if not reopen:
+                            self.assertEqual(row["createMs"], 23)
+
+    def test_visible_fallback_with_no_keyboard_focus_keeps_its_order_and_normal_quit_receipts(self):
+        _, _, state = self.exercise("fallback-no-focus", subject="retained")
+        receipt = state["ordinaryLauncherFallback"]
+        self.assertEqual(state["retainedWindow"]["secondaryShow"]["status"], "ordered")
+        self.assertEqual(receipt["status"], "failed")
+        self.assertFalse(receipt["keyboardFocus"]["lastSample"]["focused"])
+        self.assertFalse(receipt["keyboardFocus"]["observed"])
+        self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+
+    def test_fallback_rejects_an_unrelated_worker_callback_secondary_child_or_replaced_window(self):
+        for reason in ("fallback-worker", "fallback-other-callback", "fallback-extra-child", "fallback-replaced-window"):
+            with self.subTest(reason=reason):
+                commands, _, state = self.exercise(reason, subject="retained", reopen=True)
+                self.assertEqual(commands[-1], b"Q")
+                self.assertEqual(state["ordinaryLauncherFallback"]["status"], "failed")
+                self.assertEqual(state["shellActivation"]["status"], "unavailable")
+
+    def test_no_fallback_launch_when_a_provider_action_may_already_have_started(self):
+        _, _, state = self.exercise("fallback-invoked", subject="retained")
+        self.assertNotIn("ordinaryLauncherFallback", state)
+
+    def test_secondary_stays_suspended_if_explorer_exposes_the_icon_before_resume(self):
+        commands, _, state = self.exercise("fallback-reappeared", subject="retained")
+        self.assertEqual(commands, [b"B", b"Q"])
+        receipt = state["ordinaryLauncherFallback"]
+        self.assertEqual(receipt["shellBeforeResume"], dict(hresult=0, rect=RECT))
+        self.assertNotIn("secondaryExit", receipt)
+        self.assertNotIn("rootShow", receipt)
 
     def test_comparison_after_provider_refusal_records_modify_and_quit_without_invoking_any_item(self):
         commands, requests, state = self.exercise("missing-provider", subject="retained", reopen=True, compare=True)

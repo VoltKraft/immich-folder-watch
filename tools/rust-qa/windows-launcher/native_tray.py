@@ -646,6 +646,36 @@ def confirm_provider(event, surface, token):
     return provider
 
 
+def registered_without_presentation(result):
+    """Recognize a refused physical presentation before any Explorer action was attempted."""
+    if result.get("stage") != "first-marker":
+        return False
+    registration = result["registration"]
+    provider = result["provider"]
+    history = provider.get("flyoutHistory", [])
+    return (registration["added"] and registration["version4"]
+            and registration["shellReadback"] == {"hresult": 1, "rect": None}
+            and provider.get("exit") == 2 and provider.get("jobEmpty") is True
+            and [event["stage"] for event in history] == ["baseline", "hint", "cleanup"]
+            and history[1].get("surface") is None and history[1].get("markerObserved") is False
+            and history[1].get("reason") == "Independent Shell_NotifyIconGetRect returned 00000001"
+            and history[2].get("attempted") is False and history[2].get("iconAttempted") is False)
+
+
+def ordinary_secondary(api, desk, gui, trial, env, out, before_resume, pump, clock, receipt):
+    path = out / "ordinary-fallback-secondary.log"
+    with path.open("xb") as stream, launcher.child(api, desk, "Default", gui, [], trial, env, stream, False,
+                                                   private=False, before_resume=before_resume) as (proc, job, _):
+        receipt.update(resumeReturnedMs=clock(), secondaryArguments=[], secondaryPid=proc.pid,
+                       secondaryCreation100ns=api.process_identity(int(proc._handle)))
+        receipt["secondaryExit"] = launcher.wait_for_exit(proc, pump, 12)
+        receipt["secondaryJobEmpty"] = api.wait_job_empty(job, 3)
+        counts = launcher.JobAccounting()
+        recorder.checked(api.query_job(job, 1, c.byref(counts), c.sizeof(counts), None))
+        receipt["secondaryTotalProcesses"] = counts.total
+    return path.read_text(encoding="utf-8").splitlines()
+
+
 def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", reopen=False):
     if reopen and subject != "retained":
         raise ValueError("The Shell reopen case requires the retained-window executable")
@@ -697,6 +727,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 raise ValueError("The background GUI allocated a renderer before the real Shell activation")
 
         result["stage"] = "registration"
+        fallback = None
         try:
             native.watch_original(stack, result)
             command(proc, b"B")
@@ -858,6 +889,63 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 result["keyboardFocus"] = {}
                 retained.focus(result["keyboardFocus"])
                 retained.check_visible(log, "beforeQuit")
+        except Unavailable as exc:
+            if retained is None or not registered_without_presentation(result):
+                raise
+            result["shellActivation"] = dict(status="unavailable", reason=str(exc))
+            fallback = result["ordinaryLauncherFallback"] = dict(
+                status="failed", primaryPid=proc.pid, primaryCreation100ns=creation, workerBefore=result["workerBefore"],
+                initialGuiWindow=retained.hwnd, windowOperation="reopen-original" if reopen else "first-display")
+
+            def before_resume(secondary):
+                windows.pump()
+                hidden()
+                native.require_original("beforeOrdinaryLaunch")
+                reg = result["registration"]
+                receiver = desk.window(reg["hwnd"])
+                readback = fallback["shellBeforeResume"] = shell_rect(reg["hwnd"])
+                if (not receiver or any(receiver[k] != reg["receiver"][k] for k in ("pid", "tid", "class"))
+                        or desk.name(desk.thread_desktop(receiver["tid"])) != "Default"
+                        or readback != {"hresult": 1, "rect": None}):
+                    raise Unavailable("The original unpresented registration changed before the ordinary launch")
+                fallback.update(hiddenBeforeLaunch=True, suspendedSecondaryPid=secondary.pid,
+                                eventsBeforeResume=len(windows.events), beforeResumeMs=clock())
+
+            def observe_open():
+                if "afterTrigger" not in evidence:
+                    client = fallback["secondaryPid"]
+                    if f"LAUNCHER_OPEN client={client}\n" not in log().splitlines(keepends=True):
+                        return False
+                    retained.sample_after_trigger("secondaryShow", dict(secondaryPid=client), clock)
+                return True
+
+            def pump_secondary():
+                windows.pump()
+                observe_open()
+
+            secondary_lines = ordinary_secondary(api, desk, gui, trial, env, out, before_resume, pump_secondary, clock, fallback)
+            wait(observe_open, "The primary did not acknowledge the ordinary secondary")
+            hwnd = wait(windows.visible, "The ordinary secondary did not present the original primary")
+            wait(lambda: "WINDOW_FOREGROUND_REQUEST " in log(), "The ordinary launcher foreground request was missing")
+            native.visible_window(proc, hwnd, fallback, "visibleWindow")
+            if reopen:
+                retained.opened(hwnd, log, wait)
+            else:
+                retained.first(hwnd, log, wait)
+            observed = clock()
+            focus = fallback["keyboardFocus"] = {}
+            retained.focus(focus, required=False)
+            retained.check_visible(log, "beforeQuit")
+            fallback["workerAfter"] = worker_identity("ordinaryFallbackAfter")
+            native.require_original("afterOrdinaryLaunch")
+            if (fallback["suspendedSecondaryPid"] != fallback["secondaryPid"]
+                    or api.process_identity(int(proc._handle)) != creation):
+                raise ValueError("The primary or secondary changed during the ordinary fallback launch")
+            show_ordered = retained.activated_show(fallback["eventsBeforeResume"], fallback["beforeResumeMs"], observed,
+                                                   "secondaryShow", released_by=fallback["resumeReturnedMs"])
+            fallback["rootShow"] = evidence["secondaryShow"]["showEvent"]
+            if not fallback["rootShow"]["root"]:
+                raise ValueError("The ordinary launch had no native SHOW of the primary root")
         finally:
             try:
                 result["quitRequested"] = False
@@ -877,6 +965,23 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
             raise ValueError("The primary exited before the observer could request normal Quit")
         if not ordinary_console(result["contextAfter"], "Default"):
             raise Unavailable("The original input desktop could not be confirmed at teardown")
+        if fallback is not None:
+            final_log = log()
+            launcher.qualify_secondary(secondary_lines, final_log.splitlines(), fallback,
+                                       fallback["rootShow"]["hwnd"], fallback["visibleWindow"]["pid"])
+            launcher.retained_graphics(final_log, evidence, before_quit=False)
+            shutdown = result["nativeShutdown"]
+            if (shutdown["observedHostInstability"] or shutdown["cleanupMethod"] != "deletedAtQuit"
+                    or shutdown["receiverAfterExit"] != {"tid": 0, "pid": 0} or shutdown["shellAfterExit"] is None
+                    or records(final_log, "TRAY_CALLBACK") or records(final_log, "TRAY_OPEN")):
+                raise ValueError("The ordinary launch did not retain exclusive activation and original Shell cleanup")
+            if not show_ordered:
+                fallback["status"] = "inconclusive"
+                raise launcher.ShowOrderUnavailable(evidence["secondaryShow"]["reason"])
+            if not fallback["keyboardFocus"]["observed"]:
+                raise ValueError("The visible primary did not acquire foreground and keyboard focus after the ordinary launch")
+            fallback["status"] = "passed"
+            raise Unavailable(result["shellActivation"]["reason"])
         native.qualify_quiet_shell(log(), result, no_host=False)
         if (delivery(log(), key, state["startTick"], result["delivery"]["observedMs"]) != result["delivery"]
                 or "LAUNCHER_OPEN " in log()):
@@ -941,6 +1046,10 @@ def assess(target, out, result, *, subject="canonical", reopen_first=False):
                 churn_timeout = isinstance(exc, TimeoutError) and shutdown.get("observedHostInstability") is True
                 state.update(status="unavailable" if isinstance(exc, (Unavailable, launcher.ShowOrderUnavailable)) or churn_timeout else "failed",
                              failures=launcher.failures(exc))
+                fallback = state.get("ordinaryLauncherFallback", {})
+                if fallback.get("status") == "failed":
+                    fallback["failures"] = state["failures"]
+                    fallback["status"] = state["status"]
                 if not state["cleanupConfirmed"] or CleanupUnconfirmed.in_chain(exc):
                     state["status"] = "failed"
                     for later in cases[index + 1:]:
