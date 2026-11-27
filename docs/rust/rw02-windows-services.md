@@ -1213,6 +1213,21 @@ no usable icon rectangle.
 [Original executables, observations and compiler records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453/artifacts/15222710202) ·
 [Native start-order selection](../../.github/workflows/rust-windows-shell-2022.yaml).
 
+At `db1f126` the background-start case ran first on Windows Server 2022
+x64. Its accessibility action and callback shared a Windows tick, so
+their order remains unresolved. The second GUI started visible and closed
+to the tray. Immediately before its ordinary second launch, the Shell
+returned `S_FALSE` for the icon rectangle. Windows showed the original
+hidden HWND 458882 at uptime 949750 ms, 16 ms after the observer released
+the secondary process. The first focus sample found the original window
+foreground, active and focused. The secondary exited zero and the same
+inventory worker (PID 980 and identical creation time) continued through
+the reopen. The ordinary-launch checks have now passed for both initial
+window states across the two desktops. The Shell activation check on
+this run remained unavailable. The original ZIP has SHA-256
+`65274e9dd39e14bc8b3350aa8f02b8913e7b51886584ccd11979598b607091c7`.
+[Native background-first run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46045729761).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

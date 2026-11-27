@@ -21,6 +21,13 @@ native display session. The next packaging check is to verify the runtime
 prerequisite during a clean candidate installation.
 [Server 2025 reports and runtime](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial).
 
+On Server 2022 x64 an ordinary second launch at `db1f126` reopened the
+previously closed window 16 ms after the secondary process resumed, with
+keyboard focus and the original inventory worker. This complements the
+earlier hidden-start result on a separate desktop. The Shell action and
+callback on the latest desktop shared a clock tick.
+[Native tray and ordinary-launch observations](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
+
 On native Noble x64 an installed test Flatpak staged, published and cancelled
 downloads through a Documents grant on the stock package, private backport
 and restored stock package. An independent read of the stopped guest disk
