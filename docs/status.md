@@ -2,7 +2,7 @@
 
 ## Current Rust implementation goal
 
-Goal `M-RUST-IMPLEMENTATION-20261114` is paused on `rewrite/rust` in chat
+Goal `M-RUST-IMPLEMENTATION-20261114` is active on `rewrite/rust` in chat
 `01a1db8f-b8ef-7903-8dfc-932f9b39c743`. RW-01 is accepted. RW-02 is
 qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
@@ -43,7 +43,10 @@ adapter sent all nine authenticated requests through the fixed proxy,
 including the WebSocket upgrade. Its CONNECT requests carried no API key.
 The direct and `NO_PROXY` controls bypassed the relay. The native Fedora
 x64 suite passed 44 wire scenarios and nine unit tests. Proxy use for
-opted-in plaintext WebSockets is still open. The most recent four-host transport
+opted-in plaintext WebSockets subsequently passed on Fedora x64. The signed
+reference and Rust used the same proxy request forms and direct-host exception.
+The Rust suite passed 49 wire scenarios and thirteen unit tests.
+[Plaintext proxy readback](rust/rw02-realtime-transport.md#opted-in-plaintext-websocket-through-a-linux-http-proxy). The most recent four-host transport
 readback at `47fe26d` passed 22 wire scenarios and four unit tests per
 target.
 [Proxy comparison](rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime) ·

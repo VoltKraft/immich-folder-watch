@@ -1,6 +1,8 @@
 //! Loopback-only RW-02 harness for the actual Rust network adapter.
 #![forbid(unsafe_code)]
 
+#[cfg(target_os = "linux")]
+mod plaintext_proxy;
 mod protocol;
 mod session;
 mod transport;
@@ -163,12 +165,12 @@ fn fixture_roots(source: &str) -> Result<Option<Vec<Certificate>>, Error> {
     ]))
 }
 
-fn fixture_https_proxy(
+fn fixture_proxy(
     api: &Url,
     expected: &str,
     read: impl Fn(&str) -> Option<String>,
 ) -> Result<Option<Url>, Error> {
-    if !cfg!(target_os = "linux") || api.scheme() != "https" {
+    if !cfg!(target_os = "linux") {
         return Err(Error::Protocol);
     }
     let address = expected
@@ -177,7 +179,7 @@ fn fixture_https_proxy(
         .filter(|addr| addr.ip().is_loopback() && addr.port() != 0)
         .ok_or(Error::Protocol)?;
     let owned = Url::parse(&format!("http://{address}")).map_err(|_| Error::Protocol)?;
-    let proxy = transport::LinuxHttpsProxy::from_environment(api, read);
+    let proxy = transport::LinuxProxy::from_environment(api, read);
     if proxy
         .endpoint
         .as_ref()
@@ -203,9 +205,13 @@ async fn probe(args: &[String]) -> Result<(), Error> {
     let (allow_http, proxy) = match (mode.as_str(), extra) {
         ("https", []) => (false, None),
         ("allow-http", []) => (true, None),
-        ("https-linux-proxy", [owned]) => (
+        ("https-linux-proxy", [owned]) if url.scheme() == "https" => (
             false,
-            fixture_https_proxy(&url, owned, |key| std::env::var(key).ok())?,
+            fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
+        ),
+        ("allow-http-linux-proxy", [owned]) if url.scheme() == "http" => (
+            true,
+            fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
         ),
         _ => return Err(Error::Protocol),
     };
@@ -259,7 +265,7 @@ mod tests {
             "https://127.0.0.1:8001",
         ] {
             assert_eq!(
-                fixture_https_proxy(&api, owned, |key| match key {
+                fixture_proxy(&api, owned, |key| match key {
                     "HTTPS_PROXY" => Some(unowned.into()),
                     "NO_PROXY" => Some("127.0.0.1".into()),
                     _ => None,
@@ -274,10 +280,7 @@ mod tests {
             "http://127.0.0.1:8001/path",
             "http://127.0.0.1:8001?query",
         ] {
-            assert_eq!(
-                fixture_https_proxy(&api, invalid, |_| None),
-                Err(Error::Protocol)
-            );
+            assert_eq!(fixture_proxy(&api, invalid, |_| None), Err(Error::Protocol));
         }
     }
 }

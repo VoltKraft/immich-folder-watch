@@ -6,6 +6,7 @@ from collections import Counter
 from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,8 @@ PEER_CLOSE_REASON = b"synthetic maintenance"
 DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-no-max-payload"}
 LINUX_PROXY_CASES = ("linux-https-proxy", "linux-https-proxy-bypass", "linux-https-proxy-priority",
                      "linux-https-proxy-untrusted-tls", "linux-https-proxy-wrong-host-tls")
+HTTP_PROXY_CASES = ("linux-http-proxy", "linux-http-proxy-bypass", "linux-http-proxy-connect-redirect",
+                    "linux-http-proxy-upgrade-redirect", "linux-http-proxy-reconnect")
 
 
 PRE_ACK_REFUSALS = {"upgrade-redirect": "Status(302)", "upgrade-http-503": "Status(503)", "probe-refused": "Disconnected"}
@@ -79,6 +82,7 @@ class Peer(ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.scenario, self.ns, self.api = scenario, namespace, api
         self.counts = Counter()
+        self.accepted_connections = 0
         self.errors = []
         self.close_packets = []
         self.namespace_posts = []
@@ -101,6 +105,11 @@ class Peer(ThreadingHTTPServer):
             self.counts[name] += 1
             return self.counts[name]
 
+    def get_request(self):
+        request = super().get_request()
+        self.accepted_connections += 1
+        return request
+
     def open_packet(self, sid, upgrades, heartbeat_ms):
         fields = dict(sid=sid, upgrades=upgrades, pingInterval=heartbeat_ms, pingTimeout=heartbeat_ms)
         if self.scenario != "reconnect-no-max-payload":
@@ -121,6 +130,7 @@ class Peer(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    upgrade_connection = "Upgrade"
 
     def parse_request(self):
         if not super().parse_request():
@@ -312,13 +322,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.body(b"unavailable", status)
                 return
         accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest())
-        self.send_response(101)
-        self.send_header("Connection", "Upgrade")
-        self.send_header("Upgrade", "websocket")
-        self.send_header("Sec-WebSocket-Accept", accept.decode())
-        self.end_headers()
-        self.close_connection = True
         self.connection.settimeout(5)
+        self.write_switch(accept, direct)
+        self.close_connection = True
         if direct:
             offers = []
             if peer.scenario == "reconnect-namespace":
@@ -335,6 +341,13 @@ class Handler(BaseHTTPRequestHandler):
         elif not self.probe_upgrade(sid):
             return
         self.websocket_session(direct)
+
+    def write_switch(self, accept, direct):
+        self.send_response(101)
+        self.send_header("Connection", self.upgrade_connection)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Sec-WebSocket-Accept", accept.decode())
+        self.end_headers()
 
     def probe_upgrade(self, sid):
         peer = self.server
@@ -430,6 +443,35 @@ class ProxyOriginHandler(Handler):
         self.server.mark("sentSubscriptionEvents")
 
 
+class PlainProxyOrigin(ProxyOriginHandler):
+    upgrade_connection = "keep-alive, Upgrade"
+
+    def validate_target(self):
+        assert self.path.startswith("/") and not self.path.startswith("//")
+        assert self.headers.get_all("Host") == [f"127.0.0.1:{self.server.server_port}"]
+
+    def routing(self):
+        self.validate_target()
+        return super().routing()
+
+    def write_switch(self, accept, direct):
+        if not direct:
+            return super().write_switch(accept, direct)
+        # The HTTP headers and the first WebSocket frame share a single write.
+        network = self.wfile
+        with io.BytesIO() as response:
+            self.wfile = response
+            try:
+                super().write_switch(accept, direct)
+                send_frame(response, 9, b"with-switch")
+            finally:
+                self.wfile = network
+            network.write(response.getvalue())
+            network.flush()
+        assert client_frame(self.rfile) == (10, b"with-switch")
+        self.server.mark("coalescedSwitchPongs")
+
+
 @contextmanager
 def peer(scenario, api="/api", tls=None, handler=Handler):
     prefix = api.rsplit("/", 1)[0]
@@ -498,6 +540,75 @@ def proxy_environment(home):
     # settings for the child come from the case itself.
     keep = {"PATH", "SYSTEMROOT", "WINDIR", "TMP", "TEMP", "TMPDIR"}
     return {**{key: value for key, value in os.environ.items() if key.upper() in keep}, "HOME": str(home)}
+
+
+def run_http_proxy_scenario(executable, name, directory, redirect):
+    from https_proxy import plaintext_handler
+
+    bypass = name == "linux-http-proxy-bypass"
+    refuse_connect = name == "linux-http-proxy-connect-redirect"
+    refuse_upgrade = name == "linux-http-proxy-upgrade-redirect"
+    reconnect = name == "linux-http-proxy-reconnect"
+    # Reuse the one-event upgraded session, or its existing redirect/reconnect exchange.
+    scenario = "upgrade-redirect" if refuse_upgrade else "reconnect" if reconnect else "tls"
+    api = "/collection/api"
+    budget = 1750 if reconnect else 1300
+    with peer(scenario, api, handler=PlainProxyOrigin) as direct:
+        authority = f"127.0.0.1:{direct.server_port}"
+        with peer(scenario, api, handler=plaintext_handler(PlainProxyOrigin, authority, refuse_connect)) as proxied:
+            proxied.proxy_targets = {}
+            proxied.redirect_port = redirect.server_port
+            endpoint = f"http://127.0.0.1:{proxied.server_port}"
+            env = {**proxy_environment(directory), "HTTP_PROXY": endpoint}
+            if bypass:
+                env["NO_PROXY"] = "127.0.0.1"
+            start = time.monotonic()
+            proc = subprocess.run([str(executable), f"http://{authority}{api}", "allow-http-linux-proxy", "-",
+                                   str(budget), "130" if reconnect else "30000", "137", endpoint],
+                                  env=env, cwd=directory, capture_output=True, text=True, timeout=8)
+            elapsed = round((time.monotonic() - start) * 1000)
+            events = proc.stdout.splitlines()
+            trace = Counter(events)
+            origin = direct if bypass else proxied
+            stats = origin.counts.copy()
+            assert not direct.errors and not proxied.errors, (direct.errors, proxied.errors)
+            assert not redirect.accepted_connections and not redirect.counts, redirect.counts
+            assert proc.returncode == 0 and not proc.stderr and events[-1:] == ["Stopped"], (events, proc.stderr)
+            assert budget - 50 <= elapsed < budget + 2000, elapsed
+            assert stats["inventoryRequests"] >= 3 and trace["Inventory"] >= 3 and trace["Periodic"] >= 3, (stats, events)
+            assert stats["openingRequests"] == stats["namespacePosts"] == 1 and origin.namespace_posts == ["40/collection,"]
+            assert not stats["sidPollingGets"] and not stats["pollingDisconnects"]
+            expected_tunnels = 1 + int(reconnect)
+            if bypass:
+                assert not proxied.accepted_connections and not proxied.proxy_targets and not proxied.counts
+            else:
+                assert not direct.accepted_connections and not direct.counts
+                assert stats["connects"] == expected_tunnels and not stats["credentialHeaders"], stats
+                assert stats["tunneledUpgrades"] == expected_tunnels - int(refuse_connect), stats
+                assert stats["absoluteRequests"] == stats["inventoryRequests"] + 2, stats
+                assert stats["authenticatedRequests"] == stats["absoluteRequests"] + stats["tunneledUpgrades"], stats
+                assert not stats["rejectedAuthority"] and not stats["nestedConnect"], stats
+            assert stats["httpRequests"] == stats["authenticatedRequests"] + stats["connects"], stats
+            if refuse_connect or refuse_upgrade:
+                declined = [e for e in events if e.startswith("UpgradeDeclined ")]
+                assert declined == ["UpgradeDeclined Status(302)"] and trace["Attempt"] == 1, events
+                assert not any(trace[e] for e in ("Connected", "Event", "Upgraded", "DirectWebSocket")), events
+                assert not any(e.startswith(("Lost ", "StopFailed ")) for e in events), events
+                assert stats["websocketRequests"] == int(refuse_upgrade) and not stats["probes"] and not origin.close_packets
+                assert events[events.index(declined[0]) + 1:].count("Inventory") >= 2
+                assert stats["inventoryAfterUpgradeRefusal"] >= 2 and not origin.sent_on_promotion
+            else:
+                check_protocol(scenario, trace, stats, events)
+                assert trace["Attempt"] == trace["Connected"] == trace["Event"] == stats["sentSubscriptionEvents"] == expected_tunnels
+                assert stats["coalescedSwitchPongs"] == int(reconnect)
+                assert origin.direct_joins == (["40/collection,"] if reconnect else [])
+                assert origin.close_packets == [{"websocketText": "41/collection,"},
+                                                {"websocketCloseCode": 1000, "reason": "io client disconnect"}]
+            return {"client": dict(trace), "peer": dict(stats), "requestLinesAtProxy": proxied.proxy_targets.copy(),
+                    "directConnections": direct.accepted_connections, "proxyConnections": proxied.accepted_connections,
+                    "redirectConnections": redirect.accepted_connections, "connectApiHeaders": stats["credentialHeaders"],
+                    "closePacketsAtPeer": list(origin.close_packets), "directNamespaceJoinsAtPeer": list(origin.direct_joins),
+                    "namespacePostsAtPeer": list(origin.namespace_posts), "processElapsedMs": elapsed, "budgetMs": budget}
 
 
 def run_proxy_scenario(executable, name, directory, contexts, redirect):
@@ -574,6 +685,8 @@ def run_proxy_scenario(executable, name, directory, contexts, redirect):
 
 
 def run_scenario(executable, name, directory, contexts, redirect):
+    if name in HTTP_PROXY_CASES:
+        return run_http_proxy_scenario(executable, name, directory, redirect)
     if name in LINUX_PROXY_CASES:
         return run_proxy_scenario(executable, name, directory, contexts, redirect)
     platform_trust = name.startswith("linux-platform-")
@@ -800,7 +913,7 @@ def main():
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
     if platform.system() == "Linux":
         cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
-                  "linux-platform-wrong-host-tls", *LINUX_PROXY_CASES)
+                  "linux-platform-wrong-host-tls", *LINUX_PROXY_CASES, *HTTP_PROXY_CASES)
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

@@ -443,6 +443,8 @@ name = "ifw-realtime-probe"
 version = "0.0.0"
 dependencies = [
  "futures-util",
+ "hyper",
+ "hyper-util",
  "ifw-immich",
  "reqwest",
  "rustls",

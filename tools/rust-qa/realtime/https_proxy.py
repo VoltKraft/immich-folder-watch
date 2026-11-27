@@ -1,9 +1,18 @@
-"""A loopback CONNECT observer serving one synthetic TLS origin on the accepted socket."""
+"""Loopback HTTP proxy observers that serve a single fixed origin on their own sockets."""
 
 from collections import Counter
 from http.server import BaseHTTPRequestHandler
 import ssl
 import threading
+from urllib.parse import parse_qs, urlsplit
+
+
+def rejected_connect(handler, authority):
+    if handler.path != authority or handler.headers.get_all("Host") != [authority]:
+        return "rejectedAuthority"
+    if any(key in handler.headers for key in ("x-api-key", "Authorization", "Proxy-Authorization", "Cookie")):
+        return "credentialHeaders"
+    return None
 
 
 class FixedTunnel:
@@ -53,12 +62,9 @@ class FixedTunnel:
             def do_CONNECT(self):
                 self.close_connection = True
                 tunnel.mark("connects")
-                if self.path != tunnel.authority or self.headers.get_all("Host") != [tunnel.authority]:
-                    tunnel.mark("rejectedAuthority")
-                    self.send_error(403)
-                    return
-                if any(key in self.headers for key in ("x-api-key", "Authorization", "Proxy-Authorization", "Cookie")):
-                    tunnel.mark("credentialHeaders")
+                refusal = rejected_connect(self, tunnel.authority)
+                if refusal:
+                    tunnel.mark(refusal)
                     self.send_error(403)
                     return
                 self.send_response_only(200, "Connection established")
@@ -75,3 +81,56 @@ class FixedTunnel:
                     inner_handler(stream, self.client_address, self.server)
 
         return Connect
+
+
+def plaintext_handler(origin, authority, refuse_connect):
+    """Accept absolute HTTP requests and switch this socket to the fixed origin after CONNECT."""
+    class FixedPlaintext(origin):
+        in_tunnel = False
+
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(5)
+
+        def do_CONNECT(self):
+            self.server.mark("connects")
+            refusal = rejected_connect(self, authority)
+            if refusal or self.in_tunnel:
+                self.server.mark(refusal or "nestedConnect")
+                self.send_error(403)
+                self.close_connection = True
+                return
+            self.record_target("connect")
+            if refuse_connect:
+                self.redirect()
+                self.server.initial_refused.set()
+                self.close_connection = True
+                return
+            self.send_response_only(200, "Connection established")
+            self.end_headers()
+            self.in_tunnel = True
+
+        def record_target(self, label):
+            with self.server.lock:
+                self.server.proxy_targets.setdefault(label, self.requestline)
+
+        def validate_target(self):
+            url = urlsplit(self.path)
+            mode = parse_qs(url.query).get("transport")
+            assert self.headers.get_all("Host") == [authority]
+            assert self.headers.get_all("Proxy-Authorization") is None
+            if self.in_tunnel:
+                assert self.path.startswith("/socket.io/?") and self.command == "GET" and mode == ["websocket"]
+                assert not url.scheme and not url.netloc
+                self.server.mark("tunneledUpgrades")
+                self.record_target("directUpgrade" if "sid" not in parse_qs(url.query) else "upgrade")
+            else:
+                assert self.path.startswith("http://" + authority + "/") and url.netloc == authority
+                if url.path == self.server.api + "/albums":
+                    label = "inventory"
+                else:
+                    assert url.path == "/socket.io/" and mode == ["polling"]
+                    label = "polling" + self.command
+                self.server.mark("absoluteRequests")
+                self.record_target(label)
+    return FixedPlaintext

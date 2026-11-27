@@ -23,7 +23,7 @@ to select another isolated cache and `--offline` after fetching the locked archi
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
 build and 35 shared wire scenarios. Linux also runs four platform trust
-cases. Two strict polling peers accept only the
+cases and five cases each for HTTPS and explicitly enabled HTTP proxy routing. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
@@ -79,6 +79,17 @@ numeric proxy address. The suite exercises proxy use, the `NO_PROXY`
 exception, precedence of `https_proxy`, and rejection of a foreign CA and
 an incorrect endpoint identity.
 [Shipping client and Rust observations](../../../docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime).
+
+When plaintext HTTP is explicitly enabled, the Linux fixture sends REST and
+polling requests to the selected HTTP proxy in absolute form. To open a
+WebSocket it first sends CONNECT for the configured origin, then sends the
+authenticated upgrade in origin form through that tunnel. The adapter resolves the
+proxy hostname when it opens the socket. A native unit test connects to a
+loopback listener by name and verifies its CONNECT request. The observer checks
+the request lines, synthetic API header placement, bypass, rejection of
+redirects at either handshake, and a second WebSocket connection after a
+dropped session. On the reconnect the peer sends the first WebSocket frame
+with the upgrade response and observes its pong.
 
 `result.json` records each step, source and artifact hashes. `graph.json` contains
 the full selected feature graph, original inputs and notices. `sessions.json`

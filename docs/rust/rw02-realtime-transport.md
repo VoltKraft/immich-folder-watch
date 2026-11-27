@@ -497,8 +497,8 @@ specific origin. It checks `https_proxy`, `HTTPS_PROXY`, `all_proxy` and
 Selection retains the .NET spelling for IPv6 hosts with embedded IPv4.
 The loopback probe only accepts the numeric proxy address supplied by the
 fixture. The earlier direct modes continue to run their isolated tests.
-The opted-in plaintext WebSocket, authenticated proxy services, Windows
-proxy selection and the integrated application still require their own
+At this revision the opted-in plaintext WebSocket, authenticated proxy services,
+Windows proxy selection and the integrated application still needed their own
 observations.
 [.NET environment proxy](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Http/src/System/Net/Http/SocketsHttpHandler/HttpEnvironmentProxy.Unix.cs) ·
 [.NET IPv6 host formatting](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Private.Uri/src/System/IPv6AddressHelper.cs) ·
@@ -528,10 +528,34 @@ The receipt covers 20 source files, nine output digests, 109 crates and
 192 original notices. Its SHA-256 is
 `fbcb56e1ee9460af9abfac06218f9014397f114b00a742afa57dfcebf635391c`.
 
+### Opted-in plaintext WebSocket through a Linux HTTP proxy
+
+On Fedora x64 the signed .NET 3.0.4 client and Rust both used absolute
+HTTP request targets for inventory and polling. Each established the WebSocket
+through one CONNECT to the configured relay. Only the subsequent request
+inside the tunnel carried the synthetic API header. Each client received the
+event, sent a normal WebSocket close (1000) and bypassed the relay for a
+matching `NO_PROXY` entry. The signed client issued one inventory request
+and Rust issued six. The paired twelve-case report in
+`artifacts/rust/realtime-assessment/proxy-fedora-05/result.json` has SHA-256
+`13b08e624e0ed2f81031c24423a9cc76216a4814816ee266a539855a7bfd5378`.
+
+The offline Rust assessment passed 49 wire scenarios and thirteen unit tests.
+The adapter accepts a DNS hostname, IPv4 or IPv6 proxy address. The native
+DNS case connected to a proxy configured as `localhost`.
+The relay and inner upgrade redirect controls observed zero connections to
+the redirect destination. A reconnect also received the first frame arriving
+in the same read as the HTTP upgrade. The native receipt at
+`artifacts/rust/realtime-assessment/linux-plaintext-proxy-fedora-03/result.json`
+has SHA-256 `4f5d9af3656b20fa4603465e164cb4ef7894346313f357e18eec4f80ab4d388a`.
+All four audited target graphs kept their existing package and feature
+sets. Windows proxy selection, authenticated relays and full application
+integration remain open.
+
 ## Dependency and native input review
 
 The assessment has an independent lockfile, SHA-256
-`8089303faf289786169b79eb370c5afdabbff0034482ab26cf71220f3df3dcdf`.
+`31718bcf0f1c7e62c483c0ebd6a5ff8577e0fcc9ec1aa6830bd927286accddc5`.
 The four normal/build target inventories cover 114 distinct registry packages,
 two first-party packages and 202 supplied notice files. The lock includes another
 38 registry packages outside those native target profiles. The audit records

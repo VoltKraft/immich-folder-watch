@@ -84,7 +84,7 @@ On Fedora x64 the HTTPS proxy comparison qualified authenticated REST,
 polling and the WebSocket upgrade. Rust and signed .NET 3.0.4 both honored
 the configured proxy and the direct-host exception. The fixed relay saw
 zero API headers on CONNECT. The Rust suite passed 44 wire scenarios and
-nine unit tests. The plaintext WebSocket and Windows proxy paths remain open.
+nine unit tests. The subsequent [Linux plaintext comparison](rw02-realtime-transport.md#opted-in-plaintext-websocket-through-a-linux-http-proxy) passed all 49 wire cases and thirteen unit tests. Windows proxy selection remains open.
 [Proxy requests and TLS controls](rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime).
 
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,

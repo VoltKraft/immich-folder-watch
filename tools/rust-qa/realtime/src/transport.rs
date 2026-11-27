@@ -22,14 +22,16 @@ pub(crate) struct Transport {
     api: Url,
     endpoint: Url,
     client: Client,
+    #[cfg(target_os = "linux")]
+    plaintext_proxy: Option<Url>,
     header: header::HeaderValue,
     pub namespace: String,
 }
 
-/// Select the proxy for one HTTPS origin with the Unix System.Net precedence.
+/// Select the proxy for one HTTP(S) origin with the Unix System.Net precedence.
 /// The endpoint is kept separate so the loopback harness can check its
 /// ownership even when the destination is on the bypass list.
-pub(crate) struct LinuxHttpsProxy {
+pub(crate) struct LinuxProxy {
     pub endpoint: Option<Url>,
     bypass: bool,
 }
@@ -81,11 +83,20 @@ fn embedded_ipv4_host(host: &str) -> Option<String> {
     Some(format!("[{prefix}:{}]", Ipv4Addr::new(w, x, y, z)))
 }
 
-impl LinuxHttpsProxy {
+impl LinuxProxy {
     pub fn from_environment(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
-        let endpoint = ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-            .iter()
-            .filter_map(|name| read(name))
+        let (lower, upper) = if api.scheme() == "http" {
+            (
+                "http_proxy",
+                read("GATEWAY_INTERFACE").is_none().then_some("HTTP_PROXY"),
+            )
+        } else {
+            ("https_proxy", Some("HTTPS_PROXY"))
+        };
+        let endpoint = [Some(lower), upper, Some("all_proxy"), Some("ALL_PROXY")]
+            .into_iter()
+            .flatten()
+            .filter_map(&read)
             .find_map(|value| unix_proxy_endpoint(&value));
         let excluded = read("no_proxy").or_else(|| read("NO_PROXY"));
         let host = api.host_str().unwrap_or_default();
@@ -178,7 +189,7 @@ impl Transport {
         allow_http: bool,
         api_key: &str,
         roots: Option<Vec<Certificate>>,
-        https_proxy: Option<Url>,
+        proxy: Option<Url>,
     ) -> Result<Self, Error> {
         if !(api.scheme() == "https" || allow_http && api.scheme() == "http")
             || api.host().is_none()
@@ -219,8 +230,20 @@ impl Transport {
         if let Some(roots) = roots {
             builder = builder.tls_certs_only(roots);
         }
-        if let Some(proxy) = https_proxy {
-            builder = builder.proxy(reqwest::Proxy::https(proxy)?);
+        #[cfg(target_os = "linux")]
+        let mut plaintext_proxy = None;
+        if let Some(proxy) = proxy {
+            if api.scheme() == "http" {
+                #[cfg(target_os = "linux")]
+                {
+                    builder = builder.proxy(reqwest::Proxy::http(proxy.clone())?);
+                    plaintext_proxy = Some(proxy);
+                }
+                #[cfg(not(target_os = "linux"))]
+                return Err(Error::Protocol);
+            } else {
+                builder = builder.proxy(reqwest::Proxy::https(proxy)?);
+            }
         }
         Ok(Self {
             api,
@@ -228,6 +251,8 @@ impl Transport {
             namespace,
             header,
             client: builder.build().map_err(|_| Error::Transport)?,
+            #[cfg(target_os = "linux")]
+            plaintext_proxy,
         })
     }
 
@@ -287,47 +312,34 @@ impl Transport {
         // polling. Only switch the I/O stream after the RFC 6455 response.
         let key = generate_key();
         let accept = derive_accept_key(key.as_bytes());
-        let resp = self
+        let request = self
             .request(Method::GET, self.uri("websocket", sid))?
             .header(header::CONNECTION, "Upgrade")
             .header(header::UPGRADE, "websocket")
             .header(header::SEC_WEBSOCKET_VERSION, "13")
-            .header(header::SEC_WEBSOCKET_KEY, key)
-            .send()
-            .await?;
-        let headers = resp.headers();
-        if resp.status() != StatusCode::SWITCHING_PROTOCOLS {
-            return Err(Error::Status(resp.status().as_u16()));
-        }
-        let contains_upgrade = headers
-            .get_all(header::CONNECTION)
-            .iter()
-            .filter_map(|v| v.to_str().ok())
-            .flat_map(|s| s.split(','))
-            .any(|s| s.trim().eq_ignore_ascii_case("upgrade"));
-        let mut upgrades = headers.get_all(header::UPGRADE).iter();
-        let mut challenges = headers.get_all(header::SEC_WEBSOCKET_ACCEPT).iter();
-        if !contains_upgrade
-            || !upgrades
-                .next()
-                .is_some_and(|h| h.as_bytes().eq_ignore_ascii_case(b"websocket"))
-            || upgrades.next().is_some()
-            || !challenges
-                .next()
-                .is_some_and(|h| h.as_bytes() == accept.as_bytes())
-            || challenges.next().is_some()
-            || headers.contains_key(header::SEC_WEBSOCKET_EXTENSIONS)
-            || headers.contains_key(header::SEC_WEBSOCKET_PROTOCOL)
-        {
-            return Err(Error::Protocol);
-        }
+            .header(header::SEC_WEBSOCKET_KEY, key);
+        let stream = self.upgrade(request, &accept).await?;
         let config = WebSocketConfig::default()
             .read_buffer_size(16 * 1024)
             .write_buffer_size(16 * 1024)
             .max_frame_size(Some(MAX_MESSAGE_BYTES))
             .max_message_size(Some(MAX_MESSAGE_BYTES))
             .max_write_buffer_size(MAX_MESSAGE_BYTES + 32 * 1024);
-        Ok(Socket::from_raw_socket(resp.upgrade().await?, Role::Client, Some(config)).await)
+        Ok(Socket::from_raw_socket(stream, Role::Client, Some(config)).await)
+    }
+
+    async fn upgrade(
+        &self,
+        request: RequestBuilder,
+        accept: &str,
+    ) -> Result<reqwest::Upgraded, Error> {
+        #[cfg(target_os = "linux")]
+        if let Some(relay) = &self.plaintext_proxy {
+            return crate::plaintext_proxy::websocket(relay, request.build()?, accept).await;
+        }
+        let response = request.send().await?;
+        validate_upgrade(response.status(), response.headers(), accept)?;
+        Ok(response.upgrade().await?)
     }
 
     pub async fn probe(&self, sid: &str) -> Result<Socket, Error> {
@@ -364,6 +376,39 @@ impl Transport {
             Err(Error::Protocol)
         }
     }
+}
+
+pub(crate) fn validate_upgrade(
+    status: StatusCode,
+    headers: &header::HeaderMap,
+    accept: &str,
+) -> Result<(), Error> {
+    if status != StatusCode::SWITCHING_PROTOCOLS {
+        return Err(Error::Status(status.as_u16()));
+    }
+    let contains_upgrade = headers
+        .get_all(header::CONNECTION)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(','))
+        .any(|s| s.trim().eq_ignore_ascii_case("upgrade"));
+    let mut upgrades = headers.get_all(header::UPGRADE).iter();
+    let mut challenges = headers.get_all(header::SEC_WEBSOCKET_ACCEPT).iter();
+    if !contains_upgrade
+        || !upgrades
+            .next()
+            .is_some_and(|h| h.as_bytes().eq_ignore_ascii_case(b"websocket"))
+        || upgrades.next().is_some()
+        || !challenges
+            .next()
+            .is_some_and(|h| h.as_bytes() == accept.as_bytes())
+        || challenges.next().is_some()
+        || headers.contains_key(header::SEC_WEBSOCKET_EXTENSIONS)
+        || headers.contains_key(header::SEC_WEBSOCKET_PROTOCOL)
+    {
+        return Err(Error::Protocol);
+    }
+    Ok(())
 }
 
 async fn bounded_ok_body(mut response: Response) -> Result<Vec<u8>, Error> {
@@ -412,14 +457,62 @@ mod tests {
     use super::*;
 
     fn proxy_for(host: &str, environment: &[(&str, &str)]) -> Option<Url> {
-        let api = Url::parse(&format!("https://{host}/api")).unwrap();
-        LinuxHttpsProxy::from_environment(&api, |name| {
+        proxy_for_url(&format!("https://{host}/api"), environment)
+    }
+
+    fn proxy_for_url(url: &str, environment: &[(&str, &str)]) -> Option<Url> {
+        let api = Url::parse(url).unwrap();
+        LinuxProxy::from_environment(&api, |name| {
             environment
                 .iter()
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| value.to_string())
         })
         .route()
+    }
+
+    #[test]
+    fn linux_http_skips_uppercase_http_proxy_in_cgi_but_keeps_lowercase_and_all_proxy() {
+        let url = "http://127.0.0.1/api";
+        let upper = "http://127.0.0.1:8200";
+        let all = "http://127.0.0.1:8201";
+        let lower = "http://127.0.0.1:8202";
+        for (vars, expected) in [
+            (vec![("HTTP_PROXY", upper), ("all_proxy", all)], upper),
+            (
+                vec![
+                    ("GATEWAY_INTERFACE", ""),
+                    ("HTTP_PROXY", upper),
+                    ("all_proxy", all),
+                ],
+                all,
+            ),
+            (
+                vec![
+                    ("GATEWAY_INTERFACE", "CGI/1.1"),
+                    ("HTTP_PROXY", upper),
+                    ("http_proxy", lower),
+                    ("all_proxy", all),
+                ],
+                lower,
+            ),
+        ] {
+            assert_eq!(
+                proxy_for_url(url, &vars),
+                Some(Url::parse(expected).unwrap())
+            );
+        }
+        assert_eq!(
+            proxy_for_url(
+                url,
+                &[
+                    ("GATEWAY_INTERFACE", ""),
+                    ("HTTP_PROXY", upper),
+                    ("HTTPS_PROXY", all)
+                ]
+            ),
+            None
+        );
     }
 
     #[test]
