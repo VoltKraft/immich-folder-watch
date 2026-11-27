@@ -192,4 +192,13 @@ mod tests {
             assert_eq!(r.route().is_none(), local);
         }
     }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_unicast_table_contains_the_native_loopback_interface() {
+        assert!(
+            ifw_windows_proxy_settings::has_local_address(std::net::Ipv4Addr::LOCALHOST.into())
+                .unwrap()
+        );
+    }
 }
