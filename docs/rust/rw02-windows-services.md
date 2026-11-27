@@ -417,7 +417,7 @@ archives. Windows notification presentation remains open.
 
 ## Windows notification history
 
-The [Server 2022 x64 comparison](../../.github/workflows/rust-windows-notification-2022.yaml)
+The [Server 2022 x64 comparison](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-notification-2022.yaml)
 uses the same Rust sender, classic Shell observer and WinRT history reader
 on a disposable desktop. A separate check replays the normal sender's
 timed call and the Shell's visible title and body. A history entry alone
@@ -653,7 +653,7 @@ Each sample checks the same desktop, session and Explorer before and
 after the native query. The late senders then perform their own original
 presentation checks. The archived `notification-state.json` records the
 actual policy history and the reason observation ended.
-[Focused workflow](../../.github/workflows/rust-windows-notification-2022.yaml) ·
+[Focused workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-notification-2022.yaml) ·
 [Windows notification states](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state).
 
 ### After quiet time on Windows Server 2022 at 20dfb10
@@ -1042,7 +1042,7 @@ with the original process and window evidence. The contrast trial on this
 host retains its existing named-scheme requirement before changing the
 palette. The regular Server 2025 and Windows 11 ARM64 trials continue to
 measure their own desktops.
-[Server 2022 comparison](../../.github/workflows/rust-windows-shell-2022.yaml) ·
+[Server 2022 comparison](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml) ·
 [GitHub runner images](https://github.com/actions/runner-images) ·
 [Contrast observation](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
 
@@ -1129,7 +1129,7 @@ The dedicated Server 2022 comparison now starts the visible-close trial
 first after the Shell-less control. It records the planned and executed
 case order, the original handles and cleanup before starting the next GUI.
 [Native case order](../../tools/rust-qa/windows-launcher/native_tray.py) ·
-[Server 2022 comparison](../../.github/workflows/rust-windows-shell-2022.yaml).
+[Server 2022 comparison](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml).
 
 ### Visible start first on Windows Server 2022 at f148e30
 
@@ -1211,7 +1211,7 @@ also select the visible-first order. This exercises the ordinary launch
 against a previously closed window if Explorer again gives its second GUI
 no usable icon rectangle.
 [Original executables, observations and compiler records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453/artifacts/15222710202) ·
-[Native start-order selection](../../.github/workflows/rust-windows-shell-2022.yaml).
+[Native start-order selection](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml).
 
 At `db1f126` the background-start case ran first on Windows Server 2022
 x64. Its accessibility action and callback shared a Windows tick, so
@@ -1262,3 +1262,57 @@ Across the same two runs, the shipping WPF receiver returned a visible-area
 Shell rectangle on all six x64 idle trials. All six ARM64 trials found the
 WPF receiver but returned `E_FAIL` for its icon rectangle.
 [Same-host renderer and Shell results](rw02-windows-window.md#visible-gdi-and-retained-egui-under-the-same-inventory).
+
+### Visible WinRT banner on the local Windows Server 2025 x64 console
+
+The native sender built at `672d896` ran in console session 1 as the
+non-elevated `ifw-test` account on Windows Server 2025 Standard Evaluation.
+With Windows' **Do not disturb** switch on, both sends returned `S_OK` and
+both history entries could be read and removed. Seventy-eight Shell sampling
+sweeps found no banner. Windows Settings reported notifications enabled.
+After switching Do not disturb off in that same account, the normal banner
+appeared with both complete texts. A first full-screen capture showed the
+unique token `094d5024f02a4a328817fa883f5a4219`. The Shell state still
+reported `QUNS_QUIET_TIME` during this visible send.
+
+In a fresh repeat with Shell state `QUNS_ACCEPTS_NOTIFICATIONS`, the original
+sender (PID 6732) issued its successful ordinary `Show` with
+`SuppressPopup=false`. The physical observer sampled the visible banner
+133.007 ms after that call returned. Both label centers identified HWND
+131386 in `Windows.UI.Core.CoreWindow`, owned by the session's
+`ShellExperienceHost.exe` (PID 4148). UI Automation on that HWND returned
+the full title and body in two distinct on-screen rectangles. The screen
+crop shows both strings with token `4353d463f95f49a0ad72c56f53c7176d`.
+Its SHA-256 is `25b077015215c6ec99728ebcda7fb1d3a850e70665705eec4940c9cb218eb64f`.
+Independent reads verified selective removal and an empty history. The
+standard account's original Do not disturb setting was restored.
+
+The original generic UIA sampler reported no visible match on these desktops.
+In the diagnostic repeat, UIA's global point query returned the background
+Terminal while Win32 hit testing returned the Shell toast HWND at the same
+pixel. The [local physical observer](../../tools/rust-qa/windows-services/toast_console.ps1)
+queries that HWND directly and captures its label rectangles from the screen.
+The result pertains to x64 on this native Server 2025 console. Windows ARM64
+presentation has its own evidence requirement.
+
+To reproduce with this archived sender, use a fresh checkout of `672d896`
+for `toast_history.py` and the local physical observer from a separate
+checkout. Start the following in two ordinary x64 shells in the same test
+account. Set `$native` to the sender checkout's future
+`artifacts/rust/windows-services/toast-history-x86_64-pc-windows-msvc`
+directory and `$frames` to a fresh path. Keep Do not disturb off for the
+capture, then restore the test account's previous setting.
+
+```powershell
+# Start the point observer before starting the sender.
+.\tools\rust-qa\windows-services\toast_console.ps1 -IsolatedVm -NativeDirectory $native -OutputDirectory $frames
+# Run from the original sender checkout in the second shell.
+python -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msvc --isolated-vm $senderZip --archive-sha256 37ca6c25cb623f638c1f53640627a8edfffecad3d99a15cfe66d44ff6c62f7ff
+# Replay from the physical observer checkout after both have exited.
+python -B tools/rust-qa/windows-services/toast_console.py $native $frames
+```
+
+The immutable compiler ZIP is [artifact 15229643760](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46063786416/artifacts/15229643760).
+The local original ZIP, Actions digest, receipt, sender logs, screenshots,
+physical observations, replay and setting readbacks are retained under
+`artifacts/rust/local-windows-server-2025-x64/20261127/toast/`.
