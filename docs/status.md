@@ -2,11 +2,21 @@
 
 ## Current Rust implementation goal
 
-Goal `M-RUST-IMPLEMENTATION-20261114` runs on `rewrite/rust` in chat
+Goal `M-RUST-IMPLEMENTATION-20261114` is paused on `rewrite/rust` in chat
 `01a1db8f-b8ef-7903-8dfc-932f9b39c743`. RW-01 is accepted. RW-02 is
 qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
+
+On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
+checks on a local Windows Server 2025 Standard Evaluation VM. Windows
+measured 96 and 192 DPI and the observer verified visible edits in the same
+window on both displays. Both checks passed again after a cold start.
+A clean guest required the Microsoft Visual C++
+x64 runtime before the GUI could start. Windows ARM64 still needs a suitable
+native display session. The next packaging check is to verify the runtime
+prerequisite during a clean candidate installation.
+[Server 2025 reports and runtime](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial).
 
 On Fedora x64 the normalized Rust config now formats diagnostic summaries
 without its API key or endpoint. All 114 serialized YAML files matched the

@@ -188,6 +188,53 @@ removed. This console had one 96-DPI monitor and WTS protocol 0. The
 mixed-DPI and RDP results remain unmeasured.
 [Original report, log and field images](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15207180592).
 
+### Local Windows Server 2025 x64 display trial
+
+The disposable KVM guest used image 2 from the German Windows Server 2025
+Standard Evaluation x64 ISO (Desktop Experience, ISO SHA-256
+`64bd88c4cc99068ffc9727cc08f2e56ddc5707d175323f5aa0a8ab1d63d0815f`).
+A local standard user ran the observer at `db1f126` with the archived
+CPU executable from `483f053`. Windows reported an unlocked Default input
+desktop in RDP session 2 (WTS protocol 2). It measured the primary display
+at 1600 × 1000 and 96 DPI and the second at 2560 × 1600 and 192 DPI.
+
+On the fresh guest both initial launches exited with `0xc0000135` before
+creating a window. The guest lacked the system `VCRUNTIME140.dll`.
+Windows verified the Microsoft signature on the x64 Visual C++ v14
+Redistributable (installer SHA-256
+`9c02c9ed120f671b900e6b9471d890e3b2414117a7e53f4ae2e855466fa2b7c9`).
+The installer returned 0 and the system DLL then reported version
+`14.52.37029.0`. The two original failure reports are preserved alongside
+the subsequent trials.
+
+| Post-install run directory | Required observation | SHA-256 of `result.json` |
+| --- | --- | --- |
+| `rdp-4rc1sljv` | RDP rendering passed | `b8a88524cfd98bbcacf99cb23d6d795df1fce42fe543ebbce533d2697047a1f0` |
+| `mixed-dpi-pr7d_jze` | Mixed-DPI rendering passed | `a91a760650aa0f8b6e35c27f735ebfae0d903e79449c02037bb43a832c9b27f7` |
+
+After an orderly shutdown, QEMU booted the same disk without installation
+media. A fresh RDP connection repeated both observations. The RDP report
+`rdp-cre_k4v6` had SHA-256
+`4e6d932e8ce9d891f3194901549e6b79757de375b3c2b113203c6377095f5ad9`.
+The mixed-DPI report `mixed-dpi-mqunrxfm` had SHA-256
+`e10e2dd3f4243edf5ca4f5ddb308b34b5726ea5f5c70c2d4c7210d6a4846ae52`.
+Both manifests and all four before/after image comparisons verified after
+copying the results back to the host. Setup failures, successful trials and
+cold-start repeats are archived locally under
+`artifacts/rust/local-windows-server-2025-x64/20261127/`.
+
+In each run the same application window moved between the two displays.
+Its client grew from 640 × 400 to 1280 × 800 physical pixels. The focused
+filename field grew from 22 to 43 pixels high and its three-character prefix
+from 23 to 46 pixels wide. Both edits used the CPU/GDI presenter on the
+DX12 Microsoft Basic Render Driver. Independent replay of each run's two
+PNG pairs reproduced 682 changed pixels across 86 columns and 18 rows on
+the source display and 2,313 across 168 columns and 39 rows on the
+destination. Both evidence manifests verified. Both GUI processes closed
+to their supervisors, exited with code 0 and released their temporary profiles.
+These observations cover Windows Server 2025 x64. The ARM64 trials still
+require a native desktop with the corresponding displays and RDP session.
+
 ### Retained build observations
 
 The retained observer selects the paired executable from the native compiler
@@ -219,8 +266,9 @@ Ten portable checks cover Win32 layouts, active and possible paths, input
 eligibility, geometry, focus, frame evidence and retention of failed qualification
 attempts. PowerShell 7.7 parsed the field observer and compiled its shared native
 bridge. Both hosted inventories exercised the possible-target query. The
-strict mixed-DPI and RDP cases still need the corresponding native displays
-and session. [Regression checks](../../tools/rust-qa/windows-display/test_display.py) · [Windows active and possible paths](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) · [Target identification and availability](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_target_info)
+local x64 guest supplied the displays and RDP session for the [archived CPU
+executable](#local-windows-server-2025-x64-display-trial).
+[Regression checks](../../tools/rust-qa/windows-display/test_display.py) · [Windows active and possible paths](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) · [Target identification and availability](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_target_info)
 
 ```bash
 python3 -B -m unittest discover -s tools/rust-qa/windows-display -p 'test_*.py'
