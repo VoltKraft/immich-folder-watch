@@ -27,6 +27,64 @@ permissions:
   contents: read
 
 jobs:
+  original-archive:
+    name: Locate the measured Windows x64 executable
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    outputs:
+      available: ${{ steps.original.outputs.available }}
+    steps:
+      - name: Check availability of the original performance and recovery archive
+        id: original
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name=rust-windows-transitions-x64-483f0534ffdddb0f677b62fcd3b5b48cc2b0fa98
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$name" \
+            --jq '.artifacts[] | select(.id == 15191997288 and .expired == false) | .id')
+          if [[ -z "$id" ]]; then
+            echo "The archived x64 executable is unavailable on Actions. The display trial was skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+  archived-display:
+    name: Windows x64 archived renderer display
+    needs: original-archive
+    if: needs.original-archive.outputs.available == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the measured ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/15191997288/zip" > "$RUNNER_TEMP/ifw-display.zip"
+      - name: Observe a real filename edit on the archived executable
+        id: observe
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tools/rust-qa/windows-display
+          python -B tools/rust-qa/windows-display/run.py x86_64-pc-windows-msvc \
+            --cpu-archive "$RUNNER_TEMP/ifw-display.zip" --require source-frame
+      - name: Preserve the original desktop observation
+        if: ${{ !cancelled() && steps.observe.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-x64-archived-display-${{ github.sha }}
+          path: artifacts/rust/gui-native/x86_64-pc-windows-msvc/windows-display-archived-cpu-runs/
+          if-no-files-found: error
+          retention-days: 14
+
   assess:
     if: github.ref == 'refs/heads/rewrite/rust'
     name: Native assessment (${{ matrix.target }})

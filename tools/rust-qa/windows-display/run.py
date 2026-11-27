@@ -23,12 +23,12 @@ from native import Win32, pin_path, start_owned_subject
 from storage.evidence import sha256, write_json
 from win32 import Desktop, check, rect_values
 from worker import hosted, powershell, shared_windows
-from windows_observer import private_gui_environment as environment, select_powershell
+from windows_observer import private_gui_environment as environment, private_profile, select_powershell
 from topology import Topology, active_input, contains, physical_coordinates, protocol
 
 TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
 FIRST, SECOND = "IFW MMMM 27.jpg", "IFW IIII 27.jpg"
-QUALIFICATIONS = {"mixed-dpi": "mixedDpiPassed", "rdp": "rdpRenderingObserved"}
+QUALIFICATIONS = {"source-frame": "sourceFrameObserved", "mixed-dpi": "mixedDpiPassed", "rdp": "rdpRenderingObserved"}
 
 
 def wait_for(read, label, timeout=35):
@@ -127,6 +127,19 @@ def frame_evidence(record, profile, screen_dpi):
     return images
 
 
+def field_presenter(snapshot, client, begin, end):
+    """Bind a CPU transfer to this field interaction on the current display."""
+    frame = snapshot["fullEditorFrame"]
+    if snapshot["route"] == "cpu-gdi":
+        if (not frame or (frame["width"], frame["height"]) != (client[2] - client[0], client[3] - client[1])
+                or not begin <= frame["begin"] <= frame["end"] <= end):
+            raise ValueError("The field interaction lacks a current full CPU transfer at the observed client size")
+    else:
+        # An earlier CPU mesh can precede the move or a switch to wgpu.
+        frame = None
+    return {**snapshot, "fullEditorFrame": frame, "interactionQpc": [begin, end]}
+
+
 def stop_subject(proc, _rust):
     if proc.poll() is None:
         try:
@@ -138,22 +151,46 @@ def stop_subject(proc, _rust):
             proc.wait(timeout=10)
 
 
-def measure(target, build_dir, output, profile, report, *, require_interactive, retained=False):
+def archived_subject(archive, profile, processes, resources, target, report):
+    from cpu_archive import stage
+    if target != "x86_64-pc-windows-msvc" or processes.machine(-1) != (0x8664, 0x8664):
+        raise ValueError("The measured x64 image requires a native x64 observer and desktop")
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    verify = runpy.run_path(str(QA / "windows-services/service_sources.py"))["verify_checkout"]
+    if (os.getenv("GITHUB_SHA", revision) != revision
+            or verify(ROOT, [ROOT / p for p in report["inputs"]], revision) != report["inputs"]):
+        raise ValueError("The display observer differs from its recorded Git revision")
+    report["observerRevision"] = revision
+    resources.enter_context(pin_path(processes, profile, True))
+    binary, receipt = stage(archive, profile)
+    resources.enter_context(pin_path(processes, binary, False))
+    if TEXT["DESKTOP"]["pe_machine"](binary) != 0x8664 or sha256(binary) != receipt["binary"]:
+        raise ValueError("The held display image differs from the qualified Windows x64 executable")
+    report["archivedBuild"] = receipt
+    return binary
+
+
+def measure(target, build_dir, output, profile, report, *, require_interactive, retained=False, cpu_archive=None):
     api, display, processes = Desktop(), Topology(), Win32()
-    binary = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
     env = environment(profile)
+    held_window = retained or cpu_archive is not None
     with ExitStack() as resources:
         resources.enter_context(physical_coordinates(api))
-        resources.enter_context(pin_path(processes, binary, False))
-        report["build"] = TEXT["check_build"](target, binary, build_dir)
-        if retained:
+        if cpu_archive is not None:
+            binary = archived_subject(cpu_archive, profile, processes, resources, target, report)
+        else:
+            binary = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
+            resources.enter_context(pin_path(processes, binary, False))
+            report["build"] = TEXT["check_build"](target, binary, build_dir)
+        if held_window:
             import retained as retained_gui
+            env[retained_gui.DX12_WAIT_OPTION] = "Wait"
+        if retained:
             binary = retained_gui.subject(target, binary, build_dir, TEXT["read"], sha256, report, require_interactive)
             resources.enter_context(pin_path(processes, binary.parent, True))
             resources.enter_context(pin_path(processes, binary, False))
             if sha256(binary) != report["retainedBuild"]["binary"]:
                 raise ValueError("The selected retained executable changed before launch")
-            env[retained_gui.DX12_WAIT_OPTION] = "Wait"
         context = api.context()
         report["desktop"] = {**context, **{key: (context[key] if context[key] in ("Default", "WinSta0") else "other")
                                            for key in ("inputDesktop", "threadDesktop", "windowStation")}}
@@ -164,7 +201,7 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
         inventory = report["topology"] = display.inventory(api)
         # Inactive connectors can be available even when only one HWND destination is active.
         report["possibleTargets"] = display.display_paths({}, all_targets=True)
-        ps, attempts = select_powershell(profile, "accessibility")
+        ps, attempts = select_powershell(profile, "accessibility", env)
         report["observerHosts"] = [{k: v for k, v in row.items() if k != "diagnostic"} for row in attempts]
         if not ps:
             raise RuntimeError("The system UI Automation observer could not start")
@@ -183,7 +220,7 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                                  executable=binary.relative_to(ROOT).as_posix())
         observer = shared_windows()(child.pid, api.thread_desktop(api.thread()))
         resources.callback(observer.close)
-        if retained:
+        if held_window:
             lifetime = retained_gui.WindowLifetime(child.pid)
             resources.callback(lifetime.close)
             report["retainedEvents"] = {"visibility": observer.events, "objects": lifetime.events}
@@ -238,11 +275,15 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                 report["interactionPrerequisite"] = "An unlocked existing Default input desktop receiving input is required"
             else:
                 def record_frame(name, layout, monitor):
+                    started = processes.clock() if cpu_archive is not None else None
                     frame = stage(name, layout, monitor, FIRST)
                     for image in frame_evidence(frame, profile, layout["dpi"]):
                         shutil.copyfile(image, output / image.name)
                     if not input_available() or owned_layout(api, display, hwnd, child.pid) != layout:
                         raise RuntimeError("Session, monitor or physical window metrics changed during the stationary frame control")
+                    if cpu_archive is not None:
+                        route = retained_gui.archived_presenter(log, adapter, child.pid, hwnd)
+                        frame["presenter"] = field_presenter(route, layout["client"], started, processes.clock())
                     return frame
 
                 if destination:
@@ -289,9 +330,10 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
             original_error = sys.exc_info()[1]
             try:
                 if child.poll() is None and observer.visible() == hwnd:
-                    if retained and adapter:
-                        report["closedToSupervisor"] = retained_gui.close(observer, lifetime, child, hwnd, log, adapter, wait_for, report)
-                    elif not retained:
+                    if held_window and adapter:
+                        report["closedToSupervisor"] = retained_gui.close(observer, lifetime, child, hwnd, log, adapter, wait_for, report,
+                                                                         archived_cpu=cpu_archive is not None)
+                    elif not held_window:
                         observer.close_window(hwnd)
                         def hidden():
                             return observer.visible() is None and any(line.startswith("WINDOW_RELEASED passes=") for line in logs())
@@ -308,8 +350,9 @@ def unmet_qualifications(report, required):
     return [name for name in required if report.get(QUALIFICATIONS[name]) is not True]
 
 
-def assess(target, build_dir, required, *, require_interactive, retained=False):
-    name = "windows-display-retained" if retained else "windows-display"
+def assess(target, build_dir, required, *, require_interactive, retained=False, cpu_archive=None):
+    subject = "archived-cpu" if cpu_archive is not None else "retained" if retained else "canonical"
+    name = "windows-display" if subject == "canonical" else "windows-display-" + subject
     if required:
         runs = build_dir / (name + "-runs")
         runs.mkdir(exist_ok=True)
@@ -321,26 +364,25 @@ def assess(target, build_dir, required, *, require_interactive, retained=False):
               QA / "windows-text/Pointer.cs", QA / "windows-performance/native.py", QA / "observe-windows-gui.py",
               QA / "observe-windows-input.ps1", QA / "windows_observer.py", QA / "windows-desktop/run.py",
               QA / "windows-desktop/win32.py", QA / "windows-desktop/worker.py"]
-    if retained:
+    if retained or cpu_archive is not None:
         inputs.extend(QA / p for p in ("windows-launcher/retained_subject.py", "windows-services/service_sources.py",
             "windows-warm-window/inputs.py", "windows-warm-window/frame_latency.py", "windows-warm-window/window_lifetime.py",
             "windows-performance/build.py", "windows-performance/run.py"))
         inputs.extend((ROOT / ".gitattributes", ROOT / "rust/toolchain-inputs.json"))
-    report = {"status": "failed", "target": target, "subject": "retained" if retained else "canonical",
+    report = {"status": "failed", "target": target, "subject": subject,
               "host": "isolated-vm" if require_interactive else "github-hosted",
               "run": None if require_interactive else os.getenv("GITHUB_RUN_ID"),
               "attempt": None if require_interactive else os.getenv("GITHUB_RUN_ATTEMPT"),
               "inventoryPassed": False, "sourceFrameObserved": None, "mixedDpiPassed": None, "rdpRenderingObserved": None,
               "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in inputs}}
-    profile = None
+    report["profileRemoved"] = None
     try:
-        with tempfile.TemporaryDirectory(prefix="ifw-display-", dir=output) as tmp:
-            profile = Path(tmp)
-            measure(target, build_dir, output, profile, report, require_interactive=require_interactive, retained=retained)
+        with private_profile(output, "ifw-display-", report) as profile:
+            measure(target, build_dir, output, profile, report, require_interactive=require_interactive, retained=retained,
+                    cpu_archive=cpu_archive)
         report["status"] = "observed"
     except Exception:
         report["error"] = traceback.format_exc()
-    report["profileRemoved"] = None if profile is None else not profile.exists()
     report["requiredQualifications"] = required
     report["unmetQualifications"] = unmet_qualifications(report, required)
     if report["status"] == "observed" and report["unmetQualifications"]:
@@ -357,18 +399,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
     parser.add_argument("--isolated-vm", action="store_true", help="explicitly authorized disposable Windows VM and current test desktop")
-    parser.add_argument("--retained", action="store_true", help="use the paired retained Windows GUI build")
+    subject = parser.add_mutually_exclusive_group()
+    subject.add_argument("--retained", action="store_true", help="use the paired retained Windows GUI build")
+    subject.add_argument("--cpu-archive", type=Path, help="observe the measured x64 executable in the original 483f053 ZIP")
     parser.add_argument("--require", action="append", choices=sorted(QUALIFICATIONS), default=[],
-                        help="require the actual observation for success, repeat to require both in one session")
+                        help="require the actual observation for success, repeat for multiple requirements in one session")
     args = parser.parse_args()
     hosted_job = hosted() and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch" and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust"
     if (os.name != "nt" or not (hosted_job or args.isolated_vm)
             or (os.getenv("GITHUB_ACTIONS") == "true" and not hosted_job)):
         parser.error("Use the native rewrite job or an expressly authorized isolated Windows test VM")
     build_dir = ROOT / "artifacts/rust/gui-native" / args.target
-    if not (build_dir / "build.json").is_file():
+    if args.cpu_archive is not None:
+        if args.target != "x86_64-pc-windows-msvc" or not args.cpu_archive.is_file():
+            parser.error("Select Windows x64 and provide the original CPU timing and recovery ZIP")
+        build_dir.mkdir(parents=True, exist_ok=True)
+    elif not (build_dir / "build.json").is_file():
         parser.error("Build the canonical native GUI for this target before observing its display")
-    return assess(args.target, build_dir, sorted(set(args.require)), require_interactive=not hosted_job, retained=args.retained)
+    return assess(args.target, build_dir, sorted(set(args.require)), require_interactive=not hosted_job, retained=args.retained,
+                  cpu_archive=args.cpu_archive)
 
 
 if __name__ == "__main__":

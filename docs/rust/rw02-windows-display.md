@@ -152,6 +152,34 @@ For comparison, omit `--retained` to use the canonical teardown build and its
 `compiler.jsonl` and `eframe-source.zip`. A requested observation that
 could not run returns a nonzero exit and lists the missing qualification.
 
+### Display checks with the measured x64 CPU executable
+
+Use the original [Windows x64 performance and recovery ZIP](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45979619561/artifacts/15191997288)
+to run the same executable tested at `483f053` on another disposable x64
+desktop. Preserve a local copy for use after Actions retention expires. Its
+SHA-256 is `2338eba8784f413b77493bc2d9499d2d2127b5895a748115aaf46ef20407a16b`.
+This route requires a checkout of the observer, native x64 Python and system
+PowerShell. It runs the archived GUI directly without a new compiler build.
+
+```powershell
+$target = 'x86_64-pc-windows-msvc'
+$zip = 'C:\QA\windows-x64.zip'
+python -B tools/rust-qa/windows-display/run.py $target --isolated-vm --cpu-archive $zip --require mixed-dpi
+python -B tools/rust-qa/windows-display/run.py $target --isolated-vm --cpu-archive $zip --require rdp
+```
+
+The observer checks the ZIP and matches the GUI and benchmark worker to the
+original compiler, timing and recovery records. It stages only the GUI in a
+temporary profile. Each result under `windows-display-archived-cpu-runs/`
+identifies the test checkout and original binary separately. The observed
+filename edit includes the actual presenter route and the native pixel
+captures. A `--require source-frame` run on one console can establish that
+edit. Mixed DPI and RDP each require their own observation as described above.
+[Archive verifier](../../tools/rust-qa/windows-display/cpu_archive.py) ·
+[Original WARP recovery](rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053).
+
+### Retained build observations
+
 The retained observer selects the paired executable from the native compiler
 output, verifies its first-party sources and keeps the image pinned while the
 test runs. On a DX12 CPU adapter advertising Mailbox it verifies the requested

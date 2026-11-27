@@ -177,19 +177,33 @@ $png = $env:IFW_SAMPLE_PNG
                   "rdpSessionObserved": False, "rdpRenderingObserved": None, "mixedDpiPassed": None}
         missing = DRIVER["unmet_qualifications"]
         self.assertEqual(missing(report, required), required)
+        self.assertEqual(missing(report, ["source-frame"]), [])
+        self.assertEqual(missing({**report, "sourceFrameObserved": False}, ["source-frame"]), ["source-frame"])
         rdp = {**report, "rdpSessionObserved": True, "rdpRenderingObserved": False}
         self.assertEqual(missing(rdp, ["rdp"]), ["rdp"])
         self.assertEqual(missing({**rdp, "rdpRenderingObserved": True}, required), ["mixed-dpi"])
         self.assertEqual(missing({**rdp, "mixedDpiPassed": True}, required), ["rdp"])
         self.assertEqual(missing({**rdp, "mixedDpiPassed": True, "rdpRenderingObserved": True}, required), [])
 
+    def test_moved_cpu_field_requires_a_new_full_frame_at_destination_size(self):
+        observe = DRIVER["field_presenter"]
+        client = [-900, 20, 60, 620]
+        frame = {"begin": 120, "end": 140, "width": 960, "height": 600}
+        snapshot = {"route": "cpu-gdi", "fullEditorFrame": frame}
+        self.assertEqual(observe(snapshot, client, 100, 150)["fullEditorFrame"], frame)
+        for bad in (None, {**frame, "width": 640}, {**frame, "begin": 99}, {**frame, "end": 151}):
+            with self.assertRaises(ValueError):
+                observe({**snapshot, "fullEditorFrame": bad}, client, 100, 150)
+        self.assertIsNone(observe({**snapshot, "route": "wgpu-fallback"}, client, 100, 150)["fullEditorFrame"])
+
     def test_qualified_runs_preserve_failed_attempts_and_return_distinct_exit_codes(self):
         assess = DRIVER["assess"]
         records = []
 
-        def observe(_target, build_dir, output, profile, report, *, require_interactive, retained):
+        def observe(_target, build_dir, output, profile, report, *, require_interactive, retained, cpu_archive):
             self.assertTrue(require_interactive)
             self.assertFalse(retained)
+            self.assertIsNone(cpu_archive)
             self.assertTrue(profile.is_dir())
             self.assertEqual(output.parent.parent, build_dir)
             report.update(inventoryPassed=True, sourceFrameObserved=True, rdpRenderingObserved=len(records) == 1)

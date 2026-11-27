@@ -1,6 +1,7 @@
 """Use the source-verified Windows renderer in the existing display observation."""
 import ctypes as c
 from ctypes import wintypes as w
+from hashlib import sha256
 import re
 import runpy
 import sys
@@ -63,9 +64,72 @@ def presentation(log, adapter):
                 presentMode=None, desiredMaximumFrameLatency=None)
 
 
-def close(observer, lifetime, child, hwnd, log, adapter, wait, report):
+def archived_presenter(log, adapter, pid, hwnd, *, previous=None):
+    """Identify the archived executable's route and last complete mesh transfer on the owned HWND."""
+    raw = log.read_bytes()
+    # The GUI can still be writing the next line while the field observer samples it.
+    raw = raw[:raw.rfind(b"\n") + 1]
+    if previous and (previous["logBytes"] > len(raw)
+                     or sha256(raw[:previous["logBytes"]]).hexdigest() != previous["logSha256"]):
+        raise ValueError("The live presenter log lost or changed the preceding observation")
+    rows = raw.decode("utf-8", errors="replace").splitlines()
+    if [line for line in rows if line.startswith("ADAPTER ")] != [adapter]:
+        raise ValueError("The archived display adapter differs from its live subject")
+    route = "wgpu-default"
+    fallback = witness = transfer = None
+    counts = {"GDI_PRESENT": 0, "GDI_PARTIAL": 0}
+    finished = False
+    for row in rows:
+        if row.startswith("CPU_PAINT_MODE"):
+            if (row != "CPU_PAINT_MODE backend=Dx12 device=Cpu selection=adapter" or route != "wgpu-default"
+                    or adapter != "ADAPTER Dx12 Cpu Microsoft Basic Render Driver"):
+                raise ValueError("Unexpected CPU painter selection")
+            route = "cpu-gdi"
+        elif row.startswith("CPU_PAINT_FALLBACK"):
+            match = re.fullmatch(r"CPU_PAINT_FALLBACK reason=([a-z0-9-]+)", row)
+            if not match or route != "cpu-gdi" or not finished:
+                raise ValueError("Unexpected CPU painter fallback")
+            route, fallback = "wgpu-fallback", match[1]
+        elif row.startswith("GDI_PRESENT_END"):
+            if (route != "cpu-gdi" or transfer is not None or finished
+                    or row != f"GDI_PRESENT_END frames={counts['GDI_PRESENT']} partial={counts['GDI_PARTIAL']}"):
+                raise ValueError("CPU painter final transfer counts differ")
+            finished = True
+        elif row.startswith(("GDI_", "CPU_FRAME")):
+            if route != "cpu-gdi" or finished:
+                raise ValueError("Transfer outside the selected CPU painter")
+            kind, *fields = row.split()
+            values = {key: int(value) for key, value in (pair.split("=", 1) for pair in fields)}
+            if kind in counts:
+                counts[kind] += 1
+                if (transfer or values["frame"] != counts[kind] or values["hwnd"] != hwnd
+                        or min(values[k] for k in ("tid", "width", "height", "start")) <= 0
+                        or values["end"] < values["start"] or not 0 <= values["lines"] <= values["height"]
+                        or (kind == "GDI_PRESENT" and values["lines"] != values["height"])):
+                    raise ValueError("Invalid GDI transfer on the observed window")
+                transfer = (kind, values)
+            elif kind == "CPU_FRAME" and transfer:
+                mode, dib = transfer
+                if (values["pid"] != pid or values["seq"] != sum(counts.values()) or values["flushed"] != 1
+                        or not 0 < values["begin"] <= values["rasterEnd"] <= dib["start"]
+                        or any(values[k] != dib[k] for k in ("hwnd", "tid", "start", "end", "width", "height", "lines"))):
+                    raise ValueError("CPU paint and GDI transfer have different owners, extents or timestamps")
+                if mode == "GDI_PRESENT" and values["meshes"] > 0 and values["vertices"] >= 3 and values["indices"] >= 3:
+                    witness = values
+                transfer = None
+            else:
+                raise ValueError("Unmatched CPU paint or failed GDI transfer")
+    if route == "cpu-gdi" and not witness:
+        raise ValueError("No full mesh-bearing CPU frame on the observed window")
+    return dict(route=route, fallbackReason=fallback, fullEditorFrame=witness,
+                logBytes=len(raw), logSha256=sha256(raw).hexdigest())
+
+
+def close(observer, lifetime, child, hwnd, log, adapter, wait, report, *, archived_cpu=False):
     record = report["retainedClose"] = dict(hwnd=hwnd, pid=child.pid)
     before = record["device"] = presentation(log, adapter)
+    if archived_cpu:
+        record["visiblePresenter"] = archived_presenter(log, adapter, child.pid, hwnd)
     observer.pump()
     first = record["visibilityStart"] = len(observer.events)
     observer.close_window(hwnd)
@@ -80,6 +144,8 @@ def close(observer, lifetime, child, hwnd, log, adapter, wait, report):
     pid = w.DWORD()
     record["hideEvents"] = [e for e in observer.events[first:] if e["hwnd"] == hwnd]
     record["objectEvents"] = [row for row in lifetime.events if row[0] == hwnd]
+    if archived_cpu:
+        record["hiddenPresenter"] = archived_presenter(log, adapter, child.pid, hwnd, previous=record["visiblePresenter"])
     if (not observer.owner(hwnd, c.byref(pid)) or pid.value != child.pid or observer.is_visible(hwnd)
             or [row[1] for row in record["objectEvents"]] != ["create"] or child.poll() is not None
             or presentation(log, adapter) != before):

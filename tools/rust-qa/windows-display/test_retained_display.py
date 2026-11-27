@@ -27,6 +27,14 @@ def device(adapter=CPU, *, mode="Mailbox", depth=1):
     return lines
 
 
+def mesh_frame(seq=1, width=640, height=400):
+    timing = f"start=12 end=14 width={width} height={height}"
+    return [f"GDI_PRESENT frame={seq} hwnd=33 tid=17 {timing} lines={height}",
+            f"CPU_FRAME seq={seq} pid=42 hwnd=33 tid=17 begin=10 rasterEnd=11 "
+            f"{timing} meshes=4 vertices=384 indices=1224 "
+            f"sets=0 frees=0 lines={height} flushed=1"]
+
+
 class RetainedDisplayTests(unittest.TestCase):
     def setUp(self):
         self.scratch = Path(self.enterContext(tempfile.TemporaryDirectory()))
@@ -66,6 +74,42 @@ class RetainedDisplayTests(unittest.TestCase):
                 self.write(rows)
                 retained.presentation(self.log, adapter)
 
+    def test_archived_painter_follows_complete_frames_across_a_resize_and_wgpu_handoff(self):
+        select = "CPU_PAINT_MODE backend=Dx12 device=Cpu selection=adapter"
+        rows = device() + [select] + mesh_frame() + mesh_frame(2, 960, 600)
+        self.write(rows)
+        observed = retained.archived_presenter(self.log, CPU, 42, 33)
+        self.assertEqual(observed["route"], "cpu-gdi")
+        self.assertEqual([observed["fullEditorFrame"][k] for k in ("pid", "hwnd", "width", "height")],
+                         [42, 33, 960, 600])
+        self.write(rows + ["GDI_PRESENT_END frames=2 partial=0", "CPU_PAINT_FALLBACK reason=dimensions"])
+        handoff = retained.archived_presenter(self.log, CPU, 42, 33, previous=observed)
+        self.assertEqual((handoff["route"], handoff["fallbackReason"]), ("wgpu-fallback", "dimensions"))
+        self.assertEqual(handoff["fullEditorFrame"], observed["fullEditorFrame"])
+        self.assertGreater(handoff["logBytes"], observed["logBytes"])
+        self.assertNotEqual(handoff["logSha256"], observed["logSha256"])
+        self.write(rows)
+        with self.assertRaisesRegex(ValueError, "preceding observation"):
+            retained.archived_presenter(self.log, CPU, 42, 33, previous=handoff)
+        for adapter in (GPU, CPU):
+            self.write(device(adapter))
+            default = retained.archived_presenter(self.log, adapter, 42, 33)
+            self.assertEqual((default["route"], default["fullEditorFrame"]), ("wgpu-default", None))
+
+    def test_cpu_renderer_cannot_claim_another_window_or_an_incomplete_frame(self):
+        select = "CPU_PAINT_MODE backend=Dx12 device=Cpu selection=adapter"
+        blit, cpu = mesh_frame()
+        for rows in ([select], [select, blit], [blit, cpu], [select, blit, cpu.replace("pid=42", "pid=43")],
+                     [select, blit.replace("hwnd=33", "hwnd=34"), cpu], [select, blit, cpu.replace("end=14", "end=15")],
+                     [select, blit.replace("lines=400", "lines=200"), cpu], [select, blit, cpu.replace("meshes=4", "meshes=0")],
+                     [select, blit, cpu, "CPU_PAINT_FALLBACK reason=dimensions"]):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                self.write(device() + rows)
+                retained.archived_presenter(self.log, CPU, 42, 33)
+        self.write(device(GPU) + [select, blit, cpu])
+        with self.assertRaises(ValueError):
+            retained.archived_presenter(self.log, GPU, 42, 33)
+
     def test_hide_requires_the_original_owned_hwnd_and_uninterrupted_process_and_device(self):
         hwnd = 33
         for outcome in ("hidden", "destroyed", "owner-changed", "shown", "device-changed", "quit"):
@@ -101,8 +145,9 @@ class RetainedDisplayTests(unittest.TestCase):
 
     def test_requested_rdp_on_retained_subject_keeps_unavailable_result_and_distinct_output(self):
         assess = test_display.DRIVER["assess"]
-        def observe(_target, _build, _output, _profile, report, *, require_interactive, retained):
+        def observe(_target, _build, _output, _profile, report, *, require_interactive, retained, cpu_archive):
             self.assertTrue(require_interactive and retained)
+            self.assertIsNone(cpu_archive)
             report.update(inventoryPassed=True, sourceFrameObserved=True, rdpRenderingObserved=False)
         with (patch.dict(assess.__globals__, measure=observe), patch.dict(os.environ, {"GITHUB_RUN_ID": "other"}),
               redirect_stdout(io.StringIO())):

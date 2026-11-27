@@ -184,6 +184,8 @@ to reconcile project decisions, defaults, and recorded state.
   with the native glyph and editing observer. Use the same executable for
   [mixed-DPI and RDP observations](docs/rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop)
   on a disposable Windows test desktop.
+  Select the [archived x64 CPU executable](docs/rust/rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable)
+  for display checks of the renderer that passed the WPF limits and device recovery.
 - The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
   toolchain. Assign every workspace member a role in the
   [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).
@@ -197,6 +199,7 @@ to reconcile project decisions, defaults, and recorded state.
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
   the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders),
   [physical Unicode separators saved by .NET](docs/rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves),
+  [type conversion of repeated configuration properties](docs/rust/rw02-yaml.md#repeated-properties-in-the-shipping-configuration),
   [alias scope across skipped configuration properties](docs/rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Compare [Linux file modification ticks](docs/rust/rw02-legacy.md#linux-file-modification-times)
