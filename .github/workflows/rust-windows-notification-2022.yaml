@@ -5,29 +5,19 @@ on:
     branches: [rewrite/rust]
     paths:
       - '.github/workflows/rust-windows-notification-2022.yaml'
-      - '.gitattributes'
-      - 'rust/Cargo.toml'
-      - 'rust/Cargo.lock'
-      - 'rust/crates/*/Cargo.toml'
-      - 'rust/toolchain-inputs.json'
-      - 'tools/rust-qa/install-toolchain.sh'
-      - 'tools/rust-qa/check-toolchain.py'
-      - 'tools/rust-qa/audit-graph.py'
-      - 'tools/rust-qa/storage/evidence.py'
-      - 'tools/rust-qa/gui/src/tray-icon.argb'
       - 'tools/rust-qa/gui/src/windows_tray_shell.rs'
-      - 'tools/rust-qa/windows-desktop/job.py'
-      - 'tools/rust-qa/windows-desktop/win32.py'
-      - 'tools/rust-qa/windows-imports/formats.py'
-      - 'tools/rust-qa/windows-launcher/named_process.py'
-      - 'tools/rust-qa/windows-performance/build.py'
-      - 'tools/rust-qa/windows-performance/native.py'
-      - 'tools/rust-qa/windows_observer.py'
-      - 'tools/rust-qa/windows-services/*.py'
-      - 'tools/rust-qa/windows-services/*.ps1'
+      - 'tools/rust-qa/windows-notification-state/**'
+      - 'tools/rust-qa/windows-services/notification*.py'
+      - 'tools/rust-qa/windows-services/notification.ps1'
+      - 'tools/rust-qa/windows-services/toast_*.py'
+      - 'tools/rust-qa/windows-services/run.py'
+      - 'tools/rust-qa/windows-services/service_sources.py'
       - 'tools/rust-qa/windows-services/inputs.json'
       - 'tools/rust-qa/windows-services/Cargo.*'
-      - 'tools/rust-qa/windows-services/src/**'
+      - 'tools/rust-qa/windows-services/src/main.rs'
+      - 'tools/rust-qa/windows-services/src/shortcuts.rs'
+      - 'tools/rust-qa/windows-services/src/toast*.rs'
+      - 'tools/rust-qa/windows-services/src/tray.rs'
   workflow_dispatch:
 
 permissions:
@@ -37,7 +27,7 @@ jobs:
   notifications:
     if: github.ref == 'refs/heads/rewrite/rust'
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 95
     env:
       NATIVE_TARGET: x86_64-pc-windows-msvc
     steps:
@@ -73,6 +63,16 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           python3 -B tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
             --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
+
+      - name: Observe the original Shell during notification quiet time
+        if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/native-*/result.json') != '' }}
+        timeout-minutes: 68
+        shell: pwsh
+        run: |
+          python -B -m unittest discover -s tools/rust-qa/windows-notification-state
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-notification-state/notification_state.py
+          exit $LASTEXITCODE
 
       - name: Match the classic notification on the original desktop
         if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/native-*/result.json') != '' }}
@@ -112,7 +112,7 @@ jobs:
         with:
           name: rust-server-2022-notifications-${{ github.sha }}
           path: |
-            artifacts/rust/server-2022-notifications/host.json
+            artifacts/rust/server-2022-notifications/
             artifacts/rust/windows-services/build/x86_64-pc-windows-msvc/release/ifw-windows-services-probe.exe
             artifacts/rust/windows-services/native-x86_64-pc-windows-msvc/
             artifacts/rust/windows-services/notification-x86_64-pc-windows-msvc/

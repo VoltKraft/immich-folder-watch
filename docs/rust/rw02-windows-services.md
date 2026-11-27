@@ -624,6 +624,38 @@ Both original history-only archives above passed replay. Native evidence
 from this new observer is pending.
 [Popup observation and raw records](../../tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup).
 
+### Classic and WinRT notifications on Windows Server 2022 at db1d33a
+
+On the original x64 desktop, the notification state was `QUNS_QUIET_TIME`
+both before registration and at the late classic notification request.
+Explorer accepted the request and sent one show and one timeout callback.
+Across 97 UI Automation samples the observer found no visible match for
+the exact title and body. All samples completed without a provider error.
+
+The quiet WinRT sender received `0x80070490` on all 16 optional setting
+queries. Its `Show` succeeded and the tagged notification entered history.
+The ordinary sender observed the enabled setting. Its successful 4.15 ms
+`Show` fell between two samples. Across 93 samples one Shell root was
+observed, with zero provider errors and no matching visible title and
+body. Independent reads found the quiet entry, then both entries. Removing
+the ordinary entry preserved the quiet one. Removing the quiet entry
+emptied history. The job drained and the shortcut and profile were removed.
+Desktop presentation remains open for both senders.
+
+Independent replay matched 46 source inputs, 17 native service outputs,
+two classic observation files and 19 WinRT observation files. The archive
+has SHA-256 `d1337be9f94bb3a1d9d0788dfc6a88e5cea73819ad76288bd5ce42c1ec0e839f`.
+[Original notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46031319750/artifacts/15215136049).
+
+The dedicated repeat samples the notification state every 30 seconds
+while the original Explorer reports quiet time, for up to 65 minutes.
+Each sample checks the same desktop, session and Explorer before and
+after the native query. The late senders then perform their own original
+presentation checks. The archived `notification-state.json` records the
+actual policy history and the reason observation ended.
+[Focused workflow](../../.github/workflows/rust-windows-notification-2022.yaml) ·
+[Windows notification states](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

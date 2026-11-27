@@ -108,10 +108,12 @@ and rollback only. Its distribution is undecided.
 [Writer exclusion](rust/rw02-cross-session.md) ·
 [Ubuntu portal decision](rust/rw02-stack-decision.md).
 
-The [Windows Server 2022 notification comparison](../.github/workflows/rust-windows-notification-2022.yaml)
-runs the existing classic and WinRT senders on the older Explorer desktop.
-The ordinary WinRT popup has its own check against the original Shell
-observation, alongside delivery, suppression and selective history removal.
+On Windows Server 2022 x64 at `db1d33a`, the original Explorer reported
+quiet time and acknowledged the classic notification. Both WinRT requests
+succeeded, and independent processes read and selectively removed their
+history entries. The observers completed 97 classic and 93 WinRT samples
+without finding the visible title and body. The presentation checks remain open.
+[Original notifications and readback](rust/rw02-windows-services.md#classic-and-winrt-notifications-on-windows-server-2022-at-db1d33a).
 
 At `6cd7757` two source digests in the inventory worker's review still
 referred to the files preceding the Windows last-write timestamp adapter.
