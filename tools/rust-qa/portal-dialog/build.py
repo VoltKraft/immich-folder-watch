@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -68,6 +69,14 @@ def build(lint):
         'binary': digest(output / 'release/portal-dialog-assessment')}
     (OUT / 'build-inputs.json').write_text(json.dumps(report, indent=2) + '\n')
 if __name__ == '__main__':
-    if sys.argv[1:] not in ([], ['--lint']):
-        raise SystemExit('Usage: build.py [--lint]')
-    build(bool(sys.argv[1:]))
+    if sys.argv[1:] == ['--fetch']:
+        sys.path.insert(0, str(HERE.parent))
+        from gui import source_profile
+        env = dict(os.environ, CARGO_HOME=str(ART / 'assessment-cache'))
+        source_profile.CACHE.mkdir(parents=True, exist_ok=True)
+        source_profile.fetch_replay_registry(env)
+        subprocess.run(['cargo', 'fetch', '--locked', '--manifest-path', str(HERE / 'Cargo.toml')], env=env, check=True)
+    elif sys.argv[1:] in ([], ['--lint']):
+        build(bool(sys.argv[1:]))
+    else:
+        raise SystemExit('Usage: build.py [--fetch | --lint]')

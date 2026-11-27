@@ -101,6 +101,9 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
+    def test_native_linux_notification_workflow_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-linux-notification.yaml", {"actions/checkout", "actions/upload-artifact"})
+
     def test_native_notices_use_the_hash_of_the_uploaded_receipt(self):
         source = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
         stages = source.split("      - name: Retain the exact native compiler receipt ZIP\n", 1)[1]

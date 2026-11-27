@@ -267,6 +267,8 @@ to reconcile project decisions, defaults, and recorded state.
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.
+  Verify [visible GNOME notifications on ARM64](docs/rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64)
+  against the installed sender, Shell owner and original screen captures.
   Verify [ordinary Linux second launches](docs/rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui)
   with the real executable and the original window, bus owner and inventory worker.
   For the [installed test Flatpak](docs/rust/rw02-instance.md#second-launch-through-the-installed-flatpak),

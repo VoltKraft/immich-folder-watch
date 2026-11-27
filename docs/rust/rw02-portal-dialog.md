@@ -92,6 +92,31 @@ denial for this synthetic app in its temporary PermissionStore. A new request
 returned code 1, both flags false and no autostart entry. Startup following a
 real desktop login and observations from other desktop environments remain open.
 
+### Visible GNOME notifications on Linux ARM64
+
+The [ARM64 notification workflow](../../.github/workflows/rust-linux-notification.yaml)
+builds the Rust sender on Ubuntu 24.04 ARM64 and installs it in an isolated
+Flatpak profile. The earlier hosted ARM64 X11 and Wayland tests used a
+synthetic notification receiver. The focused trial uses a private GNOME
+Shell as the receiver and matches its D-Bus owner to the observed compositor
+process. The reader checks the app ID, notification ID, title and body on
+submission, then checks withdrawal through the same backend.
+
+Preserve the original monitor captures before posting, while the notification
+is listed and after withdrawal. The pixel reader requires the title and body
+in the middle capture and recognizable list controls after withdrawal. The
+Ubuntu runner uses Pillow to read the PNGs and Tesseract with English data
+to read their text. [Observer dependencies and replay command](../../tools/rust-qa/portal-dialog/notification.md).
+
+In the Fedora x64 control `gnome-wayland-flatpak-8kra069i`, the installed
+sender matched the compiled ELF, SHA-256
+`94920bcef6dfa7f2161a54244b247ed18b1e830722feb80f41a64957cde43049`.
+GNOME Shell was both the compositor and the notification service at PID 12
+in the private namespace. Replay found the exact title and body only in the
+middle image. The Clear and World Clocks controls remained visible after
+withdrawal. The original middle image has SHA-256
+`d090c4354e77bf7d95774f16a28a96caa2cc14870d53d19d5c9400cd939968b2`.
+
 ## Inputs, isolation and reproduction
 
 The frozen Rust 1.100.0 workspace has 211 third-party lock records matching

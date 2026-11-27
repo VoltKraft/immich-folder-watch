@@ -1,6 +1,7 @@
 """Exercise a real FileChooser frontend, GTK backend and native parent windows on a private desktop."""
 
 import argparse
+import configparser
 from contextlib import ExitStack
 import hashlib
 import json
@@ -24,7 +25,7 @@ def sha(path):
         return hashlib.file_digest(fd, 'sha256').hexdigest()
 
 
-def launch(backend, flatpak, shell, chooser_only, hosted_runtime):
+def launch(backend, flatpak, shell, chooser_only, hosted_runtime, notification_only=False):
     sys.path.insert(0, str(ROOT / 'tools/rust-qa/performance'))
     from linux import namespace
     record = json.loads((BASE / 'build-inputs.json').read_text())
@@ -58,6 +59,14 @@ def launch(backend, flatpak, shell, chooser_only, hosted_runtime):
         'runtime': {str(path): sha(path) for path in native_services},
         'drivers': {str(path.relative_to(ROOT)): sha(path) for path in drivers},
     }
+    if notification_only:
+        import platform
+        from linux import system_identity
+        distro = platform.freedesktop_os_release()
+        inputs['host'] = dict(system_identity(), distribution=distro['ID'], version=distro['VERSION_ID'])
+        inputs['revision'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        inputs['run'] = os.environ.get('GITHUB_RUN_ID')
+        inputs['attempt'] = os.environ.get('GITHUB_RUN_ATTEMPT')
     flatpak_paths = []
     if flatpak:
         from flatpak_fixture import SYS_DIRS
@@ -76,7 +85,8 @@ def launch(backend, flatpak, shell, chooser_only, hosted_runtime):
         'memory', '--setenv', 'XDG_CURRENT_DESKTOP', 'GNOME' if shell else 'IFWQA', '--setenv', 'GTK_USE_PORTAL',
         '0', '--setenv', 'NO_AT_BRIDGE', '1', '--setenv', 'GTK_A11Y', 'none', '--chdir', '/qa', '--',
         '/usr/bin/python3', '/app/native.py', backend, '--inside', *(['--flatpak'] if flatpak else []),
-        *(['--gnome'] if shell else []), *(['--host-chooser-only'] if chooser_only else [])]
+        *(['--gnome'] if shell else []), *(['--host-chooser-only'] if chooser_only else []),
+        *(['--notification-only'] if notification_only else [])]
     return subprocess.run(cmd).returncode
 
 
@@ -110,7 +120,7 @@ def desktop_process(kind, backend, command):
     return [*cmd, '--', *command]
 
 
-def inside(backend, flatpak, shell, chooser_only):
+def inside(backend, flatpak, shell, chooser_only, notification_only=False):
     sys.path.insert(0, '/driver')
     from session import checked_start, check_alive, wait_for, private_session
     from displays import X11, Wayland, input_action, stroke
@@ -130,7 +140,8 @@ def inside(backend, flatpak, shell, chooser_only):
     config.mkdir(parents=True)
     preferences = '[preferred]\ndefault=gtk\n'
     if shell:
-        preferences += 'org.freedesktop.impl.portal.Notification=gnome\norg.freedesktop.impl.portal.Background=gnome\n'
+        # Older GNOME installations provide notifications through the GTK portal.
+        preferences += 'org.freedesktop.impl.portal.Notification=gnome;gtk;\norg.freedesktop.impl.portal.Background=gnome\n'
     (config / 'portals.conf').write_text(preferences)
     apps = Path.home() / '.local/share/applications'
     apps.mkdir(parents=True)
@@ -176,11 +187,25 @@ def inside(backend, flatpak, shell, chooser_only):
         docs = agent('documents', ['/usr/libexec/xdg-document-portal', '-v'], 'org.freedesktop.portal.Documents')
         if shell:
             notify = wait_for(lambda: owner('org.gtk.Notifications'), 8, 'Real notification display is unavailable')
-            gnome = agent('gnome-portal',
-                ['env', 'GDK_BACKEND=wayland', '/usr/libexec/xdg-desktop-portal-gnome', '-v'],
-                'org.freedesktop.impl.portal.desktop.gnome')
+            descriptor = configparser.ConfigParser()
+            descriptor.read('/usr/share/xdg-desktop-portal/portals/gnome.portal')
+            interfaces = descriptor.get('portal', 'Interfaces').split(';')
+            gnome = None
+            if not notification_only or 'org.freedesktop.impl.portal.Notification' in interfaces:
+                gnome = agent('gnome-portal',
+                    ['env', 'GDK_BACKEND=wayland', '/usr/libexec/xdg-desktop-portal-gnome', '-v'],
+                    'org.freedesktop.impl.portal.desktop.gnome')
             record('gnome', {'backend': gnome, 'notification_provider': notify})
             result['notification_receiver'] = 'GNOME Shell org.gtk.Notifications'
+            if notification_only:
+                shell_pid, = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                    'org.freedesktop.DBus', 'GetConnectionUnixProcessID', GLib.Variant('(s)', (notify,)),
+                    None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
+                shell_image = Path(f'/proc/{shell_pid}/exe').resolve(strict=True)
+                if shell_pid != display.compositor_pid or shell_image != Path('/usr/bin/gnome-shell').resolve():
+                    raise RuntimeError('The notification receiver is outside the private GNOME Shell process')
+                record('shell_process', {'pid': shell_pid, 'compositor_pid': display.compositor_pid,
+                                         'image': str(shell_image), 'sha256': sha(shell_image)})
         elif not chooser_only:
             notify = agent('receiver', [sys.executable, '/app/notifications.py'], 'org.freedesktop.Notifications')
             result['notification_receiver'] = 'synthetic freedesktop notification service'
@@ -195,6 +220,13 @@ def inside(backend, flatpak, shell, chooser_only):
             import flatpak_fixture
             record('flatpak_launch_bus', flatpak_fixture.start_launch_bus(stack, bus))
             record('flatpak', flatpak_fixture.prepare(inputs['platform']['commit']))
+            if notification_only:
+                location = subprocess.check_output(['flatpak', '--user', 'info', '--show-location',
+                    result['steps']['flatpak']['installed_ref']], text=True).strip()
+                installed = Path(location) / 'files/bin/portal-dialog-assessment'
+                if sha(installed) != inputs['build']['binary']:
+                    raise RuntimeError('The installed notification sender differs from the native Rust build')
+                record('sender_sha256', sha(installed))
 
         def app(action):
             path = Path('/qa') / (action + '.log')
@@ -211,7 +243,7 @@ def inside(backend, flatpak, shell, chooser_only):
             return lines
         if shell:
             capture = screen(stack, bus)
-            exercise(stack, bus, display, record, app, outcome, capture)
+            exercise(stack, bus, display, record, app, outcome, capture, notification_only)
             return
         for action in ('cancel', 'select'):
             task, log = app(action)
@@ -293,6 +325,8 @@ if __name__ == '__main__':
         help='Use the signed native Platform deployment prepared in this GitHub runner temp directory')
     parser.add_argument('--gnome', action='store_true',
         help='Assess the actual GNOME Shell notification and background services')
+    parser.add_argument('--notification-only', action='store_true',
+        help='Observe posting and withdrawal on the private GNOME Shell')
     args = parser.parse_args()
     if args.host_chooser_only and args.flatpak:
         parser.error('--host-chooser-only and --flatpak select different application identities')
@@ -300,7 +334,10 @@ if __name__ == '__main__':
         parser.error('--hosted-runtime requires the outer --flatpak launcher')
     if args.gnome and (not args.flatpak or args.backend != 'wayland'):
         parser.error('--gnome requires wayland --flatpak')
+    if args.notification_only and not args.gnome:
+        parser.error('--notification-only requires --gnome')
     if args.inside:
-        inside(args.backend, args.flatpak, args.gnome, args.host_chooser_only)
+        inside(args.backend, args.flatpak, args.gnome, args.host_chooser_only, args.notification_only)
     else:
-        sys.exit(launch(args.backend, args.flatpak, args.gnome, args.host_chooser_only, args.hosted_runtime))
+        sys.exit(launch(args.backend, args.flatpak, args.gnome, args.host_chooser_only, args.hosted_runtime,
+                        args.notification_only))

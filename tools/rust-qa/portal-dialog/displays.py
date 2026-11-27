@@ -82,6 +82,7 @@ class Wayland:
         p = subprocess.Popen([compositor, '--wayland', '--no-x11', '--headless', '--virtual-monitor=1280x900',
             '--wayland-display=ifw-dialog'], env=env, stdout=stack.enter_context(self.log.open('w')),
             stderr=subprocess.STDOUT)
+        self.compositor_pid = p.pid
         stack.callback(stop, p)
         socket = Path(os.environ['XDG_RUNTIME_DIR']) / 'ifw-dialog'
         wait_for(lambda: check_alive(p, self.log) or socket.is_socket(), 8,

@@ -56,7 +56,7 @@ def screen(stack, bus):
     return capture
 
 
-def exercise(stack, bus, display, record, app, outcome, capture):
+def exercise(stack, bus, display, record, app, outcome, capture, notification_only=False):
     trace = Path('/qa/gnome-notification-bus.log')
     checked_start(stack, ['dbus-monitor', '--session', "type='method_call',interface='org.gtk.Notifications'"], trace)
     # Let the first compositor repaint and record the screen before our portal notification.
@@ -78,6 +78,8 @@ def exercise(stack, bus, display, record, app, outcome, capture):
     wait_for(lambda: 'member=RemoveNotification' in trace.read_text(), 4, 'GNOME withdrawal was not observed')
     time.sleep(0.35)
     record('capture_after', capture('withdrawn', since))
+    if notification_only:
+        return
     task, log = app('background')
     # The real frontend may issue an interactive Access dialog; retain a clean refusal if the backend has no handler.
     status = outcome(task, log)

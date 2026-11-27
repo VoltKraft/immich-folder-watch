@@ -56,6 +56,12 @@ observations from both fixtures are pending.
 [Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
 [Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
 
+The Ubuntu ARM64 portal trials reached the synthetic notification receiver.
+A focused native job now exercises the installed Rust Flatpak against the
+actual GNOME Shell and captures its notification list before delivery,
+while visible and after withdrawal. An ARM64 result is pending.
+[ARM64 notification trial](rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64).
+
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
 original database included 16 WAL frames. In both trials a new WPF worker
