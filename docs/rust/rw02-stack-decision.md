@@ -6,7 +6,7 @@ At `0bb39bf` the two retained Windows ARM64 Mailbox profiles met all
 eleven WPF limits. On x64 both profiles exceeded the idle-close, scan-close
 and scan-reopen limits across three trials per profile. Both Windows filename
 editors passed. The ARM64 ordinary second launch reopened the window in
-the background. Windows Shell activation, visible notifications, a
+the background. Windows ARM64 Shell activation, visible notifications, a
 reversible contrast change, mixed DPI, RDP and ordinary-user cross-session
 ownership remain open.
 [Windows measurements](rw02-windows-window.md#windows-results-at-0bb39bf) ·
@@ -18,10 +18,14 @@ Rust tray icon and its changed color at the same point. The accessibility
 lookup found no eligible item to invoke, and the GUI received no Shell
 activation callback.
 At `3c4d62c` the classic toolbar's default action opened the background-start
-GUI with focus and the original inventory worker. Activation after closing a
-previously visible window remains open.
+GUI with focus and the original inventory worker. At `29ce1c0` the same
+action reopened the previously visible GUI after close. The GUI recorded
+its original root still hidden when consuming the callback, then received
+keyboard focus. Each positive case ran first on its own x64 test desktop.
+Explorer exposed no usable rectangle for the second GUI in either order.
 [First visible icon](rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d) ·
-[Verified background-start activation](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
+[Verified background-start activation](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c) ·
+[Verified visible-start activation](rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
 On a Windows x64 WARP adapter, the private CPU renderer met all eleven
 same-host WPF limits at `dddb21a`. All 421 file-qualified reopens showed

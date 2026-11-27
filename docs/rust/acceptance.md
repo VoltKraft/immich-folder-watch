@@ -43,21 +43,29 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 Windows Server 2022 x64 at `47fe26d` showed the registered background-start
 icon and its acknowledged color change at the same point. At `3c4d62c` the
 same hosted image delivered the Shell callback, showed and focused the
-background-start GUI, and preserved the worker. Reopening after a normal
-window close remains outstanding.
-[Original Explorer observations](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
+background-start GUI, and preserved the worker. At `29ce1c0` a fresh x64
+desktop passed reopening the original window after closing to the tray,
+with focus, the same worker and clean Quit. Each second GUI lacked a
+usable icon rectangle on its desktop. ARM64 activation remains open.
+[Hidden start](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c) ·
+[Reopen after close](rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
 On Fedora x64 the Rust realtime adapter kept one application session after
 the server ended its namespace or closed the WebSocket. Authenticated
-inventory continued. Abrupt TCP loss still led to a second subscription
-and event. Native hosted repeats are pending.
-[Paired shipping-client and Rust trials](rw02-realtime-transport.md#server-closes-an-established-websocket).
+inventory continued. At `d97eb33` the root and named subscriptions also
+recovered after abrupt loss against the server versions pinned by Immich
+3.4.2. Refused initial upgrades admitted zero events. The Fedora x64
+suite passed 35 wire cases and six unit tests. Hosted repeats are pending.
+[Paired shipping-client and Rust trials](rw02-realtime-transport.md#server-closes-an-established-websocket) ·
+[Initial admission and original server comparison](rw02-realtime-transport.md#pausing-polling-before-the-initial-websocket-upgrade).
 
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
-x64 and ARM64. On Fedora x64 the combined Rust subject reproduced all five
-identifiers after the synthetic files were replaced. The native four-target
+x64 and ARM64. On Fedora x64, both Ubuntu architectures and Windows ARM64
+the combined Rust subject reproduced all five identifiers and retried from
+the original open file after the synthetic names were replaced. The four-target
 candidate upload and migration gates remain open.
-[Original test results and native Rust comparison](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
+[C# and Rust comparison](rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
+[Original native upload results](rw02-combined-profile.md#offline-reconstruction-with-the-legacy-upload-comparison).
 
 At `9313f39` the x64 display observer ran the same PE that previously passed
 the CPU timing and device-recovery tests. A 640 × 400 GDI frame accompanied
@@ -440,7 +448,7 @@ remain open. [Native feasibility](https://github.com/VoltKraft/immich-folder-wat
 
 | Environment | Baseline oracle | Rust runtime/security | GUI/accessibility | Install/upgrade/rollback |
 | --- | --- | --- | --- | --- |
-| Windows x64 | Core and worker reference passed (562 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 recovery, Startup, NVDA, Unicode editing, masking, clipboard and Japanese IME passed. At `4e3dbc4` both retained Mailbox profiles met all eleven WPF limits, both ordinary and keyboard launches restored focus, and the native WinRT history trial passed. At `989bb33` each Mailbox profile met nine limits, and none of the 256 sampled Explorer points showed the registered tray icon’s marker. Actual Shell activation, visible notifications, contrast, mixed DPI and RDP remain open. | Original 3.0.4 MSI passed native install, repair and removal with 439 files verified. Candidate pending. |
+| Windows x64 | Core and worker reference passed (562 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 recovery, Startup, NVDA, Unicode editing, masking, clipboard and Japanese IME passed. At `4e3dbc4` both retained Mailbox profiles met all eleven WPF limits, both ordinary and keyboard launches restored focus, and the native WinRT history trial passed. At `989bb33` each Mailbox profile met nine limits, and none of the 256 sampled Explorer points showed the registered tray icon’s marker. On Server 2022, Explorer opened the hidden-start GUI at `3c4d62c` and reopened the window after close at `29ce1c0`. Each passed when tested first. Visible notifications, contrast, mixed DPI and RDP remain open. | Original 3.0.4 MSI passed native install, repair and removal with 439 files verified. Candidate pending. |
 | Windows ARM64 | Core and worker reference passed (562 passed, nine Linux-only skips) | 34 workspace tests, 16 local filesystem checks, 14 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Encrypted SMB 3.1.1 passed at `6af7100`. NTFS alias gate, eight recoveries and 208 C# assertions passed. | DX12 recovery, Startup, NVDA, Unicode editing, masking, clipboard and Japanese IME passed. At `4e3dbc4` and `989bb33` both retained Mailbox profiles met all eleven WPF limits and WinRT history passed. A keyboard launch restored focus. The ordinary WPF and retained Rust windows reopened in the background. At `989bb33` Explorer declined icon registration. Visible notifications, contrast, mixed DPI and RDP remain open. | Original 3.0.4 MSI passed native install, repair and removal with 438 files verified. Candidate pending. |
 | Linux x64 | Core and worker reference passed (571 passed) | 38 workspace tests at `e2f161b`, 19 filesystem checks, 15 watch scenarios, five policy traces and 5,844 scalar comparisons per casing mode. Real grants, distro lock refusal and private upstream repair. Eight native storage fault cases. | X11/Wayland lifecycle, native Orca speech and masks, IME, clipboard, monitor changes and installed Flatpak grants. X11 passed all eleven resource limits. Plasma panel activation and live appearance changes passed separately on x64. | Original 3.0.4 Flatpak installed, repaired and removed on Fedora and Ubuntu. Candidate pending. |
 | Linux ARM64 | Core and worker reference passed (571 passed) | 38 workspace tests at `e2f161b`, 19 filesystem checks, 15 watch scenarios, five traces and 5,844 scalar comparisons per casing mode. Six journal records, eight storage fault recoveries and the combined offline relink. | X11/Wayland lifecycle, native Orca speech and masks, Mozc, integrated text/glyphs, monitor changes and installed Flatpak grants. At `1b95ba0` X11 passed all eleven resource limits and two clicks on the Plasma panel reopened the same GUI window. | Original 3.0.4 Flatpak installed, repaired and removed on Ubuntu. Candidate pending. |

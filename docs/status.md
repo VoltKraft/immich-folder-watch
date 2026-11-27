@@ -136,14 +136,17 @@ files were present in this run's archive and matched their compiler receipts.
 
 In the visible-first repeat at `f148e30`, Explorer activated the original
 closed-to-tray window and its inventory worker survived. The callback and
-window SHOW had the same Windows timer tick. Their order remains open.
+window SHOW had the same Windows timer tick. Their order was unresolved in that run.
 Explorer did not expose the background-start icon in the second case.
 The repeat now samples that root on its UI thread as it consumes the
 identified callback. Both the ordinary and retained sources passed
 Windows x64 and ARM64 compile checks. On Fedora all 18 editor image
-files matched the original captures. Native Shell evidence for the
-new observer is pending.
-[Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30).
+files matched the original captures. At `29ce1c0` the native x64 GUI
+confirmed its original root was hidden when it consumed the Shell Open.
+Explorer reopened and focused that window and its original worker survived
+through normal Quit. The second GUI still lacked a usable icon rectangle.
+[Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30) ·
+[Qualified reopen on x64](rust/rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
 The ARM64 IME observer at `9313f39` lost its filename field during Japanese
 layout selection. It exited before composing text and restored the layout

@@ -1128,9 +1128,33 @@ consumes that specific Shell Open. Before calling its normal activation
 handler the GUI records its HWND, PID, thread, callback ordinal and native
 visibility. A tied timestamp qualifies only if the root was still hidden
 at that point and the independent WinEvent stream then shows exactly one
-matching root SHOW. Native execution of this observer is pending.
+matching root SHOW.
 [Native launcher](../../tools/rust-qa/windows-launcher/native_tray.py) ·
 [Offscreen editor comparison](../../tools/rust-qa/windows-cpu-paint/headless/README.md).
+
+### Explorer reopened the original closed window at 29ce1c0
+
+On Windows Server 2022 x64, Explorer displayed both marker colors on the
+first GUI's icon. Its accessibility default action delivered `NIN_KEYSELECT`
+for icon 23 to receiver HWND 524654 in PID 5944. The GUI thread (6564)
+consumed callback 1 while its original root HWND 458906 was still hidden.
+The independent root SHOW was at the same native tick, 1489328. The first
+focus sample found the reopened window active, foreground and focused.
+Worker PID 5156 and its creation time matched before and after. Quit
+removed the icon, drained nine inventory passes and left the job empty.
+
+For the second GUI, which started hidden, Explorer returned `S_FALSE` for
+its icon rectangle and exposed no eligible overflow provider. This case
+ended without a callback. The hidden-start case passed when run first at
+`3c4d62c`. In the paired runs both processes registered version 4 and
+successfully removed their own HWND/icon ID on Quit. The Rust registration
+log reports the result of the add/version calls. For rectangle availability,
+the independent observer preserves the Shell's exact HRESULT, including
+`S_FALSE`. The icon's location in the second case remains unknown.
+The contrast observer recorded an unnamed original scheme and
+made no change. The archive SHA-256 is
+`c3bd6532972befc11294b0fa907fa2fd486ddc291b7b9052e87981ea743de714`.
+[Original Windows desktop and GUI logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46037576951/artifacts/15219980415).
 
 ## Shipping WPF tray lookup
 
