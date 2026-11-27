@@ -21,6 +21,23 @@ and rollback only. Its distribution is undecided.
 [Writer exclusion](rust/rw02-cross-session.md) ·
 [Ubuntu portal decision](rust/rw02-stack-decision.md).
 
+The desktop matrix for `cd15d1c` finished with both Ubuntu jobs passing.
+Both Windows jobs recorded outstanding standard-user, tray, notification
+and contrast checks. On x64 the ordinary retained GUI regained focus on
+second launch, but the canonical and two retained Mailbox comparisons
+exceeded WPF limits. On ARM64 both retained Mailbox comparisons passed.
+Ordinary retained activation remained in the background and the separate
+GDI control did not capture its first complete frame. The tested x64
+CPU renderer has its own successful timing and recovery run at `483f053`.
+The regular CI, C# compatibility and installer references, and Rust
+CodeQL passed at `cd15d1c`.
+[Desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765) ·
+[Windows x64 CPU renderer](rust/rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980891775) ·
+[C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883821) ·
+[Installer reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883855) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980891768).
+
 At `dddb21a` the first native Windows x64 CPU-painter trial passed all
 eleven same-host WPF limits. Under inventory load, close/reopen p95 was
 5.71/9.66 ms and every one of the 421 eligible reopens drew the full
