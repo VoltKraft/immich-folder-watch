@@ -91,6 +91,7 @@ impl<'de> Deserialize<'de> for EventName {
 
 pub(crate) enum Action {
     Connected,
+    ServerDisconnected,
     Refresh,
     Ignore,
 }
@@ -119,6 +120,7 @@ pub(crate) fn socket_packet(raw: &str, namespace: &str, connected: bool) -> Resu
                 Ok(Action::Connected)
             }
         }
+        "1" if connected && data.is_empty() => Ok(Action::ServerDisconnected),
         "1" | "4" => Err(Error::Disconnected),
         "2" if connected => {
             let json = data.trim_start_matches(|c: char| c.is_ascii_digit());

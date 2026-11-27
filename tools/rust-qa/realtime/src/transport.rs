@@ -296,9 +296,11 @@ impl From<tungstenite::Error> for Error {
     fn from(value: tungstenite::Error) -> Self {
         match value {
             tungstenite::Error::Capacity(_) => Self::Limit,
-            tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => {
-                Self::Disconnected
-            }
+            tungstenite::Error::ConnectionClosed
+            | tungstenite::Error::AlreadyClosed
+            | tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ) => Self::Disconnected,
             _ => Self::Transport,
         }
     }

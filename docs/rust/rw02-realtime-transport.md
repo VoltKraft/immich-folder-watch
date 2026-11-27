@@ -95,6 +95,42 @@ outputs matched their receipt. For the escaped root the peer received
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210518870) ·
 [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210644228).
 
+Windows ARM64 also passed the 22 cases and four unit tests at `6cd7757`.
+The original ZIP, targets, source pins and peer traces were checked separately.
+[Windows ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15215586046).
+
+### Server ends the selected namespace
+
+On Fedora x64 a loopback peer acknowledged a subscription, delivered one
+album event and then explicitly ended the selected Socket.IO namespace.
+With both the default namespace and `/collection`, the signed 3.0.4
+client opened one session. The earlier Rust client opened a second one and
+delivered another refresh. The shipping client removes its subscriptions
+on a server namespace disconnect. Periodic inventory remains available.
+[Shipping client](../../src/ImmichFolderWatch.Immich/ImmichRealtimeClient.cs) ·
+[Pinned Socket.IO disconnect handler](https://github.com/doghappy/socket.io-client-csharp/blob/9deebcfe8079164d269ec4f22ba58589366014fb/src/SocketIOClient/SocketIO.cs#L444-L469).
+
+The corrected Rust client kept one session on both transports, ignored
+later events and sent its final namespace disconnect on the original
+session. Both clients continued answering Engine.IO pings on polling.
+On the detached WebSocket both sent the client's disconnect followed by
+close code 1000, even when Stop came after the negotiated heartbeat window.
+The strict peer recorded 1,664 ms detached before Stop with a 1,100 ms
+heartbeat window. A retired polling SID after a server namespace disconnect
+left periodic inventory running and produced no new connection.
+
+The separate Engine.IO close packet `1` leaves the current namespace
+subscribed while the transport remains usable. Both clients delivered the
+next event and closed the original session on Stop. When the peer then
+retired an active polling SID with HTTP 400, both clients connected again.
+During the separate 2.6-second WebSocket observation, Rust reconnected after
+close code 1001. The C# peer observed no second session in that interval.
+The local 32-case paired wire record has SHA-256
+`b666cf4c18d14fb9468fcf808263839a2f4575528826d93e2c288ff5218c62fd`.
+The frozen Fedora run passed all 27 scenarios, four unit tests and Clippy.
+[Wire fixtures](../../tools/rust-qa/realtime/verify.py) ·
+[Engine.IO packet definitions](https://github.com/socketio/engine.io-protocol#protocol).
+
 ### Stopping an established session
 
 The signed Linux x64 Flatpak 3.0.4 assemblies ran on their delivered .NET

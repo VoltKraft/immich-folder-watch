@@ -12,12 +12,19 @@ use crate::{Error, Observation};
 
 pub(crate) type Observe<'a> = &'a dyn Fn(Observation);
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NamespaceState {
+    Joining,
+    Subscribed,
+    ServerDisconnected,
+}
+
 struct Session<'a> {
     transport: &'a Transport,
     open: Open,
     socket: Option<Socket>,
     heartbeat: Instant,
-    connected: bool,
+    namespace: NamespaceState,
     refresh: &'a mpsc::Sender<()>,
     observe: Observe<'a>,
 }
@@ -45,7 +52,7 @@ pub(crate) async fn run(
         heartbeat: Instant::now() + open.heartbeat_window(),
         open,
         socket: None,
-        connected: false,
+        namespace: NamespaceState::Joining,
         refresh,
         observe,
     };
@@ -68,7 +75,7 @@ pub(crate) async fn run(
     }
     drop(body);
     session.listen(connect_deadline, stopping).await?;
-    if session.connected
+    if session.namespace != NamespaceState::Joining
         && let Err(error) = session.disconnect().await
     {
         observe(Observation::StopFailed(error));
@@ -105,14 +112,23 @@ impl Session<'_> {
             return Ok(());
         }
         loop {
-            if !timeout_at(self.read_deadline(connect_deadline), self.receive(stopping)).await?? {
+            // The original upgraded transport remains available to Stop after
+            // the server has unsubscribed it from Engine.IO heartbeat events.
+            let active = if self.namespace == NamespaceState::ServerDisconnected
+                && self.socket.is_some()
+            {
+                self.receive(stopping).await?
+            } else {
+                timeout_at(self.read_deadline(connect_deadline), self.receive(stopping)).await??
+            };
+            if !active {
                 return Ok(());
             }
         }
     }
 
     fn read_deadline(&self, connect_deadline: Instant) -> Instant {
-        if self.connected {
+        if self.namespace != NamespaceState::Joining {
             self.heartbeat
         } else {
             self.heartbeat.min(connect_deadline)
@@ -217,7 +233,7 @@ impl Session<'_> {
                         .await?
                 }
                 Message::Close(_) => return Err(Error::Disconnected),
-                Message::Ping(_) => ws.flush().await?,
+                Message::Ping(_) => tokio::time::timeout(CONNECT_TIMEOUT, ws.flush()).await??,
                 Message::Binary(_) | Message::Pong(_) => {}
                 Message::Frame(_) => return Err(Error::Protocol),
             }
@@ -236,16 +252,30 @@ impl Session<'_> {
 
     async fn handle(&mut self, packet: EnginePacket<'_>) -> Result<(), Error> {
         match packet {
+            // The shipping client keeps polling the engine after the server
+            // ends the namespace. Its upgraded socket stops forwarding packets.
+            EnginePacket::Ping(_)
+                if self.namespace == NamespaceState::ServerDisconnected
+                    && self.socket.is_some() => {}
             EnginePacket::Ping(payload) => {
                 self.send(format!("3{payload}")).await?;
                 self.heartbeat = Instant::now() + self.open.heartbeat_window();
                 (self.observe)(Observation::Heartbeat);
             }
+            EnginePacket::Message(_) if self.namespace == NamespaceState::ServerDisconnected => {}
             EnginePacket::Message(data) => {
-                match socket_packet(data, &self.transport.namespace, self.connected)? {
+                match socket_packet(
+                    data,
+                    &self.transport.namespace,
+                    self.namespace == NamespaceState::Subscribed,
+                )? {
                     Action::Connected => {
-                        self.connected = true;
+                        self.namespace = NamespaceState::Subscribed;
                         (self.observe)(Observation::Connected);
+                    }
+                    Action::ServerDisconnected => {
+                        self.namespace = NamespaceState::ServerDisconnected;
+                        (self.observe)(Observation::ServerDisconnected);
                     }
                     Action::Refresh => {
                         let _ = self.refresh.try_send(());
@@ -254,8 +284,12 @@ impl Session<'_> {
                     Action::Ignore => {}
                 }
             }
-            EnginePacket::Close => return Err(Error::Disconnected),
-            EnginePacket::Noop | EnginePacket::Pong(_) | EnginePacket::PollingBinaryBase64(_) => {}
+            // The shipping adapter keeps the active session until transport
+            // shutdown is observed or its existing heartbeat deadline expires.
+            EnginePacket::Close
+            | EnginePacket::Noop
+            | EnginePacket::Pong(_)
+            | EnginePacket::PollingBinaryBase64(_) => {}
             EnginePacket::Open(_) | EnginePacket::Upgrade => return Err(Error::Protocol),
         }
         Ok(())

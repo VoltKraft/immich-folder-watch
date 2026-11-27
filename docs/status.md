@@ -18,10 +18,18 @@ Ten URL comparisons against signed 3.0.4 assemblies matched. On native
 Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
 `6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
 identifiers and retry bodies from the open file. Their upload reports
-match the Fedora report byte for byte. Windows transport and Rust upload
-readbacks at that revision are pending.
+match the Fedora report byte for byte. The 22 transport cases are now
+verified on Windows ARM64 as well. The Windows x64 transport and both
+Windows Rust upload readbacks at that revision are pending.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
+
+The local realtime comparison found that Rust resubscribed after the server
+explicitly ended the namespace. On Fedora x64 the corrected client
+preserved the original session through Stop and kept periodic inventory
+running through transport loss. All 27 transport scenarios and four unit
+tests passed. Native hosted repeats are pending.
+[Signed C# and Rust server-disconnect comparison](rust/rw02-realtime-transport.md#server-ends-the-selected-namespace).
 
 On Fedora x64 the full offline build reproduced the same five Rust upload
 results. All 78 source inputs matched `6cd7757`. The modified Wayland

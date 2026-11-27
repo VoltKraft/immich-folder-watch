@@ -32,6 +32,7 @@ impl From<time::error::Elapsed> for Error {
 enum Observation {
     Attempt,
     Connected,
+    ServerDisconnected,
     Upgraded,
     UpgradeDeclined(Error),
     Heartbeat,
@@ -65,10 +66,12 @@ async fn supervise(
     tokio::pin!(shutdown);
     let mut interval = time::interval_at(Instant::now() + inventory_period, inventory_period);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-    let retry = Cell::new(initial_retry);
+    let retry = Cell::new(Some(initial_retry));
     let report = |event| {
-        if matches!(event, Observation::Connected) {
-            retry.set(initial_retry);
+        match event {
+            Observation::Connected => retry.set(Some(initial_retry)),
+            Observation::ServerDisconnected => retry.set(None),
+            _ => {}
         }
         observe(event);
     };
@@ -80,28 +83,32 @@ async fn supervise(
                 return;
             };
             report(Observation::Lost(error));
-            let delay = retry.get();
+            let Some(delay) = retry.get() else {
+                return;
+            };
             tokio::select! {
                 biased;
                 _ = stopping.wait_for(|stopping| *stopping) => return,
                 _ = time::sleep(delay) => {}
             }
-            retry.set((delay * 2).min(Duration::from_secs(30)));
+            retry.set(Some((delay * 2).min(Duration::from_secs(30))));
         }
     };
     tokio::pin!(connection);
+    let mut connection_finished = false;
     loop {
         tokio::select! {
             biased;
             _ = &mut shutdown => break,
             _ = interval.tick() => { let _ = refresh.try_send(()); observe(Observation::Periodic); }
-            _ = &mut connection => unreachable!("the reconnect loop ends by cancellation"),
+            _ = &mut connection, if !connection_finished => connection_finished = true,
         }
     }
     let _ = request_stop.send(true);
-    if time::timeout(Duration::from_secs(2), connection)
-        .await
-        .is_err()
+    if !connection_finished
+        && time::timeout(Duration::from_secs(2), connection)
+            .await
+            .is_err()
     {
         observe(Observation::StopFailed(Error::Timeout));
     }
