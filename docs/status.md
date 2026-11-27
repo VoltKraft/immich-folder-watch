@@ -71,7 +71,17 @@ confirmed cleanup and MSI removal. Normal Quit on that console remains open.
 [Five native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341) ·
 [ARM64 Default-desktop original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341/artifacts/15212717516).
 
-The remaining Windows desktop tests cover Explorer tray activation,
+The x64 Server 2022 trial at `3c4d62c` opened the hidden-start Rust GUI
+through Explorer. The registered icon's default action produced one
+`NIN_KEYSELECT`, one GUI Open and immediate keyboard focus. Worker 7208
+continued in the original process job. In the separate visible-start trial,
+Explorer returned `S_FALSE` for the icon rectangle both before and after
+the original window was closed. All four original native library and metadata
+files were present in this run's archive and matched their compiler receipts.
+[Background-start activation and original archive](rust/rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
+
+The remaining Windows desktop tests cover tray activation after close,
+ARM64 Explorer activation,
 visible notifications, a restorable contrast setting, a move between two
 outputs with different DPI, and rendering in an actual RDP session. The available
 hosted consoles each report one 96-DPI output. The user currently has

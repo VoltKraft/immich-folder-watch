@@ -1041,6 +1041,34 @@ worker stays alive. The observer records the method and invocation time.
 [Microsoft physical-point lookup](https://learn.microsoft.com/en-us/windows/win32/api/oleacc/nf-oleacc-accessibleobjectfrompoint) ·
 [Microsoft toolbar accessibility](https://learn.microsoft.com/en-us/windows/win32/winauto/toolbar-control).
 
+### Explorer activation after a hidden start at 3c4d62c
+
+On Windows Server 2022 x64, the retained GUI started in the background
+and registered icon 23. Explorer PID 5572 painted its two marker colors
+at (847, 748) inside rectangle (835, 728)–(859, 768). The accessibility
+point lookup, toolbar hit test and enumeration identified button 1 on
+toolbar HWND 65758. Its default action started at system tick 941906.
+At tick 941921 the original Rust receiver handled one `NIN_KEYSELECT`
+for icon 23 and issued one GUI Open. On the first observation, the shown
+window (HWND 197214) was active, in the foreground and had keyboard focus.
+Worker PID 7208 retained its original creation time. The GUI then quit,
+drained the job and removed the icon.
+
+In the separate run starting visibly, the parent received `S_FALSE` for the
+icon's rectangle before the close. After the original HWND 459254 was hidden,
+the repeated rectangle check still received `S_FALSE`. No eligible overflow
+button was found. Opening the original window from this state remains open.
+The Shell-less control passed. The contrast trial again captured the baseline
+on a desktop with an unnamed scheme.
+
+The archive (SHA-256
+`2cd53333ceca88c032b9a43b043972f178ac9bb15043f342fa95c506a13d9834`)
+contains the four original eframe and winit library and metadata files.
+Their paths and hashes match the native compiler stream and receipts. The
+retained executable has SHA-256
+`b7d57b79d45466863a9923612277a2bab4b4dab86c130fbe5ad4adf504bb607e`.
+[Original observations and native compiler outputs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46029732858/artifacts/15214951547).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

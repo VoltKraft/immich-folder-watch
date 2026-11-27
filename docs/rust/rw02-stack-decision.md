@@ -17,7 +17,11 @@ On Windows Server 2022 x64 at `47fe26d`, Explorer drew the registered
 Rust tray icon and its changed color at the same point. The accessibility
 lookup found no eligible item to invoke, and the GUI received no Shell
 activation callback.
-[Windows Server 2022 observation](rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d).
+At `3c4d62c` the classic toolbar's default action opened the background-start
+GUI with focus and the original inventory worker. Activation after closing a
+previously visible window remains open.
+[First visible icon](rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d) ·
+[Verified background-start activation](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
 
 On a Windows x64 WARP adapter, the private CPU renderer met all eleven
 same-host WPF limits at `dddb21a`. All 421 file-qualified reopens showed

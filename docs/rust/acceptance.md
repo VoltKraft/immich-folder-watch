@@ -41,9 +41,11 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 ## Overall acceptance
 
 Windows Server 2022 x64 at `47fe26d` showed the registered background-start
-icon and its acknowledged color change at the same point. The Shell callback
-and window reopen remain outstanding.
-[Original Explorer observation](rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d).
+icon and its acknowledged color change at the same point. At `3c4d62c` the
+same hosted image delivered the Shell callback, showed and focused the
+background-start GUI, and preserved the worker. Reopening after a normal
+window close remains outstanding.
+[Original Explorer observations](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
 
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
 x64 and ARM64. On Fedora x64 the combined Rust subject reproduced all five
