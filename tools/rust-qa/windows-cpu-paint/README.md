@@ -41,6 +41,11 @@ The separate texture example must show the partial update on the same
 window after switching to wgpu. The native and detached commands both
 use the staged CPU build. [Visible handoff and readback](handoff/README.md).
 
+The device-recovery trial uses the same native GUI and inventory worker
+as the timing run. It destroys the GUI's own WARP device after a visible
+edit and checks the replacement window, preserved text and continued worker
+activity. [Native recovery and readback](recovery/README.md).
+
 The fetch verifies the sizes and hashes of three original crate archives.
 Further source reconstruction and compilation use the offline cache.
 The source bundle includes the original renderer, the patched renderer

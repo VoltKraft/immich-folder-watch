@@ -117,11 +117,18 @@ def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=No
         device = measured_generation(subject_log, "Mailbox", frame_latency=depth, wait_policy=wait_policy)
     else:
         device = device_observer(subject_log)
+    images, difference = visible_fields(folder, pid, (hwnd, trial["beforeField"]), (hwnd, trial["afterField"]))
+    return dict(hwnd=hwnd, pid=pid, creation100ns=trial["creation100ns"], subjectLogSha256=trial["subjectLog"],
+                device=device, frames=images, pixelDifference=difference)
+
+
+def visible_fields(folder, pid, before, after):
+    """Check the foreground text, original PNGs and material pixel changes against each observed (HWND, JSON digest)."""
     images = {}
-    for phase, draft in (("before", "recoverydraft"), ("after", "recoverydraftafter")):
+    for phase, draft, (hwnd, digest) in (("before", "recoverydraft", before), ("after", "recoverydraftafter", after)):
         path = folder / f"field-{phase}.json"
         field = json.loads(path.read_text(encoding="utf-8-sig"))
-        if (sha(path) != trial[phase + "Field"] or field["windowHandle"] != hwnd or field["processId"] != pid
+        if (sha(path) != digest or field["windowHandle"] != hwnd or field["processId"] != pid
                 or field["status"] != "passed" or field["foreground"] is not True or field["onInputDesktop"] is not True
                 or field["draft"] != draft or (phase == "after" and field["focusBeforeActivation"] != "Dateiname")):
             raise ValueError("The native editor did not preserve its owned field, text or focus")
@@ -131,7 +138,7 @@ def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=No
             frame = field[kind + "Frame"]
             with image.open("rb") as stream:
                 header = stream.read(24)
-            if (sha(image) != frame["sha256"] or frame["colors"] < 5
+            if (sha(image) != frame["sha256"] or not 5 <= frame["colors"] <= frame["width"] * frame["height"]
                     or not (10 <= frame["width"] <= 1024 and 5 <= frame["height"] <= 128)
                     or header != b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" + struct.pack(">II", frame["width"], frame["height"])):
                 raise ValueError("The native edit capture differs from its observed screen pixels")
@@ -146,5 +153,4 @@ def visible_edit(folder, trial, depth, wait_policy="Wait", *, device_observer=No
             or not math.ceil(3 * dpi / 96) <= difference["rows"] <= edited["height"]
             or not max(difference["columns"], difference["rows"]) <= difference["pixels"] <= difference["columns"] * difference["rows"]):
         raise ValueError("The reopened editor did not display the changed text")
-    return dict(hwnd=hwnd, pid=pid, creation100ns=trial["creation100ns"], subjectLogSha256=trial["subjectLog"],
-                device=device, frames=images, pixelDifference=difference)
+    return images, difference

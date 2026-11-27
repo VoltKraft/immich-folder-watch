@@ -46,6 +46,16 @@ SHOW followed resume by 16 ms. The original workers survived and both
 input desktops were restored.
 [Native keyboard observations](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
 
+The texture-handoff reader now recognizes the two Cargo output paths for
+the same application library. On the original Windows compiler streams
+it accepted all 155 reused units. A changed output path on any one of
+those units failed the comparison. The native fixture now retains and
+compares both library files across the link. A separate device-recovery
+fixture uses the timed executable and its original worker. Native
+observations from both fixtures are pending.
+[Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
+[Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
+
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
 original database included 16 WAL frames. In both trials a new WPF worker

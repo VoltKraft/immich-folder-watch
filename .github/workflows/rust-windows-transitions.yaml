@@ -147,6 +147,20 @@ jobs:
           python -B tools/rust-qa/windows-cpu-paint/handoff/readback.py $area
           exit $LASTEXITCODE
 
+      - name: Recover the original CPU-painted application after loss of its test device
+        if: ${{ !cancelled() && steps.cpu.outcome != 'skipped' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu-build.json') != '' }}
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          $area = "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET/cpu-paint"
+          python -B -m unittest discover -s tools/rust-qa/windows-cpu-paint/recovery
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-cpu-paint/recovery/run.py $area
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-cpu-paint/recovery/readback.py $area
+          exit $LASTEXITCODE
+
       - name: Retain original comparisons, frame observations and native build inputs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -177,7 +191,9 @@ jobs:
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/*.log
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/compiler.jsonl
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu.exe
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/ifw-performance-worker.exe
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/source.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/cpu-libraries.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/scan-editor/
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/handoff/
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/cpu-paint/recovery/

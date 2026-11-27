@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -167,6 +168,11 @@ def main(target, variant="mailbox"):
                 scope.enter_context(pin_path(api, path, False))
                 if sha(path) != digest:
                     raise ValueError("A pinned native measurement input changed")
+            if variant == "cpu-paint":
+                retained_worker = out / worker.name
+                shutil.copyfile(worker, retained_worker)
+                if sha(retained_worker) != sources["worker"]:
+                    raise ValueError("The retained recovery worker differs from the measured worker")
             token, workload = recorder.create_fixture(area, scope, api)
             scope.enter_context(pin_path(api, area / "files", True))
             for key, value in workload.items():
