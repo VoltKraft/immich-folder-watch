@@ -30,6 +30,17 @@ output files. A separate comparison with the original signed 3.0.4
 Flatpak assemblies agreed on all six selected inputs and read back the
 four Rust outputs in editing and runtime modes.
 
+At clean revision `9313f39` the frozen Fedora x64 run repeated all 13
+steps. All four native Ubuntu and Windows archives each
+contained 349 verified manifest entries. Each reader preserved all 87
+original files and agreed with the C# reference on 67 accepted and 20
+rejected inputs. Each target passed 261 byte checks, 402 Rust assertions
+and 228 C# readbacks.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15205794861) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15206775983) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15206866464) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15206786928).
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects

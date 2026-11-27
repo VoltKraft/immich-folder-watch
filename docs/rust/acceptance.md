@@ -40,9 +40,15 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
-The Fedora x64 YAML comparison now includes invalid earlier values in
-repeated properties. The previous 82 cases preserved all 112 output files
-byte for byte. The extended corpus passed 87 inputs and 228 C# readbacks.
+At `9313f39` the x64 display observer ran the same PE that previously passed
+the CPU timing and device-recovery tests. A 640 × 400 GDI frame accompanied
+a visible edit on the 96-DPI console. RDP and mixed-DPI checks remain open.
+[Display evidence](rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable).
+
+On Windows and Ubuntu, x64 and ARM64, the YAML comparison at `9313f39`
+passed all 87 inputs and 228 C# readbacks per platform. Rust rejects invalid
+earlier values in repeated properties. On Fedora x64 the previous 82 cases
+also preserved all 112 output files byte for byte.
 [Repeated properties and signed 3.0.4 comparison](rw02-yaml.md#repeated-properties-in-the-shipping-configuration).
 
 At `dddb21a` the private Windows x64 CPU renderer met all eleven WPF

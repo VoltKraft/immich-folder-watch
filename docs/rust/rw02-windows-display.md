@@ -178,6 +178,16 @@ edit. Mixed DPI and RDP each require their own observation as described above.
 [Archive verifier](../../tools/rust-qa/windows-display/cpu_archive.py) ·
 [Original WARP recovery](rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053).
 
+At `9313f39` the x64 runner launched the measured executable with SHA-256
+`b84080b16e365d5297e5d2eb93be9f647f43b57b21bd80332b9917e85dfa36ec`.
+The field edit changed 646 pixels across 84 columns and 18 rows. Replaying
+both original PNGs reproduced all three counts. CPU frame 25 completed a
+640 × 400 GDI transfer during the interaction on the same HWND. The hidden
+window retained its device, the GUI exited normally and the profile was
+removed. This console had one 96-DPI monitor and WTS protocol 0. The
+mixed-DPI and RDP results remain unmeasured.
+[Original report, log and field images](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15207180592).
+
 ### Retained build observations
 
 The retained observer selects the paired executable from the native compiler

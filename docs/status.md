@@ -21,16 +21,16 @@ and rollback only. Its distribution is undecided.
 [Writer exclusion](rust/rw02-cross-session.md) ·
 [Ubuntu portal decision](rust/rw02-stack-decision.md).
 
-The x64 display observer can select the exact CPU executable timed at
-`483f053`. The original archive, compiler and recovery receipts and staged
-PE digest were verified locally. A subsequent desktop observation must record
-its own field pixels, display topology, transport and presenter.
+At `9313f39` the archived x64 CPU executable from `483f053` rendered
+a real filename edit on a second hosted console. Both original field
+images reproduce 646 changed pixels. The console reported a single 96-DPI
+monitor. Mixed-DPI and RDP qualification still require those environments.
 [Archived x64 test](rust/rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable).
 
 The Rust YAML reader now checks each recognized property before a later
-occurrence replaces it. The native Fedora x64 comparison exercised 87
-inputs with 228 C# readbacks. Both the Rust and C# readers reject an invalid
-integer or malformed section followed by a valid replacement.
+occurrence replaces it. At `9313f39`, Windows and Ubuntu on x64 and ARM64
+each passed 87 inputs with 228 C# readbacks. Rust and C# both reject an
+invalid integer or malformed section followed by a valid replacement.
 [Repeated YAML properties](rust/rw02-yaml.md#repeated-properties-in-the-shipping-configuration).
 
 The desktop matrix for `cd15d1c` finished with both Ubuntu jobs passing.
