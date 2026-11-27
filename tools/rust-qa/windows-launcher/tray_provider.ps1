@@ -681,7 +681,9 @@ function Invoke-OriginalIcon($Lease,$Pattern,[scriptblock]$Clock) {
     # A failing COM return can follow a successful native activation and automatic flyout dismissal.
     $Lease.iconAttempted=$true
     $Lease.startTick=& $Clock
+    $Lease.startQpc=[Diagnostics.Stopwatch]::GetTimestamp()
     $Pattern.Invoke()
+    $Lease.returnedQpc=[Diagnostics.Stopwatch]::GetTimestamp()
     return (& $Clock)
 }
 
@@ -829,7 +831,9 @@ try {
     $invocationSurface = Get-InvocationSurface $actual $guard $lease.pane $fresh
     $invoking = $true
     $returnedTick=Invoke-OriginalIcon $lease $actual.pattern { [IfwIconSurface]::GetTickCount64() }
-    Write-Event 'invoked' @{startTick=$lease.startTick; returnedTick=$returnedTick; surface=$invocationSurface; provider=$actual.descriptor}
+    Write-Event 'invoked' @{startTick=$lease.startTick; returnedTick=$returnedTick; startQpc=$lease.startQpc
+        returnedQpc=$lease.returnedQpc; qpcFrequency=[Diagnostics.Stopwatch]::Frequency
+        surface=$invocationSurface; provider=$actual.descriptor}
 } catch {
     $cause = $_.Exception.GetBaseException()
     if (-not $invoking -and ($cause -is [InvalidOperationException] -or $cause -is [Runtime.InteropServices.COMException] -or

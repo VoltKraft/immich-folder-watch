@@ -19,6 +19,7 @@ pub(super) mod activation;
 
 #[path = "../../gui/src/windows_tray_shell.rs"]
 mod shell;
+pub(super) use shell::qpc;
 use shell::*;
 
 #[cfg(test)]
@@ -125,6 +126,9 @@ fn pump(millis: u32) {
 }
 
 fn report_events(e: Events) {
+    if e.open.ordinal > 0 {
+        println!("tray.last_open_dispatch_qpc={}", e.open.dispatch_qpc);
+    }
     for (name, count) in [
         ("taskbar_created", e.taskbar),
         ("synthetic_taskbar_created", e.synthetic_taskbar),
@@ -149,25 +153,16 @@ fn notification_state(prefix: &str) {
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn QueryPerformanceCounter(counter: *mut i64) -> i32;
     fn QueryPerformanceFrequency(frequency: *mut i64) -> i32;
 }
 
-fn performance_value(read: unsafe extern "system" fn(*mut i64) -> i32) -> Result<i64> {
+pub(super) fn qpc_frequency() -> Result<i64> {
     let mut value = 0;
-    // Both APIs write one native LARGE_INTEGER into this aligned, live i64.
-    if unsafe { read(&mut value) } == 0 || value <= 0 {
+    // The API writes one native LARGE_INTEGER into this aligned, live i64.
+    if unsafe { QueryPerformanceFrequency(&mut value) } == 0 || value <= 0 {
         return Err(invalid());
     }
     Ok(value)
-}
-
-pub(super) fn qpc() -> Result<i64> {
-    performance_value(QueryPerformanceCounter)
-}
-
-pub(super) fn qpc_frequency() -> Result<i64> {
-    performance_value(QueryPerformanceFrequency)
 }
 
 fn notification_data(icon: &Icon<'_>, id: &str, body: &str) -> NOTIFYICONDATAW {

@@ -1228,6 +1228,16 @@ this run remained unavailable. The original ZIP has SHA-256
 `65274e9dd39e14bc8b3350aa8f02b8913e7b51886584ccd11979598b607091c7`.
 [Native background-first run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46045729761).
 
+The provider now records its performance counter immediately before and
+after the accessibility action. The receiver records the same Windows
+counter when it handles the matching callback. The observer compares the
+two start and dispatch samples even when Windows reports the same uptime
+millisecond. It requires more than one counter tick between the samples,
+checks the provider's counter frequency against the observer's and keeps
+the original message-queue bounds for queued callbacks. A posted message
+with an indistinguishable queue time still has an unresolved order.
+[Windows performance-counter ordering](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

@@ -251,6 +251,7 @@ to reconcile project decisions, defaults, and recorded state.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
   match the accessible button and physical marker before its default action.
+  Compare the provider and receiver performance counters when ordering a fast callback.
   For a registered icon without a rectangle, follow the [ordinary second launch](docs/rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle)
   on the same hidden primary.
   Verify visible Windows
@@ -259,6 +260,8 @@ to reconcile project decisions, defaults, and recorded state.
   scopes posting, readback and removal to the test shortcut's app identity.
   Match a [visible WinRT popup](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup)
   to the ordinary sender's timed call and the exact title and body shown by the Shell.
+  Use the [archived native sender](tools/rust-qa/windows-services/toast-history.md#original-sender-on-a-disposable-windows-x64-vm)
+  for the isolated x64 console.
   Preserve the [original job CPU and member working sets](docs/rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget)
   in the three-trial WPF budget. Compare Windows renderer timings with the same host's WPF reference and
   qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)

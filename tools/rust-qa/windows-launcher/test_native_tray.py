@@ -36,8 +36,9 @@ def closed(added):
             f"TRAY_CLEANUP pid=18 hwnd=43 id=23 registered={int(added)} removed={int(added)}\nDRAINED passes=2\n")
 
 
-def callback(queued="22", dispatched=23, code=0x401):
-    return (f"TRAY_CALLBACK pid=18 hwnd=43 id=23 code={code} ordinal=1 queued_ms={queued} dispatch_ms={dispatched}\n"
+def callback(queued="22", dispatched=23, code=0x401, counter=None):
+    qpc = "" if counter is None else f" dispatch_qpc={counter}"
+    return (f"TRAY_CALLBACK pid=18 hwnd=43 id=23 code={code} ordinal=1 queued_ms={queued} dispatch_ms={dispatched}{qpc}\n"
             "TRAY_OPEN pid=18 ordinal=1\n")
 
 
@@ -119,6 +120,20 @@ class TrayProofTests(unittest.TestCase):
             with self.assertRaises(tray.Unavailable):
                 tray.delivery(ambiguous, KEY, 21, 29)
         self.assertIsNone(tray.delivery("LAUNCHER_OPEN client=7\nREADY Visible Available\n", KEY, 21, 29))
+
+    def test_fast_sent_callback_uses_performance_counter_order_on_a_shared_uptime_tick(self):
+        def read(counter, queued="none"):
+            return tray.delivery(callback(queued, 21, counter=counter), KEY, 21, 21,
+                                 start_qpc=501, observed_qpc=600)
+        self.assertEqual(read(503)["dispatchQpc"], 503)
+        for counter in (500, 501, 502):
+            with self.subTest(counter=counter), self.assertRaises(tray.Unavailable):
+                read(counter)
+        for counter in (None, 0, 499, 602):
+            with self.subTest(counter=counter), self.assertRaises(ValueError):
+                read(counter)
+        with self.assertRaisesRegex(tray.Unavailable, "queue time"):
+            read(503, "21")
 
     def test_msaa_requires_the_shell_hit_and_one_named_enabled_button_with_concordant_child_ids(self):
         event = dict(provider=MSAA, surface=SURFACE)
@@ -202,6 +217,8 @@ class ResidentTests(unittest.TestCase):
         proc.poll.return_value = None
         api.process_identity.return_value = 101
         api.wait_job_empty.return_value = True
+        api.frequency = 10_000_000
+        api.clock.return_value = 300
         desk.owner.return_value = 0
         desk.name.return_value = "Default"
         desk.foreground.side_effect = lambda: windows.hwnd
@@ -271,7 +288,7 @@ class ResidentTests(unittest.TestCase):
                 if stage in ("ready", "attempt"):
                     return dict(surface=dict(visible_surface, rgb=COMPLEMENT), provider=visible_element, tick=19)
                 if stage == "invoked":
-                    append(callback("20", 20) if refusal == "early" else callback())
+                    append(callback("20", 20, counter=190) if refusal == "early" else callback(counter=240))
                     if not reopen:
                         append(FIRST_RENDER if subject == "retained" else "ADAPTER Dx12 Cpu\n")
                     if refusal == "second-generation":
@@ -286,7 +303,8 @@ class ResidentTests(unittest.TestCase):
                     invoked = dict(visible_surface, rgb=COMPLEMENT)
                     if refusal == "recycled-at-invoke":
                         invoked["pane"] = invoked["pane"] | {"tid": 777}
-                    return dict(startTick=21, returnedTick=25, surface=invoked, provider=visible_element)
+                    return dict(startTick=21, returnedTick=25, startQpc=211, returnedQpc=251,
+                                qpcFrequency=api.frequency, surface=invoked, provider=visible_element)
                 self.fail("Unexpected provider stage")
             helper.stdin.write.side_effect = requests.append
 

@@ -79,7 +79,10 @@ foreach ($name in @('Wait-OpenedPane','Restore-OpenedPane','Get-InvocationSurfac
 }
 $target=[pscustomobject]@{}
 $target | Add-Member ScriptMethod Recheck { $steps.Add('MSAA preflight'); if ($reject) {throw 'Object changed'} }
-$target | Add-Member ScriptMethod Invoke { $steps.Add('Default action') }
+$target | Add-Member ScriptMethod Invoke {
+    $steps.Add('Default action')
+    $call.actionQpc=[Diagnostics.Stopwatch]::GetTimestamp()
+}
 $surface=[pscustomobject]@{}
 $surface | Add-Member ScriptMethod Matches { param($other) return [object]::ReferenceEquals($this,$other) }
 $sample=[pscustomobject]@{}
@@ -92,10 +95,11 @@ foreach ($reject in @($true,$false)) {
         $null=Invoke-OriginalIcon $call $target { $steps.Add('Clock'); return 84 }
     } catch { if (-not $reject) { throw } }
     if ($reject) {
-        if (($steps -join ',') -ne 'MSAA preflight' -or $call.iconAttempted -or $call.ContainsKey('startTick')) {
+        if (($steps -join ',') -ne 'MSAA preflight' -or $call.iconAttempted -or $call.ContainsKey('startTick') -or $call.ContainsKey('startQpc')) {
             throw 'A rejected MSAA preflight was timed or counted as an action'
         }
-    } elseif (($steps -join ',') -ne 'MSAA preflight,Physical hit,Clock,Default action,Clock' -or -not $call.iconAttempted) {
+    } elseif (($steps -join ',') -ne 'MSAA preflight,Physical hit,Clock,Default action,Clock' -or -not $call.iconAttempted -or
+              $call.startQpc -le 0 -or $call.startQpc -gt $call.actionQpc -or $call.actionQpc -gt $call.returnedQpc) {
         throw 'The default action interval captured preflight activity'
     }
 }

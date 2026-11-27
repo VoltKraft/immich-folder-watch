@@ -344,12 +344,13 @@ fn run<T>(
                     .queued_ms
                     .map_or_else(|| "none".into(), |ms| ms.to_string());
                 println!(
-                    "TRAY_CALLBACK pid={} hwnd={} id={ICON} code={} ordinal={} queued_ms={queued} dispatch_ms={}",
+                    "TRAY_CALLBACK pid={} hwnd={} id={ICON} code={} ordinal={} queued_ms={queued} dispatch_ms={} dispatch_qpc={}",
                     std::process::id(),
                     receiver.hwnd.0 as usize,
                     open.code,
                     open.ordinal,
-                    open.dispatch_ms
+                    open.dispatch_ms,
+                    open.dispatch_qpc
                 );
                 pending.open = Some(open.ordinal);
             }

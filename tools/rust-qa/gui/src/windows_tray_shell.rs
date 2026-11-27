@@ -6,17 +6,26 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{Error, PCWSTR, Result, w};
 
-// The observer and the receiver use this system-wide, boot-relative Windows clock.
-// Importing this no-argument Kernel32 API keeps the reviewed Cargo feature set intact.
+// The provider and observer use these same two system-wide Windows clocks.
 #[link(name = "kernel32")]
 unsafe extern "system" {
     #[link_name = "GetTickCount64"]
     fn get_tick_count64() -> u64;
+    fn QueryPerformanceCounter(counter: *mut i64) -> i32;
 }
 
 fn uptime_millis() -> u64 {
     // The API has no preconditions or borrowed output.
     unsafe { get_tick_count64() }
+}
+
+pub(crate) fn qpc() -> Result<i64> {
+    let mut counter = 0;
+    // Kernel32 writes one aligned LARGE_INTEGER. This time base is shared across processes.
+    if unsafe { QueryPerformanceCounter(&mut counter) } == 0 || counter <= 0 {
+        return Err(Error::from_hresult(E_FAIL));
+    }
+    Ok(counter)
 }
 
 const CALLBACK: u32 = WM_APP + 23;
@@ -30,6 +39,7 @@ pub(crate) struct OpenEvent {
     pub(crate) code: u32,
     pub(crate) queued_ms: Option<u32>,
     pub(crate) dispatch_ms: u64,
+    pub(crate) dispatch_qpc: i64,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -79,6 +89,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
             key if matches!(key, NIN_SELECT | WM_LBUTTONDBLCLK) || key == NIN_SELECT + 1 => {
                 e.shell_open = e.shell_open.saturating_add(1);
                 if id == ICON {
+                    let dispatch_qpc = qpc().unwrap_or(0);
                     // A nonqueued sent callback has no MSG.time of its own. GetMessageTime alone
                     // can then describe the thread's previous, unrelated queue entry.
                     let queued_ms = DISPATCHING.get().and_then(|entry| {
@@ -94,6 +105,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
                         code,
                         queued_ms,
                         dispatch_ms: uptime_millis(),
+                        dispatch_qpc,
                     };
                     if matches!(code, NIN_SELECT | WM_LBUTTONDBLCLK) {
                         e.pointer_open = e.pointer_open.saturating_add(1);

@@ -21,7 +21,7 @@ RECORDS = {
     "TRAY_BIND": r"phase=(initial|retry|recreate) pid=(\d+) hwnd=(\d+) id=(\d+) shell_pid=(\d+) shell_hwnd=(\d+) verified=([01])",
     "TRAY_RETIRED": r"pid=(\d+) hwnd=(\d+) id=(\d+) shell_pid=(\d+) shell_hwnd=(\d+)",
     "TRAY_ICON": r"phase=(initial|changed|sample) pid=(\d+) hwnd=(\d+) id=(\d+) rgb=([0-9a-f]{6}) rect=(none|-?\d+,-?\d+,-?\d+,-?\d+) ok=([01])",
-    "TRAY_CALLBACK": r"pid=(\d+) hwnd=(\d+) id=(\d+) code=(\d+) ordinal=(\d+) queued_ms=(none|\d+) dispatch_ms=(\d+)",
+    "TRAY_CALLBACK": r"pid=(\d+) hwnd=(\d+) id=(\d+) code=(\d+) ordinal=(\d+) queued_ms=(none|\d+) dispatch_ms=(\d+)(?: dispatch_qpc=(\d+))?",
     "TRAY_OPEN": r"pid=(\d+) ordinal=(\d+)",
     "TRAY_OPEN_ROOT": r"pid=(\d+) tid=(\d+) hwnd=(\d+) ordinal=(\d+) visible=(true|false) tick=(\d+)",
     "TRAY_CLEANUP": r"pid=(\d+) hwnd=(\d+) id=(\d+) registered=([01]) removed=([01])",
@@ -190,17 +190,25 @@ def icon(log, phase, key, rgb):
     return [int(n) for n in rect.split(",")]
 
 
-def delivery(log, key, start, observed):
+def delivery(log, key, start, observed, *, start_qpc=None, observed_qpc=None):
     callbacks, opened = records(log, "TRAY_CALLBACK"), records(log, "TRAY_OPEN")
     if not callbacks or not opened:
         return None
-    pid, hwnd, ident, code, ordinal, queued, dispatch = one(callbacks, "Shell callback")
+    pid, hwnd, ident, code, ordinal, queued, dispatch, counter = one(callbacks, "Shell callback")
     if ((pid, hwnd, ident) != key or int(code) not in (0x203, 0x400, 0x401)
             or int(ordinal) != 1 or one(opened, "GUI Open") != (pid, ordinal)):
         raise ValueError("The v4 callback and the primary Open did not identify the original icon and ordinal")
     if not (0 <= start <= int(dispatch) <= observed and observed - start <= 35_000):
         raise ValueError("The native callback dispatch was outside the provider observation")
-    if start == int(dispatch):
+    if start_qpc is not None:
+        if counter is None or not (0 < start_qpc and 0 < int(counter) and observed_qpc is not None):
+            raise ValueError("Missing native performance counter in the provider observation")
+        delta = int(counter) - start_qpc
+        if delta < -1 or int(counter) > observed_qpc + 1:
+            raise ValueError("The native callback dispatch was outside the provider observation")
+        if delta <= 1:
+            raise Unavailable("The provider and callback are within one performance counter tick")
+    elif start == int(dispatch):
         raise Unavailable("The callback and invocation shared a coarse Windows tick and could not be ordered")
     if queued != "none":
         queue_offset = (int(queued) - start) & 0xffffffff
@@ -208,8 +216,11 @@ def delivery(log, key, start, observed):
             raise ValueError("The callback was queued outside the provider observation")
         if queue_offset == 0:
             raise Unavailable("The callback queue time could not be ordered after the provider invocation")
-    return dict(pid=int(pid), hwnd=int(hwnd), iconId=int(ident), code=int(code), ordinal=int(ordinal),
-                queuedMs=None if queued == "none" else int(queued), dispatchMs=int(dispatch), observedMs=observed)
+    result = dict(pid=int(pid), hwnd=int(hwnd), iconId=int(ident), code=int(code), ordinal=int(ordinal),
+                  queuedMs=None if queued == "none" else int(queued), dispatchMs=int(dispatch), observedMs=observed)
+    if start_qpc is not None:
+        result.update(startQpc=start_qpc, dispatchQpc=int(counter), observedQpc=observed_qpc)
+    return result
 
 
 def tray_open_root(log, callback, hidden, observed):
@@ -858,9 +869,13 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 state.update(attemptTick=attempted["tick"], startTick=invoked["startTick"], returnedTick=invoked["returnedTick"])
                 if not 0 <= state["attemptTick"] <= state["startTick"] <= state["returnedTick"]:
                     raise ValueError("The provider's monotonic interval was invalid")
+                state.update(startQpc=invoked["startQpc"], returnedQpc=invoked["returnedQpc"], qpcFrequency=invoked["qpcFrequency"])
+                if not (state["qpcFrequency"] == api.frequency and 0 < state["startQpc"] <= state["returnedQpc"] <= api.clock() + 1):
+                    raise ValueError("The provider's performance counters did not match the observer's clock")
             result["stage"] = "shell-callback"
             try:
-                result["delivery"] = wait(lambda: delivery(log(), key, state["startTick"], clock()),
+                result["delivery"] = wait(lambda: delivery(log(), key, state["startTick"], clock(),
+                                                          start_qpc=state["startQpc"], observed_qpc=api.clock()),
                                           "No matching v4 Shell callback and GUI Open")
             except TimeoutError as exc:
                 if records(log(), "TRAY_CALLBACK") or records(log(), "TRAY_OPEN"):
@@ -983,7 +998,9 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
             fallback["status"] = "passed"
             raise Unavailable(result["shellActivation"]["reason"])
         native.qualify_quiet_shell(log(), result, no_host=False)
-        if (delivery(log(), key, state["startTick"], result["delivery"]["observedMs"]) != result["delivery"]
+        captured = result["delivery"]
+        if (delivery(log(), key, state["startTick"], captured["observedMs"],
+                     start_qpc=state["startQpc"], observed_qpc=captured["observedQpc"]) != captured
                 or "LAUNCHER_OPEN " in log()):
             raise ValueError("The original provider activation changed before quit")
         if retained is not None:
