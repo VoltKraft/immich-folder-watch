@@ -29,8 +29,11 @@ passed for that commit.
 [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021250087) ·
 [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021249956).
 
-In the desktop run at `9313f39`, the Plasma tray step failed on both Ubuntu
-architectures. The preceding matrix at `cd15d1c` had passed on both. In an
+In the desktop run at `9313f39`, Ubuntu's snapshot server returned HTTP 503
+for one pinned package on each architecture, before either Plasma panel
+started. Fresh downloads matched both package digests. The acquisition helper
+now retries a transient 503 within the existing limit of three attempts.
+The preceding matrix at `cd15d1c` had passed on both architectures. In an
 offline x64 replay with the prepared Noble guest and the current GUI sources,
 two panel clicks reopened the original window, and Quit removed the item.
 [Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
@@ -48,6 +51,19 @@ and rollback only. Its distribution is undecided.
 [Shell observations](rust/rw02-windows-services.md#native-notification-observations-at-5efe1f1) ·
 [Writer exclusion](rust/rw02-cross-session.md) ·
 [Ubuntu portal decision](rust/rw02-stack-decision.md).
+
+At `6cd7757` two source digests in the inventory worker's review still
+referred to the files preceding the Windows last-write timestamp adapter.
+Local replay of the Windows staging check rejected the new sources before
+building the worker. The reviewed list now covers both changed files. Detached verification
+matched all 13 entries, and the Linux worker built with the original 25
+registry packages. On private X11 the worker found a new file while the GUI
+was hidden. Both second launches reopened the original window with the same
+worker. The ordinary Windows Server 2025 and Windows 11 ARM64
+matrix retains its existing checks. An additional Server 2022 x64 job
+builds the same tray subject and checks the original contrast setting.
+[Worker sources](../tools/rust-qa/performance/worker-inputs.json) ·
+[Server 2022 Shell comparison](../.github/workflows/rust-windows-shell-2022.yaml).
 
 At `9313f39` the archived x64 CPU executable from `483f053` rendered
 a real filename edit on a second hosted console. Both original field

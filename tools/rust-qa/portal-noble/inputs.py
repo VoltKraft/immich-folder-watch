@@ -1,5 +1,6 @@
 """Acquire the fixed Ubuntu source package and authenticate the native distro control."""
 import concurrent.futures
+from email.utils import parsedate_to_datetime
 import hashlib
 from http.client import RemoteDisconnected
 import os
@@ -31,6 +32,7 @@ ORIGINALS = {
 KEYRING = "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31"
 SIGNER = "F6ECB3762474EDA9D21B7022871920D1991BC93C"
 CONNECTION_ATTEMPTS = 3
+MAX_RETRY_AFTER_SECONDS = 30
 
 
 def sha(path):
@@ -45,25 +47,48 @@ def snapshot_url(timestamp, relative):
     return f"https://snapshot.ubuntu.com/ubuntu/{timestamp}/" + quote(relative, safe="/+~")
 
 
+def retry_delay(header, attempt):
+    value = (header or "").strip()
+    if not value:
+        return attempt
+    if value.isascii() and value.isdecimal():
+        seconds = float(value)
+    else:
+        try:
+            when = parsedate_to_datetime(value)
+            if when.tzinfo is None:
+                return attempt
+            seconds = when.timestamp() - time.time()
+        except (ValueError, OSError, OverflowError):
+            return attempt
+    return max(attempt, seconds)
+
+
 def fetch(url, path, digest, download, max_bytes=16_000_000):
     if path.is_file() and not path.is_symlink() and sha(path) == digest:
         return path
     if path.exists() or path.is_symlink() or not download:
         raise ValueError(f"Missing or changed checked input {path.name}")
     for attempt in range(1, CONNECTION_ATTEMPTS + 1):
+        delay = attempt
         try:
             response = urllib.request.urlopen(url, timeout=60)
             break
         except HTTPError as error:
             error.add_note(f"Ubuntu archive input: {url}")
             error.close()
-            raise
+            if (error.code != 503 or attempt == CONNECTION_ATTEMPTS
+                    or urlsplit(error.geturl())[:2] != urlsplit(url)[:2]):
+                raise
+            delay = retry_delay(error.headers.get("Retry-After"), attempt)
+            if delay > MAX_RETRY_AFTER_SECONDS:
+                raise
         except RemoteDisconnected as error:
             if attempt == CONNECTION_ATTEMPTS:
                 raise RemoteDisconnected(
                     f"Ubuntu closed the connection before sending headers for {path.name} on all {attempt} attempts"
                 ) from error
-            time.sleep(attempt)
+        time.sleep(delay)
     with response as data, tempfile.NamedTemporaryFile(dir=path.parent) as temp:
         if urlsplit(data.geturl())[:2] != urlsplit(url)[:2]:
             raise ValueError("Unexpected Ubuntu archive redirect")

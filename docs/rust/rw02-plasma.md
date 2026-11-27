@@ -78,6 +78,18 @@ The report SHA-256 is `e0be6958ef823fcefe5d120852bcb018805f43b9d35c77a073b178a6d
 This replay used the previously authenticated packages already present on
 disk. The hosted step starts by downloading and checking its package set.
 
+Both completed Ubuntu job logs identify HTTP 503 during package acquisition.
+The x64 request was for `python3-gi_3.48.2-1_amd64.deb`. The ARM64 job was
+fetching the architecture-independent `plasma-workspace-data_5.27.12-0ubuntu0.1_all.deb`.
+Neither reached the panel observer. Fresh downloads from the same snapshots
+matched the signed package tables at 232,016 and 6,684,718 bytes respectively.
+The acquisition helper now retries a same-origin 503 within its existing
+three-attempt limit and honours bounded `Retry-After` values. The original
+SHA-256, size and archive-origin checks apply to each download.
+[x64 failed step](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/job/140567849334#step:31:1) ·
+[ARM64 failed step](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/job/140567849548#step:31:1) ·
+[Acquisition controls](../../tools/rust-qa/portal-noble/test_control.py).
+
 ## The visible tray entry
 
 The original Rust GUI registered `org.example.IfwGuiProbe/StatusNotifierItem`.

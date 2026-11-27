@@ -1,5 +1,6 @@
 """Regression checks for authenticated Ubuntu archive transfers, package selection and lock results."""
 import errno
+from email.utils import formatdate
 import hashlib
 from http.client import RemoteDisconnected
 from io import BytesIO
@@ -71,12 +72,48 @@ class ArchiveTransfers(unittest.TestCase):
         self.assertEqual(delay.call_count, 2)
         self.assertEqual(list(self.path.parent.iterdir()), [])
 
+    def test_snapshot_503_shares_the_disconnect_budget_and_honors_retry_after(self):
+        for header, seconds in ((None, 2), ("invalid", 2), ("1", 2), ("8", 8),
+                                (formatdate(1_800_000_009, usegmt=True), 9)):
+            with self.subTest(header=header):
+                body = BytesIO(b"temporary error page")
+                error = HTTPError(self.url, 503, "Service Unavailable", {"Retry-After": header} if header else {}, body)
+                with (
+                    patch("inputs.urllib.request.urlopen", side_effect=[RemoteDisconnected(), error, self.response(self.body)]) as opening,
+                    patch("inputs.time.time", return_value=1_800_000_000),
+                    patch("inputs.time.sleep") as delay,
+                ):
+                    self.assertEqual(self.acquire().read_bytes(), self.body)
+                    self.assertEqual(opening.call_args_list, [call(self.url, timeout=60)] * 3)
+                    self.assertEqual(delay.call_args_list, [call(1), call(seconds)])
+                self.assertTrue(body.closed)
+                self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+                self.path.unlink()
+
+    def test_persistent_503_closes_every_response_and_returns_last_status_without_creating_a_file(self):
+        bodies = [BytesIO(b"service unavailable") for _ in range(3)]
+        errors = [HTTPError(self.url, 503, "Service Unavailable", {}, body) for body in bodies]
+        with (
+            patch("inputs.urllib.request.urlopen", side_effect=errors) as opening,
+            patch("inputs.time.sleep") as delay,
+        ):
+            with self.assertRaises(HTTPError) as failed:
+                self.acquire()
+            self.assertIs(failed.exception, errors[-1])
+            self.assertIn("Ubuntu archive input: " + self.url, failed.exception.__notes__)
+            self.assertEqual(opening.call_count, 3)
+            self.assertEqual(delay.call_args_list, [call(1), call(2)])
+        self.assertTrue(all(body.closed for body in bodies))
+        self.assertEqual(list(self.path.parent.iterdir()), [])
+
     def test_rejected_responses_and_body_failures_are_terminal(self):
         disconnected_body = self.response(self.body)
         disconnected_body.read = Mock(side_effect=RemoteDisconnected("body disconnected"))
         cases = (
             (HTTPError(self.url, 404, "missing", {}, None), HTTPError, "404"),
             (HTTPError(self.url, 403, "forbidden", {}, None), HTTPError, "403"),
+            (HTTPError(self.url, 503, "busy", {"Retry-After": "3600"}, None), HTTPError, "503"),
+            (HTTPError("https://example.invalid/input", 503, "busy", {}, None), HTTPError, "503"),
             (self.response(self.body, "https://example.invalid/fixture.deb"), ValueError, "redirect"),
             (self.response(self.body, self.url.replace("https:", "http:")), ValueError, "redirect"),
             (self.response(body=self.body + b"!"), ValueError, "Oversize"),
