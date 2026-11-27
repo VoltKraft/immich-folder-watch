@@ -22,21 +22,20 @@ pub(crate) struct Transport {
     api: Url,
     endpoint: Url,
     client: Client,
-    #[cfg(target_os = "linux")]
     plaintext_proxy: Option<Url>,
     header: header::HeaderValue,
     pub namespace: String,
 }
 
-/// Select the proxy for one HTTP(S) origin with the Unix System.Net precedence.
+/// Select the proxy for one HTTP(S) origin with the platform-specific System.Net precedence.
 /// The endpoint is kept separate so the loopback harness can check its
 /// ownership even when the destination is on the bypass list.
-pub(crate) struct LinuxProxy {
+pub(crate) struct EnvironmentProxy {
     pub endpoint: Option<Url>,
     bypass: bool,
 }
 
-fn unix_proxy_endpoint(value: &str) -> Option<Url> {
+fn environment_proxy_endpoint(value: &str) -> Option<Url> {
     let (scheme, authority) = value.split_once("://").unwrap_or(("http", value));
     if !["http", "https", "socks4", "socks4a", "socks5"]
         .iter()
@@ -83,8 +82,9 @@ fn embedded_ipv4_host(host: &str) -> Option<String> {
     Some(format!("[{prefix}:{}]", Ipv4Addr::new(w, x, y, z)))
 }
 
-impl LinuxProxy {
-    pub fn from_environment(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
+impl EnvironmentProxy {
+    #[cfg(any(not(windows), test))]
+    pub fn unix(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
         let (lower, upper) = if api.scheme() == "http" {
             (
                 "http_proxy",
@@ -97,8 +97,39 @@ impl LinuxProxy {
             .into_iter()
             .flatten()
             .filter_map(&read)
-            .find_map(|value| unix_proxy_endpoint(&value));
+            .find_map(|value| environment_proxy_endpoint(&value));
         let excluded = read("no_proxy").or_else(|| read("NO_PROXY"));
+        Self::new(api, endpoint, excluded)
+    }
+
+    /// Windows looks up a single case-insensitive spelling of each variable.
+    /// None selects the system provider for the whole process. If a usable
+    /// opposite-scheme proxy exists, the missing scheme connects directly.
+    #[cfg(any(windows, test))]
+    pub fn windows(api: &Url, read: impl Fn(&str) -> Option<String>) -> Option<Self> {
+        let proxy = |name| read(name).as_deref().and_then(environment_proxy_endpoint);
+        let http = if read("GATEWAY_INTERFACE").is_none() {
+            proxy("HTTP_PROXY")
+        } else {
+            None
+        };
+        let https = proxy("HTTPS_PROXY");
+        let all = if http.is_none() || https.is_none() {
+            proxy("ALL_PROXY")
+        } else {
+            None
+        };
+        if http.is_none() && https.is_none() && all.is_none() {
+            return None;
+        }
+        let endpoint = match api.scheme() {
+            "http" | "ws" => http,
+            _ => https,
+        };
+        Some(Self::new(api, endpoint.or(all), read("NO_PROXY")))
+    }
+
+    fn new(api: &Url, endpoint: Option<Url>, excluded: Option<String>) -> Self {
         let host = api.host_str().unwrap_or_default();
         let embedded = embedded_ipv4_host(host);
         let host = embedded.as_deref().unwrap_or(host);
@@ -230,17 +261,11 @@ impl Transport {
         if let Some(roots) = roots {
             builder = builder.tls_certs_only(roots);
         }
-        #[cfg(target_os = "linux")]
         let mut plaintext_proxy = None;
         if let Some(proxy) = proxy {
             if api.scheme() == "http" {
-                #[cfg(target_os = "linux")]
-                {
-                    builder = builder.proxy(reqwest::Proxy::http(proxy.clone())?);
-                    plaintext_proxy = Some(proxy);
-                }
-                #[cfg(not(target_os = "linux"))]
-                return Err(Error::Protocol);
+                builder = builder.proxy(reqwest::Proxy::http(proxy.clone())?);
+                plaintext_proxy = Some(proxy);
             } else {
                 builder = builder.proxy(reqwest::Proxy::https(proxy)?);
             }
@@ -251,7 +276,6 @@ impl Transport {
             namespace,
             header,
             client: builder.build().map_err(|_| Error::Transport)?,
-            #[cfg(target_os = "linux")]
             plaintext_proxy,
         })
     }
@@ -333,7 +357,6 @@ impl Transport {
         request: RequestBuilder,
         accept: &str,
     ) -> Result<reqwest::Upgraded, Error> {
-        #[cfg(target_os = "linux")]
         if let Some(relay) = &self.plaintext_proxy {
             return crate::plaintext_proxy::websocket(relay, request.build()?, accept).await;
         }
@@ -462,13 +485,87 @@ mod tests {
 
     fn proxy_for_url(url: &str, environment: &[(&str, &str)]) -> Option<Url> {
         let api = Url::parse(url).unwrap();
-        LinuxProxy::from_environment(&api, |name| {
+        EnvironmentProxy::unix(&api, |name| {
             environment
                 .iter()
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| value.to_string())
         })
         .route()
+    }
+
+    #[test]
+    fn windows_env_provider_applies_to_both_schemes_before_system_fallback() {
+        let http = "http://127.0.0.1:8100";
+        let https = "http://127.0.0.1:8200";
+        let all = "http://127.0.0.1:8300";
+        for (vars, http_route, https_route, uses_environment) in [
+            (vec![], None, None, false),
+            (vec![("HTTP_PROXY", "http://[")], None, None, false),
+            (vec![("hTtP_PrOxY", http)], Some(http), None, true),
+            (vec![("https_proxy", https)], None, Some(https), true),
+            (
+                vec![("all_proxy", all), ("https_proxy", https)],
+                Some(all),
+                Some(https),
+                true,
+            ),
+            (
+                vec![("http_proxy", http), ("gateway_interface", "CGI/1.1")],
+                None,
+                None,
+                false,
+            ),
+            (
+                vec![
+                    ("Http_Proxy", http),
+                    ("Https_Proxy", https),
+                    ("All_Proxy", all),
+                    ("Gateway_Interface", ""),
+                ],
+                Some(all),
+                Some(https),
+                true,
+            ),
+            (
+                vec![("HTTPS_PROXY", "http://["), ("ALL_PROXY", all)],
+                Some(all),
+                Some(all),
+                true,
+            ),
+            (
+                vec![("ALL_PROXY", all), ("No_Proxy", ".example.test")],
+                None,
+                None,
+                true,
+            ),
+            (
+                vec![("ALL_PROXY", all), ("No_Proxy", "example.test:443")],
+                Some(all),
+                Some(all),
+                true,
+            ),
+        ] {
+            for (scheme, expected) in [
+                ("http", http_route),
+                ("ws", http_route),
+                ("https", https_route),
+                ("wss", https_route),
+            ] {
+                let api = Url::parse(&format!("{scheme}://example.test/api")).unwrap();
+                let selection = EnvironmentProxy::windows(&api, |name| {
+                    vars.iter()
+                        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                        .map(|(_, value)| value.to_string())
+                });
+                assert_eq!(selection.is_some(), uses_environment, "{scheme} {vars:?}");
+                assert_eq!(
+                    selection.and_then(EnvironmentProxy::route),
+                    expected.map(|s| Url::parse(s).unwrap()),
+                    "{scheme} {vars:?}"
+                );
+            }
+        }
     }
 
     #[test]

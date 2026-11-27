@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -106,6 +107,9 @@ def main():
         step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
         step("build", ["cargo", "build", "--frozen", "--release"])
         binary = target_dir / "release" / ("ifw-realtime-probe.exe" if os.name == "nt" else "ifw-realtime-probe")
+        if os.name == "nt":
+            # Replay the compiler's actual executable alongside the installed reference.
+            binary = Path(shutil.copy2(binary, output / binary.name))
         step("sessions", [sys.executable, HERE / "verify.py", "--probe", binary, "--output", output / "sessions.json"])
         record["passed"] = True
     finally:

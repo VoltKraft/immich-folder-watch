@@ -36,10 +36,12 @@ ESCAPED_PATHS = {
 PEER_CLOSE_PATHS = {"peer-close-root": "/api", "peer-close-namespace": "/collection/api"}
 PEER_CLOSE_REASON = b"synthetic maintenance"
 DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-no-max-payload"}
-LINUX_PROXY_CASES = ("linux-https-proxy", "linux-https-proxy-bypass", "linux-https-proxy-priority",
-                     "linux-https-proxy-untrusted-tls", "linux-https-proxy-wrong-host-tls")
-HTTP_PROXY_CASES = ("linux-http-proxy", "linux-http-proxy-bypass", "linux-http-proxy-connect-redirect",
-                    "linux-http-proxy-upgrade-redirect", "linux-http-proxy-reconnect")
+HTTPS_PROXY_CASES = ("https-proxy", "https-proxy-bypass", "https-proxy-priority",
+                     "https-proxy-untrusted-tls", "https-proxy-wrong-host-tls")
+HTTP_PROXY_CASES = ("http-proxy", "http-proxy-bypass", "http-proxy-connect-redirect",
+                    "http-proxy-upgrade-redirect", "http-proxy-reconnect")
+WINDOWS_HTTP_CASES = ("http-proxy-cgi", "http-proxy-opposite-scheme")
+WINDOWS_SYSTEM_CASES = ("windows-system-proxy-empty", "windows-system-proxy-invalid")
 
 
 PRE_ACK_REFUSALS = {"upgrade-redirect": "Status(302)", "upgrade-http-503": "Status(503)", "probe-refused": "Disconnected"}
@@ -542,13 +544,13 @@ def proxy_environment(home):
     return {**{key: value for key, value in os.environ.items() if key.upper() in keep}, "HOME": str(home)}
 
 
-def run_http_proxy_scenario(executable, name, directory, redirect):
+def run_http_proxy_scenario(executable, platform_name, name, directory, redirect):
     from https_proxy import plaintext_handler
 
-    bypass = name == "linux-http-proxy-bypass"
-    refuse_connect = name == "linux-http-proxy-connect-redirect"
-    refuse_upgrade = name == "linux-http-proxy-upgrade-redirect"
-    reconnect = name == "linux-http-proxy-reconnect"
+    bypass = name in {"http-proxy-bypass", "http-proxy-opposite-scheme"}
+    refuse_connect = name == "http-proxy-connect-redirect"
+    refuse_upgrade = name == "http-proxy-upgrade-redirect"
+    reconnect = name == "http-proxy-reconnect"
     # Reuse the one-event upgraded session, or its existing redirect/reconnect exchange.
     scenario = "upgrade-redirect" if refuse_upgrade else "reconnect" if reconnect else "tls"
     api = "/collection/api"
@@ -560,10 +562,17 @@ def run_http_proxy_scenario(executable, name, directory, redirect):
             proxied.redirect_port = redirect.server_port
             endpoint = f"http://127.0.0.1:{proxied.server_port}"
             env = {**proxy_environment(directory), "HTTP_PROXY": endpoint}
-            if bypass:
-                env["NO_PROXY"] = "127.0.0.1"
+            if name == "http-proxy-cgi":
+                # Win32 looks up any spelling of HTTP_PROXY; CGI suppresses
+                # this value, leaving the owned ALL_PROXY as the route.
+                env = {**proxy_environment(directory), "gAtEwAy_InTeRfAcE": "CGI/1.1",
+                       "hTtP_pRoXy": f"http://127.0.0.1:{redirect.server_port}", "aLl_PrOxY": endpoint}
+            elif name == "http-proxy-opposite-scheme":
+                env = {**proxy_environment(directory), "hTtPs_PrOxY": endpoint}
+            elif bypass:
+                env["nO_pRoXy" if platform_name == "windows" else "NO_PROXY"] = "127.0.0.1"
             start = time.monotonic()
-            proc = subprocess.run([str(executable), f"http://{authority}{api}", "allow-http-linux-proxy", "-",
+            proc = subprocess.run([str(executable), f"http://{authority}{api}", f"allow-http-{platform_name}-proxy", "-",
                                    str(budget), "130" if reconnect else "30000", "137", endpoint],
                                   env=env, cwd=directory, capture_output=True, text=True, timeout=8)
             elapsed = round((time.monotonic() - start) * 1000)
@@ -611,12 +620,12 @@ def run_http_proxy_scenario(executable, name, directory, redirect):
                     "namespacePostsAtPeer": list(origin.namespace_posts), "processElapsedMs": elapsed, "budgetMs": budget}
 
 
-def run_proxy_scenario(executable, name, directory, contexts, redirect):
+def run_proxy_scenario(executable, platform_name, name, directory, contexts, redirect):
     from https_proxy import FixedTunnel
 
-    bypass = name == "linux-https-proxy-bypass"
-    wrong_host = name == "linux-https-proxy-wrong-host-tls"
-    untrusted = name == "linux-https-proxy-untrusted-tls"
+    bypass = name == "https-proxy-bypass"
+    wrong_host = name == "https-proxy-wrong-host-tls"
+    untrusted = name == "https-proxy-untrusted-tls"
     rejected = wrong_host or untrusted
     api = "/collection/api"
     budget = 1300
@@ -633,11 +642,14 @@ def run_proxy_scenario(executable, name, directory, contexts, redirect):
             env = {**proxy_environment(directory), "HTTPS_PROXY": endpoint}
             if bypass:
                 env["NO_PROXY"] = "127.0.0.1"
-            if name == "linux-https-proxy-priority":
+            if name == "https-proxy-priority":
                 other = f"http://127.0.0.1:{redirect.server_port}"
-                env.update(https_proxy=endpoint, HTTPS_PROXY=other, all_proxy=other, ALL_PROXY=other)
+                if platform_name == "windows":
+                    env = {**proxy_environment(directory), "hTtPs_PrOxY": endpoint, "AlL_PrOxY": other}
+                else:
+                    env.update(https_proxy=endpoint, HTTPS_PROXY=other, all_proxy=other, ALL_PROXY=other)
             start = time.monotonic()
-            proc = subprocess.run([str(executable), f"https://{authority}{api}", "https-linux-proxy",
+            proc = subprocess.run([str(executable), f"https://{authority}{api}", f"https-{platform_name}-proxy",
                                    str(trust), str(budget), "30000", "137", endpoint],
                                   env=env, cwd=directory, capture_output=True, text=True, timeout=8)
             elapsed = round((time.monotonic() - start) * 1000)
@@ -685,10 +697,24 @@ def run_proxy_scenario(executable, name, directory, contexts, redirect):
 
 
 def run_scenario(executable, name, directory, contexts, redirect):
-    if name in HTTP_PROXY_CASES:
-        return run_http_proxy_scenario(executable, name, directory, redirect)
-    if name in LINUX_PROXY_CASES:
-        return run_proxy_scenario(executable, name, directory, contexts, redirect)
+    if name in WINDOWS_SYSTEM_CASES:
+        env = proxy_environment(directory)
+        if name.endswith("-invalid"):
+            env.update(HTTP_PROXY="ftp://127.0.0.1:8", HTTPS_PROXY="http://[", ALL_PROXY="http://[")
+        with peer("tls") as origin:
+            endpoint = f"http://127.0.0.1:{redirect.server_port}"
+            proc = subprocess.run([str(executable), f"https://127.0.0.1:{origin.server_port}/api",
+                                   "https-windows-proxy", "-", "300", "100", "100", endpoint],
+                                  env=env, cwd=directory, capture_output=True, text=True, timeout=8)
+            assert proc.returncode == 1 and proc.stderr.strip() == "SystemProxy" and not proc.stdout
+            assert not origin.accepted_connections and not redirect.accepted_connections
+            return {"selection": "SystemProxy", "originConnections": 0, "relayConnections": 0}
+    platform_name, _, proxy_case = name.partition("-")
+    if platform_name in ("windows", "linux"):
+        if proxy_case in (*HTTP_PROXY_CASES, *WINDOWS_HTTP_CASES):
+            return run_http_proxy_scenario(executable, platform_name, proxy_case, directory, redirect)
+        if proxy_case in HTTPS_PROXY_CASES:
+            return run_proxy_scenario(executable, platform_name, proxy_case, directory, contexts, redirect)
     platform_trust = name.startswith("linux-platform-")
     directory_trust = name == "linux-platform-directory-tls"
     fixture_name = name
@@ -913,7 +939,13 @@ def main():
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
     if platform.system() == "Linux":
         cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
-                  "linux-platform-wrong-host-tls", *LINUX_PROXY_CASES, *HTTP_PROXY_CASES)
+                  "linux-platform-wrong-host-tls")
+    platform_name = platform.system().lower()
+    if platform_name in ("windows", "linux"):
+        cases += tuple(f"{platform_name}-{case}" for case in (*HTTPS_PROXY_CASES, *HTTP_PROXY_CASES))
+    if platform_name == "windows":
+        cases += tuple(f"windows-{case}" for case in WINDOWS_HTTP_CASES)
+        cases += WINDOWS_SYSTEM_CASES
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

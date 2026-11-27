@@ -12,19 +12,16 @@ publish = false
 [dependencies]
 ifw-immich = { path = "../../../rust/crates/ifw-immich" }
 futures-util = { version = "=0.3.34", default-features = false, features = ["sink", "std"] }
+hyper = { version = "=1.12.0", default-features = false, features = ["client", "http1"] }
+hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
 reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "=1.0.229", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "=1.0.154", default-features = false, features = ["std"] }
-tokio = { version = "=1.54.1", default-features = false, features = ["rt", "macros", "time", "sync"] }
+tokio = { version = "=1.54.1", default-features = false, features = ["rt", "macros", "time", "sync", "net"] }
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-hyper = { version = "=1.12.0", default-features = false, features = ["client", "http1"] }
-hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
-tokio = { version = "=1.54.1", default-features = false, features = ["net"] }
-
-[target.'cfg(target_os = "linux")'.dev-dependencies]
+[dev-dependencies]
 tokio = { version = "=1.54.1", default-features = false, features = ["io-util"] }
 
 [lints.rust]

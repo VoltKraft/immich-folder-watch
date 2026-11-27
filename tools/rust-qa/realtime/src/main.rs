@@ -1,7 +1,6 @@
 //! Loopback-only RW-02 harness for the actual Rust network adapter.
 #![forbid(unsafe_code)]
 
-#[cfg(target_os = "linux")]
 mod plaintext_proxy;
 mod protocol;
 mod session;
@@ -27,6 +26,8 @@ enum Error {
     Protocol,
     Limit,
     Timeout,
+    #[cfg(windows)]
+    SystemProxy,
     Disconnected,
     PeerClosed,
 }
@@ -170,16 +171,16 @@ fn fixture_proxy(
     expected: &str,
     read: impl Fn(&str) -> Option<String>,
 ) -> Result<Option<Url>, Error> {
-    if !cfg!(target_os = "linux") {
-        return Err(Error::Protocol);
-    }
     let address = expected
         .strip_prefix("http://")
         .and_then(|s| s.parse::<SocketAddr>().ok())
         .filter(|addr| addr.ip().is_loopback() && addr.port() != 0)
         .ok_or(Error::Protocol)?;
     let owned = Url::parse(&format!("http://{address}")).map_err(|_| Error::Protocol)?;
-    let proxy = transport::LinuxProxy::from_environment(api, read);
+    #[cfg(windows)]
+    let proxy = transport::EnvironmentProxy::windows(api, read).ok_or(Error::SystemProxy)?;
+    #[cfg(not(windows))]
+    let proxy = transport::EnvironmentProxy::unix(api, read);
     if proxy
         .endpoint
         .as_ref()
@@ -202,17 +203,24 @@ async fn probe(args: &[String]) -> Result<(), Error> {
     {
         return Err(Error::Origin);
     }
+    let platform = std::env::consts::OS;
     let (allow_http, proxy) = match (mode.as_str(), extra) {
         ("https", []) => (false, None),
         ("allow-http", []) => (true, None),
-        ("https-linux-proxy", [owned]) if url.scheme() == "https" => (
-            false,
-            fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
-        ),
-        ("allow-http-linux-proxy", [owned]) if url.scheme() == "http" => (
-            true,
-            fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
-        ),
+        (mode, [owned]) if mode == format!("https-{platform}-proxy") && url.scheme() == "https" => {
+            (
+                false,
+                fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
+            )
+        }
+        (mode, [owned])
+            if mode == format!("allow-http-{platform}-proxy") && url.scheme() == "http" =>
+        {
+            (
+                true,
+                fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
+            )
+        }
         _ => return Err(Error::Protocol),
     };
     let transport = Transport::new(url, allow_http, "synthetic", fixture_roots(root)?, proxy)?;
@@ -250,7 +258,7 @@ async fn main() -> ExitCode {
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

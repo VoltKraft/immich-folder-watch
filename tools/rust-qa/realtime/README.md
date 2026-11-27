@@ -22,8 +22,10 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and 35 shared wire scenarios. Linux also runs four platform trust
-cases and five cases each for HTTPS and explicitly enabled HTTP proxy routing. Two strict polling peers accept only the
+build and 35 shared wire scenarios. Each platform also runs five HTTPS
+and five explicitly enabled HTTP proxy cases. Windows adds two HTTP routing
+cases and two system-provider selection controls. Linux adds four platform
+trust cases. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
@@ -68,7 +70,7 @@ An unrelated issuer and a wrong endpoint
 name must stop at the TLS handshake. The private bundle and directory
 are removed with the rest of the fixture.
 
-The Linux HTTPS proxy cases run the ordinary REST, polling and WebSocket
+The HTTPS proxy cases run the ordinary REST, polling and WebSocket
 requests against a fixed loopback origin. A second listener accepts CONNECT
 only for that authority and serves the test TLS endpoint on the accepted
 socket. It rejects credential headers on CONNECT and records whether the
@@ -80,7 +82,7 @@ exception, precedence of `https_proxy`, and rejection of a foreign CA and
 an incorrect endpoint identity.
 [Shipping client and Rust observations](../../../docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime).
 
-When plaintext HTTP is explicitly enabled, the Linux fixture sends REST and
+When plaintext HTTP is explicitly enabled, the fixture sends REST and
 polling requests to the selected HTTP proxy in absolute form. To open a
 WebSocket it first sends CONNECT for the configured origin, then sends the
 authenticated upgrade in origin form through that tunnel. The adapter resolves the
@@ -91,9 +93,23 @@ redirects at either handshake, and a second WebSocket connection after a
 dropped session. On the reconnect the peer sends the first WebSocket frame
 with the upgrade response and observes its pong.
 
+On Windows the probe reads the process environment through Win32's
+case-insensitive names. A protocol-specific variable takes precedence over
+`ALL_PROXY`. In a CGI environment the HTTP group uses `ALL_PROXY` when
+available. `NO_PROXY` applies to both groups. A usable proxy for just one
+group selects the environment provider for both, giving the other group a
+direct route. The native HTTP cases exercise that direct route and the CGI
+fallback. The native HTTPS priority case supplies mixed-case names and a
+competing listener. If every proxy value is absent or unusable, .NET selects
+the Windows system provider. The environment-only fixture reports this
+boundary and avoids consulting the desktop's proxy or PAC settings.
+[.NET 10 Windows environment selection](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Http/src/System/Net/Http/SocketsHttpHandler/HttpEnvironmentProxy.Windows.cs)
+and [system provider selection](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Http/src/System/Net/Http/SocketsHttpHandler/SystemProxyInfo.Windows.cs).
+
 `result.json` records each step, source and artifact hashes. `graph.json` contains
 the full selected feature graph, original inputs and notices. `sessions.json`
 records per-scenario HTTP and Socket.IO observations and elapsed process lifetimes.
+The Windows result directory includes the exact executable run against the peers.
 The runner fails on a changed reviewed graph or unexpected source files. The
 compact, sorted-key JSON encoding of each target inventory is pinned in
 `inputs.json`. A dependency change requires a fresh source and license review.
