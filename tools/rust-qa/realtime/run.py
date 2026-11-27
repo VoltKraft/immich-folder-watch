@@ -108,7 +108,6 @@ def main():
             ["cargo", "metadata", "--frozen", "--format-version", "1", "--manifest-path", manifest], cwd=HERE, env=env))
         graph = json.loads((output / "graph.json").read_text(encoding="utf-8"))
         record["inputs"] = verify_graph(graph, inputs, metadata, cargo_home)
-        step("format", ["cargo", "fmt", "--all", "--check"])
         if args.build_only:
             step("unit-build", ["cargo", "test", "--frozen", "--no-run", "--message-format=json"])
             messages = (output / "unit-build.txt").read_text(encoding="utf-8").splitlines()
@@ -120,8 +119,9 @@ def main():
                 raise ValueError("Expected one compiled realtime unit test executable")
             shutil.copy2(units[0], output / "ifw-realtime-unit.exe")
         else:
+            step("format", ["cargo", "fmt", "--all", "--check"])
             step("unit", ["cargo", "test", "--frozen"])
-        step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
+            step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
         step("build", ["cargo", "build", "--frozen", "--release"])
         binary = target_dir / "release" / ("ifw-realtime-probe.exe" if os.name == "nt" else "ifw-realtime-probe")
         if os.name == "nt":

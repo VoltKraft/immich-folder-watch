@@ -108,7 +108,8 @@ def main():
                                      compiled["outputs"]["ifw-realtime-probe.exe"])
             result["probeSha256"] = digest(subject)
             if compiled.get("mode") == "build-only":
-                if compiled["steps"].get("unit-build") != 0 or "sessions" in compiled["steps"] or "unit" in compiled["steps"]:
+                if (compiled["steps"].get("unit-build") != 0
+                        or {"format", "clippy", "sessions", "unit"}.intersection(compiled["steps"])):
                     raise ValueError("Expected compiler-only output before executing guest tests")
                 unit = unpack_subject(archive, "ifw-realtime-unit.exe", native, compiled["outputs"]["ifw-realtime-unit.exe"])
                 result["unitSha256"] = digest(unit)
