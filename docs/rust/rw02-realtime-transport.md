@@ -552,6 +552,35 @@ All four audited target graphs kept their existing package and feature
 sets. Windows proxy selection, authenticated relays and full application
 integration remain open.
 
+### Windows environment proxy selection with the shipping client
+
+On November 27 the 3.0.4 MSI assemblies ran against loopback peers on an
+offline Windows Server 2025 x64 guest. Nine fresh .NET processes each
+selected routes for HTTP, WS, HTTPS and WSS. Windows treated environment
+variable names case-insensitively. A usable proxy for either protocol group
+selected the environment provider for both groups. The other group connected
+directly if it had no applicable proxy. With all proxy values absent or
+invalid, .NET selected its Windows system provider.
+
+Six separate wire trials exercised HTTP and HTTPS directly, through a fixed
+proxy and with a matching `NO_PROXY` entry. Every trial recorded the album
+request, polling, the WebSocket upgrade, one event and a normal close (1000).
+For HTTP, the proxy received GET, GET, POST and a CONNECT without the Immich
+header. For HTTPS it received four CONNECTs with no Immich header. Each
+bypass trial recorded zero proxy requests. The guest had no network adapters,
+and the observer confirmed removal of the temporary test CA. The original
+`System.Net.Http.dll` from the MSI and the .NET 10.0.12 runtime used for
+the selection comparison were byte-identical.
+
+The indexed local report under
+`artifacts/rust/local-windows-server-2025-x64/20261127/environment-proxy-3.0.4/`
+has SHA-256 `5eb69d4588a80ceff743f3bb074c3c4de649cf5ab787c02b8041413d1beab1d3`.
+It binds 23 files including the six peer records. At `3104009` the Rust
+transport implements Windows environment selection and exposes the separate
+system-provider outcome. Native Rust wire results and operating-system
+proxy resolution have their own checks.
+[Native transport procedure](../../tools/rust-qa/realtime/README.md).
+
 ## Dependency and native input review
 
 The assessment has an independent lockfile, SHA-256

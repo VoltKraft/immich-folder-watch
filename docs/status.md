@@ -28,6 +28,12 @@ reference read the account SID. Old/new cross-session exclusion during
 candidate migration and the ARM64 standard-user trial remain open.
 [Cross-session guard](rust/rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64).
 
+The Windows x64 shipping assemblies passed six proxy wire trials using
+HTTP and HTTPS on the offline guest. The Rust environment adapter at
+`3104009` passed 49 Fedora wire scenarios and 14 unit tests. Windows
+environment routing and system proxy resolution have separate native
+checks. [Network observations](rust/rw02-realtime-transport.md#windows-environment-proxy-selection-with-the-shipping-client).
+
 On Server 2022 x64 an ordinary second launch at `db1f126` reopened the
 previously closed window 16 ms after the secondary process resumed, with
 keyboard focus and the original inventory worker. This complements the

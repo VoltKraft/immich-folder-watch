@@ -349,6 +349,11 @@ adapters and observed window transitions. The transport's `sessions.json`
 includes the [packets received by the peer on shutdown](rust/rw02-realtime-transport.md#stopping-an-established-session).
 Each target uploads the native transport report, checksums and logs in
 `rust-realtime-<target>-<commit>` before it starts the desktop trials.
+Changes to the transport also run the [standalone native transport
+workflow](../.github/workflows/rust-realtime.yaml) on all four targets.
+It uses the same compiler, dependency checks and loopback suite. Its
+Windows archive includes the tested executable for use on the isolated
+VM with the original MSI assemblies.
 Windows uses the fixture's inherited
 control pipe and checks real Win32 show events and `WM_CLOSE` for the child
 PID. The Linux observer runs on a private X11 or Wayland desktop. See the
