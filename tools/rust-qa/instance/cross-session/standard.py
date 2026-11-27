@@ -12,7 +12,7 @@ import queue
 import subprocess
 import threading
 
-from fixture import bind, checked, guard_id, instance, verified_process
+from fixture import HOSTED, LOCAL_WRITER, bind, checked, guard_id, instance, verified_process
 
 
 # Local administrative/operator aliases and the local-account administrator membership marker.
@@ -218,14 +218,18 @@ class FixedWriter(instance.Child):
             close(snap)
 
 
+def writer_environment(env):
+    """Forward the selected fixture identity and the synthetic profile to the Rust child."""
+    keys = {"SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP",
+            *HOSTED, *LOCAL_WRITER}
+    return {key: value for key, value in env.items() if key.upper() in keys}
+
+
 @contextmanager
 def fixed_writer(area, accounts, sid, parent, env, config):
     exe, profile = area / "build/instance.exe", area / "profile"
     if guard_id(profile) != config["guard"]:
         raise RuntimeError("The pre-created guard changed")
-    keys = ("SYSTEMROOT", "WINDIR", "RUNNER_ENVIRONMENT", "GITHUB_ACTIONS", "GITHUB_REPOSITORY",
-            "GITHUB_REF", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP")
-    selected = {key: value for key, value in env.items() if key.upper() in keys}
     import msvcrt
     kernel = c.WinDLL("kernel32", use_last_error=True)
     create = bind(kernel, "CreateFileW", w.HANDLE, w.LPCWSTR, w.DWORD, w.DWORD, c.c_void_p, w.DWORD, w.DWORD, w.HANDLE)
@@ -242,7 +246,7 @@ def fixed_writer(area, accounts, sid, parent, env, config):
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
                 or hashlib.file_digest(pinned, "sha256").hexdigest() != config["binarySha256"]):
             raise RuntimeError("The pinned Rust executable is not the reviewed fixture image")
-        with FixedWriter(area, sid, selected) as child:
+        with FixedWriter(area, sid, writer_environment(env)) as child:
             receipt = verified_process(accounts, child.proc.pid, sid, exe, parent["sessionId"])
             if not required_authority(config["mode"], receipt, parent):
                 raise RuntimeError("The suspended Rust writer does not have the required authority for this trial")

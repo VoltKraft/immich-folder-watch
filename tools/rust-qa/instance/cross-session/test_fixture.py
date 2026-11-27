@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from batch import eligible
 from fixture import HOSTED, LOCAL_WRITER, INSTANCE, MARKER, ROOT, guard_id, instance, read, subject_env, wait, write
-from standard import AMBIENT, STANDARD, qualifies, required_authority, restriction_flag
+from standard import AMBIENT, STANDARD, qualifies, required_authority, restriction_flag, writer_environment
 import observe
 import worker
 
@@ -82,9 +82,11 @@ class FixtureTests(unittest.TestCase):
             subject_env(Path.cwd(), {**HOSTED, "GITHUB_REF": "refs/heads/main"})
 
     def test_local_writer_and_hosted_job_have_distinct_environments(self):
-        with patch.dict(os.environ, {**HOSTED, **LOCAL_WRITER}):
-            local = subject_env(Path.cwd(), LOCAL_WRITER)
-            hosted = subject_env(Path.cwd(), HOSTED)
+        with patch.dict(os.environ, {**HOSTED, **LOCAL_WRITER, "IFW_UNRELATED": "1"}):
+            local = writer_environment(subject_env(Path.cwd(), LOCAL_WRITER))
+            hosted = writer_environment(subject_env(Path.cwd(), HOSTED))
+        self.assertNotIn("IFW_UNRELATED", local)
+        self.assertNotIn("IFW_UNRELATED", hosted)
         self.assertEqual(local["IFW_QA_EXISTING_SESSION"], "1")
         self.assertTrue(HOSTED.keys().isdisjoint(local))
         self.assertNotIn("IFW_QA_EXISTING_SESSION", hosted)

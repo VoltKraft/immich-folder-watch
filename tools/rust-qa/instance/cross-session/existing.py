@@ -112,7 +112,8 @@ def main():
             (area / "abort").touch()
         if local:
             finish_process(local)
-        for name in ("worker-done.json", "original-bootstrap-done.json", "scheduled-attempt.json", "original-attempt.json"):
+        for name in ("worker-done.json", "original-bootstrap-done.json", "scheduled-attempt.json", "original-attempt.json",
+                     "original-done.json", "scheduled-done.json"):
             if (area / name).is_file():
                 shutil.copyfile(area / name, output / name)
         try:
