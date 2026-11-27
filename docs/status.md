@@ -21,6 +21,13 @@ native display session. The next packaging check is to verify the runtime
 prerequisite during a clean candidate installation.
 [Server 2025 reports and runtime](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial).
 
+The Windows x64 file guard passed in two active sessions of the same local
+standard user on Server 2025. Five Rust processes demonstrated refusal in
+both directions, release and reacquisition of the same file. The managed
+reference read the account SID. Old/new cross-session exclusion during
+candidate migration and the ARM64 standard-user trial remain open.
+[Cross-session guard](rust/rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64).
+
 On Server 2022 x64 an ordinary second launch at `db1f126` reopened the
 previously closed window 16 ms after the secondary process resumed, with
 keyboard focus and the original inventory worker. This complements the

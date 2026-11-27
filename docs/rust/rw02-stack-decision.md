@@ -101,8 +101,10 @@ after a real upload on native Ubuntu and Windows, x64 and ARM64. The
 Windows ARM64 result used a private input desktop in the original logon
 session. The separate Default-desktop trial stopped before Quit. Installed
 WPF secondary launches also reactivated the Rust inventory worker on both
-architectures. The same-user, standard-user cross-session check and RW-07
-candidate migration remain open.
+architectures. On Server 2025 x64 the Rust file guard passed in two
+interactive sessions of the same standard user. The matching ARM64 trial
+and RW-07 candidate migration remain open.
+[Cross-session writer](rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64).
 [Ubuntu recovery](rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
 [Windows recovery](rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6) ·
 [Installed Windows activation](rw02-instance.md#installed-windows-activation-at-d7c084c).
