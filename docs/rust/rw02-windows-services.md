@@ -417,6 +417,13 @@ archives. Windows notification presentation remains open.
 
 ## Windows notification history
 
+The [Server 2022 x64 comparison](../../.github/workflows/rust-windows-notification-2022.yaml)
+uses the same Rust sender, classic Shell observer and WinRT history reader
+on a disposable desktop. A separate check replays the normal sender's
+timed call and the Shell's visible title and body. A history entry alone
+leaves presentation open. The archive retains the original executable,
+host build and both readers' evidence.
+
 At `1b95ba0`, Explorer on Windows x64 accepted the ordinary Shell
 notification and reported a show callback. Across 86 samples the
 independent screen observer could not identify its exact title and body.

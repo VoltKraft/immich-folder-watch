@@ -1,0 +1,121 @@
+name: Rust Windows Server 2022 notifications
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-notification-2022.yaml'
+      - '.gitattributes'
+      - 'rust/Cargo.toml'
+      - 'rust/Cargo.lock'
+      - 'rust/crates/*/Cargo.toml'
+      - 'rust/toolchain-inputs.json'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/check-toolchain.py'
+      - 'tools/rust-qa/audit-graph.py'
+      - 'tools/rust-qa/storage/evidence.py'
+      - 'tools/rust-qa/gui/src/tray-icon.argb'
+      - 'tools/rust-qa/gui/src/windows_tray_shell.rs'
+      - 'tools/rust-qa/windows-desktop/job.py'
+      - 'tools/rust-qa/windows-desktop/win32.py'
+      - 'tools/rust-qa/windows-imports/formats.py'
+      - 'tools/rust-qa/windows-launcher/named_process.py'
+      - 'tools/rust-qa/windows-performance/build.py'
+      - 'tools/rust-qa/windows-performance/native.py'
+      - 'tools/rust-qa/windows_observer.py'
+      - 'tools/rust-qa/windows-services/*.py'
+      - 'tools/rust-qa/windows-services/*.ps1'
+      - 'tools/rust-qa/windows-services/inputs.json'
+      - 'tools/rust-qa/windows-services/Cargo.*'
+      - 'tools/rust-qa/windows-services/src/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notifications:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2022
+    timeout-minutes: 35
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Record the original Windows image and Explorer
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          $explorer = Get-Item -LiteralPath (Join-Path $env:SystemRoot 'explorer.exe')
+          $out = New-Item -ItemType Directory -Path artifacts/rust/server-2022-notifications -Force
+          [ordered]@{
+            revision = $env:GITHUB_SHA
+            run = $env:GITHUB_RUN_ID
+            attempt = $env:GITHUB_RUN_ATTEMPT
+            target = $env:NATIVE_TARGET
+            image = $env:ImageOS
+            imageVersion = $env:ImageVersion
+            os = $os.Caption
+            osVersion = $os.Version
+            explorerVersion = $explorer.VersionInfo.FileVersion
+          } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $out.FullName 'host.json')
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Build the native sender and observe the original Shell
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
+            --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
+
+      - name: Match the classic notification on the original desktop
+        if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/native-*/result.json') != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/notification.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Observe normal and quiet WinRT sends, history and selective removal
+        if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/native-*/result.json') != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_history.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Verify visible presentation of the ordinary WinRT notification
+        if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/toast-history-*/result.json') != '' }}
+        shell: pwsh
+        run: |
+          $dir = "artifacts/rust/windows-services/toast-history-$env:NATIVE_TARGET"
+          $result = Get-Content -Raw "$dir/result.json" | ConvertFrom-Json
+          if ($result.status -eq 'unavailable') {
+            Write-Output "WinRT observation unavailable. $($result.reason)"
+            exit 2
+          }
+          python -B tools/rust-qa/windows-services/toast_history.py $env:NATIVE_TARGET --replay $dir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($result.presentationObserved -ne $true) {
+            Write-Output 'History verified. The independent observer could not match the ordinary title and body on screen.'
+            exit 2
+          }
+          Write-Output 'Verified the ordinary WinRT sender and its visible Shell popup.'
+
+      - name: Retain the native sender, build and original desktop observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-server-2022-notifications-${{ github.sha }}
+          path: |
+            artifacts/rust/server-2022-notifications/host.json
+            artifacts/rust/windows-services/build/x86_64-pc-windows-msvc/release/ifw-windows-services-probe.exe
+            artifacts/rust/windows-services/native-x86_64-pc-windows-msvc/
+            artifacts/rust/windows-services/notification-x86_64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-history-x86_64-pc-windows-msvc/
+          if-no-files-found: error
+          retention-days: 14
