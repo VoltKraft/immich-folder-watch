@@ -544,7 +544,7 @@ def proxy_environment(home):
     return {**{key: value for key, value in os.environ.items() if key.upper() in keep}, "HOME": str(home)}
 
 
-def run_http_proxy_scenario(executable, platform_name, name, directory, redirect):
+def run_http_proxy_scenario(executable, platform_name, name, directory, redirect, configure_system=None):
     from https_proxy import plaintext_handler
 
     bypass = name in {"http-proxy-bypass", "http-proxy-opposite-scheme"}
@@ -571,8 +571,12 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
                 env = {**proxy_environment(directory), "hTtPs_PrOxY": endpoint}
             elif bypass:
                 env["nO_pRoXy" if platform_name == "windows" else "NO_PROXY"] = "127.0.0.1"
+            provider = platform_name
+            if configure_system is not None:
+                env = {**proxy_environment(directory), **configure_system(endpoint)}
+                provider = "windows-system"
             start = time.monotonic()
-            proc = subprocess.run([str(executable), f"http://{authority}{api}", f"allow-http-{platform_name}-proxy", "-",
+            proc = subprocess.run([str(executable), f"http://{authority}{api}", f"allow-http-{provider}-proxy", "-",
                                    str(budget), "130" if reconnect else "30000", "137", endpoint],
                                   env=env, cwd=directory, capture_output=True, text=True, timeout=8)
             elapsed = round((time.monotonic() - start) * 1000)
@@ -620,7 +624,7 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
                     "namespacePostsAtPeer": list(origin.namespace_posts), "processElapsedMs": elapsed, "budgetMs": budget}
 
 
-def run_proxy_scenario(executable, platform_name, name, directory, contexts, redirect):
+def run_proxy_scenario(executable, platform_name, name, directory, contexts, redirect, configure_system=None):
     from https_proxy import FixedTunnel
 
     bypass = name == "https-proxy-bypass"
@@ -648,8 +652,12 @@ def run_proxy_scenario(executable, platform_name, name, directory, contexts, red
                     env = {**proxy_environment(directory), "hTtPs_PrOxY": endpoint, "AlL_PrOxY": other}
                 else:
                     env.update(https_proxy=endpoint, HTTPS_PROXY=other, all_proxy=other, ALL_PROXY=other)
+            provider = platform_name
+            if configure_system is not None:
+                env = {**proxy_environment(directory), **configure_system(endpoint)}
+                provider = "windows-system"
             start = time.monotonic()
-            proc = subprocess.run([str(executable), f"https://{authority}{api}", f"https-{platform_name}-proxy",
+            proc = subprocess.run([str(executable), f"https://{authority}{api}", f"https-{provider}-proxy",
                                    str(trust), str(budget), "30000", "137", endpoint],
                                   env=env, cwd=directory, capture_output=True, text=True, timeout=8)
             elapsed = round((time.monotonic() - start) * 1000)

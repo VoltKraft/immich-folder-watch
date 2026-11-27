@@ -123,7 +123,7 @@ and the hashes of the source inputs. Preserve this directory as the build artifa
 
 On the local Windows x64 guest, use a native x64 Python 3.11 or later,
 OpenSSL on PATH, the complete Actions artifact ZIP and a source export from
-the recorded commit. Supply the full commit and the independently retrieved
+the recorded commit on the guest's NTFS volume. Supply the full commit and the independently retrieved
 Actions artifact digest. Run the guest command from the checkout.
 
 ```powershell
@@ -135,6 +135,30 @@ unit executable and the loopback suite. Its separate receipt records the
 OS, Python, compiler artifact, unit output and wire observations. An older
 full-run archive that retained only the release probe permits a guest wire
 replay. The receipt identifies that archive's missing unit executable.
+
+Add `--system-proxy` on the provisioned local hypervisor guest `IFW-QA25` to test the current user's
+Windows connection settings. This fixture saves the active WinINet options,
+sets the proxy flags through WinINet, and verifies their restoration. It runs
+HTTP and HTTPS sessions directly, through a named proxy, with literal,
+wildcard and `<local>` bypasses, with protocol-specific endpoints, and with
+a competing environment proxy. The PAC and WPAD controls expect an explicit
+`AutomaticProxy` result and zero requests. An unhandled manual proxy chain
+returns `SystemProxy`. The reference covers a single named relay, lowercase
+`http=` and `https=`, exact and wildcard host entries and `<local>`. Other protocol
+groups, mixed-case scheme labels and multi-server failover are unqualified. The probe reads the active connection when creating
+the transport. Live refresh and failover between multiple proxies remain open.
+
+The binary forbids unsafe Rust. Its separate Windows-only library wraps
+`WinHttpGetIEProxyConfigForCurrentUser` and the IP Helper unicast table for
+`<local>`. The caller owns each returned UTF-16 string and releases it
+with `GlobalFree`. IP Helper allocates its table for release with `FreeMibTable`.
+The bindings use the previously reviewed `windows-sys` 0.61.2 archive and its
+MIT license branch. The Windows target graph adds the WinHTTP, IpHelper and
+Ndis modules and their NetworkManagement parent. The system libraries are
+`winhttp.dll`, `kernel32.dll` and `iphlpapi.dll`. The four resolved inventories,
+archive checksums and original notice hashes are in `inputs.json`.
+[Microsoft's WinHTTP allocation contract](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpgetieproxyconfigforcurrentuser)
+and [unicast table contract](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/nf-netioapi-getunicastipaddresstable).
 
 ## Windows x64 crypto object reconstruction
 

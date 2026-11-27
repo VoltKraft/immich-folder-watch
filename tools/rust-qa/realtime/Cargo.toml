@@ -9,6 +9,12 @@ rust-version = "1.100"
 license = "AGPL-3.0-only"
 publish = false
 
+[lib]
+name = "ifw_windows_proxy_settings"
+path = "src/windows_settings.rs"
+test = false
+doctest = false
+
 [dependencies]
 ifw-immich = { path = "../../../rust/crates/ifw-immich" }
 futures-util = { version = "=0.3.34", default-features = false, features = ["sink", "std"] }
@@ -21,8 +27,16 @@ serde_json = { version = "=1.0.154", default-features = false, features = ["std"
 tokio = { version = "=1.54.1", default-features = false, features = ["rt", "macros", "time", "sync", "net"] }
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", default-features = false, features = [
+    "Win32_Networking_WinHttp",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+] }
+
 [dev-dependencies]
 tokio = { version = "=1.54.1", default-features = false, features = ["io-util"] }
 
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"

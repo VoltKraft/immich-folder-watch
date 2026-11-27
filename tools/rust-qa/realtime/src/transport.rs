@@ -30,9 +30,9 @@ pub(crate) struct Transport {
 /// Select the proxy for one HTTP(S) origin with the platform-specific System.Net precedence.
 /// The endpoint is kept separate so the loopback harness can check its
 /// ownership even when the destination is on the bypass list.
-pub(crate) struct EnvironmentProxy {
+pub(crate) struct SelectedProxy {
     pub endpoint: Option<Url>,
-    bypass: bool,
+    pub(crate) bypass: bool,
 }
 
 fn environment_proxy_endpoint(value: &str) -> Option<Url> {
@@ -82,7 +82,7 @@ fn embedded_ipv4_host(host: &str) -> Option<String> {
     Some(format!("[{prefix}:{}]", Ipv4Addr::new(w, x, y, z)))
 }
 
-impl EnvironmentProxy {
+impl SelectedProxy {
     #[cfg(any(not(windows), test))]
     pub fn unix(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
         let (lower, upper) = if api.scheme() == "http" {
@@ -485,7 +485,7 @@ mod tests {
 
     fn proxy_for_url(url: &str, environment: &[(&str, &str)]) -> Option<Url> {
         let api = Url::parse(url).unwrap();
-        EnvironmentProxy::unix(&api, |name| {
+        SelectedProxy::unix(&api, |name| {
             environment
                 .iter()
                 .find(|(key, _)| *key == name)
@@ -553,14 +553,14 @@ mod tests {
                 ("wss", https_route),
             ] {
                 let api = Url::parse(&format!("{scheme}://example.test/api")).unwrap();
-                let selection = EnvironmentProxy::windows(&api, |name| {
+                let selection = SelectedProxy::windows(&api, |name| {
                     vars.iter()
                         .find(|(key, _)| key.eq_ignore_ascii_case(name))
                         .map(|(_, value)| value.to_string())
                 });
                 assert_eq!(selection.is_some(), uses_environment, "{scheme} {vars:?}");
                 assert_eq!(
-                    selection.and_then(EnvironmentProxy::route),
+                    selection.and_then(SelectedProxy::route),
                     expected.map(|s| Url::parse(s).unwrap()),
                     "{scheme} {vars:?}"
                 );

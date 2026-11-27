@@ -3,6 +3,7 @@
 import argparse
 import ctypes
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -63,6 +64,8 @@ def main():
     parser.add_argument("--head", required=True, help="full Git commit recorded by the native compiler")
     parser.add_argument("--source-root", required=True, type=Path, help="source checkout or export at that commit")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--system-proxy", action="store_true",
+                        help="exercise and restore the current user's connection settings on this disposable guest")
     args = parser.parse_args()
     if not __debug__:
         raise ValueError("Python assertions must be enabled")
@@ -125,6 +128,30 @@ def main():
             if sessions["probeSha256"] != result["probeSha256"] or sessions.get("failure") or not sessions["cases"]:
                 raise ValueError("Incomplete wire result or unexpected executable")
             result["wireCases"] = len(sessions["cases"])
+            if args.system_proxy:
+                fixture = "tools/rust-qa/realtime/windows_system_fixture.py"
+                if fixture not in compiled["sourceFiles"]:
+                    raise ValueError("The compiler receipt does not include the Windows system proxy fixture")
+                # Keep a second copy of the settings in the supervisor. A
+                # timed-out worker may have been terminated before its finally.
+                spec = importlib.util.spec_from_file_location("ifw_proxy_fixture", source / fixture)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                connection = module.Connection()
+                saved = connection.settings()
+                try:
+                    step("system-proxy", [sys.executable, source / fixture, "--probe", subject,
+                                          "--output", output / "system-proxy.json"], 240)
+                finally:
+                    if [v or None for v in connection.settings()] != [v or None for v in saved]:
+                        connection.settings(saved)
+                    result["supervisorSettingsRestored"] = [v or None for v in connection.settings()] == [v or None for v in saved]
+                    if not result["supervisorSettingsRestored"]:
+                        raise RuntimeError("The local supervisor could not restore the Windows proxy settings")
+                system = json.loads((output / "system-proxy.json").read_text(encoding="utf-8"))
+                if system["probeSha256"] != result["probeSha256"] or not system["settingsRestored"]:
+                    raise ValueError("System proxy fixture could not verify the tested binary or restored settings")
+                result["systemProxyCases"] = len(system["cases"])
             result["passed"] = True
     finally:
         result.setdefault("passed", False)

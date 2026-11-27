@@ -5,6 +5,8 @@ mod plaintext_proxy;
 mod protocol;
 mod session;
 mod transport;
+#[cfg(any(windows, test))]
+mod windows_proxy;
 
 use reqwest::{Certificate, Url};
 use std::{
@@ -26,8 +28,10 @@ enum Error {
     Protocol,
     Limit,
     Timeout,
-    #[cfg(windows)]
+    #[cfg(any(windows, test))]
     SystemProxy,
+    #[cfg(windows)]
+    AutomaticProxy,
     Disconnected,
     PeerClosed,
 }
@@ -169,6 +173,7 @@ fn fixture_roots(source: &str) -> Result<Option<Vec<Certificate>>, Error> {
 fn fixture_proxy(
     api: &Url,
     expected: &str,
+    include_system: bool,
     read: impl Fn(&str) -> Option<String>,
 ) -> Result<Option<Url>, Error> {
     let address = expected
@@ -178,9 +183,17 @@ fn fixture_proxy(
         .ok_or(Error::Protocol)?;
     let owned = Url::parse(&format!("http://{address}")).map_err(|_| Error::Protocol)?;
     #[cfg(windows)]
-    let proxy = transport::EnvironmentProxy::windows(api, read).ok_or(Error::SystemProxy)?;
+    let proxy = match transport::SelectedProxy::windows(api, read) {
+        Some(selection) => selection,
+        None if include_system => windows_proxy::current_user(api)?,
+        None => return Err(Error::SystemProxy),
+    };
     #[cfg(not(windows))]
-    let proxy = transport::EnvironmentProxy::unix(api, read);
+    let proxy = if include_system {
+        return Err(Error::Protocol);
+    } else {
+        transport::SelectedProxy::unix(api, read)
+    };
     if proxy
         .endpoint
         .as_ref()
@@ -204,21 +217,25 @@ async fn probe(args: &[String]) -> Result<(), Error> {
         return Err(Error::Origin);
     }
     let platform = std::env::consts::OS;
+    let include_system = cfg!(windows) && mode.ends_with("-windows-system-proxy");
+    let suffix = if include_system {
+        "windows-system"
+    } else {
+        platform
+    };
     let (allow_http, proxy) = match (mode.as_str(), extra) {
         ("https", []) => (false, None),
         ("allow-http", []) => (true, None),
-        (mode, [owned]) if mode == format!("https-{platform}-proxy") && url.scheme() == "https" => {
-            (
-                false,
-                fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
-            )
-        }
+        (mode, [owned]) if mode == format!("https-{suffix}-proxy") && url.scheme() == "https" => (
+            false,
+            fixture_proxy(&url, owned, include_system, |key| std::env::var(key).ok())?,
+        ),
         (mode, [owned])
-            if mode == format!("allow-http-{platform}-proxy") && url.scheme() == "http" =>
+            if mode == format!("allow-http-{suffix}-proxy") && url.scheme() == "http" =>
         {
             (
                 true,
-                fixture_proxy(&url, owned, |key| std::env::var(key).ok())?,
+                fixture_proxy(&url, owned, include_system, |key| std::env::var(key).ok())?,
             )
         }
         _ => return Err(Error::Protocol),
@@ -273,7 +290,7 @@ mod tests {
             "https://127.0.0.1:8001",
         ] {
             assert_eq!(
-                fixture_proxy(&api, owned, |key| match key {
+                fixture_proxy(&api, owned, false, |key| match key {
                     "HTTPS_PROXY" => Some(unowned.into()),
                     "NO_PROXY" => Some("127.0.0.1".into()),
                     _ => None,
@@ -288,7 +305,10 @@ mod tests {
             "http://127.0.0.1:8001/path",
             "http://127.0.0.1:8001?query",
         ] {
-            assert_eq!(fixture_proxy(&api, invalid, |_| None), Err(Error::Protocol));
+            assert_eq!(
+                fixture_proxy(&api, invalid, false, |_| None),
+                Err(Error::Protocol)
+            );
         }
     }
 }
