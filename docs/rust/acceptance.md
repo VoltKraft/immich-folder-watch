@@ -52,10 +52,14 @@ on that revision. At `10ab0b8` automatic selection again met all eleven
 limits. The example switched from CPU painting to wgpu on the original
 window. All three screen captures preserved the expected texture colors.
 The separate device-loss trial stopped before requesting destruction.
+At `483f053` the same measured executable passed a real WARP device
+loss. Its new window showed the existing edit, accepted the next edit
+and retained the original worker through another inventory and normal Quit.
 [First native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
 [Second native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6) ·
 [Automatic selection](rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca) ·
-[Visible texture handoff](rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8).
+[Visible texture handoff](rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
+[WARP recovery](rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053).
 
 The native foreground F24 checks at `de3eec4` restored focus on both Windows
 architectures and preserved the original workers. The x64 observation

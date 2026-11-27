@@ -8,6 +8,19 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+The remaining Windows desktop tests cover a visible Explorer tray and
+notifications, a restorable contrast setting, a move between two
+outputs with different DPI, and rendering in an actual RDP session. The available
+hosted consoles each report one 96-DPI output. The user currently has
+neither a dedicated Windows installation medium nor an additional approved
+test desktop. The standard-user cross-session test also needs two sessions
+for the same user. The Ubuntu portal package was qualified for installation
+and rollback only. Its distribution is undecided.
+[Windows display trial](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop) ·
+[Shell observations](rust/rw02-windows-services.md#native-notification-observations-at-5efe1f1) ·
+[Writer exclusion](rust/rw02-cross-session.md) ·
+[Ubuntu portal decision](rust/rw02-stack-decision.md).
+
 At `dddb21a` the first native Windows x64 CPU-painter trial passed all
 eleven same-host WPF limits. Under inventory load, close/reopen p95 was
 5.71/9.66 ms and every one of the 421 eligible reopens drew the full
@@ -63,6 +76,16 @@ recovery run did not retain the membership list that failed its check.
 [Native comparisons and original archive](rust/rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
 [Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
 [Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
+
+At `483f053` the revised Windows x64 run passed. After destruction of
+the original WARP device the replacement window displayed
+`recoverydraft` and accepted the edit to `recoverydraftafter`. The
+same worker completed another inventory and exited normally. The three
+original screen captures and the 177 changed pixels passed independent
+readback. In the separate timing trial, the same GUI binary met all
+eleven WPF limits and completed an editor frame on all 436 eligible
+reopens. All three texture-handoff observations passed again.
+[Windows x64 recovery and original archive](rust/rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053).
 
 At `10ab0b8` the installed Ubuntu ARM64 Flatpak delivered its exact
 notification and withdrawal to the real GNOME Shell. The private

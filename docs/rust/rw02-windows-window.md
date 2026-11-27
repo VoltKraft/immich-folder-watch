@@ -1259,10 +1259,39 @@ against the before- and after-link hashes.
 
 The separate device-loss trial stopped before requesting destruction.
 The original GUI drew two complete CPU frames, the worker completed two
-empty inventories, and the observer captured zero editor fields. Device
-recreation on this CPU-painted executable remains open.
+empty inventories, and the observer captured zero editor fields. This
+run ended before device recreation.
 
 The 153-entry original ZIP for
 `10ab0b8a4f490eb99392905ea73da36101cf8a57` has SHA-256
 `63f272b6f05b8f4888f9da93bb637ea7cbb36022057c14c470f20c346f771591`.
 [Original native compilers, timing records and screen captures](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591446/artifacts/15184517026).
+
+### WARP device recovery on Windows x64 at 483f053
+
+On the hosted x64 console, GUI PID 9300 displayed `recoverydraft` in the
+filename field on HWND 2425322. The observer sent `G` to destroy the GUI's
+own logical WARP device. The loss callback reported `Destroyed`, and the
+CPU-policy retry selected the Microsoft Basic Render Driver again. On the
+new HWND 2687384, the original GUI thread still had focus in `Dateiname`.
+The observer read back the restored draft and appended `after`, producing
+`recoverydraftafter`. The native trace recorded 101 complete editor-mesh
+transfers during the first edit and 38 during the second. Independent
+decoding of the two 276 × 18 pixel crops on the replacement window confirmed
+177 changed pixels across 28 columns and 18 rows.
+
+All three job samples identified the original GUI, its inventory worker
+(PID 2480) and the worker's system console host (PID 9548). The worker
+finished a third empty inventory after the recovered edit. Ordinary Quit
+returned zero for the GUI and worker, destroyed the replacement HWND and
+left the job empty. The observer removed the isolated profile.
+[Recovery observer and replay](../../tools/rust-qa/windows-cpu-paint/recovery/README.md).
+
+The separate timing trial used the same CPU-painted executable and met all
+eleven same-host WPF limits. During two inventories of 100,000 files, all
+436 file-qualified reopens had a complete editor-mesh transfer before the
+next close. The p95 from request to visible HWND was 10.42 ms and from
+request to completed GDI transfer was 26.26 ms. The original ZIP for
+`483f0534ffdddb0f677b62fcd3b5b48cc2b0fa98` contains 160 entries and has
+SHA-256 `2338eba8784f413b77493bc2d9499d2d2127b5895a748115aaf46ef20407a16b`.
+[Native build, timing, device-loss trace and field captures](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45979619561/artifacts/15191997288).
