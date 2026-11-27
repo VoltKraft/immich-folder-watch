@@ -1069,6 +1069,15 @@ retained executable has SHA-256
 `b7d57b79d45466863a9923612277a2bab4b4dab86c130fbe5ad4adf504bb607e`.
 [Original observations and native compiler outputs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46029732858/artifacts/15214951547).
 
+In both background-first runs the independent rectangle query for the
+visible-start GUI had already returned `S_FALSE` at registration, before
+the first window close. Both runs started it second on the same Explorer.
+The dedicated Server 2022 comparison now starts the visible-close trial
+first after the Shell-less control. It records the planned and executed
+case order, the original handles and cleanup before starting the next GUI.
+[Native case order](../../tools/rust-qa/windows-launcher/native_tray.py) ·
+[Server 2022 comparison](../../.github/workflows/rust-windows-shell-2022.yaml).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

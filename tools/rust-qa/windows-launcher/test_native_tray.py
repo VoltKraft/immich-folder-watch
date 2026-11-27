@@ -425,30 +425,52 @@ class TrialSelectionTests(unittest.TestCase):
                 finally:
                     state["cleanupConfirmed"] = state["profile"] != unconfirmed
             def resident(_api, _desk, gui, _trial, env, out, state, *, subject, reopen):
-                calls.append((gui.name, subject, reopen, out.name, env["IFW_QA_TASKBAR_COMPARISON"]))
+                calls.append((gui.name, subject, reopen, out, env["IFW_QA_TASKBAR_COMPARISON"], env["IFW_QA_MSAA_ICON"]))
                 if state["profile"] == "1":
                     raise tray.Unavailable("Provider declined this profile")
-            for arch, variant, unconfirmed, expected_calls in (("x86_64", "retained", None, 2), ("x86_64", "retained", "1", 1),
-                            ("x86_64", "canonical", None, 1), ("aarch64", "retained", None, 2)):
+            background, reopen = "inputDesktop", "inputDesktopReopen"
+            trials = (("x86_64", "retained", False, [background, reopen]), ("x86_64", "retained", True, [reopen, background]),
+                      ("x86_64", "canonical", False, [background]), ("aarch64", "retained", False, [background, reopen]))
+            for arch, variant, reopen_first, residents in trials:
                 target = arch + "-pc-windows-msvc"
-                with self.subTest(target=target, subject=variant, unconfirmed=unconfirmed):
-                    out = root / f"{arch}-{variant}-{unconfirmed}"
-                    out.mkdir()
-                    profiles, calls, result = [], [], {}
-                    with (patch.object(tray.launcher, "native_subject", subject), patch.object(tray.launcher, "staged_profile", profile),
-                          patch.object(tray, "resident", resident), patch.object(tray.launcher, "private_desktop"),
-                          patch.object(tray.c, "WinDLL", create=True), patch.object(tray, "bind")):
-                        if unconfirmed:
-                            with self.assertRaises(tray.Unavailable):
-                                tray.assess(target, out, result, subject=variant)
-                            self.assertEqual(result["inputDesktopReopen"]["status"], "not-run")
-                        else:
-                            self.assertEqual(tray.assess(target, out, result, subject=variant), "unavailable")
-                    self.assertEqual(len(calls), expected_calls)
-                    self.assertEqual(calls[0], ("selected-gui", variant, False, out.name, "0"))
-                    if expected_calls == 2:
-                        self.assertEqual(calls[1], ("selected-gui", variant, True, "inputDesktopReopen", "1" if arch == "x86_64" else "0"))
-                        self.assertEqual(result["inputDesktopReopen"]["status"], "passed")
+                order = ["shellLess", *residents]
+                for unconfirmed in [None, *map(str, range(len(order)))]:
+                    with self.subTest(target=target, subject=variant, reopen_first=reopen_first, unconfirmed=unconfirmed):
+                        out = root / f"{arch}-{variant}-{reopen_first}-{unconfirmed}"
+                        out.mkdir()
+                        profiles, calls, result = [], [], {}
+                        with (patch.object(tray.launcher, "native_subject", subject), patch.object(tray.launcher, "staged_profile", profile),
+                              patch.object(tray, "resident", resident), patch.object(tray.launcher, "private_desktop"),
+                              patch.object(tray.c, "WinDLL", create=True), patch.object(tray, "bind")):
+                            if unconfirmed is None:
+                                status = tray.assess(target, out, result, subject=variant, reopen_first=reopen_first)
+                                self.assertEqual(status, "unavailable")
+                                self.assertEqual(result[residents[0]]["status"], "unavailable")
+                                if len(residents) == 2:
+                                    self.assertEqual(result[residents[1]]["status"], "passed")
+                                started = order
+                            else:
+                                error = tray.Unavailable if unconfirmed == "1" else tray.CleanupUnconfirmed
+                                with self.assertRaises(error):
+                                    tray.assess(target, out, result, subject=variant, reopen_first=reopen_first)
+                                stop = int(unconfirmed) + 1
+                                started = order[:stop]
+                                self.assertEqual(result[started[-1]]["status"], "failed")
+                                for missing in order[stop:]:
+                                    self.assertEqual(result[missing]["status"], "not-run")
+                        self.assertEqual(result["caseOrder"], order)
+                        self.assertEqual(result["startedCases"], started)
+                        self.assertEqual(len(profiles), len(started))
+                        msaa = arch == "x86_64" and variant == "retained"
+                        self.assertEqual(calls, [("selected-gui", variant, case == reopen, out / case if case == reopen else out,
+                                                  str(int(msaa and case == reopen)), str(int(msaa))) for case in started[1:]])
+
+    def test_reopen_first_rejects_other_subjects_before_native_setup(self):
+        with patch.object(tray.launcher, "native_subject") as setup:
+            for target, subject in (("x86_64-pc-windows-msvc", "canonical"), ("aarch64-pc-windows-msvc", "retained")):
+                with self.subTest(target=target, subject=subject), self.assertRaisesRegex(ValueError, "--reopen-first requires"):
+                    tray.assess(target, Path("unused"), {}, subject=subject, reopen_first=True)
+            setup.assert_not_called()
 
 
 if __name__ == "__main__":

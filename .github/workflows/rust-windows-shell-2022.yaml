@@ -89,11 +89,11 @@ jobs:
           }
           @('library_paths<<IFW_COMPILER_OUTPUTS') + $libraries + 'IFW_COMPILER_OUTPUTS' >> $env:GITHUB_OUTPUT
 
-      - name: Exercise the retained window through the original Explorer
+      - name: Exercise visible startup and close before background startup on the original Explorer
         shell: pwsh
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
-          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained --reopen-first
           exit $LASTEXITCODE
 
       - name: Observe the original contrast setting and a reversible change if available

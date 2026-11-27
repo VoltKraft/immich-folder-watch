@@ -868,13 +868,24 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 raise launcher.ShowOrderUnavailable(evidence["callbackShow"]["reason"])
 
 
-def assess(target, out, result, *, subject="canonical"):
+def trial_order(target, subject, reopen_first=False):
+    if reopen_first:
+        if (target, subject) != ("x86_64-pc-windows-msvc", "retained"):
+            raise ValueError("--reopen-first requires the retained Windows x64 subject")
+        return ("shellLess", "inputDesktopReopen", "inputDesktop")
+    return ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
+
+
+def assess(target, out, result, *, subject="canonical", reopen_first=False):
     files = (Path(__file__).resolve(), PROVIDER, launcher.HERE / "tray_msaa.cs", launcher.HERE / "tray_retry.py",
              launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
-    cases = ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
+    cases = trial_order(target, subject, reopen_first)
+    result["caseOrder"] = list(cases)
+    result["startedCases"] = []
     with launcher.native_subject(target, out, result, files, subject=subject) as (api, desk, built_gui, inventory, _revision):
         for index, case in enumerate(cases):
+            result["startedCases"].append(case)
             state = result[case] = dict(cleanupConfirmed=False)
             try:
                 case_out = out
@@ -923,14 +934,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=launcher.TARGETS)
     parser.add_argument("--subject", choices=launcher.SUBJECTS, default="canonical")
+    parser.add_argument("--reopen-first", action="store_true",
+                        help="Run the retained x64 visible-start, close and reopen case before the background start")
     options = parser.parse_args()
     target = options.target
+    try:
+        trial_order(target, options.subject, options.reopen_first)
+    except ValueError as exc:
+        parser.error(str(exc))
     directory = "windows-gui-tray-retained" if options.subject == "retained" else "windows-gui-tray"
     out = launcher.ROOT / "artifacts/rust" / directory / target
     out.mkdir(parents=True, exist_ok=False)
     result = {"target": target, "subject": options.subject, "status": "failed"}
     try:
-        result["status"] = assess(target, out, result, subject=options.subject)
+        result["status"] = assess(target, out, result, subject=options.subject, reopen_first=options.reopen_first)
     except Exception as exc:
         result["failures"] = launcher.failures(exc)
     finally:
