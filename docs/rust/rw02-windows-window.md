@@ -1095,6 +1095,27 @@ window in the background. The application requested foreground and the
 observer found no focus in 41 samples over 2.02 seconds.
 [Windows ARM64 originals](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45874234228/artifacts/15149575448).
 
+### Windows x64 profiles at 9313f39
+
+On this Server 2025 runner, the retained Mailbox profiles with one and
+two queued frames both met all eleven same-host WPF limits. The table
+uses median p95 timings across three trials per profile.
+
+| Inventory-time measurement | WPF limit | Ordinary GUI | Retained Mailbox, one frame | Retained Mailbox, two frames |
+| --- | ---: | ---: | ---: | ---: |
+| Close (ms) | 30.172 | 111.889 | 21.865 | 17.687 |
+| Reopen (ms) | 22.374 | 204.023 | 11.290 | 10.980 |
+
+The ordinary GUI also exceeded the visible working-set and both idle
+window-timing limits. The FIFO profile exceeded the inventory-time close
+limit at 40.229 ms. Independent replay matched all eleven metrics and the
+WPF limits using the three original trials for each of the five profiles
+on this host and the earlier `cd15d1c` host. The original x64 Japanese
+IME trial showed preedit and committed U+3042 on the same window, then
+restored the input language and keyboard layout.
+[Native Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15215577777) ·
+[Previous Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765/artifacts/15200496266).
+
 ### Closing the window during a DXGI wait
 
 In the x64 frame-cost trace at `0bb39bf`, 59 of the 63 slow closes spent

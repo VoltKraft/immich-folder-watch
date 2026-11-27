@@ -61,6 +61,13 @@ two panel clicks reopened the original window, and Quit removed the item.
 [Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
 [Noble x64 replay](rust/rw02-plasma.md#two-panel-activations-with-the-current-gui-at-6cd7757).
 
+The same matrix finished on both Windows targets with outstanding desktop
+checks. Both retained Mailbox profiles on x64 met all eleven same-host
+WPF limits. The ordinary GUI exceeded five. The x64 Japanese input trial
+showed composition, committed U+3042 and restored the original input
+settings. The ARM64 trial stopped before composition.
+[Original Windows measurements](rust/rw02-windows-window.md#windows-x64-profiles-at-9313f39).
+
 The pre-fix run at `6cd7757` also received HTTP 503 during both Ubuntu
 panel setups and during the ARM64 portal package setup. Both integrated
 Linux inventory trials stopped at the worker-receipt check in that run.
