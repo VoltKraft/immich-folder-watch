@@ -144,7 +144,7 @@ class WindowsContrastTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             output = root / "windows-contrast"
-            def early_exit(actual, desktop, receipt):
+            def early_exit(actual, desktop, receipt, archive):
                 self.assertEqual((actual, desktop), (target, name))
                 profile = observer["capture_profile"](output)
                 (profile / "observer-cache").write_text("synthetic")
@@ -154,7 +154,7 @@ class WindowsContrastTests(unittest.TestCase):
             api = Mock()
             api.context.return_value = {"session": 2}
             with (patch.dict(supervise.__globals__, Desktop=lambda: api, Win32=Mock, job_guard=lambda: None,
-                             ordinary_console=lambda ctx, desk: True, inputs=lambda _: {}, capture_job=early_exit),
+                             ordinary_console=lambda ctx, desk: True, inputs=lambda *_: {}, capture_job=early_exit),
                   patch.dict(observer["TEXT"]["DESKTOP"], named_input_desktop=selected),
                   patch.dict("os.environ", GITHUB_SHA="a"*40, GITHUB_RUN_ID="7", GITHUB_RUN_ATTEMPT="1"),
                   patch("builtins.print")):
@@ -649,6 +649,27 @@ class WindowsContrastTests(unittest.TestCase):
         api.visible.assert_not_called()
         api.iconic.assert_not_called()
         api.ancestor.assert_not_called()
+
+    def test_archive_requires_explicit_native_x64_vm_outside_hosted_jobs(self):
+        select = observer["source_revision"]
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "trial.zip"
+            archive.touch()
+            process = Mock()
+            process.machine.return_value = (0x8664, 0x8664)
+            with (patch.dict(select.__globals__, Win32=lambda: process),
+                  patch.object(subprocess, "check_output", return_value="a" * 40) as head,
+                  patch("sys.platform", "win32"), patch.dict(os.environ, {}, clear=True)):
+                self.assertEqual(select("x86_64-pc-windows-msvc", archive), "a" * 40)
+                self.assertEqual(head.call_count, 1)
+                with patch.dict(os.environ, GITHUB_ACTIONS="true"), self.assertRaises(ValueError):
+                    select("x86_64-pc-windows-msvc", archive)
+                with self.assertRaises(ValueError):
+                    select("aarch64-pc-windows-msvc", archive)
+                process.machine.return_value = (0x8664, 0xaa64)
+                with self.assertRaises(ValueError):
+                    select("x86_64-pc-windows-msvc", archive)
+                self.assertEqual(head.call_count, 1)
 
     def test_temporary_setting_requires_a_real_disposable_rewrite_job(self):
         guard = observer["job_guard"]

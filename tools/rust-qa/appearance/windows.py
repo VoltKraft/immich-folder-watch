@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import runpy
+import subprocess
 import sys
 import time
 import traceback
@@ -22,7 +23,7 @@ from storage.evidence import sha256, write_json
 from job import run_worker
 from win32 import Desktop, GA_ROOT, READ_OBJECTS, bind, check, ordinary_console, same_name, unlocked_console
 from windows_colors import SystemColors, contrast_cycle, label_bitmap, label_colors
-from windows_observer import private_gui_environment, private_profile, select_powershell
+from windows_observer import isolated_windows_vm, private_gui_environment, private_profile, select_powershell
 from worker import hosted, named_desktop, powershell
 
 TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
@@ -190,8 +191,11 @@ def on_subject_desktop(api, name, cycle, report):
         check(report["ownedHandleClosed"], "CloseDesktop(contrast publisher)")
 
 
-def capture_job(target, desktop, report):
-    return run_worker(Path(__file__).resolve(), [target, "--capture-worker"],
+def capture_job(target, desktop, report, archive=None):
+    args = [target, "--capture-worker"]
+    if archive is not None:
+        args.extend(["--isolated-vm", "--cpu-archive", str(archive)])
+    return run_worker(Path(__file__).resolve(), args,
                       desktop, ROOT, report, timeout_seconds=300)
 
 
@@ -201,8 +205,8 @@ def exercise(api, context, pid, hwnd, env, ps, output, report):
     setup = TEXT["read"](control / "session.json")
     report["hwnd"], report["pid"] = hwnd, pid
     if (setup["session"] != context["session"] or setup["source"] != report["build"]["source"]
-            or setup["target"] != report["target"] or setup["run"] != os.environ["GITHUB_RUN_ID"]
-            or setup["attempt"] != os.environ["GITHUB_RUN_ATTEMPT"]
+            or setup["target"] != report["target"] or setup["run"] != os.getenv("GITHUB_RUN_ID")
+            or setup["attempt"] != os.getenv("GITHUB_RUN_ATTEMPT")
             or not named_desktop(name)):
         raise ValueError("The capture worker does not belong to its contrast supervisor")
     def window_guard():
@@ -235,13 +239,16 @@ def exercise(api, context, pid, hwnd, env, ps, output, report):
             return
 
 
-def inputs(folder):
+def inputs(folder, revision, archived=False):
     files = [*TEXT["observer_paths"](), Path(__file__).resolve(), HERE / "windows_colors.py",
              HERE / "windows-label.ps1", HERE / "test_windows_colors.py", QA / "windows-services/service_sources.py",
              QA / "windows-performance/native.py", ROOT / ".gitattributes"]
-    files += [ROOT / name for name in TEXT["read"](folder / "build.json")["compilerSources"]]
+    if archived:
+        files.append(QA / "windows-display/cpu_archive.py")
+    else:
+        files += [ROOT / name for name in TEXT["read"](folder / "build.json")["compilerSources"]]
     verify = runpy.run_path(str(QA / "windows-services/service_sources.py"))["verify_checkout"]
-    return verify(ROOT, files, os.environ["GITHUB_SHA"])
+    return verify(ROOT, files, revision)
 
 
 def capture_profile(output):
@@ -254,16 +261,36 @@ def capture_profile(output):
     return path
 
 
-def capture_worker(target, folder, output):
-    job_guard()
+def source_revision(target, archive):
+    if archive is None:
+        job_guard()
+        return os.environ["GITHUB_SHA"]
+    if (not isolated_windows_vm(True) or target != "x86_64-pc-windows-msvc"
+            or Win32().machine(-1) != (0x8664, 0x8664) or not archive.is_file()):
+        raise ValueError("Select a disposable native Windows x64 VM and the original CPU archive")
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+
+
+def check_subject(target, folder, binary, archived):
+    if not archived:
+        return TEXT["check_build"](target, binary, folder)
+    module = runpy.run_path(str(QA / "windows-display/cpu_archive.py"))
+    if TEXT["DESKTOP"]["pe_machine"](binary) != 0x8664 or sha256(binary) != module["GUI_SHA256"]:
+        raise ValueError("The observed native executable differs from the qualified x64 renderer")
+    return {"source": module["ORIGIN"]["revision"], "target": target, "binarySha256": module["GUI_SHA256"],
+                    "archiveSha256": module["ARCHIVE_SHA256"]}
+
+
+def capture_worker(target, folder, output, archive=None):
+    revision = source_revision(target, archive)
     report = {"status": "failed", "target": target}
     try:
         with ExitStack() as stack:
-            binary = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
-            stack.enter_context(pin_path(Win32(), binary, False))
-            report["build"] = TEXT["check_build"](target, binary, folder)
-            report["inputs"] = inputs(folder)
             profile = capture_profile(output)
+            report["inputs"] = inputs(folder, revision, archive is not None)
+            binary = (profile / "cpu.exe" if archive else TEXT["DESKTOP"]["GUI_BINARY"]).resolve(strict=True)
+            stack.enter_context(pin_path(Win32(), binary, False))
+            report["build"] = check_subject(target, folder, binary, archive is not None)
             env = private_gui_environment(profile)
             ps, report["observerHosts"] = select_powershell(profile, "accessibility", env=env)
             if not ps:
@@ -293,17 +320,17 @@ def finish_contrast(report, child, worker_exit, unavailable):
         raise RuntimeError("The Windows contrast restoration is unconfirmed")
 
 
-def supervise(target, folder, output):
-    job_guard()
+def supervise(target, folder, output, archive=None):
+    revision = source_revision(target, archive)
     output.mkdir(exist_ok=False)
     control = output / "control"
     control.mkdir()
     desk, processes = Desktop(), Win32()
     token = uuid.uuid4().hex
-    report = dict(target=target, run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"],
-                  source=os.environ["GITHUB_SHA"], status="failed")
+    report = dict(target=target, run=os.getenv("GITHUB_RUN_ID"), attempt=os.getenv("GITHUB_RUN_ATTEMPT"),
+                  source=revision, status="failed")
     try:
-        report["inputs"] = inputs(folder)
+        report["inputs"] = inputs(folder, revision, archive is not None)
         context = desk.context()
         if not ordinary_console(context, "Default"):
             raise RuntimeError("Start the contrast supervisor on the active unlocked disposable runner")
@@ -312,16 +339,24 @@ def supervise(target, folder, output):
         selected = TEXT["DESKTOP"]["named_input_desktop"](desk, placement)
         with (private_profile(output, "profile-", report) as profile, selected as desktop,
               ThreadPoolExecutor(max_workers=1) as pool, ExitStack() as stack):
-            announce(control, "session", token, session=session, source=report["source"], target=target,
+            binary_revision = revision
+            if archive is not None:
+                stack.enter_context(pin_path(processes, profile, True))
+                stage = runpy.run_path(str(QA / "windows-display/cpu_archive.py"))["stage"]
+                binary, receipt = stage(archive, profile)
+                stack.enter_context(pin_path(processes, binary, False))
+                report["archivedBuild"] = receipt
+                binary_revision = receipt["revision"]
+            announce(control, "session", token, session=session, source=binary_revision, target=target,
                      run=report["run"], attempt=report["attempt"], profile=profile.name)
             job = report["captureJob"] = {}
             placement["selected"] = desktop
-            worker = pool.submit(capture_job, target, desktop, job)
+            worker = pool.submit(capture_job, target, desktop, job, archive)
             unavailable = None
             try:
                 ready = report["ready"] = message(control, "ready", token, worker, timeout=100)
                 pid, hwnd = ready["pid"], ready["hwnd"]
-                exe = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
+                exe = (profile / "cpu.exe" if archive else TEXT["DESKTOP"]["GUI_BINARY"]).resolve(strict=True)
                 if (type(pid) is not int or pid <= 0 or type(hwnd) is not int or hwnd <= 0
                         or desk.pid_session(pid) != session or not same_name(ready["desktop"], desktop)):
                     raise ValueError("The observed GUI does not belong to the supervisor's session")
@@ -332,11 +367,12 @@ def supervise(target, folder, output):
                 image, size = c.create_unicode_buffer(32768), w.DWORD(32768)
                 check(desk.image(handle, 0, image, c.byref(size)), "QueryFullProcessImageNameW")
                 report["creation100ns"] = processes.process_identity(handle)
-                if Path(image.value) != exe or ready["build"] != TEXT["check_build"](target, exe, folder):
+                if Path(image.value) != exe or ready["build"] != check_subject(target, folder, exe, archive is not None):
                     raise ValueError("The observed process differs from the pinned native executable")
                 alive = bind(processes.kernel, "WaitForSingleObject", w.DWORD, w.HANDLE, w.DWORD)
                 def session_guard():
-                    job_guard()
+                    if archive is None:
+                        job_guard()
                     if desk.pid_session(os.getpid()) != session:
                         raise ValueError("The contrast supervisor left its original logon session")
                 def capture(phase, state):
@@ -374,7 +410,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
     parser.add_argument("--capture-worker", action="store_true", help="read the owned label on the chosen input desktop")
+    parser.add_argument("--isolated-vm", action="store_true", help="use an expressly selected disposable native Windows VM")
+    parser.add_argument("--cpu-archive", type=Path, help="original x64 CPU timing and recovery ZIP for the VM")
     args = parser.parse_args()
+    if bool(args.cpu_archive) != args.isolated_vm:
+        parser.error("The disposable VM requires both --isolated-vm and --cpu-archive")
     build_dir = ROOT / "artifacts/rust/gui-native" / args.target
+    if args.cpu_archive:
+        build_dir.mkdir(parents=True, exist_ok=True)
     method = capture_worker if args.capture_worker else supervise
-    sys.exit(method(args.target, build_dir, build_dir / "windows-contrast"))
+    sys.exit(method(args.target, build_dir, build_dir / "windows-contrast", args.cpu_archive))
