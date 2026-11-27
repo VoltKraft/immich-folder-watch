@@ -23,6 +23,14 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def test_counts(log):
+    matches = re.findall(rb"^test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; "
+                         rb"(\d+) measured; (\d+) filtered out;", log, re.M)
+    if len(matches) != 1:
+        return None
+    return dict(zip(("passed", "failed", "ignored", "measured", "filtered"), map(int, matches[0])))
+
+
 def harnesses(stream):
     found = {}
     for line in stream.splitlines():
@@ -72,7 +80,9 @@ def run(archive, expected, output):
         manifest = json.loads(kit.read("build.json"))
         stream = kit.read("compiler.jsonl")
         rows = harnesses(stream)
+        checkout = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         if (manifest["target"] != TARGET or not re.fullmatch("[0-9a-f]{40}", manifest["revision"])
+                or manifest["revision"] != checkout
                 or hashlib.sha256(stream).hexdigest() != manifest["compilerSha256"]
                 or manifest["lockSha256"] != digest(ROOT / "rust/Cargo.lock")
                 or set(rows) != set(manifest["binaries"])
@@ -96,8 +106,10 @@ def run(archive, expected, output):
                                         stderr=subprocess.STDOUT, timeout=300).returncode
                 except subprocess.TimeoutExpired:
                     rc = 124
-            results[name] = {"exit": rc, "logSha256": digest(log)}
-        passed = all(row["exit"] == 0 for row in results.values())
+            results[name] = {"exit": rc, "logSha256": digest(log), "counts": test_counts(log.read_bytes())}
+        passed = (all(row["exit"] == 0 and row["counts"] is not None and row["counts"]["failed"] == 0
+                      for row in results.values())
+                  and any(row["counts"]["passed"] for row in results.values()))
         result = {"revision": manifest["revision"], "archiveSha256": expected, "target": TARGET,
                   "platform": platform.platform(), "host": "local-vm", "passed": passed, "tests": results}
         (output / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
