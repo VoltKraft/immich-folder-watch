@@ -40,6 +40,11 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+The Fedora x64 YAML comparison now includes invalid earlier values in
+repeated properties. The previous 82 cases preserved all 112 output files
+byte for byte. The extended corpus passed 87 inputs and 228 C# readbacks.
+[Repeated properties and signed 3.0.4 comparison](rw02-yaml.md#repeated-properties-in-the-shipping-configuration).
+
 At `dddb21a` the private Windows x64 CPU renderer met all eleven WPF
 limits. All 421 file-qualified reopens drew a complete editor frame
 before the next close. The ordinary retained renderer met eight limits

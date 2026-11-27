@@ -7,6 +7,29 @@ application workspace and the storage assessment. No shipping dependency,
 configuration profile, migration routine or publication was changed. The C#
 component is an oracle, not a required Rust runtime.
 
+## Repeated properties in the shipping configuration
+
+The C# reader converts each recognized property as it encounters it. A
+second valid value replaces the first. When an earlier value cannot be
+converted, loading fails even if a later occurrence is valid. For example,
+`retry: {maxAttempts: wrong, maxAttempts: 5}` fails in 3.0.4. The previous
+Rust probe discarded the first value before its integer conversion.
+
+The typed Rust reader now consumes the mappings in source order. The
+comparison includes a repeated integer in both orders, a replaced section,
+a malformed source inside a replaced list and valid duplicates alongside
+unknown properties. The parser's limits also apply to skipped and replaced
+values. On native Fedora x64, 87 original C# inputs passed 261 file-byte
+comparisons, 402 Rust differential assertions and 228 C# readbacks. All
+13 Rust tests passed. [Rust reader](../../tools/rust-qa/yaml/src/model.rs) ·
+[C# cases](../../tools/rust-qa/yaml/dotnet/Program.cs).
+
+Independent comparison with the previous Linux x64 run found matching
+results for all 82 earlier cases and identical bytes in all 112 earlier
+output files. A separate comparison with the original signed 3.0.4
+Flatpak assemblies agreed on all six selected inputs and read back the
+four Rust outputs in editing and runtime modes.
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects

@@ -95,6 +95,13 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
     if {path.name for path in profile.iterdir()} != {name + ".yaml" for name in inputs}:
         raise ValueError("Original profile files differ from the exported cases")
     verify_encodings(profile, inputs)
+    for name in ("duplicate-invalid-first", "duplicate-invalid-last", "duplicate-invalid-section", "duplicate-invalid-nested"):
+        if inputs[name]["accepted"]:
+            raise ValueError(f"The shipping reader accepted the malformed property in {name}")
+    nested = inputs["duplicate-nested-and-skipped"]["editable"]
+    if (nested["watch"]["sources"][0]["extensions"] != [".jpg"] or nested["retry"]["maxAttempts"] != 0
+            or inputs["duplicate-section"]["editable"]["retry"] != {"maxAttempts": 9, "baseDelayMilliseconds": 500}):
+        raise ValueError("The shipping reader's last valid property or section differs")
     marked = inputs["saved-album-format-mark"]
     album = "\ufeffFoto"
     if (marked["editable"]["watch"]["sources"][0]["albumName"] != album

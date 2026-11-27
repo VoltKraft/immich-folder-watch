@@ -6,80 +6,116 @@ use std::path::Path;
 #[cfg(not(windows))]
 use std::path::{Component, PathBuf};
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct RawConfig {
-    immich: Option<RawImmich>,
-    watch: Option<RawWatch>,
-    retry: Option<RawRetry>,
-    logging: Option<RawLogging>,
-    localization: Option<RawLocalization>,
+// The shipping typed reader assigns each occurrence as it reads it. An earlier
+// malformed value still fails even when a later property would replace it.
+macro_rules! legacy_mapping {
+    ($visibility:vis struct $name:ident { $( $field:ident : $ty:ty => $key:literal ),* $(,)? }) => {
+        #[derive(Default)]
+        $visibility struct $name {
+            $($field: $ty,)*
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct Properties;
+                impl<'de> serde::de::Visitor<'de> for Properties {
+                    type Value = $name;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        formatter.write_str("a configuration mapping")
+                    }
+
+                    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<$name, A::Error> {
+                        let mut section = $name::default();
+                        while let Some(key) = map.next_key::<String>()? {
+                            match key.as_str() {
+                                $($key => section.$field = map.next_value()?,)*
+                                _ => { map.next_value::<serde::de::IgnoredAny>()?; }
+                            }
+                        }
+                        Ok(section)
+                    }
+                }
+
+                deserializer.deserialize_map(Properties)
+            }
+        }
+    };
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawImmich {
-    allow_insecure_http: Option<bool>,
-    server_api_url: Option<String>,
-    api_key: Option<String>,
+legacy_mapping! {
+    pub struct RawConfig {
+        immich: Option<RawImmich> => "immich",
+        watch: Option<RawWatch> => "watch",
+        retry: Option<RawRetry> => "retry",
+        logging: Option<RawLogging> => "logging",
+        localization: Option<RawLocalization> => "localization",
+    }
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawWatch {
-    sources: Option<Vec<Option<RawSource>>>,
-    transfer_order: Option<String>,
-    extensions: Option<Vec<Option<String>>>,
-    #[serde(deserialize_with = "nullable_integer")]
-    batch_interval_seconds: Option<i32>,
-    #[serde(deserialize_with = "nullable_integer")]
-    max_batch_size: Option<i32>,
-    #[serde(deserialize_with = "nullable_integer")]
-    file_ready_timeout_seconds: Option<i32>,
+legacy_mapping! {
+    struct RawImmich {
+        allow_insecure_http: Option<bool> => "allowInsecureHttp",
+        server_api_url: Option<String> => "serverApiUrl",
+        api_key: Option<String> => "apiKey",
+    }
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawSource {
-    path: Option<String>,
-    album_name: Option<String>,
-    include_subdirectories: Option<bool>,
-    extensions: Option<Vec<Option<String>>>,
-    exclude_directories: Option<Vec<Option<String>>>,
-    exclude_file_names: Option<Vec<Option<String>>>,
-    sync_mode: Option<String>,
-    delete_after_upload: Option<bool>,
+legacy_mapping! {
+    struct RawWatch {
+        sources: Option<Vec<Option<RawSource>>> => "sources",
+        transfer_order: Option<String> => "transferOrder",
+        extensions: Option<Vec<Option<String>>> => "extensions",
+        batch_interval_seconds: RawInteger => "batchIntervalSeconds",
+        max_batch_size: RawInteger => "maxBatchSize",
+        file_ready_timeout_seconds: RawInteger => "fileReadyTimeoutSeconds",
+    }
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawRetry {
-    #[serde(deserialize_with = "nullable_integer")]
-    max_attempts: Option<i32>,
-    #[serde(deserialize_with = "nullable_integer")]
-    base_delay_milliseconds: Option<i32>,
+legacy_mapping! {
+    struct RawSource {
+        path: Option<String> => "path",
+        album_name: Option<String> => "albumName",
+        include_subdirectories: Option<bool> => "includeSubdirectories",
+        extensions: Option<Vec<Option<String>>> => "extensions",
+        exclude_directories: Option<Vec<Option<String>>> => "excludeDirectories",
+        exclude_file_names: Option<Vec<Option<String>>> => "excludeFileNames",
+        sync_mode: Option<String> => "syncMode",
+        delete_after_upload: Option<bool> => "deleteAfterUpload",
+    }
 }
 
-// YamlDotNet sets a present null non-nullable integer to zero; absent fields
-// retain the class initializer. Option alone would collapse these two states.
-fn nullable_integer<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<i32>, D::Error> {
-    Option::<i32>::deserialize(deserializer).map(|value| Some(value.unwrap_or(0)))
+legacy_mapping! {
+    struct RawRetry {
+        max_attempts: RawInteger => "maxAttempts",
+        base_delay_milliseconds: RawInteger => "baseDelayMilliseconds",
+    }
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawLogging {
-    level: Option<String>,
-    target: Option<String>,
-    log_directory: Option<String>,
+// A missing integer keeps its C# class initializer. An explicit null assigns zero.
+#[derive(Default)]
+struct RawInteger(Option<i32>);
+
+impl<'de> Deserialize<'de> for RawInteger {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(Some(
+            Option::<i32>::deserialize(deserializer)?.unwrap_or(0),
+        )))
+    }
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct RawLocalization {
-    language: Option<String>,
+legacy_mapping! {
+    struct RawLogging {
+        level: Option<String> => "level",
+        target: Option<String> => "target",
+        log_directory: Option<String> => "logDirectory",
+    }
+}
+
+legacy_mapping! {
+    struct RawLocalization {
+        language: Option<String> => "language",
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -288,13 +324,13 @@ impl RawConfig {
                 sources,
                 transfer_order: rules.choice(watch.transfer_order, &["oldestFirst"], "newestFirst"),
                 extensions: Vec::new(),
-                batch_interval_seconds: watch.batch_interval_seconds.unwrap_or(5),
-                max_batch_size: watch.max_batch_size.unwrap_or(25),
-                file_ready_timeout_seconds: watch.file_ready_timeout_seconds.unwrap_or(30),
+                batch_interval_seconds: watch.batch_interval_seconds.0.unwrap_or(5),
+                max_batch_size: watch.max_batch_size.0.unwrap_or(25),
+                file_ready_timeout_seconds: watch.file_ready_timeout_seconds.0.unwrap_or(30),
             },
             retry: Retry {
-                max_attempts: retry.max_attempts.unwrap_or(5),
-                base_delay_milliseconds: retry.base_delay_milliseconds.unwrap_or(500),
+                max_attempts: retry.max_attempts.0.unwrap_or(5),
+                base_delay_milliseconds: retry.base_delay_milliseconds.0.unwrap_or(500),
             },
             logging: Logging {
                 level: rules.text(logging.level, "Information"),

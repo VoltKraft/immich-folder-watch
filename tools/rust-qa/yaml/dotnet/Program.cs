@@ -65,6 +65,11 @@ internal static class Program
         {
             ["duplicate-field"] = "retry:\n  maxAttempts: 1\n  maxAttempts: 9\n",
             ["duplicate-section"] = "retry: {maxAttempts: 1, baseDelayMilliseconds: 7}\nretry: {maxAttempts: 9}\n",
+            ["duplicate-invalid-first"] = "retry:\n  maxAttempts: wrong\n  maxAttempts: 5\n",
+            ["duplicate-invalid-last"] = "retry: {maxAttempts: 5, maxAttempts: wrong}\n",
+            ["duplicate-invalid-section"] = "retry: wrong\nretry: {maxAttempts: 5}\n",
+            ["duplicate-invalid-nested"] = "watch:\n  sources: [{path: Pictures, includeSubdirectories: wrong}]\n  sources: [{path: Photos}]\n",
+            ["duplicate-nested-and-skipped"] = "watch:\n  sources:\n  - path: Pictures\n    extensions: [png]\n    extensions: [jpg]\n    future: {includeSubdirectories: wrong}\n    future: [one, two]\nretry: {maxAttempts: 5, maxAttempts: null}\n",
             ["merge-key"] = "base: &base {path: from-merge, albumName: merge}\nwatch:\n  sources:\n    - <<: *base\n      albumName: explicit\n",
             ["unknown-keys"] = "future: {nested: [one, two]}\nwatch:\n  sources: [{path: media, future: {nested: [a, b]}}]\n",
             ["null-values"] = "immich: {apiKey: null, serverApiUrl: null}\nlogging: {level: null, target: null, logDirectory: null}\nlocalization: {language: null}\nwatch: {sources: [null, {path: null, albumName: null, extensions: [null, jpg, ' ']}], extensions: null}\n",

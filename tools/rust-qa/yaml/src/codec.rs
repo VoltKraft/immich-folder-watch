@@ -38,7 +38,7 @@ pub fn options() -> Options {
             max_recorded_anchor_events: 4096, max_recorded_anchor_bytes: 65_536,
             max_inclusion_depth: 0,
         },
-        duplicate_keys: DuplicateKeyPolicy::LastWins,
+        duplicate_keys: DuplicateKeyPolicy::PassThrough,
         merge_keys: MergeKeyPolicy::AsOrdinary,
         reject_unsupported_tags: true,
         // YamlDotNet writes U+FEFF at the start of a plain album name verbatim.
@@ -183,6 +183,18 @@ mod tests {
         budget_pair(
             "watch: {sources: [&s {path: \"owned\\nscalar\"}, *s]}",
             |options| options.budget.as_mut().unwrap().max_recorded_anchor_bytes = 2,
+        );
+    }
+
+    #[test]
+    fn overwritten_and_skipped_properties_still_consume_the_parser_budget() {
+        budget_pair(
+            "watch: {sources: [{albumName: abcdefgh}], sources: []}",
+            |options| options.budget.as_mut().unwrap().max_total_scalar_bytes = 20,
+        );
+        budget_pair(
+            "{future: [one, two, three, four], future: two}",
+            |options| options.budget.as_mut().unwrap().max_nodes = 6,
         );
     }
 
