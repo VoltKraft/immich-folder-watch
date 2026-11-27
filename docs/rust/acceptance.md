@@ -47,6 +47,12 @@ background-start GUI, and preserved the worker. Reopening after a normal
 window close remains outstanding.
 [Original Explorer observations](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
 
+On Fedora x64 the Rust realtime adapter kept one application session after
+the server ended its namespace or closed the WebSocket. Authenticated
+inventory continued. Abrupt TCP loss still led to a second subscription
+and event. Native hosted repeats are pending.
+[Paired shipping-client and Rust trials](rw02-realtime-transport.md#server-closes-an-established-websocket).
+
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
 x64 and ARM64. On Fedora x64 the combined Rust subject reproduced all five
 identifiers after the synthetic files were replaced. The native four-target

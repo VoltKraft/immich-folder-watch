@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import socket
 import ssl
 import struct
 import subprocess
@@ -31,6 +32,8 @@ ESCAPED_PATHS = {
                           "/collection/caf%C3%A9/~summer%2fphotos/aPI"),
     "escaped-root-api": ("/%61pi", "/api"),
 }
+PEER_CLOSE_PATHS = {"peer-close-root": "/api", "peer-close-namespace": "/collection/api"}
+PEER_CLOSE_REASON = b"synthetic maintenance"
 
 
 def send_frame(stream, opcode, data=b"", final=True):
@@ -75,6 +78,7 @@ class Peer(ThreadingHTTPServer):
         self.probe_answered = threading.Event()
         self.held_poll_released = threading.Event()
         self.upgrade_committed = threading.Event()
+        self.peer_close_complete = threading.Event()
         self.tls_client_hello = threading.Event()
         self.lock = threading.Lock()
         self.polls = {}
@@ -128,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == peer.api + "/albums":
             assert self.command == "GET" and not url.query
             peer.mark("inventoryRequests")
+            if peer.peer_close_complete.is_set():
+                peer.mark("inventoryAfterPeerClose")
             self.body(b"[]")
             return None
         assert url.path == "/socket.io/"
@@ -183,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
             peer.polls[sid] = 0
             upgrade = peer.scenario in {"websocket", "ws-size", "upgrade-redirect", "probe-refused", "tls", "reconnect",
                                         "close-timeout", "ack-after-upgrade", "stalled-probe", "server-disconnect-ws",
-                                        "engine-close-ws"}
+                                        "engine-close-ws", "peer-close-ws"}
             heartbeat_timeout = {"missed-heartbeat": 150, "stalled-probe": 400,
                                  "server-disconnect-ws": 550}.get(peer.scenario, 3000)
             handshake = dict(sid=sid, upgrades=["websocket"] if upgrade else [],
@@ -256,7 +262,7 @@ class Handler(BaseHTTPRequestHandler):
             peer.mark("engineCloseNotices")
             self.body(b"\x1e".join([b"1", event("on_album_update", peer.ns), b"2"]))
         elif peer.scenario in {"websocket", "tls", "ws-size", "reconnect", "close-timeout", "server-disconnect-ws",
-                              "engine-close-ws"}:
+                              "engine-close-ws", "peer-close-ws"}:
             assert peer.probe_answered.wait(4), "websocket did not complete its probe"
             self.body(b"6")
         else:
@@ -318,6 +324,18 @@ class Handler(BaseHTTPRequestHandler):
         send_frame(self.wfile, 1, payload[:8], final=False)
         send_frame(self.wfile, 0, payload[8:])
         send_frame(self.wfile, 1, event("unsubscribed", peer.ns))
+        if peer.scenario == "peer-close-ws":
+            close = struct.pack("!H", 1001) + PEER_CLOSE_REASON
+            send_frame(self.wfile, 8, close)
+            peer.mark("peerCloseRequests")
+            opcode, echo = client_frame(self.rfile)
+            assert (opcode, echo) == (8, close), "expected the masked echo of the peer close"
+            peer.close_packets.append({"websocketCloseCode": int.from_bytes(echo[:2], "big"),
+                                       "reason": echo[2:].decode("utf-8")})
+            self.connection.shutdown(socket.SHUT_WR)
+            assert self.rfile.read(1) == b"", "unexpected client bytes after the close reply"
+            peer.peer_close_complete.set()
+            return
         if peer.scenario == "reconnect" and peer.counts["upgrades"] == 1:
             send_frame(self.wfile, 1, b"1")
             return
@@ -413,18 +431,21 @@ def run_scenario(executable, name, directory, contexts, redirect):
     encrypted = rejected_tls or name in {"tls", "upgrade-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
     api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade", "server-disconnect-poll"} else "/api"
+    api = PEER_CLOSE_PATHS.get(name, api)
     input_path, api = ESCAPED_PATHS.get(name, (api, api))
     scenario = "polling" if name in ESCAPED_PATHS else name
+    if name in PEER_CLOSE_PATHS:
+        scenario = "peer-close-ws"
     with peer(scenario, api, contexts[certificate_address] if encrypted else None) as origin:
         origin.redirect_port = redirect.server_port
         protocol = "https" if encrypted else "http"
         url = f"{protocol}://127.0.0.1:{origin.server_port}{input_path}"
         trust = directory / ("other.crt" if name == "untrusted-tls" else "ca.crt")
         mode = "https" if encrypted or name == "http-default" else "allow-http"
-        budget = 1300 if name in {"tls", "reconnect", "exact-size", "ws-size", "poll-size"} else 850
+        budget = 1300 if scenario in {"tls", "reconnect", "exact-size", "ws-size", "poll-size", "peer-close-ws"} else 850
         if name in {"stalled-probe", "server-disconnect-ws"}:
             budget = 1750
-        retry = 130 if name == "reconnect" or name.startswith(("server-disconnect-", "engine-close-")) else 30_000
+        retry = 130 if scenario in {"reconnect", "peer-close-ws"} or name.startswith(("server-disconnect-", "engine-close-")) else 30_000
         before = time.monotonic()
         proc = subprocess.run([str(executable), url, mode, str(trust), str(budget), str(retry), "100"],
                               cwd=directory, text=True, capture_output=True, timeout=10)
@@ -450,10 +471,13 @@ def run_scenario(executable, name, directory, contexts, redirect):
         assert not origin.errors, origin.errors
         result = {"client": dict(trace), "peer": dict(stats), "closePacketsAtPeer": origin.close_packets.copy(),
                   "budgetMs": budget, "processElapsedMs": elapsed}
-        if name in ESCAPED_PATHS:
+        if name in ESCAPED_PATHS or name in PEER_CLOSE_PATHS:
             assert origin.namespace_posts == ["40" + origin.ns], origin.namespace_posts
             result.update(configuredPath=input_path, inventoryPathAtPeer=api + "/albums",
                           namespacePostsAtPeer=origin.namespace_posts.copy())
+        if name in PEER_CLOSE_PATHS:
+            assert origin.close_packets == [{"websocketCloseCode": 1001, "reason": PEER_CLOSE_REASON.decode("ascii")}]
+            assert origin.peer_close_complete.is_set() and elapsed < budget + 1500, (elapsed, stats)
         if encrypted:
             result.update(tlsClientHelloObserved=True, certificateAddress=certificate_address,
                           endpointAddress="127.0.0.1", httpRequests=stats["httpRequests"],
@@ -499,6 +523,14 @@ def check_protocol(name, trace, stats, events):
             assert events.index("Connected") < events.index("Event") < events.index("Upgraded"), events
     if name == "reconnect":
         assert trace["Lost Disconnected"] == 1 and trace["Connected"] == 2, (events, stats)
+    if name == "peer-close-ws":
+        assert stats["peerCloseRequests"] == stats["probes"] == stats["upgrades"] == trace["Upgraded"] == 1, (events, stats)
+        assert trace["Attempt"] == stats["openingRequests"] == trace["Connected"] == trace["Event"] == trace["PeerClosed"] == 1
+        assert events.index("Connected") < events.index("Upgraded") < events.index("Event") < events.index("PeerClosed")
+        assert not any(e.startswith("Lost ") for e in events) and not trace["ServerDisconnected"], events
+        after_close = events[events.index("PeerClosed") + 1:]
+        assert after_close.count("Periodic") >= 3 and after_close.count("Inventory") >= 3
+        assert stats["inventoryAfterPeerClose"] >= 3, (events, stats)
     if name.startswith("engine-close-"):
         assert stats["engineCloseNotices"] == trace["Event"] == trace["Connected"] == trace["Attempt"] == 1, (events, stats)
         assert not trace["ServerDisconnected"] and not any(e.startswith("Lost ") for e in events), events
@@ -542,7 +574,7 @@ def main():
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
              "reconnect", "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
              "stalled-probe", "server-disconnect-poll", "server-disconnect-ws", "server-disconnect-then-close",
-             "engine-close-poll", "engine-close-ws", *ESCAPED_PATHS)
+             "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

@@ -20,6 +20,7 @@ enum Error {
     Limit,
     Timeout,
     Disconnected,
+    PeerClosed,
 }
 
 impl From<time::error::Elapsed> for Error {
@@ -33,6 +34,7 @@ enum Observation {
     Attempt,
     Connected,
     ServerDisconnected,
+    PeerClosed,
     Upgraded,
     UpgradeDeclined(Error),
     Heartbeat,
@@ -70,7 +72,7 @@ async fn supervise(
     let report = |event| {
         match event {
             Observation::Connected => retry.set(Some(initial_retry)),
-            Observation::ServerDisconnected => retry.set(None),
+            Observation::ServerDisconnected | Observation::PeerClosed => retry.set(None),
             _ => {}
         }
         observe(event);

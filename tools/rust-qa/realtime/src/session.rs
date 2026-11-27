@@ -74,11 +74,34 @@ pub(crate) async fn run(
         .await??;
     }
     drop(body);
-    session.listen(connect_deadline, stopping).await?;
+    match session.listen(connect_deadline, stopping).await {
+        Err(Error::PeerClosed) => {
+            let socket = session.socket.as_mut().ok_or(Error::Protocol)?;
+            return finish_peer_close(session.namespace, socket.flush(), observe).await;
+        }
+        result => result?,
+    }
     if session.namespace != NamespaceState::Joining
         && let Err(error) = session.disconnect().await
     {
         observe(Observation::StopFailed(error));
+    }
+    Ok(())
+}
+
+async fn finish_peer_close(
+    namespace: NamespaceState,
+    reply: impl Future<Output = Result<(), tokio_tungstenite::tungstenite::Error>>,
+    observe: Observe<'_>,
+) -> Result<(), Error> {
+    // Record the peer's decision before writing the queued masked reply.
+    // A failed write or its deadline must not resubscribe an established session.
+    if namespace != NamespaceState::Joining {
+        observe(Observation::PeerClosed);
+    }
+    tokio::time::timeout(CONNECT_TIMEOUT, reply).await??;
+    if namespace == NamespaceState::Joining {
+        return Err(Error::Disconnected);
     }
     Ok(())
 }
@@ -232,7 +255,7 @@ impl Session<'_> {
                     self.handle(websocket_packet(text.as_bytes()).map_err(|_| Error::Protocol)?)
                         .await?
                 }
-                Message::Close(_) => return Err(Error::Disconnected),
+                Message::Close(_) => return Err(Error::PeerClosed),
                 Message::Ping(_) => tokio::time::timeout(CONNECT_TIMEOUT, ws.flush()).await??,
                 Message::Binary(_) | Message::Pong(_) => {}
                 Message::Frame(_) => return Err(Error::Protocol),
@@ -293,5 +316,35 @@ impl Session<'_> {
             EnginePacket::Open(_) | EnginePacket::Upgrade => return Err(Error::Protocol),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::io::ErrorKind;
+    use tokio_tungstenite::tungstenite;
+
+    #[tokio::test]
+    async fn a_failed_close_reply_preserves_the_decision_made_at_receipt() {
+        for (state, established) in [
+            (NamespaceState::Joining, false),
+            (NamespaceState::Subscribed, true),
+            (NamespaceState::ServerDisconnected, true),
+        ] {
+            let observed = Cell::new(false);
+            let reply = async {
+                assert_eq!(observed.get(), established);
+                Err(tungstenite::Error::Io(ErrorKind::BrokenPipe.into()))
+            };
+            let result = finish_peer_close(state, reply, &|event| {
+                assert!(matches!(event, Observation::PeerClosed));
+                observed.set(true);
+            })
+            .await;
+            assert_eq!(result, Err(Error::Transport));
+            assert_eq!(observed.get(), established);
+        }
     }
 }

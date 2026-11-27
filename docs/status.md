@@ -31,6 +31,16 @@ running through transport loss. All 27 transport scenarios and four unit
 tests passed. Native hosted repeats are pending.
 [Signed C# and Rust server-disconnect comparison](rust/rw02-realtime-transport.md#server-ends-the-selected-namespace).
 
+A longer comparison on Fedora x64 also found that .NET 3.0.4 kept a
+single application session after WebSocket close code 1001. Its REST
+client could still read inventory 77.8 seconds later. Rust now acknowledges
+the peer's close, keeps inventory running and retries after an abrupt TCP
+loss. Both namespace paths passed the three clean-close variants and their
+abrupt-loss controls. All 29 strict wire scenarios and five unit tests
+passed. The signed client reconnected directly over WebSocket, while Rust
+used polling and upgrade.
+[Signed observations and Rust comparison](rust/rw02-realtime-transport.md#server-closes-an-established-websocket).
+
 On Fedora x64 the full offline build reproduced the same five Rust upload
 results. All 78 source inputs matched `6cd7757`. The modified Wayland
 binding was rebuilt and its new interface version observed. The native

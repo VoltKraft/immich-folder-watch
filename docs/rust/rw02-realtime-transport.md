@@ -127,9 +127,49 @@ During the separate 2.6-second WebSocket observation, Rust reconnected after
 close code 1001. The C# peer observed no second session in that interval.
 The local 32-case paired wire record has SHA-256
 `b666cf4c18d14fb9468fcf808263839a2f4575528826d93e2c288ff5218c62fd`.
-The frozen Fedora run passed all 27 scenarios, four unit tests and Clippy.
+At `f148e30` the frozen Fedora run passed all 27 scenarios, four unit
+tests and Clippy. Independent readback matched all 19 source inputs to
+that revision and all nine outputs to `result.json`, SHA-256
+`2699d02dad8194d58504e8d810762e24f68c4f91624e492133a9bfca57d0581a`.
 [Wire fixtures](../../tools/rust-qa/realtime/verify.py) ·
 [Engine.IO packet definitions](https://github.com/socketio/engine.io-protocol#protocol).
+
+### Server closes an established WebSocket
+
+The signed .NET 3.0.4 client received WebSocket close code 1001 after its
+first album event. For each of the root and `/collection` namespaces, the
+peer tried three variants: a preceding Engine.IO close notice, the close
+frame alone, and a close frame followed immediately by TCP shutdown.
+All six cases retained a single session and event. An authenticated REST
+inventory invoked by the driver succeeded 77.77–77.79 seconds after the
+close. In the two controls with abrupt TCP loss and no close frame, the
+signed client established a direct WebSocket session after 18–19 ms and
+delivered the second album event. The signed results have SHA-256
+`81c29b85269321585ca2381f25c3476681cba96d12ddb45a6c79f0aa63a62682`.
+[Pinned WebSocket receive implementation](https://github.com/doghappy/socket.io-client-csharp/blob/9deebcfe8079164d269ec4f22ba58589366014fb/src/SocketIOClient/Protocol/WebSocket/WebSocketAdapter.cs#L24-L53).
+
+Before the correction, Rust opened a second session about 0.5 seconds
+after close code 1001. After the correction, the six corresponding Fedora
+x64 trials kept one session through the 28-second observation. Periodic
+REST inventory continued. Both abrupt-loss controls still reconnected
+through polling and upgrade, then delivered the second event.
+
+On the connection held open by the peer, the signed client deferred its
+close until application shutdown. Rust sent a masked close reply as soon
+as it received the peer's close frame. This follows the WebSocket closing
+handshake. Both fixtures check the number of application sessions and
+events separately from the transport used for a retry. The strict native
+suite also checks the exact reply reason, EOF and at least three
+authenticated inventory requests after the closing handshake.
+[WebSocket closing handshake](https://www.rfc-editor.org/rfc/rfc6455#section-5.5.1) ·
+[Native peer](../../tools/rust-qa/realtime/verify.py).
+
+All 29 strict scenarios and five unit tests passed on Fedora x64. Both
+close peers observed twelve authenticated inventory requests after EOF.
+The admission-state test verified that a broken pipe while sending the
+close reply preserves the established session's no-retry decision. That
+decision is recorded before the bounded write begins. The frozen build
+receipt has SHA-256 `8ec897639ba542c3684283e7c15e0029e82be2a0ae13540dd4b5e31369117695`.
 
 ### Stopping an established session
 

@@ -22,7 +22,7 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 27 wire scenarios. Two strict polling peers accept only the
+build and all 29 wire scenarios. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
@@ -37,6 +37,9 @@ heartbeats. The peer records the namespace disconnect
 for an established polling or WebSocket session. On WebSocket it also checks
 the normal close code, the reason and completion of the reply. Two stop controls
 withhold the namespace acknowledgement or the WebSocket close reply.
+Two further peers send close code 1001 once the root or named namespace
+has delivered an event. They check the masked close reply, end of the TCP
+stream and subsequent authenticated inventory requests.
 The TLS controls use a fresh private CA,
 one server certificate for the loopback endpoint and one for a different
 loopback address. The latter must complete no HTTP requests. The peer records
