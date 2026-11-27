@@ -6,13 +6,15 @@ from ctypes import wintypes as w
 from hashlib import sha256
 import os
 from pathlib import Path
+import runpy
 import shutil
 import socket
+import sys
 import uuid
 
-from device_recovery import WORKER, check, completed, read, recorder, sha, sources
+from device_recovery import QA, WORKER, check, check_members, completed, read, recorder, sha, sources
 from inputs import DX12_WAIT_OPTION, subjects
-from native import bind, checked, owned_directory, pin_new_marker, pin_path, start_owned_subject
+from native import checked, owned_directory, pin_new_marker, pin_path, start_owned_subject
 from observe import capture_field
 from window_lifetime import WindowLifetime
 from gdi_case import native_root
@@ -20,6 +22,10 @@ from gdi_case import native_root
 
 def observe(cpu, api, out, record):
     fixture = recorder.load_windows_fixture()
+    sys.path.append(str(QA / "windows-launcher"))
+    launcher = runpy.run_path(str(QA / "windows-launcher/observe.py"))
+    desktop = launcher["Desktop"]()
+    console = launcher["system_console_path"](api.kernel)
     with ExitStack() as scope:
         area = scope.enter_context(owned_directory(api, Path(os.environ["RUNNER_TEMP"]), "ifw-rw02-" + uuid.uuid4().hex))
         token = uuid.uuid4().hex
@@ -63,13 +69,11 @@ def observe(cpu, api, out, record):
         worker = recorder.owned_worker(api, proc, log, recorder.await_value)
         handle = api.open_job_member(proc.benchmark_job, worker)
         scope.callback(api.close, handle)
-        query = bind(api.kernel, "QueryFullProcessImageNameW", w.BOOL, w.HANDLE, w.DWORD, w.LPWSTR, c.POINTER(w.DWORD))
-        buffer, length = c.create_unicode_buffer(32768), w.DWORD(32768)
-        checked(query(handle, 0, buffer, c.byref(length)))
-        if (Path(buffer.value) != stage / WORKER or
-                any(api.machine(h) != (0x8664, 0x8664) for h in (proc._handle, handle))):
-            raise ValueError("The running images are not the staged native GUI and worker")
-        record.update(pids=[proc.pid, worker], fields=[], workers=[], frequency=api.frequency)
+        handles = (proc._handle, handle)
+        if any(api.machine(h) != (0x8664, 0x8664) for h in handles):
+            raise ValueError("The running GUI and worker must both be native x64 images")
+        record.update(pids=[proc.pid, worker], creation100ns=[api.process_identity(h) for h in handles],
+                      fields=[], workers=[], frequency=api.frequency)
         identify = native_root()
 
         def text():
@@ -80,33 +84,34 @@ def observe(cpu, api, out, record):
         def live():
             recorder.wait_running(proc)
             windows.pump()
-            return api.job_pids(proc.benchmark_job) == {proc.pid, worker}
+            job = {}
+            try:
+                launcher["primary_job_members"](api, desktop, proc.benchmark_job, proc.pid, worker, stage / "cpu.exe",
+                                                console, job)
+                check_members(job, record["pids"], record["creation100ns"])
+            except (OSError, ValueError) as error:
+                record["failedJobObservation"] = job
+                raise ValueError(f"Recovery job membership: {error}") from error
+            return job
 
         def window(generation, previous):
-            if not live():
-                raise ValueError("The original GUI or worker exited")
+            live()
             hwnd = windows.visible(retiring=previous)
             if (hwnd and hwnd != previous and f"GRAPHICS_READY generation={generation}".encode() in text().splitlines()
                     and any(e["hwnd"] == hwnd and e["event"] == "show" for e in windows.events)):
                 return hwnd
 
         def snapshot():
-            if not live():
-                raise ValueError("The original process job lost its inventory worker")
+            job = live()
             raw = text()
-            parent, image = api.processes().get(worker, (0, ""))
-            if parent != proc.pid or image.lower() != WORKER:
-                raise ValueError("The held worker no longer belongs to the original GUI")
-            for pid, h in ((proc.pid, proc._handle), (worker, handle)):
-                api.verify_job_member(proc.benchmark_job, pid, h)
             return dict(qpc=api.clock(), logBytes=len(raw), logSha256=sha256(raw).hexdigest(),
-                        passes=completed(raw.decode()), jobPids=sorted([worker, proc.pid]), image=image.lower(),
-                        parent=parent, creation100ns=[api.process_identity(h) for h in (proc._handle, handle)])
+                        passes=completed(raw.decode()), job=job)
 
         def command(value):
             proc.stdin.write(value)
             proc.stdin.flush()
 
+        live()
         command(b"T")
         previous = None
         for number, phase in enumerate(("before", "after"), 1):
@@ -115,7 +120,8 @@ def observe(cpu, api, out, record):
             started = api.clock()
             digest = capture_field(shell, trial, env, out, hwnd, proc.pid, log, phase)
             ended = api.clock()
-            if not live() or windows.visible() != hwnd or identify(hwnd, proc.pid) != root:
+            live()
+            if windows.visible() != hwnd or identify(hwnd, proc.pid) != root:
                 raise ValueError("The visible editor or worker changed during the field observation")
             record["fields"].append(dict(root=root, field=digest, qpc=[started, ended]))
             recorder.await_value(lambda: live() and completed(text().decode()) >= 2, "Initial empty inventories", timeout=20)

@@ -55,6 +55,11 @@ texture on the same window. Detached replay matched all 225 sampled pixels
 and both copies of the application library. The recovery observer stopped
 before requesting device destruction. The original log contains two
 complete CPU frames and two empty inventories.
+The original recovery observer required exactly two job members. The
+timed GUI on the same host also had a Windows console host attached to
+its worker. Recovery now checks each member's actual image and parent
+against the original GUI, worker and Windows system directory. The first
+recovery run did not retain the membership list that failed its check.
 [Native comparisons and original archive](rust/rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
 [Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
 [Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).

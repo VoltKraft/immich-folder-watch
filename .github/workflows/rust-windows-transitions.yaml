@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/rust-windows-transitions.yaml'
       - 'tools/rust-qa/windows-inventory/scan.py'
+      - 'tools/rust-qa/windows-launcher/observe.py'
+      - 'tools/rust-qa/windows-desktop/win32.py'
       - 'tools/rust-qa/windows-frame-cost/**'
       - '!tools/rust-qa/windows-frame-cost/*.md'
       - 'tools/rust-qa/windows-cpu-paint/**'

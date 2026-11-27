@@ -3,8 +3,11 @@
 On a disposable hosted Windows x64 runner, the test uses the two executables
 from the CPU timing trial. The GUI starts its original inventory worker against
 an empty synthetic directory and an exclusively bound loopback port. The
-observer holds both processes in one Windows job and verifies the image and
-creation time of the worker. It sends `G` over the GUI's private fixture pipe
+observer holds both original process handles. It enumerates their job and
+matches both executable paths and creation times. The Windows launcher
+observer also recognizes a direct console host of either process by its
+full path in the native system directory. Each worker sample retains the
+complete job membership and parent PIDs. The observer sends `G` over the GUI's private fixture pipe
 after entering `recoverydraft` in the foreground editor. This destroys the
 application's own logical wgpu device.
 

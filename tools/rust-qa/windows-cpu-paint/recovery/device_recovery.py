@@ -31,7 +31,8 @@ def read(path):
 
 def sources(revision):
     result = paint.sources(revision)
-    for path in (HERE / "run.py", HERE / "readback.py", Path(__file__).resolve(), HERE.parent / "cpu_build.py", QA / "windows-warm-window/frame_latency.py"):
+    for path in (HERE / "run.py", HERE / "readback.py", Path(__file__).resolve(), HERE.parent / "cpu_build.py",
+                 QA / "windows-warm-window/frame_latency.py", QA / "windows-launcher/observe.py", QA / "windows-desktop/win32.py"):
         relative = path.relative_to(QA.parents[1]).as_posix()
         committed = subprocess.check_output(["git", "show", revision + ":" + relative], cwd=QA.parents[1])
         if sha(path) != sha256(committed).hexdigest():
@@ -66,6 +67,27 @@ def completed(text):
     return len(counts)
 
 
+def check_members(job, pids, creation):
+    gui, worker = pids
+    members = {row["pid"]: row for row in job["members"]}
+    if (len(members) != len(job["members"]) or sorted(members) != job["pids"] or not {gui, worker} <= members.keys()
+            or len(creation) != 2 or min(creation) <= 0):
+        raise ValueError("Incomplete original GUI and inventory job membership")
+    for pid, role, image, stamp in zip(pids, ("primary", "worker"), ("cpu.exe", WORKER), creation, strict=True):
+        row = members[pid]
+        if row["role"] != role or row["image"].casefold() != image or row["creation100ns"] != stamp:
+            raise ValueError(f"The held {role} process changed in the recovery job")
+    if members[worker]["parent"] != gui:
+        raise ValueError("The held worker no longer belongs to the original GUI")
+    parents = set()
+    for pid in members.keys() - {gui, worker}:
+        row = members[pid]
+        if (pid <= 0 or row["role"] != "systemConsoleHost" or row["image"].casefold() != "conhost.exe"
+                or row["parent"] not in pids or row["parent"] in parents or row["creation100ns"] <= 0):
+            raise ValueError(f"Unexpected additional member {pid} in the recovery job")
+        parents.add(row["parent"])
+
+
 def check(out, record):
     raw = (out / "subject.log").read_bytes()
     text = raw.decode()
@@ -90,16 +112,14 @@ def check(out, record):
         raise ValueError("Missing process observations across device destruction and recovery")
     previous = 0
     for row in snapshots:
+        check_members(row["job"], record["pids"], record["creation100ns"])
         length = row["logBytes"]
         prefix = raw[:length]
         if not previous <= length <= len(raw) or length <= 0:
             raise ValueError("Reordered observer log prefixes")
         previous = length
         if (sha256(prefix).hexdigest() != row["logSha256"] or not prefix.endswith(b"\n")
-                or row["passes"] != completed(prefix.decode()) or row["passes"] < 2
-                or row["jobPids"] != sorted([process, worker]) or row["image"] != WORKER or row["parent"] != process
-                or row["creation100ns"] != snapshots[0]["creation100ns"] or len(row["creation100ns"]) != 2
-                or min(row["creation100ns"]) <= 0):
+                or row["passes"] != completed(prefix.decode()) or row["passes"] < 2):
             raise ValueError("The held GUI or worker changed or lacks complete inventory reports")
     if (b"GRAPHICS_DESTROY " in raw[:snapshots[0]["logBytes"]] or
             b"GRAPHICS_READY generation=2" not in raw[:snapshots[1]["logBytes"]] or
@@ -127,6 +147,8 @@ def check(out, record):
 def verify(cpu):
     out = cpu / "recovery"
     record = read(out / "result.json")
+    if record["status"] != "passed":
+        raise ValueError(f"Native device recovery {record['status']}: {record.get('error', 'no recorded diagnosis')}")
     timing = read(cpu / "result.json")
     cpu_build.verify(cpu, timing)
     source = timing["inputs"]["inventory"]
@@ -135,7 +157,7 @@ def verify(cpu):
     if (original["candidateRevision"] != timing["revision"] or original["target"] != timing["target"]
             or any(source[k] != original["inventory"][k] for k in ("compiledEntry", "approvedBundle", "packages", "sources"))):
         raise ValueError("The inventory worker and original baseline have different compiler inputs")
-    if (record["status"] != "passed" or any(record[k] != timing[k] for k in ("revision", "run", "attempt", "target"))
+    if (any(record[k] != timing[k] for k in ("revision", "run", "attempt", "target"))
             or sources(record["revision"]) != record["sources"] or record["measurement"] != sha(cpu / "result.json")
             or record["images"] != [timing["binary"], source["worker"]] or sha(cpu / WORKER) != source["worker"]
             or recorder.pe_machine(cpu / WORKER) != 0x8664 or source["gui"] != timing["binary"]):

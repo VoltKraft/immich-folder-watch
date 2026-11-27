@@ -44,8 +44,9 @@ def fixture(root):
 
     def snapshot(qpc):
         raw = text.encode()
-        snapshots.append(dict(qpc=qpc, passes=device.completed(text), creation100ns=[100, 110],
-                              jobPids=[1, 2], parent=1, image=device.WORKER, logBytes=len(raw),
+        members = [dict(pid=1, parent=91, image="cpu.exe", role="primary", creation100ns=100),
+                   dict(pid=2, parent=1, image=device.WORKER, role="worker", creation100ns=110)]
+        snapshots.append(dict(qpc=qpc, passes=device.completed(text), job=dict(pids=[1, 2], members=members), logBytes=len(raw),
                               logSha256=sha256(raw).hexdigest()))
 
     snapshot(17)
@@ -58,7 +59,7 @@ def fixture(root):
     text += "GDI_PRESENT_END frames=1 partial=0\nDRAINED passes=7\n"
     log = root / "subject.log"
     log.write_bytes(text.encode())
-    return dict(subjectLog=device.sha(log), pids=[1, 2], fields=[sample(root, "before", old, [5, 15]),
+    return dict(subjectLog=device.sha(log), pids=[1, 2], creation100ns=[100, 110], fields=[sample(root, "before", old, [5, 15]),
                 sample(root, "after", new, [37, 48])], workers=snapshots, frequency=10_000_000, destroyQpc=20, quitQpc=60,
                 workerExit=0, emptyJob=True, profileRemoved=True, termination=dict(method="control-Q", exitCode=0),
                 lifetimes=[[old, "create", 1], [old, "destroy", 2], [new, "create", 3], [new, "destroy", 4]],
@@ -79,17 +80,48 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(observed["changedPixels"], 128)
 
     def test_swapped_gui_or_worker_and_failed_quit_do_not_qualify(self):
-        for key, value in (("creation100ns", [100, 111]), ("jobPids", [1, 42]), ("parent", 3),
-                           ("passes", 2), ("logSha256", "0" * 64)):
+        for key, value in (("passes", 2), ("logSha256", "0" * 64)):
             with self.subTest(key=key):
                 changed = deepcopy(self.good)
                 changed["workers"][2][key] = value
+                with self.assertRaises(ValueError):
+                    device.check(self.root, changed)
+        for member, changes in ((0, dict(creation100ns=105)), (1, dict(pid=42)), (1, dict(parent=3)),
+                                (1, dict(image="cpu.exe")), (1, dict(creation100ns=111))):
+            with self.subTest(changes=changes):
+                changed = deepcopy(self.good)
+                changed["workers"][2]["job"]["members"][member].update(changes)
                 with self.assertRaises(ValueError):
                     device.check(self.root, changed)
         for key, value in (("emptyJob", False), ("workerExit", 1), ("profileRemoved", False),
                            ("termination", dict(method="already exited", exitCode=0))):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 device.check(self.root, dict(self.good, **{key:value}))
+
+    def test_job_may_include_an_identified_console_host_of_the_original_worker(self):
+        job = self.good["workers"][1]["job"]
+        job["pids"].append(3)
+        helper = dict(pid=3, role="systemConsoleHost", image="conhost.exe", parent=2, creation100ns=115)
+        job["members"].append(helper)
+        self.assertEqual(device.check(self.root, self.good)["workerPassesAfterRecovery"], 1)
+        for changes in (dict(image="other.exe"), dict(role="primary"), dict(parent=91), dict(pid=5), dict(creation100ns=0)):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                job["members"][-1] = {**helper, **changes}
+                device.check(self.root, self.good)
+        job["members"][-1] = helper
+        job["pids"].append(4)
+        with self.assertRaises(ValueError):
+            device.check(self.root, self.good)
+        job["members"].append(dict(helper, pid=4))
+        with self.assertRaises(ValueError):
+            device.check(self.root, self.good)
+
+    def test_incomplete_native_observation_reports_the_recorded_failure(self):
+        out = self.root / "recovery"
+        out.mkdir()
+        (out / "result.json").write_text(json.dumps(dict(status="incomplete", error="worker exited")))
+        with self.assertRaisesRegex(ValueError, "Native device recovery incomplete: worker exited"):
+            device.verify(self.root)
 
     def test_only_actual_destroyed_first_device_and_successful_new_generation_qualify(self):
         log = (self.root / "subject.log").read_text()
