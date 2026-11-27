@@ -1232,3 +1232,37 @@ The detached timing reader verified all 140 entries of the 87,313,592-byte
 original at `3b488ca8ff817012c2f2fcb47dba46c75e598ffe`, ZIP SHA-256
 `d09ac6347cbc599f7761807d739116aa65d14a84d885d44c200efb7500df0543`.
 [Native build, timings, compiler streams and captures](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644127/artifacts/15161087080).
+
+### Visible texture handoff on Windows x64 at 10ab0b8
+
+Automatic WARP selection again met all eleven WPF limits. During two
+inventories of 100,000 files, scan close/reopen p95 was 6.53/11.07 ms
+against 29.55/21.31 ms. Of 423 file-qualified reopens, 421 had a full
+editor-mesh transfer after the visible sample and before the next close.
+For those frames the request-to-GDI-flush p95 was 23.41 ms. Editing the
+reopened field changed 209 pixels.
+
+On the same runner, the handoff example kept HWND 1376806 throughout
+three screen captures. The original texture appeared red, then displayed
+the green center from its partial update. Adding a second texture with
+nearest filtering switched painting to wgpu. The final capture showed
+the original red corner, green center and new blue marker. All 225
+sampled pixels matched their expected RGB values. The observers counted
+seven complete CPU frames and two successful DXGI presents before the
+final capture. The example quit normally and left an empty job.
+
+Cargo reused all 155 shared units. The two paths reported for the GUI
+library contained identical bytes, with SHA-256
+`13863e362ce80936b37efcbd9a605cc883524987ade365b940f6354677362a7f`.
+The detached reader checked the archived GUI and presenter libraries
+against the before- and after-link hashes.
+
+The separate device-loss trial stopped before requesting destruction.
+The original GUI drew two complete CPU frames, the worker completed two
+empty inventories, and the observer captured zero editor fields. Device
+recreation on this CPU-painted executable remains open.
+
+The 153-entry original ZIP for
+`10ab0b8a4f490eb99392905ea73da36101cf8a57` has SHA-256
+`63f272b6f05b8f4888f9da93bb637ea7cbb36022057c14c470f20c346f771591`.
+[Original native compilers, timing records and screen captures](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591446/artifacts/15184517026).

@@ -21,12 +21,16 @@ same host. A second x64 host at `972adc6` also met all eleven limits,
 with full frames in 171 of 172 eligible reopen intervals. This makes
 the CPU path viable for the tested software adapter. At `3b488ca` automatic
 selection passed all eleven limits and delivered a complete frame on all
-246 eligible reopens. The separate visible transition to wgpu is open.
+246 eligible reopens. At `10ab0b8` automatic selection again met all
+eleven limits. A real sampler change switched the example to wgpu while
+preserving its partial texture update on the same visible window.
+Recovery of the timed CPU renderer after device loss remains open.
 On Fedora x64 six real editor frames at two scales matched
 the egui-wgpu reference within two levels per color channel.
 [Native measurements](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
 [Independent second run](rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6) ·
 [Automatic WARP selection](rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca) ·
+[Visible handoff](rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
 [Source inventory and pixel comparison](rw02-windows-window.md#cpu-rendering-of-the-original-editor-meshes).
 
 On Windows x64 at `de3eec4`, disabling DWM transitions on the retained

@@ -47,10 +47,15 @@ on that host. A second native run at `972adc6` also met all eleven
 limits with 171 full frames across 172 eligible reopen intervals.
 Automatic WARP selection at `3b488ca` met all eleven limits on a third
 host and drew a complete frame on each of 246 eligible reopens. The
-separate sampler-handoff example stopped before the first visible sample.
+separate sampler-handoff example stopped before the first visible sample
+on that revision. At `10ab0b8` automatic selection again met all eleven
+limits. The example switched from CPU painting to wgpu on the original
+window. All three screen captures preserved the expected texture colors.
+The separate device-loss trial stopped before requesting destruction.
 [First native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
 [Second native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6) ·
-[Automatic selection and handoff outcome](rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca).
+[Automatic selection](rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca) ·
+[Visible texture handoff](rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8).
 
 The native foreground F24 checks at `de3eec4` restored focus on both Windows
 architectures and preserved the original workers. The x64 observation

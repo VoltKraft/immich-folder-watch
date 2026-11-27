@@ -46,13 +46,16 @@ SHOW followed resume by 16 ms. The original workers survived and both
 input desktops were restored.
 [Native keyboard observations](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
 
-The texture-handoff reader now recognizes the two Cargo output paths for
-the same application library. On the original Windows compiler streams
-it accepted all 155 reused units. A changed output path on any one of
-those units failed the comparison. The native fixture now retains and
-compares both library files across the link. A separate device-recovery
-fixture uses the timed executable and its original worker. Native
-observations from both fixtures are pending.
+At `10ab0b8` the Windows x64 CPU renderer again met all eleven WPF limits.
+Of 423 eligible reopens, 421 had a complete editor frame after the
+window became visible and before the next close. The separate example
+switched to wgpu when a texture required nearest filtering. Its original
+red texture and green partial update remained visible next to the new blue
+texture on the same window. Detached replay matched all 225 sampled pixels
+and both copies of the application library. The recovery observer stopped
+before requesting device destruction. The original log contains two
+complete CPU frames and two empty inventories.
+[Native comparisons and original archive](rust/rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
 [Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
 [Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
 
