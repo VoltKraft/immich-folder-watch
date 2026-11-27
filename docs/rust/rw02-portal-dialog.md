@@ -117,6 +117,17 @@ middle image. The Clear and World Clocks controls remained visible after
 withdrawal. The original middle image has SHA-256
 `d090c4354e77bf7d95774f16a28a96caa2cc14870d53d19d5c9400cd939968b2`.
 
+At `10ab0b8` on Ubuntu ARM64 the installed sender matched the native ELF,
+SHA-256 `1fa404ff22bd4e2502be75cc1800057ad6f6a4cb314eb9440d1f64c82bc8da0b`.
+The GTK backend at `:1.11` delivered the app's exact title and body for
+`native-test` to GNOME Shell at `:1.5` (PID 13) and withdrew the same
+ID. The image stream stayed paused. WirePlumber 0.4.17 exited after it
+could not start its logind monitor in the isolated session. The archive
+contained zero of the three required PNGs and the detached reader
+rejected it. On Fedora x64, a separate clean-checkout control at the
+same revision passed the bus and pixel checks and matched all 25 recorded
+source files. [Original ARM64 artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591797/artifacts/15181348629).
+
 ## Inputs, isolation and reproduction
 
 The frozen Rust 1.100.0 workspace has 211 third-party lock records matching

@@ -56,10 +56,11 @@ observations from both fixtures are pending.
 [Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
 [Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
 
-The Ubuntu ARM64 portal trials reached the synthetic notification receiver.
-A focused native job now exercises the installed Rust Flatpak against the
-actual GNOME Shell and captures its notification list before delivery,
-while visible and after withdrawal. An ARM64 result is pending.
+At `10ab0b8` the installed Ubuntu ARM64 Flatpak delivered its exact
+notification and withdrawal to the real GNOME Shell. The private
+WirePlumber session stopped before producing any monitor images, leaving
+visible delivery open. The Fedora x64 control verified the visible text
+and its withdrawal on the same revision.
 [ARM64 notification trial](rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64).
 
 The installed Windows 3.0.4 worker restarted from its Rust-returned live

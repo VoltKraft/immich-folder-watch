@@ -2,6 +2,9 @@
 
 The combined RW-02 build produces one SPDX 2.3 JSON document per native target. Each document describes the development executable measured on that runner, the Cargo sources that actually compiled, the five embedded fonts and the audited native and protocol inputs. The generator runs offline with Python 3.11+ and Git. The SBOM uses the native source commit time for its reproducible timestamp. Its creation record identifies the generator, source-notice audit, Cargo-unit verifier, font reader and historical review pin by SHA-256. [Generator](../../tools/rust-qa/combined-profile/sbom.py) · [Native build evidence](rw02-combined-profile.md) · [SPDX package fields](https://spdx.github.io/spdx-spec/v2.3.1/package-information/)
 
+The separate Windows x64 WARP measurement has its own compiler, source
+and notice evidence. [Measured renderer dependencies at 3b488ca](rw02-gui-dependencies.md#windows-x64-warp-renderer-inputs-at-3b488ca).
+
 ## Generate and check
 
 Run from the repository root with the native source commit available in Git.

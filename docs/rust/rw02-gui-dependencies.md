@@ -249,6 +249,37 @@ target reports were reproduced from the original archives and checked
 against their unpacked sources. [Published source](https://static.crates.io/crates/windows/windows-0.62.2.crate)
 · [Target digests](../../rust/audit/gui-profile.json).
 
+## Windows x64 WARP renderer inputs at 3b488ca
+
+The native Rust 1.100.0 MSVC build selected CPU painting on a supported
+WARP surface. Its patched `egui-wgpu 0.37.0` retained the `capture` and
+`winit` features. Cargo reported 156 compiler units and 138 package
+identities. The measured `cpu.exe` had SHA-256
+`6085e3f96e2e74cd890cbfdb5a9717aebb00b1353b41991f37eb36b92b71785f`.
+[Original Windows x64 build and timings](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644127/artifacts/15161087080).
+
+| Dependency change | Role in this build |
+| --- | --- |
+| `hdrshot-egui-backend 0.2.0` | Target rasterizer used by the patched presenter, compiled as `egui_software_backend` with `default` and `std`. |
+| `strength_reduce 0.2.4` | Target arithmetic library used by the rasterizer, compiled with no Cargo features. |
+| `constify 0.0.1` | Build-host procedural macro used to compile the rasterizer. Cargo produced a macro DLL. |
+| `syn 2.0.119` | Existing build-host dependency of `constify`. The macro adds `extra-traits` to the selected features. |
+
+The three added crates declare `MIT OR Apache-2.0`. The archived
+`source.zip` contains their original crate bytes, twelve rasterizer and
+inherited attribution files, the original egui-wgpu crate, the modified
+sources and manifests, the lockfile and the project license. The WARP
+patch has SHA-256 `2f70dad4bf081a6eaced6dc849f7ad23843db972f39964a596f8b11c9192dc12`.
+[Original grants, provenance and individual hashes](../../tools/rust-qa/windows-cpu-paint/upstream.json)
+· [Patched source hashes](../../tools/rust-qa/windows-cpu-paint/renderer-inputs.json).
+
+The compiler stream and eight members of `cpu-libraries.zip` identify the
+two target libraries and the host macro outputs. Together with the
+executable and source archive they establish which private build ran.
+A standalone relink and installed-package delivery remain unverified for
+this executable. The combined development SPDX documents describe their own
+executables. [Combined SPDX subjects](rw02-combined-sbom.md).
+
 ## Native interfaces and outstanding checks
 
 At `8b071ab`, each native host rebuilt the integrated GUI. The archived
