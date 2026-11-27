@@ -435,7 +435,11 @@ function Get-ExactProvider($Surface, [string]$Label) {
             if ($hwnd -eq $Surface.root) { $item=$candidate; $root=$candidateRoot }
         }
     }
-    if ($visible -ne 1 -or $null -eq $item) { throw [InvalidOperationException]::new("Expected one exact visible provider under the physical hit root, found $visible") }
+    if ($visible -ne 1 -or $null -eq $item) {
+        $missing=[InvalidOperationException]::new("Expected one exact visible provider under the physical hit root, found $visible")
+        $missing.Data['noVisibleNamedItem']=($visible -eq 0)
+        throw $missing
+    }
     $current = $item.Current
     $point = [Windows.Point]::new($Surface.point[0], $Surface.point[1])
     $bounds = $current.BoundingRectangle
@@ -464,11 +468,39 @@ function Get-ExactProvider($Surface, [string]$Label) {
         throw [InvalidOperationException]::new('The visible point did not belong to an exact invokable item')
     }
     return @{ pattern = $pattern; descriptor = [ordered]@{
+        method='UIA.Invoke'
         runtimeId = $runtime; hitRuntimeId = $hitId; root=$Surface.root; pid = $current.ProcessId; matchCount = $visible; matchedLabel = $Label
         nameMatches = $nameMatches; helpMatches = $helpMatches
         enabled = $current.IsEnabled; offscreen = $current.IsOffscreen; hitDepth = $depth
         bounds = @($bounds.Left, $bounds.Top, $bounds.Right, $bounds.Bottom)
     } }
+}
+
+function Get-MsaaProvider($Surface,[string]$Label) {
+    if ($env:IFW_QA_MSAA_ICON -cne '1' -or $Surface.root -ne $Surface.bar -or $Surface.rootClass -cne 'Shell_TrayWnd' -or
+        $Surface.hit -eq $Surface.root -or $Surface.overflow -ne 0 -or $null -ne $Surface.pane -or $null -ne $lease.state -or
+        $guard.ButtonHit($Surface.point[0],$Surface.point[1]) -ne $Surface.hit) {
+        throw [InvalidOperationException]::new('The original taskbar child is unavailable for the MSAA point lookup')
+    }
+    if (-not ('IfwTrayButton' -as [type])) {
+        Add-Type -AssemblyName Accessibility
+        Add-Type -Path (Join-Path $PSScriptRoot 'tray_msaa.cs') -ReferencedAssemblies ([Accessibility.IAccessible].Assembly.Location)
+    }
+    $target=[IfwTrayButton]::At($Surface.hit,$Surface.rect,$Surface.point[0],$Surface.point[1],$Label)
+    if ($guard.ButtonHit($Surface.point[0],$Surface.point[1]) -ne $Surface.hit) {
+        throw [InvalidOperationException]::new('The native hit changed during the MSAA point lookup')
+    }
+    return @{pattern=$target; descriptor=[ordered]@{
+        method='MSAA.accDoDefaultAction'; root=$Surface.root; pid=$Surface.shellPid; nativeHit=$Surface.hit
+        matchedLabel=$Label; matchCount=1; nameMatches=$true; role=0x2b; state=$target.state
+        childId=$target.childId; pointChildId=$target.pointChildId; hitTestChildId=$target.hitTestChildId
+        childCount=$target.childCount; bounds=$target.bounds
+    }}
+}
+
+function Get-SelectedProvider($Surface,[string]$Label,[string]$Method) {
+    if ($Method -ceq 'MSAA.accDoDefaultAction') { return Get-MsaaProvider $Surface $Label }
+    return Get-ExactProvider $Surface $Label
 }
 
 function Test-ProviderPoint($Item,$Root,$Point,[uint32]$Owner) {
@@ -636,6 +668,15 @@ function Restore-OpenedPane($Guard,$Lease,$Record) {
     throw 'The original closed hidden-icons state was not observed after restoration'
 }
 
+function Get-InvocationSurface($Provider,$Guard,$Pane,$Expected) {
+    if ($Provider.descriptor.method -ceq 'MSAA.accDoDefaultAction') { $Provider.pattern.Recheck() }
+    $surface=$Guard.Read($Pane)
+    if (-not $Expected.Matches($surface)) {
+        throw [InvalidOperationException]::new('The original Shell surface changed at invocation')
+    }
+    return $surface
+}
+
 function Invoke-OriginalIcon($Lease,$Pattern,[scriptblock]$Clock) {
     # A failing COM return can follow a successful native activation and automatic flyout dismissal.
     $Lease.iconAttempted=$true
@@ -757,7 +798,14 @@ try {
             break
         } catch {
             $cause = $_.Exception.GetBaseException()
-            if ($arrival.Elapsed.TotalSeconds -ge 4 -or $cause -isnot [InvalidOperationException]) { throw }
+            if ($cause -isnot [InvalidOperationException]) { throw }
+            if ($arrival.Elapsed.TotalSeconds -ge 4) {
+                if ($env:IFW_QA_MSAA_ICON -cne '1' -or $cause.Data['noVisibleNamedItem'] -ne $true -or $null -ne $lease.state) { throw }
+                $second=Get-Marker $guard $contrast $first
+                Write-Event 'msaa-lookup' @{surface=$second; uiaVisibleNamedItems=0}
+                $provider=Get-MsaaProvider $second $label
+                break
+            }
             Start-Sleep -Milliseconds 120
             $second = Get-Marker $guard $contrast $first
         }
@@ -765,7 +813,7 @@ try {
     Write-Event 'ready' @{surface = $second; provider = $provider.descriptor}
     if ([Console]::In.ReadLine() -cne 'invoke') { return }
     $fresh = Get-Marker $guard $contrast $first
-    $current = Get-ExactProvider $fresh $label
+    $current = Get-SelectedProvider $fresh $label $provider.descriptor.method
     if (($current.descriptor | ConvertTo-Json -Compress) -cne ($provider.descriptor | ConvertTo-Json -Compress)) {
         throw [InvalidOperationException]::new('The resolved accessibility provider changed')
     }
@@ -774,14 +822,11 @@ try {
         throw [InvalidOperationException]::new('The physical Shell hit or pixel changed before invocation')
     }
     Write-Event 'attempt' @{surface = $fresh; provider = $current.descriptor; tick = [IfwIconSurface]::GetTickCount64()}
-    $actual = Get-ExactProvider $fresh $label
+    $actual = Get-SelectedProvider $fresh $label $provider.descriptor.method
     if (($actual.descriptor | ConvertTo-Json -Compress) -cne ($current.descriptor | ConvertTo-Json -Compress)) {
         throw [InvalidOperationException]::new('The exact accessibility provider changed after the attempt receipt')
     }
-    $invocationSurface = $guard.Read($lease.pane)
-    if (-not $fresh.Matches($invocationSurface)) {
-        throw [InvalidOperationException]::new('The original Shell surface changed at invocation')
-    }
+    $invocationSurface = Get-InvocationSurface $actual $guard $lease.pane $fresh
     $invoking = $true
     $returnedTick=Invoke-OriginalIcon $lease $actual.pattern { [IfwIconSurface]::GetTickCount64() }
     Write-Event 'invoked' @{startTick=$lease.startTick; returnedTick=$returnedTick; surface=$invocationSurface; provider=$actual.descriptor}

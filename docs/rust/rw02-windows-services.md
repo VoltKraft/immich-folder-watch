@@ -1015,6 +1015,25 @@ checks their hashes before upload. A native archive with those files is pending.
 [Original observations and builds](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437427/artifacts/15212996332) ·
 [Windows Shell run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437427).
 
+### Identifying a classic notification toolbar button
+
+The retained x64 GUI observer tries Microsoft Active Accessibility when UI
+Automation finds zero visible items with the per-run name on the original
+taskbar. It requires both observed icon colors, the original Explorer
+process and toolbar HWND, and a single visible, enabled push button with
+the exact name and a default action. Both the physical-point lookup and the
+toolbar's own hit test must identify that button inside the registered
+icon rectangle. An overflow pane or a changed hit ends this route.
+
+Immediately before invoking the default action, the helper checks the
+button and samples the marker again. The primary must then receive its
+matching native Shell callback and show the window while its original
+worker stays alive. The observer records the method and invocation time.
+[Observer](../../tools/rust-qa/windows-launcher/native_tray.py) ·
+[Classic toolbar adapter](../../tools/rust-qa/windows-launcher/tray_msaa.cs) ·
+[Microsoft physical-point lookup](https://learn.microsoft.com/en-us/windows/win32/api/oleacc/nf-oleacc-accessibleobjectfrompoint) ·
+[Microsoft toolbar accessibility](https://learn.microsoft.com/en-us/windows/win32/winauto/toolbar-control).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

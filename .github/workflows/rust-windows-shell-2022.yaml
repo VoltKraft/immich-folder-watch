@@ -7,6 +7,7 @@ on:
       - '.github/workflows/rust-windows-shell-2022.yaml'
       - 'tools/rust-qa/windows-launcher/native_tray.py'
       - 'tools/rust-qa/windows-launcher/tray_provider.ps1'
+      - 'tools/rust-qa/windows-launcher/tray_msaa.cs'
       - 'tools/rust-qa/appearance/windows*.py'
       - 'tools/rust-qa/appearance/windows-label.ps1'
       - 'tools/rust-qa/performance/worker-inputs.json'

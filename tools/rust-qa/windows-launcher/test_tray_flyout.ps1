@@ -73,9 +73,31 @@ foreach ($bounds in @(@(0,0,4097,20),@(0,0,1000,162),@(2,0,800,52))) {
 $vertical=[IfwIconSurface+BarComparison]::new([int[]]@(0,0,160,4096),[int[]]@(10,70,25,100))
 if ($vertical.columns*$vertical.rows -gt 1536) { throw 'The taskbar sampling budget was exceeded' }
 . (Join-Path $PSScriptRoot '../windows-services/tray-overflow.ps1')
-foreach ($name in @('Wait-OpenedPane','Restore-OpenedPane','Invoke-OriginalIcon')) {
+foreach ($name in @('Wait-OpenedPane','Restore-OpenedPane','Get-InvocationSurface','Invoke-OriginalIcon')) {
     $fn=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$true)
     . ([scriptblock]::Create($fn.Extent.Text))
+}
+$target=[pscustomobject]@{}
+$target | Add-Member ScriptMethod Recheck { $steps.Add('MSAA preflight'); if ($reject) {throw 'Object changed'} }
+$target | Add-Member ScriptMethod Invoke { $steps.Add('Default action') }
+$surface=[pscustomobject]@{}
+$surface | Add-Member ScriptMethod Matches { param($other) return [object]::ReferenceEquals($this,$other) }
+$sample=[pscustomobject]@{}
+$sample | Add-Member ScriptMethod Read { param($pane) $steps.Add('Physical hit'); return $surface }
+foreach ($reject in @($true,$false)) {
+    $steps=[Collections.Generic.List[string]]::new(); $call=@{}
+    $button=@{pattern=$target;descriptor=@{method='MSAA.accDoDefaultAction'}}
+    try {
+        $null=Get-InvocationSurface $button $sample $null $surface
+        $null=Invoke-OriginalIcon $call $target { $steps.Add('Clock'); return 84 }
+    } catch { if (-not $reject) { throw } }
+    if ($reject) {
+        if (($steps -join ',') -ne 'MSAA preflight' -or $call.iconAttempted -or $call.ContainsKey('startTick')) {
+            throw 'A rejected MSAA preflight was timed or counted as an action'
+        }
+    } elseif (($steps -join ',') -ne 'MSAA preflight,Physical hit,Clock,Default action,Clock' -or -not $call.iconAttempted) {
+        throw 'The default action interval captured preflight activity'
+    }
 }
 $script:Bar=51; $script:ShellPid=81
 $script:original=[IfwIconSurface+Pane]::new(62,81,77,'NotifyIconOverflowWindow')

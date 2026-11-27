@@ -19,6 +19,9 @@ SURFACE = dict(pid=18, hwnd=43, id=23, creation=101, rect=RECT, point=[12, 26], 
 ELEMENT = dict(runtimeId="42,99", matchCount=1, matchedLabel="IFW tray " + TOKEN, pid=81, hitDepth=2,
                root=51, hitRuntimeId="42,199",
                nameMatches=True, helpMatches=False, enabled=True, offscreen=False, bounds=[-4, 10, 28, 42])
+MSAA = dict(method="MSAA.accDoDefaultAction", matchCount=1, matchedLabel="IFW tray " + TOKEN,
+            root=51, pid=81, nativeHit=52, role=0x2b, state=0, childId=4, pointChildId=4,
+            hitTestChildId=4, childCount=5, nameMatches=True, bounds=RECT)
 
 
 def registration(added):
@@ -103,6 +106,28 @@ class TrayProofTests(unittest.TestCase):
                 tray.delivery(ambiguous, KEY, 21, 29)
         self.assertIsNone(tray.delivery("LAUNCHER_OPEN client=7\nREADY Visible Available\n", KEY, 21, 29))
 
+    def test_msaa_requires_the_shell_hit_and_one_named_enabled_button_with_concordant_child_ids(self):
+        event = dict(provider=MSAA, surface=SURFACE)
+        self.assertEqual(tray.confirm_surface(event, KEY, 101, RECT, RGB), SURFACE)
+        self.assertEqual(tray.confirm_provider(event, SURFACE, TOKEN), MSAA)
+        for changes in (dict(role=22), dict(state=0x8000), dict(state=0x10000), dict(state=1), dict(nativeHit=53),
+                        dict(hitTestChildId=3), dict(childCount=129), dict(childCount=0), dict(nameMatches=False),
+                        dict(matchCount=2), dict(matchedLabel="other"), dict(bounds=[-5,10,28,42])):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                tray.confirm_provider(dict(provider=MSAA | changes), SURFACE, TOKEN)
+
+    def test_msaa_route_follows_original_uia_absence_and_can_never_open_a_flyout(self):
+        first = dict(stage="first", surface=dict(SURFACE, rgb=RGB))
+        second = dict(SURFACE, rgb=COMPLEMENT)
+        lookup = dict(stage="msaa-lookup", surface=second, uiaVisibleNamedItems=0)
+        ready = dict(stage="ready", surface=second, provider=MSAA)
+        tray.verify_msaa_route([first, lookup, ready], ready, True)
+        for events, enabled in (([lookup, first, ready], True), ([first, lookup, ready], False),
+                ([first, lookup | {"uiaVisibleNamedItems":1}, ready], True), ([first, dict(stage="opening"), lookup, ready], True),
+                ([first, lookup | {"surface":SURFACE}, ready], True), ([first, ready], True)):
+            with self.subTest(events=events, enabled=enabled), self.assertRaises(ValueError):
+                tray.verify_msaa_route(events, ready, enabled)
+
     def test_real_primary_shutdown_requires_empty_job_native_removal_and_independent_absence(self):
         api, desk, proc = Mock(), Mock(), Mock(pid=18)
         api.wait_job_empty.return_value = True
@@ -154,7 +179,7 @@ class TrayProofTests(unittest.TestCase):
 
 
 class ResidentTests(unittest.TestCase):
-    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False, compare=False):
+    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False, compare=False, msaa=False):
         api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
         proc.poll.return_value = None
@@ -171,7 +196,7 @@ class ResidentTests(unittest.TestCase):
         visible_surface = (dict(SURFACE, rect=visible_rect, point=[326, 426], hit=62, root=61, overflow=61,
                                 rootClass="TopLevelWindowForOverflowXamlIsland",
                                 pane=dict(hwnd=61, pid=81, tid=82, windowClass="TopLevelWindowForOverflowXamlIsland")) if flyout else SURFACE)
-        visible_element = dict(ELEMENT, root=visible_surface["root"], bounds=visible_rect)
+        visible_element = dict(MSAA if msaa else ELEMENT, root=visible_surface["root"], bounds=visible_rect)
         with TemporaryDirectory() as directory:
             out = Path(directory)
             logfile = out / "resident-primary.log"
@@ -347,11 +372,23 @@ class ResidentTests(unittest.TestCase):
         self.assertFalse(state["nativeShutdown"]["stableRegistration"])
         self.assertNotIn("delivery", state)
 
-    def test_callback_during_attempt_receipt_output_precedes_the_real_provider_invocation(self):
-        commands, _, state = self.exercise("early")
+    def test_msaa_action_keeps_the_same_callback_worker_focus_and_shutdown_requirements(self):
+        commands, requests, state = self.exercise(None, subject="retained", msaa=True)
+        self.assertEqual(state["providerIdentity"]["method"], "MSAA.accDoDefaultAction")
+        self.assertEqual(requests, [b"second\n", b"invoke\n"])
+        self.assertEqual((state["delivery"]["pid"], state["delivery"]["hwnd"]), (18,43))
+        self.assertEqual(state["workerBefore"], state["workerAfter"])
+        self.assertTrue(state["keyboardFocus"]["observed"])
+        self.assertTrue(state["nativeShutdown"]["stableRegistration"])
         self.assertEqual(commands[-1], b"Q")
-        self.assertNotIn("delivery", state)
-        self.assertLess(state["provider"]["attemptTick"], state["provider"]["startTick"])
+
+    def test_callback_during_attempt_receipt_output_precedes_the_real_provider_invocation(self):
+        for msaa in (False, True):
+            with self.subTest(msaa=msaa):
+                commands, _, state = self.exercise("early", subject="retained", msaa=msaa)
+                self.assertEqual(commands[-1], b"Q")
+                self.assertNotIn("delivery", state)
+                self.assertLess(state["provider"]["attemptTick"], state["provider"]["startTick"])
 
     def test_lost_or_foreign_shell_cannot_authorize_invoke_and_delete_does_not_imply_stability(self):
         for refusal in ("unbound", "foreign-provider", "beforeMarker", "afterMarker", "beforeInvoke",

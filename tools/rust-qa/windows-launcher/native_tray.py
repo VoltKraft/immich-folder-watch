@@ -469,6 +469,13 @@ def verify_marker_route(surface, baseline, opened):
             or pane and (surface["root"], surface["rootClass"]) != (pane["hwnd"], pane["windowClass"])):
         raise Unavailable("The physical marker did not identify the observed original Explorer surface")
 
+def verify_msaa_route(events, item, enabled):
+    receipts = [r for r in events if r["stage"] in ("first", "msaa-lookup", "ready")]
+    if (not enabled or [r["stage"] for r in receipts] != ["first", "msaa-lookup", "ready"]
+            or receipts[1].get("uiaVisibleNamedItems") != 0 or receipts[1]["surface"] != item["surface"]
+            or receipts[2]["provider"] != item["provider"] or any(r["stage"] == "opening" for r in events)):
+        raise ValueError("MSAA activation lacks its original taskbar color and empty UI Automation lookup")
+
 
 def provider_route(events, original, result, *, final=False):
     names = ("baseline", "hint", "opening", "opened", "cleanup", "cleanup-failed")
@@ -542,6 +549,8 @@ def provider(api, desk, trial, env, out, key, creation, result, original):
             baseline, opened = provider_route(events, original, result)
             if item and "surface" in item:
                 verify_marker_route(item["surface"], baseline, opened)
+                if item.get("provider", {}).get("method") == "MSAA.accDoDefaultAction":
+                    verify_msaa_route(events, item, env.get("IFW_QA_MSAA_ICON") == "1")
             return item
         try:
             machine = result["machine"] = api.machine(int(proc._handle))
@@ -568,6 +577,7 @@ def provider(api, desk, trial, env, out, key, creation, result, original):
 
 def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
     surface = event["surface"]
+    provider = event.get("provider")
     if ([str(surface[name]) for name in ("pid", "hwnd", "id")] != list(key)
             or surface["creation"] != creation or surface["rect"] != rect):
         raise ValueError("The independent Shell rectangle and executable identity differ from the primary")
@@ -582,9 +592,9 @@ def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
                     or (surface["rootClass"] in ("NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland")
                         and original_pane(surface["pane"], surface["shellPid"]) and surface["rootClass"] == surface["pane"]["windowClass"]
                         and surface["root"] == surface["pane"]["hwnd"] == surface["overflow"] and surface["root"] != surface["bar"]))
-            or "provider" in event and (event["provider"].get("root") != surface["root"] or not event["provider"].get("hitRuntimeId")
-                                       or (event["provider"]["hitDepth"] == 0) !=
-                                       (event["provider"]["hitRuntimeId"] == event["provider"]["runtimeId"]))
+            or provider is not None and provider.get("root") != surface["root"]
+            or provider is not None and provider.get("method") != "MSAA.accDoDefaultAction" and
+               (not provider.get("hitRuntimeId") or (provider["hitDepth"] == 0) != (provider["hitRuntimeId"] == provider["runtimeId"]))
             or not re.fullmatch("[0-9a-f]{6}", surface["rgb"])):
         raise ValueError("Incomplete pixel, input desktop or Explorer hit evidence")
     if expected_rgb is not None and any(abs(a - b) > 8 for a, b in zip(bytes.fromhex(surface["rgb"]), bytes.fromhex(expected_rgb))):
@@ -601,13 +611,22 @@ def confirm_provider(event, surface, token):
     left, top, right, bottom = surface["rect"]
     x, y = surface["point"]
     if (provider["matchCount"] != 1 or provider["matchedLabel"] != "IFW tray " + token
-            or not provider["runtimeId"] or provider["pid"] != surface["shellPid"]
-            or not (provider["nameMatches"] is True or provider["helpMatches"] is True)
-            or provider["enabled"] is not True or provider["offscreen"] is not False
-            or not 0 <= provider["hitDepth"] < 12 or len(bounds) != 4
+            or provider["pid"] != surface["shellPid"] or provider["root"] != surface["root"] or len(bounds) != 4
             or not all(math.isfinite(v) for v in bounds)
             or not (left <= bounds[0] <= x < bounds[2] <= right and top <= bounds[1] <= y < bounds[3] <= bottom)):
         raise ValueError("The provider did not independently identify a unique visible item at the marker")
+    if provider.get("method") == "MSAA.accDoDefaultAction":
+        ids = [provider[k] for k in ("childId", "pointChildId", "hitTestChildId")]
+        if (surface["rootClass"] != "Shell_TrayWnd" or surface["root"] != surface["bar"] or surface["pane"] is not None
+                or provider["nativeHit"] != surface["hit"] or surface["hit"] == surface["root"] or provider["role"] != 0x2b
+                or type(provider["state"]) is not int or provider["state"] & 0x18001 or provider["nameMatches"] is not True
+                or any(type(v) is not int or v < 0 for v in ids) or len({v for v in ids if v}) > 1
+                or not 1 <= provider["childCount"] <= 128):
+            raise ValueError("The original MSAA toolbar button, hit, or child identity differs")
+    elif (provider.get("method", "UIA.Invoke") != "UIA.Invoke" or not provider["runtimeId"]
+            or not (provider["nameMatches"] is True or provider["helpMatches"] is True)
+            or provider["enabled"] is not True or provider["offscreen"] is not False or not 0 <= provider["hitDepth"] < 12):
+        raise ValueError("The UI Automation provider was unavailable at the marker")
     return provider
 
 
@@ -850,7 +869,7 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
 
 
 def assess(target, out, result, *, subject="canonical"):
-    files = (Path(__file__).resolve(), PROVIDER, launcher.HERE / "tray_retry.py",
+    files = (Path(__file__).resolve(), PROVIDER, launcher.HERE / "tray_msaa.cs", launcher.HERE / "tray_retry.py",
              launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
     cases = ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
@@ -864,6 +883,8 @@ def assess(target, out, result, *, subject="canonical"):
                     case_out.mkdir()
                 with launcher.staged_profile(state, api, built_gui, inventory) as (gui, trial, env):
                     env["IFW_QA_WINDOWS_TRAY"] = "1"
+                    env["IFW_QA_MSAA_ICON"] = "1" if (
+                        target == "x86_64-pc-windows-msvc" and subject == "retained" and case != "shellLess") else "0"
                     env["IFW_QA_TASKBAR_COMPARISON"] = "1" if (
                         target == "x86_64-pc-windows-msvc" and subject == "retained" and case == "inputDesktopReopen") else "0"
                     if case == "shellLess":

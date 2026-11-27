@@ -242,7 +242,9 @@ to reconcile project decisions, defaults, and recorded state.
   The [Windows Server 2022 check](.github/workflows/rust-windows-shell-2022.yaml)
   runs the same retained tray and canonical contrast subjects on its original desktop.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
-  when changing the shared receiver or launcher. Verify visible Windows
+  when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
+  match the accessible button and physical marker before its default action.
+  Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
   The separate [WinRT history trial](tools/rust-qa/windows-services/toast-history.md)
   scopes posting, readback and removal to the test shortcut's app identity.
