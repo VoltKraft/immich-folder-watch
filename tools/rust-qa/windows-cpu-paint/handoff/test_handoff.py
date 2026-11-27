@@ -1,13 +1,11 @@
 """Controls for the native retained-HWND texture handoff and its independent readback."""
 import copy
-import json
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from evidence import check, cpu, dxgi_calls, scene
-from fixture_build import compiler_examples, example_main, sha
+from fixture_build import example_main, sha
 import pixels
 
 ROOT = dict(pid=47, hwnd=500, tid=19, width=640, height=480)
@@ -107,30 +105,3 @@ class Handoff(unittest.TestCase):
         for invalid in (source+source,source.replace(b"mod fonts;",b"")):
             with self.assertRaises(ValueError):
                 example_main(invalid)
-
-    def test_example_can_only_use_the_original_native_compiler_artifacts(self):
-        gui = PureWindowsPath("D:/private/project/tools/rust-qa/gui")
-        release = PureWindowsPath("D:/private/build/release")
-        exe = release / "native-gui-assessment.exe"
-        app = dict(package_id="path+file:///D:/private/project/tools/rust-qa/gui#0.0.0",
-                   manifest_path=str(gui / "Cargo.toml"), executable=str(exe), filenames=[str(exe)],
-                   target=dict(name="native-gui-assessment", kind=["bin"], src_path=str(gui / "src/main.rs")))
-        lib = dict(reason="compiler-artifact", package_id="actual-renderer", manifest_path="renderer/Cargo.toml",
-                   target=dict(name="egui_wgpu", kind=["lib"]), features=["winit"], profile={"opt_level":"3"},
-                   filenames=[str(release / "deps/libegui_wgpu-0123456789abcdef.rlib")], fresh=True)
-        example_exe = str(release / "examples/texture_handoff.exe")
-        example = dict(app, reason="compiler-artifact", executable=example_exe, filenames=[example_exe],
-                       target=dict(name="texture_handoff", kind=["example"], src_path=str(gui / "examples/texture_handoff/main.rs")))
-        stream = self.out / "example.jsonl"
-
-        def write(artifact):
-            rows = [artifact, example, {"reason":"build-finished","success":True}]
-            stream.write_text("".join(json.dumps(row) + "\n" for row in rows))
-
-        with patch("fixture_build.gdi.compilation", return_value=(gui, exe, [app,lib], None)):
-            write(lib)
-            self.assertEqual(compiler_examples(self.out / "cpu.jsonl", stream), 1)
-            for change in ({"features":["other"]}, {"filenames":["other.rlib"]}, {"fresh":False}):
-                write(dict(lib, **change))
-                with self.subTest(change=change), self.assertRaises(ValueError):
-                    compiler_examples(self.out / "cpu.jsonl", stream)

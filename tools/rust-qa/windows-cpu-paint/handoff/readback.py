@@ -10,6 +10,8 @@ from evidence import check
 def verify(cpu):
     out = cpu / "handoff"
     record = fixture_build.read(out / "result.json")
+    if record["status"] != "passed":
+        raise ValueError(f"The native texture handoff did not finish: {record.get('error', record['status'])}")
     build = fixture_build.read(cpu / "cpu-build.json")
     # A finished CPU build suffices even if a separate resource measurement failed later.
     base = dict(build, cpuBuild=fixture_build.sha(cpu / "cpu-build.json"), buildReceipt=build["ordinaryBuild"],
@@ -18,7 +20,7 @@ def verify(cpu):
     fixture_build.verify(cpu, record)
     from inputs import recorder
     raw = {n: fixture_build.sha(out / n) for n in ("subject.log", "presents.log", "present-build.log")}
-    if (record["status"] != "passed" or raw != record["raw"] or fixture_build.sha(out / "present.exe") != record["presentObserver"]
+    if (raw != record["raw"] or fixture_build.sha(out / "present.exe") != record["presentObserver"]
             or recorder.pe_machine(out / "present.exe") != 0x8664
             or fixture_build.observer_sources(record["revision"]) != record["sources"]):
         raise ValueError("Incomplete or unrelated original observation, source revision or native ETW helper")
