@@ -96,6 +96,23 @@ reported 402 units and ARM64 reported 401. Both relinks recovered the
 same SQLite value after the Wayland interface changed from version 1 to 2.
 [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001344710) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795/artifacts/15001819213).
 
+### Offline reconstruction with the legacy upload comparison
+
+At `6cd7757` the Fedora x64 builder reproduced the reviewed lock and all
+four target graphs from the cached original inputs. The native compiler
+reported 337 packages and 402 compilation units. The five upload results
+matched the earlier Fedora run byte for byte. The Wayland relink changed
+the observed blur interface from version 1 to 2. Detached verification
+matched all 78 source inputs to the Git revision and all 27 output hashes
+to their files. The SPDX readback verified 446 packages and 1,063
+relationships in this native development build.
+
+The original report at
+`artifacts/rust/combined-profile/runs/held-upload-6cd7757-01/result.json`
+has SHA-256 `955437b27ad61587329d4f7d073a0cc72efc2105cef820543c9c550d26d37f05`.
+[Five shipping multipart cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
+[Development SBOM scope](rw02-combined-sbom.md).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).

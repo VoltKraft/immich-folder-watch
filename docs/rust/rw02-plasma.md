@@ -54,6 +54,30 @@ Independent image, executable and library readback produced SHA-256
 `7ed39ec64ce3eee3a4b3be11bc98ffa8a4b405c1678b4a7ebd731e54569d715a`.
 [Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806677718).
 
+### Two panel activations with the current GUI at 6cd7757
+
+In the hosted desktop run at `9313f39`, the Plasma step failed on both
+Ubuntu architectures. Both architectures had passed the preceding run at
+`cd15d1c`. The Plasma sources, package manifests and Linux GUI sources were
+identical between those revisions.
+[Hosted run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
+[Preceding run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765).
+
+At `6cd7757` a local offline build used the reviewed Rust compiler, the
+Noble linker environment and the current GUI sources. In a private Plasma
+desktop using the prepared Noble x64 guest on the Fedora kernel, its real
+panel delivered two `StatusNotifierItem.Activate` calls at (163, 878).
+Both opened GUI window `0x1a00002`. The two icon crops contained 277 and
+259 gold pixels. Both neighbouring control crops contained zero. The
+watcher list was empty before registration and after Quit.
+
+The executable SHA-256 is `4bc5c47e538b581c9341298387f27370015a9a8ee7b0dae8a2b4b461b655a6a1`.
+The raw report, screen crops and activation log are in
+`artifacts/rust/plasma/noble-6cd7757-33gatgnn/observations/plasma-ivr6h9xb/`.
+The report SHA-256 is `e0be6958ef823fcefe5d120852bcb018805f43b9d35c77a073b178a6d348f5a8`.
+This replay used the previously authenticated packages already present on
+disk. The hosted step starts by downloading and checking its package set.
+
 ## The visible tray entry
 
 The original Rust GUI registered `org.example.IfwGuiProbe/StatusNotifierItem`.

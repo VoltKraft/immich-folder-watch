@@ -40,6 +40,12 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
+x64 and ARM64. On Fedora x64 the combined Rust subject reproduced all five
+identifiers after the synthetic files were replaced. The native four-target
+candidate upload and migration gates remain open.
+[Original test results and native Rust comparison](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
+
 At `9313f39` the x64 display observer ran the same PE that previously passed
 the CPU timing and device-recovery tests. A 640 × 400 GDI frame accompanied
 a visible edit on the 96-DPI console. RDP and mixed-DPI checks remain open.

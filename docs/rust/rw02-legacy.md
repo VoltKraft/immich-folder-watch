@@ -99,7 +99,19 @@ fractional-second digits. The local Rust report at
 has SHA-256 `9566c011122e9a568338013265ab4aeaa02cc0be2a378f64b9528407d54ac054`.
 The C# results are in
 `artifacts/rust/combined-profile/upload-identity-csharp/results/legacy-upload.trx`.
-The Windows and Ubuntu runs are pending for this extension.
+
+At `6cd7757` the four original GitHub C# reference archives matched their
+published SHA-256 digests. All five named multipart cases passed in each
+TRX file on native .NET SDK 10.0.401. Ubuntu x64 and ARM64 each passed 573
+tests. Windows x64 and ARM64 each passed 564 and skipped nine Linux or Unix
+cases. Each of the 20 upload results had its own execution ID. The detached
+original-archive readback at
+`artifacts/rust/combined-profile/csharp-6cd7757/readback.json` has SHA-256
+`9000ec317d0059dfb61c4cf7d86d61f64300a461ce618debf6eda9caf034aed7`.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375/artifacts/15208975243) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375/artifacts/15207953609) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375/artifacts/15207429889) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375/artifacts/15208447095).
 
 ## Executable differential test
 

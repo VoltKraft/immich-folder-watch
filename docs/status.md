@@ -11,16 +11,30 @@ The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-impleme
 On Fedora x64 the combined Rust subject matched the shipping client's five
 legacy upload identifiers, including an empty file and a 70,679-byte file.
 Each retry used the original open file after its name was replaced. The C#
-multipart reference passed all five cases. The realtime subject also passed
+multipart reference passed all five cases on native Ubuntu and Windows x64
+and ARM64 at `6cd7757`. The realtime subject also passed
 22 loopback scenarios after correcting the namespace of encoded API paths.
 Ten URL comparisons against signed 3.0.4 assemblies matched. These additions
-still need native Windows and Ubuntu results.
+still need the corresponding Windows and Ubuntu Rust results.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
+On Fedora x64 the full offline build reproduced the same five Rust upload
+results. All 78 source inputs matched `6cd7757`. The modified Wayland
+binding was rebuilt and its new interface version observed. The native
+feasibility matrix, regular CI and both Rust CodeQL configurations also
+passed for that commit.
+[Offline build and SBOM](rust/rw02-combined-profile.md#offline-reconstruction-with-the-legacy-upload-comparison) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242485) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021250087) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021249956).
+
 In the desktop run at `9313f39`, the Plasma tray step failed on both Ubuntu
-architectures. The preceding matrix at `cd15d1c` had passed on both.
-[Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691).
+architectures. The preceding matrix at `cd15d1c` had passed on both. In an
+offline x64 replay with the prepared Noble guest and the current GUI sources,
+two panel clicks reopened the original window, and Quit removed the item.
+[Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
+[Noble x64 replay](rust/rw02-plasma.md#two-panel-activations-with-the-current-gui-at-6cd7757).
 
 The remaining Windows desktop tests cover a visible Explorer tray and
 notifications, a restorable contrast setting, a move between two
