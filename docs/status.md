@@ -15,6 +15,17 @@ checks. Thirty further signed 3.0.4 profiles matched Rust for both watch
 and log paths with dot components and repeated or trailing separators.
 [Configuration diagnostics and native comparisons](rust/rw02-yaml.md#configuration-diagnostics-and-native-path-comparisons).
 
+The native Fedora x64 transport suite passed 39 cases and six unit tests.
+Rust and the signed .NET 3.0.4 assemblies accepted the same private CA
+through a Linux trust bundle or a hashed directory. Both rejected a foreign
+issuer and a wrong endpoint at initial connection and at the subsequent
+WebSocket handshake. The four native feasibility jobs, regular CI and Rust
+CodeQL passed at `d97eb33`.
+[TLS comparison](rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates) ·
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039459327) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039467065) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039466914).
+
 On Fedora x64 the combined Rust subject matched the shipping client's five
 legacy upload identifiers, including an empty file and a 70,679-byte file.
 Each retry used the original open file after its name was replaced. The C#

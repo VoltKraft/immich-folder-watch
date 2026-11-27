@@ -22,7 +22,8 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 35 wire scenarios. Two strict polling peers accept only the
+build and 35 shared wire scenarios. Linux also runs four platform trust
+cases. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
@@ -57,6 +58,15 @@ one server certificate for the loopback endpoint and one for a different
 loopback address. The latter must complete no HTTP requests. The peer records
 the incoming TLS ClientHello separately from HTTP requests. The test uses
 only synthetic credentials and its own temporary trust files.
+
+The four Linux repeats exercise the default platform verifier used by
+the adapter when no application root is supplied. Each child has its own
+temporary home, `SSL_CERT_FILE` and `SSL_CERT_DIR`. Two positive controls
+trust the issuer only in the bundle or only in the hashed directory.
+Both must complete an authenticated REST read and a WebSocket subscription.
+An unrelated issuer and a wrong endpoint
+name must stop at the TLS handshake. The private bundle and directory
+are removed with the rest of the fixture.
 
 `result.json` records each step, source and artifact hashes. `graph.json` contains
 the full selected feature graph, original inputs and notices. `sessions.json`

@@ -23,7 +23,9 @@ Socket.IO session ID. All requests derive from one configured origin. A single
 HTTP/1 client checks that origin before attaching the sensitive fixture
 header. It disables redirects, automatic retries and proxies. HTTPS is the
 default, with an explicit HTTP exception. TLS verifies chain and hostname.
-The fixture substitutes a private root store. [HTTP and TLS transport](../../tools/rust-qa/realtime/src/transport.rs).
+The shared fixture supplies private roots. The Linux platform-verifier
+cases run with a private certificate bundle and directory.
+[HTTP and TLS transport](../../tools/rust-qa/realtime/src/transport.rs).
 
 For an advertised WebSocket upgrade, the client checks the HTTP 101 response,
 the Connection and Upgrade fields, and the RFC 6455 challenge. Unrequested
@@ -422,6 +424,38 @@ x64 and ARM64 `sessions.json` digests are
 [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343500)
 · [Wire fixture](../../tools/rust-qa/realtime/verify.py)
 · [Client transport policy](../../tools/rust-qa/realtime/src/transport.rs).
+
+### Linux platform trust with private certificates
+
+On Fedora 45 x64 both signed .NET 3.0.4 and the Rust adapter used the
+platform's normal certificate verification path. Each accepted the same
+synthetic issuer when it was available only through the PEM bundle and
+when it was available only through the hashed certificate directory.
+Each client completed an authenticated REST request, received the named
+namespace event over TLS 1.3 and sent the normal namespace and WebSocket
+close packets in both cases.
+
+Four rejection trials per client exercised a foreign issuer and a wrong
+IP subject alternative name, both at the first request and on a new TLS
+connection for the WebSocket upgrade after a valid polling handshake.
+Under the invalid certificate the peer received zero HTTP requests.
+All twelve trials ran in a Linux namespace with only loopback, synthetic
+roots and a private home. The independent readback of the original
+process traces and server observations has SHA-256
+`c6d72c3ff7e4c44295dc9b61df6e5def56d1cb278587302ee795f131e19ee03e`.
+[Linux verifier inputs](https://docs.rs/rustls-native-certs/0.8.5/rustls_native_certs/fn.load_native_certs.html) ·
+[Hashed certificate directory](https://docs.openssl.org/3.5/man1/openssl-rehash/).
+
+The native Linux suite repeats the two accepted trust configurations and
+the two initial refusals. `Transport::new` receives no application CA.
+The two OpenSSL environment settings point to relative entries in the
+child's private working directory, including when its parent path contains
+a colon. The Fedora x64 receipt covers 39 wire scenarios and six unit
+tests. Each trusted platform case completed 13 inventory requests and
+delivered one event. Both rejected cases yielded zero HTTP requests.
+Its SHA-256 is `98cca2641cacd27e9c34ff07462eaf06cea4c317c66ae33288eac0b772f58005`.
+Windows store and installed Flatpak trust remain separate checks.
+[Native test entry point](../../tools/rust-qa/realtime/README.md).
 
 ## Dependency and native input review
 

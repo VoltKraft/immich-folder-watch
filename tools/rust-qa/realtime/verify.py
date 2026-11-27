@@ -477,6 +477,10 @@ def make_trust(directory):
 
 
 def run_scenario(executable, name, directory, contexts, redirect):
+    platform_trust = name.startswith("linux-platform-")
+    directory_trust = name == "linux-platform-directory-tls"
+    fixture_name = name
+    name = "tls" if directory_trust else name.removeprefix("linux-platform-")
     rejected_tls = name in {"untrusted-tls", "wrong-host-tls"}
     encrypted = rejected_tls or name in {"tls", "upgrade-redirect", "reconnect-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
@@ -498,9 +502,27 @@ def run_scenario(executable, name, directory, contexts, redirect):
         if name in {"stalled-probe", "server-disconnect-ws"} or reconnecting:
             budget = 1750
         retry = 130 if reconnecting or name in PRE_ACK_REFUSALS or name in {"stalled-probe", "peer-close-ws"} or name.startswith(("server-disconnect-", "engine-close-")) else 30_000
+        work, roots, env = directory, str(trust), None
+        trust_source = "explicit"
+        if platform_trust:
+            work = (directory / fixture_name).resolve()
+            work.mkdir(mode=0o700)
+            (work / "certs").mkdir()
+            if directory_trust:
+                trust_source = "SSL_CERT_DIR"
+                shutil.copyfile(directory / "other.crt", work / "root.pem")
+                trust = Path(shutil.copyfile(trust, work / "certs" / "issuer.pem"))
+                subprocess.run(["openssl", "rehash", str(work / "certs")], check=True, capture_output=True,
+                               env={**os.environ, "OPENSSL_CONF": str(directory / "test.conf")}, timeout=10)
+            else:
+                trust_source = "SSL_CERT_FILE"
+                trust = Path(shutil.copyfile(trust, work / "root.pem"))
+            roots = "linux-platform"
+            # One relative entry also works when the temporary parent path contains a colon.
+            env = {**os.environ, "HOME": str(work), "SSL_CERT_FILE": "root.pem", "SSL_CERT_DIR": "certs"}
         before = time.monotonic()
-        proc = subprocess.run([str(executable), url, mode, str(trust), str(budget), str(retry), "100"],
-                              cwd=directory, text=True, capture_output=True, timeout=10)
+        proc = subprocess.run([str(executable), url, mode, roots, str(budget), str(retry), "100"],
+                              cwd=work, env=env, text=True, capture_output=True, timeout=10)
         elapsed = round((time.monotonic() - before) * 1000)
         events = proc.stdout.splitlines()
         trace = Counter(events)
@@ -564,6 +586,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
         if encrypted:
             result.update(tlsClientHelloObserved=True, certificateAddress=certificate_address,
                           endpointAddress="127.0.0.1", httpRequests=stats["httpRequests"],
+                          trustSource=trust_source,
                           trustAnchorDerSha256=hashlib.sha256(ssl.PEM_cert_to_DER_cert(trust.read_text("ascii"))).hexdigest())
         return result
 
@@ -676,6 +699,9 @@ def main():
              "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
              "stalled-probe", "server-disconnect-poll", "server-disconnect-ws", "server-disconnect-then-close",
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
+    if platform.system() == "Linux":
+        cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
+                  "linux-platform-wrong-host-tls")
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),

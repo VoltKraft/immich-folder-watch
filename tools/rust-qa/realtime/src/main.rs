@@ -136,6 +136,27 @@ fn interval(value: &str) -> Result<Duration, Error> {
         .ok_or(Error::Protocol)
 }
 
+fn fixture_roots(source: &str) -> Result<Option<Vec<Certificate>>, Error> {
+    if source == "linux-platform" {
+        // With both OpenSSL paths set, the pinned Linux verifier loads only
+        // the child process's fixture store. Other hosts use explicit roots.
+        if !cfg!(target_os = "linux")
+            || std::env::var("SSL_CERT_FILE").as_deref() != Ok("root.pem")
+            || std::env::var("SSL_CERT_DIR").as_deref() != Ok("certs")
+        {
+            return Err(Error::Protocol);
+        }
+        return Ok(None);
+    }
+    if source == "-" {
+        return Ok(Some(Vec::new()));
+    }
+    let pem = std::fs::read(Path::new(source)).map_err(|_| Error::Transport)?;
+    Ok(Some(vec![
+        Certificate::from_pem(&pem).map_err(|_| Error::Transport)?,
+    ]))
+}
+
 async fn probe(args: &[String]) -> Result<(), Error> {
     let [url, mode, root, budget, retry, period] = args else {
         return Err(Error::Protocol);
@@ -153,14 +174,7 @@ async fn probe(args: &[String]) -> Result<(), Error> {
         "allow-http" => true,
         _ => return Err(Error::Protocol),
     };
-    // The fixture always supplies isolated trust, including an empty store
-    // when testing rejection. Never open a user's certificate store here.
-    let mut roots = Vec::new();
-    if root != "-" {
-        let pem = std::fs::read(Path::new(root)).map_err(|_| Error::Transport)?;
-        roots.push(Certificate::from_pem(&pem).map_err(|_| Error::Transport)?);
-    }
-    let transport = Transport::new(url, allow_http, "synthetic", Some(roots))?;
+    let transport = Transport::new(url, allow_http, "synthetic", fixture_roots(root)?)?;
     let (refresh, mut rx) = mpsc::channel(1);
     let inventory = async {
         while rx.recv().await.is_some() {
