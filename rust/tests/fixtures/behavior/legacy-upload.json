@@ -41,6 +41,27 @@
       "modifiedDotNetTicks": "638425299060000000",
       "contentSha256Upper": "79665FD124088F455970E40EA3CEC303F3B1B95875C0262A3F6DEEB813FF7137",
       "deviceAssetId": "d67ff7cbfa56623b2995bf6d48fcfa44408bd8922e279d50a44458cc435f8244"
+    },
+    {
+      "id": "BEH-LEGACY-04",
+      "parity": ["PAR-04", "PAR-05"],
+      "displayPath": "/synthetic/Camera/empty.jpg",
+      "contentBase64": "",
+      "modifiedUtc": "2024-02-03T04:05:06Z",
+      "modifiedDotNetTicks": "638425299060000000",
+      "contentSha256Upper": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "deviceAssetId": "4f5823671899e0370771252d28d18c06ce904ee7520aa6436ffeb3167c132575"
+    },
+    {
+      "id": "BEH-LEGACY-05",
+      "parity": ["PAR-04", "PAR-05"],
+      "displayPath": "C:\\Synthetic\\Groß\\東京.jpg",
+      "contentBase64": "bXVsdGlidWZmZXItMDEyMzQ1Njc4OQo=",
+      "contentRepeats": 3073,
+      "modifiedUtc": "2024-02-03T04:05:06.1234567Z",
+      "modifiedDotNetTicks": "638425299061234567",
+      "contentSha256Upper": "49C0A0B208C7E3D4C1E036743751DE640B82BBF271D781925A3CE5008357CF2E",
+      "deviceAssetId": "0960e04723cde2b2dd57e1af4b2fa35c12ca5fcbc33def882ed828b93d27c2b6"
     }
   ]
 }

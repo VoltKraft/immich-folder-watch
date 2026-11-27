@@ -35,7 +35,8 @@ def environment(work, toolchain):
 
 
 def source_witness():
-    files = [ROOT / "rust/toolchain-inputs.json", ROOT / "rust/Cargo.toml", QA / "audit-graph.py",
+    files = [ROOT / "rust/toolchain-inputs.json", ROOT / "rust/Cargo.toml",
+             ROOT / "rust/tests/fixtures/behavior/legacy-upload.json", QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "gui/source_profile.py",
              QA / "gui/src/fonts.rs", QA / "yaml/prepare.py"]
     files += list((ROOT / "rust/audit").glob("*.json"))
@@ -107,7 +108,7 @@ def main():
                 record["microsoftImports"] = compare(original, vendor)
             record["profileSha256"] = sha256(output / "profile.json")
             subprocess.run(["rustfmt", "--edition", "2024", "--config", "skip_children=true", "--check",
-                            str(HERE / "src/main.rs")], env=env, check=True)
+                            *sorted((HERE / "src").glob("*.rs"))], env=env, check=True)
             if args.native:
                 print(f"Linking and exercising {args.native}", flush=True)
                 record["native"] = run_native(args.native, toolchain, vendor, work / "build", output, env, args.jobs)

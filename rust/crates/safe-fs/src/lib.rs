@@ -28,6 +28,8 @@ pub use staging::{Download, PublishError};
 #[cfg(windows)]
 #[path = "windows.rs"]
 mod native;
+#[cfg(windows)]
+pub use native::WindowsWriteTime;
 #[cfg(test)]
 #[path = "../tests/support/mod.rs"]
 mod test_support;

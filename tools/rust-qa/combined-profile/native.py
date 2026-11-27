@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import upload_trial
 from sources import HERE, QA, ROOT, read, sha256, source_config, source_profile
 
 
@@ -112,6 +113,7 @@ def run_native(target, toolchain, vendor, build, output, env, jobs):
     answer = {"target": target, "isolation": isolation, "binarySha256": sha256(binary),
               "buildLogSha256": sha256(output / "build.log"), "clippyLogSha256": sha256(output / "clippy.log"),
               "smokeSha256": sha256(output / "smoke.json"), "sqliteFlags": sqlite["flags"]}
+    answer["legacyUploadSha256"] = upload_trial.run(prefix, subject, fixture, env, output)
     if sys.platform == "linux":
         answer["sampleMtimeNs"] = mtime_ns
         answer["nativeRendererSymbols"] = linux_renderer_symbols(binary, output / "renderer-symbols.txt", env)

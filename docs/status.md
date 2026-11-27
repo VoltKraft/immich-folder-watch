@@ -8,6 +8,20 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+On Fedora x64 the combined Rust subject matched the shipping client's five
+legacy upload identifiers, including an empty file and a 70,679-byte file.
+Each retry used the original open file after its name was replaced. The C#
+multipart reference passed all five cases. The realtime subject also passed
+22 loopback scenarios after correcting the namespace of encoded API paths.
+Ten URL comparisons against signed 3.0.4 assemblies matched. These additions
+still need native Windows and Ubuntu results.
+[Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
+[Realtime transport](rust/rw02-realtime-transport.md).
+
+In the desktop run at `9313f39`, the Plasma tray step failed on both Ubuntu
+architectures. The preceding matrix at `cd15d1c` had passed on both.
+[Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691).
+
 The remaining Windows desktop tests cover a visible Explorer tray and
 notifications, a restorable contrast setting, a move between two
 outputs with different DPI, and rendering in an actual RDP session. The available

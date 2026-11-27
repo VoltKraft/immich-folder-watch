@@ -341,6 +341,10 @@ public sealed class RustRewriteBehaviorContractTests
         using var directory = new SyntheticDirectory();
         var path = Path.Combine(directory.Path, "photo.jpg");
         var bytes = Convert.FromBase64String(String(value, "contentBase64")!);
+        if (value.TryGetProperty("contentRepeats", out var repeats))
+        {
+            bytes = Enumerable.Repeat(bytes, repeats.GetInt32()).SelectMany(block => block).ToArray();
+        }
         await File.WriteAllBytesAsync(path, bytes);
         var timestamp = DateTimeOffset.Parse(String(value, "modifiedUtc")!, CultureInfo.InvariantCulture).UtcDateTime;
         File.SetLastWriteTimeUtc(path, timestamp);

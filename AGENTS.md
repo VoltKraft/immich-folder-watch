@@ -203,7 +203,8 @@ to reconcile project decisions, defaults, and recorded state.
   [alias scope across skipped configuration properties](docs/rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties) and the
   [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
   Compare [Linux file modification ticks](docs/rust/rw02-legacy.md#linux-file-modification-times)
-  using metadata from the held file. For realtime changes, verify the
+  using metadata from the held file. Verify [legacy upload identities](docs/rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file)
+  and the rewound retry body against the C# multipart cases. For realtime changes, verify the
   [disconnect packets observed by the peer](docs/rust/rw02-realtime-transport.md#stopping-an-established-session).
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).

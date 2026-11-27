@@ -51,7 +51,7 @@ values are significant. Missing/unrecognized operations fail the harness.
 | `BEH-API-11` | All ten permission probes with deliberately invalid IDs, exact methods/bodies and blocking flags | PAR-05 |
 | `BEH-API-12`–`13` | Album membership fallback methods/payloads; permission denial does not try alternative routes | PAR-02, PAR-05 |
 | `BEH-API-14`–`19` | Unassigned root assets, trash with `force:false`, exact-ID delete/rename, same-name albums do not grant destructive ownership, verifiable new owned ID | PAR-02, PAR-05 |
-| `BEH-LEGACY-01`–`03` | Legacy multipart retry and exact device identifier encoding with Unicode/Windows display paths and equal-size, equal-time different contents | PAR-04, PAR-05 |
+| `BEH-LEGACY-01`–`05` | Legacy multipart retry and exact device identifier encoding with Unicode and Windows display paths, equal-size and equal-time replacements, an empty file, and a 70,679-byte file with a fractional-second timestamp | PAR-04, PAR-05 |
 | `BEH-APPLY-01`–`05` | Invalid local draft and rejected access leave config untouched; save precedes restart; restart failure preserves saved config; cancellation does not save/restart | PAR-06, PAR-08 |
 | `BEH-WORKER-01`–`03` | Existing-file startup behavior for all three modes, subsequently created file upload, local preservation, durable mapping and Last Sync | PAR-01, PAR-03, PAR-04 |
 

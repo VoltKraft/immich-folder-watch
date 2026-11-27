@@ -66,6 +66,14 @@ impl UtcTicks {
         let minute = digits(&bytes[14..16])?;
         let second = digits(&bytes[17..19])?;
         let fraction = digits(&bytes[20..27])?;
+        Self::from_calendar([year, month, day], [hour, minute, second], fraction)
+    }
+
+    fn from_calendar(
+        [year, month, day]: [u32; 3],
+        [hour, minute, second]: [u32; 3],
+        fraction: u32,
+    ) -> Result<Self, TimestampError> {
         if !(1..=9999).contains(&year)
             || !(1..=12).contains(&month)
             || day == 0
@@ -85,6 +93,38 @@ impl UtcTicks {
             days * TICKS_PER_DAY
                 + u64::from(hour * 3600 + minute * 60 + second) * TICKS_PER_SECOND
                 + u64::from(fraction),
+        )
+    }
+
+    /// Match DateTime.FromFileTimeUtc using the UTC calendar returned by Windows
+    /// for this FILETIME. Preserve its submillisecond ticks. .NET maps a leap
+    /// second to the last representable tick of its minute.
+    pub fn from_windows_utc(
+        file_time: u64,
+        date: [u16; 3],
+        [hour, minute, second]: [u16; 3],
+        milliseconds: u16,
+    ) -> Result<Self, TimestampError> {
+        const FILE_TIME_OFFSET: u64 = 504_911_232_000_000_000;
+        if file_time > MAX_TICKS - FILE_TIME_OFFSET {
+            return Err(TimestampError::Range);
+        }
+        if milliseconds >= 1000 || second > 60 {
+            return Err(TimestampError::Calendar);
+        }
+        let fraction = if second == 60 {
+            9_999_999
+        } else {
+            u32::from(milliseconds) * 10_000 + (file_time % 10_000) as u32
+        };
+        Self::from_calendar(
+            date.map(u32::from),
+            [
+                u32::from(hour),
+                u32::from(minute),
+                u32::from(second.min(59)),
+            ],
+            fraction,
         )
     }
 
@@ -223,6 +263,20 @@ fn days_in_month(year: u32, month: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_file_times_keep_submillisecond_ticks_and_clamp_a_leap_second() {
+        let date = [2016, 12, 31];
+        let file_time = 131_277_023_999_991_234;
+        let sample = UtcTicks::from_windows_utc(file_time, date, [23, 59, 59], 999).unwrap();
+        assert_eq!(sample.format_sql(), "2016-12-31T23:59:59.9991234+00:00");
+        let leap = UtcTicks::from_windows_utc(file_time, date, [23, 59, 60], 0).unwrap();
+        assert_eq!(leap.format_sql(), "2016-12-31T23:59:59.9999999+00:00");
+        assert_eq!(
+            UtcTicks::from_windows_utc(2_650_467_744_000_000_000, date, [0, 0, 0], 0),
+            Err(TimestampError::Range)
+        );
+    }
 
     #[test]
     fn extremes_and_pre_unix_epoch_retain_every_tick() {

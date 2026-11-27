@@ -6,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::mem::{size_of, size_of_val};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use std::os::windows::fs::OpenOptionsExt;
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::path::{Component, Path, Prefix};
 use std::ptr;
@@ -114,6 +114,7 @@ unsafe extern "system" {
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
+    fn FileTimeToSystemTime(file_time: *const [u32; 2], utc: *mut [u16; 8]) -> i32;
     fn GetFileInformationByHandle(file: RawHandle, information: *mut HandleInformation) -> i32;
     fn GetFileInformationByHandleEx(
         file: RawHandle,
@@ -140,6 +141,38 @@ unsafe extern "system" {
         information: *const c_void,
         bytes: u32,
     ) -> i32;
+}
+
+/// The UTC calendar Windows assigns to a last-write FILETIME. Windows owns
+/// its leap-second table, and can report a 60th second in this calendar.
+pub struct WindowsWriteTime {
+    pub file_time: u64,
+    /// Year, month and day of month.
+    pub date: [u16; 3],
+    /// Hour, minute and second.
+    pub time: [u16; 3],
+    pub milliseconds: u16,
+}
+
+impl WindowsWriteTime {
+    /// Convert the timestamp from the supplied handle metadata without opening any pathname.
+    pub fn from_metadata(metadata: &std::fs::Metadata) -> io::Result<Self> {
+        let file_time = metadata.last_write_time();
+        let words = [file_time as u32, (file_time >> 32) as u32];
+        let mut utc = [0u16; 8];
+        // SAFETY: FILETIME is two DWORDs (low, high), and SYSTEMTIME consists
+        // of eight WORDs. Both aligned arrays live for the entire call.
+        if unsafe { FileTimeToSystemTime(&words, &mut utc) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let [year, month, _, day, hour, minute, second, milliseconds] = utc;
+        Ok(Self {
+            file_time,
+            date: [year, month, day],
+            time: [hour, minute, second],
+            milliseconds,
+        })
+    }
 }
 
 #[link(name = "bcrypt")]

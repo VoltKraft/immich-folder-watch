@@ -3,6 +3,8 @@
 
 #[path = "../../gui/src/fonts.rs"]
 mod fonts;
+mod legacy_upload;
+mod upload_trial;
 
 use desktop_lifecycle::{DesktopLifecycle, HostCommand};
 use desktop_platform_log::{Level, Record};
@@ -119,9 +121,21 @@ fn renderer_witness() -> Result<&'static str, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let mut args = std::env::args_os().skip(1);
+    let first = args.next().ok_or("missing synthetic root")?;
+    if first == "--legacy-upload" {
+        let root = args.next().ok_or("missing synthetic upload root")?;
+        let display = args.next().ok_or("missing display path")?;
+        if args.next().is_some() {
+            return Err("unexpected legacy upload argument".into());
+        }
+        return upload_trial::observe(
+            Path::new(&root),
+            display.to_str().ok_or("invalid display text")?,
+        );
+    }
     // Only the runner-created fixture directory is passed to the filesystem adapter.
-    let directory = std::env::args_os().nth(1).ok_or("missing synthetic root")?;
-    let root = safe_fs::Directory::open_root(Path::new(&directory))?;
+    let root = safe_fs::Directory::open_root(Path::new(&first))?;
     let media = root.open_file("sample.txt".as_ref())?;
     assert!(media.is_current_entry()?);
 

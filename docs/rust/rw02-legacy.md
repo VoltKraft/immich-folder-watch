@@ -68,6 +68,39 @@ SHA-256 `4fcb13e55e09889ff88c4f87321b2008cc7557965c6ab6f45a689eebc1d0cd51`.
 [Combined native comparison](../../tools/rust-qa/combined-profile/src/main.rs) ·
 [Signed package identity](rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
 
+## Legacy upload identities from the held file
+
+The shipping multipart client can receive a request for a legacy device
+identifier after it has already sent the file once. Its identifier incorporates
+the verbatim display path, length, last-write time in .NET ticks and uppercase
+SHA-256 of the file contents. The final SHA-256 is lowercase. Each input
+field is separated by the ASCII pipe character and encoded as UTF-8.
+[Shipping client](../../src/ImmichFolderWatch.Immich/ImmichAssetClient.cs) ·
+[Five reference cases](../../rust/tests/fixtures/behavior/legacy-upload.json).
+
+The combined Rust subject consumes the first body, signals its observer and
+waits. The observer renames the synthetic file and puts a replacement at the
+original name. Four replacements preserve length and timestamp. The fifth
+is ten bytes longer and one minute newer to distinguish metadata from the
+original handle and the current directory entry. If Windows denies the move
+with a sharing violation, the observer records that outcome. The subject
+reads the identity from its original handle, rewinds it and streams the
+retry. The observer compares both body hashes, the retry position and every
+identifier field with the C# vectors. The nonempty replacements have different
+bytes. The empty case also checks the identity of the directory entry.
+[Rust calculation](../../tools/rust-qa/combined-profile/src/legacy_upload.rs) ·
+[Native observer](../../tools/rust-qa/combined-profile/upload_trial.py).
+
+On Fedora x64 all five renames succeeded, each retry started at offset zero,
+and all five device identifiers and body hashes matched. The C# multipart
+test passed all five cases, including the 70,679-byte file with seven
+fractional-second digits. The local Rust report at
+`artifacts/rust/combined-profile/legacy-upload-native-ysh2m2ab/native-04/legacy-upload.json`
+has SHA-256 `9566c011122e9a568338013265ab4aeaa02cc0be2a378f64b9528407d54ac054`.
+The C# results are in
+`artifacts/rust/combined-profile/upload-identity-csharp/results/legacy-upload.trx`.
+The Windows and Ubuntu runs are pending for this extension.
+
 ## Executable differential test
 
 The development-only

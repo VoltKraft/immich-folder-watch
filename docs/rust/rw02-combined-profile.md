@@ -98,6 +98,11 @@ same SQLite value after the Wayland interface changed from version 1 to 2.
 
 ## Reproduction
 
+The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
+The native receipt indexes `legacy-upload.json`, which identifies the corpus,
+the two streamed bodies, the directory-entry result and the retry position
+for each case.
+
 Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the disposable GitHub-hosted x64 or ARM64 host, the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)
 
 ```sh
