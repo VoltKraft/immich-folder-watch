@@ -167,7 +167,11 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
             pw = checked_start(stack, ['pipewire'], pw_log)
             wait_for(lambda: check_alive(pw, pw_log) or Path('/run/user/0/pipewire-0').is_socket(), 5,
                 'Private PipeWire not ready')
-            checked_start(stack, ['wireplumber'], Path('/qa/wireplumber.log'))
+            if notification_only:
+                from shell_services import private_video_policy
+                record('video_policy', private_video_policy(stack))
+            else:
+                checked_start(stack, ['wireplumber'], Path('/qa/wireplumber.log'))
         display = X11(xd) if backend == 'x11' else Wayland(stack, bus, shell)
 
         def owner(name):

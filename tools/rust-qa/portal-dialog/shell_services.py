@@ -1,8 +1,34 @@
 """Observe the real private GNOME Shell notification display and background portal."""
 
 from pathlib import Path
+import os
+import subprocess
 import time
 from session import checked_start, check_alive, wait_for
+
+
+def private_video_policy(stack):
+    """Keep the screen consumer connected inside the headless notification fixture."""
+    home = Path.home()
+    if home != Path('/tmp/home') or os.environ['XDG_RUNTIME_DIR'] != '/run/user/0':
+        raise RuntimeError('The screen observer requires the private GNOME profile')
+    # WirePlumber 0.4 starts its BlueZ seat monitor by default. This desktop
+    # has neither Bluetooth devices nor a logind seat. Leave video policy intact.
+    legacy = Path('/usr/share/wireplumber/bluetooth.lua.d/30-bluez-monitor.lua').is_file()
+    if legacy:
+        config = home / '.config/wireplumber/bluetooth.lua.d/89-private-video.lua'
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text('bluez_monitor.enabled = false\nbluez_midi_monitor.enabled = false\n')
+    log = Path('/qa/wireplumber.log')
+    policy = checked_start(stack, ['wireplumber'], log)
+
+    def ready():
+        check_alive(policy, log)
+        clients = subprocess.run(['pw-cli', 'ls', 'Client'], capture_output=True, text=True, timeout=3, check=True)
+        return 'WirePlumber' in clients.stdout
+
+    wait_for(ready, 8, 'The private PipeWire video policy did not connect')
+    return {'wireplumber_pid': policy.pid, 'legacy_bluetooth_disabled': legacy}
 
 
 def screen(stack, bus):

@@ -35,3 +35,31 @@ on the observer host. Pillow uses a permissive license and Tesseract and its
 English data use Apache-2.0. [Pillow license](https://github.com/python-pillow/Pillow/blob/main/LICENSE) ·
 [Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE) ·
 [English model license](https://github.com/tesseract-ocr/tessdata_fast/blob/main/LICENSE).
+
+## Ubuntu ARM64 capture at 10ab0b8
+
+The installed ARM64 sender submitted and withdrew `native-test`. GTK forwarded
+both calls to GNOME Shell PID 13 on the private display. All three screen
+captures timed out. GStreamer stopped at PAUSED and WirePlumber 0.4.17
+disconnected after failing to start its logind monitor. The detached reader
+rejected the missing images. The original archive has 21 members, 2,490,623
+bytes and SHA-256
+`2eaf33af0a180e86b84594188b6368d54fcf58ec6ec92b1ddba9e53e7f430565`.
+[Original ARM64 build and desktop logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591797/artifacts/15181348629).
+
+The same Ubuntu release and WirePlumber package on x64 reproduced the failure
+with the original observer. In WirePlumber 0.4 the headless test now disables
+the Bluetooth audio and MIDI monitors in its private configuration directory.
+It checks that the video session manager has actually connected to PipeWire
+before starting GNOME. The repaired x64 trial with the same sender captured
+three full frames. The middle frame contained the complete title and body.
+After withdrawal the list still showed “Do Not Disturb” and “Clear”.
+
+The local comparison uses the existing Noble userspace on the Fedora x64
+kernel. Its original, repaired and ARM64-hosted results are separate. The
+repaired x64 capture hashes are
+`8bbaca6f54a8ee0d967bfdadf86cf9fb7b6a3707c2e51da7dd8b1d4489846e60`
+before posting, `38c55918aa72654bffc52fbbacd6d00c4c35d69a0052d835c09f1a3564ec6cb5`
+with the notification visible and
+`f46b5b23f2ea53d8455510f73569e631aca24a234cdc506d3315624e37d14d10`
+after withdrawal.

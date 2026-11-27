@@ -60,7 +60,11 @@ At `10ab0b8` the installed Ubuntu ARM64 Flatpak delivered its exact
 notification and withdrawal to the real GNOME Shell. The private
 WirePlumber session stopped before producing any monitor images, leaving
 visible delivery open. The Fedora x64 control verified the visible text
-and its withdrawal on the same revision.
+and its withdrawal on the same revision. An isolated Ubuntu 24.04 x64
+control reproduced the failure with WirePlumber 0.4.17. With the unused
+Bluetooth seat monitors disabled in that private profile, the same sender
+produced all three captures. The title and body disappeared from the
+still-open message list after withdrawal. Native ARM64 replay is pending.
 [ARM64 notification trial](rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64).
 
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
