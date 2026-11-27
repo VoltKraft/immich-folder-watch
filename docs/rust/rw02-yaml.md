@@ -291,6 +291,27 @@ namespaces and application-level validation remain separate
 work. Negative numeric values accepted by the legacy loader are not thereby
 approved by the application's configuration validator.
 
+### Configuration diagnostics and native path comparisons
+
+The normalized configuration's Rust `Debug` output reports the watch
+source count. Formatting its connection settings reports the insecure
+HTTP flag. Compact and pretty formatting both omit the endpoint and API
+key. The regression check also confirms that serialization retains both
+values. On Fedora x64 all 14 unit tests, 261 input-byte checks, 402
+differential assertions and 228 C# readbacks passed. All 114 Rust-written
+YAML files were byte-identical to the preceding clean run. The native
+receipt has SHA-256
+`a2011aab9822cc848b22e1ef46c36982f89b275598c2bc510f2b0eca54c2a369`.
+[Configuration and diagnostic test](../../tools/rust-qa/yaml/src/model.rs).
+
+In a separate Fedora x64 comparison with the signed 3.0.4 loader, both
+readers preserved the editable spelling of 30 synthetic absolute and
+relative directory paths, including repeated separators, terminal dot and
+parent components and literal names ending in dots. Their runtime watch
+and log directories matched in every case. The two comparison receipts
+have SHA-256 `a017e3faa42898f71f6273cacbc0e793443229ac4625232f25af5a06ff59ee27`
+and `eb446c5cdd4c74cb7aea6f613b46098c1d487bfc09c1c7b07ec380d0603c224b`.
+
 ### Ordinary profiles with 100 and 300 folders
 
 The original native corpus contained at most four watch folders per

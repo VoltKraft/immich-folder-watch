@@ -8,6 +8,13 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+On Fedora x64 the normalized Rust config now formats diagnostic summaries
+without its API key or endpoint. All 114 serialized YAML files matched the
+previous native run byte for byte, and the shipping C# reader passed 228
+checks. Thirty further signed 3.0.4 profiles matched Rust for both watch
+and log paths with dot components and repeated or trailing separators.
+[Configuration diagnostics and native comparisons](rust/rw02-yaml.md#configuration-diagnostics-and-native-path-comparisons).
+
 On Fedora x64 the combined Rust subject matched the shipping client's five
 legacy upload identifiers, including an empty file and a 70,679-byte file.
 Each retry used the original open file after its name was replaced. The C#

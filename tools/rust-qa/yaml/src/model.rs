@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 use std::path::Path;
 #[cfg(not(windows))]
 use std::path::{Component, PathBuf};
@@ -118,7 +119,7 @@ legacy_mapping! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub immich: Immich,
@@ -128,12 +129,30 @@ pub struct Config {
     pub localization: Localization,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+impl fmt::Debug for Config {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Config")
+            .field("source_count", &self.watch.sources.len())
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Immich {
     allow_insecure_http: bool,
     server_api_url: String,
     api_key: String,
+}
+
+impl fmt::Debug for Immich {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Immich")
+            .field("allow_insecure_http", &self.allow_insecure_http)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -420,4 +439,42 @@ fn normalize_path(value: &str, profile: &Path) -> Result<String, &'static str> {
         result.push(std::path::MAIN_SEPARATOR);
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configuration_debug_omits_profile_values_but_serialization_preserves_them() {
+        let config = serde_json::json!({
+            "immich": {
+                "allowInsecureHttp": false, "serverApiUrl": "https://endpoint.invalid/private",
+                "apiKey": "synthetic-yaml-key"
+            },
+            "watch": {
+                "sources": [], "extensions": [], "transferOrder": "newestFirst",
+                "batchIntervalSeconds": 5, "maxBatchSize": 25, "fileReadyTimeoutSeconds": 30
+            },
+            "retry": {"maxAttempts": 5, "baseDelayMilliseconds": 500},
+            "logging": {"level": "Information", "target": "file", "logDirectory": "synthetic-log-dir"},
+            "localization": {"language": "auto"}
+        });
+        let model: Config = serde_json::from_value(config.clone()).unwrap();
+        let diagnostics = format!(
+            "{model:?} {model:#?} {:?} {:#?}",
+            model.immich, model.immich
+        );
+        for value in [
+            "synthetic-yaml-key",
+            "endpoint.invalid",
+            "synthetic-log-dir",
+        ] {
+            assert!(
+                !diagnostics.contains(value),
+                "profile value in Debug output"
+            );
+        }
+        assert!(serde_json::to_value(model).unwrap() == config);
+    }
 }
