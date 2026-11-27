@@ -1180,3 +1180,55 @@ the later check for one WARP device with no active loss through Quit.
 This result qualifies one explicitly selected CPU-painter trial on a
 Windows x64 software adapter. Repeatability, ordinary renderer selection,
 RDP and mixed-DPI operation remain to be qualified.
+
+### Native Windows x64 CPU repeat at 972adc6
+
+On another x64 runner the explicitly selected CPU painter again met all
+eleven WPF limits. Scan close/reopen p95 was 7.11/8.32 ms against
+17.72/19.08 ms. The ordinary retained median again exceeded three
+limits, with idle close at 43.70 ms, scan close at 23.33 ms and scan
+reopen at 32.22 ms. Both CPU process logs retained their original WARP
+device through normal Quit. The same worker completed two inventories
+of 100,000 files. Edits on the reopened HWND changed 177 pixels.
+
+Of 172 file-qualified reopens, 171 had a full CPU transfer between the
+independent visible-window observation and the next close request. For
+those 171 frames, request to GDI flush took 13.75 ms at p95 and visible
+observation to flush took 6.76 ms. On the remaining reopen three complete
+transfers preceded the first visible sample. The observer found no
+further complete frame before the next close, so it excluded that
+reopen from the frame-latency calculation.
+
+The detached reader verified the 87,115,707-byte original at
+`972adc6aa275282ab8c4447979c5ef9a8845e416`, ZIP SHA-256
+`3fb093bd45d8b6e6d2ffaa37113683cc13e5cd771fddc350be1e9e1755e17fbd`.
+[Original Windows compiler, pixels and native timings](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250568/artifacts/15158602743).
+
+### Automatic WARP selection on Windows x64 at 3b488ca
+
+The retained GUI selected the CPU painter on the DX12 Microsoft Basic Render
+Driver without a painter override. All eleven same-host WPF limits passed.
+Scan close/reopen p95 was 4.22/9.18 ms against 18.69/20.03 ms. The ordinary
+retained renderer exceeded both limits at 21.49/26.12 ms. Startup took
+171.06 ms. The CPU-painted subject recorded zero idle CPU and presentations
+in both visibility states and used 56.83/55.61 MiB visible/hidden.
+
+Worker PID 1636 completed both passes over 100,000 distinct files. For
+each of the 246 file-qualified reopens, the original window (HWND 1180180,
+PID 944) received a complete editor-mesh transfer after the independent
+visible sample and before the next close. Request to GDI flush took 17.39 ms
+at p95 and visible sample to flush took 9.99 ms. The reopened editor showed
+177 changed pixels and the subject exited normally. Both process logs
+retained one healthy WARP device through Quit.
+
+The separate sampler-handoff example compiled. Its observer stopped before
+starting the example. Cargo reused all 155 shared units. For the application
+library it reported the promoted release `.rlib` in the primary build and
+the compilation-unit `.rlib` alongside the same `.rmeta` in the example.
+The observer required identical output paths. This archive supplies zero
+of the three required visible texture observations.
+
+The detached timing reader verified all 140 entries of the 87,313,592-byte
+original at `3b488ca8ff817012c2f2fcb47dba46c75e598ffe`, ZIP SHA-256
+`d09ac6347cbc599f7761807d739116aa65d14a84d885d44c200efb7500df0543`.
+[Native build, timings, compiler streams and captures](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644127/artifacts/15161087080).

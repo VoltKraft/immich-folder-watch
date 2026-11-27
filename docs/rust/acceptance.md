@@ -43,8 +43,20 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 At `dddb21a` the private Windows x64 CPU renderer met all eleven WPF
 limits. All 421 file-qualified reopens drew a complete editor frame
 before the next close. The ordinary retained renderer met eight limits
-on that host. This is one native CPU-renderer trial.
-[Raw timing, pixels and original archive](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
+on that host. A second native run at `972adc6` also met all eleven
+limits with 171 full frames across 172 eligible reopen intervals.
+Automatic WARP selection at `3b488ca` met all eleven limits on a third
+host and drew a complete frame on each of 246 eligible reopens. The
+separate sampler-handoff example stopped before the first visible sample.
+[First native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
+[Second native CPU trial](rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6) ·
+[Automatic selection and handoff outcome](rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca).
+
+The native foreground F24 checks at `de3eec4` restored focus on both Windows
+architectures and preserved the original workers. The x64 observation
+resolved equal resume and SHOW timestamps using the original HWND's
+hidden state immediately after resume. Explorer activation remains open.
+[Native keyboard observations](rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
 
 At `c4d05b6` the installed 3.0.4 Windows worker consumed the Rust-returned
 database on both architectures. On the x64 Default desktop and the ARM64

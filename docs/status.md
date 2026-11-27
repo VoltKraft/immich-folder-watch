@@ -13,17 +13,38 @@ eleven same-host WPF limits. Under inventory load, close/reopen p95 was
 5.71/9.66 ms and every one of the 421 eligible reopens drew the full
 editor before the next close. From the request to a completed GDI flush
 the p95 was 24.04 ms. The ordinary retained renderer met eight limits.
-A second native CPU comparison at `972adc6` is in progress.
-[Native comparison and archived compiler and window evidence](rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a).
+The repeat at `972adc6` also met all eleven limits. Scan close/reopen p95
+was 7.11/8.32 ms. Of 172 eligible reopens, 171 had a complete transfer
+after the visible sample and before the next close.
+[First native archive](rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
+[Second native archive and frame coverage](rust/rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6).
 
-The next private x64 build selects CPU painting from the actual WARP
+The private x64 build at `3b488ca` selects CPU painting from the actual WARP
 adapter and root surface. It retains wgpu's texture state across CPU
 frames so a later unsupported sampler can switch renderers without
 losing a partial texture update. Local frozen reconstruction and
-Windows x64 cross-Clippy passed. The native timing and three visible
-texture samples for this implementation are pending.
+Windows x64 cross-Clippy passed. Both Rust CodeQL configurations, all
+eight regular CI jobs and all four native feasibility jobs passed. On native
+Windows x64 automatic WARP selection met all eleven WPF limits. All 246
+eligible reopens received a complete editor frame, with request-to-flush
+p95 of 17.39 ms. The separate example compiled but stopped before the
+first of three visible texture samples when Cargo reported the application
+library under its internal path. The larger desktop matrix passed on both
+Ubuntu architectures. Both Windows jobs reported outstanding desktop checks.
+[Native timing and compiler evidence](rust/rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca) ·
+[Desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644176) ·
 [Renderer comparison](../tools/rust-qa/windows-cpu-paint/README.md) ·
-[Texture handoff and readback](../tools/rust-qa/windows-cpu-paint/handoff/README.md).
+[Texture handoff and readback](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
+[Four native feasibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644102) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908649768) ·
+[Regular CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908649763).
+
+At `de3eec4` the foreground F24 launch restored keyboard focus to the
+original window on both Windows architectures. On x64 a hidden-window
+sample after resume resolved the tied 7,585,140 ms timestamps. On ARM64
+SHOW followed resume by 16 ms. The original workers survived and both
+input desktops were restored.
+[Native keyboard observations](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
 
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The

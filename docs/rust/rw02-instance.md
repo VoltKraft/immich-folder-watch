@@ -1054,8 +1054,7 @@ observer pumps queued events. A hidden sample followed by exactly one
 SHOW on the same live root can resolve a tied timestamp. The observer
 records the process creation times, window thread and the sample’s
 performance-counter interval. An already visible sample leaves the
-existing ordering checks in effect. Only a fresh native run can supply
-this additional observation.
+existing ordering checks in effect.
 [Native keyboard recorder](../../tools/rust-qa/windows-launcher/observe.py) ·
 [Windows visibility query](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowvisible) ·
 [Windows event timestamp](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wineventproc).
@@ -1067,6 +1066,29 @@ has SHA-256 `8ffa18aea8bb5963ec8d007249a71ace51728071597409061875b36ca10351b0`.
 A separate review also reproduced the x64 success at `0bb39bf`. All
 28 targeted tests passed. The full launcher suite passed 107 tests on
 Linux and skipped three native cases.
+
+On Windows x64 at `de3eec4`, both secondary resume and SHOW fell in
+uptime millisecond 7,585,140. After resume the observer found the original
+HWND 4391472 (PID 7336, UI thread 8828) still hidden. The event count
+was two on both sides of this query. The third event was a SHOW on the
+same HWND. Its first foreground and focus samples then found the original
+window active with keyboard focus. The F24 launcher (PID 4820) had
+started secondary PID 1260, which the primary identified in its IPC log.
+The original inventory worker (PID 6396) survived the close and reopen.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538660/artifacts/15161077395).
+
+On ARM64 the original HWND 655392 (PID 7152, UI thread 10740) was also
+hidden immediately after resume. Windows recorded resume at 5,317,437 ms
+and SHOW at 5,317,453 ms. The original window held keyboard focus on
+the first sample and inventory worker PID 6348 survived. On both hosts
+the primary and secondary exited zero, both process jobs emptied, the
+temporary profile was removed and the supervisor restored the original
+`Default` input desktop. Both keyboard steps passed. Separate checks
+failed in each desktop job. These observations cover an F24 launch
+from a foreground test window on a private desktop. Explorer activation
+remains open.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538660/artifacts/15156702599) ·
+[Desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538660).
 
 ## Both installed Windows launch orders at 2dd5f93
 
