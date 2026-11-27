@@ -128,6 +128,18 @@ rejected it. On Fedora x64, a separate clean-checkout control at the
 same revision passed the bus and pixel checks and matched all 25 recorded
 source files. [Original ARM64 artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591797/artifacts/15181348629).
 
+The native ARM64 run at `1a62d5c` retained the same sender ELF and
+produced all three 1280 × 900 monitor captures. GTK at `:1.12`
+forwarded the notification and withdrawal to GNOME Shell at `:1.6`.
+That bus connection belonged to compositor PID 26. The open list showed
+**Synthetic notification** and **Private portal delivery test** under
+**Portal assessment**. The withdrawal removed the entry while the list,
+its controls and two independent system messages remained visible. Visual
+inspection and detached OCR agreed. The 2,601,390-byte archive contained
+24 entries and matched the Actions SHA-256
+`bc2dacb2807575d5e1f9bda80c881996d19b859138fffd418bfb6b84bf3a21c1`.
+[Three original images, bus trace, installed sender and native readback](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45964876262/artifacts/15182840409).
+
 ## Inputs, isolation and reproduction
 
 The frozen Rust 1.100.0 workspace has 211 third-party lock records matching
