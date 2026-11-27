@@ -194,7 +194,12 @@ starts the ordinary executable on the same desktop while the original GUI
 and inventory worker are running. It records whether that launcher opens
 and focuses the window and checks both processes through Quit. Across
 123 local launcher tests, 120 passed and three platform cases skipped.
-The Windows Server 2022 trial is running at `3d55500`.
+At `3d55500` a second launch opened and focused the original background-start
+GUI on Windows Server 2022 x64 when Explorer exposed no usable icon rectangle.
+Windows showed the window 171 ms after the second process was released.
+The original worker survived and the secondary exited zero. The same
+condition after closing a visible window is still open. The next run
+starts the background GUI first on a fresh Explorer desktop.
 [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453) ·
 [Ordinary launcher when the icon has no rectangle](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
 

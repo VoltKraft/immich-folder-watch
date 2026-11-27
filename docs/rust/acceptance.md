@@ -50,6 +50,13 @@ usable icon rectangle on its desktop. ARM64 activation remains open.
 [Hidden start](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c) ·
 [Reopen after close](rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
+At `3d55500` on Windows Server 2022 x64, a second ordinary launch opened
+the background-start primary when Explorer reported no usable icon rectangle.
+The original worker survived, the primary received foreground and keyboard
+focus, and the secondary exited zero. The same condition after a manual
+close still needs a native observation.
+[Original HWND, worker and second launch](rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
+
 At `20dfb10` the x64 Explorer left quiet time after 48 minutes. The
 classic sender received a show callback, and WinRT history contained
 the normal and suppressed entries with their exact text. None of the

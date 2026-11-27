@@ -6,12 +6,22 @@ on:
     paths:
       - '.github/workflows/rust-windows-shell-2022.yaml'
       - 'tools/rust-qa/windows-launcher/native_tray.py'
+      - 'tools/rust-qa/windows-launcher/observe.py'
+      - 'tools/rust-qa/windows-launcher/retained_window.py'
       - 'tools/rust-qa/windows-launcher/tray_provider.ps1'
       - 'tools/rust-qa/windows-launcher/tray_msaa.cs'
       - 'tools/rust-qa/appearance/windows*.py'
       - 'tools/rust-qa/appearance/windows-label.ps1'
       - 'tools/rust-qa/performance/worker-inputs.json'
   workflow_dispatch:
+    inputs:
+      start_order:
+        description: First GUI to register with the original Explorer
+        type: choice
+        default: background-first
+        options:
+          - background-first
+          - visible-first
 
 permissions:
   contents: read
@@ -89,11 +99,18 @@ jobs:
           }
           @('library_paths<<IFW_COMPILER_OUTPUTS') + $libraries + 'IFW_COMPILER_OUTPUTS' >> $env:GITHUB_OUTPUT
 
-      - name: Exercise visible startup and close before background startup on the original Explorer
+      - name: Exercise both start modes on the original Explorer
         shell: pwsh
+        env:
+          START_ORDER: ${{ inputs.start_order || 'background-first' }}
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
-          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained --reopen-first
+          $orderArgs = @(switch ($env:START_ORDER) {
+            'background-first' { }
+            'visible-first' { '--reopen-first' }
+            default { throw "Unexpected start order" }
+          })
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained @orderArgs
           exit $LASTEXITCODE
 
       - name: Observe the original contrast setting and a reversible change if available

@@ -504,6 +504,14 @@ observations.
 [.NET IPv6 host formatting](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Private.Uri/src/System/IPv6AddressHelper.cs) ·
 [Fixed CONNECT and TLS controls](../../tools/rust-qa/realtime/README.md).
 
+An independent comparison of the compiled selector with .NET 10.0.12
+matched 174 environment and host combinations. A further 1,288 observations
+covered 23 IPv6 address spellings and 56 bypass configurations, including
+IPv4-mapped addresses. The two selectors produced the same canonical host,
+bypass decision and route in every case. These were local policy lookups.
+The readback has SHA-256
+`bde12955166473228e6121a0010e461fc480112f740ec722258f2b4726b5aeb7`.
+
 In the paired repeat the corrected Rust executable sent all nine HTTPS
 requests through the fixed relay, including six REST reads, the polling
 open and join, and the WebSocket upgrade. The signed client sent its four

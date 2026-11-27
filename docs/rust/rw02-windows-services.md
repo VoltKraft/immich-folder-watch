@@ -1191,8 +1191,28 @@ the primary's first window. The observer compares the original SHOW
 timestamp with the second process's release and samples actual foreground,
 active window and keyboard focus. A delayed hook event alone cannot
 establish that the launch opened the window. The ordinary launch is
-recorded separately from Shell activation. Native execution is pending.
+recorded separately from Shell activation.
 [Launcher observer](../../tools/rust-qa/windows-launcher/native_tray.py).
+
+At `3d55500` the background-start primary (PID 7928) had no usable icon
+rectangle on the original Windows Server 2022 x64 desktop. A second launch
+of the same executable (PID 3136) sent the ordinary IPC request and exited
+zero. Windows reported the primary's first window (HWND 720948) shown
+171 ms after the observer released the second process. The first sample
+found foreground, active window and keyboard focus on the primary. The
+original inventory worker (PID 5924, same creation time) survived until Quit.
+
+The visible-start case on that host obtained a usable icon rectangle and
+received a Shell callback. Its provider call and callback had the same
+Windows tick, so that trial did not establish their order. The contrast
+baseline remained unnamed. The job finished with a failure. The workflow
+now defaults to starting the background GUI first; the dispatch input can
+also select the visible-first order. This exercises the ordinary launch
+against a previously closed window if Explorer again gives its second GUI
+no usable icon rectangle.
+[Original executables, observations and compiler records](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453/artifacts/15222710202) ·
+[Native start-order selection](../../.github/workflows/rust-windows-shell-2022.yaml).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named
