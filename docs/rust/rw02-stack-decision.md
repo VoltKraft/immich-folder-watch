@@ -13,6 +13,12 @@ ownership remain open.
 [Ubuntu results](rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
+On Windows Server 2022 x64 at `47fe26d`, Explorer drew the registered
+Rust tray icon and its changed color at the same point. The accessibility
+lookup found no eligible item to invoke, and the GUI received no Shell
+activation callback.
+[Windows Server 2022 observation](rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d).
+
 On a Windows x64 WARP adapter, the private CPU renderer met all eleven
 same-host WPF limits at `dddb21a`. All 421 file-qualified reopens showed
 a full editor frame before the next close. Scan close/reopen p95 was

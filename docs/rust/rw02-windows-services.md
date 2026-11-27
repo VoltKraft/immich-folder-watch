@@ -986,6 +986,35 @@ measure their own desktops.
 [GitHub runner images](https://github.com/actions/runner-images) ·
 [Contrast observation](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
 
+### Visible background-start icon on Windows Server 2022 at 47fe26d
+
+On hosted image `win22/20261123.376.1` (Explorer 10.0.20348.1), the
+background-start Rust primary registered icon 23 with version 4. Explorer
+returned the physical rectangle (835, 728)–(859, 768). The observer saw
+`33ca56` at (847, 748), then `cc35a9` at the same point after the original
+receiver acknowledged its HICON change. The Explorer process (6236), child
+window (65770) and taskbar (524458) matched across observations. This
+confirms visible rendering of the registered Rust icon on this x64 desktop.
+The accessibility lookup found zero eligible items at that point. The
+observer issued no invocation. The primary recorded no Shell activation
+callback. Its original worker completed four inventories and exited cleanly.
+
+In the separate ordinary-close trial, the original HWND 262596 was still
+present and hidden. Explorer returned `S_FALSE` for the subsequent
+rectangle query. The worker completed two inventories, and both trial
+icons were removed on shutdown. The contrast observer captured the
+original field twice. Windows returned an unnamed current scheme, so the
+reversible palette change remains untested on this desktop.
+
+The original ZIP (SHA-256
+`e6b7fef62d424255b5635a37815ef76b13fec7731ee162f3faef694e27e98401`)
+contains both native executables, the retained source archive and compiler
+receipt. Its upload glob missed the eframe and winit library and metadata
+files. The workflow at `bfc6408` reads all four paths from that receipt and
+checks their hashes before upload. A native archive with those files is pending.
+[Original observations and builds](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437427/artifacts/15212996332) ·
+[Windows Shell run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437427).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

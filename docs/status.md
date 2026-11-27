@@ -14,8 +14,10 @@ Each retry used the original open file after its name was replaced. The C#
 multipart reference passed all five cases on native Ubuntu and Windows x64
 and ARM64 at `6cd7757`. The realtime subject also passed
 22 loopback scenarios after correcting the namespace of encoded API paths.
-Ten URL comparisons against signed 3.0.4 assemblies matched. These additions
-still need the corresponding Windows and Ubuntu Rust results.
+Ten URL comparisons against signed 3.0.4 assemblies matched. On native
+Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
+`6cd7757`. The Windows transport and four hosted Rust upload comparisons
+are pending.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
@@ -39,8 +41,29 @@ two panel clicks reopened the original window, and Quit removed the item.
 [Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
 [Noble x64 replay](rust/rw02-plasma.md#two-panel-activations-with-the-current-gui-at-6cd7757).
 
-The remaining Windows desktop tests cover a visible Explorer tray and
-notifications, a restorable contrast setting, a move between two
+On Windows Server 2022 x64 at `47fe26d`, Explorer displayed the registered
+Rust tray icon and its color change at the same physical point. The
+accessibility lookup found no item to invoke. The GUI received no Shell
+activation callback. Both trials retired their icon and drained the worker.
+The four-target native feasibility run, regular CI and Rust CodeQL passed
+at that revision.
+[Windows Server 2022 observation](rust/rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437145) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025454532) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025454701).
+
+The installed Windows activation run at `47fe26d` finished with four of
+five jobs passing. Both Rust-primary trials passed, as did WPF-primary on
+x64 and on the private ARM64 input desktop. In the ARM64 Default-desktop
+trial, Rust's secondary exited successfully and the original WPF window
+(HWND 131434) changed from hidden to visible. During Quit, the menu helper
+could not find a sampled point on that window's client area. The fixture
+confirmed cleanup and MSI removal. Normal Quit on that console remains open.
+[Five native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341) ·
+[ARM64 Default-desktop original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341/artifacts/15212717516).
+
+The remaining Windows desktop tests cover Explorer tray activation,
+visible notifications, a restorable contrast setting, a move between two
 outputs with different DPI, and rendering in an actual RDP session. The available
 hosted consoles each report one 96-DPI output. The user currently has
 neither a dedicated Windows installation medium nor an additional approved

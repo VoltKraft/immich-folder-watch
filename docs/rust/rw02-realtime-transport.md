@@ -87,6 +87,14 @@ The earlier four-target run at `e2f161b` exercised the original 20 scenarios.
 [Strict peers](../../tools/rust-qa/realtime/verify.py) ·
 [Earlier native results](#four-native-transport-results-at-e2f161b).
 
+At `6cd7757` native Ubuntu x64 and ARM64 each passed all 22 scenarios
+and four unit tests. The original archives matched their GitHub digests.
+On each host, all 19 recorded source inputs matched Git, and all ten indexed
+outputs matched their receipt. For the escaped root the peer received
+`41`. The named case ended with `41/collection/caf%C3%A9/~summer%2fphotos,`.
+[Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210518870) ·
+[Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210644228).
+
 ### Stopping an established session
 
 The signed Linux x64 Flatpak 3.0.4 assemblies ran on their delivered .NET
