@@ -466,6 +466,43 @@ The combined `comparison.json` has SHA-256
 `2fbe453f1342b12e84fddc3992e3ee7e9ecdadce6985db25354b7a2c85dc0678`.
 Both hosts recorded the same two image byte sequences as the Fedora run.
 
+### Menu shutdown after an installed Linux restore
+
+At `10ab0b8` the native Ubuntu ARM64 observer read both committed rows
+from the restored database before clicking Quit. The private D-Bus daemon
+reported that the recipient disconnected while the call was awaiting a
+reply. The observer stopped there. The following revision, `1a62d5c`,
+completed the original restore trial on both Ubuntu architectures.
+[Initial ARM64 job, step 64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45963591552/job/140386886900#step:64:1) ·
+[Repeat on Ubuntu](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45964876195).
+
+The revised observer resolves the menu owner's unique bus name. It
+checks the owner's process against the session-bus proxy reached through
+the original signed GUI's mounted socket, then sends the click to that
+owner. It records whether the menu acknowledged the call or the bus
+reported the recipient disconnecting. The original process must exit
+normally, its menu must disappear and a configured worker must log its
+shutdown after the click. The restore trial then opens the final database
+and verifies both mappings and the state of the two files.
+[Menu observer](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py) ·
+[Installed database checks](../../tools/RustCompatibilityOracle/installed/interop/installed_backup.py).
+
+On Fedora x64 the installed signed app acknowledged all four clicks. The
+private bus identified four separate proxy processes. Each matched the
+socket peer seen from the corresponding GUI. The two configured workers
+logged their shutdowns and the final database passed SQLite's
+`quick_check` with the original and new asset mappings at ROWIDs 1 and 2. Both test
+refs were removed. The separate same-ID and different-ID probe runs also
+confirmed a normal signed exit. A private D-Bus regression exercised the
+recipient disconnecting after it received the click and before replying.
+All 18 regression tests passed.
+
+The working-tree test used base `483f053` and archived its exact sources.
+Under `artifacts/rust/shipping-flatpak-interop/same-id-0_8jvfk6/` the
+result has SHA-256 `6cdd171686a03aad6b5dd35f485f6b8198669a3e8238634b2200809a4875cfcd`
+and the observer source ZIP has SHA-256
+`0279a18cb9e12e6c676091ff7eacb0476fb1767529d8c70f992c5182674e059c`.
+
 ### Installed Windows worker restart at 2dd5f93
 
 Both original Windows 3.0.4 packages uploaded the first synthetic PNG to

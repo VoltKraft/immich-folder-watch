@@ -262,8 +262,8 @@ logging:
         if backup:
             details['rustBackup'] = capture(database, out, port, backup, sha(config), reader)
             require(not lifetime.poll(0) and identity(pid) == original['gui'], 'Signed apphost exited during live backup')
-        quit_shipping(bus)
-        details['exit'] = shipping.wait(timeout=15)
+        details['quit'] = quit_shipping(bus, shipping, lifetime, original, out, log)
+        details['exit'] = details['quit']['exit']
         wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(),
                  5, 'A Flatpak process remained after configured shipping Quit')
         try:

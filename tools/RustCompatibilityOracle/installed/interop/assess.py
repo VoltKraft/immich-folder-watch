@@ -165,11 +165,8 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
             path.write_bytes(subprocess.check_output(['git', 'show', f'{revision}:{name}'], cwd=root))
             archive.write(path, name)
             snapshot[name] = sha(path)
-        driver_names = ['assess.py', 'test_assess.py', 'shipping_upload.py', 'installed_backup.py']
-        if gui_build is not None:
-            driver_names.extend(['gui_refusal.py', 'gui-launch.sh'])
-        else:
-            driver_names.append('hold.sh')
+        driver_names = ['assess.py', 'test_assess.py', 'shipping_upload.py', 'installed_backup.py', 'gui_refusal.py',
+                        'gui-launch.sh' if gui_build is not None else 'hold.sh']
         for name in driver_names:
             driver = HERE / name
             relative = driver.relative_to(root).as_posix()
@@ -440,8 +437,9 @@ def inside():
             probe.stdin.flush()
             r['probeExit'] = probe.wait(timeout=8)
             r['probeExitedBeforeOriginalQuit'] = bool(probe_lifetime.poll(1000)) and not original_lifetime.poll(0)
-            bus.call_sync(APP + '.Tray', '/StatusNotifierItem/Menu', 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (3, 'clicked', GLib.Variant('i', 0), 0)), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
-            r['originalExit'] = old.wait(timeout=12)
+            from gui_refusal import quit_shipping
+            r['originalQuit'] = quit_shipping(bus, old, original_lifetime, original, out)
+            r['originalExit'] = r['originalQuit']['exit']
             r['originalNativeExited'] = bool(original_lifetime.poll(1000))
             require(r['originalNativeExited'] and r['probeExitedBeforeOriginalQuit'] and r['originalExit'] == r['probeExit'] == 0 and 'WRITER_RELEASED' in log.read_text().splitlines(), 'Original or probe did not quit normally')
             wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=3).strip(), 6, 'Installed instance remained after quit')

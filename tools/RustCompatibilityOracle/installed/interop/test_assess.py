@@ -1,5 +1,6 @@
 """Check that the two Flatpak prerequisite outcomes cannot be interchanged."""
 
+from contextlib import ExitStack
 from copy import deepcopy
 import fcntl
 import hashlib
@@ -7,18 +8,131 @@ import json
 import os
 from pathlib import Path
 import signal
+import socket
 import sqlite3
 import struct
+import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from assess import gui_source_snapshot, inventory_inputs, verify_paths, verify_siblings
 from installed_backup import build_input, open_database_handle, snapshot
 from shipping_upload import empty_permission_probe, endpoint_tuple, FILENAME, IMAGE, multipart_image, verify_asset_posts
+
+
+class ShippingQuitTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        here = Path(__file__).resolve().parent
+        performance = here.parents[2] / 'rust-qa/performance'
+        with patch.object(sys, 'path', [str(here.parent / 'launch'), str(performance), str(performance / 'worker'), *sys.path]):
+            import gui_refusal
+        cls.observer = gui_refusal
+
+    def test_private_bus_routes_the_exact_click_before_the_recipient_disconnects(self):
+        gio = self.observer.Gio
+        with TemporaryDirectory() as temp, ExitStack() as stack:
+            address = 'unix:path=' + str(Path(temp) / 'bus')
+            broker = stack.enter_context(subprocess.Popen(
+                ['dbus-daemon', '--session', '--nofork', '--print-address=1', '--address=' + address],
+                stdout=subprocess.PIPE, text=True))
+            stack.callback(broker.terminate)
+            self.assertEqual(broker.stdout.readline().strip().split(',')[0], address)
+            flags = gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION
+            bus = gio.DBusConnection.new_for_address_sync(address, flags, None, None)
+            stack.callback(bus.close_sync, None)
+            peer = gio.DBusConnection.new_for_address_sync(address, flags, None, None)
+            receiver = peer.get_unique_name()
+            received = []
+            clicked = threading.Event()
+
+            def read_click(connection, message, incoming):
+                if incoming and message.get_member() == 'Event':
+                    received.append((message.get_serial(), message.get_sender(), message.get_destination(),
+                                     message.get_path(), message.get_interface(), message.get_body().unpack()))
+                    clicked.set()
+                    return None
+                return message
+
+            def disconnect():
+                if clicked.wait(4):
+                    peer.close_sync(None)
+
+            peer.add_filter(read_click)
+            thread = threading.Thread(target=disconnect)
+            thread.start()
+            stack.callback(thread.join)
+            process = Mock()
+            process.wait.return_value = 0
+            lifetime = Mock()
+            lifetime.poll.return_value = [(7, 1)]
+            with patch.object(self.observer, 'shipping_menu', return_value={'receiver': receiver}):
+                result = self.observer.quit_shipping(bus, process, lifetime, {}, Path(temp))
+            self.assertEqual(result['delivery'], 'recipient-disconnected')
+            self.assertEqual(received, [(result['serial'], bus.get_unique_name(), receiver, '/StatusNotifierItem/Menu',
+                                         'com.canonical.dbusmenu', (3, 'clicked', 0, 0))])
+
+    def test_reply_must_match_the_click_and_the_expected_application_or_broker(self):
+        gio, glib = self.observer.Gio, self.observer.GLib
+        receiver, sender = ':1.7', ':1.8'
+        click = gio.DBusMessage.new_method_call(receiver, '/Menu', 'com.canonical.dbusmenu', 'Event')
+        click.set_sender(sender)
+        click.set_serial(19)
+        reply = click.new_method_reply()
+        reply.set_sender(receiver)
+        self.assertEqual(self.observer.quit_delivery(reply, 19, receiver, sender), 'menu-reply')
+        error = click.new_method_error_literal('org.freedesktop.DBus.Error.NoReply',
+                                              'Message recipient disconnected from message bus without replying')
+        error.set_sender('org.freedesktop.DBus')
+        for original, change, value in (
+            (reply, 'set_sender', ':1.9'), (reply, 'set_body', glib.Variant('(i)', (3,))),
+            (error, 'set_sender', receiver), (error, 'set_reply_serial', 18), (error, 'set_destination', ':1.9'),
+            (error, 'set_error_name', 'org.freedesktop.DBus.Error.ServiceUnknown'),
+            (error, 'set_body', glib.Variant('(s)', ('Did not receive a reply.',))),
+        ):
+            with self.subTest(field=change, value=value):
+                changed = original.copy()
+                getattr(changed, change)(value)
+                with self.assertRaises(RuntimeError):
+                    self.observer.quit_delivery(changed, 19, receiver, sender)
+
+    def test_menu_peer_must_match_the_proxy_serving_the_original_sandbox_socket(self):
+        with TemporaryDirectory() as temp, socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+            proc = Path(temp)
+            directory = proc / 'root/run/flatpak'
+            directory.mkdir(parents=True)
+            (proc / 'environ').write_bytes(b'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/flatpak/bus\0')
+            listener.bind(str(directory / 'bus'))
+            listener.listen(3)
+            bus = Mock()
+            for reported, executable in ((os.getpid() + 1, '/usr/bin/xdg-dbus-proxy'), (os.getpid(), '/another')):
+                bus.call_sync.return_value = self.observer.GLib.Variant('(u)', (reported,))
+                with self.subTest(pid=reported, executable=executable), patch.object(
+                        self.observer, 'identity', return_value={'executable': executable}) as observed:
+                    with self.assertRaisesRegex(RuntimeError, 'session bus proxy'):
+                        self.observer.shipping_proxy(bus, ':1.4', proc)
+                    observed.assert_called_once_with(os.getpid())
+                    self.assertEqual(bus.call_sync.call_args.args[4].unpack(), (':1.4',))
+
+    def test_routed_click_still_requires_clean_original_exit_and_fresh_worker_shutdown(self):
+        bus, process, lifetime = Mock(), Mock(), Mock()
+        bus.send_message_with_reply_sync.return_value = (Mock(), 4)
+        with TemporaryDirectory() as temp, ExitStack() as stack:
+            log = Path(temp) / 'worker.log'
+            log.write_text('Folder watch worker received shutdown signal.\n')
+            stack.enter_context(patch.object(self.observer, 'shipping_menu', return_value={'receiver': ':1.7'}))
+            stack.enter_context(patch.object(self.observer, 'quit_delivery', return_value='recipient-disconnected'))
+            stack.enter_context(patch.object(self.observer, 'owner', return_value=False))
+            for exit_code, exited, error in ((1, True, 'exit normally'), (0, False, 'exit normally'),
+                                              (0, True, 'acknowledge shutdown')):
+                process.wait.return_value = exit_code
+                lifetime.poll.return_value = exited
+                with self.subTest(exit_code=exit_code, exited=exited), self.assertRaisesRegex(RuntimeError, error):
+                    self.observer.quit_shipping(bus, process, lifetime, {}, Path(temp), log)
 
 
 class DirectoryReadTests(unittest.TestCase):

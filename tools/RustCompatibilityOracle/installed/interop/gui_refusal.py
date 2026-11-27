@@ -20,6 +20,8 @@ from session import checked_start, check_alive, wait_for
 
 NAME = APP + '.RustAssessment'
 WORKER_EXE = '/app/bin/ifw-performance-worker'
+MENU_PATH = '/StatusNotifierItem/Menu'
+MENU_INTERFACE = 'com.canonical.dbusmenu'
 
 
 def watch_directory_read(fd):
@@ -212,7 +214,7 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
     if route != 'exited':
         # A separate primary is a real failure. Quit it through its own menu before collecting cleanup.
         wait_for(lambda: owner(bus, APP + '.Tray'), 6, 'Second shipping primary has no tray')
-        quit_shipping(bus)
+        later['shippingQuit'] = quit_shipping(bus, old, old_lifetime, later['shipping'], out)
     later.update(shippingExit=old.wait(timeout=10), shippingExited=bool(old_lifetime.poll(1000)),
                  socketAfterShipping=socket_id(endpoint), stillHidden=display.visible() is None)
     require(later['shippingExit'] == 0 and later['shippingExited'] and later['stillHidden']
@@ -236,10 +238,85 @@ def observe_later_launches(stack, bus, display, pins, report, out, command, prim
                           and before == later['socketSeenByShipping'] == later['socketAfterShipping'] == later['socketAfterRust'])
 
 
-def quit_shipping(bus):
-    bus.call_sync(APP + '.Tray', '/StatusNotifierItem/Menu', 'com.canonical.dbusmenu', 'Event',
-                  GLib.Variant('(isvu)', (3, 'clicked', GLib.Variant('i', 0), 0)), None,
-                  Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
+def quit_delivery(reply, serial, receiver, sender):
+    require(serial > 0 and reply.get_reply_serial() == serial and reply.get_destination() == sender,
+            'The bus reply does not identify the issued shipping Quit click')
+    if reply.get_message_type() == Gio.DBusMessageType.METHOD_RETURN:
+        require(reply.get_sender() == receiver and not reply.get_signature(), 'Unexpected shipping menu acknowledgement')
+        return 'menu-reply'
+    # The private dbus-daemon emits this reply for a routed, pending method when its recipient disconnects.
+    # Timeouts, a target gone before routing, proxy denials and application-generated errors remain failures.
+    body = reply.get_body()
+    require(reply.get_message_type() == Gio.DBusMessageType.ERROR and reply.get_sender() == 'org.freedesktop.DBus'
+            and reply.get_error_name() == 'org.freedesktop.DBus.Error.NoReply' and body is not None
+            and body.get_type_string() == '(s)' and body.unpack() == ('Message recipient disconnected from message bus without replying',),
+            'The shipping Quit click lacks a menu reply or a routed recipient-disconnected reply')
+    return 'recipient-disconnected'
+
+
+def shipping_proxy(bus, receiver, proc):
+    addresses = [value.removeprefix(b'DBUS_SESSION_BUS_ADDRESS=unix:path=').decode()
+                 for value in (proc / 'environ').read_bytes().split(b'\0')
+                 if value.startswith(b'DBUS_SESSION_BUS_ADDRESS=unix:path=')]
+    require(len(addresses) == 1, 'The original signed GUI must use a single private session bus socket')
+    address, = addresses
+    root = proc / 'root'
+    if address == '/tmp/session-bus':
+        address = os.readlink(root / 'tmp/session-bus')
+    require(address in ('/run/flatpak/bus', '/run/user/0/bus'), 'Unexpected signed Flatpak bus proxy socket')
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
+        peer.settimeout(3)
+        peer.connect(str(root / address.lstrip('/')))
+        proxy_pid, _, _ = struct.unpack('3i', peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+    reported_pid, = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                                  'GetConnectionUnixProcessID', GLib.Variant('(s)', (receiver,)), None,
+                                  Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
+    proxy = identity(proxy_pid)
+    require(reported_pid == proxy_pid and proxy['executable'] == '/usr/bin/xdg-dbus-proxy',
+            'The menu connection does not belong to the original signed GUI session bus proxy')
+    return dict(proxy=proxy, proxySocket=address, busReportedPid=reported_pid)
+
+
+def shipping_menu(bus, process, lifetime, app, out):
+    tray = APP + '.Tray'
+    receiver, = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                              'GetNameOwner', GLib.Variant('(s)', (tray,)), None,
+                              Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
+    require(Gio.dbus_is_unique_name(receiver) and identity(process.pid) == app['wrapper']
+            and identity(app['gui']['pid']) == app['gui'] and not lifetime.poll(0),
+            'The original signed application is required before the Quit click')
+    proxy = shipping_proxy(bus, receiver, Path('/proc') / str(app['gui']['pid']))
+    wait_for(lambda: f'REGISTERED {tray} {receiver}' in (out / 'watcher.log').read_text().splitlines(),
+             5, 'The private watcher did not observe the original menu connection')
+    label, = bus.call_sync(receiver, MENU_PATH, MENU_INTERFACE, 'GetProperty', GLib.Variant('(is)', (3, 'label')),
+                           GLib.VariantType.new('(v)'), Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
+    require(label in ('Quit', 'Beenden'), 'The original shipping menu does not identify item 3 as Quit')
+    return dict(receiver=receiver, **proxy, gui=app['gui']['pid'],
+                instance=app['instance'], menuId=3, label=label)
+
+
+def quit_shipping(bus, process, lifetime, app, out, worker_log=None):
+    menu = shipping_menu(bus, process, lifetime, app, out)
+    receiver = menu['receiver']
+    offset = worker_log.stat().st_size if worker_log else None
+    message = Gio.DBusMessage.new_method_call(receiver, MENU_PATH, MENU_INTERFACE, 'Event')
+    message.set_flags(Gio.DBusMessageFlags.NO_AUTO_START)
+    message.set_body(GLib.Variant('(isvu)', (3, 'clicked', GLib.Variant('i', 0), 0)))
+    reply, serial = bus.send_message_with_reply_sync(message, Gio.DBusSendMessageFlags.NONE, 3000, None)
+    delivery = quit_delivery(reply, serial, receiver, bus.get_unique_name())
+    require(process.wait(timeout=15) == 0 and lifetime.poll(1000),
+            'The original signed process did not exit normally after the Quit click')
+    wait_for(lambda: not owner(bus, receiver) and not owner(bus, APP + '.Tray'), 5,
+             'The original shipping menu or its private bus connection survived Quit')
+    if worker_log:
+        with worker_log.open('rb') as stream:
+            stream.seek(offset)
+            require(b'Folder watch worker received shutdown signal.' in stream.read(),
+                    'The configured signed worker did not acknowledge shutdown after the Quit click')
+    response = dict(sender=reply.get_sender(), destination=reply.get_destination(), replySerial=reply.get_reply_serial())
+    if delivery == 'recipient-disconnected':
+        response.update(error=reply.get_error_name(), reason=reply.get_body().unpack()[0])
+    return dict(**menu, serial=serial, delivery=delivery, response=response, exit=0, workerShutdownObserved=worker_log is not None)
 
 
 def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
@@ -291,9 +368,8 @@ def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
             and refusal['oldAlive'] and not refusal['candidateBusOwner'] and refusal['originalIdentity'] == first['gui']
             and refusal['originalWindow'] == first['window'] and refusal['originalEndpointAfter'] == before
             and refusal['profileAfter'] == profile, 'The candidate did not refuse before startup with the original state intact')
-    quit_shipping(bus)
-    report['originalExit'] = original.wait(timeout=12)
-    require(report['originalExit'] == 0 and old_lifetime.poll(1000), 'The original GUI did not quit normally')
+    report['originalQuit'] = quit_shipping(bus, original, old_lifetime, first, out)
+    report['originalExit'] = report['originalQuit']['exit']
     log = out / 'released.log'
     inventory = Inventory(worker, out, report) if worker else None
     candidate = checked_start(stack, [*command, '--branch=test', *(inventory.arguments if inventory else []), APP], log)
@@ -328,9 +404,8 @@ def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
     restored_lifetime = pidfd(stack, restored_app['gui']['pid'])
     require(restored_app['directoryIdentity'] == first['directoryIdentity'], 'Restored application used a different profile or runtime directory')
     wait_for(lambda: check_alive(restored, restored_log) or owner(bus, APP + '.Tray'), 8, 'The restored original did not own its tray')
-    quit_shipping(bus)
-    report['restoredShippingExit'] = restored.wait(timeout=12)
-    require(report['restoredShippingExit'] == 0 and restored_lifetime.poll(1000), 'The restored original did not quit normally')
+    report['restoredShippingQuit'] = quit_shipping(bus, restored, restored_lifetime, restored_app, out)
+    report['restoredShippingExit'] = report['restoredShippingQuit']['exit']
     wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(),
              6, 'A private application remained after both exited')
     report.update(profileAfterQuit=profile_files(), positiveWorkerEnabled=bool(inventory), refusalObserved=True)

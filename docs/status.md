@@ -77,6 +77,15 @@ run passed with the same Rust ELF as the first trial. All three original
 GNOME screen captures and both portal messages passed detached replay.
 [ARM64 notification trial](rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64).
 
+Ubuntu ARM64 at `10ab0b8` committed both restored upload mappings, then
+the signed application disconnected before its Quit reply reached the
+observer. Both Ubuntu hosts completed the original test at `1a62d5c`.
+On Fedora x64 the revised test bound each of four menu replies to the
+original signed GUI's Flatpak proxy. Both configured workers logged
+shutdown, the two mappings survived restart and the installation was empty
+at the end. A private bus test covered the precise disconnected-recipient
+reply. [Installed Quit observations](rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore).
+
 The installed Windows 3.0.4 worker restarted from its Rust-returned live
 backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
 original database included 16 WAL frames. In both trials a new WPF worker

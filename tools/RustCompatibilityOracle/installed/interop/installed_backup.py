@@ -225,8 +225,7 @@ def restart(stack, bus, display, pins, report, out, details, server, config, dat
             current = snapshot(database)['tables']['sync_entries']
             return len(current) == 2 and current[0] == original_entries[0] and current[1][6] == NEW_ID
         wait_for(new_entry, 12, 'The second signed worker did not commit its upload')
-        quit_shipping(bus)
-        require(process.wait(timeout=15) == 0 and lifetime.poll(1000), 'Restored worker failed to quit normally')
+        restart_result['quit'] = quit_shipping(bus, process, lifetime, native, out, log)
     finally:
         server.release.set()
     wait_for(lambda: not subprocess.check_output(['flatpak', 'ps', '--columns=application'], text=True, timeout=4).strip(), 5,
