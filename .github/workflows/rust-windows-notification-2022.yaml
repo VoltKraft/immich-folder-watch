@@ -64,6 +64,16 @@ jobs:
           python3 -B tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
             --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
 
+      - name: Retain the native sender for the disposable Windows VM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-native-toast-sender-${{ github.sha }}
+          path: |
+            artifacts/rust/windows-services/build/x86_64-pc-windows-msvc/release/ifw-windows-services-probe.exe
+            artifacts/rust/windows-services/native-x86_64-pc-windows-msvc/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Observe the original Shell during notification quiet time
         if: ${{ !cancelled() && hashFiles('artifacts/rust/windows-services/native-*/result.json') != '' }}
         timeout-minutes: 68

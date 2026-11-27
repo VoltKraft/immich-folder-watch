@@ -78,3 +78,22 @@ its display name, deletes the empty UUID leaf by its original handle and
 checks that the name is absent. The shortcut and synthetic profile
 remain pinned throughout both exchanges.
 [Registry creation and dispositions](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regcreatekeyexw) · [User-mode removal by handle](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwdeletekey).
+
+## Original sender on a disposable Windows x64 VM
+
+The Server 2022 notification workflow uploads `rust-native-toast-sender-<revision>`
+after compiling the sender. Save the original ZIP and its Actions SHA-256 digest.
+In a fresh Windows checkout of that revision, sign in on the disposable
+VM's unlocked console with the standard test account. Run the following with
+native x64 Python and Git from an ordinary, non-elevated shell.
+
+```powershell
+python -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msvc --isolated-vm C:\QA\sender.zip --archive-sha256 $digest
+```
+
+The fixture verifies the archive, executable, compiler, dependency graph and
+checkout bytes before posting. It uses the same native sender, scoped history
+operations and timed Shell observer as the hosted test. The result in
+`artifacts/rust/windows-services/toast-history-x86_64-pc-windows-msvc/` records
+the VM observation separately from its compiler run. Replay the directory with
+`--replay` and check `presentationObserved` for the visible banner.

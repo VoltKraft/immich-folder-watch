@@ -39,15 +39,16 @@ class ObserverUnavailable(Exception):
     """The observer could not establish its sampling baseline before the sender was released."""
 
 
-def bind_build(target, exe, original, record):
+def bind_build(target, exe, original, record, *, compiler_job=None):
     file = original / "result.json"
     early = json.loads(file.read_bytes())
     pins = json.loads((HERE / "inputs.json").read_bytes())
     compiler = json.loads((ROOT / "rust/toolchain-inputs.json").read_bytes())
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    if (early["hosted"] is not True or source != early["head"] or source != os.environ["GITHUB_SHA"]
-            or early["target"] != target or early["workflowRun"] != os.environ["GITHUB_RUN_ID"]
-            or early["workflowAttempt"] != os.environ["GITHUB_RUN_ATTEMPT"] or early["runner"] != os.environ["RUNNER_NAME"]
+    if compiler_job is None:
+        compiler_job = tuple(os.environ[key] for key in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME"))
+    if (early["hosted"] is not True or source != early["head"] or early["target"] != target
+            or tuple(early[key] for key in ("head", "workflowRun", "workflowAttempt", "runner")) != compiler_job
             or early["probeSha256"] != sha(exe) or early["locked"] != pins["lockSha256"]
             or early["canonicalGraphSha256"] != pins["targetGraphs"][target]
             or any(type(early["steps"].get(key)) is not int or early["steps"][key] != 0

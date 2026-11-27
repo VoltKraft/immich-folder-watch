@@ -83,7 +83,7 @@ impl<'a> Identity<'a> {
     }
 }
 
-fn process_identity() -> Result<()> {
+fn process_identity(require_standard_user: bool) -> Result<()> {
     let pid = std::process::id();
     let mut session = 0;
     let mut elevation = TOKEN_ELEVATION::default();
@@ -102,7 +102,9 @@ fn process_identity() -> Result<()> {
             &mut returned,
         )?;
     }
-    if returned != size_of::<TOKEN_ELEVATION>() as u32 {
+    if returned != size_of::<TOKEN_ELEVATION>() as u32
+        || (require_standard_user && elevation.TokenIsElevated != 0)
+    {
         return Err(invalid());
     }
     println!(
@@ -298,21 +300,30 @@ fn inspect(id: &Identity<'_>) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn run(area: &Path, token: &str, operation: &str) -> Result<()> {
-    let temp = std::env::var_os("RUNNER_TEMP").ok_or_else(invalid)?;
+pub(super) fn run(area: &Path, token: &str, operation: &str, isolated_vm: bool) -> Result<()> {
     let arch = match std::env::consts::ARCH {
         "aarch64" => "ARM64",
         "x86_64" => "X64",
         _ => return Err(invalid()),
     };
-    if fs::canonicalize(area.parent().ok_or_else(invalid)?)? != fs::canonicalize(temp)?
-        || std::env::var("RUNNER_ARCH").as_deref() != Ok(arch)
-    {
+    let temp = if isolated_vm {
+        if arch != "X64" {
+            return Err(invalid());
+        }
+        std::env::var_os("IFW_QA_VM_TEMP")
+    } else {
+        if std::env::var("RUNNER_ARCH").as_deref() != Ok(arch) {
+            return Err(invalid());
+        }
+        std::env::var_os("RUNNER_TEMP")
+    }
+    .ok_or_else(invalid)?;
+    if fs::canonicalize(area.parent().ok_or_else(invalid)?)? != fs::canonicalize(temp)? {
         return Err(invalid());
     }
     let id = Identity::new(token)?;
     println!("operation={operation}\naumid={}\nphase=identity", id.aumid);
-    process_identity()?;
+    process_identity(isolated_vm)?;
     let app = wide(OsStr::new(&id.aumid.to_string_lossy()));
     unsafe {
         SetCurrentProcessExplicitAppUserModelID(PCWSTR(app.as_ptr()))?;

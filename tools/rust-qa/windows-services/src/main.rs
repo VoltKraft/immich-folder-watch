@@ -65,7 +65,15 @@ fn run() -> Result<()> {
         && std::env::var("GITHUB_REF").as_deref() == Ok("refs/heads/rewrite/rust")
         && std::env::var("GITHUB_REPOSITORY").as_deref() == Ok("VoltKraft/immich-folder-watch")
     {
-        return toast::run(area, id, known.to_str().ok_or_else(invalid)?);
+        return toast::run(area, id, known.to_str().ok_or_else(invalid)?, false);
+    }
+    if mode == "--isolated-vm-toast-history"
+        && std::env::var_os("GITHUB_ACTIONS").is_none()
+        && std::env::var("IFW_QA_TOAST_HISTORY").as_deref() == Ok("1")
+        && std::env::var("IFW_QA_ISOLATED").as_deref() == Ok("1")
+        && std::env::var("IFW_QA_INVENTORY_TOKEN").as_deref() == Ok(id)
+    {
+        return toast::run(area, id, known.to_str().ok_or_else(invalid)?, true);
     }
     if mode == "--hosted-notification"
         && hosted()

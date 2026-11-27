@@ -1,19 +1,21 @@
 """Observe two inbox WinRT toasts using only this disposable job's unique app identity."""
 
 import argparse
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 import time
 import uuid
 
 from activation import ART, HERE, QA, ROOT, TARGET, hosted, module, paths, sha, write
 from service_sources import service_files, verify_checkout
 import toast_banner
+import toast_vm
 from toast_display_name import DISPLAY, PARENT, MissingNamespace, display_name, identity_absent
 
 LINK = "IFW synthetic notification.lnk"
@@ -371,10 +373,15 @@ def replay(directory, result):
         required_checks.append("notifier-readiness")
     if DISPLAY_NAME_SOURCE in build["sourceFiles"] and result.get("registryIdentityInitiallyAbsent") is not True:
         raise ValueError("Missing the pre-registration notification identity collision check")
+    isolated_vm = result.get("host") == "isolated-vm"
+    if isolated_vm and (target != toast_vm.TARGET or not re.fullmatch("[0-9a-f]{64}", result["senderArchiveSha256"])
+                        or "run" in result or "attempt" in result):
+        raise ValueError("Missing the distinct VM observation and native compiler archive identities")
+    run, attempt = (result["compilerRun"], result["compilerAttempt"]) if isolated_vm else (result["run"], result["attempt"])
     if (sha(native_report) != result["earlyResultSha256"] or build["hosted"] is not True
             or not re.fullmatch("[0-9a-f]{64}", result["binarySha256"])
             or (build["head"], build["target"], build["workflowRun"], build["workflowAttempt"], build["probeSha256"])
-            != (result["head"], target, result["run"], result["attempt"], result["binarySha256"])
+            != (result["head"], target, run, attempt, result["binarySha256"])
             or not result["observerInputs"] or build["sourceFiles"] != result["observerInputs"]
             or build["checkoutVerified"] is not True or build["canonicalGraphSha256"] != result["graphSha256"]
             or any(type(build["steps"].get(k)) is not int or build["steps"][k] != 0
@@ -415,6 +422,8 @@ def replay(directory, result):
         row = parse_log((directory / filename).read_bytes(), operation, token, proc["pid"],
                         result["desktop"]["session"], proc["exit"], require_readiness=readiness is not None,
                         direct_show=readiness not in (None, SETTING_REQUIRED_SHA256))
+        if isolated_vm and row["fields"].get("elevated") != "false":
+            raise ValueError("The isolated Windows console sender must run as a standard user")
         if any(row.get(key) != proc.get(key) for key in ("notifierReadiness", "postResult")):
             raise ValueError("The reported readiness or Show result differs from the original native calls")
         if operation != "prepare" and row["fields"].get("installedLinkVerified") != "true":
@@ -472,7 +481,7 @@ def replay(directory, result):
     return original
 
 
-def measure(target, exe, out, record):
+def measure(target, exe, out, record, *, isolated_vm=False):
     from notification_probe import (Desktop, Win32, child, fixture_profile, ordinary_console, owned_directory,
                                     pin_new_marker, pin_path)
     from native import known_folder
@@ -483,20 +492,24 @@ def measure(target, exe, out, record):
     session = record["desktop"]["session"]
     if not ordinary_console(record["desktop"], "Default"):
         raise Unavailable("The job has no unlocked ordinary input desktop")
-    if any(pe_machine(path) != TARGET[os.environ["RUNNER_ARCH"]][1] for path in (exe, Path(sys.executable))):
+    machine = next(machine for name, machine in TARGET.values() if name == target)
+    if api.machine(-1) != (machine, machine) or any(pe_machine(path) != machine for path in (exe, Path(sys.executable))):
         raise ValueError("Expected a native observer and native sender")
     token = uuid.uuid4().hex
     record.update(token=token, processes=[], normalBanners=[], presentationObserved=None, activationObserved=None)
     record["registryIdentityInitiallyAbsent"] = identity_absent(token)
     if not record["registryIdentityInitiallyAbsent"]:
         raise ValueError("The notification identity already exists before the shortcut-only trial")
-    temp = Path(os.environ["RUNNER_TEMP"])
+    temp = Path(tempfile.gettempdir() if isolated_vm else os.environ["RUNNER_TEMP"])
     with ExitStack() as outer:
         outer.enter_context(pin_path(api, exe, False))
         area = outer.enter_context(fixture_profile(api, temp, token, record))
         pin_new_marker(outer, api, area / "synthetic.fixture", token)
         env = dict(os.environ, TEMP=str(area), TMP=str(area), IFW_QA_TOAST_HISTORY="1",
                    IFW_QA_ISOLATED="1", IFW_QA_INVENTORY_TOKEN=token)
+        if isolated_vm:
+            env["IFW_QA_VM_TEMP"] = str(temp)
+        mode = "--isolated-vm-toast-history" if isolated_vm else "--hosted-toast-history"
 
         def call(operation):
             index = len(record["processes"])
@@ -505,7 +518,7 @@ def measure(target, exe, out, record):
             record["processes"].append(info)
 
             def run():
-                with child(api, exe, ["--hosted-toast-history", str(area), token, operation], area, env, log, info) as proc:
+                with child(api, exe, [mode, str(area), token, operation], area, env, log, info) as proc:
                     proc.wait(timeout=25)
                 item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"],
                                  require_readiness=True, direct_show=True)
@@ -519,7 +532,8 @@ def measure(target, exe, out, record):
 
             if operation != "post-normal":
                 return run()
-            item, banner = toast_banner.observe(api, desktop, area, env, out, index, token, info, run, session)
+            item, banner = toast_banner.observe(api, desktop, area, env, out, index, token, info, run, session,
+                                               isolated_vm=isolated_vm)
             record["normalBanners"].append(banner)
             if banner["status"] == "visible":
                 record["presentationObserved"] = True
@@ -573,25 +587,45 @@ def measure(target, exe, out, record):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=[name for name, _ in TARGET.values()])
-    parser.add_argument("--replay", type=Path, help="Verify an original positive hosted artifact using only its saved files")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--replay", type=Path, help="Verify an original positive observation using its saved files")
+    mode.add_argument("--isolated-vm", type=Path, metavar="SENDER_ZIP", help="Use the native sender on a disposable x64 VM")
+    parser.add_argument("--archive-sha256", help="Actions digest for the original native sender archive")
     args = parser.parse_args()
     target = args.target
+    if bool(args.isolated_vm) != bool(args.archive_sha256):
+        parser.error("--isolated-vm requires --archive-sha256")
     if args.replay:
         result = json.loads((args.replay / "result.json").read_bytes())
         if result["target"] != target or result["status"] != "passed":
             raise ValueError("Expected the complete positive artifact from this target")
         print(json.dumps(replay(args.replay, result), sort_keys=True))
         return 0
-    request_identity(target)
+    if args.isolated_vm:
+        toast_vm.require_vm(target)
+        sender = toast_vm.read_sender(args.isolated_vm, args.archive_sha256)
+    else:
+        request_identity(target)
+        sender = nullcontext((*paths(target), None))
+    with sender as (exe, original, build):
+        return observe_sender(target, exe, original, build, args.archive_sha256)
+
+
+def observe_sender(target, exe, original, archived, archive_digest):
     out = ART / ("toast-history-" + target)
-    out.mkdir(exist_ok=False)
-    result = dict(status="failed", target=target, head=os.environ["GITHUB_SHA"], run=os.environ["GITHUB_RUN_ID"],
-                  attempt=os.environ["GITHUB_RUN_ATTEMPT"])
+    out.mkdir(parents=True, exist_ok=False)
+    result = dict(status="failed", target=target)
+    compiler_job = None
+    if archived is None:
+        result.update(head=os.environ["GITHUB_SHA"], run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"])
+    else:
+        compiler_job = tuple(archived[key] for key in ("head", "workflowRun", "workflowAttempt", "runner"))
+        result.update(host="isolated-vm", head=archived["head"], compilerRun=archived["workflowRun"],
+                      compilerAttempt=archived["workflowAttempt"], senderArchiveSha256=archive_digest)
     try:
         from notification_probe import bind_build
         result["observerInputs"] = verify_checkout(ROOT, service_files(), result["head"], HERE)
-        exe, original = paths(target)
-        bind_build(target, exe, original, result)
+        bind_build(target, exe, original, result, compiler_job=compiler_job)
         build = json.loads((original / "result.json").read_bytes())
         controls = original / "toast-controls.txt"
         if (type(build["steps"].get("toast-controls")) is not int or build["steps"]["toast-controls"] != 0
@@ -610,14 +644,14 @@ def main():
             raise ValueError("The native build did not complete the notifier readiness controls")
         result["earlyEvidence"][readiness.name] = sha(readiness)
         pe = module("toast_pe", QA / "windows-imports/formats.py")
-        imports = pe.pe_imports(exe, TARGET[os.environ["RUNNER_ARCH"]][1])
+        imports = pe.pe_imports(exe, next(machine for name, machine in TARGET.values() if name == target))
         validate_imports(imports)
         table = original / "pe-imports.json"
         if sha(table) != build["evidenceFiles"].get(table.name) or json.loads(table.read_bytes()) != imports:
             raise ValueError("The native service's import table changed since the original build")
         (out / table.name).write_bytes(table.read_bytes())
         (out / "native-build.json").write_bytes((original / "result.json").read_bytes())
-        result["historyStatus"] = result["status"] = measure(target, exe, out, result)
+        result["historyStatus"] = result["status"] = measure(target, exe, out, result, isolated_vm=archived is not None)
         if result["status"] == "passed":
             result["evidenceFiles"] = evidence_files(out)
             replay(out, result)

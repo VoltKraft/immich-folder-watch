@@ -76,7 +76,7 @@ def assess(receipt, rows, sender, item, session, machine):
             "presentation": event, "samplingWindow": clocks["samplingWindow"]}
 
 
-def observe(api, desktop, area, env, out, index, token, sender, send, session):
+def observe(api, desktop, area, env, out, index, token, sender, send, session, *, isolated_vm=False):
     basename = f"{index:03}-normal-popup"
     raw_log = out / (basename + ".log")
     receipt = dict(senderLog=sender["log"], aumid="IFW.RustQA.Toast." + token, qpcFrequency=api.frequency,
@@ -91,6 +91,8 @@ def observe(api, desktop, area, env, out, index, token, sender, send, session):
                     args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
                             "-File", str(HERE / "notification.ps1"), "-Token", token, "-Fixture", str(area),
                             "-Kind", "WinrtNormal"]
+                    if isolated_vm:
+                        args.append("-IsolatedVm")
                     receipt.update(observer={}, observerLog=raw_log.name)
                     provider = stack.enter_context(child(api, Path(program), args, area, env, raw_log, receipt["observer"]))
                     # Signal before draining the process, including a disabled sender or a failed read.

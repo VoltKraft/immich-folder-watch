@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, call, patch
 from uuid import UUID
+from zipfile import ZipFile
 
 import toast_history as h
 import toast_display_name as registration
@@ -520,6 +521,7 @@ class ToastHistoryTests(unittest.TestCase):
                       TEMP=r"C:\old-temp", TMP=r"C:\old-tmp", IFW_QA_INVENTORY_TOKEN="f"*32,
                       IFW_QA_ISOLATED="0", IFW_QA_TOAST_HISTORY="0")
         api = Mock()
+        api.machine.return_value = (machine, machine)
         api.wait_job_empty.return_value = True
         api.close.return_value = True
         record = {}
@@ -551,6 +553,30 @@ class ToastHistoryTests(unittest.TestCase):
         self.assertEqual((launch["desktop"], launch["cwd"], launch["primary"]), ("Default", area, True))
         self.assertEqual(launch["env"], {**parent, "TEMP": str(area), "TMP": str(area), "IFW_QA_TOAST_HISTORY": "1",
                                         "IFW_QA_INVENTORY_TOKEN": TOKEN, "IFW_QA_ISOLATED": "1"})
+
+    def test_isolated_vm_requires_an_original_digest_and_bounds_extraction(self):
+        prefix = "native-" + TARGET + "/"
+        with TemporaryDirectory() as temp:
+            archive = Path(temp) / "sender.zip"
+            report = dict(target=TARGET, hosted=True, runner="native-build", head="a" * 40, workflowRun="42",
+                          workflowAttempt="1", evidenceFiles={"compiler.txt": h.hashlib.sha256(b"compiler").hexdigest()})
+            with ZipFile(archive, "w") as bundle:
+                bundle.writestr(prefix + "result.json", json.dumps(report))
+                bundle.writestr(prefix + "compiler.txt", b"compiler")
+                bundle.writestr("build/" + TARGET + "/release/" + h.toast_vm.EXE, b"PE fixture")
+            with h.toast_vm.read_sender(archive, h.sha(archive)) as (exe, area, receipt):
+                self.assertEqual((exe.read_bytes(), (area / "compiler.txt").read_bytes(), receipt),
+                                 (b"PE fixture", b"compiler", report))
+            self.assertFalse(exe.exists())
+            with self.assertRaisesRegex(ValueError, "digest changed"), h.toast_vm.read_sender(archive, "0" * 64):
+                self.fail("A changed archive reached the caller")
+            with ZipFile(archive, "a") as bundle:
+                bundle.writestr(prefix + "../elsewhere", b"unrecorded")
+            with self.assertRaisesRegex(ValueError, "differs from the build receipt"), h.toast_vm.read_sender(archive, h.sha(archive)):
+                self.fail("Unexpected archive entries reached the caller")
+            with patch.object(sys, "platform", "win32"), patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+                with self.assertRaisesRegex(ValueError, "disposable"):
+                    h.toast_vm.require_vm(TARGET)
 
     def test_pre_fix_environment_and_foreign_desktop_are_refused_before_any_native_launch(self):
         import notification_probe

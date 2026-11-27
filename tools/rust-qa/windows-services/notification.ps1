@@ -1,14 +1,24 @@
 # Observe only the fresh synthetic title and body on the disposable runner's original desktop.
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$Token,
       [Parameter(Mandatory)][string]$Fixture,
-      [ValidateSet('Shell','WinrtNormal')][string]$Kind='Shell')
+      [ValidateSet('Shell','WinrtNormal')][string]$Kind='Shell',
+      [switch]$IsolatedVm)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows' -or
-    $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust' -or
-    $Kind -cnotin @('Shell','WinrtNormal') -or ($Kind -ceq 'Shell' -and $env:IFW_QA_LATE_NOTIFICATION -cne '1') -or
+if ($IsolatedVm) {
+    if ($env:GITHUB_ACTIONS -or $Kind -cne 'WinrtNormal' -or $env:IFW_QA_ISOLATED -cne '1' -or
+        $env:IFW_QA_INVENTORY_TOKEN -cne $Token) { throw 'Expected the isolated WinRT fixture' }
+    $tempRoot = $env:IFW_QA_VM_TEMP
+} else {
+    if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows' -or
+        $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') {
+        throw 'Expected the disposable Windows rewrite runner'
+    }
+    $tempRoot = $env:RUNNER_TEMP
+}
+if ($Kind -cnotin @('Shell','WinrtNormal') -or ($Kind -ceq 'Shell' -and $env:IFW_QA_LATE_NOTIFICATION -cne '1') -or
     ($Kind -ceq 'WinrtNormal' -and $env:IFW_QA_TOAST_HISTORY -cne '1') -or
-    [IO.Path]::GetFullPath($Fixture) -ine (Join-Path $env:RUNNER_TEMP "ifw-shell-$Token") -or
+    [IO.Path]::GetFullPath($Fixture) -ine (Join-Path $tempRoot "ifw-shell-$Token") -or
     [IO.File]::ReadAllText((Join-Path $Fixture 'synthetic.fixture')) -cne $Token) { throw 'Expected the disposable notification fixture' }
 function Emit([hashtable]$Record) {
     [Console]::Out.WriteLine('NOTICE_OBSERVER ' + ($Record | ConvertTo-Json -Depth 8 -Compress))
