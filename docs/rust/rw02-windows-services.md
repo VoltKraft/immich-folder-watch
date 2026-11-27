@@ -1110,6 +1110,19 @@ case order, the original handles and cleanup before starting the next GUI.
 [Native case order](../../tools/rust-qa/windows-launcher/native_tray.py) ·
 [Server 2022 comparison](../../.github/workflows/rust-windows-shell-2022.yaml).
 
+### Visible start first on Windows Server 2022 at f148e30
+
+On a fresh original Explorer the visible-start GUI ran first. After the
+user-window close, Explorer supplied the registered icon rectangle
+(835, 728)–(859, 768). Activating the visible icon reached the original
+GUI (PID 4620) and the original worker (PID 5276) survived the reopen.
+The callback and the native window SHOW fell within the same Windows timer
+tick. The observer could not establish their order. In the second,
+background-start case, Explorer returned `S_FALSE` for the icon rectangle
+and exposed no eligible overflow provider. Both cases cleaned up. The
+earlier background-first run qualified that startup on its own desktop.
+[Original visible-first archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46033236196/artifacts/15215852607).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

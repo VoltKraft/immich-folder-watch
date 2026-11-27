@@ -105,6 +105,12 @@ the original window was closed. All four original native library and metadata
 files were present in this run's archive and matched their compiler receipts.
 [Background-start activation and original archive](rust/rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
 
+In the visible-first repeat at `f148e30`, Explorer activated the original
+closed-to-tray window and its inventory worker survived. The callback and
+window SHOW had the same Windows timer tick. Their order remains open.
+Explorer did not expose the background-start icon in the second case.
+[Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30).
+
 The ARM64 IME observer at `9313f39` lost its filename field during Japanese
 layout selection. It exited before composing text and restored the layout
 and test profile. It now waits for the same focused field and records the
