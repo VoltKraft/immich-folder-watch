@@ -382,6 +382,10 @@ class RetainedWindow:
                 return False
         if show < earliest:
             raise ValueError("The retained window show was outside its native activation interval")
+        root = self.record.get("rootAtTrayOpen") if field == "callbackShow" else None
+        if root and (root["visible"] or root["tick"] > show):
+            row.update(status="inconclusive", reason="The original root was not observed hidden before its native SHOW")
+            return False
         resume = self.record.get("afterKeyboardResume") if field == "secondaryShow" else None
         if resume:
             self.record["keyboardHook"] = dict(count=len(self.windows.events), rootEvents=[
@@ -403,6 +407,15 @@ class RetainedWindow:
         if row["distinctTicks"]:
             row.update(status="ordered", basis="distinctTicks")
             return True
+        # The GUI consumed this exact Shell Open on the root's own thread while it was still hidden.
+        # The independent hook must show its original hide and a single subsequent root SHOW.
+        if root and root["tick"] == show == latest:
+            hidden = self.record["hidden"]
+            if (event["root"] and self.events(start) == [event]
+                    and self.events(self.start) == [hidden["hideEvent"], event]
+                    and self.record["reopened"]["events"] == [hidden["hideEvent"], event]):
+                row.update(status="ordered", basis="hiddenOnGuiThreadBeforeTrayOpen")
+                return True
         row.update(status="inconclusive", reason="The SHOW and activation could not be ordered within the Windows timer tick")
         return False
 

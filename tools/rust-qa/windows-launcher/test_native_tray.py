@@ -42,6 +42,20 @@ def callback(queued="22", dispatched=23, code=0x401):
 
 
 class TrayProofTests(unittest.TestCase):
+    def test_consumed_open_must_identify_the_held_gui_thread_root_and_callback_ordinal(self):
+        root = dict(pid=18, tid=8, hwnd=99)
+        delivered = dict(pid=18, ordinal=1, dispatchMs=23)
+        line = "TRAY_OPEN_ROOT pid=18 tid=8 hwnd=99 ordinal=1 visible=false tick=23\n"
+        self.assertEqual(tray.tray_open_root(line, delivered, root, 28),
+                         dict(**root, ordinal=1, visible=False, tick=23))
+        for source, wrong in (("pid=18", "pid=19"), ("tid=8", "tid=9"), ("hwnd=99", "hwnd=43"),
+                              ("ordinal=1", "ordinal=2"), ("tick=23", "tick=22"), ("tick=23", "tick=29")):
+            with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                tray.tray_open_root(line.replace(source, wrong), delivered, root, 28)
+        with self.assertRaises(ValueError):
+            tray.tray_open_root(line + line, delivered, root, 28)
+        self.assertIsNone(tray.tray_open_root(line.rstrip(), delivered, root, 28))
+
     def test_native_source_ignores_incomplete_records_and_rejects_a_mismatched_incarnation(self):
         probe = tray.NativeTray(Mock(), Mock(), "Default", TOKEN)
         probe.witness = Mock(confirmed=True)
@@ -179,7 +193,8 @@ class TrayProofTests(unittest.TestCase):
 
 
 class ResidentTests(unittest.TestCase):
-    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False, compare=False, msaa=False):
+    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False, compare=False, msaa=False,
+                 tied_sample=None, root_show=True):
         api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
         proc.poll.return_value = None
@@ -259,7 +274,11 @@ class ResidentTests(unittest.TestCase):
                         append("GRAPHICS_READY generation=2\n")
                     if refusal == "different-window":
                         windows.hwnd = 100
-                    windows.show(16 if refusal == "premature-show" else 24, create=not reopen)
+                    if tied_sample:
+                        append(tied_sample)
+                    show_tick = 23 if tied_sample is not None else 24
+                    windows.show(16 if refusal == "premature-show" else show_tick, create=not reopen)
+                    windows.events[-1]["root"] = root_show
                     invoked = dict(visible_surface, rgb=COMPLEMENT)
                     if refusal == "recycled-at-invoke":
                         invoked["pane"] = invoked["pane"] | {"tid": 777}
@@ -307,6 +326,9 @@ class ResidentTests(unittest.TestCase):
                                 "different-worker": "inventory worker changed"}.get(refusal, "one acknowledged")
                     with self.assertRaisesRegex(ValueError, expected):
                         operation()
+                elif tied_sample is not None and ("visible=false tick=23" not in tied_sample or not root_show):
+                    with self.assertRaises(tray.launcher.ShowOrderUnavailable):
+                        operation()
                 elif refusal:
                     with self.assertRaises(tray.Unavailable):
                         operation()
@@ -353,6 +375,20 @@ class ResidentTests(unittest.TestCase):
         for wrong in ("second-generation", "different-window", "premature-show", "different-worker"):
             with self.subTest(wrong=wrong):
                 self.exercise(wrong, subject="retained", reopen=True)
+
+    def test_same_tick_requires_a_hidden_sample_on_the_gui_thread_and_an_independent_root_show(self):
+        line = "TRAY_OPEN_ROOT pid=18 tid=8 hwnd=99 ordinal=1 visible=false tick=23\n"
+        for sample, root in ((line, True), ("", True), (line.replace("false", "true"), True),
+                             (line.replace("tick=23", "tick=24"), True), (line, False)):
+            with self.subTest(sample=sample, root=root):
+                _, _, state = self.exercise(None, subject="retained", reopen=True, tied_sample=sample, root_show=root)
+                row = state["retainedWindow"]["callbackShow"]
+                self.assertFalse(row["distinctTicks"])
+                self.assertEqual(row["showEvent"], dict(event="show", hwnd=99, root=root, winEventTimeMs=23))
+                if sample == line and root:
+                    self.assertEqual(row["basis"], "hiddenOnGuiThreadBeforeTrayOpen")
+                else:
+                    self.assertEqual(row["status"], "inconclusive")
 
     def test_registration_refusal_or_unidentified_icon_still_quits_naturally_without_activation(self):
         for reason, commands, requests in (("shell", [b"B", b"Q"], []),

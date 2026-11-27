@@ -1123,6 +1123,15 @@ and exposed no eligible overflow provider. Both cases cleaned up. The
 earlier background-first run qualified that startup on its own desktop.
 [Original visible-first archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46033236196/artifacts/15215852607).
 
+The repeat observes the original window on its own UI thread when it
+consumes that specific Shell Open. Before calling its normal activation
+handler the GUI records its HWND, PID, thread, callback ordinal and native
+visibility. A tied timestamp qualifies only if the root was still hidden
+at that point and the independent WinEvent stream then shows exactly one
+matching root SHOW. Native execution of this observer is pending.
+[Native launcher](../../tools/rust-qa/windows-launcher/native_tray.py) ·
+[Offscreen editor comparison](../../tools/rust-qa/windows-cpu-paint/headless/README.md).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

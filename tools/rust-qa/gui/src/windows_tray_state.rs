@@ -99,7 +99,7 @@ impl Recovery {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrayEvent {
     Availability(bool),
-    Open,
+    Open(u32),
 }
 
 #[derive(Default)]
@@ -118,7 +118,7 @@ impl Pending {
             self.available = None;
         }
         if let Some(ordinal) = self.open {
-            send(TrayEvent::Open)?;
+            send(TrayEvent::Open(ordinal))?;
             self.open = None;
             return Ok(Some(ordinal));
         }

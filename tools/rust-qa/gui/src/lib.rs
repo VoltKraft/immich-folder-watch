@@ -18,6 +18,37 @@ use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 type Handle = *mut c_void;
 
+/// Observe the original GUI root while consuming the identified Shell Open, before applying it.
+pub fn observe_tray_open(root: &winit::window::Window, ordinal: u32) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{GA_ROOT, GetAncestor, IsWindowVisible};
+
+    let Ok(borrowed) = root.window_handle() else {
+        return;
+    };
+    let RawWindowHandle::Win32(window) = borrowed.as_raw() else {
+        return;
+    };
+    let hwnd = HWND(window.hwnd.get() as Handle);
+    let mut pid = 0;
+    // Holding the winit root on its creating thread binds the native visibility query to this window.
+    unsafe {
+        let tid = GetWindowThreadProcessId(hwnd.0, &mut pid);
+        if tid != GetCurrentThreadId()
+            || pid != std::process::id()
+            || GetAncestor(hwnd, GA_ROOT) != hwnd
+        {
+            return;
+        }
+        let visible = IsWindowVisible(hwnd).as_bool();
+        let tick = GetTickCount64();
+        println!(
+            "TRAY_OPEN_ROOT pid={pid} tid={tid} hwnd={} ordinal={ordinal} visible={visible} tick={tick}",
+            window.hwnd
+        );
+    }
+}
+
 /// Request foreground for the visible root on its creating UI thread after explicit activation.
 pub fn focus_owned_window(root: &winit::window::Window) {
     use windows::Win32::Foundation::HWND;
@@ -58,6 +89,7 @@ pub fn focus_owned_window(root: &winit::window::Window) {
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetCurrentThreadId() -> u32;
+    fn GetTickCount64() -> u64;
 }
 #[link(name = "user32")]
 unsafe extern "system" {

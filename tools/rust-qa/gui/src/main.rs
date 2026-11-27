@@ -38,6 +38,8 @@ enum Command {
     #[cfg(target_os = "windows")]
     TrayAvailability(bool),
     #[cfg(target_os = "windows")]
+    ObserveTrayOpen(u32),
+    #[cfg(target_os = "windows")]
     ReadFilenameIme(u8),
     Open,
     Close,
@@ -109,6 +111,13 @@ impl Model {
             #[cfg(target_os = "windows")]
             Command::TrayAvailability(available) => self.lifecycle.tray_result(available),
             #[cfg(target_os = "windows")]
+            Command::ObserveTrayOpen(ordinal) => {
+                if let Some(root) = self.root_window.upgrade() {
+                    native_gui_assessment::observe_tray_open(&root, ordinal);
+                }
+                self.lifecycle.activate()
+            }
+            #[cfg(target_os = "windows")]
             Command::ReadFilenameIme(sample) => {
                 self.ime_sample = Some(sample);
                 None
@@ -122,8 +131,10 @@ impl Model {
             }
         };
         #[cfg(windows)]
-        self.foreground
-            .update(matches!(command, Command::Open), action);
+        self.foreground.update(
+            matches!(command, Command::Open | Command::ObserveTrayOpen(_)),
+            action,
+        );
         action
     }
 }
@@ -566,10 +577,14 @@ fn windows_fixture_input(
         {
             // B releases the observer barrier. This process obtains the registration result from the Shell.
             let target = control.clone();
+            let observe_open = std::env::var("IFW_QA_TRAY_REOPEN").as_deref() == Ok("1");
             let (tray, registered) =
                 NativeTray::start(std::env::var("IFW_QA_INVENTORY_TOKEN")?, move |event| {
                     target.sender.try_send(match event {
-                        TrayEvent::Open => Command::Open,
+                        TrayEvent::Open(ordinal) if observe_open => {
+                            Command::ObserveTrayOpen(ordinal)
+                        }
+                        TrayEvent::Open(_) => Command::Open,
                         TrayEvent::Availability(available) => Command::TrayAvailability(available),
                     })?;
                     target.wake();

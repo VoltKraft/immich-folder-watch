@@ -42,7 +42,10 @@
 @@ -186 +186 @@
 -        model.borrow_mut().graphics.attach(creation);
 +        if creation.wgpu_render_state.is_some() { model.borrow_mut().graphics.attach(creation); }
-@@ -635,0 +636,6 @@
+@@ -648,3 +648,9 @@
+         available,
+     ))
+ }
 +
 +#[cfg(all(test, target_os = "linux"))]
 +mod cpu_view_observation;

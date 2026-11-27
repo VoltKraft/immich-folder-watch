@@ -23,6 +23,7 @@ RECORDS = {
     "TRAY_ICON": r"phase=(initial|changed|sample) pid=(\d+) hwnd=(\d+) id=(\d+) rgb=([0-9a-f]{6}) rect=(none|-?\d+,-?\d+,-?\d+,-?\d+) ok=([01])",
     "TRAY_CALLBACK": r"pid=(\d+) hwnd=(\d+) id=(\d+) code=(\d+) ordinal=(\d+) queued_ms=(none|\d+) dispatch_ms=(\d+)",
     "TRAY_OPEN": r"pid=(\d+) ordinal=(\d+)",
+    "TRAY_OPEN_ROOT": r"pid=(\d+) tid=(\d+) hwnd=(\d+) ordinal=(\d+) visible=(true|false) tick=(\d+)",
     "TRAY_CLEANUP": r"pid=(\d+) hwnd=(\d+) id=(\d+) registered=([01]) removed=([01])",
 }
 
@@ -209,6 +210,21 @@ def delivery(log, key, start, observed):
             raise Unavailable("The callback queue time could not be ordered after the provider invocation")
     return dict(pid=int(pid), hwnd=int(hwnd), iconId=int(ident), code=int(code), ordinal=int(ordinal),
                 queuedMs=None if queued == "none" else int(queued), dispatchMs=int(dispatch), observedMs=observed)
+
+
+def tray_open_root(log, callback, hidden, observed):
+    """Read the GUI thread's real root observation for the Open carrying this Shell callback ordinal."""
+    rows = records(log, "TRAY_OPEN_ROOT")
+    if not rows:
+        return None
+    pid, tid, hwnd, ordinal, visible, tick = one(rows, "tray Open root")
+    sample = dict(pid=int(pid), tid=int(tid), hwnd=int(hwnd), ordinal=int(ordinal),
+                  visible=visible == "true", tick=int(tick))
+    if (any(sample[key] != hidden[key] for key in ("pid", "tid", "hwnd"))
+            or (sample["pid"], sample["ordinal"]) != (callback["pid"], callback["ordinal"])
+            or not callback["dispatchMs"] <= sample["tick"] <= observed):
+        raise ValueError("The tray Open root sample did not match the original GUI, callback or interval")
+    return sample
 
 
 class ShellWitness:
@@ -835,7 +851,10 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                     retained.opened(hwnd, log, wait)
                 else:
                     retained.first(hwnd, log, wait)
-                show_ordered = retained.activated_show(events_before_invoke, result["delivery"]["dispatchMs"], clock(), "callbackShow")
+                observed = clock()
+                if reopen:
+                    evidence["rootAtTrayOpen"] = tray_open_root(log(), result["delivery"], evidence["hidden"], observed)
+                show_ordered = retained.activated_show(events_before_invoke, result["delivery"]["dispatchMs"], observed, "callbackShow")
                 result["keyboardFocus"] = {}
                 retained.focus(result["keyboardFocus"])
                 retained.check_visible(log, "beforeQuit")
@@ -864,6 +883,8 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
             raise ValueError("The original provider activation changed before quit")
         if retained is not None:
             launcher.retained_graphics(log(), evidence, before_quit=False)
+            if reopen and tray_open_root(log(), result["delivery"], evidence["hidden"], observed) != evidence["rootAtTrayOpen"]:
+                raise ValueError("The retained window's tray Open observation changed before Quit")
             if not show_ordered:
                 raise launcher.ShowOrderUnavailable(evidence["callbackShow"]["reason"])
 
@@ -894,6 +915,7 @@ def assess(target, out, result, *, subject="canonical", reopen_first=False):
                     case_out.mkdir()
                 with launcher.staged_profile(state, api, built_gui, inventory) as (gui, trial, env):
                     env["IFW_QA_WINDOWS_TRAY"] = "1"
+                    env["IFW_QA_TRAY_REOPEN"] = "1" if case == "inputDesktopReopen" else "0"
                     env["IFW_QA_MSAA_ICON"] = "1" if (
                         target == "x86_64-pc-windows-msvc" and subject == "retained" and case != "shellLess") else "0"
                     env["IFW_QA_TASKBAR_COMPARISON"] = "1" if (

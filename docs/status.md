@@ -119,6 +119,11 @@ In the visible-first repeat at `f148e30`, Explorer activated the original
 closed-to-tray window and its inventory worker survived. The callback and
 window SHOW had the same Windows timer tick. Their order remains open.
 Explorer did not expose the background-start icon in the second case.
+The repeat now samples that root on its UI thread as it consumes the
+identified callback. Both the ordinary and retained sources passed
+Windows x64 and ARM64 compile checks. On Fedora all 18 editor image
+files matched the original captures. Native Shell evidence for the
+new observer is pending.
 [Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30).
 
 The ARM64 IME observer at `9313f39` lost its filename field during Japanese

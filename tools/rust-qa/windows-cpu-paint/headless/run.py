@@ -21,7 +21,7 @@ from pixels import compare
 
 
 GUI = QA / "gui"
-SUBJECT_SHA = "a22d904d24eec3a7eabe543a176278ce46ed9f3ec2f90772d8137e5e03a201f9"
+SUBJECT_SHA = "d92c032a1c09bcf344d833f2accdbb4214496c717a4ae206520f39518b80ce18"
 LOCK_SHA = "55959e8ab77241da561ad189b53f75b3cba769a917ef47c8aa6b0acf9e304ae9"
 AREA = ROOT / "artifacts/rust"
 SCOPE = AREA / "egui-cpu-assessment"

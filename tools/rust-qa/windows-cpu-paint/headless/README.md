@@ -25,3 +25,10 @@ python3 tools/rust-qa/windows-cpu-paint/headless/run.py artifacts/rust/egui-cpu-
 The runner verifies the native compiler, private GUI source trees and five font files. It compiles a frozen test copy with an isolated home, network namespace and read-only inputs. Each execution writes its 18 original BGRA files, compiler/test log and JSON report to a new directory under `artifacts/rust/egui-cpu-assessment/`. To repeat the channel comparisons without compiling, pass that directory's `pixels/` subdirectory to [pixels.py](pixels.py). Both commands return a failure on an incomplete frame, a failed edit/restore or a channel difference above two.
 
 The original comparison used rustc 1.100.0 and llvmpipe with LLVM 23.1.5. Its `artifacts/rust/egui-cpu-view-local/pixel-comparison.json` has SHA-256 `1b9a7958707800295c5aabc4d7e5d5ac7eb3c214256da0ee6680e685bc578f01`, and `cpu-comparison.log` has SHA-256 `be7a48c5c2592dd8ed9b109c5d6a08d9797c7c9f655ec4f0c61a8600e4c9d4da`. Reconstructing the test from its staged GUI and the verified renderer archive reproduced all 18 original image files byte for byte. The ordinary application source SHA-256 was `a22d904d24eec3a7eabe543a176278ce46ed9f3ec2f90772d8137e5e03a201f9`.
+
+With the Windows tray observer in the GUI, the source SHA-256 was
+`d92c032a1c09bcf344d833f2accdbb4214496c717a4ae206520f39518b80ce18`.
+All 18 BGRA files matched the originals byte for byte. Both CPU painters
+passed the channel comparison against the six GPU reference frames. The
+new comparison report has SHA-256
+`085850f4926ac89be7de7fd12eb7d8026834fb9e1ade17e4ab6ffc8ad5937794`.
