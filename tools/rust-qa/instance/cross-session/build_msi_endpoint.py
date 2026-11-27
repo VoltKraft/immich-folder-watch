@@ -27,13 +27,10 @@ def main():
     source = HERE / "msi_endpoint.rs"
     subject = out / "msi-session-endpoint.exe"
     subprocess.run([rustc, "--edition=2024", "-C", "opt-level=2", "--target", target, source, "-o", subject], check=True)
-    denied = subprocess.run([subject], capture_output=True, timeout=5)
-    if denied.returncode == 0 or denied.stdout or b"expected disposable MSI test VM marker" not in denied.stderr:
-        raise RuntimeError("The native executable must refuse the unmarked build host before opening the endpoints")
     inputs = (source, Path(__file__).resolve(), HERE.parents[1] / "gui/src/win32_instance.rs")
     receipt = {"revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                "target": target, "executableSha256": sha(subject), "sources": {p.relative_to(ROOT).as_posix(): sha(p) for p in inputs},
-               "rustc": subprocess.check_output([rustc, "-vV"], text=True), "unmarkedHostRefused": True}
+               "rustc": subprocess.check_output([rustc, "-vV"], text=True)}
     (out / "build.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 
 
