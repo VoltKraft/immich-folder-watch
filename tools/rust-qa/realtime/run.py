@@ -56,7 +56,11 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--cargo-home", type=Path, default=ROOT / "artifacts/rust/realtime-cargo")
     parser.add_argument("--offline", action="store_true", help="use the already-populated isolated Cargo cache")
+    parser.add_argument("--build-only", action="store_true",
+                        help="compile the Windows x64 subject and unit executable for a separate native test guest")
     args = parser.parse_args()
+    if args.build_only and args.target != "x86_64-pc-windows-msvc":
+        parser.error("--build-only requires the Windows x64 compiler host")
     output = args.output.resolve()
     if output.exists() and any(output.iterdir()):
         raise ValueError("Use an empty output directory to keep individual native results separate")
@@ -70,6 +74,8 @@ def main():
     manifest = HERE / "Cargo.toml"
     record = {"target": args.target, "lockSha256": sha256(HERE / "Cargo.lock"), "steps": {},
               "sourceFiles": {}, "workflowRun": os.getenv("GITHUB_RUN_ID")}
+    if args.build_only:
+        record["mode"] = "build-only"
     for file in sorted([p for p in HERE.glob("*") if p.is_file()] + list((HERE / "src").glob("*.rs"))
                        + list((ROOT / "rust/crates/ifw-immich/src").glob("*.rs"))
                        + [ROOT / "rust/Cargo.toml", ROOT / "rust/crates/ifw-immich/Cargo.toml",
@@ -103,14 +109,26 @@ def main():
         graph = json.loads((output / "graph.json").read_text(encoding="utf-8"))
         record["inputs"] = verify_graph(graph, inputs, metadata, cargo_home)
         step("format", ["cargo", "fmt", "--all", "--check"])
-        step("unit", ["cargo", "test", "--frozen"])
+        if args.build_only:
+            step("unit-build", ["cargo", "test", "--frozen", "--no-run", "--message-format=json"])
+            messages = (output / "unit-build.txt").read_text(encoding="utf-8").splitlines()
+            units = [message["executable"] for line in messages if line.startswith("{")
+                     and (message := json.loads(line)).get("reason") == "compiler-artifact"
+                     and message["profile"]["test"] and message["target"]["name"] == "ifw-realtime-probe"
+                     and message["executable"]]
+            if len(units) != 1:
+                raise ValueError("Expected one compiled realtime unit test executable")
+            shutil.copy2(units[0], output / "ifw-realtime-unit.exe")
+        else:
+            step("unit", ["cargo", "test", "--frozen"])
         step("clippy", ["cargo", "clippy", "--frozen", "--all-targets", "--", "-D", "warnings"])
         step("build", ["cargo", "build", "--frozen", "--release"])
         binary = target_dir / "release" / ("ifw-realtime-probe.exe" if os.name == "nt" else "ifw-realtime-probe")
         if os.name == "nt":
             # Replay the compiler's actual executable alongside the installed reference.
             binary = Path(shutil.copy2(binary, output / binary.name))
-        step("sessions", [sys.executable, HERE / "verify.py", "--probe", binary, "--output", output / "sessions.json"])
+        if not args.build_only:
+            step("sessions", [sys.executable, HERE / "verify.py", "--probe", binary, "--output", output / "sessions.json"])
         record["passed"] = True
     finally:
         record.setdefault("passed", False)

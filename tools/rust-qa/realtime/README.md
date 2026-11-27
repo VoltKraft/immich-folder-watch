@@ -114,6 +114,28 @@ The runner fails on a changed reviewed graph or unexpected source files. The
 compact, sorted-key JSON encoding of each target inventory is pinned in
 `inputs.json`. A dependency change requires a fresh source and license review.
 
+### Windows x64 on the local test guest
+
+On a Windows x64 compiler host, append `--build-only` to the `run.py` command.
+Cargo compiles the release probe and the Rust unit executable. The result
+directory contains both binaries, their SHA256 values, the compiler checks
+and the hashes of the source inputs. Preserve this directory as the build artifact.
+
+On the local Windows x64 guest, use a native x64 Python 3.11 or later,
+OpenSSL on PATH, the complete Actions artifact ZIP and a source export from
+the recorded commit. Supply the full commit and the independently retrieved
+Actions artifact digest. Run the guest command from the checkout.
+
+```powershell
+python tools/rust-qa/realtime/guest.py --archive $BuildZip --archive-sha256 $ActionsDigest --head $Commit --source-root $Source --output $Result
+```
+
+The guest verifies the archive, source and binary hashes before starting the
+unit executable and the loopback suite. Its separate receipt records the
+OS, Python, compiler artifact, unit output and wire observations. An older
+full-run archive that retained only the release probe permits a guest wire
+replay. The receipt identifies that archive's missing unit executable.
+
 ## Windows x64 crypto object reconstruction
 
 The ring package includes NASM input, generator scripts and the preassembled COFF
