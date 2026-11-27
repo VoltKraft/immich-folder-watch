@@ -954,6 +954,27 @@ trial received a show callback. Its 91 sweeps found no visible pair.
 ARM64 Explorer refused the classic registration.
 [x64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14997780160) · [ARM64 WinRT](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996411832) · [x64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996548148) · [ARM64 classic Shell](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14997195340).
 
+### Comparing marker colors across the original x64 taskbar
+
+In the x64 retained-window trial, Explorer can acknowledge the native icon
+and return a rectangle whose pixels do not contain the marker. The normal
+activation trial first looks for that marker and an identifiable Shell
+provider. If the close/reopen case finds neither the expected marker nor a
+verified hidden-icons button, the observer compares a grid across the same
+visible taskbar. It samples up to 1,536 points twice before and twice after
+the original receiver successfully changes its HICON to the complementary
+color through `NIM_MODIFY`.
+
+Each counted transition must have the original and complementary colors at
+the same physical point in both observations of each phase. All four reads
+must resolve to the same Explorer-owned window. The observer retains counts,
+coordinate bounds and timings. A transition outside the supplied rectangle
+can locate the marker for further investigation. Activation still requires
+the accessible item, its callback and the reopened original window with its
+worker. A run with no eligible provider records activation as unavailable.
+[Native observer](../../tools/rust-qa/windows-launcher/native_tray.py) ·
+[Shell sampling](../../tools/rust-qa/windows-launcher/tray_provider.ps1).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

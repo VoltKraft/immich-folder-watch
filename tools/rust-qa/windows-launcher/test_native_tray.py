@@ -154,7 +154,7 @@ class TrayProofTests(unittest.TestCase):
 
 
 class ResidentTests(unittest.TestCase):
-    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False):
+    def exercise(self, refusal, *, subject="canonical", reopen=False, flyout=False, compare=False):
         api, desk, windows = Mock(), Mock(), OwnedRoot(18)
         proc, helper = Mock(pid=18, _handle=42), Mock()
         proc.poll.return_value = None
@@ -213,7 +213,15 @@ class ResidentTests(unittest.TestCase):
             proc.stdin.write.side_effect = send
             def receive(stage):
                 if stage == "first":
+                    if compare:
+                        return None
                     return {"surface": visible_surface | {"shellPid": 87} if refusal == "foreign-provider" else visible_surface}
+                if stage == "taskbar-before":
+                    return dict(stage=stage, surface=dict(SURFACE, rgb="eeeeee"), barBounds=[-20,0,100,100], expectedRgb=RGB)
+                if stage == "taskbar-after":
+                    return dict(color=COMPLEMENT, comparison=dict(barBounds=[-20,0,100,100], iconBounds=RECT, stable=30,
+                                rows=5, columns=6, firstColor=3, secondColor=2, inside=0, outside=2,
+                                startTick=[1,5,29,32], endTick=[4,7,30,34]))
                 if stage == "ready" and refusal == "provider":
                     raise tray.Unavailable("No exact accessible icon")
                 if stage in ("ready", "attempt"):
@@ -249,7 +257,8 @@ class ResidentTests(unittest.TestCase):
                   patch.object(retained_window, "visible_surface", side_effect=lambda *a: tray.visible_surface(
                       *a, monitor_area=lambda _: [-20, 0, 100, 100])),
                   patch.object(retained_window, "focus_sample", return_value=dict(foreground=True, active=True, focused=True)),
-                  patch.object(tray, "bind", return_value=lambda: 28), patch.object(tray, "ordinary_console", return_value=True),
+                  patch.object(tray, "bind", return_value=Mock(side_effect=[26,28,35]) if compare else lambda: 28),
+                  patch.object(tray, "ordinary_console", return_value=True),
                   patch.object(tray.launcher, "child", child), patch.object(tray.launcher, "snapshot", return_value={}),
                   patch.object(tray.launcher, "system_console_path"), patch.object(tray.recorder, "load_windows_fixture") as fixture,
                   patch.object(tray.recorder, "idle_complete", return_value=True), patch.object(tray.recorder, "owned_worker", return_value=28),
@@ -260,7 +269,8 @@ class ResidentTests(unittest.TestCase):
                   patch.object(tray, "shell_rect", return_value=dict(hresult=-1, rect=None))):
                 fixture.return_value.Windows.return_value = windows
                 fixture.return_value.TITLE = TITLE
-                operation = lambda: tray.resident(api, desk, out / "gui.exe", out, {"IFW_QA_INVENTORY_TOKEN": TOKEN},
+                env = {"IFW_QA_INVENTORY_TOKEN": TOKEN, "IFW_QA_TASKBAR_COMPARISON": "1" if compare else "0"}
+                operation = lambda: tray.resident(api, desk, out / "gui.exe", out, env,
                                                   out, state, subject=subject, reopen=reopen)
                 if refusal == "early":
                     with self.assertRaisesRegex(ValueError, "outside the provider observation"):
@@ -327,6 +337,16 @@ class ResidentTests(unittest.TestCase):
                 self.assertEqual((actual, sent), (commands, requests))
                 self.assertNotIn("delivery", state)
 
+    def test_comparison_after_provider_refusal_records_modify_and_quit_without_invoking_any_item(self):
+        commands, requests, state = self.exercise("missing-provider", subject="retained", reopen=True, compare=True)
+        self.assertEqual(commands, [b"B", b"P", b"M", b"P", b"Q"])
+        self.assertEqual(requests, [b"compare\n"])
+        self.assertEqual(state["taskbarComparison"]["status"], "transition-observed")
+        self.assertEqual(state["nativeShutdown"]["markerAcknowledgements"], 1)
+        self.assertEqual(state["nativeShutdown"]["cleanupMethod"], "deletedAtQuit")
+        self.assertFalse(state["nativeShutdown"]["stableRegistration"])
+        self.assertNotIn("delivery", state)
+
     def test_callback_during_attempt_receipt_output_precedes_the_real_provider_invocation(self):
         commands, _, state = self.exercise("early")
         self.assertEqual(commands[-1], b"Q")
@@ -367,14 +387,15 @@ class TrialSelectionTests(unittest.TestCase):
                     yield root / "selected-gui", root, {}
                 finally:
                     state["cleanupConfirmed"] = state["profile"] != unconfirmed
-            def resident(_api, _desk, gui, _trial, _env, out, state, *, subject, reopen):
-                calls.append((gui.name, subject, reopen, out.name))
+            def resident(_api, _desk, gui, _trial, env, out, state, *, subject, reopen):
+                calls.append((gui.name, subject, reopen, out.name, env["IFW_QA_TASKBAR_COMPARISON"]))
                 if state["profile"] == "1":
                     raise tray.Unavailable("Provider declined this profile")
-            for variant, unconfirmed, expected_calls in (("retained", None, 2), ("retained", "1", 1),
-                                                        ("canonical", None, 1)):
-                with self.subTest(subject=variant, unconfirmed=unconfirmed):
-                    out = root / f"{variant}-{unconfirmed}"
+            for arch, variant, unconfirmed, expected_calls in (("x86_64", "retained", None, 2), ("x86_64", "retained", "1", 1),
+                            ("x86_64", "canonical", None, 1), ("aarch64", "retained", None, 2)):
+                target = arch + "-pc-windows-msvc"
+                with self.subTest(target=target, subject=variant, unconfirmed=unconfirmed):
+                    out = root / f"{arch}-{variant}-{unconfirmed}"
                     out.mkdir()
                     profiles, calls, result = [], [], {}
                     with (patch.object(tray.launcher, "native_subject", subject), patch.object(tray.launcher, "staged_profile", profile),
@@ -382,14 +403,14 @@ class TrialSelectionTests(unittest.TestCase):
                           patch.object(tray.c, "WinDLL", create=True), patch.object(tray, "bind")):
                         if unconfirmed:
                             with self.assertRaises(tray.Unavailable):
-                                tray.assess("target", out, result, subject=variant)
+                                tray.assess(target, out, result, subject=variant)
                             self.assertEqual(result["inputDesktopReopen"]["status"], "not-run")
                         else:
-                            self.assertEqual(tray.assess("target", out, result, subject=variant), "unavailable")
+                            self.assertEqual(tray.assess(target, out, result, subject=variant), "unavailable")
                     self.assertEqual(len(calls), expected_calls)
-                    self.assertEqual(calls[0], ("selected-gui", variant, False, out.name))
+                    self.assertEqual(calls[0], ("selected-gui", variant, False, out.name, "0"))
                     if expected_calls == 2:
-                        self.assertEqual(calls[1], ("selected-gui", variant, True, "inputDesktopReopen"))
+                        self.assertEqual(calls[1], ("selected-gui", variant, True, "inputDesktopReopen", "1" if arch == "x86_64" else "0"))
                         self.assertEqual(result["inputDesktopReopen"]["status"], "passed")
 
 

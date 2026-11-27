@@ -39,6 +39,39 @@ try {
 } catch {
     if ($_.Exception.GetBaseException().Message -ne 'Invalid marker grid rectangle') { throw }
 }
+$bar=[IfwIconSurface+BarComparison]::new([int[]]@(-16,4,16,12),[int[]]@(0,4,12,12))
+for ($pass=0; $pass -lt 4; $pass++) {
+    $bar.AddPass($pass,{
+        param($x,$y)
+        if ($x -lt -16 -or $x -ge 16 -or $y -lt 4 -or $y -ge 12) { throw 'Sample left the taskbar' }
+        if ($y -ne 6) { return -91L }
+        switch ($x) {
+            -14 { return 91L }  # Stable change outside the returned rectangle.
+              2 { return 91L }  # Stable change inside it.
+            -10 { if ($pass -lt 2) { return 91L }; return 81L }  # Replaced hit window.
+             -6 { if ($pass -eq 2) { return 0L }; return 91L }    # Temporarily covered.
+             -2 { if ($pass -eq 1) { return -91L }; return 91L }  # Transient color.
+              6 { if ($pass -lt 2) { return 91L }; return -91L }  # Different locations.
+             10 { if ($pass -ge 2) { return 91L }; return -91L }
+            default { return -91L }
+        }
+    })
+}
+if ($bar.rows -ne 2 -or $bar.columns -ne 8 -or $bar.stable -ne 14 -or $bar.firstColor -ne 3 -or
+    $bar.secondColor -ne 4 -or $bar.inside -ne 1 -or $bar.outside -ne 1 -or
+    ($bar.transitionBounds -join ',') -ne '-14,6,3,7' -or ($bar | ConvertTo-Json) -match '"(hits|center)"') {
+    throw 'The taskbar comparison misattributed a pixel, lost coverage counts or exposed its internal samples'
+}
+foreach ($bounds in @(@(0,0,4097,20),@(0,0,1000,162),@(2,0,800,52))) {
+    try {
+        [void][IfwIconSurface+BarComparison]::new([int[]]$bounds,[int[]]@(0,2,18,18))
+        throw 'Unexpected taskbar dimensions were accepted'
+    } catch {
+        if ($_.Exception.GetBaseException().Message -ne 'Unexpected original taskbar or icon dimensions') { throw }
+    }
+}
+$vertical=[IfwIconSurface+BarComparison]::new([int[]]@(0,0,160,4096),[int[]]@(10,70,25,100))
+if ($vertical.columns*$vertical.rows -gt 1536) { throw 'The taskbar sampling budget was exceeded' }
 . (Join-Path $PSScriptRoot '../windows-services/tray-overflow.ps1')
 foreach ($name in @('Wait-OpenedPane','Restore-OpenedPane','Invoke-OriginalIcon')) {
     $fn=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$true)
@@ -110,4 +143,4 @@ foreach ($case in @('open-threw','close-threw','already-dismissed','foreign-surf
         }
     }
 }
-Write-Output 'Four passive marker-grid controls, seven flyout recovery controls and the native tuple comparison passed.'
+Write-Output 'Icon and taskbar color sampling, flyout recovery and native identity controls passed.'

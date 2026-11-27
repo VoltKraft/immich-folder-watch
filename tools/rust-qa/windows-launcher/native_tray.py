@@ -587,7 +587,7 @@ def confirm_surface(event, key, creation, rect, expected_rgb, first=None):
                                        (event["provider"]["hitRuntimeId"] == event["provider"]["runtimeId"]))
             or not re.fullmatch("[0-9a-f]{6}", surface["rgb"])):
         raise ValueError("Incomplete pixel, input desktop or Explorer hit evidence")
-    if any(abs(a - b) > 8 for a, b in zip(bytes.fromhex(surface["rgb"]), bytes.fromhex(expected_rgb))):
+    if expected_rgb is not None and any(abs(a - b) > 8 for a, b in zip(bytes.fromhex(surface["rgb"]), bytes.fromhex(expected_rgb))):
         raise ValueError("The independent pixel did not match the current marker")
     if first and any(surface[k] != first[k] for k in ("rect", "point", "hit", "root", "rootClass", "overflow", "pane", "monitor",
                                                       "cursor", "bar", "shellPid", "shellCreation")):
@@ -708,18 +708,9 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                 command(proc, b"P")
                 return wait(lambda: icon(log()[offset:], "sample", key, rgb), "Missing fresh GUI rectangle for the original tray icon")
 
-            with provider(api, desk, trial, env, out, key, creation, state, native.witness.original) as (helper, get):
-                initial = wait(lambda: get("first"), "The native marker observer did not start")
-                first_rect = initial_rect
-                if initial["surface"]["overflow"] or first_rect is None:
-                    native.require_original("visibleMarkerHost", initial["surface"])
-                    first_rect = result["firstVisibleGuiRect"] = fresh_gui_rect(colors[0])
-                    if first_rect != initial["surface"]["rect"]:
-                        raise Unavailable("The GUI and the physical marker did not agree on the visible Shell rectangle")
-                first = result["first"] = confirm_surface(initial, key, creation, first_rect, colors[0])
+            def change_marker(surface):
                 hidden()
-                result["stage"] = "second-marker"
-                native.require_original("beforeMarker", first)
+                native.require_original("beforeMarker", surface)
                 command(proc, b"M")
                 changed = wait(lambda: icon(log(), "changed", key, colors[1]), "Missing GUI marker modification")
                 native.require_original("afterMarker")
@@ -727,8 +718,52 @@ def resident(api, desk, gui, trial, env, out, result, *, subject="canonical", re
                     raise ValueError("The GUI marker was not backed by exactly one acknowledged Shell modification")
                 native.witness.markers += 1
                 current = result["secondGuiRect"] = fresh_gui_rect(colors[1])
-                if first_rect != changed or changed != current:
+                if surface["rect"] != changed or changed != current:
                     raise Unavailable("The notification icon moved during the marker challenge")
+                return current
+
+            with provider(api, desk, trial, env, out, key, creation, state, native.witness.original) as (helper, get):
+                compare = reopen and env.get("IFW_QA_TASKBAR_COMPARISON") == "1"
+                initial = wait(lambda: get("first") or (compare and get("taskbar-before")), "The native marker observer did not start")
+                if initial.get("stage") == "taskbar-before":
+                    record = result["taskbarComparison"] = {"before": initial, "status": "incomplete"}
+                    hint = initial["surface"]
+                    if (initial["expectedRgb"] != colors[0] or hint["rootClass"] != "Shell_TrayWnd" or hint["pane"] is not None
+                            or initial_rect is None or fresh_gui_rect(colors[0]) != initial_rect):
+                        raise Unavailable("Missing original taskbar or stable GUI rectangle for the color comparison")
+                    confirm_surface(initial, key, creation, initial_rect, expected_rgb=None)
+                    record["changeStartTick"] = clock()
+                    change_marker(hint)
+                    record["changeAckTick"] = clock()
+                    command(helper, b"compare\n")
+                    observed = wait(lambda: get("taskbar-after"), "Missing physical taskbar color comparison")
+                    data = record["samples"] = observed["comparison"]
+                    starts, ends = data["startTick"], data["endTick"]
+                    if (observed["color"] != colors[1] or data["iconBounds"] != initial_rect or data["barBounds"] != initial["barBounds"]
+                            or not (0 <= data["inside"] + data["outside"] <= min(data["firstColor"], data["secondColor"])
+                                    <= max(data["firstColor"], data["secondColor"]) <= data["stable"] <= data["rows"] * data["columns"] <= 1536)
+                            or min(data["inside"], data["outside"]) < 0
+                            or len(starts) != 4 or len(ends) != 4 or any(e < s or e-s > 8100 for s, e in zip(starts, ends))
+                            or not (ends[0] < starts[1] <= ends[1] <= record["changeStartTick"] <= record["changeAckTick"]
+                                    <= starts[2] <= ends[2] < starts[3] <= ends[3] <= clock())):
+                        raise ValueError("The reported taskbar comparison did not bracket the original live marker modification")
+                    native.require_original("afterTaskbarComparison", hint)
+                    hidden()
+                    if result["workerBefore"] != worker_identity("taskbarComparisonEnd"):
+                        raise ValueError("The original inventory worker changed during the taskbar comparison")
+                    record["status"] = "no-stable-points"
+                    if data["stable"]:
+                        record["status"] = "transition-observed" if data["inside"] or data["outside"] else "no-transition-sampled"
+                    raise Unavailable("The original taskbar had no verified provider for activation")
+                first_rect = initial_rect
+                if initial["surface"]["overflow"] or first_rect is None:
+                    native.require_original("visibleMarkerHost", initial["surface"])
+                    first_rect = result["firstVisibleGuiRect"] = fresh_gui_rect(colors[0])
+                    if first_rect != initial["surface"]["rect"]:
+                        raise Unavailable("The GUI and the physical marker did not agree on the visible Shell rectangle")
+                first = result["first"] = confirm_surface(initial, key, creation, first_rect, colors[0])
+                result["stage"] = "second-marker"
+                current = change_marker(first)
                 command(helper, b"second\n")
                 ready = wait(lambda: get("ready"), "The two-color and accessibility observer did not report an outcome")
                 result["second"] = confirm_surface(ready, key, creation, current, colors[1], first)
@@ -829,6 +864,8 @@ def assess(target, out, result, *, subject="canonical"):
                     case_out.mkdir()
                 with launcher.staged_profile(state, api, built_gui, inventory) as (gui, trial, env):
                     env["IFW_QA_WINDOWS_TRAY"] = "1"
+                    env["IFW_QA_TASKBAR_COMPARISON"] = "1" if (
+                        target == "x86_64-pc-windows-msvc" and subject == "retained" and case == "inputDesktopReopen") else "0"
                     if case == "shellLess":
                         name = "IfwQa_Tray_" + state["profile"]
                         native = NativeTray(api, desk, name, state["profile"])

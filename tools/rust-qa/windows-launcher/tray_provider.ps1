@@ -44,6 +44,7 @@ public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
     [DllImport("user32")] static extern IntPtr GetShellWindow();
     [DllImport("user32")] static extern IntPtr WindowFromPoint(Point p);
     [DllImport("user32")] static extern IntPtr GetAncestor(IntPtr hwnd, uint kind);
+    [DllImport("user32")] static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32")] static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
     [DllImport("user32")] static extern bool GetCursorPos(out Point point);
@@ -287,6 +288,96 @@ public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
         } finally { if (ReleaseDC(IntPtr.Zero,dc) == 0) throw new Win32Exception(Marshal.GetLastWin32Error()); }
         Require(center.Matches(Read(null)), "The original marker rectangle or Explorer changed during the scan");
         return grid;
+    }
+    // Each sample retains only a matching/nonmatching bit and the hit HWND, never a desktop image.
+    public sealed class BarComparison {
+        public int[] barBounds, iconBounds, transitionBounds;
+        public int step = 4, columns, rows, stable, firstColor, secondColor, inside, outside;
+        public ulong[] startTick = new ulong[4], endTick = new ulong[4];
+        internal long[][] hits = new long[4][];
+        internal Sample center;
+        internal uint barThread, receiverThread;
+        public BarComparison(int[] bounds, int[] icon) {
+            long width=(long)bounds[2]-bounds[0], height=(long)bounds[3]-bounds[1];
+            Require(width >= 2 && height >= 2 && Math.Max(width,height) <= 4096 && Math.Min(width,height) <= 160 &&
+                    icon[0] >= bounds[0] && icon[1] >= bounds[1] && icon[2] <= bounds[2] && icon[3] <= bounds[3] &&
+                    icon[2] > icon[0] && icon[3] > icon[1], "Unexpected original taskbar or icon dimensions");
+            barBounds=bounds; iconBounds=icon;
+            while (((width+step-1)/step)*((height+step-1)/step) > 1536) step++;
+            columns=(int)((width+step-1)/step); rows=(int)((height+step-1)/step);
+        }
+        int Coordinate(int axis, int cell) {
+            return (int)Math.Min((long)barBounds[axis+2]-1, (long)barBounds[axis]+cell*step+step/2);
+        }
+        public void AddPass(int index, Func<int,int,long> read) {
+            Require(index >= 0 && index < 4 && hits[index] == null && (index == 0 || hits[index-1] != null),
+                    "Invalid taskbar color sample order");
+            hits[index]=new long[columns*rows];
+            for (int i=0;i<hits[index].Length;i++) {
+                int x=Coordinate(0,i%columns), y=Coordinate(1,i/columns);
+                long current=hits[index][i]=read(x,y);
+                if (index != 3 || current == 0) continue;
+                long owner=Math.Abs(current);
+                if (Math.Abs(hits[0][i]) != owner || Math.Abs(hits[1][i]) != owner || Math.Abs(hits[2][i]) != owner) continue;
+                stable++;
+                bool first=hits[0][i] > 0 && hits[1][i] > 0, second=hits[2][i] > 0 && current > 0;
+                if (first) firstColor++;
+                if (second) secondColor++;
+                if (!first || !second) continue;
+                if (x >= iconBounds[0] && x < iconBounds[2] && y >= iconBounds[1] && y < iconBounds[3]) inside++; else outside++;
+                if (transitionBounds == null) transitionBounds=new int[]{x,y,x+1,y+1};
+                else {
+                    transitionBounds[0]=Math.Min(transitionBounds[0],x); transitionBounds[1]=Math.Min(transitionBounds[1],y);
+                    transitionBounds[2]=Math.Max(transitionBounds[2],x+1); transitionBounds[3]=Math.Max(transitionBounds[3],y+1);
+                }
+            }
+        }
+    }
+    uint ThreadOf(IntPtr hwnd, uint expectedPid) {
+        uint owner; uint tid=GetWindowThreadProcessId(hwnd,out owner);
+        Require(tid != 0 && owner == expectedPid && IsInput(GetThreadDesktop(tid)), "The input desktop window owner changed");
+        return tid;
+    }
+    int[] BarBounds() {
+        Rect b=new Rect(); Require(Present(bar) && GetWindowRect(bar,out b), "Missing visible original taskbar bounds");
+        return new int[]{b.Left,b.Top,b.Right,b.Bottom};
+    }
+    public BarComparison BeginComparison(Sample center) {
+        Require(center != null && center.pane == null && center.root == bar.ToInt64(), "Expected the original taskbar");
+        return new BarComparison(BarBounds(),center.rect) {
+            center=center, barThread=ThreadOf(bar,shellPid), receiverThread=ThreadOf(receiver,pid)
+        };
+    }
+    void CheckComparison(BarComparison b) {
+        var arrays=System.Collections.StructuralComparisons.StructuralEqualityComparer;
+        Sample current=Read(null); // Checks the live receiver, original Explorer, input desktop and independent icon ID.
+        Require(current.root == bar.ToInt64() && current.monitor == b.center.monitor && current.hit == b.center.hit &&
+                arrays.Equals(current.cursor,b.center.cursor) && arrays.Equals(current.rect,b.iconBounds) &&
+                arrays.Equals(BarBounds(),b.barBounds) && ThreadOf(bar,shellPid)==b.barThread && ThreadOf(receiver,pid)==b.receiverThread &&
+                ProcessSessionIsActive(pid) && ProcessSessionIsActive(shellPid), "The original taskbar comparison surface changed");
+    }
+    static bool ProcessSessionIsActive(uint owner) {
+        uint session; return ProcessIdToSessionId(owner,out session) && session == WTSGetActiveConsoleSessionId();
+    }
+    public void CapturePass(BarComparison b, int index, int[] color) {
+        CheckComparison(b);
+        IntPtr dc=GetDC(IntPtr.Zero);
+        Require(dc != IntPtr.Zero, "Could not sample the original visible taskbar");
+        try {
+            b.startTick[index]=GetTickCount64();
+            b.AddPass(index,delegate(int x,int y) {
+                Require(GetTickCount64()-b.startTick[index] < 8000, "Taskbar sample exceeded its time bound");
+                var p=new Point{X=x,Y=y}; var hit=WindowFromPoint(p);
+                if (!OnOriginalTaskbar(p,hit,b.center)) return 0;
+                uint px=GetPixel(dc,x,y);
+                if (px == 0xffffffff || WindowFromPoint(p) != hit || !OnOriginalTaskbar(p,hit,b.center)) return 0;
+                bool match=Math.Abs((int)(px & 255)-color[0]) <= 8 && Math.Abs((int)((px>>8) & 255)-color[1]) <= 8 &&
+                           Math.Abs((int)((px>>16) & 255)-color[2]) <= 8;
+                return match ? hit.ToInt64() : -hit.ToInt64();
+            });
+            b.endTick[index]=GetTickCount64();
+        } finally { if (ReleaseDC(IntPtr.Zero,dc) == 0) throw new Win32Exception(Marshal.GetLastWin32Error()); }
+        CheckComparison(b);
     }
     public void Dispose() {
         int error = 0;
@@ -632,7 +723,23 @@ try {
                 Write-Event 'chevron-hint' @{afterRejectionAtHint=(Get-ChevronHintReadback $guard $script:lastSurface $names)}
             }
         }
-        if ($null -eq $lease.state) { throw [InvalidOperationException]::new("The pinned taskbar had no verified Show hidden icons provider ($($selection.gate))") }
+        if ($null -eq $lease.state) {
+            if ($env:IFW_QA_TASKBAR_COMPARISON -ceq '1' -and $scan.status -ceq 'sampled') {
+                $comparison=$guard.BeginComparison($script:lastSurface)
+                $guard.CapturePass($comparison,0,$orig)
+                Start-Sleep -Milliseconds 120
+                $guard.CapturePass($comparison,1,$orig)
+                Write-Event 'taskbar-before' @{surface=$script:lastSurface; barBounds=$comparison.barBounds; expectedRgb=$expectedRgb}
+                if ([Console]::In.ReadLine() -cne 'compare') { return }
+                Start-Sleep -Milliseconds 120
+                $guard.CapturePass($comparison,2,$contrast)
+                Start-Sleep -Milliseconds 120
+                $guard.CapturePass($comparison,3,$contrast)
+                Write-Event 'taskbar-after' @{comparison=$comparison; color=($contrast.ForEach({$_.ToString('x2')}) -join '')}
+                [void][Console]::In.ReadLine()
+            }
+            throw [InvalidOperationException]::new("The pinned taskbar had no verified Show hidden icons provider ($($selection.gate))")
+        }
         $lease.pane=Wait-OpenedPane $guard
         if ($null -eq $lease.pane) { throw [InvalidOperationException]::new('Explorer did not expose the requested native hidden-icons surface') }
         Write-Event 'opened' @{pane=$lease.pane}
