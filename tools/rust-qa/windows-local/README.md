@@ -25,6 +25,33 @@ compiler messages, checks each digest and records each process exit and
 output. The network fixture uses private loopback endpoints. A compiler
 receipt and a guest result identify different events.
 
+## Shipping .NET solution and installer checks
+
+In a fresh guest checkout, select the x64 SDK from `global.json`, Git for
+Windows, Python and PowerShell 7.3 or later. Stage the locked Avalonia
+source and upstream inputs in `artifacts/reduced-avalonia/inputs`.
+Pass the guest path of the offline public NuGet feed. The launcher keeps the
+private Avalonia packages mapped to the feed it builds from the pinned sources.
+
+```powershell
+./tools/rust-qa/windows-local/dotnet.ps1 -OfflineNugetFeed D:\public-packages
+```
+
+The launcher runs the PowerShell and installer regression tests, builds the
+solution, verifies package provenance and writes the .NET test logs under
+`artifacts/rust/local-dotnet/<revision>/`. Select `-BuildInstallers` with the
+WiX and runtime pack inputs staged when candidate packages are needed. To
+exercise the installed upgrade on a clean, elevated guest desktop, supply
+the published 3.0.3 MSI. The test checks its pinned hash before installation.
+
+```powershell
+./packaging/windows/Test-InstalledUpgrade.ps1 -LocalQaVm `
+    -BaselinePackage D:\immich-folder-watch-3.0.3-win-x64.msi `
+    -CandidateMsi artifacts/windows/msi/immich-folder-watch-3.0.4-win-x64.msi `
+    -CandidatePublishDirectory artifacts/windows/msi/publish/win-x64 `
+    -EvidenceDirectory artifacts/windows/upgrade-evidence
+```
+
 ## Other native suites
 
 | Scope | Local execution and evidence |

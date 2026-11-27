@@ -3,15 +3,30 @@ param(
     [Parameter(Mandatory = $true)][string]$CandidateMsi,
     [Parameter(Mandatory = $true)][string]$CandidatePublishDirectory,
     [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
-    [string]$CandidateVersion = "3.0.4"
+    [string]$CandidateVersion = "3.0.4",
+    [switch]$LocalQaVm,
+    [string]$BaselinePackage
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 # This test installs/uninstalls system software and must never run on a user's PC.
-if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_ENVIRONMENT -ne "github-hosted") {
-    throw "Installed upgrade tests require a disposable GitHub-hosted Windows runner."
+if (-not $IsWindows) { throw "Installed upgrade tests require Windows." }
+if ($LocalQaVm) {
+    if ($env:GITHUB_ACTIONS -or $env:COMPUTERNAME -ine "IFW-QA25" -or
+        [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64' -or
+        -not (Get-CimInstance Win32_ComputerSystem).HypervisorPresent) {
+        throw "Select the disposable IFW-QA25 x64 VM for a local installed upgrade."
+    }
+    if (-not $BaselinePackage) { throw "Supply the original 3.0.3 x64 MSI for the offline guest." }
+    $BaselinePackage = (Resolve-Path -LiteralPath $BaselinePackage).Path
+    $sourceCommit = git -C $PSScriptRoot rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $sourceCommit -cnotmatch '^[0-9a-f]{40}$') { throw "Missing guest checkout revision." }
+} elseif ($env:GITHUB_ACTIONS -ne "true" -or $env:RUNNER_ENVIRONMENT -ne "github-hosted") {
+    throw "Installed upgrade tests require a disposable GitHub-hosted Windows runner or the selected local QA VM."
+} else {
+    $sourceCommit = $env:GITHUB_SHA
 }
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -33,7 +48,8 @@ $legacyDirectory = Join-Path $env:ProgramData "Immich Folder Watch"
 $baselineMsi = Join-Path $EvidenceDirectory "immich-folder-watch-3.0.3-win-x64.msi"
 $summaryPath = Join-Path $EvidenceDirectory "upgrade-result.json"
 $summary = [ordered]@{
-    sourceCommit = $env:GITHUB_SHA
+    sourceCommit = $sourceCommit
+    hostType = $(if ($LocalQaVm) { "local-vm" } else { "github-hosted" })
     baselineVersion = "3.0.3"
     candidateMsiVersion = $CandidateVersion
     candidateMsiSha256 = (Get-FileHash -LiteralPath $CandidateMsi -Algorithm SHA256).Hash
@@ -367,7 +383,11 @@ if (@(Get-InstalledProducts).Count -ne 0 -or (Test-Path -LiteralPath $installDir
 if (@(Get-PendingAppOperations).Count -ne 0) { throw "Runner has pre-existing deferred application file operations." }
 
 try {
-    Invoke-WebRequest -Uri "https://github.com/VoltKraft/immich-folder-watch/releases/download/v3.0.3/immich-folder-watch-3.0.3-win-x64.msi" -OutFile $baselineMsi
+    if ($BaselinePackage) {
+        Copy-Item -LiteralPath $BaselinePackage -Destination $baselineMsi
+    } else {
+        Invoke-WebRequest -Uri "https://github.com/VoltKraft/immich-folder-watch/releases/download/v3.0.3/immich-folder-watch-3.0.3-win-x64.msi" -OutFile $baselineMsi
+    }
     $baselineHash = (Get-FileHash -LiteralPath $baselineMsi -Algorithm SHA256).Hash
     if ($baselineHash -ne "E2559768224568EAAE67DB9B19B82D8390720FFB9692CFE6248F69F08042CC6C") {
         throw "Released baseline MSI SHA-256 mismatch."
