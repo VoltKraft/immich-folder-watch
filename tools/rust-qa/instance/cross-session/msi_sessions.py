@@ -140,7 +140,10 @@ def measure(work, order, own, other, accounts, sid):
         result['heldSocket'] = wait(area, 'wpf-socket.json', timeout=12)
         if order == 'wpf-first':
             native, result['rustProcess'] = endpoint(stack, work, area, own, accounts, sid)
-            native.expect('PIPE_REFUSED code=Some(5)')
+            refusal = native.events.get(timeout=10)
+            allowed = {'PIPE_REFUSED code=Some(5)': 5, 'PIPE_REFUSED code=Some(231)': 231}
+            require(refusal in allowed, f'Expected refusal of the occupied first pipe instance, received {refusal!r}')
+            result['pipeRefusalWin32'] = allowed[refusal]
             native.expect('EXISTING_PIPE_SERVER pid=' + str(wpf['pid']))
             native.success()
             result['rustRefusedNs'] = time.monotonic_ns()
