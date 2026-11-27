@@ -95,17 +95,22 @@ class ImeTests(unittest.TestCase):
                 self.assertIsNotNone(eligibility({**observation, **changes}))
 
     def test_requires_ordered_native_events_exact_field_and_restoration(self):
-        positive = {"status": "passed", "subjectId": 23, "selectedLayout": 0xe0010411, "preeditBeforeEnter": True,
+        field = {"state": "observed", "lastObservation": "focused-filename-read", "attempts": 2}
+        positive = {"status": "passed", "subjectId": 23, "windowHandle": 55, "fieldAfterLayout": field,
+                    "selectedLayout": 0xe0010411, "preeditBeforeEnter": True,
                     "commitAfterEnter": True, "normalFilenameConfirmed": True, "committedCodePoint": "U+3042",
                     "originalLayout": 0x04090409, "restoredLayout": 0x04090409}
-        self.assertTrue(accepted(positive, 23))
-        self.assertFalse(accepted(positive, 42))
+        self.assertTrue(accepted(positive, 23, 55))
+        self.assertFalse(accepted(positive, 42, 55))
+        self.assertFalse(accepted(positive, 23, 56))
         for k in positive:
-            self.assertFalse(accepted({n: v for n, v in positive.items() if n != k}, 23), k)
-        self.assertFalse(accepted({**positive, "restoredLayout": 0x411}, 23))
-        self.assertFalse(accepted({**positive, "committedCodePoint": "U+0061"}, 23))
+            self.assertFalse(accepted({n: v for n, v in positive.items() if n != k}, 23, 55), k)
+        for change in ({"state": "unavailable"}, {"lastObservation": "filename-unfocused"}, {"attempts": 0}):
+            self.assertFalse(accepted({**positive, "fieldAfterLayout": {**field, **change}}, 23, 55))
+        self.assertFalse(accepted({**positive, "restoredLayout": 0x411}, 23, 55))
+        self.assertFalse(accepted({**positive, "committedCodePoint": "U+0061"}, 23, 55))
         diagnostic = {"beforeA": {"state": "observed", "open": True, "conversionFlags": 1}}
-        self.assertFalse(accepted({**positive, "preeditBeforeEnter": False, "attempts": [diagnostic]}, 23))
+        self.assertFalse(accepted({**positive, "preeditBeforeEnter": False, "attempts": [diagnostic]}, 23, 55))
 
     def test_gui_receipt_binds_executable_native_machine_and_field_source(self):
         with tempfile.TemporaryDirectory() as d:

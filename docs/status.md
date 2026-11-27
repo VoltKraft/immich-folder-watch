@@ -80,6 +80,12 @@ the original window was closed. All four original native library and metadata
 files were present in this run's archive and matched their compiler receipts.
 [Background-start activation and original archive](rust/rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
 
+The ARM64 IME observer at `9313f39` lost its filename field during Japanese
+layout selection. It exited before composing text and restored the layout
+and test profile. It now waits for the same focused field and records the
+last observation if the field stays unavailable. A native repeat is pending.
+[ARM64 source and archive](rust/rw02-windows-ime.md).
+
 The remaining Windows desktop tests cover tray activation after close,
 ARM64 Explorer activation,
 visible notifications, a restorable contrast setting, a move between two

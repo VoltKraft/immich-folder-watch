@@ -52,13 +52,17 @@ if ($Mode -ceq 'inventory') {
     return
 }
 
-function Wait-For([scriptblock]$Read, [string]$Name, [int]$Seconds=8) {
-    $until = [DateTime]::UtcNow.AddSeconds($Seconds)
+function Wait-For([scriptblock]$Read, [string]$Name, [int]$Seconds=8, $Evidence=$null) {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     do {
         $value = & $Read
         if ($value) { return $value }
         Start-Sleep -Milliseconds 70
-    } while ([DateTime]::UtcNow -lt $until)
+    } while ($clock.Elapsed.TotalSeconds -lt $Seconds)
+    if ($null -ne $Evidence) {
+        $Evidence.state = 'unavailable'
+        throw "Timed out waiting for $Name. Last observation was $($Evidence.lastObservation)."
+    }
     throw "Timed out waiting for $Name."
 }
 
@@ -72,29 +76,59 @@ function Get-Label($Element) {
 
 function Get-OwnedFilename {
     $root = [Windows.Automation.AutomationElement]::FromHandle($handle)
+    if ($null -eq $root) { return }
     if ($root.Current.ProcessId -ne $SubjectId) { throw 'UIA root belongs to a different process.' }
     $condition = [Windows.Automation.PropertyCondition]::new(
         [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Edit)
+    $match = $null
     foreach ($el in $root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)) {
-        if ($el.Current.ProcessId -eq $SubjectId -and (Get-Label $el) -ceq 'Dateiname' -and -not $el.Current.IsPassword) { return $el }
+        if ($el.Current.ProcessId -eq $SubjectId -and (Get-Label $el) -ceq 'Dateiname' -and -not $el.Current.IsPassword) {
+            if ($null -ne $match) { throw 'Multiple filename edits belong to the subject window.' }
+            $match = $el
+        }
     }
+    return $match
 }
 
-function Test-OwnedFocus {
+function Test-OwnedFocus($Expected = $field) {
     if (-not [IfwObservedWindow]::OnInputDesktop() -or [IfwObservedWindow]::GetForegroundWindow() -ne $handle) { return $false }
     $el = [Windows.Automation.AutomationElement]::FocusedElement
-    return ($null -ne $el -and $el.Current.ProcessId -eq $SubjectId -and -not $el.Current.IsPassword -and
+    return ($null -ne $Expected -and $null -ne $el -and [Windows.Automation.Automation]::Compare($Expected, $el) -and
+            $el.Current.ProcessId -eq $SubjectId -and $el.Current.IsEnabled -and $el.Current.HasKeyboardFocus -and -not $el.Current.IsPassword -and
             $el.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and (Get-Label $el) -ceq 'Dateiname')
 }
 
-function Get-Text {
+function Get-Text($Element = $field) {
     $value = $null
-    if ($field.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$value)) { return [string]$value.Current.Value }
-    $value = $field.GetCurrentPattern([Windows.Automation.TextPattern]::Pattern)
+    if ($Element.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$value)) { return [string]$value.Current.Value }
+    $value = $Element.GetCurrentPattern([Windows.Automation.TextPattern]::Pattern)
     return $value.DocumentRange.GetText(-1).TrimEnd("`r","`n")
 }
 
+function Test-SubjectLayout {
+    return ([IfwQaIme.Native]::OwnedThread($handle, $SubjectId) -eq $threadId -and
+            [IfwQaIme.Native]::GetKeyboardLayout($threadId) -eq $japanese)
+}
+
+function Read-LayoutFilename($Evidence) {
+    $Evidence.attempts++
+    if (-not (Test-SubjectLayout)) { $Evidence.lastObservation = 'subject-layout-changed'; return }
+    try {
+        $candidate = Get-OwnedFilename
+        if ($null -eq $candidate) { $Evidence.lastObservation = 'filename-missing'; return }
+        if (-not (Test-OwnedFocus $candidate)) { $Evidence.lastObservation = 'filename-unfocused'; return }
+        $text = Get-Text $candidate
+        if ($text -cne $expected) { $Evidence.lastObservation = 'unexpected-filename'; throw 'Unexpected initial synthetic filename.' }
+        $Evidence.state = 'observed'
+        $Evidence.lastObservation = 'focused-filename-read'
+        return @{ element=$candidate; text=$text }
+    } catch [Windows.Automation.ElementNotAvailableException] {
+        $Evidence.lastObservation = 'element-became-unavailable'
+    }
+}
+
 function Send-Key([string]$Name) {
+    if (-not (Test-SubjectLayout)) { throw 'The original window thread no longer has the selected Japanese layout.' }
     if (-not (Test-OwnedFocus)) { throw 'The normal subject filename does not own foreground and keyboard focus.' }
     [IfwQaIme.Native]::SendFixtureKey($handle, $SubjectId, $Name)
 }
@@ -143,6 +177,7 @@ try {
     }
     $result.subjectId = $SubjectId
     $result.threadId = $threadId
+    $result.windowHandle = $WindowHandle
     $field = Wait-For { Get-OwnedFilename } 'normal German filename'
     if (-not [IfwObservedWindow]::OnInputDesktop()) { throw 'The observer is outside the input desktop.' }
     $result.setForeground = [IfwObservedWindow]::SetForegroundWindow($handle)
@@ -174,10 +209,11 @@ try {
         Set-OwnedLayout $japanese
     }
     $result.selectedLayout = [IfwQaIme.Native]::GetKeyboardLayout($threadId).ToInt64()
-    $field = Get-OwnedFilename
-    $initial = Get-Text
     $expected = 'Gr' + [char]0xfc + [char]0xdf + 'e ' + [char]0x2013 + ' Sommer.jpg'
-    if ($initial -cne $expected) { throw 'Unexpected initial synthetic filename.' }
+    $result.fieldAfterLayout = [ordered]@{ state='waiting'; attempts=0; lastObservation='pending' }
+    $ready = Wait-For { Read-LayoutFilename $result.fieldAfterLayout } 'the focused filename on the original window after Japanese layout selection' -Evidence $result.fieldAfterLayout
+    $field = $ready.element
+    $initial = $ready.text
     Send-Key 'end'
     $result.attempts = @()
     $composing = $false

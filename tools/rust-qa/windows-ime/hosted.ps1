@@ -15,6 +15,7 @@ $report = [ordered]@{ tested=$false; passed=$false; capability=$feature; nativeT
 . (Join-Path $PSScriptRoot 'language-list.ps1')
 & (Join-Path $PSScriptRoot 'test_language_list.ps1')
 & (Join-Path $PSScriptRoot 'test_mode_sample.ps1')
+& (Join-Path $PSScriptRoot 'test_field_focus.ps1')
 & python -B -m unittest discover -s $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'The native IME observation and cleanup controls failed.' }
 

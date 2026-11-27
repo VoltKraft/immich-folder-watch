@@ -77,8 +77,11 @@ def eligibility(inventory):
     return None
 
 
-def accepted(data, pid):
+def accepted(data, pid, hwnd):
+    field = data.get("fieldAfterLayout", {})
     return (data.get("status") == "passed" and data.get("subjectId") == pid
+            and data.get("windowHandle") == hwnd and field.get("state") == "observed"
+            and field.get("lastObservation") == "focused-filename-read" and field.get("attempts", 0) > 0
             and data.get("selectedLayout", 0) & 0xffff == 0x411
             and data.get("preeditBeforeEnter") is True and data.get("commitAfterEnter") is True
             and data.get("normalFilenameConfirmed") is True and data.get("committedCodePoint") == "U+3042"
@@ -145,8 +148,10 @@ def subject(args, api, env, host, result):
                                   ["-SubjectId", child.pid, "-WindowHandle", hwnd, "-SubjectLog", log], child.stdin)
             result["observerExit"] = exit_code
             result["afterInput"] = api.context()
-            if exit_code or not accepted(read(args.output / "compose.json"), child.pid):
-                raise RuntimeError("The native composition and normal filename evidence did not pass")
+            compose = read(args.output / "compose.json")
+            if exit_code or not accepted(compose, child.pid, hwnd):
+                detail = compose.get("restoreError") or compose.get("error") or "missing evidence"
+                raise RuntimeError(f"The native composition and normal filename evidence did not pass: {detail}")
             if not ordinary_console(result["afterInput"], context["threadDesktop"]):
                 raise RuntimeError("The active input desktop changed before completion")
         finally:
@@ -224,6 +229,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     source = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "hosted.ps1", HERE / "language-list.ps1",
               HERE / "test_language_list.ps1", HERE / "Ime.cs", HERE / "mode-sample.ps1", HERE / "test_mode_sample.ps1",
+              HERE / "test_field_focus.ps1",
               QA / "windows-desktop/worker.py", QA / "windows-desktop/win32.py", QA / "windows_observer.py",
               QA / "observe-windows-gui.py", QA / "observe-windows-input.ps1", *FIELD_SOURCES]
     result = {"status": "failed", "source": os.getenv("GITHUB_SHA"), "run": os.getenv("GITHUB_RUN_ID"),

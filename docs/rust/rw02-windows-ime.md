@@ -1,5 +1,20 @@
 # RW-02 Windows system IME composition
 
+At `9313f39` Windows ARM64 installed Japanese Basic Typing and selected
+HKL 68224017. The original GUI was in the foreground. The single
+accessibility lookup immediately after the keyboard layout change returned
+no filename field and the observer stopped before composition. It restored
+the original layout and language list, removed the added capability and
+closed the GUI. The preceding run at `cd15d1c` observed preedit, commit
+and the inserted U+3042.
+
+After selecting the Japanese layout, the observer now waits up to eight
+seconds for the focused filename in the original GUI window. It records its
+last observation and attempt count, and checks the focused field and layout
+again before delivering keys. The native repeat is pending.
+[Original ARM64 evidence](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15213539112) ·
+[Field checks](../../tools/rust-qa/windows-ime/observe.ps1).
+
 The hosted wrapper first runs the actual field test with the installed
 components. If the runner has an active input desktop and the native
 inventory identifies a missing Japanese input service, Windows servicing
