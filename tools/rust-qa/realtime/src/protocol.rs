@@ -52,7 +52,7 @@ fn advertises_websocket<'de, D: serde::Deserializer<'de>>(de: D) -> Result<bool,
         fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<bool, A::Error> {
             let mut websocket = false;
             while let Some(name) = seq.next_element::<String>()? {
-                websocket |= name == "websocket";
+                websocket |= name.eq_ignore_ascii_case("websocket");
             }
             Ok(websocket)
         }

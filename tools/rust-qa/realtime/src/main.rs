@@ -36,6 +36,7 @@ enum Observation {
     ServerDisconnected,
     PeerClosed,
     Upgraded,
+    DirectWebSocket,
     UpgradeDeclined(Error),
     Heartbeat,
     Event,
@@ -79,9 +80,18 @@ async fn supervise(
     };
     let (request_stop, mut stopping) = watch::channel(false);
     let connection = async {
+        let mut prefer_websocket = false;
         loop {
             report(Observation::Attempt);
-            let Err(error) = session::run(transport, refresh, &report, &mut stopping).await else {
+            let Err(error) = session::run(
+                transport,
+                refresh,
+                &report,
+                &mut stopping,
+                &mut prefer_websocket,
+            )
+            .await
+            else {
                 return;
             };
             report(Observation::Lost(error));

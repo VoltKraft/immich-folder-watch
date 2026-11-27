@@ -188,13 +188,13 @@ impl Transport {
         Ok(())
     }
 
-    pub async fn probe(&self, sid: &str) -> Result<Socket, Error> {
+    pub async fn websocket(&self, sid: Option<&str>) -> Result<Socket, Error> {
         // Keep the exact origin, headers, TLS verifier and no-redirect policy of
         // polling. Only switch the I/O stream after the RFC 6455 response.
         let key = generate_key();
         let accept = derive_accept_key(key.as_bytes());
         let resp = self
-            .request(Method::GET, self.uri("websocket", Some(sid)))?
+            .request(Method::GET, self.uri("websocket", sid))?
             .header(header::CONNECTION, "Upgrade")
             .header(header::UPGRADE, "websocket")
             .header(header::SEC_WEBSOCKET_VERSION, "13")
@@ -233,8 +233,11 @@ impl Transport {
             .max_frame_size(Some(MAX_MESSAGE_BYTES))
             .max_message_size(Some(MAX_MESSAGE_BYTES))
             .max_write_buffer_size(MAX_MESSAGE_BYTES + 32 * 1024);
-        let mut ws =
-            Socket::from_raw_socket(resp.upgrade().await?, Role::Client, Some(config)).await;
+        Ok(Socket::from_raw_socket(resp.upgrade().await?, Role::Client, Some(config)).await)
+    }
+
+    pub async fn probe(&self, sid: &str) -> Result<Socket, Error> {
+        let mut ws = self.websocket(Some(sid)).await?;
         ws.send(Message::text("2probe")).await?;
         loop {
             match ws.next().await.ok_or(Error::Disconnected)?? {

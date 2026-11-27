@@ -95,8 +95,12 @@ outputs matched their receipt. For the escaped root the peer received
 [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210518870) ·
 [Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15210644228).
 
-Windows ARM64 also passed the 22 cases and four unit tests at `6cd7757`.
-The original ZIP, targets, source pins and peer traces were checked separately.
+Windows x64 and ARM64 also passed the 22 cases and four unit tests at
+`6cd7757`. Independent replay checked all four native archives, each
+target graph, 19 source inputs and ten raw output hashes per target.
+Across the four hosts, 88 wire cases and 16 unit tests passed. The Windows
+x64 archive has SHA-256 `dd77b477436e841045fd3a9c06b317507c0ad5058be89c667f43c2f1105ec758`.
+[Windows x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15215793491) ·
 [Windows ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15215586046).
 
 ### Server ends the selected namespace
@@ -170,6 +174,44 @@ The admission-state test verified that a broken pipe while sending the
 close reply preserves the established session's no-retry decision. That
 decision is recorded before the bounded write begins. The frozen build
 receipt has SHA-256 `8ec897639ba542c3684283e7c15e0029e82be2a0ae13540dd4b5e31369117695`.
+
+### Opening the next session after an abrupt disconnect
+
+At `20dfb10` the Rust client still started with polling after an upgraded
+WebSocket lost its TCP connection. In the signed client, the server's
+WebSocket offer updates the transport preference for that client instance.
+On the next attempt the shipping client opened a WebSocket at the configured
+origin without the old SID. The peer sent a new Engine.IO OPEN. It received
+the masked `40` or `40/collection,` directly and delivered the second
+event. Both signed trials also recovered when that first direct request
+returned HTTP 503. The successful direct retry followed 12.493 seconds
+later for the default namespace and 11.404 seconds later for the named one.
+[Pinned transport selection](https://github.com/doghappy/socket.io-client-csharp/blob/9deebcfe8079164d269ec4f22ba58589366014fb/src/SocketIOClient/SocketIO.cs#L373-L404).
+
+The Rust implementation now remembers that offer across connection attempts.
+Its fresh direct handshake uses the original header, origin, TLS verifier
+and frame limits. In the named case the peer verified a masked pong before
+the OPEN and a masked namespace join immediately afterwards. A second
+upgrade offered in the direct OPEN produced no extra probe. The HTTP 503
+and HTTPS redirect controls both led to another direct attempt. The redirect
+destination received zero requests. In the polling-only control, expiry
+of the first SID led to a second polling session. All five controls
+delivered two events and the correct final namespace disconnect.
+
+The Fedora x64 frozen build passed all 33 wire scenarios and five unit
+tests. The native receipt has SHA-256
+`75e2a918b1dc44acf673ff299681a0f152f74c0b4b79a9a5d28c230cbf3fc278`.
+[Wire assertions and original request fields](../../tools/rust-qa/realtime/verify.py).
+
+A separate peer returned HTTP 503 on the *initial* SID-bound upgrade,
+before namespace admission. In both signed trials the polling connection
+closed before that response. The server saw no later SID-bound polling
+GET, application event or retry during 95 seconds. Separate runs cancelled
+cleanly after 42 seconds and completed two requested REST inventory reads.
+On the same peer the Fedora Rust client admitted an event over polling,
+then admitted a second after direct recovery from a later polling failure.
+Initial upgrade admission therefore still differs. The paired comparison
+has SHA-256 `ee5362d9df916405ea5690ad0976fc0fef07f9547569fc9c8c6b87ac1f507977`.
 
 ### Stopping an established session
 

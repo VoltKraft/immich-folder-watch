@@ -34,24 +34,45 @@ pub(crate) async fn run(
     refresh: &mpsc::Sender<()>,
     observe: Observe<'_>,
     stopping: &mut watch::Receiver<bool>,
+    prefer_websocket: &mut bool,
 ) -> Result<(), Error> {
     let connect_deadline = Instant::now() + CONNECT_TIMEOUT;
-    let Some(opening) =
-        until_stop(stopping, timeout_at(connect_deadline, transport.poll(None))).await
-    else {
-        return Ok(());
+    let mut body = Vec::new();
+    let mut polling_tail = None;
+    let (open, socket) = if *prefer_websocket {
+        let Some(opening) = until_stop(
+            stopping,
+            timeout_at(connect_deadline, direct_open(transport)),
+        )
+        .await
+        else {
+            return Ok(());
+        };
+        let (open, socket) = opening??;
+        observe(Observation::DirectWebSocket);
+        (open, Some(socket))
+    } else {
+        let Some(opening) =
+            until_stop(stopping, timeout_at(connect_deadline, transport.poll(None))).await
+        else {
+            return Ok(());
+        };
+        body = opening??;
+        let mut packets = polling_packets(&body).map_err(|_| Error::Protocol)?;
+        let Some(Ok(EnginePacket::Open(text))) = packets.next() else {
+            return Err(Error::Protocol);
+        };
+        let open = Open::parse(text)?;
+        // The shipping client remembers the offer even if this upgrade fails.
+        *prefer_websocket = open.websocket;
+        polling_tail = Some(packets);
+        (open, None)
     };
-    let body = opening??;
-    let mut packets = polling_packets(&body).map_err(|_| Error::Protocol)?;
-    let Some(Ok(EnginePacket::Open(text))) = packets.next() else {
-        return Err(Error::Protocol);
-    };
-    let open = Open::parse(text)?;
     let mut session = Session {
         transport,
         heartbeat: Instant::now() + open.heartbeat_window(),
         open,
-        socket: None,
+        socket,
         namespace: NamespaceState::Joining,
         refresh,
         observe,
@@ -66,7 +87,7 @@ pub(crate) async fn run(
         return Ok(());
     };
     post??;
-    for packet in packets {
+    for packet in polling_tail.into_iter().flatten() {
         timeout_at(
             connect_deadline,
             session.handle(packet.map_err(|_| Error::Protocol)?),
@@ -87,6 +108,29 @@ pub(crate) async fn run(
         observe(Observation::StopFailed(error));
     }
     Ok(())
+}
+
+async fn direct_open(transport: &Transport) -> Result<(Open, Socket), Error> {
+    let mut socket = transport.websocket(None).await?;
+    loop {
+        match socket.next().await.ok_or(Error::Disconnected)?? {
+            Message::Text(text) => {
+                let EnginePacket::Open(json) =
+                    websocket_packet(text.as_bytes()).map_err(|_| Error::Protocol)?
+                else {
+                    return Err(Error::Protocol);
+                };
+                return Ok((Open::parse(json)?, socket));
+            }
+            Message::Ping(_) => socket.flush().await?,
+            Message::Pong(_) => {}
+            Message::Close(_) => {
+                socket.flush().await?;
+                return Err(Error::Disconnected);
+            }
+            _ => return Err(Error::Protocol),
+        }
+    }
 }
 
 async fn finish_peer_close(
@@ -131,7 +175,10 @@ impl Session<'_> {
         connect_deadline: Instant,
         stopping: &mut watch::Receiver<bool>,
     ) -> Result<(), Error> {
-        if self.open.websocket && !self.upgrade(connect_deadline, stopping).await? {
+        if self.socket.is_none()
+            && self.open.websocket
+            && !self.upgrade(connect_deadline, stopping).await?
+        {
             return Ok(());
         }
         loop {

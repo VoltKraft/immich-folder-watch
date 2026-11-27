@@ -34,6 +34,7 @@ ESCAPED_PATHS = {
 }
 PEER_CLOSE_PATHS = {"peer-close-root": "/api", "peer-close-namespace": "/collection/api"}
 PEER_CLOSE_REASON = b"synthetic maintenance"
+DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect"}
 
 
 def send_frame(stream, opcode, data=b"", final=True):
@@ -73,6 +74,8 @@ class Peer(ThreadingHTTPServer):
         self.errors = []
         self.close_packets = []
         self.namespace_posts = []
+        self.open_requests = []
+        self.direct_joins = []
         self.stopping = threading.Event()
         self.poll_started = threading.Event()
         self.probe_answered = threading.Event()
@@ -137,10 +140,11 @@ class Handler(BaseHTTPRequestHandler):
             self.body(b"[]")
             return None
         assert url.path == "/socket.io/"
-        query = parse_qs(url.query, strict_parsing=True)
+        query = parse_qs(url.query, strict_parsing=True, keep_blank_values=True)
         assert query.pop("EIO") == ["4"]
-        transport, sid = query.pop("transport")[0], query.pop("sid", [None])[0]
-        assert not query and transport in ("polling", "websocket")
+        transport, = query.pop("transport")
+        sid, = query.pop("sid", [None])
+        assert not query and transport in ("polling", "websocket") and sid != ""
         return transport, sid
 
     def do_POST(self):
@@ -173,7 +177,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         mode, sid = route
         peer = self.server
-        if sid is None:
+        if mode == "websocket" and sid is None:
+            assert peer.scenario in DIRECT_RECONNECT and peer.counts["abruptWebsocketCloses"] == 1
+            self.upgrade(direct=True)
+        elif sid is None:
             assert mode == "polling"
             count = peer.mark("openingRequests")
             if peer.scenario == "redirect":
@@ -187,7 +194,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             sid = f"synthetic-{count}"
             peer.polls[sid] = 0
-            upgrade = peer.scenario in {"websocket", "ws-size", "upgrade-redirect", "probe-refused", "tls", "reconnect",
+            if peer.scenario in DIRECT_RECONNECT or peer.scenario == "reconnect-polling":
+                peer.open_requests.append({"path": self.path, "status": 200, "sid": sid})
+            upgrade = peer.scenario in DIRECT_RECONNECT or peer.scenario in {"websocket", "ws-size", "upgrade-redirect", "probe-refused", "tls",
                                         "close-timeout", "ack-after-upgrade", "stalled-probe", "server-disconnect-ws",
                                         "engine-close-ws", "peer-close-ws"}
             heartbeat_timeout = {"missed-heartbeat": 150, "stalled-probe": 400,
@@ -261,8 +270,13 @@ class Handler(BaseHTTPRequestHandler):
         elif number == 2 and peer.scenario == "engine-close-poll":
             peer.mark("engineCloseNotices")
             self.body(b"\x1e".join([b"1", event("on_album_update", peer.ns), b"2"]))
-        elif peer.scenario in {"websocket", "tls", "ws-size", "reconnect", "close-timeout", "server-disconnect-ws",
-                              "engine-close-ws", "peer-close-ws"}:
+        elif number == 2 and peer.scenario == "reconnect-polling":
+            self.body(event("on_album_update" if sid == "synthetic-1" else "on_album_delete", peer.ns))
+        elif number == 3 and peer.scenario == "reconnect-polling" and sid == "synthetic-1":
+            peer.mark("retiredPollingSessions")
+            self.body(b'{"code":1,"message":"Session ID unknown"}', status=400)
+        elif peer.scenario in DIRECT_RECONNECT or peer.scenario in {"websocket", "tls", "ws-size", "close-timeout", "server-disconnect-ws",
+                                                                   "engine-close-ws", "peer-close-ws"}:
             assert peer.probe_answered.wait(4), "websocket did not complete its probe"
             self.body(b"6")
         else:
@@ -270,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
             peer.stopping.wait(6)
             self.close_connection = True
 
-    def upgrade(self):
+    def upgrade(self, *, direct=False):
         peer = self.server
         peer.mark("websocketRequests")
         if peer.scenario == "upgrade-redirect":
@@ -280,6 +294,16 @@ class Handler(BaseHTTPRequestHandler):
         assert self.headers["Sec-WebSocket-Version"] == "13"
         key = self.headers["Sec-WebSocket-Key"]
         assert len(base64.b64decode(key, validate=True)) == 16
+        if direct:
+            attempt = peer.mark("directWebsocketRequests")
+            status = {"reconnect-refused": 503, "reconnect-redirect": 302}.get(peer.scenario, 101) if attempt == 1 else 101
+            peer.open_requests.append({"path": self.path, "status": status})
+            if status == 302:
+                self.redirect()
+                return
+            if status == 503:
+                self.body(b"unavailable", status)
+                return
         accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest())
         self.send_response(101)
         self.send_header("Connection", "Upgrade")
@@ -288,14 +312,35 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True
         self.connection.settimeout(5)
+        if direct:
+            offers = []
+            if peer.scenario == "reconnect-namespace":
+                send_frame(self.wfile, 9, b"before-direct-open")
+                assert client_frame(self.rfile) == (10, b"before-direct-open")
+                peer.mark("directPreOpenPongs")
+                offers = ["websocket"]
+            handshake = dict(sid="synthetic-direct", upgrades=offers, pingInterval=3000, pingTimeout=3000, maxPayload=LIMIT)
+            peer.open_requests[-1]["engineOpen"] = handshake
+            send_frame(self.wfile, 1, b"0" + json.dumps(handshake).encode())
+            opcode, join = client_frame(self.rfile)
+            assert (opcode, join) == (1, ("40" + peer.ns).encode()), "expected a direct masked namespace join"
+            peer.direct_joins.append(join.decode("ascii"))
+            peer.mark("directSessions")
+            send_frame(self.wfile, 1, ("40" + peer.ns + '{"sid":"direct-namespace-id"}').encode())
+        elif not self.probe_upgrade():
+            return
+        self.websocket_session(direct)
+
+    def probe_upgrade(self):
+        peer = self.server
         assert client_frame(self.rfile) == (1, b"2probe")
         peer.mark("probes")
         if peer.scenario == "probe-refused":
             send_frame(self.wfile, 8, struct.pack("!H", 1000))
-            return
+            return False
         if peer.scenario == "stalled-probe":
             peer.stopping.wait(6)
-            return
+            return False
         if peer.scenario == "ack-after-upgrade":
             assert peer.poll_started.wait(4), "expected the active namespace poll"
         send_frame(self.wfile, 1, b"3probe")
@@ -307,6 +352,10 @@ class Handler(BaseHTTPRequestHandler):
             assert peer.counts["releasedPollingPongs"] == 1, "upgrade overtook the polling heartbeat reply"
             send_frame(self.wfile, 1, ("40" + peer.ns + '{"sid":"websocket-namespace-id"}').encode())
             peer.mark("websocketNamespaceAcks")
+        return True
+
+    def websocket_session(self, direct):
+        peer = self.server
         if peer.scenario == "ws-size":
             send_frame(self.wfile, 1, b'a' * (LIMIT // 2), final=False)
             send_frame(self.wfile, 0, b'b' * (LIMIT // 2 + 1))
@@ -320,7 +369,7 @@ class Handler(BaseHTTPRequestHandler):
         if peer.scenario == "engine-close-ws":
             send_frame(self.wfile, 1, b"1")
             peer.mark("engineCloseNotices")
-        payload = event("on_album_update", peer.ns, "7")
+        payload = event("on_album_delete" if direct else "on_album_update", peer.ns, "7")
         send_frame(self.wfile, 1, payload[:8], final=False)
         send_frame(self.wfile, 0, payload[8:])
         send_frame(self.wfile, 1, event("unsubscribed", peer.ns))
@@ -336,8 +385,9 @@ class Handler(BaseHTTPRequestHandler):
             assert self.rfile.read(1) == b"", "unexpected client bytes after the close reply"
             peer.peer_close_complete.set()
             return
-        if peer.scenario == "reconnect" and peer.counts["upgrades"] == 1:
-            send_frame(self.wfile, 1, b"1")
+        if peer.scenario in DIRECT_RECONNECT and not direct:
+            peer.mark("abruptWebsocketCloses")
+            self.connection.shutdown(socket.SHUT_RDWR)
             return
         if peer.scenario == "server-disconnect-ws":
             detached_at = time.monotonic()
@@ -428,9 +478,10 @@ def make_trust(directory):
 
 def run_scenario(executable, name, directory, contexts, redirect):
     rejected_tls = name in {"untrusted-tls", "wrong-host-tls"}
-    encrypted = rejected_tls or name in {"tls", "upgrade-redirect"}
+    encrypted = rejected_tls or name in {"tls", "upgrade-redirect", "reconnect-redirect"}
     certificate_address = "127.0.0.2" if name == "wrong-host-tls" else "127.0.0.1"
-    api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade", "server-disconnect-poll"} else "/api"
+    api = "/collection/api" if name in {"polling", "tls", "ack-after-upgrade", "server-disconnect-poll",
+                                        "reconnect-namespace"} else "/api"
     api = PEER_CLOSE_PATHS.get(name, api)
     input_path, api = ESCAPED_PATHS.get(name, (api, api))
     scenario = "polling" if name in ESCAPED_PATHS else name
@@ -443,9 +494,10 @@ def run_scenario(executable, name, directory, contexts, redirect):
         trust = directory / ("other.crt" if name == "untrusted-tls" else "ca.crt")
         mode = "https" if encrypted or name == "http-default" else "allow-http"
         budget = 1300 if scenario in {"tls", "reconnect", "exact-size", "ws-size", "poll-size", "peer-close-ws"} else 850
-        if name in {"stalled-probe", "server-disconnect-ws"}:
+        reconnecting = name in DIRECT_RECONNECT or name == "reconnect-polling"
+        if name in {"stalled-probe", "server-disconnect-ws"} or reconnecting:
             budget = 1750
-        retry = 130 if scenario in {"reconnect", "peer-close-ws"} or name.startswith(("server-disconnect-", "engine-close-")) else 30_000
+        retry = 130 if reconnecting or scenario == "peer-close-ws" or name.startswith(("server-disconnect-", "engine-close-")) else 30_000
         before = time.monotonic()
         proc = subprocess.run([str(executable), url, mode, str(trust), str(budget), str(retry), "100"],
                               cwd=directory, text=True, capture_output=True, timeout=10)
@@ -461,7 +513,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
             assert proc.returncode == 0 and not proc.stderr and events[-1:] == ["Stopped"], (events, stats, proc.stderr)
             close_wait = 2000 if name == "close-timeout" else 0
             assert budget + close_wait - 50 <= elapsed < budget + close_wait + 2000, (budget, elapsed)
-            assert trace["Attempt"] == (1 if rejected_tls else stats["openingRequests"]), (events, stats)
+            assert trace["Attempt"] == (1 if rejected_tls else stats["openingRequests"] + stats["directWebsocketRequests"]), (events, stats)
             assert trace["Periodic"] >= 1
             if rejected_tls:
                 assert trace["Lost Transport"] == 1 and not stats and not trace["Connected"], (events, stats)
@@ -478,6 +530,20 @@ def run_scenario(executable, name, directory, contexts, redirect):
         if name in PEER_CLOSE_PATHS:
             assert origin.close_packets == [{"websocketCloseCode": 1001, "reason": PEER_CLOSE_REASON.decode("ascii")}]
             assert origin.peer_close_complete.is_set() and elapsed < budget + 1500, (elapsed, stats)
+        if reconnecting:
+            direct = name in DIRECT_RECONNECT
+            assert origin.namespace_posts == ["40" + origin.ns] * (1 if direct else 2)
+            assert origin.direct_joins == (["40" + origin.ns] if direct else [])
+            statuses = [200, 200]
+            if direct:
+                refusal = {"reconnect-refused": [503], "reconnect-redirect": [302]}.get(name, [])
+                statuses = [200, *refusal, 101]
+            assert [request["status"] for request in origin.open_requests] == statuses
+            expected_close = ([{"websocketText": "41" + origin.ns}, {"websocketCloseCode": 1000, "reason": "io client disconnect"}]
+                              if direct else [{"httpPost": "41" + origin.ns}])
+            assert origin.close_packets == expected_close
+            result.update(openRequestsAtPeer=origin.open_requests.copy(), directNamespaceJoinsAtPeer=origin.direct_joins.copy(),
+                          namespacePostsAtPeer=origin.namespace_posts.copy(), inventoryPathAtPeer=api + "/albums")
         if encrypted:
             result.update(tlsClientHelloObserved=True, certificateAddress=certificate_address,
                           endpointAddress="127.0.0.1", httpRequests=stats["httpRequests"],
@@ -487,9 +553,9 @@ def run_scenario(executable, name, directory, contexts, redirect):
 
 def check_protocol(name, trace, stats, events):
     polling_at_stop = name in {"polling", "upgrade-redirect", "probe-refused", "exact-size", "cancel-poll", "stalled-probe",
-                               "server-disconnect-poll", "engine-close-poll"}
-    websocket_at_stop = name in {"websocket", "tls", "reconnect", "close-timeout", "ack-after-upgrade", "server-disconnect-ws",
-                                 "engine-close-ws"}
+                               "server-disconnect-poll", "engine-close-poll", "reconnect-polling"}
+    websocket_at_stop = name in DIRECT_RECONNECT or name in {"websocket", "tls", "close-timeout", "ack-after-upgrade",
+                                                             "server-disconnect-ws", "engine-close-ws"}
     assert stats["pollingDisconnects"] == int(polling_at_stop), (events, stats)
     assert stats["websocketDisconnects"] == stats["normalCloseFrames"] == int(websocket_at_stop), (events, stats)
     assert stats["normalCloseReplies"] == int(websocket_at_stop and name != "close-timeout"), (events, stats)
@@ -510,9 +576,10 @@ def check_protocol(name, trace, stats, events):
     if websocket_at_stop or name == "ws-size":
         assert stats["probes"] == stats["upgrades"] == trace["Upgraded"] and stats["upgrades"] >= 1, (events, stats)
     if websocket_at_stop:
-        assert stats["websocketPongs"] == stats["enginePongs"] == stats["upgrades"], (events, stats)
+        sessions = stats["upgrades"] + stats["directSessions"]
+        assert stats["websocketPongs"] == stats["enginePongs"] == sessions, (events, stats)
         assert stats["enginePongs"] + stats["pollingPongs"] == trace["Heartbeat"], (events, stats)
-        assert trace["Event"] == stats["upgrades"] + int(name == "websocket"), (events, stats)
+        assert trace["Event"] == sessions + int(name == "websocket"), (events, stats)
         if name == "ack-after-upgrade":
             assert events.index("Upgraded") < events.index("Connected") < events.index("Event"), events
             assert stats["websocketNamespaceAcks"] == stats["pollingPongs"] == stats["releasedPollingPongs"] == 1
@@ -521,8 +588,22 @@ def check_protocol(name, trace, stats, events):
             assert events.index("Connected") < events.index("Upgraded"), events
         if name == "websocket":
             assert events.index("Connected") < events.index("Event") < events.index("Upgraded"), events
-    if name == "reconnect":
-        assert trace["Lost Disconnected"] == 1 and trace["Connected"] == 2, (events, stats)
+    if name in DIRECT_RECONNECT:
+        assert stats["openingRequests"] == stats["upgrades"] == stats["abruptWebsocketCloses"] == 1, (events, stats)
+        assert stats["directSessions"] == trace["DirectWebSocket"] == 1 and trace["Connected"] == trace["Event"] == 2
+        assert stats["directPreOpenPongs"] == int(name == "reconnect-namespace"), (events, stats)
+        # The WSS peer closes TCP without a TLS close_notify or a WebSocket Close.
+        losses = ["Lost Transport" if name == "reconnect-redirect" else "Lost Disconnected"]
+        losses += {"reconnect-refused": ["Lost Status(503)"], "reconnect-redirect": ["Lost Status(302)"]}.get(name, [])
+        assert [e for e in events if e.startswith("Lost ")] == losses, (events, stats)
+        assert events.index("Event") < events.index(losses[0]) <= events.index(losses[-1]) < events.index("DirectWebSocket")
+        later = events[events.index("DirectWebSocket") + 1:]
+        assert later.index("Connected") < later.index("Event") < later.index("Stopped")
+    if name == "reconnect-polling":
+        assert stats["retiredPollingSessions"] == trace["Lost Status(400)"] == 1 and stats["openingRequests"] == 2
+        assert trace["Connected"] == trace["Event"] == 2 and not stats["websocketRequests"] and not trace["DirectWebSocket"]
+        loss = events.index("Lost Status(400)")
+        assert events.index("Event") < loss and events[loss + 1:].index("Connected") < events[loss + 1:].index("Event")
     if name == "peer-close-ws":
         assert stats["peerCloseRequests"] == stats["probes"] == stats["upgrades"] == trace["Upgraded"] == 1, (events, stats)
         assert trace["Attempt"] == stats["openingRequests"] == trace["Connected"] == trace["Event"] == trace["PeerClosed"] == 1
@@ -556,7 +637,7 @@ def check_protocol(name, trace, stats, events):
     if name == "missed-heartbeat":
         assert trace["Lost Timeout"] == 1 and stats["pendingPolls"] == 1, (events, stats)
     if name not in {"untrusted-tls", "wrong-host-tls", "opening-size", "redirect", "stop-before-ack"}:
-        assert stats["namespacePosts"] == trace["Connected"] >= 1, (events, stats)
+        assert stats["namespacePosts"] + stats["directSessions"] == trace["Connected"] >= 1, (events, stats)
     if name in {"redirect", "opening-size", "missed-heartbeat", "poll-size", "ws-size"}:
         after_loss = events[next(i for i, e in enumerate(events) if e.startswith("Lost ")) + 1:]
         assert "Periodic" in after_loss and "Inventory" in after_loss and trace["Attempt"] == 1, (events, stats)
@@ -572,7 +653,8 @@ def main():
     executable = args.probe.resolve(strict=True)
     cases = ("polling", "websocket", "tls", "untrusted-tls", "wrong-host-tls", "http-default", "upgrade-redirect",
              "probe-refused", "redirect", "exact-size", "opening-size", "poll-size", "ws-size",
-             "reconnect", "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
+             "reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-polling",
+             "cancel-poll", "missed-heartbeat", "stop-before-ack", "close-timeout", "ack-after-upgrade",
              "stalled-probe", "server-disconnect-poll", "server-disconnect-ws", "server-disconnect-then-close",
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
     with executable.open("rb") as stream:

@@ -22,10 +22,18 @@ The runner uses `artifacts/rust/realtime-cargo` by default. Supply `--cargo-home
 to select another isolated cache and `--offline` after fetching the locked archives.
 The native runner verifies the active compiler/host, locked target graph, archive
 and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, release
-build and all 29 wire scenarios. Two strict polling peers accept only the
+build and all 33 wire scenarios. Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
+
+After abrupt loss of an upgraded connection the peer expects the next
+request to open a WebSocket without the old SID. It sends a fresh
+Engine.IO OPEN and verifies the masked namespace join and second event.
+The named case checks a WebSocket ping before the OPEN. On a refused or
+redirected direct reconnect, the peer checks the transport of the next
+request. A polling-only control retires the first SID and observes a
+second polling session. The HTTPS redirect case uses the isolated test CA.
 
 The upgrade trials exercise the namespace
 acknowledgement on either transport. The polling case delivers an event

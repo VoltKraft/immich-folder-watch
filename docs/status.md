@@ -18,9 +18,9 @@ Ten URL comparisons against signed 3.0.4 assemblies matched. On native
 Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
 `6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
 identifiers and retry bodies from the open file. Their upload reports
-match the Fedora report byte for byte. The 22 transport cases are now
-verified on Windows ARM64 as well. The Windows x64 transport and both
-Windows Rust upload readbacks at that revision are pending.
+match the Fedora report byte for byte. The 22 transport cases and four
+unit tests passed on Windows x64 and ARM64 as well. The two Windows Rust
+upload readbacks at that revision are pending.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
@@ -38,8 +38,18 @@ the peer's close, keeps inventory running and retries after an abrupt TCP
 loss. Both namespace paths passed the three clean-close variants and their
 abrupt-loss controls. All 29 strict wire scenarios and five unit tests
 passed. The signed client reconnected directly over WebSocket, while Rust
-used polling and upgrade.
+still used polling and upgrade at `20dfb10`.
 [Signed observations and Rust comparison](rust/rw02-realtime-transport.md#server-closes-an-established-websocket).
+
+The Rust client now opens a direct WebSocket after losing an upgraded
+connection. Native Fedora x64 passed all 33 wire scenarios and five unit
+tests. Root and named subscriptions recovered, including after a refused
+direct request. A redirected direct request sent zero traffic to the other
+origin. The original polling-only path also recovered.
+On the same pre-admission upgrade refusal the signed client delivered
+zero events. Rust delivered one on polling and a second after a later
+transport loss. This initial refusal remains under comparison.
+[Direct reconnect and signed reference](rust/rw02-realtime-transport.md#opening-the-next-session-after-an-abrupt-disconnect).
 
 On Fedora x64 the full offline build reproduced the same five Rust upload
 results. All 78 source inputs matched `6cd7757`. The modified Wayland
