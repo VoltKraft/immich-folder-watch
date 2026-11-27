@@ -50,6 +50,13 @@ usable icon rectangle on its desktop. ARM64 activation remains open.
 [Hidden start](rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c) ·
 [Reopen after close](rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
 
+At `20dfb10` the x64 Explorer left quiet time after 48 minutes. The
+classic sender received a show callback, and WinRT history contained
+the normal and suppressed entries with their exact text. None of the
+96 classic or 93 WinRT screen samples showed the expected title and body.
+Visible Windows notification presentation remains open.
+[Original Windows notification archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46034955133/artifacts/15221500889).
+
 On Fedora x64 the Rust realtime adapter kept one application session after
 the server ended its namespace or closed the WebSocket. Authenticated
 inventory continued. At `d97eb33` the root and named subscriptions also
@@ -59,11 +66,19 @@ suite passed 35 wire cases and six unit tests. Hosted repeats are pending.
 [Paired shipping-client and Rust trials](rw02-realtime-transport.md#server-closes-an-established-websocket) ·
 [Initial admission and original server comparison](rw02-realtime-transport.md#pausing-polling-before-the-initial-websocket-upgrade).
 
+On Fedora x64 at `12400d8` all 39 wire scenarios and six unit tests
+passed. Rust and the signed shipping assemblies used either an isolated
+Linux CA bundle or a hashed directory for authenticated inventory and a
+WebSocket session. Both rejected a foreign issuer and an incorrect host
+identity, including during the WebSocket upgrade after a valid polling join.
+[Private CA and peer results](rw02-realtime-transport.md#linux-platform-trust-with-private-certificates).
+
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
-x64 and ARM64. On Fedora x64, both Ubuntu architectures and Windows ARM64
-the combined Rust subject reproduced all five identifiers and retried from
-the original open file after the synthetic names were replaced. The four-target
-candidate upload and migration gates remain open.
+x64 and ARM64. On those four targets and on Fedora x64 the combined Rust
+executable independently reproduced every identifier and retry body from
+the original open file after each synthetic name was replaced. The Rust
+comparison reads the body locally. Installed candidate uploads and migration
+remain open.
 [C# and Rust comparison](rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Original native upload results](rw02-combined-profile.md#offline-reconstruction-with-the-legacy-upload-comparison).
 
@@ -77,6 +92,12 @@ passed all 87 inputs and 228 C# readbacks per platform. Rust rejects invalid
 earlier values in repeated properties. On Fedora x64 the previous 82 cases
 also preserved all 112 output files byte for byte.
 [Repeated properties and signed 3.0.4 comparison](rw02-yaml.md#repeated-properties-in-the-shipping-configuration).
+
+At `1d9f94d` Rust omitted the API key and private endpoint from debug
+output while preserving all 114 emitted YAML files byte for byte on
+Fedora x64. All 228 C# readbacks passed. Thirty watch- and log-path
+comparisons matched the signed release's editable and resolved values.
+[Diagnostic and path checks](rw02-yaml.md#configuration-diagnostics-and-native-path-comparisons).
 
 At `dddb21a` the private Windows x64 CPU renderer met all eleven WPF
 limits. All 421 file-qualified reopens drew a complete editor frame

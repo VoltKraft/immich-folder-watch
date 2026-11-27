@@ -656,6 +656,27 @@ actual policy history and the reason observation ended.
 [Focused workflow](../../.github/workflows/rust-windows-notification-2022.yaml) ·
 [Windows notification states](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state).
 
+### After quiet time on Windows Server 2022 at 20dfb10
+
+On the repeat run's original unlocked x64 desktop, Explorer reported `QUNS_QUIET_TIME`
+in 96 consecutive samples taken 30 seconds apart. The next sample,
+48 minutes after observation began, reported `QUNS_ACCEPTS_NOTIFICATIONS`.
+The Explorer process and taskbar window remained the same. At the classic
+request the Shell still reported that it accepted notifications and sent
+one show and one timeout callback. Across 96 UI Automation samples,
+including one during the request, none found the exact visible title and body.
+
+WinRT accepted the ordinary and quiet sends. An independent history reader
+matched each entry's title, body, tag and group and verified selective removal.
+The separate ordinary popup request returned success in 4.13 ms between
+two samples. Across all 93 samples the observer found no exact title and
+body on the Shell. Both observers completed without provider errors.
+Visible presentation remains open for both notification paths. The job
+finished with a failure after 54 minutes 57 seconds. The original archive
+has SHA-256 `f1f2ee67fb51580110f70b6378e16d1a9e658f5ab7c6910bd7ec2274078e56c7`.
+[Windows x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46034955133/job/140627892360) ·
+[Original state, callbacks, history and popup observations](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46034955133/artifacts/15221500889).
+
 ## Primary GUI and Shell callback
 
 The elected GUI owns a hidden top-level Shell receiver throughout the

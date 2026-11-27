@@ -37,10 +37,11 @@ Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
 `6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
 identifiers and retry bodies from the open file. Their upload reports
 match the Fedora report byte for byte. The 22 transport cases and four
-unit tests passed on Windows x64 and ARM64 as well. Windows ARM64 also
-passed all five held-file upload cases and reproduced the 22 wire cases
-after offline reconstruction of its import library. The Windows x64
-combined upload readback at that revision is pending.
+unit tests passed on Windows x64 and ARM64 as well. Both Windows builds
+reproduced all five held-file identifiers and retry bodies. Their upload
+reports were byte-identical, and each architecture's 23 archived files
+matched the corresponding desktop archive. Windows ARM64 also reproduced
+the 22 wire cases after offline reconstruction of its import library.
 [Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
 [Realtime transport](rust/rw02-realtime-transport.md).
 
@@ -171,7 +172,8 @@ starts the ordinary executable on the same desktop while the original GUI
 and inventory worker are running. It records whether that launcher opens
 and focuses the window and checks both processes through Quit. Across
 123 local launcher tests, 120 passed and three platform cases skipped.
-The native result is pending.
+The Windows Server 2022 trial is running at `3d55500`.
+[Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453) ·
 [Ordinary launcher when the icon has no rectangle](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
 
 The ARM64 IME observer at `9313f39` lost its filename field during Japanese
@@ -180,8 +182,7 @@ and test profile. It now waits for the same focused field and records the
 last observation if the field stays unavailable. A native repeat is pending.
 [ARM64 source and archive](rust/rw02-windows-ime.md).
 
-The remaining Windows desktop tests cover tray activation after close,
-ARM64 Explorer activation,
+The remaining Windows desktop tests cover ARM64 Explorer activation,
 visible notifications, a restorable contrast setting, a move between two
 outputs with different DPI, and rendering in an actual RDP session. The available
 hosted consoles each report one 96-DPI output. The user currently has
@@ -198,8 +199,14 @@ On Windows Server 2022 x64 at `db1d33a`, the original Explorer reported
 quiet time and acknowledged the classic notification. Both WinRT requests
 succeeded, and independent processes read and selectively removed their
 history entries. The observers completed 97 classic and 93 WinRT samples
-without finding the visible title and body. The presentation checks remain open.
-[Original notifications and readback](rust/rw02-windows-services.md#classic-and-winrt-notifications-on-windows-server-2022-at-db1d33a).
+without finding the visible title and body. In a separate run at `20dfb10`
+the original Explorer reported that notifications were allowed after 48
+minutes of quiet time.
+The classic sender received a show callback and the exact WinRT entries
+appeared in history. None of the 96 classic or 93 WinRT screen samples
+showed the expected title and body. Visible presentation remains open.
+[Earlier observations](rust/rw02-windows-services.md#classic-and-winrt-notifications-on-windows-server-2022-at-db1d33a) ·
+[Original archive after quiet time](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46034955133/artifacts/15221500889).
 
 At `6cd7757` two source digests in the inventory worker's review still
 referred to the files preceding the Windows last-write timestamp adapter.

@@ -137,6 +137,19 @@ archive. Its native build receipt has SHA-256
 [Windows ARM64 compiler and upload receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15218516011) ·
 [Windows ARM64 original files](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15219815690).
 
+The Windows x64 build reported 250 packages and 281 compiler units.
+Independent replay verified all 78 source inputs, 22 indexed outputs and
+the original and replacement files for all five cases. After each pathname
+was replaced, the device asset ID matched the original file. The first
+read and the retry from offset zero both returned its bytes. The x64 and ARM64
+Windows upload reports share SHA-256
+`28caaf8ebb730fb5c08559fd295171a64797126df1ae011cd8376fb004c9d1e1`.
+This completes the five held-file cases on native Linux and Windows, each
+on x64 and ARM64. Separate Windows desktop checks in the same run failed.
+[Windows x64 compiler and upload receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15220466574) ·
+[Windows x64 original files](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15220771583) ·
+[Native C# reference tests](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
