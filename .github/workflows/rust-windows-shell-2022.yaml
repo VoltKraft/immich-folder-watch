@@ -67,11 +67,26 @@ jobs:
           python3 -B tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
 
       - name: Build the retained Rust GUI
+        id: retained
         shell: pwsh
         run: |
           . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
           python -B tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $root = "artifacts/rust/windows-warm-window/$env:NATIVE_TARGET"
+          $record = Get-Content -Raw "$root/build.json" | ConvertFrom-Json -AsHashtable
+          $libraries = foreach ($unit in 'eframeUnit', 'winitUnit') {
+            $outputs = $record[$unit].outputs
+            if (-not $outputs -or $outputs.Count -lt 1) { throw "Missing compiler outputs for $unit" }
+            foreach ($path in $outputs.Keys) {
+              $file = "$root/build/$path"
+              if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine $outputs[$path]) {
+                throw "Compiler output differs for $file"
+              }
+              $file
+            }
+          }
+          @('library_paths<<IFW_COMPILER_OUTPUTS') + $libraries + 'IFW_COMPILER_OUTPUTS' >> $env:GITHUB_OUTPUT
 
       - name: Exercise the retained window through the original Explorer
         shell: pwsh
@@ -100,8 +115,7 @@ jobs:
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/compiler.jsonl
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/eframe-source.zip
             artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/native-gui-assessment.exe
-            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/deps/libeframe-*.rlib
-            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/deps/libwinit-*.rlib
+            ${{ steps.retained.outputs.library_paths }}
             artifacts/rust/windows-gui-tray-retained/x86_64-pc-windows-msvc/
           if-no-files-found: error
           retention-days: 14
