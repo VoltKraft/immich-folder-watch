@@ -975,6 +975,17 @@ worker. A run with no eligible provider records activation as unavailable.
 [Native observer](../../tools/rust-qa/windows-launcher/native_tray.py) ·
 [Shell sampling](../../tools/rust-qa/windows-launcher/tray_provider.ps1).
 
+The Server 2022 x64 comparison runs the same source-built observer, retained
+GUI and inventory worker on another standard hosted Windows image. It
+records the OS build, runner image version and Explorer version, along
+with the original process and window evidence. The contrast trial on this
+host retains its existing named-scheme requirement before changing the
+palette. The regular Server 2025 and Windows 11 ARM64 trials continue to
+measure their own desktops.
+[Server 2022 comparison](../../.github/workflows/rust-windows-shell-2022.yaml) ·
+[GitHub runner images](https://github.com/actions/runner-images) ·
+[Contrast observation](rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

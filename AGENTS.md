@@ -239,6 +239,8 @@ to reconcile project decisions, defaults, and recorded state.
   to compare the supplied icon with the pixels on the original Explorer surface.
   For a registered x64 icon with no visible marker at the returned rectangle,
   use the [taskbar color comparison](docs/rust/rw02-windows-services.md#comparing-marker-colors-across-the-original-x64-taskbar).
+  The [Windows Server 2022 check](.github/workflows/rust-windows-shell-2022.yaml)
+  runs the same retained tray and canonical contrast subjects on its original desktop.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. Verify visible Windows
   notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).

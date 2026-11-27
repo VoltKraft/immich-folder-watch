@@ -1,0 +1,107 @@
+name: Rust Windows Server 2022 Shell comparison
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-shell-2022.yaml'
+      - 'tools/rust-qa/windows-launcher/native_tray.py'
+      - 'tools/rust-qa/windows-launcher/tray_provider.ps1'
+      - 'tools/rust-qa/appearance/windows*.py'
+      - 'tools/rust-qa/appearance/windows-label.ps1'
+      - 'tools/rust-qa/performance/worker-inputs.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-shell:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record the original runner and Explorer version
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          $explorer = Get-Item -LiteralPath (Join-Path $env:SystemRoot 'explorer.exe')
+          $out = New-Item -ItemType Directory -Path artifacts/rust/server-2022-shell
+          [ordered]@{
+            revision = $env:GITHUB_SHA
+            image = $env:ImageOS
+            imageVersion = $env:ImageVersion
+            os = $os.Caption
+            osVersion = $os.Version
+            explorerVersion = $explorer.VersionInfo.FileVersion
+          } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $out.FullName 'host.json')
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: x64
+
+      - name: Build the canonical Rust GUI
+        id: gui
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Prepare the reviewed inventory worker inputs
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+
+      - name: Build the retained Rust GUI
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Exercise the retained window through the original Explorer
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained
+          exit $LASTEXITCODE
+
+      - name: Observe the original contrast setting and a reversible change if available
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/appearance/windows.py "$NATIVE_TARGET"
+
+      - name: Retain host, executable and original desktop evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-server-2022-shell-${{ github.sha }}
+          path: |
+            artifacts/rust/server-2022-shell/host.json
+            artifacts/rust/gui-native/x86_64-pc-windows-msvc/build.json
+            artifacts/rust/gui-native/x86_64-pc-windows-msvc/graph.json
+            artifacts/rust/gui-native/x86_64-pc-windows-msvc/windows-contrast/
+            artifacts/rust/gui-build/release/native-gui-assessment.exe
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build.json
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/compiler.jsonl
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/eframe-source.zip
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/native-gui-assessment.exe
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/deps/libeframe-*.rlib
+            artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/build/release/deps/libwinit-*.rlib
+            artifacts/rust/windows-gui-tray-retained/x86_64-pc-windows-msvc/
+          if-no-files-found: error
+          retention-days: 14
