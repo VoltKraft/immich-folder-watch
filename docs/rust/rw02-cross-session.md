@@ -123,11 +123,24 @@ python3 tools/rust-qa/instance/cross-session/observe.py "$NATIVE_TARGET" \
   --output "artifacts/rust/instance-native/$NATIVE_TARGET/cross-session"
 ```
 
-A separate test uses two **already logged-on standard sessions of the same account** on a disposable Windows VM. Prepare a new shared local scratch directory accessible to that account in both sessions. Its marker `.ifw-existing-session-test` contains exactly the UTF-8 text `Immich Folder Watch isolated Windows test VM; synthetic data only` followed by LF. The two shells use the same checkout, Python executable and native target. Run the controller first, then give its printed unique directory to the peer within 110 seconds. Both validate their existing console or RDP session through Windows Terminal Services. The controller reads back the second connection state and protocol. This mode uses no scheduled task or alternative launch, and records its origin as `existing-standard-sessions`. Only the fixed guard’s child environment receives its four expected public rewrite identifiers. [Two-session runner](../../tools/rust-qa/instance/cross-session/existing.py)
+A separate test uses two **already logged-on standard sessions of the same account** on a disposable Windows VM. Prepare a new shared local scratch directory accessible to that account in both sessions. Its marker `.ifw-existing-session-test` contains exactly the UTF-8 text `Immich Folder Watch isolated Windows test VM; synthetic data only` followed by LF. The two shells use the same checkout, Python executable and native target. Run the controller first, then give its printed unique directory to the peer within 110 seconds. Both validate their existing console or RDP session through Windows Terminal Services. The controller reads back the second connection state and protocol. This mode uses no scheduled task or alternative launch, and records its origin as `existing-standard-sessions`. The local controller identifies its environment explicitly. Only the file-only Rust writer and read-only managed SID query accept the local mode. The legacy activation endpoints require the hosted rewrite environment. [Two-session runner](../../tools/rust-qa/instance/cross-session/existing.py)
 
 ```powershell
 python tools/rust-qa/instance/cross-session/existing.py controller x86_64-pc-windows-msvc $MarkedVmScratch
 python tools/rust-qa/instance/cross-session/existing.py peer x86_64-pc-windows-msvc $PrintedFixtureDirectory
+```
+
+The native feasibility job retains the Windows build it actually exercised
+with the legacy coordinator. A VM with the matching native .NET 10 runtime
+and Python can reuse that build. Supply the original Actions artifact ZIP
+and its published SHA-256 to the controller. The loader verifies the build
+against the local source checkout, target and original coordinator, including
+the managed runtime configuration. The peer uses the controller's staged
+writer. A native compile on the VM remains available with the original
+command. Both routes require the two independently logged-on sessions.
+
+```powershell
+python tools/rust-qa/instance/cross-session/existing.py controller x86_64-pc-windows-msvc $MarkedVmScratch --native-archive $WriterZip --archive-sha256 $ActionsDigest
 ```
 
 Seventeen local tests passed, including an actual two-session POSIX rehearsal using the pinned native Rust writer. They cover changed authority, false or misattributed lock responses, cleanup failures and independent reporting. The manual two-desktop route reports `standardUserGuardPassed` for its own result and leaves `ambientGuardPassed` unmeasured. [Regression tests](../../tools/rust-qa/instance/cross-session/test_fixture.py)

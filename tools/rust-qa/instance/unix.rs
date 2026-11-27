@@ -28,7 +28,7 @@ unsafe extern "C" {
     ) -> i32;
 }
 
-pub fn check_environment(root: &Path, owner: &str) -> io::Result<()> {
+pub fn check_environment(root: &Path, owner: &str, _: &str) -> io::Result<()> {
     let metadata = fs::symlink_metadata(root)?;
     if owner != "unix"
         || !metadata.is_dir()

@@ -58,7 +58,11 @@ def main():
     parser.add_argument("role", choices=("controller", "peer"))
     parser.add_argument("target", choices=TARGETS.values())
     parser.add_argument("path", type=Path, help="Marked VM root for controller, its printed unique directory for peer")
+    parser.add_argument("--native-archive", type=Path, help="original Actions ZIP containing the tested native writer")
+    parser.add_argument("--archive-sha256", help="SHA-256 from the corresponding Actions artifact")
     args = parser.parse_args()
+    if bool(args.native_archive) != bool(args.archive_sha256) or (args.native_archive and args.role != "controller"):
+        parser.error("The controller takes the native archive and its Actions SHA-256 together")
     native = {"AMD64": "x86_64-pc-windows-msvc", "X86_64": "x86_64-pc-windows-msvc",
               "ARM64": "aarch64-pc-windows-msvc", "AARCH64": "aarch64-pc-windows-msvc"}
     if os.name != "nt" or native.get(platform.machine().upper()) != args.target:

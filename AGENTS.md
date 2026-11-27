@@ -220,6 +220,9 @@ to reconcile project decisions, defaults, and recorded state.
   [original native notices](docs/rust/rw02-combined-notices.md) and the
   original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
   Bind hosted notices to the Actions digest of the native compiler receipt.
+  For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
+  use the tested native writer and its identity oracle in two sessions of
+  the same account. Verify the Actions digest before reusing a hosted build.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
   Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [system appearance](docs/rust/rw02-appearance.md) and

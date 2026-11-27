@@ -176,7 +176,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--keep-windows-build", action="store_true",
+                        help="retain the verified native Windows writer and managed identity oracle for a disposable VM")
     args = parser.parse_args()
+    if args.keep_windows_build and os.name != "nt":
+        parser.error("The retained writer requires a native Windows build")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="ifw-ipc-") as temp:
@@ -199,6 +203,10 @@ def main():
             raise
         finally:
             (output / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if args.keep_windows_build:
+            sys.path.insert(0, str(HERE / "cross-session"))
+            from native_build import retain
+            retain(output / "writer", exe, oracle[1], result)
         print(json.dumps(result["observations"]))
 
 

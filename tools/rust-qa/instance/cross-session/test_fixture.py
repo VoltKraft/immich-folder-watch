@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from batch import eligible
-from fixture import HOSTED, INSTANCE, MARKER, ROOT, guard_id, instance, read, subject_env, wait, write
+from fixture import HOSTED, LOCAL_WRITER, INSTANCE, MARKER, ROOT, guard_id, instance, read, subject_env, wait, write
 from standard import AMBIENT, STANDARD, qualifies, required_authority, restriction_flag
 import observe
 import worker
@@ -81,6 +81,15 @@ class FixtureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             subject_env(Path.cwd(), {**HOSTED, "GITHUB_REF": "refs/heads/main"})
 
+    def test_local_writer_and_hosted_job_have_distinct_environments(self):
+        with patch.dict(os.environ, {**HOSTED, **LOCAL_WRITER}):
+            local = subject_env(Path.cwd(), LOCAL_WRITER)
+            hosted = subject_env(Path.cwd(), HOSTED)
+        self.assertEqual(local["IFW_QA_EXISTING_SESSION"], "1")
+        self.assertTrue(HOSTED.keys().isdisjoint(local))
+        self.assertNotIn("IFW_QA_EXISTING_SESSION", hosted)
+        self.assertEqual({key: hosted[key] for key in HOSTED}, HOSTED)
+
     def test_effective_membership_integrity_privileges_and_capabilities_are_required(self):
         standard = dict(elevated=False, tokenType=1, elevationType=1, enabledAdministrativeGroups=0,
                         privilegesOutsideStandard=0, enabledOutsideStandard=0, uiAccess=False,
@@ -97,7 +106,7 @@ class FixtureTests(unittest.TestCase):
     def test_same_session_or_wrong_account_stops_before_any_writer(self):
         with tempfile.TemporaryDirectory() as tmp:
             area = Path(tmp)
-            config = {"hosted": HOSTED, "controller": {"sidSha256": "fixture", "sessionId": 2}, "expires": time.time() + 30}
+            config = {"environment": HOSTED, "mode": STANDARD, "controller": {"sidSha256": "fixture", "sessionId": 2}, "expires": time.time() + 30}
             write(area / "controller.json", config)
             for digest, session in (("stranger", 0), ("fixture", 2)):
                 with patch("worker.Accounts") as accounts:

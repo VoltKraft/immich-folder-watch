@@ -16,6 +16,7 @@ INSTANCE = HERE.parent
 ROOT = INSTANCE.parents[2]
 HOSTED = {"RUNNER_ENVIRONMENT": "github-hosted", "GITHUB_ACTIONS": "true",
           "GITHUB_REPOSITORY": "VoltKraft/immich-folder-watch", "GITHUB_REF": "refs/heads/rewrite/rust"}
+LOCAL_WRITER = {"IFW_QA_EXISTING_SESSION": "1"}
 MARKER = b"synthetic-only\n"
 NAME = re.compile(r"IfwQaCross_[a-f0-9]{32}\Z")
 SID_IN_TEXT = re.compile(r"\bS-\d+-(?:\d+-)*\d+\b", re.I)
@@ -72,10 +73,11 @@ def validate_area(area):
 
 
 def subject_env(area, job):
-    if job != HOSTED:
-        raise ValueError("The original job identity is outside the hosted rewrite assessment")
+    if job not in (HOSTED, LOCAL_WRITER):
+        raise ValueError("Unknown writer assessment environment")
+    inherited = {key: value for key, value in os.environ.items() if key not in HOSTED and key not in LOCAL_WRITER}
     private = area / "synthetic-home"
-    return {**os.environ, **job, "USERPROFILE": str(private), "HOME": str(private),
+    return {**inherited, **job, "USERPROFILE": str(private), "HOME": str(private),
             "APPDATA": str(private / "roaming"), "LOCALAPPDATA": str(private / "local"),
             "TEMP": str(private / "tmp"), "TMP": str(private / "tmp"), "DOTNET_CLI_HOME": str(private),
             "NUGET_PACKAGES": str(private / "packages"), "DOTNET_NOLOGO": "1", "DOTNET_CLI_TELEMETRY_OPTOUT": "1",

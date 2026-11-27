@@ -5,18 +5,22 @@ use std::path::Path;
 #[path = "../gui/src/win32_instance.rs"]
 mod local;
 
-pub fn check_environment(_: &Path, owner: &str) -> io::Result<()> {
-    for (key, value) in [
-        ("RUNNER_ENVIRONMENT", "github-hosted"),
-        ("GITHUB_ACTIONS", "true"),
-        ("GITHUB_REPOSITORY", "VoltKraft/immich-folder-watch"),
-        ("GITHUB_REF", "refs/heads/rewrite/rust"),
-    ] {
-        if std::env::var(key).as_deref() != Ok(value) {
-            return Err(io::Error::other(
-                "the legacy IPC names require the rewrite branch's disposable Windows runner",
-            ));
-        }
+pub fn check_environment(_: &Path, owner: &str, role: &str) -> io::Result<()> {
+    let isolated_writer =
+        role == "writer" && std::env::var("IFW_QA_EXISTING_SESSION").as_deref() == Ok("1");
+    if !isolated_writer
+        && ![
+            ("RUNNER_ENVIRONMENT", "github-hosted"),
+            ("GITHUB_ACTIONS", "true"),
+            ("GITHUB_REPOSITORY", "VoltKraft/immich-folder-watch"),
+            ("GITHUB_REF", "refs/heads/rewrite/rust"),
+        ]
+        .iter()
+        .all(|(key, value)| std::env::var(key).as_deref() == Ok(*value))
+    {
+        return Err(io::Error::other(
+            "the legacy IPC names require the rewrite branch's disposable Windows runner",
+        ));
     }
     if !local::valid_sid(owner) {
         return Err(io::Error::other(

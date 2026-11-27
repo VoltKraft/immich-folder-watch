@@ -58,7 +58,7 @@ fn main() -> io::Result<()> {
     }
     let owner = args[3].to_str().ok_or(io::ErrorKind::InvalidInput)?;
     let role = args[1].to_str().ok_or(io::ErrorKind::InvalidInput)?;
-    platform::check_environment(root, owner)?;
+    platform::check_environment(root, owner, role)?;
     if role == "writer" {
         return writer(root);
     }

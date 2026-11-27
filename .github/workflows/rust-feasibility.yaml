@@ -81,6 +81,22 @@ jobs:
           export CARGO_HOME="$PWD/artifacts/rust/cargo-home"
           python3 tools/rust-qa/test-native.py "$NATIVE_TARGET"
 
+      - name: Build and exercise the writer for standard-user Windows desktops
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --keep-windows-build \
+            --output "artifacts/rust/desktop-writer/$NATIVE_TARGET"
+
+      - name: Retain the tested Windows writer and development identity oracle
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-desktop-writer-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/desktop-writer/${{ matrix.target }}/writer/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Exercise handle-bound operations over an actual loopback SMB share
         if: runner.os == 'Windows'
         shell: pwsh

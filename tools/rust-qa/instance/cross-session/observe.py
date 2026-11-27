@@ -13,7 +13,7 @@ import traceback
 import uuid
 
 from batch import batch_rights, eligible
-from fixture import (Accounts, HERE, HOSTED, MARKER, ROOT, guard_id, instance, read,
+from fixture import (Accounts, HERE, HOSTED, LOCAL_WRITER, MARKER, ROOT, guard_id, instance, read,
                      subject_env, verified_process, wait, write, participants_exited)
 from standard import AMBIENT, EXISTING, STANDARD, qualifies, required_authority, unchanged_authority
 from worker import PHASES
@@ -28,13 +28,17 @@ def prepare(area, args, result, mode, reference=None):
     (profile / "writer.lock").touch(mode=0o600, exist_ok=False)
     for name in ("tmp", "roaming", "local"):
         (area / "synthetic-home" / name).mkdir(parents=True)
-    env = subject_env(area, HOSTED)
+    job = LOCAL_WRITER if mode == EXISTING else HOSTED
+    env = subject_env(area, job)
     accounts = Accounts()
     sid, _, baseline = accounts.identify(os.getpid())
     result["controller"] = baseline
     if mode == EXISTING and not qualifies(baseline):
         raise RuntimeError("The original existing session must already be an ordinary Windows user")
-    if reference is None:
+    if mode == EXISTING and args.native_archive:
+        from native_build import stage
+        exe, oracle, build = stage(args.native_archive, args.archive_sha256, area / "build", args.target, env)
+    elif reference is None:
         exe, oracle, build = instance.build(args, area / "build", env)
     else:
         original_image, oracle, build = reference
@@ -51,7 +55,7 @@ def prepare(area, args, result, mode, reference=None):
         raise RuntimeError("The independently compiled identity oracle and native token disagree")
     result["oracleSidMatched"] = True
     result["guard"] = guard_id(profile)
-    write(area / "controller.json", {"controller": baseline, "mode": mode, "hosted": HOSTED, "guard": result["guard"],
+    write(area / "controller.json", {"controller": baseline, "mode": mode, "environment": job, "guard": result["guard"],
                                      "binarySha256": build["rust_binary_sha256"], "pythonSha256": instance.sha(Path(sys.executable)),
                                      "workerSha256": instance.sha(HERE / "worker.py"),
                                      "consoleLevelsSha256": instance.sha(HERE / "console_levels.py"), "expires": time.time() + 300})

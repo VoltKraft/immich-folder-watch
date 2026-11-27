@@ -16,10 +16,12 @@ if (args.Length != 3 || !Path.IsPathFullyQualified(args[1]) ||
 }
 #if IFW_WINDOWS
 // The shipping implementation derives its names from the real SID. Only a disposable runner may use them.
-if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT") != "github-hosted" ||
-    Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true" ||
-    Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch" ||
-    Environment.GetEnvironmentVariable("GITHUB_REF") != "refs/heads/rewrite/rust")
+bool isolatedIdentity = args[0] == "identity" && Environment.GetEnvironmentVariable("IFW_QA_EXISTING_SESSION") == "1";
+bool hosted = Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT") == "github-hosted" &&
+    Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" &&
+    Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch" &&
+    Environment.GetEnvironmentVariable("GITHUB_REF") == "refs/heads/rewrite/rust";
+if (!OperatingSystem.IsWindows() || (!isolatedIdentity && !hosted))
 {
     throw new InvalidOperationException("The Windows oracle requires the rewrite branch's disposable runner.");
 }

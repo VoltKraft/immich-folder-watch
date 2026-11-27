@@ -14,7 +14,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import console_levels
-from fixture import Accounts, HERE, HOSTED, bind, checked, guard_id, instance, read, release, subject_env, validate_area, wait, write
+from fixture import Accounts, HERE, HOSTED, LOCAL_WRITER, bind, checked, guard_id, instance, read, release, subject_env, validate_area, wait, write
 from standard import AMBIENT, EXISTING, STANDARD, fixed_writer, qualifies, required_authority
 
 
@@ -75,7 +75,9 @@ def own_identity(area, role):
     config = read(area / "controller.json")
     accounts = Accounts()
     sid, image, identity = accounts.identify(os.getpid())
-    if (time.time() > config["expires"] or role not in PHASES or config["hosted"] != HOSTED or identity["sidSha256"] != config["controller"]["sidSha256"]
+    expected = LOCAL_WRITER if config["mode"] == EXISTING else HOSTED
+    if (time.time() > config["expires"] or role not in PHASES or config["environment"] != expected
+            or identity["sidSha256"] != config["controller"]["sidSha256"]
             or (identity["sessionId"] == config["controller"]["sessionId"]) != (role == "original")
             or image.resolve() != Path(sys.executable).resolve() or instance.sha(image) != config["pythonSha256"]
             or instance.sha(HERE / "worker.py") != config["workerSha256"]
@@ -90,7 +92,7 @@ def participant(area, role):
     parent = read(area / (role + "-bootstrap.json"))
     if (config["mode"] == AMBIENT and identity != parent) or not required_authority(config["mode"], identity, parent):
         raise RuntimeError("The actual participant does not have the required authority for this trial")
-    env = subject_env(area, config["hosted"])
+    env = subject_env(area, config["environment"])
     result = {"passed": False, "worker": identity}
     try:
         write(area / (role + "-ready.json"), {"worker": identity, "guard": config["guard"]})
