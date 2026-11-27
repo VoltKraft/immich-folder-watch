@@ -1,0 +1,76 @@
+name: Compile Windows x64 VM inputs
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-x64-build.yaml'
+      - 'rust/**'
+      - 'tools/rust-qa/windows-local/**'
+      - 'tools/rust-qa/instance/cross-session/**'
+      - 'tools/rust-qa/gui/src/win32_instance.rs'
+      - 'tools/rust-qa/realtime/**'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/enter-windows-build.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2025
+    timeout-minutes: 35
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Compile the endpoint used with the installed MSI
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/instance/cross-session/build_msi_endpoint.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-msi-session-endpoint-x86_64-pc-windows-msvc-${{ github.sha }}
+          path: artifacts/rust/msi-session-endpoint/x86_64-pc-windows-msvc/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Compile workspace test executables
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-local/workspace.py build artifacts/rust/local-vm-inputs/workspace
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-workspace-windows-x64-${{ github.sha }}
+          path: artifacts/rust/local-vm-inputs/workspace/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Compile the transport and its unit tests
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --build-only --output artifacts/rust/local-vm-inputs/realtime
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-realtime-build-x86_64-pc-windows-msvc-${{ github.sha }}
+          path: artifacts/rust/local-vm-inputs/realtime/
+          if-no-files-found: error
+          retention-days: 14

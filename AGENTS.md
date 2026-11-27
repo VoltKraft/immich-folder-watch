@@ -225,8 +225,10 @@ to reconcile project decisions, defaults, and recorded state.
   For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
   use the tested native writer and its identity oracle in two sessions of
   the same account. Verify the Actions digest before reusing a hosted build.
+  Run every feasible Windows x64 rewrite test on the [local disposable
+  VM](tools/rust-qa/windows-local/README.md). The x64 Actions job compiles inputs.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
-  Windows VHD recovery. The desktop assessment owns Linux tmpfs recovery.
+  Windows ARM64 VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [system appearance](docs/rust/rw02-appearance.md) and
   [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
   Check the [older GTK contrast setting](docs/rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals)
@@ -248,8 +250,8 @@ to reconcile project decisions, defaults, and recorded state.
   to compare the supplied icon with the pixels on the original Explorer surface.
   For a registered x64 icon with no visible marker at the returned rectangle,
   use the [taskbar color comparison](docs/rust/rw02-windows-services.md#comparing-marker-colors-across-the-original-x64-taskbar).
-  The [Windows Server 2022 check](.github/workflows/rust-windows-shell-2022.yaml)
-  runs the same retained tray and canonical contrast subjects on its original desktop.
+  The [Windows Server 2022 check](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml)
+  previously ran the same retained tray and canonical contrast subjects on its original desktop.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
   match the accessible button and physical marker before its default action.

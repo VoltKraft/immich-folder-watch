@@ -1,5 +1,13 @@
 # Development
 
+## Windows test hosts for the rewrite
+
+Run Windows x64 tests on the local Server 2025 Desktop Experience VM.
+The [guest commands and suites](../tools/rust-qa/windows-local/README.md) cover
+native evidence, package checks and test inputs. GitHub compiles x64 inputs for the
+VM and tests Windows ARM64, Linux x64 and Linux ARM64 on their native runners.
+This routing also applies to the shipping-reference tests on the rewrite PR.
+
 ## Rust rewrite reference corpus
 
 The selected RW-01 through RW-07 goal and its gates live in the
@@ -38,7 +46,7 @@ can isolate SDK state; set `DOTNET_GENERATE_ASPNET_CERTIFICATE=false` and
 protocol tests need local IPC access; a sandbox rejection is not a failed behavior test.
 
 `rust-compatibility.yaml` runs on `rewrite/rust` for corpus/source changes and
-manual dispatch on that branch only, using native Windows/Linux x64/ARM64 runners.
+manual dispatch on that branch only, using Windows ARM64 and Linux x64/ARM64 runners.
 It uploads reference evidence under the exact source SHA, has read-only repository
 permissions and cannot publish releases. SDK architecture selection is supported
 by the [pinned setup action](https://github.com/actions/setup-dotnet/blob/0f4a354dd5547a28c70b7853dbd95d5b67886e73/action.yml);
@@ -115,8 +123,8 @@ python3 -B tools/RustCompatibilityOracle/installed/run.py linux-x64 \
 ```
 
 Supply a fresh output directory each time. Omitting `--package` downloads
-the exact published asset. The Windows executor requires the matching
-disposable GitHub-hosted Windows runner on `rewrite/rust`. The four-target
+the exact published asset. The hosted Windows executor uses ARM64 on `rewrite/rust`. Windows x64
+installation checks belong to the disposable local VM. The three-target
 workflow uploads the native logs, retained synthetic profile and evidence
 hashes. The [separate Fedora x64 launch test](rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) runs the signed 3.0.4 Flatpak twice on a private X11 desktop.
 The [Ubuntu x64 and ARM64 launch jobs](rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64)
@@ -180,14 +188,14 @@ proxy, the response to the click and the original process exit.
 [Menu shutdown evidence](rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore).
 The [desktop workflow](../.github/workflows/rust-desktop-assessment.yaml) produced the
 [two native Ubuntu restorations](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
-The four desktop jobs queue by branch and native target. Each target
+The three hosted desktop jobs queue by branch and native target. Each target
 retains pending revisions when another push arrives. Ubuntu can start
 its next revision while Windows measures a previous one. Each job uses
 its own same-host baseline and records its source SHA.
 [GitHub Actions concurrency and queue limits](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
-The Windows installed-application comparison uses a fresh hosted desktop
-for each architecture and start order. With Rust primary, the installed
+The Windows installed-application comparison uses a fresh local x64 or hosted ARM64 desktop
+for each start order. With Rust primary, the installed
 .NET 3.0.4 executable must reopen the original Rust HWND while the same
 inventory worker reads a new file. With WPF primary,
 the Rust process must activate the original installed window and exit.
@@ -204,14 +212,14 @@ The ARM64 workflow also pairs WPF and its Rust secondary on a fresh input
 desktop in the same logon session. The observer follows the original WPF
 window from visible to hidden and back, then requests Quit through the
 shipping menu. This job and its detached reader both use
-`--private-input-desktop`. The other four jobs keep their ordinary
+`--private-input-desktop`. The other trials use their ordinary
 console and individual outcomes. The private trial checks restoration of
 the original console before reporting a complete activation.
 
 ### Installed Windows worker backup
 
 The separate [MSI upload workflow](../.github/workflows/rust-windows-installed-upload.yaml)
-uses a fresh Windows x64 or ARM64 runner and the original 3.0.4 package.
+uses native Windows ARM64 and the original 3.0.4 package. The x64 trial uses the local VM.
 It seeds the reviewed Cargo and .NET inputs, then builds the native Rust
 SQLite helper. Only the private loopback peer receives the synthetic PNGs.
 Before the upload the trial verifies that Rust refuses the empty SQLite
@@ -343,14 +351,15 @@ python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mai
 python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes
 ```
 
-The [four-target assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
+The [desktop assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
 records native Rust and C# storage results, loopback sessions, graph digests,
 adapters and observed window transitions. The transport's `sessions.json`
 includes the [packets received by the peer on shutdown](rust/rw02-realtime-transport.md#stopping-an-established-session).
 Each target uploads the native transport report, checksums and logs in
 `rust-realtime-<target>-<commit>` before it starts the desktop trials.
 Changes to the transport also run the [standalone native transport
-workflow](../.github/workflows/rust-realtime.yaml) on all four targets.
+workflow](../.github/workflows/rust-realtime.yaml) on the three hosted targets.
+The Windows x64 guest executes the compiled transport suite locally.
 It uses the same compiler, dependency checks and loopback suite. Its
 Windows archive includes the tested executable for use on the isolated
 VM with the original MSI assemblies.
@@ -444,9 +453,9 @@ a successful presentation while the reopened window was visible. The
 ordinary three-trial run still owns the resource decision.
 [Deferred-frame commands and evidence](../tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter).
 
-The [Windows x64 transition workflow](../.github/workflows/rust-windows-transitions.yaml)
-builds the ordinary and retained GUIs, freezes three same-host WPF trials
-and records all eleven metrics for the two Rust builds. It then compares
+The archived [Windows x64 transition workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-transitions.yaml)
+built the ordinary and retained GUIs, froze three same-host WPF trials
+and recorded all eleven metrics for the two Rust builds. It then compared
 two fresh instances of the same retained executable during file inventory.
 Only the experimental instance requests disabled DWM transitions on its
 own root window. The native comparison archives both executable images,
@@ -456,7 +465,7 @@ this diagnostic. Its recorded limit failures remain part of the stack decision.
 [Window-level API](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute) ·
 [Diagnostic commands and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md).
 
-The same workflow builds a separate Windows x64 executable with
+The archived workflow built a separate Windows x64 executable with
 `--frame-ready`. Its window thread can service input while DXGI is still
 waiting for the next frame. The replay joins the actual close message to an
 observed hide during inventory, and a later redraw to a native presentation
@@ -482,7 +491,7 @@ GDI. It uses the earlier WPF limits, records the actual bitmap transfers,
 and verifies edits in the reopened filename field.
 [Full-view renderer and offline replay](../tools/rust-qa/windows-gdi-present/README.md).
 
-The Windows x64 transition workflow also compares a private CPU rasterizer
+The archived Windows x64 transition workflow also compared a private CPU rasterizer
 on the same original editor and measures GDI transfers during both inventory
 passes. It retains the native libraries, GUI, compiler output and source
 archive for replay against the same WPF limits. A separate example uses
@@ -496,7 +505,7 @@ and exercise its respective winit or transport consumer. [Import-library reconst
 
 The [crash and storage exhaustion fixture](rust/rw02-storage-faults.md)
 uses separate copies for both language verifiers and preserves each
-original backup. The four native desktop jobs select `--stored-keys` in the
+original backup. The native desktop trials select `--stored-keys` in the
 SQLite assessment. Each job records the C# writer's complete casing table,
 the two synthetic backups and the Rust observations for entries, tombstones
 and repair journals. Inspect `stored-keys/result.json` and the original
@@ -777,7 +786,7 @@ python -m unittest discover -s tools/tests -p test_msi_upgrade_contract.py -v
 python -m unittest discover -s tools/tests -p test_installed_upgrade.py -v
 ```
 
-The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). Windows CI
+The PowerShell execution tests require `pwsh` (or `IFW_TEST_PWSH`). Outside the rewrite, Windows CI
 also runs `Test-InstalledUpgrade.ps1` on a fresh hosted runner for a real x64
 upgrade attempt while the released application is running. It verifies either
 completion or explicit safe refusal with the complete baseline retained, followed

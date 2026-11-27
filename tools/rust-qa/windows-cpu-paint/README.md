@@ -63,4 +63,4 @@ measured source revision with the pinned GUI cache and the original
 Windows performance and ordinary build directories in their archived
 layout. Read the individual comparison values in
 `result.json` under `checks.resources` for the native verdict.
-[Native workflow](../../../.github/workflows/rust-windows-transitions.yaml).
+[Native workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-transitions.yaml).

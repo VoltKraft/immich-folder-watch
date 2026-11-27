@@ -38,7 +38,7 @@ The experiment takes one idle resource trial, one two-pass 100,000-file inventor
 
 ## One-shot frame readiness in the Windows message loop
 
-Run the private PE on the same hosted Windows x64 desktop that recorded the three WPF, canonical and ordinary retained trials, using their original compiler receipts, executables, budget, worker and native observers. The [focused workflow](../../../.github/workflows/rust-windows-transitions.yaml) prepares those inputs. Run the first command on that host. To repeat the second command on a different machine, restore the native artifact under its original `artifacts/rust` layout and use its recorded checkout revision.
+Run the private PE on the same hosted Windows x64 desktop that recorded the three WPF, canonical and ordinary retained trials, using their original compiler receipts, executables, budget, worker and native observers. The [focused workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-transitions.yaml) prepares those inputs. Run the first command on that host. To repeat the second command on a different machine, restore the native artifact under its original `artifacts/rust` layout and use its recorded checkout revision.
 
 ```powershell
 python -B tools/rust-qa/windows-warm-window/measure.py x86_64-pc-windows-msvc --frame-ready

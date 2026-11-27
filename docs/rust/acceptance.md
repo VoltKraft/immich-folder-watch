@@ -7,6 +7,10 @@ This record owns the evidence matrix. A planned test, compiled artifact or exist
 C# test name does not establish a Rust/native pass. Only synthetic isolated data
 is permitted. The C# oracle is development tooling, never a candidate runtime.
 
+For new Windows x64 evidence, record the local guest run, source revision,
+input digest and observed results. The [test host instructions](../../tools/rust-qa/windows-local/README.md)
+identify the remaining GitHub targets and the x64 compiler archives.
+
 ## Baseline and provenance
 
 - Starting rewrite revision: `009246552cb4c0091196bab9a58cd64d44e5b629`, clean tree.

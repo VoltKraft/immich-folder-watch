@@ -81,7 +81,7 @@ remain pinned throughout both exchanges.
 
 ## Original sender on a disposable Windows x64 VM
 
-The Server 2022 notification workflow uploads `rust-native-toast-sender-<revision>`
+The former Server 2022 notification workflow uploaded `rust-native-toast-sender-<revision>`
 after compiling the sender. Save the original ZIP and its Actions SHA-256 digest.
 In a fresh Windows checkout of that revision, sign in on the disposable
 VM's unlocked console with the standard test account. Run the following with

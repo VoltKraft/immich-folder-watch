@@ -96,10 +96,34 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
     def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
-        for name in ("rust-windows-transitions.yaml", "rust-windows-msi-interop.yaml",
-                     "rust-windows-installed-upload.yaml"):
+        for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):
             with self.subTest(workflow=name):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        self.check_rust_workflow("rust-windows-x64-build.yaml", {"actions/checkout", "actions/upload-artifact"})
+
+    def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):
+        compiler = "rust-windows-x64-build.yaml"
+        for path in WORKFLOWS.glob("rust-*.yaml"):
+            source = path.read_text()
+            # Look at runner selections, including inline matrix rows.
+            windows = re.findall(r"(?:runs-on|runner|os):\s*['\"]?(windows-[\w.-]+)", source)
+            allowed = {"windows-2025"} if path.name == compiler else {"windows-11-arm"}
+            self.assertLessEqual(set(windows), allowed, path.name)
+        source = (WORKFLOWS / compiler).read_text()
+        commands = re.findall(r"^          python -B (.+)$", source, re.M)
+        self.assertEqual(commands, [
+            "tools/rust-qa/instance/cross-session/build_msi_endpoint.py $env:NATIVE_TARGET",
+            "tools/rust-qa/windows-local/workspace.py build artifacts/rust/local-vm-inputs/workspace",
+            "tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --build-only --output artifacts/rust/local-vm-inputs/realtime",
+        ])
+        ci = (WORKFLOWS / "ci.yaml").read_text().split("  build-windows:\n", 1)[1].split("    steps:", 1)[0]
+        self.assertIn("github.ref != 'refs/heads/rewrite/rust'", ci)
+        self.assertIn("github.head_ref == 'rewrite/rust'", ci)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", ci)
+        for name in ("rust-compatibility", "rust-feasibility", "rust-realtime", "rust-desktop-assessment", "rust-legacy-install"):
+            with self.subTest(workflow=name):
+                runners = re.findall(r"runner: ([\w.-]+)", (WORKFLOWS / (name + ".yaml")).read_text())
+                self.assertCountEqual(runners, ["ubuntu-24.04", "ubuntu-24.04-arm", "windows-11-arm"])
 
     def test_native_linux_notification_workflow_is_branch_bound_and_cannot_publish(self):
         self.check_rust_workflow("rust-linux-notification.yaml", {"actions/checkout", "actions/upload-artifact"})

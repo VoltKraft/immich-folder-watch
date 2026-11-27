@@ -8,6 +8,14 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+New Windows x64 tests for the rewrite run on the local Server 2025 VM.
+The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
+and Linux ARM64 still have hosted test jobs. Already started mixed runs may
+finish. See the [suite inventory and guest commands](../tools/rust-qa/windows-local/README.md).
+The guest also showed the expected WinRT notification title and body on the
+original Shell window. The console observer retained the screenshot and the
+original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
+
 On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
 checks on a local Windows Server 2025 Standard Evaluation VM. Windows
 measured 96 and 192 DPI and the observer verified visible edits in the same
@@ -289,7 +297,7 @@ worker. The ordinary Windows Server 2025 and Windows 11 ARM64
 matrix retains its existing checks. An additional Server 2022 x64 job
 builds the same tray subject and checks the original contrast setting.
 [Worker sources](../tools/rust-qa/performance/worker-inputs.json) ·
-[Server 2022 Shell comparison](../.github/workflows/rust-windows-shell-2022.yaml).
+[Server 2022 Shell comparison](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml).
 
 At `9313f39` the archived x64 CPU executable from `483f053` rendered
 a real filename edit on a second hosted console. Both original field
@@ -557,7 +565,7 @@ replay passed. The ordinary and disabled windows closed in 41.40 and
 41.34 ms and reopened in 30.41 and 30.49 ms. Both exceeded the WPF
 limits of 30.71 and 21.94 ms on this host.
 [Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4) ·
-[Native x64 workflow](../.github/workflows/rust-windows-transitions.yaml).
+[Native x64 workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-transitions.yaml).
 
 On the `ead9fb3` x64 foreground keyboard trial, the original HWND obtained
 focus, but Windows timestamped its SHOW and the secondary process resume

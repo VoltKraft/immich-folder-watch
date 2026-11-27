@@ -28,6 +28,11 @@ jobs:
     uses: ./.github/workflows/flatpak-validation.yaml
 
   build-windows:
+    # The rewrite's Windows x64 tests execute on its local Server 2025 VM.
+    if: >-
+      github.ref != 'refs/heads/rewrite/rust' &&
+      !(github.event_name == 'pull_request' && github.head_ref == 'rewrite/rust' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
     name: Build and Test (windows-latest)
     runs-on: windows-latest
 

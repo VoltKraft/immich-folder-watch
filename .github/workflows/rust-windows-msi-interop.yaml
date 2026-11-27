@@ -39,7 +39,6 @@ jobs:
         arch: [x64, arm64]
         primary: [Rust, WPF]
         include:
-          - { runner: windows-2025, arch: x64, target: x86_64-pc-windows-msvc }
           - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
           - { runner: windows-11-arm, arch: arm64-private-input, sdkArch: arm64, primary: WPF, target: aarch64-pc-windows-msvc }
     env:

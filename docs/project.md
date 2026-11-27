@@ -68,6 +68,12 @@ trial for Ubuntu's Documents portal. Its scope is feasibility of the file
 lock through a real application grant. Distribution approval and any
 commitment to maintaining host packages require a separate decision.
 
+On November 27 the user assigned all Windows tests feasible on the local
+Server 2025 x64 VM to that VM. New GitHub jobs may compile x64 test inputs.
+Windows ARM64 and both Linux architectures keep their native Actions jobs.
+Previously started mixed-platform runs may finish.
+[Execution and evidence](../tools/rust-qa/windows-local/README.md).
+
 The following acceptance criteria are fixed for this run. Their evidence is
 conjunctive: a missing required platform/test/artifact remains open.
 
@@ -80,7 +86,7 @@ conjunctive: a missing required platform/test/artifact remains open.
 | RI-AC05 | One controlled per-user writer, including same Windows user across sessions and old/new interoperation; bounded channels, supervised tasks, durable shutdown and DB ownership. Native tray/reconnect, autostart, notifications, background/activation and logging pass platform tests. |
 | RI-AC06 | Full UI/draft/apply/status/error/log flows, DE/EN, keyboard, accessibility, DPI and Unicode/IME pass. Hidden startup, close/reopen/Quit, tray/portal denial, GPU failure and actually tested fallbacks pass on all targets. Visible/hidden resource budgets are selected from same-machine baseline measurements and verified. |
 | RI-AC07 | Generic desktop crates stay independent of Immich/its profile. An isolated second desktop application proves lifecycle, settings, logs and synthetic background work on all four targets. Domain/sync/storage/platform interfaces remain independent of egui types. |
-| RI-AC08 | Automated Actions builds/tests produce four candidate packages; offline reconstruction and actual installation, upgrade, repair, uninstall and rollback after synthetic upload/download/deletion/repair activity pass. A database restore is never represented as undoing external side effects. |
+| RI-AC08 | Automated builds produce four candidate packages, with native tests on the assigned hosts; offline reconstruction and actual installation, upgrade, repair, uninstall and rollback after synthetic upload/download/deletion/repair activity pass. A database restore is never represented as undoing external side effects. |
 | RI-AC09 | Exact compiler, lockfile, feature/transitive/native/font graph and build inputs are pinned/audited for AGPL-3.0-only distribution. Notices, license inventory, SBOM and source/reconstruction artifacts exist. No inspection/control server is included in production. |
 | RI-AC10 | Independent migration and final integration reviews have no unresolved acceptance-blocking findings. Documentation, commits, draft PR, artifact manifest and acceptance matrix accurately distinguish executed/pass/fail/unavailable evidence. |
 
