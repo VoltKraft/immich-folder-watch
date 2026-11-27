@@ -73,6 +73,13 @@ WebSocket session. Both rejected a foreign issuer and an incorrect host
 identity, including during the WebSocket upgrade after a valid polling join.
 [Private CA and peer results](rw02-realtime-transport.md#linux-platform-trust-with-private-certificates).
 
+On Fedora x64 the HTTPS proxy comparison qualified authenticated REST,
+polling and the WebSocket upgrade. Rust and signed .NET 3.0.4 both honored
+the configured proxy and the direct-host exception. The fixed relay saw
+zero API headers on CONNECT. The Rust suite passed 44 wire scenarios and
+nine unit tests. The plaintext WebSocket and Windows proxy paths remain open.
+[Proxy requests and TLS controls](rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime).
+
 At `6cd7757` all five C# multipart retry cases passed on Windows and Ubuntu,
 x64 and ARM64. On those four targets and on Fedora x64 the combined Rust
 executable independently reproduced every identifier and retry body from

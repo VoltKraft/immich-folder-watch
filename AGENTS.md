@@ -207,7 +207,9 @@ to reconcile project decisions, defaults, and recorded state.
   and the rewound retry body against the C# multipart cases. For realtime changes, verify the
   [disconnect packets observed by the peer](docs/rust/rw02-realtime-transport.md#stopping-an-established-session).
   Use the [private bundle and directory](docs/rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates)
-  for the Linux platform-verifier trials.
+  for the Linux platform-verifier trials. For [Linux HTTPS proxy routing](docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime),
+  verify the CONNECT authority, the route taken by authenticated origin
+  requests, and the direct connection when the endpoint is in `NO_PROXY`.
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
   Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)

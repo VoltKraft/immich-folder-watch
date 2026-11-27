@@ -107,6 +107,16 @@ x64 archive has SHA-256 `dd77b477436e841045fd3a9c06b317507c0ad5058be89c667f43c2f
 [Windows x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15215793491) ·
 [Windows ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15215586046).
 
+At `47fe26d` the same 22 wire scenarios and four unit tests passed again
+on each native target. Independent replay compared the original archives
+with their Actions digests, all 19 source inputs with Git and all ten
+outputs per host with the compiler and test receipts. The peers recorded
+the expected namespace disconnect and WebSocket close packets.
+[Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251/artifacts/15212873584) ·
+[Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251/artifacts/15213927201) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251/artifacts/15220358518) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251/artifacts/15218787911).
+
 ### Server ends the selected namespace
 
 On Fedora x64 a loopback peer acknowledged a subscription, delivered one
@@ -456,6 +466,59 @@ delivered one event. Both rejected cases yielded zero HTTP requests.
 Its SHA-256 is `98cca2641cacd27e9c34ff07462eaf06cea4c317c66ae33288eac0b772f58005`.
 Windows store and installed Flatpak trust remain separate checks.
 [Native test entry point](../../tools/rust-qa/realtime/README.md).
+
+### Linux proxy selection for REST and realtime
+
+On Fedora x64 the signed Linux 3.0.4 assemblies and the Rust executable
+with sources verified against `3d55500` used the same fixed loopback
+destination. Each of the twelve processes ran in its own network namespace
+with only loopback. Each received
+one application event and stopped normally. The relay connected only to the
+fixture's fixed port. Each connection was identified at both ends by its
+addresses and ports.
+
+| Child process environment | Signed 3.0.4 | Rust before the correction |
+| --- | --- | --- |
+| Direct, or target in `NO_PROXY` | All four request types reached the origin directly on HTTP and HTTPS | Direct on both schemes |
+| `HTTPS_PROXY` | Four CONNECT tunnels carried the REST read, polling GET, polling POST and WebSocket upgrade. The origin received the synthetic API header on all four. None of the CONNECT requests contained it. | All nine authenticated origin requests went directly to the server. The relay received none. |
+| `HTTP_PROXY`, plaintext explicitly enabled | The three REST and polling requests used absolute request URIs. The WebSocket used CONNECT. | All nine authenticated origin requests went directly to the server. The relay received none. |
+
+The twelve-case readback has SHA-256
+`2d0efe5c34b32ae9242e0c878dfc1a41ee483e258da30ab9088b5167d288038d`.
+The shipping REST and realtime handlers use the .NET proxy policy.
+The earlier Rust assessment explicitly disabled proxy selection in reqwest.
+[Shipping REST setup](../../src/ImmichFolderWatch.App.Linux/Hosting/AppHost.cs) ·
+[Shipping realtime setup](../../src/ImmichFolderWatch.Immich/ImmichRealtimeTransport.cs) ·
+[Rust transport](../../tools/rust-qa/realtime/src/transport.rs).
+
+The Linux HTTPS assessment now selects the configured proxy for the
+specific origin. It checks `https_proxy`, `HTTPS_PROXY`, `all_proxy` and
+`ALL_PROXY` in that order and applies the .NET host rules for `NO_PROXY`.
+Selection retains the .NET spelling for IPv6 hosts with embedded IPv4.
+The loopback probe only accepts the numeric proxy address supplied by the
+fixture. The earlier direct modes continue to run their isolated tests.
+The opted-in plaintext WebSocket, authenticated proxy services, Windows
+proxy selection and the integrated application still require their own
+observations.
+[.NET environment proxy](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Http/src/System/Net/Http/SocketsHttpHandler/HttpEnvironmentProxy.Unix.cs) ·
+[.NET IPv6 host formatting](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Private.Uri/src/System/IPv6AddressHelper.cs) ·
+[Fixed CONNECT and TLS controls](../../tools/rust-qa/realtime/README.md).
+
+In the paired repeat the corrected Rust executable sent all nine HTTPS
+requests through the fixed relay, including six REST reads, the polling
+open and join, and the WebSocket upgrade. The signed client sent its four
+requests through the same relay. The relay saw no API header on CONNECT.
+Each client received one event, exchanged a normal WebSocket close and
+bypassed the relay when the origin matched `NO_PROXY`. The twelve-case
+readback has SHA-256 `54e68dabda336ebca3f1c8ef71ca60283cdbbf9d55c0e9d22dc1ff1dd777da9e`.
+
+The Fedora x64 offline suite also passed all 44 wire scenarios and nine
+unit tests with that binary. A separate CONNECT observer served the inner
+TLS connection on its accepted socket. The foreign issuer and wrong-host
+cases produced distinct TLS alerts and zero HTTP requests on either path.
+The receipt covers 20 source files, nine output digests, 109 crates and
+192 original notices. Its SHA-256 is
+`fbcb56e1ee9460af9abfac06218f9014397f114b00a742afa57dfcebf635391c`.
 
 ## Dependency and native input review
 

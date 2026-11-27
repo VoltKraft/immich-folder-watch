@@ -68,6 +68,18 @@ An unrelated issuer and a wrong endpoint
 name must stop at the TLS handshake. The private bundle and directory
 are removed with the rest of the fixture.
 
+The Linux HTTPS proxy cases run the ordinary REST, polling and WebSocket
+requests against a fixed loopback origin. A second listener accepts CONNECT
+only for that authority and serves the test TLS endpoint on the accepted
+socket. It rejects credential headers on CONNECT and records whether the
+inner client completed the TLS handshake. Both paths check the synthetic
+API header at the origin.
+The child receives case-specific proxy settings and the fixture's expected
+numeric proxy address. The suite exercises proxy use, the `NO_PROXY`
+exception, precedence of `https_proxy`, and rejection of a foreign CA and
+an incorrect endpoint identity.
+[Shipping client and Rust observations](../../../docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime).
+
 `result.json` records each step, source and artifact hashes. `graph.json` contains
 the full selected feature graph, original inputs and notices. `sessions.json`
 records per-scenario HTTP and Socket.IO observations and elapsed process lifetimes.

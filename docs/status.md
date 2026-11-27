@@ -26,6 +26,19 @@ CodeQL passed at `d97eb33`.
 [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039467065) ·
 [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039466914).
 
+The signed Linux 3.0.4 client honored a configured proxy for authenticated
+inventory, polling and the subsequent WebSocket upgrade. The Rust build
+at `3d55500` sent those requests directly. The corrected Linux HTTPS
+adapter sent all nine authenticated requests through the fixed proxy,
+including the WebSocket upgrade. Its CONNECT requests carried no API key.
+The direct and `NO_PROXY` controls bypassed the relay. The native Fedora
+x64 suite passed 44 wire scenarios and nine unit tests. Proxy use for
+opted-in plaintext WebSockets is still open. The most recent four-host transport
+readback at `47fe26d` passed 22 wire scenarios and four unit tests per
+target.
+[Proxy comparison](rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime) ·
+[Four native hosts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251).
+
 On Fedora x64 the combined Rust subject matched the shipping client's five
 legacy upload identifiers, including an empty file and a 70,679-byte file.
 Each retry used the original open file after its name was replaced. The C#
@@ -143,6 +156,15 @@ could not find a sampled point on that window's client area. The fixture
 confirmed cleanup and MSI removal. Normal Quit on that console remains open.
 [Five native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341) ·
 [ARM64 Default-desktop original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341/artifacts/15212717516).
+
+At `3d55500` the installed WPF worker backup and restore passed on Windows
+x64 and on the private ARM64 desktop. On the ARM64 Default desktop all 16
+sampled points inside the original WPF client hit a different foreground
+window. The test stopped before Quit, then removed its MSI and synthetic
+profile. The four native feasibility jobs passed at this revision.
+[Installed worker jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105278) ·
+[ARM64 Default original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105278/artifacts/15220713764) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105356).
 
 The x64 Server 2022 trial at `3c4d62c` opened the hidden-start Rust GUI
 through Explorer. The registered icon's default action produced one

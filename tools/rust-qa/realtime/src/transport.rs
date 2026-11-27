@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 
 use futures_util::{SinkExt, StreamExt};
 use ifw_immich::realtime::{IncomingMessage, MAX_MESSAGE_BYTES};
@@ -21,6 +24,93 @@ pub(crate) struct Transport {
     client: Client,
     header: header::HeaderValue,
     pub namespace: String,
+}
+
+/// Select the proxy for one HTTPS origin with the Unix System.Net precedence.
+/// The endpoint is kept separate so the loopback harness can check its
+/// ownership even when the destination is on the bypass list.
+pub(crate) struct LinuxHttpsProxy {
+    pub endpoint: Option<Url>,
+    bypass: bool,
+}
+
+fn unix_proxy_endpoint(value: &str) -> Option<Url> {
+    let (scheme, authority) = value.split_once("://").unwrap_or(("http", value));
+    if !["http", "https", "socks4", "socks4a", "socks5"]
+        .iter()
+        .any(|supported| scheme.eq_ignore_ascii_case(supported))
+    {
+        return None;
+    }
+    // System.Net reads the decimal port prefix after the host, ignoring a
+    // subsequent suffix. A colon with no valid port falls through to the
+    // next environment variable. Ignore colons in credentials and IPv6.
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let colon = host
+        .rfind(':')
+        .filter(|pos| host.find(']').is_none_or(|end| *pos > end));
+    if let Some(colon) = colon {
+        let port = &host[colon + 1..];
+        let digits = port.bytes().take_while(u8::is_ascii_digit).count();
+        let port_number = port[..digits].parse::<u16>().ok()?;
+        let name = &authority[..authority.len() - port.len() - 1];
+        return Url::parse(&format!("{scheme}://{name}:{port_number}")).ok();
+    }
+    Url::parse(&format!("{scheme}://{authority}")).ok()
+}
+
+/// System.Uri compares the literal bypass entry to its canonical Host. Some
+/// bracketed IPv6 hosts end in dotted IPv4 there, while Url writes hexadecimal.
+fn embedded_ipv4_host(host: &str) -> Option<String> {
+    let raw = host.strip_prefix('[')?.strip_suffix(']')?;
+    let address = raw.parse::<Ipv6Addr>().ok()?;
+    let [a, b, c, d, e, f, high, _] = address.segments();
+    let translated =
+        [a, b, c, d] == [0; 4] && high != 0 && matches!((e, f), (0, 0 | 0xffff) | (0xffff, 0));
+    if !translated && (e, f) != (0, 0x5efe) {
+        return None;
+    }
+    // A trailing compressed pair can occur in an ISATAP address. Otherwise
+    // the final two hexadecimal fields are explicit in these address forms.
+    let prefix = raw
+        .strip_suffix("::")
+        .or_else(|| raw.rsplitn(3, ':').nth(2))?;
+    let [.., w, x, y, z] = address.octets();
+    Some(format!("[{prefix}:{}]", Ipv4Addr::new(w, x, y, z)))
+}
+
+impl LinuxHttpsProxy {
+    pub fn from_environment(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
+        let endpoint = ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
+            .iter()
+            .filter_map(|name| read(name))
+            .find_map(|value| unix_proxy_endpoint(&value));
+        let excluded = read("no_proxy").or_else(|| read("NO_PROXY"));
+        let host = api.host_str().unwrap_or_default();
+        let embedded = embedded_ipv4_host(host);
+        let host = embedded.as_deref().unwrap_or(host);
+        let bypass = excluded.as_deref().is_some_and(|list| {
+            list.split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .any(|entry| {
+                    let Some(domain) = entry.strip_prefix('.') else {
+                        return host.eq_ignore_ascii_case(entry);
+                    };
+                    host.eq_ignore_ascii_case(domain)
+                        || host
+                            .get(host.len().saturating_sub(entry.len())..)
+                            .is_some_and(|tail| tail.eq_ignore_ascii_case(entry))
+                })
+        });
+        Self { endpoint, bypass }
+    }
+
+    pub fn route(self) -> Option<Url> {
+        self.endpoint.filter(|_| !self.bypass)
+    }
 }
 
 fn escaped_byte(path: &str) -> Option<u8> {
@@ -88,6 +178,7 @@ impl Transport {
         allow_http: bool,
         api_key: &str,
         roots: Option<Vec<Certificate>>,
+        https_proxy: Option<Url>,
     ) -> Result<Self, Error> {
         if !(api.scheme() == "https" || allow_http && api.scheme() == "http")
             || api.host().is_none()
@@ -127,6 +218,9 @@ impl Transport {
             .timeout(Duration::from_secs(120));
         if let Some(roots) = roots {
             builder = builder.tls_certs_only(roots);
+        }
+        if let Some(proxy) = https_proxy {
+            builder = builder.proxy(reqwest::Proxy::https(proxy)?);
         }
         Ok(Self {
             api,
@@ -317,11 +411,118 @@ impl From<tungstenite::Error> for Error {
 mod tests {
     use super::*;
 
+    fn proxy_for(host: &str, environment: &[(&str, &str)]) -> Option<Url> {
+        let api = Url::parse(&format!("https://{host}/api")).unwrap();
+        LinuxHttpsProxy::from_environment(&api, |name| {
+            environment
+                .iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| value.to_string())
+        })
+        .route()
+    }
+
+    #[test]
+    fn linux_https_uses_the_first_valid_protocol_then_all_proxy() {
+        let lower = "127.0.0.1:8200";
+        let upper = "http://[::1]:8201";
+        let all = "http://127.0.0.1:8202";
+        let expected = Url::parse("http://127.0.0.1:8200").unwrap();
+        for value in [
+            lower,
+            "http://127.0.0.1:8200x",
+            "http://127.0.0.1:8200/path",
+        ] {
+            assert_eq!(
+                proxy_for(
+                    "example.test",
+                    &[
+                        ("https_proxy", value),
+                        ("HTTPS_PROXY", upper),
+                        ("all_proxy", all)
+                    ]
+                ),
+                Some(expected.clone())
+            );
+        }
+        for invalid in ["", "http://[", "http://127.0.0.1:", "ftp://127.0.0.1:8200"] {
+            assert_eq!(
+                proxy_for(
+                    "example.test",
+                    &[
+                        ("https_proxy", invalid),
+                        ("HTTPS_PROXY", upper),
+                        ("all_proxy", all)
+                    ]
+                ),
+                Some(Url::parse(upper).unwrap())
+            );
+        }
+        assert_eq!(
+            proxy_for(
+                "example.test",
+                &[
+                    ("HTTP_PROXY", upper),
+                    ("all_proxy", lower),
+                    ("ALL_PROXY", all)
+                ]
+            ),
+            Some(expected)
+        );
+        assert_eq!(proxy_for("example.test", &[("HTTP_PROXY", upper)]), None);
+    }
+
+    #[test]
+    fn linux_https_bypass_matches_hosts_and_dot_domains_with_lowercase_precedence() {
+        for (host, exclusions, bypass) in [
+            ("example.test", " , EXAMPLE.TEST , ", true),
+            ("a.example.test", "example.test", false),
+            ("a.example.test", ".example.test", true),
+            ("example.test", ".example.test", true),
+            ("otherexample.test", ".example.test", false),
+            ("127.0.0.1", "*", false),
+            ("127.0.0.1", "127.0.0.1:443", false),
+            ("[::1]", "[::1]", true),
+            ("[::1]", "::1", false),
+            ("[::ffff:7f00:1]", "[::ffff:127.0.0.1]", true),
+            ("[::ffff:127.0.0.1]", "[::ffff:7f00:1]", false),
+            ("[::7f00:1]", "[::127.0.0.1]", true),
+            ("[::ffff:0:7f00:1]", "[::ffff:0:127.0.0.1]", true),
+            ("[::ffff:1]", "[::ffff:0.0.0.1]", false),
+            ("[64:ff9b::7f00:1]", "[64:ff9b::127.0.0.1]", false),
+            (
+                "[2001:db8::5efe:7f00:1]",
+                "[2001:db8::5efe:127.0.0.1]",
+                true,
+            ),
+            (
+                "[2001:db8:1:2:0:5efe::]",
+                "[2001:db8:1:2:0:5efe:0.0.0.0]",
+                true,
+            ),
+            ("127.0.0.1", "", false),
+        ] {
+            assert_eq!(
+                proxy_for(
+                    host,
+                    &[
+                        ("HTTPS_PROXY", "127.0.0.1:8200"),
+                        ("no_proxy", exclusions),
+                        ("NO_PROXY", host)
+                    ]
+                )
+                .is_none(),
+                bypass,
+                "{host} {exclusions}"
+            );
+        }
+    }
+
     #[test]
     fn authenticated_requests_require_the_configured_scheme_host_port_and_no_user_info() {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let api = Url::parse("https://127.0.0.1:4443/collection/api").unwrap();
-        let transport = Transport::new(api, false, "synthetic", Some(Vec::new())).unwrap();
+        let transport = Transport::new(api, false, "synthetic", Some(Vec::new()), None).unwrap();
         assert_eq!(transport.namespace, "/collection");
         for foreign in [
             "http://127.0.0.1:4443/socket.io/",

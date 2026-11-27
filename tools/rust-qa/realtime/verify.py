@@ -35,6 +35,8 @@ ESCAPED_PATHS = {
 PEER_CLOSE_PATHS = {"peer-close-root": "/api", "peer-close-namespace": "/collection/api"}
 PEER_CLOSE_REASON = b"synthetic maintenance"
 DIRECT_RECONNECT = {"reconnect", "reconnect-namespace", "reconnect-refused", "reconnect-redirect", "reconnect-no-max-payload"}
+LINUX_PROXY_CASES = ("linux-https-proxy", "linux-https-proxy-bypass", "linux-https-proxy-priority",
+                     "linux-https-proxy-untrusted-tls", "linux-https-proxy-wrong-host-tls")
 
 
 PRE_ACK_REFUSALS = {"upgrade-redirect": "Status(302)", "upgrade-http-503": "Status(503)", "probe-refused": "Disconnected"}
@@ -369,9 +371,7 @@ class Handler(BaseHTTPRequestHandler):
         if peer.scenario == "engine-close-ws":
             send_frame(self.wfile, 1, b"1")
             peer.mark("engineCloseNotices")
-        payload = event("on_album_delete" if direct else "on_album_update", peer.ns, "7")
-        send_frame(self.wfile, 1, payload[:8], final=False)
-        send_frame(self.wfile, 0, payload[8:])
+        self.send_subscription_event(direct)
         send_frame(self.wfile, 1, event("unsubscribed", peer.ns))
         if peer.scenario == "peer-close-ws":
             close = struct.pack("!H", 1001) + PEER_CLOSE_REASON
@@ -413,11 +413,28 @@ class Handler(BaseHTTPRequestHandler):
             peer.mark("normalCloseReplies")
             send_frame(self.wfile, 8, normal)
 
+    def send_subscription_event(self, direct):
+        payload = event("on_album_delete" if direct else "on_album_update", self.server.ns, "7")
+        send_frame(self.wfile, 1, payload[:8], final=False)
+        send_frame(self.wfile, 0, payload[8:])
+
+
+class ProxyOriginHandler(Handler):
+    def routing(self):
+        route = super().routing()
+        self.server.mark("authenticatedRequests")
+        return route
+
+    def send_subscription_event(self, direct):
+        super().send_subscription_event(direct)
+        self.server.mark("sentSubscriptionEvents")
+
 
 @contextmanager
-def peer(scenario, api="/api", tls=None):
+def peer(scenario, api="/api", tls=None, handler=Handler):
     prefix = api.rsplit("/", 1)[0]
     instance = Peer(scenario, prefix + "," if prefix else "", api)
+    instance.RequestHandlerClass = handler
     if tls is not None:
         def observe_client_hello(connection, server_name, context):
             instance.tls_client_hello.set()
@@ -476,7 +493,89 @@ def make_trust(directory):
     return contexts, certificates
 
 
+def proxy_environment(home):
+    # Inherit only executable search and OS/temp paths. All proxy, CGI and trust
+    # settings for the child come from the case itself.
+    keep = {"PATH", "SYSTEMROOT", "WINDIR", "TMP", "TEMP", "TMPDIR"}
+    return {**{key: value for key, value in os.environ.items() if key.upper() in keep}, "HOME": str(home)}
+
+
+def run_proxy_scenario(executable, name, directory, contexts, redirect):
+    from https_proxy import FixedTunnel
+
+    bypass = name == "linux-https-proxy-bypass"
+    wrong_host = name == "linux-https-proxy-wrong-host-tls"
+    untrusted = name == "linux-https-proxy-untrusted-tls"
+    rejected = wrong_host or untrusted
+    api = "/collection/api"
+    budget = 1300
+    trust = directory / ("other.crt" if untrusted else "ca.crt")
+    # Both paths name the same origin. Each owns its own TLS context and
+    # ClientHello observer, so even a rejected direct attempt is distinguishable.
+    tunneled_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    tunneled_tls.load_cert_chain(directory / ("peer-4.crt" if wrong_host else "peer-3.crt"), directory / "peer.key")
+    with peer("tls", api, contexts["127.0.0.1"], ProxyOriginHandler) as direct:
+        authority = f"127.0.0.1:{direct.server_port}"
+        tunnel = FixedTunnel(authority, tunneled_tls)
+        with peer("tls", api, handler=tunnel.handler(ProxyOriginHandler)) as proxied:
+            endpoint = f"http://127.0.0.1:{proxied.server_port}"
+            env = {**proxy_environment(directory), "HTTPS_PROXY": endpoint}
+            if bypass:
+                env["NO_PROXY"] = "127.0.0.1"
+            if name == "linux-https-proxy-priority":
+                other = f"http://127.0.0.1:{redirect.server_port}"
+                env.update(https_proxy=endpoint, HTTPS_PROXY=other, all_proxy=other, ALL_PROXY=other)
+            start = time.monotonic()
+            proc = subprocess.run([str(executable), f"https://{authority}{api}", "https-linux-proxy",
+                                   str(trust), str(budget), "30000", "137", endpoint],
+                                  env=env, cwd=directory, capture_output=True, text=True, timeout=8)
+            elapsed = round((time.monotonic() - start) * 1000)
+            events = proc.stdout.splitlines()
+            trace = Counter(events)
+            outer, alerts = tunnel.snapshot()
+            origin = direct if bypass else proxied
+            stats = origin.counts.copy()
+            assert not direct.errors and not proxied.errors and not redirect.counts, (direct.errors, proxied.errors, redirect.counts)
+            assert proc.returncode == 0 and not proc.stderr and events[-1:] == ["Stopped"], (events, proc.stderr)
+            assert budget - 50 <= elapsed < budget + 2000, elapsed
+            assert trace["Attempt"] == 1 and trace["Periodic"] >= 2, events
+            assert direct.tls_client_hello.is_set() == bypass, "unexpected direct TLS route"
+            if bypass:
+                assert not outer and not alerts and not proxied.counts, (outer, alerts, proxied.counts)
+            else:
+                assert not direct.counts and outer.get("connections", 0) >= 1, (direct.counts, outer)
+                assert outer["connections"] == outer.get("connects") == outer.get("clientHellos"), outer
+                assert not outer.get("rejectedAuthority") and not outer.get("credentialHeaders"), outer
+            if rejected:
+                assert not stats and not outer.get("completedTls") and alerts, (stats, outer, alerts)
+                expected_alert = "_ALERT_UNKNOWN_CA" if untrusted else "_ALERT_BAD_CERTIFICATE"
+                assert all(reason.endswith(expected_alert) for reason in alerts), alerts
+                assert sum(alerts.values()) == outer["clientHellos"], (alerts, outer)
+                assert trace["Lost Transport"] == 1 and not any(trace[key] for key in ("Inventory", "Connected", "Event", "Upgraded")), events
+            else:
+                if not bypass:
+                    assert outer["completedTls"] == outer["connects"] and not alerts, (outer, alerts)
+                assert stats["inventoryRequests"] >= 2 and trace["Inventory"] >= 2, (stats, events)
+                assert stats["openingRequests"] == stats["namespacePosts"] == stats["websocketRequests"] == 1, stats
+                assert stats["httpRequests"] == stats["authenticatedRequests"] == stats["inventoryRequests"] + 3, stats
+                check_protocol("tls", trace, stats, events)
+                assert trace["Connected"] == trace["Event"] == stats["sentSubscriptionEvents"] == 1, (events, stats)
+                assert not any(e.startswith("Lost ") for e in events), events
+                assert origin.namespace_posts == ["40/collection,"]
+                assert origin.close_packets == [{"websocketText": "41/collection,"},
+                                                {"websocketCloseCode": 1000, "reason": "io client disconnect"}]
+            return {"client": dict(trace), "peer": dict(stats), "connectObserver": outer, "tlsAlertsAtProxy": alerts,
+                    "directClientHello": direct.tls_client_hello.is_set(), "directHttpRequests": direct.counts["httpRequests"],
+                    "tunneledHttpRequests": proxied.counts["httpRequests"], "connectApiHeaders": outer.get("credentialHeaders", 0),
+                    "competingEndpointHttpRequests": redirect.counts["httpRequests"], "closePacketsAtPeer": list(origin.close_packets),
+                    "namespacePostsAtPeer": list(origin.namespace_posts), "processElapsedMs": elapsed, "budgetMs": budget,
+                    "trustAnchorDerSha256": hashlib.sha256(ssl.PEM_cert_to_DER_cert(trust.read_text("ascii"))).hexdigest(),
+                    "endpointAddress": "127.0.0.1", "certificateAddress": "127.0.0.2" if wrong_host else "127.0.0.1"}
+
+
 def run_scenario(executable, name, directory, contexts, redirect):
+    if name in LINUX_PROXY_CASES:
+        return run_proxy_scenario(executable, name, directory, contexts, redirect)
     platform_trust = name.startswith("linux-platform-")
     directory_trust = name == "linux-platform-directory-tls"
     fixture_name = name
@@ -701,7 +800,7 @@ def main():
              "engine-close-poll", "engine-close-ws", *PEER_CLOSE_PATHS, *ESCAPED_PATHS)
     if platform.system() == "Linux":
         cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
-                  "linux-platform-wrong-host-tls")
+                  "linux-platform-wrong-host-tls", *LINUX_PROXY_CASES)
     with executable.open("rb") as stream:
         probe_sha = hashlib.file_digest(stream, "sha256").hexdigest()
     result = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),
