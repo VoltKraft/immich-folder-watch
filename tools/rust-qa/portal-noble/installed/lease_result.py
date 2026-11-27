@@ -16,7 +16,7 @@ def verify_phase(record, phase, trial, reader, app_commit, runtime_commit):
         raise ValueError(f"Wrong installed app, runtime, guest or observation for {phase}")
 
 
-def original_backing(home, phase):
+def backing_receipt(home, phase, filename, expected):
     from contextlib import ExitStack
     with ExitStack() as stack:
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -25,13 +25,20 @@ def original_backing(home, phase):
         for name in ("ifw-portal-" + phase, "source", "album"):
             fd = os.open(name, flags, dir_fd=fd)
             stack.callback(os.close, fd)
-        file = os.open("original.jpg", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+        file = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
         with os.fdopen(file, "rb") as stream:
             meta = os.fstat(stream.fileno())
-            if not stat.S_ISREG(meta.st_mode) or meta.st_size != len(b"Synthetic upload fixture\n"):
-                raise ValueError("Unexpected original test file")
+            if not stat.S_ISREG(meta.st_mode) or meta.st_size != len(expected):
+                raise ValueError("Unexpected test file")
+            content = stream.read(meta.st_size + 1)
+            if content != expected:
+                raise ValueError("Unexpected backing file contents")
             return {"device": meta.st_dev, "inode": meta.st_ino, "size": meta.st_size,
-                    "sha256": hashlib.sha256(stream.read(meta.st_size + 1)).hexdigest()}
+                    "sha256": hashlib.sha256(content).hexdigest()}
+
+
+def original_backing(home, phase):
+    return backing_receipt(home, phase, "original.jpg", b"Synthetic upload fixture\n")
 
 
 def collect(seed, output, app_commit, runtime_commit, candidate_status, restore_status, dpkg_state, home):
@@ -56,6 +63,11 @@ def collect(seed, output, app_commit, runtime_commit, candidate_status, restore_
                 result["finalBacking"][phase] = original_backing(home, phase)
                 if result["finalBacking"][phase] != phase_result["originalBacking"]:
                     raise ValueError("The original backing changed across the package transitions")
+                if inputs.get("downloadOperations"):
+                    published = backing_receipt(home, phase, "download.jpg", b"Synthetic download fixture\n")
+                    if phase_result["publishedBacking"] != {**published, "privateDirectoryMode": "0700"}:
+                        raise ValueError("The published backing file differs from the held staged payload")
+                    result.setdefault("finalDownloads", {})[phase] = published
             except (OSError, KeyError, TypeError, ValueError) as error:
                 result["errors"][phase] = str(error)
         if result["errors"]:

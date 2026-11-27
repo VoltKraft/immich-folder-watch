@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from lease_result import collect, original_backing
+from lease_result import backing_receipt, collect, original_backing
 
 
 class InstalledLeaseResult(unittest.TestCase):
@@ -76,6 +76,27 @@ class InstalledLeaseResult(unittest.TestCase):
             self.collect()
         self.assertIn("stock", self.result()["errors"])
         self.assertIn("restored", self.result()["phases"])
+
+    def test_download_receipt_requires_the_staged_inode_after_publication(self):
+        inputs = json.loads((self.seed / "inputs.json").read_text())
+        inputs["downloadOperations"] = True
+        (self.seed / "inputs.json").write_text(json.dumps(inputs))
+        payload = b"Synthetic download fixture\n"
+        for phase in ["stock", "candidate", "restored"]:
+            path = self.root / ("ifw-portal-" + phase) / "source/album/download.jpg"
+            path.write_bytes(payload)
+            record = json.loads((self.out / (phase + ".json")).read_text())
+            record["publishedBacking"] = {**backing_receipt(self.root, phase, "download.jpg", payload),
+                                          "privateDirectoryMode": "0700"}
+            self.write(phase, record)
+        self.collect()
+        self.assertEqual(set(self.result()["finalDownloads"]), {"stock", "candidate", "restored"})
+        replacement = path.with_name("another.jpg")
+        replacement.write_bytes(payload)
+        replacement.replace(path)
+        with self.assertRaises(ValueError):
+            self.collect()
+        self.assertIn("restored", self.result()["errors"])
 
 
 if __name__ == "__main__":

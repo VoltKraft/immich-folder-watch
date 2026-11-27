@@ -105,6 +105,69 @@ all three media inodes and contents from the powered-off guest. Its
 This establishes native x64 package feasibility. Distribution approval
 remains open.
 
+#### Recipient file access on stock Noble
+
+On 2026-11-27 Ubuntu still published `1.18.4-1ubuntu2.24.04.3` in Noble
+Updates and Security, with `.4` in Proposed. Upstream's latest stable
+release was still 1.22.1. The earlier [package comparison](rw02-portal-upstream.md#additional-distribution-sources-checked-on-2026-11-22)
+identified the lock handler in each source. [Ubuntu publication records](https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedSources&source_name=xdg-desktop-portal&exact_match=true&status=Published)
+· [Upstream releases](https://github.com/flatpak/xdg-desktop-portal/releases).
+
+For a directory outside the sandbox's existing filesystem permissions,
+Noble's FileChooser registers the selection in Documents and sends the
+resulting URI to the application. The alternative FileTransfer recipient
+API also exports a Documents grant. The service closes the source
+descriptors after registering them. Its `RetrieveFiles` reply contains an
+array of path strings. These two recipient paths therefore reach the same
+FUSE lock handler. A process using a second copy or a separate lock file
+would coordinate on another inode and could not observe the existing
+writer's exclusive `flock` on the selected media. The project Flatpak
+grants access to arbitrary watch folders through the portal.
+[Noble source package](https://launchpad.net/ubuntu/+source/xdg-desktop-portal/1.18.4-1ubuntu2.24.04.3)
+· [FileChooser registration](https://github.com/flatpak/xdg-desktop-portal/blob/1.18.4/src/file-chooser.c)
+· [FileTransfer recipient](https://github.com/flatpak/xdg-desktop-portal/blob/1.18.4/document-portal/file-transfer.c)
+· [Application permissions](../../packaging/flatpak/flathub/io.github.voltkraft.immich-folder-watch.yml).
+
+The two interface XML files and four implementation files reviewed from
+the Ubuntu source build matched their pristine archive bytes. The input
+hashes and both publication responses are archived under
+`artifacts/rust/portal-provider-availability-20261127/`. The source
+inventory has SHA-256 `2c16f76d840f5ff420b52003fea47b0652aaa840bbd7f0ba95c5bf4b4e9a16cd`.
+
+#### Installed download publication and cancellation on Noble x64
+
+In the offline VM `lease-2u3w25w5`, the installed regular-user Flatpak
+ran the workspace's `Directory::begin_download` through its writable
+directory grant. A separate process on the backing side held an open
+descriptor to the 27-byte private payload before publication. The final
+destination was absent at that point. After publication its inode matched
+the still-open descriptor. The app then attempted to publish different
+bytes over the original upload fixture and cancelled a third transfer.
+All three phases left the original file intact, the published contents
+intact and only one empty owner-only staging container. After revocation
+each new application process received `ENOENT`. The guest reread the six
+original and published files after restoring the Ubuntu package.
+
+| Installed package phase | Upload read while the backing writer holds its exclusive lock | Published backing inode on device 64769 | Phase result SHA-256 |
+| --- | --- | ---: | --- |
+| Stock Noble | `ENOSYS` | 281870 | `648939833ea3fcc02d099132bb154d6af70c21bf7c1b59e0258740d24c7fb496` |
+| Private backport | Contended, then readable on release | 281997 | `eecca45ee6634fbe567b5b5e0f3ef112454c7c500d34bf3386c5ffa670cc76fc` |
+| Restored Noble | `ENOSYS` | 282004 | `0c64121b987578ed3ac0d45fd1c547df1d8281d9a9687d1dfd83dc32d2d29d0b` |
+
+The successful stock download operations and the failed stock upload lease
+occurred with the same grant and installed application. The full candidate
+still requires a host portal that can forward the file lock. The observer
+and collector sources and all files in the VM manifest matched their recorded
+hashes. The aggregate lease and VM receipts have SHA-256
+`3b79f7db95b3d6033ec7a762660731997e11dbef0280802dd4d99c7c0d2aef1e`
+and `e2ab87fdac4e184506ce98c021942e37237a0e29fa5ac9d96807be00d7e38886`.
+After shutdown a separate read-only ext4 inspection recovered the same six
+file inodes and byte sequences from the guest disk. Each album contained
+both files and one empty mode-0700 container. Its
+`offline-download-readback.json` has SHA-256
+`ae60e1708a17f08beb0ac166b3e31a8e1c9e9dece7720b541fe7b660333c9a91`.
+[Installed guest and replay commands](../../tools/rust-qa/portal-noble/installed/README.md).
+
 ### Private service comparisons
 
 At `a66e045` each Ubuntu runner recorded 28 checks against the packaged

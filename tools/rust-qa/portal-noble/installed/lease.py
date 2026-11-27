@@ -10,6 +10,7 @@ from pathlib import Path
 import pwd
 import re
 import select
+import stat
 import subprocess
 import tempfile
 import time
@@ -20,6 +21,7 @@ STORE = "org.freedesktop.impl.portal.PermissionStore"
 OBJECT = "/org/freedesktop/portal/documents"
 DBUS = "org.freedesktop.DBus"
 FIXTURE = b"Synthetic upload fixture\n"
+DOWNLOAD = b"Synthetic download fixture\n"
 RIGHTS = ["read", "write"]
 VERSION = "1.18.4-1ubuntu2.24.04.3"
 
@@ -59,7 +61,8 @@ def reader_reply(lines, expected, uid):
                 "busy": (r"REFUSED lease=contended", 20),
                 "revoked": (r"NO_GRANT root_errno=(2|13)", 21),
                 "lock-unsupported": (r"LOCK_CONTROL errno=(38|95)", 0),
-                "lock-acquired": (r"LOCK_CONTROL acquired", 0)}
+                "lock-acquired": (r"LOCK_CONTROL acquired", 0),
+                "staged": (r"STAGED download\.jpg", 0)}
     pattern, status = patterns[expected]
     if not re.fullmatch(pattern, lines[1]):
         raise ValueError(f"Expected {expected} from the ordinary Flatpak, received {lines[1]!r}")
@@ -68,7 +71,12 @@ def reader_reply(lines, expected, uid):
 
 @contextmanager
 def reader(token, phase, expected, result, hold=False):
-    mode = "lock-control" if expected.startswith("lock-") else ("hold" if hold else "read")
+    if expected == "staged":
+        mode = "download"
+    elif expected.startswith("lock-"):
+        mode = "lock-control"
+    else:
+        mode = "hold" if hold else "read"
     command = ["flatpak", "run", "--user", "--branch=test", "--env=IFW_QA_ISOLATED=1",
                APP, mode, token, phase]
     record = {"expected": expected, "mode": command[-3], "lines": []}
@@ -89,7 +97,14 @@ def reader(token, phase, expected, result, hold=False):
             if hold:
                 proc.stdin.write(b"release\n")
             record["exit"] = proc.wait(timeout=12)
-            if record["exit"] != status or proc.stdout.read(1000):
+            tail = proc.stdout.read(1000)
+            if expected == "staged":
+                if tail != b"PUBLISHED download.jpg COLLISION original.jpg CANCELLED cancelled.jpg\n":
+                    raise ValueError("The installed Flatpak did not complete its staged operations")
+                record["lines"].append(tail.decode().strip())
+            elif tail:
+                raise ValueError("Unexpected extra reader output")
+            if record["exit"] != status:
                 raise ValueError("Unexpected ordinary reader output or exit status")
         finally:
             if proc.poll() is None:
@@ -102,6 +117,35 @@ def reader(token, phase, expected, result, hold=False):
             record["exit"] = proc.returncode
             errors.seek(0)
             record["stderr"] = errors.read(4096).decode(errors="replace")
+
+
+def check_download(token, phase, album, result):
+    def private_child(parent):
+        dirs = [p for p in parent.iterdir() if re.fullmatch(r"\.ifw-internal-[a-f0-9]{32}", p.name)]
+        if len(dirs) != 1:
+            raise ValueError("Expected one private transaction directory at this level")
+        meta = dirs[0].lstat()
+        if not stat.S_ISDIR(meta.st_mode) or stat.S_IMODE(meta.st_mode) != 0o700 or meta.st_uid != os.getuid():
+            raise ValueError("The backing transaction directory lacks owner-only protection")
+        return dirs[0]
+
+    with ExitStack() as stack:
+        with reader(token, phase, "staged", result, hold=True):
+            outer = private_child(album)
+            inner = private_child(outer)
+            if (album / "download.jpg").exists() or [p.name for p in inner.iterdir()] != ["payload"]:
+                raise ValueError("The pending download is already visible or its staging directory differs")
+            stream = stack.enter_context((inner / "payload").open("rb"))
+            meta = os.fstat(stream.fileno())
+            if not stat.S_ISREG(meta.st_mode) or stream.read(len(DOWNLOAD) + 1) != DOWNLOAD:
+                raise ValueError("Unexpected staged payload contents")
+        destination = album / "download.jpg"
+        if (not os.path.samestat(meta, destination.lstat()) or destination.read_bytes() != DOWNLOAD
+                or sorted(p.name for p in album.iterdir()) != sorted([outer.name, "original.jpg", "download.jpg"])
+                or any(outer.iterdir())):
+            raise ValueError("Published identity, contents or private cleanup differ")
+        result["publishedBacking"] = {"device": meta.st_dev, "inode": meta.st_ino, "size": meta.st_size,
+                                      "sha256": sha(destination), "privateDirectoryMode": "0700"}
 
 
 def check_lock(token, phase, backing, result):
@@ -260,6 +304,7 @@ def observe(phase, payload, runtime, result):
         stack.callback(revoke)
         result["grantedRights"] = inspect(True)
         check_lock(token, phase, backing, result)
+        check_download(token, phase, backing.parent, result)
     if owners() != result["services"]:
         raise ValueError("An installed service changed owner during the phase")
 

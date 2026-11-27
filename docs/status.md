@@ -18,6 +18,13 @@ native display session. The next packaging check is to verify the runtime
 prerequisite during a clean candidate installation.
 [Server 2025 reports and runtime](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial).
 
+On native Noble x64 an installed test Flatpak staged, published and cancelled
+downloads through a Documents grant on the stock package, private backport
+and restored stock package. An independent read of the stopped guest disk
+matched all six expected file identities and contents. The stock upload read
+lease still returned `ENOSYS`; distribution of the backport remains undecided.
+[Installed download and rollback results](rust/rw02-portal-noble.md#installed-download-publication-and-cancellation-on-noble-x64).
+
 On Fedora x64 the normalized Rust config now formats diagnostic summaries
 without its API key or endpoint. All 114 serialized YAML files matched the
 previous native run byte for byte, and the shipping C# reader passed 228

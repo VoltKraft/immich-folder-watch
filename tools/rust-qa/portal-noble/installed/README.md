@@ -53,7 +53,13 @@ The same installed test app receives a fresh directory grant for each
 phase. It opens the regular file with the workspace Rust filesystem crate,
 checks the expected bytes on success and verifies that the sandbox cannot
 read the backing pathname. The observer checks lock contention, release,
-revocation, grant deletion and preservation of the backing file.
+revocation, grant deletion and preservation of the backing file. During a
+download it opens the sandbox's staged payload from the backing side and
+keeps that descriptor until publication. Its inode and bytes must match
+`download.jpg` after publication. The ordinary reader also tries an
+occupied destination and cancels a separate transfer. The guest checks
+the incumbent file, empty owner-only container and final published inode
+after the package transitions.
 
 Retain `vm.json`, `inputs.iso`, `console.log`, `guest.log` and the evidence
 disk for each run. The package VM additionally exports `build.log`,

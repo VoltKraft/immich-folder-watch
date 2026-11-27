@@ -1,4 +1,4 @@
-//! Read a single synthetic source through the installed Flatpak's own Documents grant.
+//! Exercise synthetic reads and staged downloads through the installed Flatpak's Documents grant.
 #![forbid(unsafe_code)]
 
 use safe_fs::Directory;
@@ -94,6 +94,38 @@ fn report(line: &str) -> io::Result<()> {
     io::stdout().flush()
 }
 
+fn await_release() -> io::Result<()> {
+    if io::stdin().lock().lines().next().transpose()?.as_deref() != Some("release") {
+        return Err(io::Error::other("Expected the holder release"));
+    }
+    Ok(())
+}
+
+fn download(album: &Directory) -> io::Result<()> {
+    let mut stage = album.begin_download(OsStr::new("download.jpg"))?;
+    stage.write_all(b"Synthetic download fixture\n")?;
+    stage.flush()?;
+    report("STAGED download.jpg")?;
+    await_release()?;
+    stage.publish().map_err(io::Error::other)?;
+
+    let mut collision = album.begin_download(OsStr::new("original.jpg"))?;
+    collision.write_all(b"Conflicting download fixture\n")?;
+    match collision.publish() {
+        Err(safe_fs::PublishError::BeforeRename(error))
+            if error.kind() == io::ErrorKind::AlreadyExists => {}
+        other => {
+            return Err(io::Error::other(format!(
+                "Expected occupied destination: {other:?}"
+            )));
+        }
+    }
+    let mut cancelled = album.begin_download(OsStr::new("cancelled.jpg"))?;
+    cancelled.write_all(b"Cancelled download fixture\n")?;
+    cancelled.cancel()?;
+    report("PUBLISHED download.jpg COLLISION original.jpg CANCELLED cancelled.jpg")
+}
+
 // Independent syscall control on the same granted synthetic name. It does
 // not provide data to the normal reader. Parent descriptors remain pinned.
 fn lock_control(root: &Path) -> io::Result<i32> {
@@ -136,7 +168,7 @@ fn run() -> io::Result<i32> {
     let [mode, document, phase] = args.as_slice() else {
         return Err(io::Error::other("Expected mode, document ID and phase"));
     };
-    if !matches!(mode.as_str(), "read" | "hold" | "lock-control")
+    if !matches!(mode.as_str(), "read" | "hold" | "download" | "lock-control")
         || !matches!(phase.as_str(), "stock" | "candidate" | "restored")
         || document.is_empty()
         || document.len() > 32
@@ -161,6 +193,10 @@ fn run() -> io::Result<i32> {
         }
     };
     let album = dir.open_directory(OsStr::new("album"))?;
+    if mode == "download" {
+        download(&album)?;
+        return Ok(0);
+    }
     let mut file = match album.open_file(OsStr::new("original.jpg")) {
         Ok(file) => file,
         Err(error) => {
@@ -185,10 +221,8 @@ fn run() -> io::Result<i32> {
         contents.len(),
         file.identity()
     ))?;
-    if mode == "hold"
-        && io::stdin().lock().lines().next().transpose()?.as_deref() != Some("release")
-    {
-        return Err(io::Error::other("Expected the holder release"));
+    if mode == "hold" {
+        await_release()?;
     }
     drop(file);
     Ok(0)

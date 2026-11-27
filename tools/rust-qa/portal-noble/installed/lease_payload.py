@@ -78,6 +78,7 @@ def prepare(apt, runtime, build=None):
         "sources": {str(p.relative_to(ROOT)): sha(p) for p in sorted(inputs)},
         **candidate,
         "baseImage": IMAGE_SHA, "guestStatus": plan["status"], "reader": sha(payload / "reader"),
+        "downloadOperations": True,
         "stock": next(r["SHA256"] for r in plan["packages"] if Path(r["Filename"]).name.startswith(SOURCE + "_")),
         "runtime": platform,
     }, indent=2) + "\n")
