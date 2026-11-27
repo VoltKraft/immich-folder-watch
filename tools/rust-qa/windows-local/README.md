@@ -60,10 +60,31 @@ the published 3.0.3 MSI. The test checks its pinned hash before installation.
 | Console appearance, notifications, Shell, tray and text | Use the original guest desktop and standard user. Retain the HWND, observed pixels, callback or visible text required by each test. [Contrast](../../../docs/rust/rw02-appearance.md) · [Toast sender and observer](../windows-services/toast-history.md#original-sender-on-a-disposable-windows-x64-vm) · [Tray](../../../docs/rust/rw02-windows-services.md) · [Text](../../../docs/rust/rw02-windows-text.md) |
 | File guard and installed launch order | Use the console and RDP under the same standard account for the guard. Use separate overlays for the two installed start orders. [Cross-session instructions](../../../docs/rust/rw02-cross-session.md) · [Installed WPF primary](../windows-msi-interop/reverse/README.md) |
 | Graphics, accessibility and same-host resource budgets | Run the WPF reference and native GUI on the same guest, collecting the window, file-worker and frame evidence. [Measurement procedure](../../../docs/rust/rw02-windows-window.md) · [Transition comparison](../windows-warm-window/dwm-transitions.md) |
-| Native feasibility, storage and reference compatibility | Use synthetic legacy fixtures, an owned guest volume for VHD/FAT recovery and the original offline backups. [Native commands](../../../docs/development.md#rust-feasibility-workspace) · [Storage faults](../../../docs/rust/rw02-storage-faults.md) · [Reference corpus](../../../docs/development.md#rust-rewrite-reference-corpus) |
+| Native feasibility, storage and reference compatibility | Use synthetic legacy fixtures, an owned guest volume for VHD/FAT recovery and the original offline backups. [Native commands](../../../docs/development.md#rust-feasibility-workspace) · [Local VHD command](../storage-faults/README.md#local-windows-x64-vhd-trials) · [Reference corpus](../../../docs/development.md#rust-rewrite-reference-corpus) |
 | .NET, installed worker, MSI and upgrade | Use an isolated overlay for each install and the original hash-pinned package. Retain the installed payload, backup/rollback observations and uninstall logs. [Windows build and upgrade](../../../packaging/windows/README.md#upgrade-process-safety) · [Installed worker backup](../../../docs/development.md#installed-windows-worker-backup) |
 
 Some older entry points require a GitHub-hosted machine. Their x64
 acceptance checks stay open until a guest-capable entry point produces the
 required evidence. Preserve the original fixture preconditions and identify
 the host truthfully. Previously captured hosted runs remain historical evidence.
+
+## Workspace execution on Server 2025 at 30e2a9c
+
+The dedicated standard account ran all nine original Windows x64 test
+executables from [artifact 15230663783](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066266349/artifacts/15230663783)
+in an offline copy of the Windows Server 2025 VM. The artifact SHA-256 was
+`2a778d9090ea4829975bd3ea473f36bbb91acb0df073dd097f7456e67422ae45`.
+All processes exited with zero. The six harnesses containing tests passed
+35 cases, with zero failed, ignored or filtered. This covered 11 handle
+integration cases, 11 legacy cases, five safe filesystem cases, three
+Immich cases, three platform logging cases and two desktop lifecycle
+cases. The two examples and the legacy probe executable contained zero
+tests. The Windows short-name requirement was enabled for the run.
+
+The original Cargo compiler JSON stream, binary hashes, artifact metadata,
+guest execution receipt, nine test logs and independently counted results
+are retained under
+`artifacts/rust/local-windows-server-2025-x64/20261127/workspace-30e2a9c/`.
+The measured guest had Python 3.13.17, Git 2.56.1 and VC++ x64 runtime
+14.52.37029.0. Its pre-test inventory found no installed Rust or .NET SDK,
+Visual Studio C++ tools or Windows SDK.

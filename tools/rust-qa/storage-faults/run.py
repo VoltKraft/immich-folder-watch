@@ -287,13 +287,16 @@ def main() -> int:
     parser.add_argument("--cargo-home", type=Path, default=ROOT / "artifacts/rust/storage-assessment/cargo-home")
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--tmpfs", action="store_true", help="Also run actual ENOSPC in private Linux 8-MiB tmpfs namespaces")
-    parser.add_argument("--windows-vhd", action="store_true", help="Also exhaust an owned 16-MiB FAT16 VHD on disposable hosted Windows only")
+    parser.add_argument("--windows-vhd", action="store_true", help="Also exhaust an owned 16-MiB FAT16 VHD on disposable Windows")
+    parser.add_argument("--local-qa-vm", action="store_true", help="Select the provisioned local Windows x64 guest for the VHD trial")
     parser.add_argument("--windows-provider", action="store_true", help="After all VHD recovery checks, observe ordinary safe-fs access through one private NTFS directory mount")
     args = parser.parse_args()
     if args.tmpfs and sys.platform != "linux":
         parser.error("--tmpfs is a native Linux experiment")
     if args.windows_vhd and os.name != "nt":
         parser.error("--windows-vhd requires a disposable native Windows candidate runner")
+    if args.local_qa_vm and (not args.windows_vhd or args.target != "x86_64-pc-windows-msvc"):
+        parser.error("--local-qa-vm requires the Windows x64 target and --windows-vhd")
     if args.windows_provider and not args.windows_vhd:
         parser.error("--windows-provider requires the existing --windows-vhd recovery")
     output = isolated(args.output)
@@ -337,7 +340,7 @@ def main() -> int:
 
     try:
         if args.windows_vhd:
-            windows_vhd.hosted_gate(ROOT, env)
+            windows_vhd.require_disposable_host(ROOT, env, args.local_qa_vm)
         command("native-toolchain", [sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"), args.target])
         expected_lock = {(item["name"], item["version"]): item["archive_sha256"] for item in inputs["packages"]}
         if external_lock(HERE / "Cargo.lock") != expected_lock or external_lock(STORAGE / "Cargo.lock") != expected_lock:
@@ -490,7 +493,8 @@ def main() -> int:
                             result["provider_followup"] = observed
                             return {"status": observed["status"], "receipt": (
                                 None if "receipt_error" in observed else "windows-provider.json")}
-                    private = windows_vhd.run(binary, seed, case, mode, env, ROOT, after_recovery=after_recovery)
+                    private = windows_vhd.run(binary, seed, case, mode, env, ROOT,
+                                              after_recovery=after_recovery, local_vm=args.local_qa_vm)
                     result["steps"][name + "-volume"] = {"call": "windows_vhd.run", "exit_code": 0,
                         "expected_exit_code": 0, "receipt": str((case / "windows-vhd.json").relative_to(output))}
                     events = private["events"]

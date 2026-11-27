@@ -253,3 +253,16 @@ For older exports without the new lookup table, the stored location is the
 previous `first-party-sources/<logical-path>` convention. Missing bytes in an
 older hosted artifact must still be reported separately; a Git reconstruction
 does not retroactively make them present in that artifact.
+
+## Local Windows x64 VHD trials
+
+Use an elevated PowerShell in the disposable Server 2025 VM with the pinned
+native toolchain, MSVC, .NET SDK and offline Cargo inputs. From the checkout
+root, run the same recovery and provider cases as the ARM64 runner.
+
+```powershell
+python -B tools/rust-qa/storage-faults/run.py x86_64-pc-windows-msvc --local-qa-vm --windows-vhd --windows-provider --cargo-home artifacts/rust/storage-cargo-home --output artifacts/rust/storage-faults/local-x64
+```
+
+Choose a fresh output directory per run. Each filesystem-full case records
+the host type alongside the original VHD, its native attachment and cleanup.

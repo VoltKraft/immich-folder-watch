@@ -54,6 +54,21 @@ def hosted_gate(root: Path, env: dict) -> None:
         raise Unavailable("native Windows x64/ARM64 process and runner are required")
 
 
+def require_disposable_host(root: Path, env: dict, local_vm: bool) -> None:
+    if not local_vm:
+        hosted_gate(root, env)
+        return
+    if (os.name != "nt" or env.get("GITHUB_ACTIONS") or root.resolve() != Path(__file__).resolve().parents[3]
+            or ct.sizeof(ct.c_void_p) != 8 or platform.machine().lower() not in ("amd64", "x86_64")):
+        raise Unavailable("Select the local Windows x64 QA guest for VHD testing")
+    shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    command = ("$s = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop; "
+               "if ($s.Name -ine 'IFW-QA25' -or !$s.HypervisorPresent) { exit 1 }")
+    if subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", command],
+                      stdin=subprocess.DEVNULL, timeout=30).returncode:
+        raise Unavailable("VHD testing requires the provisioned IFW-QA25 virtual machine")
+
+
 class StorageType(ct.Structure):
     _fields_ = [("device", U32), ("vendor", ct.c_ubyte * 16)]
 
@@ -176,7 +191,7 @@ class Api:
         return result
 
 
-def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: Path, *, after_recovery=None) -> dict:
+def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: Path, *, after_recovery=None, local_vm=False) -> dict:
     directory = output.with_name(output.name + "-volume")
     directory.mkdir(exist_ok=False)
     receipt_path = directory / "windows-vhd.json"
@@ -194,7 +209,8 @@ def run(executable: Path, seed: Path, output: Path, mode: str, env: dict, root: 
     vhd = directory / "owned.vhd"
     anchor = None
     try:
-        hosted_gate(root, env)
+        require_disposable_host(root, env, local_vm)
+        report["executionHost"] = "local-vm" if local_vm else "github-hosted"
         image.no_reparse(directory)
         api = Api()
         report["system_modules"] = api.system_modules()

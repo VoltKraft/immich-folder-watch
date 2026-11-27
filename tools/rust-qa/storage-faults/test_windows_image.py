@@ -108,6 +108,12 @@ class WindowsImageTests(unittest.TestCase):
         with self.assertRaises(windows_vhd.Unavailable):
             windows_vhd.hosted_gate(ROOT, {})
 
+    def test_local_vhd_mode_refuses_an_actions_environment_before_opening_a_volume(self) -> None:
+        with patch.object(windows_vhd.subprocess, "run") as query:
+            with self.assertRaises(windows_vhd.Unavailable):
+                windows_vhd.require_disposable_host(ROOT, {"GITHUB_ACTIONS": "true"}, True)
+            query.assert_not_called()
+
     def test_win32_parameter_layouts_are_native_64_bit_compatible(self) -> None:
         self.assertEqual(windows_vhd.ct.sizeof(windows_vhd.StorageType), 20)
         self.assertEqual(windows_vhd.StorageType.vendor.offset, 4)
