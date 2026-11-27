@@ -12,6 +12,9 @@ On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
 checks on a local Windows Server 2025 Standard Evaluation VM. Windows
 measured 96 and 192 DPI and the observer verified visible edits in the same
 window on both displays. Both checks passed again after a cold start.
+The same native executable also followed both contrast transitions on a named
+Windows scheme and restored the original desktop palette and text pixels.
+[Contrast measurements](rust/rw02-appearance.md#reversible-windows-server-2025-x64-contrast-on-a-named-scheme).
 A clean guest required the Microsoft Visual C++
 x64 runtime before the GUI could start. Windows ARM64 still needs a suitable
 native display session. The next packaging check is to verify the runtime

@@ -347,3 +347,42 @@ pre- and post-capture flags, scheme and eight colors matched. The
 supervisor recorded `settingChangeAttempted=false`, verified process,
 desktop and profile cleanup, and returned unavailable.
 [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328).
+
+### Reversible Windows Server 2025 x64 contrast on a named scheme
+
+On November 27 a standard user on the local German Server 2025 Evaluation
+console ran the observer at `7da7374`. A disposable QEMU disk overlay
+preserved the configured VM. The original account reported an empty scheme
+name. For this trial the user session opened Windows' own
+`Resources/Ease of Access Themes/hc1.theme` through the shell. Windows then
+reported the named scheme `Kontrast Nr. 1`. Both runs used the
+[original x64 CPU renderer](rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable)
+from `483f053` with the DX12 Microsoft Basic Render Driver and GDI presenter.
+
+| Initial setting | Observed sequence on one HWND | SHA-256 of original result.json |
+| --- | --- | --- |
+| Named high contrast | High → ordinary → high | `a1a3b787fa398168a4c982a40381829b4f75b46434c0e0c4d5a6f6539fa00acf` |
+| Named ordinary contrast | Ordinary → high → ordinary | `b3daa2f2ae29d4e0a0f58c749fbead002c5799d24d11e5a7f4c3c9e3e6b58b47` |
+
+Each toggle changed only the enabled bit in the flags (`0x7e` and `0x7f`).
+Each restoration matched the original flags, scheme, eight system colors
+and original filename-label raster. Two screen reads per phase agreed. In
+high contrast, 856 of the 1,188 label pixels showed the Windows background
+RGB (45, 50, 54), and 79 matched the white system text within the observer's
+tolerance. The ordinary background was RGB (248, 248, 248). Both GUI
+processes drained and exited zero. Both supervisors returned to Default,
+closed their job and desktop handles, and removed the private profile.
+Independent host readback verified all 30 observer input hashes and all 24
+manifest entries per run and decoded each of the twelve bitmaps. The two
+original ZIPs and their replay records are under
+`artifacts/rust/local-windows-server-2025-x64/20261127/contrast/`.
+Windows ARM64 still requires a corresponding reversible native observation.
+
+To repeat either direction, select a named starting scheme on a disposable
+native Windows x64 console. Use its checked-out observer and the original
+x64 CPU archive. Store each run's `windows-contrast` output before the next
+run, which requires a fresh output directory.
+
+```powershell
+python -B tools/rust-qa/appearance/windows.py x86_64-pc-windows-msvc --isolated-vm --cpu-archive C:\QA\windows-x64.zip
+```
