@@ -97,6 +97,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Build and check the installed-MSI cross-session endpoint
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: bash
+        run: python3 tools/rust-qa/instance/cross-session/build_msi_endpoint.py "$NATIVE_TARGET"
+
+      - name: Retain the x64 endpoint for the disposable standard-user MSI guest
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-msi-session-endpoint-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/msi-session-endpoint/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Exercise handle-bound operations over an actual loopback SMB share
         if: runner.os == 'Windows'
         shell: pwsh
