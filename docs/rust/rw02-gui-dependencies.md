@@ -187,6 +187,39 @@ The [Linux x64 receipt](../../tools/rust-qa/gui/evidence/text-profile-linux-x64.
 binds the native results, both build records, the source graph, observation
 drivers and the application's orderly shutdown.
 
+## Offline compiler inputs for the ordinary Linux GUI
+
+The normal Linux [build entry point](../../tools/rust-qa/build-gui-probe.py)
+prepares the pinned Cargo archives. Its [isolated compiler](../../tools/rust-qa/gui/build.py)
+reconstructs the 372 registry packages in the ordinary GUI lock with
+the same source filters as the standalone settings reader.
+Their original archives and unpacked compiler sources have inventory
+SHA-256 `0a4cc8dc3db5daee67b22898a0b4b3ca09a15fd157691e3d19eb72c134f885fe`.
+The cache is under `artifacts/rust/gui-registry/<digest>/`. A new compiler
+invocation authenticates the archives, file lists and individual source
+bytes before mounting the directory at `/vendor`. Clippy, release builds
+and native tests use this read-only mount in an offline namespace.
+The separately reconstructed text crates and installed fonts keep their
+existing inputs. [Directory reconstruction](../../tools/rust-qa/gui/startup/vendor.py).
+
+For a release build, the [compiler check](../../tools/rust-qa/gui/compiler_inputs.py)
+matches every compiled package and feature set to the native graph and
+checks the manifest used by each build unit. The executable must come
+from the ordinary GUI's `src/main.rs`. The per-target output under
+`artifacts/rust/gui-native/` retains `compiler.jsonl`,
+`registry-sources.json`, `graph.json` and their SHA-256 values in
+`build.json`. The same check verifies the integrated settings reader's
+[staged compiler output](../../tools/rust-qa/gui/startup/README.md).
+
+The Fedora x64 offline build recorded 289 compiler units across 235
+packages in graph `6c99492b82997e4e20b66e559a9de9bbea8c22d910bf00fe26484413f00df700`.
+Clippy and all 40 native tests passed. The release executable had SHA-256
+`a4e098475577ccc1244f441ea9b728a9afeb15f93f1d0e2acfe4854b55e645e1`.
+On private X11 and Mutter Wayland desktops it passed the four lifecycle
+cases on each display. The respective `results.json` digests were
+`2997002748a926d60010001cdc19f0f17ca8a339a3bd035caa2fe11895af3108`
+and `13a7b2321429ae7665f90fb0d3507a89b82ddaca568302af2be60b189ffebb8d`.
+
 ## Windows notification-area bindings
 
 The ordinary GUI and the retained-window comparison now use the same

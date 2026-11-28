@@ -42,12 +42,13 @@ def main():
     if not args.offline:
         source_profile.fetch_replay_registry(env)
         subprocess.run(["cargo", "fetch", "--locked", "--manifest-path", str(MANIFEST)], env=env, check=True)
-    lock_hash, graph_hash = source_profile.verify_native_graph(args.target, env, output / "graph.json")
     source_profile.validate()
-    if not args.local_x64_inputs:
-        subprocess.run(["cargo", "clippy", "--manifest-path", str(MANIFEST), "--frozen",
-                        "--all-targets", "--", "-D", "warnings"], env=env, check=True)
+    compiler_evidence = {}
     if os.name == "nt":
+        lock_hash, graph_hash = source_profile.verify_native_graph(args.target, env, output / "graph.json")
+        if not args.local_x64_inputs:
+            subprocess.run(["cargo", "clippy", "--manifest-path", str(MANIFEST), "--frozen",
+                            "--all-targets", "--", "-D", "warnings"], env=env, check=True)
         subprocess.run(["cargo", "build", "--manifest-path", str(MANIFEST), "--release", "--frozen"],
                        env=env, check=True)
         binary = build / "release/native-gui-assessment.exe"
@@ -55,8 +56,21 @@ def main():
                  "--lib", "--bin", "native-gui-assessment"]
     else:
         builder = [sys.executable, str(QA / "gui/build.py"), "--registry", str(cargo_home / "registry")]
+        subprocess.run([*builder, "--clippy"], env=env, check=True)
         subprocess.run(builder, env=env, check=True)
         binary = build / "release/native-gui-assessment"
+        inputs = json.loads(binary.with_suffix(".inputs.json").read_bytes())
+        shutil.copyfile(build / "gui-graph.json", output / "graph.json")
+        shutil.copyfile(build / "gui-compiler.jsonl", output / "compiler.jsonl")
+        shutil.copyfile(build / "gui-registry-sources.json", output / "registry-sources.json")
+        lock_hash = source_profile.sha(MANIFEST.with_name("Cargo.lock"))
+        graph_hash = source_profile.sha(output / "graph.json")
+        if (inputs["graphSha256"] != graph_hash or inputs["binary_sha256"] != source_profile.sha(binary)
+                or inputs["compilerStreamSha256"] != source_profile.sha(output / "compiler.jsonl")
+                or inputs["registryReceiptSha256"] != source_profile.sha(output / "registry-sources.json")):
+            raise ValueError("The Linux GUI and its compiler inputs differ from the build receipt")
+        compiler_evidence = {key: inputs[key] for key in
+                             ("compilerStreamSha256", "compilerUnits", "registryReceiptSha256", "compilerDrivers")}
         tests = [*builder, "--test"]
     if args.local_x64_inputs:
         kit = args.local_x64_inputs.resolve()
@@ -76,7 +90,7 @@ def main():
         test_evidence = {"unitTestLogSha256": source_profile.sha(test_log)}
     record = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "target": args.target, "graphSha256": graph_hash, "lockSha256": lock_hash,
-              **test_evidence,
+              **test_evidence, **compiler_evidence,
               "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "sourceTrees": profile["trees"], "fallbackFonts": profile["fonts"],
               "textNotices": profile["noticeFiles"], "sourceProfileSha256": source_profile.sha(source_profile.REVIEW),

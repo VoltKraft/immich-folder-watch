@@ -8,7 +8,6 @@ import shutil
 import subprocess
 import sys
 import tomllib
-from urllib.parse import unquote
 
 HERE = Path(__file__).resolve().parent
 GUI = HERE.parent
@@ -18,7 +17,9 @@ AREA = ROOT / "artifacts/rust"
 BASE = "c63d91c42eae9f71f07a2d1816214a1e16609ef8"
 sys.path.insert(0, str(QA / "combined-profile"))
 from graphs import TARGETS, feature_map, fingerprint, normal_build
-from sources import locked, read, sha256, source_config, source_profile, write, yaml_prepare
+from sources import locked, read, sha256, source_config, source_profile, write
+from gui.compiler_inputs import verify_gui_units
+from gui.startup.vendor import verify_sources as verify_registry_sources
 
 
 def baseline_json(path):
@@ -55,26 +56,7 @@ def verify_sources(gui, yaml, vendor, original, output):
     combined = baseline_json("tools/rust-qa/combined-profile/review.json")
     if fingerprint(catalog) != combined["allCompilerTreesSha256"]:
         raise ValueError("The original combined source receipt differs from the reviewed compiler trees")
-    selected = locked(gui) | locked(yaml)
-    projection = {}
-    for (name, version), checksum in selected.items():
-        key = name + "-" + version
-        root = vendor / key
-        expected = catalog[key]
-        record = read(root / ".cargo-checksum.json")
-        if (root.is_symlink() or record["package"] != checksum or checksum != expected["originalSha256"]
-                or sha256(vendor.parents[1] / "cache" / vendor.name / (key + ".crate")) != checksum):
-            raise ValueError(f"The supplied compiler source or original archive differs for {key}")
-        hashes = {}
-        for entry in root.rglob("*"):
-            if entry.is_symlink():
-                raise ValueError(f"Unexpected linked compiler input {entry}")
-            if entry.is_file() and entry != root / ".cargo-checksum.json":
-                hashes[entry.relative_to(root).as_posix()] = sha256(entry)
-        if (hashes != record["files"] or len(hashes) != expected["files"]
-                or yaml_prepare.digest(yaml_prepare.canonical(hashes)) != expected["compilerTreeSha256"]):
-            raise ValueError(f"The supplied compiler tree differs for {key}")
-        projection[key] = expected
+    projection = verify_registry_sources(vendor, locked(gui) | locked(yaml), catalog)
     write(output / "registry-sources.json", projection)
     return projection
 
@@ -130,7 +112,7 @@ def assess(output, vendor, original, toolchain):
         features = feature_map(after)
         write(output / (target + ".json"), features)
         summary[target] = {"packages": len(after), "featuresSha256": fingerprint(features)}
-    drivers = [Path(__file__), HERE / "language.patch", QA / "gui/source_profile.py", QA / "combined-profile/graphs.py",
+    drivers = [Path(__file__), HERE / "language.patch", HERE / "vendor.py", GUI / "compiler_inputs.py", QA / "gui/source_profile.py", QA / "combined-profile/graphs.py",
                QA / "combined-profile/sources.py", QA / "yaml/prepare.py", QA / "check-toolchain.py"]
     report = {"drivers": {str(path.relative_to(ROOT)): sha256(path) for path in drivers}, "revision": BASE, "originalLock": lock, "manifest": sha256(gui / "Cargo.toml"),
               "lock": sha256(gui / "Cargo.lock"), "patch": sha256(HERE / "language.patch"),
@@ -175,32 +157,8 @@ def compile_gui(vendor, toolchain, output, build):
     with log.open("wb") as stream:
         subprocess.run([*cargo, "build", "--release", "--frozen", "--jobs", "2", "--message-format",
                         "json-render-diagnostics", *source_config("/vendor")], stdout=stream, check=True)
-    units = [json.loads(line) for line in log.read_text().splitlines()]
-    features = {}
-    local = {"native-gui-assessment": "tools/rust-qa/gui", "ifw-yaml-assessment": "tools/rust-qa/yaml",
-             "desktop-lifecycle": "rust/crates/desktop-lifecycle",
-             **{name: "tools/rust-qa/gui/artifacts/text/" + name for name in ("egui", "epaint", "unicode-bidi")}}
-    for item in units:
-        if item["reason"] != "compiler-artifact":
-            continue
-        source, identity = item["package_id"].rsplit("#", 1)
-        name, version = (identity.split("@", 1) if "@" in identity else
-                         (Path(unquote(source)).name, identity))
-        directory = Path(item["manifest_path"]).parent
-        if name in local:
-            correct = source.startswith("path+file:") and directory == Path("/project") / local[name]
-        else:
-            correct = source == "registry+https://github.com/rust-lang/crates.io-index" and directory == Path("/vendor") / (name + "-" + version)
-        if not correct:
-            raise ValueError(f"Unexpected compiler source for {name} {version}")
-        features.setdefault(name + " v" + version, set()).add(tuple(sorted(item["features"])))
-    expected = read(output / (target + ".json"))
+    count = verify_gui_units(log, read(output / (target + ".json")))
     binary = build / "release/native-gui-assessment"
-    app = [i for i in units if i.get("executable") == "/build/release/native-gui-assessment"]
-    if (units[-1] != {"reason": "build-finished", "success": True} or len(app) != 1
-            or {k: sorted(v) for k, v in features.items()} != {k: sorted(map(tuple, v)) for k, v in expected.items()}
-            or app[0]["target"]["src_path"] != "/project/tools/rust-qa/gui/src/main.rs"):
-        raise ValueError("The linked native application and its dependency graph differ from the qualified inputs")
     with (output / "units-test.log").open("wb") as stream:
         subprocess.run([*cargo, "test", "--release", "--frozen", "--jobs", "2", "--bin", "native-gui-assessment",
                         *source_config("/vendor")], stdout=stream, stderr=subprocess.STDOUT, check=True)
@@ -208,7 +166,7 @@ def compile_gui(vendor, toolchain, output, build):
     write(output / "native.json", {"target": target, "compiler": compiler, "binarySha256": sha256(binary),
           "supplySha256": sha256(output / "supply.json"), "unitTestLogSha256": sha256(output / "units-test.log"),
           "textAndFontProfileSha256": sha256(source_profile.REVIEW),
-          "unitsCount": sum(i["reason"] == "compiler-artifact" for i in units), "unitsSha256": sha256(log),
+          "unitsCount": count, "unitsSha256": sha256(log),
           "sources": {p.relative_to(output / "project").as_posix(): sha256(p) for p in sorted(inputs)}})
 
 

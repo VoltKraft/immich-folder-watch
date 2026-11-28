@@ -355,6 +355,12 @@ python3 tools/rust-qa/gui/native.py --backend wayland --input --present-mode mai
 python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-changes
 ```
 
+The ordinary Linux GUI build reconstructs its Cargo directory source from
+the locked crate archives. Its private build environment mounts that
+directory read-only. The target's `gui-native` output contains the
+complete release compiler messages, source inventory and native graph.
+[Compiler input checks](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
+
 The [desktop assessment workflow](../.github/workflows/rust-desktop-assessment.yaml)
 records native Rust and C# storage results, loopback sessions, graph digests,
 adapters and observed window transitions. The transport's `sessions.json`
