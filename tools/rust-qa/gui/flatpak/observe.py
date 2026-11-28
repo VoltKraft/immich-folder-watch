@@ -16,7 +16,7 @@ from gi.repository import Gio, GLib
 from session import checked_start, check_alive, private_session, wait_for
 sys.path.insert(0, '/driver/worker')
 from second_launch import identity, visible_pid
-from run import APP, GL, GL_COMMIT, sha
+from run import APP, sha
 import tray_menu
 
 
@@ -55,7 +55,8 @@ def process_witness(primary, log, bus, inputs, installed, out):
     original = owner(bus)
     proxy = identity(original['proxyPid'])
     marker = launch_line(log)
-    if (row['wrapper'] != primary.pid or row['app'] != APP or row['arch'] != 'x86_64'
+    arch = inputs['architecture']
+    if (row['wrapper'] != primary.pid or row['app'] != APP or row['arch'] != arch
             or row['branch'] != 'test' or row['instance'] != marker['instance']
             or not all(len(short) >= 12 and full.startswith(short) for short, full in
                        ((row['commit'], installed['commit']), (row['runtime'], inputs['platform']['commit'])))
@@ -83,9 +84,13 @@ def process_witness(primary, log, bus, inputs, installed, out):
     if len(libraries) != 1:
         raise RuntimeError('The live process must map exactly one llvmpipe Vulkan driver')
     library = libraries.pop()
+    native_gl = inputs['gl']
+    icd = native_gl['icdSandboxPath']
     driver_digest = sha(base / library.lstrip('/'))
-    if driver_digest != inputs['gl']['driverSha256']:
-        raise RuntimeError('The loaded Mesa driver differs from the pinned GL extension')
+    icd_digest = sha(base / icd.lstrip('/'))
+    if (library != native_gl['driverSandboxPath'] or driver_digest != native_gl['driverSha256']
+            or icd_digest != native_gl['icdSha256']):
+        raise RuntimeError('The loaded Mesa library or installed Vulkan ICD differs from the native GL extension')
     contents = (base / '.flatpak-info').read_bytes()
     (out / 'primary.flatpak-info').write_bytes(contents)
     info = configparser.ConfigParser(interpolation=None)
@@ -96,9 +101,11 @@ def process_witness(primary, log, bus, inputs, installed, out):
     link = os.readlink(base / 'tmp/session-bus')
     target = (base / marker['proxySocket'].lstrip('/')).stat()
     desktop = Path('/tmp/session-bus').stat()
-    if (info['Application']['name'] != APP or inst['instance-id'] != row['instance'] or inst['arch'] != 'x86_64'
+    extension = native_gl['ref'].split('/')[1] + '=' + native_gl['commit']
+    if (info['Application']['name'] != APP or info['Application']['runtime'] != inputs['platform']['ref']
+            or inst['instance-id'] != row['instance'] or inst['arch'] != arch
             or inst['app-commit'] != installed['commit'] or inst['runtime-commit'] != inputs['platform']['commit']
-            or inst['runtime-extensions'] != GL + '=' + GL_COMMIT or inst['branch'] != 'test'
+            or inst['runtime-extensions'] != extension or inst['branch'] != 'test'
             or not inst.getboolean('session-bus-proxy') or not inst.getboolean('system-bus-proxy')
             or dict(context) != {'shared': 'ipc;', 'sockets': 'x11;'}
             or dict(info['Session Bus Policy']) != {'org.kde.StatusNotifierWatcher': 'talk'}
@@ -108,7 +115,7 @@ def process_witness(primary, log, bus, inputs, installed, out):
         raise RuntimeError('The running Flatpak does not have the expected deployment, proxy or sandbox policy')
     return dict(flatpak=row, dbusOwner=original, proxy=proxy, wrapper=identity(primary.pid), sandbox=sandbox,
                 gui=gui, guiSha256=image, namespacePids=ns_pids, pidNamespace=ns, inSandboxLaunch=marker,
-                loadedDriver={'sandboxPath': library, 'sha256': driver_digest},
+                loadedDriver={'sandboxPath': library, 'sha256': driver_digest, 'icdPath': icd, 'icdSha256': icd_digest},
                 busSocketInodes={'desktop': desktop.st_ino, 'proxy': target.st_ino},
                 flatpakInfoSha256=sha(out / 'primary.flatpak-info'))
 

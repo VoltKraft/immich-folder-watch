@@ -479,6 +479,26 @@ The ordinary mode passed independently with result SHA-256
 The installed test exercises GUI-only protocol delivery. The physical panel
 and worker restart use the [separate Plasma trial](rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu).
 
+On a native x64 or ARM64 rewrite runner, pass the signed Platform deployment
+after preparing its matching GL.default extension. The fixture copies the two
+original signature transcripts, acquisition receipts and deployment metadata
+into its evidence directory. It checks the native ELF machine for the GUI
+and Mesa library, follows the Platform's GL mount to the Vulkan ICD, and hashes
+that ICD and the library mapped by the running GUI. The earlier installed ARM64
+shipping trial recorded `lib/aarch64-linux-gnu/GL` with the Vulkan ICD merge
+directory and GL commit `ab6ebce8bf5a62d9393fca493a08c45fe669a8f73527bccec6ad3dbf62748b41`.
+[Signed deployment pins](../../tools/RustCompatibilityOracle/installed/launch/graphics.py) ·
+[Native shipping launch evidence](rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64).
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak/run.py plasma-native --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu
+```
+
+The architecture-aware runner passed locally on x64 with result SHA-256
+`fb74331a74bd6e6f694eca20c181f1a729772931dec80a97133edc9b8c12aea1`.
+Its evidence manifest SHA-256 is
+`c32414feb0c8daad09976bfd92b87b0052d9c8410c752f157fbccee91531330d`.
+
 ## Ordinary second launch of the Windows GUI
 
 The shipping desktop shortcut starts the executable without arguments. A second
