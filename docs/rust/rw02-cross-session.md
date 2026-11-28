@@ -577,3 +577,50 @@ closed, then discarded the overlay. QMP reported 4 GiB of base memory
 and zero hotplugged bytes. Admission of a previously running configured
 worker, startup with an absent file and atomic config replacement remain
 separate cases.
+
+### Ordinary replacement of two Rust-owned config files on NTFS
+
+On November 28, 2026, the native x64 probe built at `fa337fa` attempted
+an atomic save with the ordinary Win32 `FileRenameInfo` operation. In a
+fresh marked NTFS profile it created both `config.yaml` and
+`.ifw-atomic-config.tmp` with `CREATE_NEW`. It wrote different fixed
+83-byte YAML documents, flushed both and read each back from its original
+handle. Both handles explicitly allowed delete sharing. An independent
+ordinary process read each file's ID by name and received Windows
+sharing violation 32 for each attempt to open either file for data reads
+or writes. All components ran on the isolated x64 Windows Server 2025
+console. [Native input and compiler receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46108513570/artifacts/15248398639)
+· [Owned-file probe](../../tools/rust-qa/instance/cross-session/atomic_config.rs)
+· [Win32 rename information](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info).
+
+**The save failed.** Windows returned `ERROR_ACCESS_DENIED` (5). The
+probe closed its handles. The independent observer at `e736a9a` then
+reopened both original names on volume `13001045781266693700`,
+confirmed their identities and archived their contents before removing
+the synthetic profile.
+
+| Name after the failed save | File ID before and after | SHA-256 of the original bytes recovered |
+| --- | --- | --- |
+| `config.yaml` | `281474976904777` | `9290676e2f5c40cb774b387a3401e748e827daf2203235f7aa3be1c126c85222` |
+| `.ifw-atomic-config.tmp` | `281474976904778` | `7488fdeaf9744a2c50a3bc1ac0ef57fe0eec9006806c78e40b09b495582f6297` |
+
+The guest returned the original ZIP through its serial port after Windows
+could not find the dedicated result volume. Its SHA-256 is
+`cc669cc8be349bea8b329d2eeee39177aa2b4b259f04466cafe6ef91c8044e4c`.
+The replay checks the original AMD64 executable and source receipt,
+ordinary process identities, the two native access results per filename,
+the raw Windows file IDs and both complete YAML documents.
+
+```bash
+atomic=artifacts/rust/local-windows-server-2025-x64/20261128/atomic-fa337fa
+python3 tools/rust-qa/instance/cross-session/replay_atomic_config.py \
+  "$atomic/original-guest-results.zip" "$atomic/compiler.zip" "$atomic/checkout.zip" \
+  c868e67350c4d3a75eca7c73483dbed9734631f212d7ec2d114f8474fc6522a6
+```
+
+The replay JSON SHA-256 is
+`c9f55f37874a36d86cdb2eabb539df372bcb43bead50d96395ccc96e843e15a0`.
+QMP recorded 4 GiB of base memory and zero hotplugged bytes. The guest
+had no network adapter. After ACPI shutdown, the host confirmed that
+QEMU had exited and the scratch files had no open handles before
+discarding the overlay. A successful guarded atomic save remains open.
