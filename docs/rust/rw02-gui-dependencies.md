@@ -210,8 +210,13 @@ and native tests use this read-only mount in an offline namespace.
 Each compiler inventory has a separate Cargo target directory so replaying
 the stock control cannot supply cached crate objects to the corrected GUI.
 Invocations sharing an output directory take one build lock. The compiler
-writes its stream and graph in a fresh staging directory. A failed build
-therefore leaves the previous release receipt and compiler stream together.
+prepares the ELF, its receipt, stream, graph and registry inventory in
+one generation and switches the `gui-current` link atomically. The full
+wrapper publishes its unit-test log with the matching compiler evidence
+under the target's `gui-native` directory. A multi-file reader can call
+`pin_build` or `pin_native` once and use the returned directory throughout.
+The old public filenames continue to resolve to the current files.
+[Publication and reader functions](../../tools/rust-qa/gui/publication.py).
 The separately reconstructed text crates and installed fonts keep their
 existing inputs. [Directory reconstruction](../../tools/rust-qa/gui/startup/vendor.py).
 
@@ -223,6 +228,13 @@ from the ordinary GUI's `src/main.rs`. The per-target output under
 `registry-sources.json`, `graph.json` and their SHA-256 values in
 `build.json`. The same check verifies the integrated settings reader's
 [staged compiler output](../../tools/rust-qa/gui/startup/README.md).
+
+On Fedora two concurrent full wrapper invocations each passed all 40 tests
+and produced the same ELF. All 807 readbacks during the overlap resolved
+to complete generations. The prior release and test evidence remained
+byte-identical after both writers exited. The original check is under
+`artifacts/rust/gui-run/atomic-publication-c352d35/verified.json`, SHA-256
+`ee17187836783e792a82f524f2ac9438c8913d558a25869ba0490fd3d3971884`.
 
 The Fedora x64 offline build at `1862b75` recorded 289 compiler units across 235
 packages in graph `6c99492b82997e4e20b66e559a9de9bbea8c22d910bf00fe26484413f00df700`.

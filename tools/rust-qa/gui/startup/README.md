@@ -34,7 +34,9 @@ resolution. The native build and desktop measurements below cover Fedora x64.
 Use the existing checked GUI font and text-source materialization, the pinned
 Rust toolchain and a combined-profile result directory that contains the
 original four feature maps and `source-trees.json`. All example output
-directories should be fresh.
+directories should be fresh. With the ordinary GUI already built, stage
+the worker from the same checkout so its receipt matches the current
+worker inputs.
 
 ```sh
 area=artifacts/rust/combined-profile
@@ -43,10 +45,11 @@ python3 -B tools/rust-qa/gui/startup/qualify.py \
   --vendor "$area/startup-vendor/registry/src/reviewed" \
   --combined-receipt "$area/runs/digest-native-2f63c15" \
   --output "$area/startup-build" --native
+python3 -B tools/rust-qa/performance/build_worker.py --name startup-language-worker
 python3 -B tools/rust-qa/gui/startup/observe.py \
   --gui "$area/startup-build/native-build/release/native-gui-assessment" \
   --compiler-receipt "$area/startup-build/native.json" \
-  --worker artifacts/rust/performance/subjects/startup-language-worker-20261128 \
+  --worker artifacts/rust/performance/subjects/startup-language-worker \
   --sdk artifacts/flatpak-local-2.11.2/sdk \
   --signed-repo artifacts/rust/yaml-assessment/signed-flatpak-3.0.4-folders/ostree \
   --output "$area/startup-desktop"
