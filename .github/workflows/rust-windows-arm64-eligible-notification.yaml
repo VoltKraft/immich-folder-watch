@@ -1,0 +1,17 @@
+name: Rust Windows ARM64 notification after quiet time
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths: ['.github/workflows/rust-windows-arm64-eligible-notification.yaml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eligible:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    uses: ./.github/workflows/rust-windows-arm64-notification.yaml
+    with:
+      wait_eligible: true

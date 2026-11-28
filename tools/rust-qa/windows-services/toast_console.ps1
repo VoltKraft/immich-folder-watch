@@ -50,6 +50,8 @@ if ($HostedArm64) {
     $report.head = $env:GITHUB_SHA
     $report.run = $env:GITHUB_RUN_ID
     $report.attempt = $env:GITHUB_RUN_ATTEMPT
+    $report.job = $env:GITHUB_JOB
+    $report.workflow = $env:GITHUB_WORKFLOW
     $report.scriptSha256 = Get-ObserverDigest $PSCommandPath
     $report.observerPid = $PID
 }
@@ -88,6 +90,11 @@ public static class IfwToastPoint {
     }
     $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
     $session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+    if ($HostedArm64) {
+        $report.session = $session
+        $report.diagnostics = [ordered]@{samples=0; firstQpc=$null; lastQpc=$null; visibleCoreWindowVisits=0
+            shellWindowVisits=0; viewQueries=0; normalViewMatches=0; onscreenViewVisits=0; staleElements=0}
+    }
     $shellImages = @(
         (Join-Path $env:SystemRoot 'SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe')
         (Join-Path $env:SystemRoot 'SystemApps\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe')
@@ -113,6 +120,7 @@ public static class IfwToastPoint {
         $ownerId = [IfwToastPoint]::Pid($root)
         $owner = Get-Process -Id $ownerId -ErrorAction SilentlyContinue
         if (!$owner -or $owner.SessionId -ne $session -or $shellImages -inotcontains $owner.Path) { return }
+        if ($HostedArm64) { $report.diagnostics.shellWindowVisits++ }
         $window = $conditionType::FromHandle($root)
         if ($window.Current.ProcessId -ne $ownerId) { return }
         $surface = $window
@@ -125,9 +133,12 @@ public static class IfwToastPoint {
             $toastId = [Windows.Automation.OrCondition]::new($ids[0],$ids[1])
             $filter = [Windows.Automation.AndCondition]::new($type,$toastId)
             $views = $window.FindAll([Windows.Automation.TreeScope]::Subtree,$filter)
+            $report.diagnostics.viewQueries++
+            $report.diagnostics.normalViewMatches += $views.Count
             if ($views.Count -ne 1) { return }
             $surface = $views.Item(0)
             if ($surface.Current.ProcessId -ne $ownerId -or $surface.Current.IsOffscreen) { return }
+            $report.diagnostics.onscreenViewVisits++
             $normalView = @{automationId=$surface.Current.AutomationId; runtimeId=($surface.GetRuntimeId() -join ',')}
         }
         $labels = @()
@@ -185,12 +196,20 @@ public static class IfwToastPoint {
         $root = [IfwToastPoint]::Root(($area.Right-260),($area.Bottom-97))
         $candidates = @($root)
         if ($HostedArm64) {
-            $candidates += @([IfwToastPoint]::CoreWindows() | Where-Object { $_ -ne $root })
+            $coreWindows = @([IfwToastPoint]::CoreWindows())
+            $report.diagnostics.samples++
+            if ($null -eq $report.diagnostics.firstQpc) { $report.diagnostics.firstQpc = $report.beginQpc }
+            $report.diagnostics.lastQpc = $report.beginQpc
+            $report.diagnostics.visibleCoreWindowVisits += $coreWindows.Count
+            $candidates += @($coreWindows | Where-Object { $_ -ne $root })
         }
         $observed = $null
         foreach ($candidate in $candidates) {
             try { $observed = Read-PhysicalPopup $candidate }
-            catch [Windows.Automation.ElementNotAvailableException] { continue }
+            catch [Windows.Automation.ElementNotAvailableException] {
+                if ($HostedArm64) { $report.diagnostics.staleElements++ }
+                continue
+            }
             if ($observed) { break }
         }
         if ($observed) {

@@ -1,5 +1,5 @@
 # Observe Windows Settings and run a reversible Do not disturb comparison on a dedicated ARM64 console.
-param([ValidateSet('Read','Permit','Restore')][string]$Action = 'Read')
+param([ValidateSet('Read','Permit','ConfirmPermitted','Restore')][string]$Action = 'Read')
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
     $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or
@@ -7,8 +7,9 @@ if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hos
     $env:PROCESSOR_ARCHITECTURE -cne 'ARM64' -or $env:GITHUB_SHA -cnotmatch '^[a-f0-9]{40}$') {
     throw 'This readback requires the native ARM64 rewrite runner.'
 }
+$eligibleJob = $env:GITHUB_WORKFLOW -ceq 'Rust Windows ARM64 notification after quiet time' -and $env:IFW_QA_TOAST_ELIGIBILITY -ceq 'wait'
 if ($Action -ne 'Read' -and ($env:GITHUB_JOB -cne 'observe' -or
-    $env:GITHUB_WORKFLOW -cne 'Rust Windows ARM64 notification on a fresh console' -or
+    ($env:GITHUB_WORKFLOW -cne 'Rust Windows ARM64 notification on a fresh console' -and !$eligibleJob) -or
     $env:IFW_QA_TOAST_POLICY -cne 'permitted')) {
     throw 'The temporary change requires the disposable ARM64 notification comparison.'
 }
@@ -66,7 +67,10 @@ if (Test-Path -LiteralPath $path) { throw 'Expected a fresh notification setting
 [int]$eligibility = 0
 $hr = [IfwToastSettings]::SHQueryUserNotificationState([ref]$eligibility)
 $report = [ordered]@{ head = $env:GITHUB_SHA; run = $env:GITHUB_RUN_ID; attempt = $env:GITHUB_RUN_ATTEMPT
-    session = $session; action = $Action; afterSender = $Action -ne 'Permit'; eligibilityHresult = $hr; eligibilityValue = $eligibility
+    session = $session; action = $Action; afterSender = ($Action -in @('Restore','Read') -and (!$eligibleJob -or
+        (Test-Path -LiteralPath (Join-Path $folder 'toast-history-aarch64-pc-windows-msvc/result.json'))))
+    eligibilityHresult = $hr; eligibilityValue = $eligibility
+    job = $env:GITHUB_JOB; workflow = $env:GITHUB_WORKFLOW
     scriptSha256 = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
     status = 'unavailable'; opened = $false; closed = $false }
 # Persist the intent before the native toggle. The restore step can recover
@@ -148,7 +152,7 @@ try {
                 }
                 Start-Sleep -Milliseconds 200
             } while ([DateTime]::UtcNow -lt $deadline)
-            if ($Action -ne 'Read') { Set-TestDnd $opened $dndPattern }
+            if ($Action -in @('Permit','Restore')) { Set-TestDnd $opened $dndPattern }
         } else { $report.reason = 'The notification Settings window was unavailable.' }
     }
 } finally {
@@ -174,4 +178,6 @@ try {
     }
 }
 if ($Action -eq 'Permit' -and $report.status -cne 'permitted') { throw 'The controlled trial has no verified starting setting.' }
+if ($Action -eq 'ConfirmPermitted' -and ($report.status -cne 'observed' -or $report.notifications.state -cne 'On' -or
+    $report.doNotDisturb.state -cne 'Off')) { throw 'The console settings no longer permit the ordinary popup.' }
 if ($Action -eq 'Restore' -and $report.status -notin @('restored','no-owned-change')) { throw 'Restoration was not confirmed.' }

@@ -12,6 +12,11 @@ on:
       - 'tools/rust-qa/windows-desktop/**'
       - 'rust/toolchain-inputs.json'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      wait_eligible:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,17 +26,13 @@ jobs:
     if: github.ref == 'refs/heads/rewrite/rust'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - policy: original
-            artifact: rust-fresh-console-arm64
-          - policy: permitted
-            artifact: rust-permitted-console-arm64
+      matrix: ${{ fromJSON(inputs.wait_eligible && '{"include":[{"policy":"permitted","artifact":"rust-eligible-console-arm64"}]}' || '{"include":[{"policy":"original","artifact":"rust-fresh-console-arm64"},{"policy":"permitted","artifact":"rust-permitted-console-arm64"}]}') }}
     runs-on: windows-11-arm
-    timeout-minutes: 35
+    timeout-minutes: ${{ inputs.wait_eligible && 105 || 35 }}
     env:
       NATIVE_TARGET: aarch64-pc-windows-msvc
       IFW_QA_TOAST_POLICY: ${{ matrix.policy }}
+      IFW_QA_TOAST_ELIGIBILITY: ${{ inputs.wait_eligible && 'wait' || 'immediate' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,12 +63,31 @@ jobs:
           powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action Permit
           exit $LASTEXITCODE
 
-      - name: Observe the ordinary WinRT popup and read its history
-        id: sender
-        if: ${{ !cancelled() && (matrix.policy == 'original' || steps.prepare.outcome == 'success') && (steps.services.outcome == 'success' || steps.services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/pe-imports.json', env.NATIVE_TARGET)) != '' }}
+      - name: Wait for the original console to accept notifications
+        id: wait_for_shell
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.prepare.outcome == 'success' }}
+        timeout-minutes: 67
         shell: pwsh
         run: |
-          python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --wait
+          exit $LASTEXITCODE
+
+      - name: Recheck the actual notification and Do not disturb switches after waiting
+        id: confirm_permitted
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.wait_for_shell.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action ConfirmPermitted
+          exit $LASTEXITCODE
+
+      - name: Observe the ordinary WinRT popup and read its history
+        id: sender
+        if: ${{ !cancelled() && (!inputs.wait_eligible || steps.confirm_permitted.outcome == 'success') && (matrix.policy == 'original' || steps.prepare.outcome == 'success') && (steps.services.outcome == 'success' || steps.services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/pe-imports.json', env.NATIVE_TARGET)) != '' }}
+        shell: pwsh
+        run: |
+          $extra = @()
+          if ($env:IFW_QA_TOAST_ELIGIBILITY -ceq 'wait') { $extra += '--after-eligibility' }
+          python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64 @extra
           exit $LASTEXITCODE
 
       - name: Restore the original Do not disturb setting
@@ -78,7 +98,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Read the notification settings after the screen observation
-        if: ${{ !cancelled() && (steps.sender.outcome == 'success' || steps.sender.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.sender.outcome == 'success' || steps.sender.outcome == 'failure' || inputs.wait_eligible && steps.prepare.outcome == 'success') }}
         shell: pwsh
         run: |
           powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1
@@ -93,7 +113,9 @@ jobs:
             artifacts/rust/windows-services/native-aarch64-pc-windows-msvc/
             artifacts/rust/windows-services/toast-history-aarch64-pc-windows-msvc/
             artifacts/rust/windows-services/toast-physical-aarch64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-eligibility-aarch64-pc-windows-msvc/
             artifacts/rust/windows-services/toast-settings-aarch64-pc-windows-msvc*.json
+            ${{ inputs.wait_eligible && 'artifacts/rust/windows-services/build/aarch64-pc-windows-msvc/release/ifw-windows-services-probe.exe' || '' }}
           if-no-files-found: error
           retention-days: 14
 
@@ -104,10 +126,25 @@ jobs:
           python -B tools/rust-qa/windows-services/toast_console.py --check-policy $env:IFW_QA_TOAST_POLICY "artifacts/rust/windows-services/toast-history-$env:NATIVE_TARGET"
           exit $LASTEXITCODE
 
+      - name: Verify restoration when the eligible send did not start
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.prepare.outcome == 'success' && hashFiles(format('artifacts/rust/windows-services/toast-history-{0}/result.json', env.NATIVE_TARGET)) == '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --check-unsent-policy
+          exit $LASTEXITCODE
+
       - name: Verify both visible labels against the original native sender
         if: ${{ !cancelled() && steps.sender.outcome == 'success' }}
         shell: pwsh
         run: |
           $area = 'artifacts/rust/windows-services'
           python -B tools/rust-qa/windows-services/toast_console.py --require-visible "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Replay Shell eligibility against the original ordinary Show and physical observation
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.sender.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $area = 'artifacts/rust/windows-services'
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --verify "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
           exit $LASTEXITCODE

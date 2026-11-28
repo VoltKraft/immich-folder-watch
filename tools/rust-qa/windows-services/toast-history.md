@@ -210,3 +210,41 @@ operations and timed Shell observer as the hosted test. The result in
 `artifacts/rust/windows-services/toast-history-x86_64-pc-windows-msvc/` records
 the VM observation separately from its compiler run. Replay the directory with
 `--replay` and check `presentationObserved` for the visible banner.
+
+## Ordinary notification after the ARM64 console accepts notifications
+
+The [dedicated ARM64 trial](../../../.github/workflows/rust-windows-arm64-eligible-notification.yaml)
+uses one fresh Windows 11 ARM64 console. A change to that workflow on
+`rewrite/rust` or an explicit dispatch requests the longer test. The usual
+fresh-console comparisons keep their 35-minute job limit.
+
+The trial builds the original Rust sender, records both notification switches,
+temporarily turns off Do not disturb if necessary, and closes its Settings
+window. It checks the unlocked input desktop and calls
+`SHQueryUserNotificationState` every 30 seconds for up to 65 minutes.
+Each sample preserves the native HRESULT, returned state, performance
+counters and elapsed time. Only a successful return of
+`QUNS_ACCEPTS_NOTIFICATIONS` (5) releases the sender trial. It reads both
+switches again and arms the physical observer before invoking the existing
+history test. The restoration and independent Settings read also run when
+the eligibility wait expires.
+
+A separate read-only observer samples the same Shell API roughly every 25 ms
+while the original sender runs. Offline replay finds the successful ordinary
+WinRT `Show` in the native process log and compares its counter interval with
+the raw queries. The complete queries immediately before and after the call
+must each fall within 500 ms of it. Replay reports both measured gaps and
+any overlapping queries. The archive retains the original executable, compiler
+receipt, SHA-256 of the actual observer scripts, job and session identities,
+and the source revision. The physical observer counts visits to visible
+CoreWindows, verified Shell windows, completed toast-view queries and their
+matches. Positive visibility still requires both synthetic labels on the
+original physical Shell popup and the independent provider match.
+
+For a downloaded archive, use the two original directories from that job.
+
+```powershell
+$target = 'aarch64-pc-windows-msvc'
+python -B tools/rust-qa/windows-services/toast_eligibility.py --verify "toast-history-$target" "toast-physical-$target"
+python -B tools/rust-qa/windows-services/toast_console.py --require-visible "toast-history-$target" "toast-physical-$target"
+```
