@@ -95,6 +95,23 @@ def verify_scalar_fields(exported):
         raise ValueError("The shipping reader's typed interval or boolean conversion changed")
 
 
+    tagged = inputs["typed-tag-properties"]["editable"]["watch"]
+    rounding = inputs["typed-tag-rounding"]["editable"]["watch"]
+    alias = inputs["typed-tag-alias"]["editable"]["watch"]["sources"][0]
+    control = inputs["typed-scalar-control"]["editable"]["watch"]
+    if (tagged["batchIntervalSeconds"] != 90 or tagged["fileReadyTimeoutSeconds"] != 9
+            or [src["albumName"] for src in tagged["sources"]] != ["90", "True"]
+            or (rounding["batchIntervalSeconds"], rounding["fileReadyTimeoutSeconds"]) != (10, 10)
+            or rounding["sources"][0]["albumName"] != "1.25E-06"
+            or alias["albumName"] != "90" or alias["excludeFileNames"] != ["True", "001"]
+            or control["batchIntervalSeconds"] != 17 or control["sources"][0]["albumName"] != "001"
+            or control["sources"][0]["includeSubdirectories"] is not True
+            or inputs["typed-tag-unicode-lines"]["editable"]["watch"]["batchIntervalSeconds"] != 90
+            or inputs["typed-tag-text-alias-to-boolean"]["accepted"]
+            or inputs["typed-tag-padded-boolean"]["accepted"] or inputs["typed-integer-octal-prefix"]["accepted"]):
+        raise ValueError("The shipping reader's explicit scalar type conversions changed")
+
+
 def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust: dict, csharp: dict) -> None:
     if (exported["format"] != "ifw-rw02-yaml-reference-v2" or rust["format"] != "ifw-rw02-yaml-result-v2"
             or csharp["format"] != "ifw-rw02-yaml-readback-v2"):

@@ -57,16 +57,16 @@ legacy_mapping! {
 legacy_mapping! {
     struct RawImmich {
         allow_insecure_http: RawFlag => "allowInsecureHttp",
-        server_api_url: Option<String> => "serverApiUrl",
-        api_key: Option<String> => "apiKey",
+        server_api_url: RawText => "serverApiUrl",
+        api_key: RawText => "apiKey",
     }
 }
 
 legacy_mapping! {
     struct RawWatch {
         sources: Option<Vec<Option<RawSource>>> => "sources",
-        transfer_order: Option<String> => "transferOrder",
-        extensions: Option<Vec<Option<String>>> => "extensions",
+        transfer_order: RawText => "transferOrder",
+        extensions: Option<Vec<RawText>> => "extensions",
         batch_interval_seconds: RawInteger => "batchIntervalSeconds",
         max_batch_size: RawInteger => "maxBatchSize",
         file_ready_timeout_seconds: RawInteger => "fileReadyTimeoutSeconds",
@@ -75,13 +75,13 @@ legacy_mapping! {
 
 legacy_mapping! {
     struct RawSource {
-        path: Option<String> => "path",
-        album_name: Option<String> => "albumName",
+        path: RawText => "path",
+        album_name: RawText => "albumName",
         include_subdirectories: RawFlag => "includeSubdirectories",
-        extensions: Option<Vec<Option<String>>> => "extensions",
-        exclude_directories: Option<Vec<Option<String>>> => "excludeDirectories",
-        exclude_file_names: Option<Vec<Option<String>>> => "excludeFileNames",
-        sync_mode: Option<String> => "syncMode",
+        extensions: Option<Vec<RawText>> => "extensions",
+        exclude_directories: Option<Vec<RawText>> => "excludeDirectories",
+        exclude_file_names: Option<Vec<RawText>> => "excludeFileNames",
+        sync_mode: RawText => "syncMode",
         delete_after_upload: RawFlag => "deleteAfterUpload",
     }
 }
@@ -93,34 +93,119 @@ legacy_mapping! {
     }
 }
 
-// Quoted values retain their spelling. Untagged plain numbers and booleans
-// can already have their native representation from the YAML reader.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum LegacyScalar<T> {
-    Value(T),
-    Text(String),
+// Direct string deserialization retains the spelling of untagged scalar values.
+// The structural reader has already validated the document before marking a
+// recognized property's explicit numeric or Boolean tag.
+enum Scalar {
+    Null,
+    Text(String, bool),
+    Int(i32),
+    Bool(bool),
+    Float(f64),
+    Other(String),
 }
 
-impl<T> LegacyScalar<T> {
-    fn read<'de, D>(input: D, native_tag: &str) -> Result<(Option<Self>, bool), D::Error>
-    where
-        D: serde::Deserializer<'de>,
-        T: Deserialize<'de>,
-    {
+impl Scalar {
+    fn read<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let serde_saphyr::Tagged(value, tag) =
-            serde_saphyr::Tagged::<Option<Self>>::deserialize(input)?;
-        let string_conversion = match tag.as_deref() {
-            Some("tag:yaml.org,2002:str") => true,
-            None | Some("!" | "tag:yaml.org,2002:null") => false,
-            Some(tag) if tag == native_tag => false,
-            _ => {
-                return Err(serde::de::Error::custom(
-                    "unexpected configuration scalar tag",
-                ));
+            serde_saphyr::Tagged::<Option<String>>::deserialize(deserializer)?;
+        let invalid = || serde::de::Error::custom("invalid configuration scalar");
+        // An alias replays the value assigned to its defining property. An
+        // integer stored in an album name therefore reaches later uses as text.
+        if let Some((kind @ ("bool" | "int" | "float"), property)) =
+            tag.as_deref().and_then(|t| t.split_once(':'))
+        {
+            let text = value.ok_or_else(invalid)?;
+            let typed = match kind {
+                "int" => legacy_integer(&text).map(Self::Int),
+                "bool" => legacy_flag(&text, false).map(Self::Bool),
+                _ => text.trim().parse().ok().map(Self::Float),
             }
-        };
-        Ok((value, string_conversion))
+            .ok_or_else(invalid)?;
+            return match property {
+                "text" => Ok(Self::Text(typed.text().ok_or_else(invalid)?, true)),
+                "integer" => typed.integer().map(Self::Int).ok_or_else(invalid),
+                "boolean" => typed.flag().map(Self::Bool).ok_or_else(invalid),
+                _ => Err(invalid()),
+            };
+        }
+        Ok(match (tag.as_deref(), value) {
+            (_, None) => Self::Null,
+            (Some("tag:yaml.org,2002:str"), Some(text)) => Self::Text(text, true),
+            (None | Some("!"), Some(text)) => Self::Text(text, false),
+            (_, Some(text)) => Self::Other(text),
+        })
+    }
+
+    fn text(self) -> Option<String> {
+        match self {
+            Self::Null => None,
+            Self::Text(text, _) | Self::Other(text) => Some(text),
+            Self::Int(number) => Some(number.to_string()),
+            Self::Bool(value) => Some(if value { "True" } else { "False" }.into()),
+            Self::Float(value) => Some(float_text(value)),
+        }
+    }
+
+    fn integer(self) -> Option<i32> {
+        match self {
+            Self::Null => Some(0),
+            Self::Int(value) => Some(value),
+            Self::Bool(value) => Some(i32::from(value)),
+            Self::Text(text, true) => text.trim().parse().ok(),
+            Self::Text(text, false) => legacy_integer(&text),
+            Self::Float(value) => {
+                let rounded = value.round_ties_even();
+                (f64::from(i32::MIN)..=f64::from(i32::MAX))
+                    .contains(&rounded)
+                    .then_some(rounded as i32)
+            }
+            Self::Other(_) => None,
+        }
+    }
+
+    fn flag(self) -> Option<bool> {
+        match self {
+            Self::Null => Some(false),
+            Self::Bool(value) => Some(value),
+            Self::Int(value) => Some(value != 0),
+            Self::Float(value) => Some(value != 0.0),
+            Self::Text(text, tagged_string) => legacy_flag(&text, tagged_string),
+            Self::Other(_) => None,
+        }
+    }
+}
+
+#[derive(Default)]
+struct RawText(Option<String>);
+
+impl<'de> Deserialize<'de> for RawText {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(Scalar::read(deserializer)?.text()))
+    }
+}
+
+// .NET 10 general-format Double uses shortest round-trip digits and switches
+// to an uppercase, signed exponent outside its fixed-point range.
+fn float_text(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".to_owned();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_negative() {
+            "-Infinity"
+        } else {
+            "Infinity"
+        }
+        .to_owned();
+    }
+    let scientific = format!("{value:e}");
+    let (mantissa, exponent) = scientific.split_once('e').expect("finite float exponent");
+    let exponent: i32 = exponent.parse().expect("formatted exponent");
+    if (-4..17).contains(&exponent) {
+        value.to_string()
+    } else {
+        format!("{mantissa}E{exponent:+03}")
     }
 }
 
@@ -160,23 +245,23 @@ fn legacy_integer(text: &str) -> Option<i32> {
 
 impl<'de> Deserialize<'de> for RawInteger {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let (value, tagged_string) = LegacyScalar::read(deserializer, "tag:yaml.org,2002:int")?;
-        let number = match value {
-            None => 0,
-            Some(LegacyScalar::Value(number)) => number,
-            Some(LegacyScalar::Text(text)) => {
-                // A !!str tag supplies an actual String to .NET's property converter.
-                let number = if tagged_string {
-                    text.trim().parse().ok()
-                } else {
-                    legacy_integer(&text)
-                };
-                number.ok_or_else(|| {
-                    serde::de::Error::custom("invalid legacy configuration integer")
-                })?
-            }
-        };
-        Ok(Self(Some(number)))
+        let number = Scalar::read(deserializer)?.integer();
+        number
+            .map(|n| Self(Some(n)))
+            .ok_or_else(|| serde::de::Error::custom("invalid legacy configuration integer"))
+    }
+}
+
+fn legacy_flag(text: &str, tagged_string: bool) -> Option<bool> {
+    let value = if tagged_string {
+        text.trim()
+    } else {
+        text.strip_suffix('\n').unwrap_or(text)
+    };
+    match (value.to_ascii_lowercase().as_str(), tagged_string) {
+        ("true", _) | ("y" | "yes" | "on", false) => Some(true),
+        ("false", _) | ("n" | "no" | "off", false) => Some(false),
+        _ => None,
     }
 }
 
@@ -185,44 +270,24 @@ struct RawFlag(bool);
 
 impl<'de> Deserialize<'de> for RawFlag {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let (value, tagged_string) = LegacyScalar::read(deserializer, "tag:yaml.org,2002:bool")?;
-        let flag = match value {
-            None => false,
-            Some(LegacyScalar::Value(flag)) => flag,
-            Some(LegacyScalar::Text(text)) => {
-                // A tagged String uses Boolean.Parse; the ordinary YAML patterns allow
-                // legacy names and match just before a single final LF.
-                let value = if tagged_string {
-                    text.trim()
-                } else {
-                    text.strip_suffix('\n').unwrap_or(&text)
-                };
-                match (value.to_ascii_lowercase().as_str(), tagged_string) {
-                    ("true", _) | ("y" | "yes" | "on", false) => true,
-                    ("false", _) | ("n" | "no" | "off", false) => false,
-                    _ => {
-                        return Err(serde::de::Error::custom(
-                            "invalid legacy configuration boolean",
-                        ));
-                    }
-                }
-            }
-        };
-        Ok(Self(flag))
+        let value = Scalar::read(deserializer)?.flag();
+        value
+            .map(Self)
+            .ok_or_else(|| serde::de::Error::custom("invalid legacy configuration boolean"))
     }
 }
 
 legacy_mapping! {
     struct RawLogging {
-        level: Option<String> => "level",
-        target: Option<String> => "target",
-        log_directory: Option<String> => "logDirectory",
+        level: RawText => "level",
+        target: RawText => "target",
+        log_directory: RawText => "logDirectory",
     }
 }
 
 legacy_mapping! {
     struct RawLocalization {
-        language: Option<String> => "language",
+        language: RawText => "language",
     }
 }
 
@@ -358,8 +423,8 @@ impl TextRules {
         value.trim_matches(|value| self.whitespace.contains(&value))
     }
 
-    fn text(&self, value: Option<String>, default: &str) -> String {
-        self.trim(value.as_deref().unwrap_or(default)).to_owned()
+    fn text(&self, value: RawText, default: &str) -> String {
+        self.trim(value.0.as_deref().unwrap_or(default)).to_owned()
     }
 
     fn key(&self, value: &str) -> String {
@@ -369,8 +434,8 @@ impl TextRules {
             .collect()
     }
 
-    fn choice(&self, value: Option<String>, choices: &[&str], default: &str) -> String {
-        let key = self.key(self.trim(value.as_deref().unwrap_or_default()));
+    fn choice(&self, value: RawText, choices: &[&str], default: &str) -> String {
+        let key = self.key(self.trim(value.0.as_deref().unwrap_or_default()));
         choices
             .iter()
             .find(|value| self.key(value) == key)
@@ -379,12 +444,12 @@ impl TextRules {
             .to_owned()
     }
 
-    fn list(&self, values: Option<Vec<Option<String>>>, extensions: bool) -> Vec<String> {
+    fn list(&self, values: Option<Vec<RawText>>, extensions: bool) -> Vec<String> {
         let mut seen = BTreeSet::new();
         values
             .unwrap_or_default()
             .into_iter()
-            .flatten()
+            .filter_map(|item| item.0)
             .filter_map(|value| {
                 let value = self.trim(&value);
                 if value.is_empty() {
@@ -410,7 +475,7 @@ impl TextRules {
 impl RawConfig {
     #[cfg(target_os = "linux")]
     pub(crate) fn startup_language(self) -> Option<String> {
-        self.localization.and_then(|settings| settings.language)
+        self.localization.and_then(|settings| settings.language.0)
     }
 
     pub fn normalize(self, rules: &TextRules) -> Config {

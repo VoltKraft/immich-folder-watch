@@ -71,8 +71,9 @@ pub fn parse(input: &str, mut options: Options, max_bytes: usize) -> Result<RawC
         return Err(Failure::InputBytes);
     }
     let anchors = crate::anchors::compatible_input(input, &mut options)?;
-    let view = crate::scalar_breaks::compatible_input(&anchors, &options)?;
-    serde_saphyr::from_str_with_options::<Option<RawConfig>>(&view, options)
+    let view = crate::anchors::typed_scalar_input(&anchors, &mut options)?;
+    let typed = crate::scalar_breaks::compatible_input(&view, &options)?;
+    serde_saphyr::from_str_with_options::<Option<RawConfig>>(&typed, options)
         .map_err(classify)?
         .ok_or(Failure::InvalidDocument)
 }

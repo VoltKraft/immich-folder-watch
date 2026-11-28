@@ -15,7 +15,9 @@ enum Role {
     Logging,
     Localization,
     Strings,
-    Scalar,
+    Text,
+    Integer,
+    Boolean,
     Key,
     Skipped,
 }
@@ -34,21 +36,15 @@ impl Role {
             (Watch, "sources") => Sources,
             (Watch | Source, "extensions")
             | (Source, "excludeDirectories" | "excludeFileNames") => Strings,
-            (Immich, "allowInsecureHttp" | "serverApiUrl" | "apiKey")
-            | (
-                Watch,
-                "batchIntervalSeconds"
-                | "fileReadyTimeoutSeconds"
-                | "maxBatchSize"
-                | "transferOrder",
-            )
-            | (
-                Source,
-                "path" | "albumName" | "includeSubdirectories" | "syncMode" | "deleteAfterUpload",
-            )
-            | (Retry, "maxAttempts" | "baseDelayMilliseconds")
+            (Immich, "allowInsecureHttp")
+            | (Source, "includeSubdirectories" | "deleteAfterUpload") => Boolean,
+            (Watch, "batchIntervalSeconds" | "fileReadyTimeoutSeconds" | "maxBatchSize")
+            | (Retry, "maxAttempts" | "baseDelayMilliseconds") => Integer,
+            (Immich, "serverApiUrl" | "apiKey")
+            | (Watch, "transferOrder")
+            | (Source, "path" | "albumName" | "syncMode")
             | (Logging, "level" | "target" | "logDirectory")
-            | (Localization, "language") => Scalar,
+            | (Localization, "language") => Text,
             _ => Skipped,
         }
     }
@@ -56,7 +52,7 @@ impl Role {
     fn element(self) -> Self {
         match self {
             Self::Sources => Self::Source,
-            Self::Strings => Self::Scalar,
+            Self::Strings => Self::Text,
             _ => Self::Skipped,
         }
     }
@@ -265,4 +261,93 @@ pub fn compatible_input<'a>(
     }
     output.push_str(input.get(copied..).ok_or(Failure::InvalidYaml)?);
     Ok(Cow::Owned(output))
+}
+
+/// The high-level reader resolves core tags before delivering a scalar to Serde.
+/// Keep the original scalar token and expose its resolved type to the property reader.
+pub(super) fn typed_scalar_input<'a>(
+    input: &'a str,
+    options: &mut serde_saphyr::Options,
+) -> Result<Cow<'a, str>, Failure> {
+    if !input.contains('!') {
+        return Ok(Cow::Borrowed(input));
+    }
+    let lines = Lines::for_input(input);
+    let syntax = lines.as_ref().map_or(input, |v| v.syntax.as_str());
+    let original = |offset| lines.as_ref().map_or(offset, |v| v.original(offset));
+    let mut stack = Vec::new();
+    let mut tags = Vec::new();
+    let settings = crate::scalar_breaks::parser_options(options);
+    for event in Parser::new_from_str_with_options(syntax, settings) {
+        let (event, span) = event.map_err(|_| Failure::InvalidYaml)?;
+        match event {
+            Event::MappingStart(style, ..) | Event::SequenceStart(style, ..) => {
+                if options
+                    .budget
+                    .as_ref()
+                    .is_some_and(|b| stack.len() >= b.max_depth)
+                {
+                    return Err(Failure::Budget);
+                }
+                let role = next_role(stack.last_mut(), None);
+                stack.push(if matches!(event, Event::MappingStart(..)) {
+                    Container::Mapping {
+                        role,
+                        style,
+                        next_value: None,
+                    }
+                } else {
+                    Container::Sequence(role.element())
+                });
+            }
+            Event::MappingEnd | Event::SequenceEnd => {
+                stack.pop().ok_or(Failure::InvalidYaml)?;
+            }
+            Event::Scalar(value, _, _, tag) => {
+                let property = match next_role(stack.last_mut(), Some(&value)) {
+                    Role::Text => "text",
+                    Role::Integer => "integer",
+                    Role::Boolean => "boolean",
+                    _ => continue,
+                };
+                let source = match tag.as_ref().and_then(|t| t.core_suffix()) {
+                    Some("bool") => "bool",
+                    Some("int") => "int",
+                    Some("float") => "float",
+                    _ => continue,
+                };
+                let span = span.tag_span().ok_or(Failure::InvalidYaml)?;
+                let start = original(span.start.byte_offset().ok_or(Failure::InvalidYaml)?);
+                let end = original(span.end.byte_offset().ok_or(Failure::InvalidYaml)?);
+                tags.push((start, end, source, property));
+            }
+            Event::Alias(_) | Event::UnresolvedAlias(_) => {
+                next_role(stack.last_mut(), None);
+            }
+            _ => {}
+        }
+    }
+    if tags.is_empty() {
+        return Ok(Cow::Borrowed(input));
+    }
+    let mut checked = String::with_capacity(input.len());
+    let mut typed = String::with_capacity(input.len());
+    let mut copied = 0;
+    for (start, end, source, property) in tags {
+        let before = input.get(copied..start).ok_or(Failure::InvalidYaml)?;
+        checked.push_str(before);
+        typed.push_str(before);
+        checked.push('!');
+        write!(typed, "!<{source}:{property}>").expect("writing to a string");
+        copied = end;
+    }
+    checked.push_str(&input[copied..]);
+    typed.push_str(&input[copied..]);
+    // Admit the complete structure, original scalar contents, other tags and all
+    // alias replays before reading the internally marked copy of this same document.
+    let checked = crate::scalar_breaks::compatible_input(&checked, options)?;
+    serde_saphyr::from_str_with_options::<serde::de::IgnoredAny>(&checked, options.clone())
+        .map_err(crate::codec::classify)?;
+    options.reject_unsupported_tags = false;
+    Ok(Cow::Owned(typed))
 }

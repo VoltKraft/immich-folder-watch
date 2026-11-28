@@ -81,13 +81,51 @@ resaved 14 unchanged or edited outputs from seven profiles. The readback
 under `artifacts/rust/yaml-assessment/ordinary-scalars-20261128/signed-guarded/readback.json`
 has SHA-256 `9c024fa5cb67e907c619b59cb3b65240160edb03825e312be72f3f656dfb9091`.
 
-A separate comparison of 24 additional spellings leaves six known
+At `d9b9e72`, a separate comparison of 24 additional spellings found six
 differences. The shipping reader accepts `!!int 1:30` and `!!float 9.0`
 in an integer setting and accepts an explicitly tagged integer or Boolean
 in a string album name. It rejects the integer `0o25` and the explicitly
 tagged, padded Boolean `!!bool " yes "`. Each of these six already differed
 before the interval change. Windows and native ARM64 have separate
 qualification runs.
+
+## Explicit scalar tags on typed properties
+
+The signed 3.0.4 reader uses a YAML tag to construct a .NET value before
+assigning it to a configuration property. An interval written as
+`!!int 1:30` becomes 90 seconds. A timeout written as `!!float 9.0`
+becomes 9 seconds. A tagged float midway between two integers rounds to the
+even integer. Album names written as `!!int 90` and `!!bool true` become
+the strings `90` and `True`. The shipping reader rejects an ordinary integer
+setting of `0o25` and a Boolean setting of `!!bool ' yes '`.
+
+The pinned parser exposes a scalar's resolved tag and its original byte span.
+Rust now checks the complete document with the native parser's tag, structure
+and alias limits before passing the tagged property to the legacy conversion.
+Only the tag token changes in that internal view. The scalar contents and
+the input file retain their original spelling. A later alias reuses the
+value assigned to the original property. For example, an integer stored in
+an album name becomes a string, so replaying the album name `90` into a
+Boolean setting fails in both readers.
+[Typed field conversion](../../tools/rust-qa/yaml/src/model.rs) ·
+[Native scalar and tag events](../../tools/rust-qa/yaml/src/anchors.rs).
+
+On Fedora x64, the updated reader agreed with the signed 3.0.4 assemblies
+on all 24 additional spellings and the preceding 34 ordinary profiles. Two
+more comparisons covered 22 scalar conversions and nine cases including
+a block scalar, scientific notation, an anchored album name and an untagged
+control. The shipping assemblies also reopened, validated and resaved 18
+unchanged or edited Rust outputs from nine profiles. The receipt under
+`artifacts/rust/yaml-assessment/ordinary-scalars-20261128/signed-tagged-native-final/readback.json`
+has SHA-256 `abe9f3419a715709104a3722e6cf28d941a50541d15ddfd99a382842dd2960ff`.
+
+The frozen Fedora x64 run preserved 101 original files and passed 303 byte
+checks, 451 differential assertions and 256 C# readbacks. All 93 prior case
+records matched and their 118 emitted YAML files remained byte-identical.
+The run also passed formatting, Clippy and 14 Rust tests. Its receipt under
+`artifacts/rust/yaml-assessment/runs/explicit-scalar-types-fedorax64-01/result.json`
+has SHA-256 `cad9f8e90acceda9cf4505ad783045f93b0ee27ed5cde6af1633b105720ae015`.
+These results cover Fedora x64 with its recorded runtime and culture.
 
 ## Reading the original YAML file bytes
 
