@@ -350,3 +350,26 @@ the failed job then passed saved English, saved German, system German and
 system English on Fedora with the fixed watcher. The report in
 `hosted-048b0d7/watcher-fixed-original-x64/results.json` has SHA-256
 `e73798f29714c5994ce60d70b8d85b49a88c8006f2cd58aa06518000d0eb7427`.
+
+### Native repeat with the watcher object ready
+
+Both Ubuntu 24.04 jobs passed at `68a8123`. On each architecture the first
+registration succeeded for all 16 new watcher owners, each with its own PID.
+The ordinary GUI and inventory worker then completed four starts per host.
+Saved English, saved German, system English and system German each produced
+the expected four editor labels and three tray commands. All eight runs
+recorded the worker's successful exit and a drained queue. [Actions run 46142640444](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46142640444)
+
+| Target | Native compiler units | Installed Orca PCM, English / German | Original Actions ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| x86-64 | 310 | 391,140 / 324,454 bytes | `4d0e9149499f01c80eb70794245b4c754adc1d0c0ff04ddf5962d04eda4c225b` |
+| ARM64 | 309 | 377,112 / 364,454 bytes | `d333327a2a155c708affd6f8b3a0a7f71608293c7860b09f3aea877c5b3a5f7f` |
+
+An independent readback tied each ZIP to its Actions digest, target ELF,
+compiler stream and reviewed registry tree. Both installed editors opened
+with the accessibility bus disabled. With the bus available and no event
+subscribers, each editor registered its root through its own Flatpak proxy.
+The GTK control was visible on both hosts. Orca then spoke the filename,
+password, language and Quit controls in order in both saved languages.
+The screenshots matched the reference images, subsequent launches reopened
+the original window, and both private installations were empty after Quit.
