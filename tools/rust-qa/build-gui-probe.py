@@ -5,6 +5,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
+import shutil
 import subprocess
 import sys
 
@@ -21,7 +23,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
     parser.add_argument("--offline", action="store_true", help="use pre-fetched locked registry archives")
+    parser.add_argument("--local-x64-inputs", type=Path, metavar="DIRECTORY",
+                        help="compile the ordinary x64 GUI and its native test executables for the local VM")
     args = parser.parse_args()
+    if args.local_x64_inputs and (os.name != "nt" or args.target != "x86_64-pc-windows-msvc"):
+        parser.error("--local-x64-inputs requires the native Windows x64 compiler")
     output = ARTIFACTS / "gui-native" / args.target
     output.mkdir(parents=True, exist_ok=True)
     cargo_home = ARTIFACTS / "assessment-cache"
@@ -31,14 +37,16 @@ def main():
            "IFW_QA_FONT_DIR": str(ROOT / "rust/assets/fonts"), "IFW_QA_FALLBACK_DIR": str(source_profile.FONTS)}
     subprocess.run([sys.executable, str(QA / "check-toolchain.py"), args.target], check=True)
     subprocess.run([sys.executable, str(QA / "verify-gui-inputs.py")], check=True)
-    subprocess.run(["cargo", "fmt", "--manifest-path", str(MANIFEST), "--", "--check"], env=env, check=True)
+    if not args.local_x64_inputs:
+        subprocess.run(["cargo", "fmt", "--manifest-path", str(MANIFEST), "--", "--check"], env=env, check=True)
     if not args.offline:
         source_profile.fetch_replay_registry(env)
         subprocess.run(["cargo", "fetch", "--locked", "--manifest-path", str(MANIFEST)], env=env, check=True)
     lock_hash, graph_hash = source_profile.verify_native_graph(args.target, env, output / "graph.json")
     source_profile.validate()
-    subprocess.run(["cargo", "clippy", "--manifest-path", str(MANIFEST), "--frozen",
-                    "--all-targets", "--", "-D", "warnings"], env=env, check=True)
+    if not args.local_x64_inputs:
+        subprocess.run(["cargo", "clippy", "--manifest-path", str(MANIFEST), "--frozen",
+                        "--all-targets", "--", "-D", "warnings"], env=env, check=True)
     if os.name == "nt":
         subprocess.run(["cargo", "build", "--manifest-path", str(MANIFEST), "--release", "--frozen"],
                        env=env, check=True)
@@ -50,15 +58,25 @@ def main():
         subprocess.run(builder, env=env, check=True)
         binary = build / "release/native-gui-assessment"
         tests = [*builder, "--test"]
-    test_log = output / "gui-unit-tests.log"
-    with test_log.open("wb") as log:
-        outcome = subprocess.run(tests, env=env, stdout=log, stderr=subprocess.STDOUT)
-    if outcome.returncode:
-        print(test_log.read_text(encoding="utf-8", errors="replace")[-8000:], file=sys.stderr)
-        outcome.check_returncode()
+    if args.local_x64_inputs:
+        kit = args.local_x64_inputs.resolve()
+        kit.mkdir(parents=True, exist_ok=False)
+        test_inputs = kit / "tests"
+        pack = runpy.run_path(str(QA / "windows-local/workspace.py"))["build_harnesses"]
+        pack(test_inputs, "gui", ["cargo", "test", "--release", "--all-targets", "--frozen"], env,
+             graph=output / "graph.json")
+        test_evidence = {"testHarnessReceiptSha256": source_profile.sha(test_inputs / "build.json")}
+    else:
+        test_log = output / "gui-unit-tests.log"
+        with test_log.open("wb") as log:
+            outcome = subprocess.run(tests, env=env, stdout=log, stderr=subprocess.STDOUT)
+        if outcome.returncode:
+            print(test_log.read_text(encoding="utf-8", errors="replace")[-8000:], file=sys.stderr)
+            outcome.check_returncode()
+        test_evidence = {"unitTestLogSha256": source_profile.sha(test_log)}
     record = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "target": args.target, "graphSha256": graph_hash, "lockSha256": lock_hash,
-              "unitTestLogSha256": source_profile.sha(test_log),
+              **test_evidence,
               "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "sourceTrees": profile["trees"], "fallbackFonts": profile["fonts"],
               "textNotices": profile["noticeFiles"], "sourceProfileSha256": source_profile.sha(source_profile.REVIEW),
@@ -68,6 +86,11 @@ def main():
                                    ROOT / "rust/Cargo.toml",
                                    ROOT / "rust/crates/desktop-lifecycle/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]}}
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    if args.local_x64_inputs:
+        desktop = kit / "desktop"
+        desktop.mkdir()
+        for path in (binary, output / "graph.json", output / "build.json"):
+            shutil.copyfile(path, desktop / path.name)
     print(f"{args.target} built {record['binarySha256']}")
 
 

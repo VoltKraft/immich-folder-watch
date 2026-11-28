@@ -230,6 +230,8 @@ to reconcile project decisions, defaults, and recorded state.
   the same account. Verify the Actions digest before reusing a hosted build.
   Run every feasible Windows x64 rewrite test on the [local disposable
   VM](tools/rust-qa/windows-local/README.md). The x64 Actions job compiles inputs.
+  Use the [GUI compiler and guest harnesses](tools/rust-qa/windows-local/README.md#ordinary-gui-and-native-gui-test-executables)
+  for the ordinary x64 GUI.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
   Windows ARM64 VHD recovery. The desktop assessment owns Linux tmpfs recovery.
   The [system appearance](docs/rust/rw02-appearance.md) and

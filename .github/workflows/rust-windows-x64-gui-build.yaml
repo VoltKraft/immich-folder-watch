@@ -1,0 +1,66 @@
+name: Compile Windows x64 GUI VM inputs
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-x64-gui-build.yaml'
+      - '.gitattributes'
+      - 'rust/Cargo.toml'
+      - 'rust/crates/desktop-lifecycle/**'
+      - 'rust/assets/fonts/**'
+      - 'rust/audit/gui*'
+      - 'rust/audit/notices/**'
+      - 'rust/toolchain-inputs.json'
+      - 'tools/rust-qa/gui/**'
+      - 'tools/rust-qa/verify-gui-inputs.py'
+      - 'tools/rust-qa/build-gui-probe.py'
+      - 'tools/rust-qa/windows-local/workspace.py'
+      - 'tools/rust-qa/storage/evidence.py'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/enter-windows-build.ps1'
+      - 'tools/rust-qa/check-toolchain.py'
+      - 'tools/rust-qa/audit-graph.py'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # The GUI source reconstruction reads its pinned historical lockfile.
+
+      - name: Install the pinned compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Compile the ordinary GUI and native test harnesses
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/build-gui-probe.py $env:NATIVE_TARGET --local-x64-inputs artifacts/rust/local-vm-inputs/gui
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-gui-tests-windows-x64-${{ github.sha }}
+          path: artifacts/rust/local-vm-inputs/gui/tests/
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-gui-windows-x64-${{ github.sha }}
+          path: artifacts/rust/local-vm-inputs/gui/desktop/
+          if-no-files-found: error
+          retention-days: 14

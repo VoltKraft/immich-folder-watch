@@ -25,6 +25,27 @@ compiler messages, checks each digest and records each process exit and
 output. The network fixture uses private loopback endpoints. A compiler
 receipt and a guest result identify different events.
 
+## Ordinary GUI and native GUI test executables
+
+The [x64 GUI compiler](../../../.github/workflows/rust-windows-x64-gui-build.yaml)
+uses the reviewed GUI lockfile, reconstructed source trees and fonts. It
+builds the ordinary GUI and all Cargo test executables for the library,
+application and integration targets. Download both original ZIPs for the
+same revision and check their Actions digests. The
+`rust-gui-tests-windows-x64-` archive is the input to this guest command.
+
+```powershell
+python -B tools/rust-qa/windows-local/workspace.py run C:\QA\gui-tests.zip $digest C:\QA\results\gui --suite gui
+```
+
+The guest compares its checked-out revision and GUI lockfile with the
+compiler receipt, checks all executable digests and runs each harness
+sequentially. For an interactive assessment, the separate
+`rust-gui-windows-x64-` archive contains the ordinary executable,
+native dependency graph and build receipt. Its `testHarnessReceiptSha256`
+identifies the companion test kit. The retained-window and CPU-renderer
+comparisons use their own executables and measurements.
+
 ## Shipping .NET solution and installer checks
 
 In a fresh guest checkout, select the x64 SDK from `global.json`, Git for
