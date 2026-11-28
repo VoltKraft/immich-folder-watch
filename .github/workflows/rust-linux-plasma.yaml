@@ -34,6 +34,7 @@ on:
       - 'tools/rust-qa/install-toolchain.sh'
       - 'tools/rust-qa/check-toolchain.py'
       - 'tools/rust-qa/build-gui-probe.py'
+      - 'tools/rust-qa/combined-profile/sources.py'
       - 'tools/rust-qa/verify-gui-inputs.py'
       - 'tools/rust-qa/audit-graph.py'
       - 'tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt'
