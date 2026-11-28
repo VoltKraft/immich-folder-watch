@@ -1105,8 +1105,10 @@ name = "portal-dialog-assessment"
 version = "0.0.0"
 dependencies = [
  "async-io",
+ "blocking",
  "futures-lite",
  "raw-window-handle",
+ "rustix 1.1.6",
  "safe-fs",
  "wayland-backend",
  "wayland-client",

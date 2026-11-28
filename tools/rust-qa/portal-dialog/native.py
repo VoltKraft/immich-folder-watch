@@ -286,6 +286,7 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
                     raise RuntimeError(f'GTK returned an unexpected selection: {lines}')
             if action in selections and flatpak:
                 _, doc_id, reported_path = next(line for line in lines if line.startswith('DOCUMENT_GRANT ')).split(' ', 2)
+                _, source, label = next(line for line in lines if line.startswith('DOCUMENT_LABEL ')).split(' ', 2)
                 app_path = Path(os.environ['XDG_RUNTIME_DIR']) / 'doc' / doc_id / selections[action].name
                 if (reported_path != str(app_path) or uri != app_path.as_uri()
                         or 'DOCUMENT_ENTRY ' + markers[action] not in lines):
@@ -293,9 +294,19 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
                 host, rights = document_info(doc_id)
                 if host != str(selections[action]) or 'read' not in rights:
                     raise RuntimeError('Documents portal backing or grant recipient disagreed')
+                version, = bus.call_sync(service, documents_path, 'org.freedesktop.DBus.Properties', 'Get',
+                    GLib.Variant('(ss)', (service, 'version')), None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
+                if source in ('xattr', 'Documents.GetHostPaths'):
+                    if label != host:
+                        raise RuntimeError('Displayed host label differs from the selected backing directory')
+                elif source != 'grant' or label != reported_path or version >= 5:
+                    raise RuntimeError('Unexpected display fallback for the available Documents portal')
+                if action == 'select-escaped' and version >= 5 and 'DOCUMENT_PORTAL_LABEL ' + host not in lines:
+                    raise RuntimeError('The installed client did not resolve its exact document ID through GetHostPaths')
                 suffix = '-escaped' if action == 'select-escaped' else ''
                 grant = {'id': doc_id, 'uri': uri, 'application_view': reported_path,
-                         'backing': host, 'permissions': rights}
+                         'backing': host, 'permissions': rights, 'display': label,
+                         'display_source': source, 'documents_version': version}
                 grants[suffix] = grant
                 record('documents' + suffix, grant)
             result['steps'][action]['client'] = lines

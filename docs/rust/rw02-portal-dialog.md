@@ -103,6 +103,41 @@ The original ZIP had SHA-256
 `1f716448e1aa5133528cb49381c0e62e8b081a3dd0d4baa38b063c1c4ecff15a`.
 [Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46118180278/artifacts/15252637426).
 
+### Resolving the display name inside the installed Flatpak
+
+The installed chooser resolves its display text in the same order as the
+shipping [DocumentPortalClient](../../src/ImmichFolderWatch.App.Linux/Platform/DocumentPortalClient.cs).
+It first requests the `user.document-portal.host-path` attribute on the
+grant. When that yields no absolute host path, it requests `GetHostPaths`
+for that exact document ID and verifies the returned basename. A three-second
+deadline covers both operations. If the label is unavailable, it displays the
+grant path. The resolver returns text. Directory operations receive the original
+grant separately. [Rust resolver](../../tools/rust-qa/portal-dialog/src/display_path.rs) ·
+[Documents interface](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Documents.html).
+
+In two Fedora x64 installed runs, the attribute returned the exact synthetic
+backing path `/tmp/selection/Grüße #2 %2F`. An independent call by the same
+Flatpak to version 5 of the Documents interface returned the same text for
+that ID. The producer directory was outside the sandbox. Enumeration of the
+granted directory, revocation and the surviving control grant all passed.
+The `results.json` hashes were
+`331baca16be096652dbcd415cc2efed6cf43161b932059c3614f471617d14024`
+for `x11-flatpak-8r8044ee` and
+`eb022486657231ae2f87c828413ec9405a8f07e74726fa54142115fdb978a839`
+for `wayland-flatpak-fxzz3xmb`. Both used ELF SHA-256
+`aee073300e00c7cf47c02ada88754f47402c23196db6f80f38759ed0750e12e4`.
+
+The portal crate uses two existing audited inputs directly for the bounded
+attribute read. The offline build reproduced the preceding receipt's 211
+locked archives and the exact 116 active registry input records.
+`rustix` 1.1.6 with its existing `fs` feature and `blocking` 1.7.0 both
+offer MIT. Their original crate archives matched the Cargo.lock checksums
+and each contained the MIT license text with SHA-256
+`23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3`.
+[Portal lockfile](../../tools/rust-qa/portal-dialog/Cargo.lock) ·
+[rustix license](https://github.com/bytecodealliance/rustix/blob/4a563ad698b2c20ff848515821023d2265a788d0/LICENSE-MIT) ·
+[blocking license](https://github.com/smol-rs/blocking/blob/e29a5e6979f56c7537b04ab17ca7bdceee66ef5f/LICENSE-MIT).
+
 ## Notifications and autostart
 
 On Fedora x64 the private notification observer now publishes each complete

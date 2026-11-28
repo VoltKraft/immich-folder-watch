@@ -1,6 +1,7 @@
 //! A local native parent window and portal caller for a synthetic session.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod display_path;
 mod document_uri;
 mod parent;
 mod portal;
