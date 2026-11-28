@@ -1,4 +1,4 @@
-# Read-only Windows preflight for the installed 3.0.4 MSI
+# Installed 3.0.4 MSI preflight and Windows cutover trials
 
 The [cutover protocol](../../../../docs/rust-rewrite-plan.md#cutover-protocol)
 requires exclusive ownership across Windows sessions for the entire handover.
@@ -36,7 +36,7 @@ for writing or grants migration authority.
 
 ## Native trial and replay
 
-Use a disposable Server 2025 x64 overlay with 4 GiB RAM and an active RDP
+Use a disposable Server 2025 x64 overlay with 3584 MiB RAM and an active RDP
 session for its ordinary `ifw-test` user. Install the pinned release MSI into
 the overlay. Preserve the installer log and receipt in the existing test marker
 directory. Begin with an absent `%LOCALAPPDATA%\Immich Folder Watch` profile.
@@ -110,3 +110,100 @@ remaining QEMU process, open scratch handle or listener on the trial port.
 `shutdown.json` retains the memory readback and matches both backing images to
 their pretrial size, inode and modification time. The disposable overlays were
 then removed.
+
+## Private MSI transaction for the original x64 launch paths
+
+The [test-only successor](transaction/Cutover.wxs) uses the shipping UpgradeCode
+and matches exactly the original x64 3.0.4 ProductCode. It installs the archived
+Rust preflight in its own Program Files directory. The package checks the
+`IFW-QA25` computer name and an explicit test property on first install. The
+shipping MSI and its installed files are ordinary Windows Installer inputs.
+
+The [installer observer](transaction/admin.ps1) requires all WPF processes to
+have exited before each operation. It records the machine registration, installed
+executable digest and desktop shortcut target after each transaction. The
+[profile owner](transaction/standard.py) starts in a separate, ordinary RDP
+session and restores the synthetic YAML, SQLite database, WAL and SHM from the
+original [one-upload WPF handover](wpf-handover.md). It hashes those four files
+before and after each installation change, runs the archived Rust preflight
+and attempts an ordinary launch at the removed WPF path.
+
+The first upgrade injects a Type 19 MSI error after `InstallExecute` and before
+`InstallFinalize`. The repeat omits that property. Both upgrades place
+`RemoveExistingProducts` immediately after `InstallInitialize`; Windows
+Installer owns removal and rollback. To return to the old version after a
+successful upgrade, the administrator uninstalls the private successor and
+reinstalls the original 3.0.4 MSI from the read-only medium. The standard user
+then opens the installed WPF application and selects its ordinary tray Quit.
+[Windows Installer removal sequencing](https://learn.microsoft.com/en-us/windows/win32/msi/removeexistingproducts-action) ·
+[Executing the script within the transaction](https://learn.microsoft.com/en-us/windows/win32/msi/installexecute-action).
+
+### Reproducing the transaction
+
+Use one disposable 3584 MiB Server 2025 x64 VM with the original per-machine
+3.0.4 installation, the bound standard-user marker from the preflight above,
+and a fresh `ifw-test` RDP profile. Supply the original compiler archive above
+as `endpoint.zip`, the 3.0.4 x64 MSI as `shipping.msi`, the previous WPF
+handover guest archive as `handover.zip`, and the project's pinned
+`WixToolset.Sdk.6.0.2.nupkg` as `wix.nupkg`. Put the matching
+`Cutover.wxs` and `admin.ps1` beside them on the read-only DVD. Restore the
+matching LF checkout and native Python and PowerShell 7 for the RDP observer.
+On the local administrator console run the following command.
+
+```powershell
+& D:\admin.ps1 -Disc D:\
+```
+
+In the standard user's ordinary RDP session run the observer from that checkout.
+It takes input from the same read-only DVD.
+
+```powershell
+$qa = (Resolve-Path tools/rust-qa/instance/cross-session/transaction).Path
+$bootstrap = 'import runpy,sys;sys.argv=sys.argv[1:];runpy.run_path(sys.argv[0],run_name="__main__")'
+python -B -c $bootstrap "$qa\standard.py" D:\ "$env:LOCALAPPDATA\IFW-MsiSessions\trial-transaction-01"
+```
+
+Retain the raw install logs, preflight streams, compiled private MSI, phase
+receipts, original WPF Quit evidence and guest transfer record. The
+[independent reader](transaction/replay.py) takes the guest ZIP, original
+compiler ZIP, original WPF handover ZIP and delivered checkout ZIP in that
+order. It checks the retained rollback script's copy of the original executable
+and compares each phase with the original profile bytes and compiler evidence.
+
+### Server 2025 x64 result at 2ba4006
+
+On November 28, 2026, the local guest ran the observers from
+`2ba40065a08f096345c402eee45f3d0f5c9d4f6a`. The standard user was in
+RDP session 2 and the local administrator performed the MSI operations.
+
+| Observation | Native result |
+| --- | --- |
+| Baseline | Windows registered 3.0.4, the public desktop shortcut targeted the original WPF executable, and the standard-user preflight returned 20. |
+| Failed major upgrade | Windows Installer returned 1603 after executing the private failure action. The rollback script copied the original `ImmichFolderWatch.exe` from its own `C:\Config.Msi\*.rbf` file. The 3.0.4 registration, original executable hash, shortcut and native veto 20 were present again. |
+| Successful major upgrade | Windows Installer returned 0. The private successor replaced 3.0.4 in the machine registration. The public desktop shortcut disappeared. Starting the original WPF executable in RDP returned Win32 error 2. The installed Rust preflight returned 21 for the remaining upgrade-family registration. |
+| Ordinary return to 3.0.4 | Both successor removal and original MSI reinstallation returned 0. The registration, original executable and shortcut returned. The standard user's restored WPF process, PID 6344, owned editor HWND 131274 and tray receiver HWND 197074. The observer selected the highlighted Quit command 3 on popup HWND 262322. WPF exited 0. |
+
+At all four samples the profile owner read identical bytes for the original
+YAML, database, WAL and SHM. The input database held one shipping-worker
+upload row and passed SQLite `quick_check`. Its WAL was empty after the
+previous worker's orderly Quit.
+
+The guest ZIP has SHA-256
+`da7fd6fc5e48951cd685c92736c43229392c29a4fb766147aa6cb1f7c5a9a59e` and
+742,624 bytes. The private compiled MSI has SHA-256
+`91a5067d1e266862c865096f78806e5d6f9b6e7c7f181ad0ab5a08583e320600`.
+The original DVDs, guest archive, host readback and negative controls are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/cutover-transaction-03`.
+Changing the native preflight stream, the original executable's rollback
+destination, or a recorded database digest caused independent replay to fail.
+After ACPI shutdown the host found the port closed and no remaining QEMU
+process. It verified the original disk and firmware metadata and removed both
+temporary SSD overlays. QMP recorded 3,758,096,384 bytes of base RAM and zero
+hotplugged bytes.
+
+The trial establishes transactional replacement of the installed x64 launch
+paths while WPF is already drained. RI-AC05 still requires exclusion of a
+competing launch during the transaction, treatment of unregistered copies,
+and rollback after a production Rust writer has actually changed the profile.
+The private candidate continued to veto writes. Native ARM64 migration
+remains open.
