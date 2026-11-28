@@ -156,6 +156,8 @@ across an ordinary second launch. Its native result is
 `artifacts/rust/gui-run/x11-qih95zgk/results.json`, SHA-256
 `96e05d8844a8c9ef7e0fa9eb269241166182686fe9648fd6be1bc8365f9ccd63`.
 
+## Desktop status changes outside Flatpak
+
 The [desktop status observer](desktop_status.py) toggled `IsEnabled` on a
 separate, private session bus. The same mapped X11 window and GUI PID 23
 survived all four samples. Starting with status off yielded zero roots,
@@ -164,3 +166,38 @@ enabling it again registered `:1.4`. Quit removed the final root and exited
 zero. Run the observer with the candidate executable as its sole argument.
 The original result is `artifacts/rust/flatpak-accessibility/desktop-status-1k9hds8a/status.json`,
 SHA-256 `7ae11d5f9eea3a987e89d2d4ddbb2e8def517f136d8da717fb8ec633dfd624c3`.
+
+Use the ordinary release ELF as the sole argument to repeat the check
+with the normal compiler profile. Before startup the observer verifies
+the adjacent compiler receipt, its first-party inputs, the original Cargo
+unit stream, target graph and corrected registry inventory. On the
+private X11 desktop it matches the running ELF and window PID. It follows
+each previously observed AT-SPI root through disable and Quit by asking
+the registry for its current children.
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak-accessibility/desktop_status.py \
+  artifacts/rust/gui-build/release/native-gui-assessment
+```
+
+On Fedora x64 the normal executable had SHA-256
+`8701338776267200c277de2dc7a7f73969716509e0dcc6f9524770531524aeaa`.
+Both observers retained its compiler receipt
+`a47f684efaf5791e54ebda2e3c9b5b98a6d7de3bf2c8a5a1668444bd0acc90ad`.
+The same X11 window `4194306` and PID 27 remained present throughout the
+off/on/off/on sequence. The registry returned zero, one, zero and one
+root, respectively. The two active registrations were `:1.3` and `:1.4`.
+After Quit both registrations and the window were gone, and the original
+process exited zero. The result is
+`artifacts/rust/flatpak-accessibility/desktop-status-yp4yoxn8/status.json`,
+SHA-256 `956eda2f8f8750850beb315f9e16b97f6f667d233b32651ebdf60456c6846a20`.
+
+On a separate private Mutter Wayland desktop Orca 51.2 spoke the German
+filename and password field roles, the language switch and the English Quit
+button during keyboard traversal. Protected input produced bullet speech.
+Closing the editor with Alt+F4 and launching it normally again retained
+the original PID 437 and its backward Unicode selection. Shift+Left
+extended the selection from offset 2 to 1 with the other endpoint at 5,
+and the next character replaced it. The report and original audio are under
+`artifacts/rust/gui-run/wayland-tb_t4rf8/`. The report SHA-256 is
+`2921c4827e1dcb11ee09cb406a714fff45948643cf9ed3eb2a8034ddd801b838`.
