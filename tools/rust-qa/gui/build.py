@@ -1,6 +1,7 @@
 """Build the assessment offline and retain its exact native source and input binding."""
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -31,6 +32,17 @@ def source_digests(paths):
 
 
 def main(args):
+    build = args.output.resolve()
+    if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
+        raise ValueError("Use a build directory below artifacts/rust")
+    build.mkdir(exist_ok=True, parents=True)
+    with (build / ".gui-build.lock").open("ab") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        with tempfile.TemporaryDirectory(prefix="gui-inputs-", dir=build) as staging:
+            compile_gui(args, build, Path(staging))
+
+
+def compile_gui(args, build, staging):
     toolchain = args.toolchain.resolve(strict=True)
     registry = args.registry.resolve(strict=True)
     fonts = ROOT / "rust/assets/fonts"
@@ -40,10 +52,6 @@ def main(args):
     target = f"{platform.machine()}-unknown-linux-gnu"
     version = subprocess.check_output([sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"),
                                        target, "--rustc", str(toolchain / "bin/rustc")], text=True)
-    build = args.output.resolve()
-    if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
-        raise ValueError("Use a build directory below artifacts/rust")
-    build.mkdir(exist_ok=True, parents=True)
     registry_receipt = directory.parents[2] / "registry-sources.json"
     registry_digest = sha(registry_receipt)
     # Cargo identifies registry crates by their published version. Separate
@@ -55,7 +63,7 @@ def main(args):
         vendor.configure_cargo_home(Path(home), directory)
         audit_env = dict(os.environ, PATH=str(toolchain / "bin") + os.pathsep + os.environ["PATH"],
                          CARGO_HOME=home, CARGO_TARGET_DIR=str(build))
-        graph_file = Path(home) / "graph.json" if args.clippy or args.test else build / "gui-graph.json"
+        graph_file = staging / "gui-graph.json"
         _, graph_sha = source_profile.verify_native_graph(target, audit_env, graph_file, directory_source=directory)
         packages = json.loads(graph_file.read_bytes())["packages"]
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
@@ -104,7 +112,7 @@ def main(args):
                HERE.parent / "audit-graph.py", HERE.parent / "storage/evidence.py"]
     original_sources = source_digests(sources)
     original_drivers = source_digests(drivers)
-    log = build / "gui-compiler.jsonl"
+    log = staging / "gui-compiler.jsonl"
     with log.open("wb") as stream:
         subprocess.run([*command, *cargo, "build", *selection, "--release", "--frozen", "--jobs", str(args.jobs),
                         "--message-format=json-render-diagnostics"], stdout=stream, check=True)
@@ -118,7 +126,7 @@ def main(args):
               "font_notice": sha(fonts / "OFL-1.1.txt"),
               "sources": original_sources}
     record["graphSha256"] = graph_sha
-    saved_receipt = build / "gui-registry-sources.json"
+    saved_receipt = staging / "gui-registry-sources.json"
     shutil.copyfile(registry_receipt, saved_receipt)
     record["registryReceiptSha256"] = sha(saved_receipt)
     expected_receipt = vendor.GUI_LOCK_RECEIPTS[original_sources["tools/rust-qa/gui/Cargo.lock"]]
@@ -134,13 +142,14 @@ def main(args):
     record["sourceReconstructionSha256"] = sha(Path(source_profile.__file__))
     release = build / "release"
     release.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=release) as staging:
-        staged = Path(staging) / binary.name
-        shutil.copy2(binary, staged)
-        inputs = staged.with_suffix(".inputs.json")
-        inputs.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-        staged.replace(release / binary.name)
-        inputs.replace(release / inputs.name)
+    staged = staging / binary.name
+    shutil.copy2(binary, staged)
+    inputs = staged.with_suffix(".inputs.json")
+    inputs.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    for evidence in (graph_file, log, saved_receipt):
+        evidence.replace(build / evidence.name)
+    staged.replace(release / staged.name)
+    inputs.replace(release / inputs.name)
     print(f"{target} {record['binary_sha256']} {release / binary.name}")
 
 

@@ -209,6 +209,9 @@ bytes before mounting the directory at `/vendor`. Clippy, release builds
 and native tests use this read-only mount in an offline namespace.
 Each compiler inventory has a separate Cargo target directory so replaying
 the stock control cannot supply cached crate objects to the corrected GUI.
+Invocations sharing an output directory take one build lock. The compiler
+writes its stream and graph in a fresh staging directory. A failed build
+therefore leaves the previous release receipt and compiler stream together.
 The separately reconstructed text crates and installed fonts keep their
 existing inputs. [Directory reconstruction](../../tools/rust-qa/gui/startup/vendor.py).
 
