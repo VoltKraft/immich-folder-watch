@@ -3,6 +3,7 @@
 Run python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py --same-id or --different-id.
 Use --gui-build artifacts/rust/GUI_BUILD to exercise the actual candidate against the installed old GUI.
 Add --inventory-subject artifacts/rust/performance/subjects/SUBJECT to run its reviewed worker on synthetic read-only inputs.
+Add --tray-worker-restart to restart and quit that installed worker through the original GUI's tray menu.
 Append --shipping-upload to exercise the original signed worker's upload while a worker-enabled Rust launch is refused.
 After --shipping-upload, supply --rust-backup artifacts/rust/storage-native/BUILD to return a live Rust backup to the installed worker.
 Use the published 3.0.4 bundle, detached signature and native Platform and GL deployments from ../launch/run.py.
@@ -131,7 +132,8 @@ def inventory_inputs(subject, root, revision, gui_hash, release, out, expected_w
                         launcher=hashlib.sha256(WORKER_LAUNCH.encode()).hexdigest())
 
 
-def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False, backup_build=None, hosted_runtime=None):
+def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False, backup_build=None, hosted_runtime=None,
+          tray_worker_restart=False):
     root = HERE.parents[3]
     art = root / 'artifacts/rust'
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
@@ -248,7 +250,8 @@ def outer(same_id, gui_build=None, inventory_subject=None, shipping_upload=False
             require(backup_files['buildRevision'] == revision, 'Hosted backup helper must come from this source revision')
         native_elf_machine(backup, arch)
     save(out / 'inputs.json', dict(base=pins, guiHash=gui_hash, guiEvidence=gui_files, inventory=worker_files, installedBackup=backup_files, namespaces=namespaces(), probeAppId=APP if same_id else PROBE,
-                                   sameId=same_id, shippingUpload=shipping_upload, revision=revision, rustc=sha(compiler), target=target,
+                                   sameId=same_id, shippingUpload=shipping_upload, trayWorkerRestart=tray_worker_restart,
+                                   revision=revision, rustc=sha(compiler), target=target,
                                    probe=EXPECTED_PROBE if gui_build is None else None,
                                    sources=snapshot, archive=sha(out / 'observer-source.zip')))
     command = namespace(out, frozen / HERE.relative_to(root), None)
@@ -373,7 +376,8 @@ def inside():
             stack.callback(setup_command, ['flatpak', '--user', 'uninstall', '--noninteractive', installed['installed_ref']])
             if i['guiHash']:
                 from gui_refusal import run as observe_refusal
-                observe_refusal(stack, bus, display, pins, r, out, i['guiHash'], i['inventory'])
+                observe_refusal(stack, bus, display, pins, r, out, i['guiHash'], i['inventory'],
+                                tray_worker_restart=i['trayWorkerRestart'])
                 if i['shippingUpload']:
                     from shipping_upload import observe as observe_upload
                     observe_upload(stack, bus, display, pins, r, out, i['installedBackup'])
@@ -461,6 +465,7 @@ if __name__ == '__main__':
         mode.add_argument('--different-id', action='store_true')
         mode.add_argument('--gui-build', type=Path)
         parser.add_argument('--inventory-subject', type=Path)
+        parser.add_argument('--tray-worker-restart', action='store_true')
         parser.add_argument('--shipping-upload', action='store_true')
         parser.add_argument('--rust-backup', type=Path)
         parser.add_argument('--hosted-runtime', type=Path)
@@ -469,7 +474,9 @@ if __name__ == '__main__':
             parser.error('The inventory subject and hosted runtime options require --gui-build')
         if args.shipping_upload and not args.inventory_subject:
             parser.error('--shipping-upload requires --inventory-subject')
+        if args.tray_worker_restart and not args.inventory_subject:
+            parser.error('--tray-worker-restart requires --inventory-subject')
         if args.rust_backup and not args.shipping_upload:
             parser.error('--rust-backup requires --shipping-upload')
         outer(not args.different_id, args.gui_build, args.inventory_subject, args.shipping_upload,
-              args.rust_backup, args.hosted_runtime)
+              args.rust_backup, args.hosted_runtime, args.tray_worker_restart)

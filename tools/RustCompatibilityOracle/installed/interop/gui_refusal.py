@@ -64,14 +64,29 @@ class Inventory:
             configSha256=sha(self.config / 'immich-folder-watch/config.yaml'), observations=[])
 
     def attach(self, stack, primary):
-        from assess import pidfd
         self.primary = primary
+        binding = self.bind_worker(stack)
+        self.report.update(worker=self.worker, primary=identity(primary), **binding)
+        wait_for(lambda: len(self.sweeps()) >= 2, 12, 'Missing the two initial inventory sweeps')
+        require(self.sweeps()[:2] == [(0, 0, 0), (0, 0, 1)], 'The synthetic album did not start empty')
+        self.check('initial')
+
+    def bind_worker(self, stack):
+        from assess import pidfd
         self.worker, = wait_for(workers, 8, 'The installed GUI did not start its worker')
         pid = self.worker['pid']
         proc = Path('/proc') / str(pid)
-        require(self.worker['parent'] == primary and sha(proc / 'exe') == self.inputs['binary'],
-                'Expected the actual reviewed direct inventory child of the installed GUI')
         self.lifetime = pidfd(stack, pid)
+        binary = sha(proc / 'exe')
+        require(self.worker['parent'] == self.primary and binary == self.inputs['binary'],
+                'Expected the actual reviewed direct inventory child of the installed GUI')
+        namespace_pids = [int(n) for n in re.search(r'^NSpid:\s*(.+)$', (proc / 'status').read_text(), re.M)[1].split()]
+        pid_namespace = os.readlink(proc / 'ns/pid')
+        mount_namespace = os.readlink(proc / 'ns/mnt')
+        require(len(namespace_pids) == 2 and namespace_pids[0] == pid and namespace_pids[1] > 1
+                and pid_namespace == os.readlink(f'/proc/{self.primary}/ns/pid') != os.readlink('/proc/self/ns/pid')
+                and mount_namespace == os.readlink(f'/proc/{self.primary}/ns/mnt') != os.readlink('/proc/self/ns/mnt'),
+                'The installed inventory worker did not share the primary Flatpak process and mount namespaces')
         root = proc / 'root'
         env = dict(item.split(b'=', 1) for item in (proc / 'environ').read_bytes().split(b'\0') if b'=' in item)
         required = {'IFW_QA_ISOLATED': '1', 'IFW_QA_BENCHMARK': '1', 'XDG_CONFIG_HOME': str(self.config),
@@ -89,11 +104,11 @@ class Inventory:
         with socket.socket() as local:
             code = local.connect_ex(('127.0.0.1', 9))
         require(code == errno.ECONNREFUSED, 'Expected ECONNREFUSED at the private loopback endpoint')
-        self.report.update(worker=self.worker, primary=identity(primary), mounts=mounts, environment=required, busTarget=link,
-                           privateNetwork=os.readlink(proc / 'ns/net'), offlineLoopbackErrno=code)
-        wait_for(lambda: len(self.sweeps()) >= 2, 12, 'Missing the two initial inventory sweeps')
-        require(self.sweeps()[:2] == [(0, 0, 0), (0, 0, 1)], 'The synthetic album did not start empty')
-        self.check('initial')
+        require(not self.lifetime.poll(0) and identity(pid) == self.worker, 'The inventory child changed during identity checks')
+        return dict(mounts=mounts, inputsByInode={str(p): [p.stat().st_dev, p.stat().st_ino] for p in (self.media, self.config)},
+                    environment=required, busTarget=link, binarySha256=binary, namespacePids=namespace_pids,
+                    pidNamespace=pid_namespace, mountNamespace=mount_namespace, privateNetwork=os.readlink(proc / 'ns/net'),
+                    offlineLoopbackErrno=code)
 
     def sweeps(self):
         return [tuple(map(int, m)) for m in re.findall(r'^INVENTORY_COMPLETE files=(\d+) changed=(\d+) pass=(\d+)$',
@@ -134,9 +149,41 @@ class Inventory:
     def drained(self):
         self.report['workerExited'] = bool(self.lifetime.poll(1000))
         self.report['sweeps'] = self.sweeps()
-        require(self.report['workerExited'] and not workers() and self.log.read_text().splitlines().count('INVENTORY_STARTED') == 1
+        restarts = int('replacement' in self.report)
+        require(self.report['workerExited'] and not workers() and self.log.read_text().splitlines().count('INVENTORY_STARTED') == 1 + restarts
                 and sha(self.config / 'immich-folder-watch/config.yaml') == self.report['configSha256'],
-                'Expected one drained worker and its unchanged synthetic configuration')
+                'The expected worker lifetimes, final drain or unchanged synthetic configuration were not observed')
+
+    def restarted(self, stack, old_exited):
+        require(old_exited.poll(8000), 'The original inventory pidfd did not report an exit after Restart')
+        original = self.report
+        old_pid = self.worker['pid']
+        binding = self.bind_worker(stack)
+        replacement = original['replacement'] = dict(worker=self.worker, **binding)
+        require(self.worker['pid'] != old_pid and all(binding[k] == original[k] for k in
+                ('binarySha256', 'mounts', 'inputsByInode', 'environment', 'busTarget', 'pidNamespace', 'mountNamespace', 'privateNetwork')),
+                'The replacement worker used a different executable, workload, instance or namespace')
+        old, new = original['namespacePids'][-1], binding['namespacePids'][-1]
+        require(new != old, 'Restart reused the original worker namespace PID')
+        def sweeps_after_restart():
+            lines = self.log.read_text().splitlines()
+            return restarted_sweeps(lines, old, new)
+        observed = wait_for(sweeps_after_restart, 12, 'The replacement did not complete two inventories after the original exit')
+        require(observed == [(2, 2, 0), (2, 0, 1)], 'The new worker did not independently inventory the same two files')
+        replacement.update(originalPidfdExited=True, initialSweeps=observed)
+        self.check('replacement-inventoried')
+
+
+def restarted_sweeps(lines, old, new):
+    exit_line = f'WORKER_EXIT pid={old} reason=restart success=true'
+    if lines.count(exit_line) != 1:
+        return None
+    after = lines[lines.index(exit_line) + 1:]
+    if f'WORKER_RESTARTED old={old} new={new}' not in after or old == new:
+        return None
+    sweeps = [tuple(map(int, m.groups())) for line in after if
+              (m := re.fullmatch(r'INVENTORY_COMPLETE files=(\d+) changed=(\d+) pass=(\d+)', line))]
+    return sweeps[:2] if len(sweeps) >= 2 else None
 
 
 def owner(bus, name):
@@ -254,16 +301,56 @@ def quit_delivery(reply, serial, receiver, sender):
     return 'recipient-disconnected'
 
 
-def shipping_proxy(bus, receiver, proc):
+def candidate_command(bus, primary, lifetime, out, receiver, ident):
+    require(ident in (2, 3) and Gio.dbus_is_unique_name(receiver) and not lifetime.poll(0), 'Expected the live installed primary')
+    def call(destination, path, interface, method, body, result):
+        return bus.call_sync(destination, path, interface, method, body, GLib.VariantType.new(result),
+                             Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
+    def check_owner():
+        require(call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetNameOwner',
+                     GLib.Variant('(s)', (NAME,)), '(s)') == (receiver,) and not lifetime.poll(0),
+                'The elected Rust primary or its bus owner changed before menu delivery')
+    check_owner()
+    proxy = installed_proxy(bus, receiver, Path('/proc') / str(primary))
+    require(f'REGISTERED {NAME} {receiver}' in (out / 'watcher.log').read_text().splitlines(),
+            'The original watcher did not register this installed Rust notifier')
+    path, = call(receiver, '/StatusNotifierItem', 'org.freedesktop.DBus.Properties', 'Get',
+                 GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')), '(v)')
+    require(path == MENU_PATH, 'The installed Rust notifier advertised a different menu')
+    revision, (root, properties, rows) = call(receiver, path, MENU_INTERFACE, 'GetLayout',
+        GLib.Variant('(iias)', (0, 1, [])), '(u(ia{sv}av))')
+    labels = [p.get('label') for _, p, _ in rows]
+    require(revision > 0 and root == 0 and properties.get('children-display') == 'submenu'
+            and labels in (['Open GUI', 'Restart', 'Quit'], ['GUI öffnen', 'Neustart', 'Beenden'])
+            and all((item, p, children) == (i, {'label': labels[i-1], 'enabled': True, 'visible': True}, [])
+                    for i, (item, p, children) in enumerate(rows, 1)), 'The original application exposed an unexpected menu')
+    check_owner()
+    message = Gio.DBusMessage.new_method_call(receiver, path, MENU_INTERFACE, 'Event')
+    message.set_flags(Gio.DBusMessageFlags.NO_AUTO_START)
+    message.set_body(GLib.Variant('(isvu)', (ident, 'clicked', GLib.Variant('s', ''), 0)))
+    reply, serial = bus.send_message_with_reply_sync(message, Gio.DBusSendMessageFlags.NONE, 3000, None)
+    delivery = quit_delivery(reply, serial, receiver, bus.get_unique_name())
+    require(ident == 3 or delivery == 'menu-reply', 'The installed Restart must return through the original proxy')
+    frames = {}
+    for suffix, frame in (('request', message), ('reply', reply)):
+        packet = out / f'candidate-menu-{ident}-{suffix}.dbus'
+        packet.write_bytes(bytes(frame.to_blob(Gio.DBusCapabilityFlags.NONE)))
+        frames[packet.name] = sha(packet)
+    return dict(id=ident, label=labels[ident-1], receiver=receiver, gui=primary, **proxy, menuPath=path,
+                layoutRevision=revision, labels=labels, serial=serial, delivered=delivery, frames=frames, sender=bus.get_unique_name(),
+                response=dict(sender=reply.get_sender(), destination=reply.get_destination(), replySerial=reply.get_reply_serial()))
+
+
+def installed_proxy(bus, receiver, proc):
     addresses = [value.removeprefix(b'DBUS_SESSION_BUS_ADDRESS=unix:path=').decode()
                  for value in (proc / 'environ').read_bytes().split(b'\0')
                  if value.startswith(b'DBUS_SESSION_BUS_ADDRESS=unix:path=')]
-    require(len(addresses) == 1, 'The original signed GUI must use a single private session bus socket')
+    require(len(addresses) == 1, 'The original installed GUI must use a single private session bus socket')
     address, = addresses
     root = proc / 'root'
     if address == '/tmp/session-bus':
         address = os.readlink(root / 'tmp/session-bus')
-    require(address in ('/run/flatpak/bus', '/run/user/0/bus'), 'Unexpected signed Flatpak bus proxy socket')
+    require(address in ('/run/flatpak/bus', '/run/user/0/bus'), 'Unexpected installed Flatpak bus proxy socket')
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
         peer.settimeout(3)
         peer.connect(str(root / address.lstrip('/')))
@@ -273,7 +360,7 @@ def shipping_proxy(bus, receiver, proc):
                                   Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
     proxy = identity(proxy_pid)
     require(reported_pid == proxy_pid and proxy['executable'] == '/usr/bin/xdg-dbus-proxy',
-            'The menu connection does not belong to the original signed GUI session bus proxy')
+            'The menu connection does not belong to the original installed GUI session bus proxy')
     return dict(proxy=proxy, proxySocket=address, busReportedPid=reported_pid)
 
 
@@ -285,7 +372,7 @@ def shipping_menu(bus, process, lifetime, app, out):
     require(Gio.dbus_is_unique_name(receiver) and identity(process.pid) == app['wrapper']
             and identity(app['gui']['pid']) == app['gui'] and not lifetime.poll(0),
             'The original signed application is required before the Quit click')
-    proxy = shipping_proxy(bus, receiver, Path('/proc') / str(app['gui']['pid']))
+    proxy = installed_proxy(bus, receiver, Path('/proc') / str(app['gui']['pid']))
     wait_for(lambda: f'REGISTERED {tray} {receiver}' in (out / 'watcher.log').read_text().splitlines(),
              5, 'The private watcher did not observe the original menu connection')
     label, = bus.call_sync(receiver, MENU_PATH, MENU_INTERFACE, 'GetProperty', GLib.Variant('(is)', (3, 'label')),
@@ -319,7 +406,7 @@ def quit_shipping(bus, process, lifetime, app, out, worker_log=None):
     return dict(**menu, serial=serial, delivery=delivery, response=response, exit=0, workerShutdownObserved=worker_log is not None)
 
 
-def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
+def run(stack, bus, display, pins, report, out, gui_hash, worker=None, *, tray_worker_restart=False):
     from assess import pidfd
     watcher = out / 'watcher.log'
     watcher_process = checked_start(stack, ['/usr/bin/python3', '-B', '/watcher.py'], watcher)
@@ -382,12 +469,36 @@ def run(stack, bus, display, pins, report, out, gui_hash, worker=None):
     runtime_handle = os.open(f'/proc/{native}/root/run/user/0', os.O_DIRECTORY | os.O_RDONLY | os.O_CLOEXEC)
     stack.callback(os.close, runtime_handle)
     observe_later_launches(stack, bus, display, pins, report, out, command, candidate, new_window, lifetime, inventory)
-    bus.call_sync(NAME, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
-                  GLib.Variant('(sava{sv})', ('quit', [], {})), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
+    if tray_worker_restart:
+        require(inventory and report['laterLaunches']['exclusive'], 'The tray comparison requires both ordinary launches')
+        receiver = report['laterLaunches']['candidateOwner']
+        old_lifetime = inventory.lifetime
+        old = inventory.report['namespacePids'][-1]
+        exit_line = f'WORKER_EXIT pid={old} reason=restart success=true'
+        require(exit_line not in log.read_text().splitlines(), 'The original worker had already restarted')
+        menus = report['candidateTray'] = {}
+        menus['restart'] = candidate_command(bus, native, lifetime, out, receiver, 2)
+        inventory.restarted(stack, old_lifetime)
+        require(display.visible() == new_xid and window(display, new_xid) == new_window,
+                'Restart changed the original reopened Rust editor')
+        menus['quit'] = candidate_command(bus, native, lifetime, out, receiver, 3)
+        require(menus['quit']['proxy'] == menus['restart']['proxy'] and menus['restart']['serial'] < menus['quit']['serial'],
+                'The commands were not delivered in order to the original Flatpak proxy')
+    else:
+        bus.call_sync(NAME, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
+                      GLib.Variant('(sava{sv})', ('quit', [], {})), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
     report['candidateExit'] = candidate.wait(timeout=14)
     require(report['candidateExit'] == 0 and lifetime.poll(1000) and 'DRAINED ' in log.read_text(), 'Candidate did not drain and quit')
     if inventory:
         inventory.drained()
+        if tray_worker_restart:
+            replacement = inventory.report['replacement']
+            new = replacement['namespacePids'][-1]
+            lifecycle = [line for line in log.read_text().splitlines() if line.startswith(('INVENTORY_WORKER ', 'WORKER_EXIT ', 'WORKER_RESTARTED '))]
+            require(lifecycle == [f'INVENTORY_WORKER pid={old}', exit_line, f'INVENTORY_WORKER pid={new}',
+                                  f'WORKER_RESTARTED old={old} new={new}', f'WORKER_EXIT pid={new} reason=quit success=true'],
+                    'The original supervisor did not confirm both actual worker exits in sequence')
+            report['candidateTray']['workerLifecycle'] = lifecycle
     counts = re.findall(r'^LEGACY_SOCKET_ACCEPTED ([0-9]+)$', log.read_text(), re.MULTILINE)
     report['acceptedConnectionsDuringRun'] = int(counts[0]) if len(counts) == 1 else None
     try:

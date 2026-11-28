@@ -114,9 +114,23 @@ class ShippingQuitTests(unittest.TestCase):
                 with self.subTest(pid=reported, executable=executable), patch.object(
                         self.observer, 'identity', return_value={'executable': executable}) as observed:
                     with self.assertRaisesRegex(RuntimeError, 'session bus proxy'):
-                        self.observer.shipping_proxy(bus, ':1.4', proc)
+                        self.observer.installed_proxy(bus, ':1.4', proc)
                     observed.assert_called_once_with(os.getpid())
                     self.assertEqual(bus.call_sync.call_args.args[4].unpack(), (':1.4',))
+
+    def test_restart_only_accepts_the_two_new_passes_after_the_observed_old_worker_exit(self):
+        read = self.observer.restarted_sweeps
+        first = 'INVENTORY_COMPLETE files=2 changed=2 pass=0'
+        next_pass = 'INVENTORY_COMPLETE files=2 changed=0 pass=1'
+        exited = 'WORKER_EXIT pid=12 reason=restart success=true'
+        changed = 'WORKER_RESTARTED old=12 new=63'
+        self.assertEqual(read([first, next_pass, exited, changed, first, next_pass], 12, 63), [(2, 2, 0), (2, 0, 1)])
+        for lines, new in [([first, next_pass, exited, changed], 63), ([exited, changed, next_pass], 63),
+                           ([exited, changed, first, next_pass], 12), ([exited, changed, first, next_pass], 42),
+                           ([exited, exited, changed, first, next_pass], 63),
+                           ([exited.replace('true', 'false'), changed, first, next_pass], 63)]:
+            with self.subTest(lines=lines, new=new):
+                self.assertIsNone(read(lines, 12, new))
 
     def test_routed_click_still_requires_clean_original_exit_and_fresh_worker_shutdown(self):
         bus, process, lifetime = Mock(), Mock(), Mock()
