@@ -1,0 +1,51 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -34,0 +35,6 @@
++
++constify = { path = "/review/constify-0.0.1" }
++strength_reduce = { path = "/review/strength_reduce-0.2.4" }
++
++[dev-dependencies]
++cpu_painter = { package = "hdrshot-egui-backend", version = "=0.2.0", path = "/review/hdrshot-egui-backend-0.2.0" }
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -645,0 +646,9 @@
++]
++
++[[package]]
++name = "constify"
++version = "0.0.1"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn 2.0.119",
+@@ -1410,0 +1420,10 @@
++name = "hdrshot-egui-backend"
++version = "0.2.0"
++dependencies = [
++ "ahash",
++ "constify",
++ "egui",
++ "strength_reduce",
++]
++
++[[package]]
+@@ -1744,0 +1764 @@
++ "hdrshot-egui-backend",
+@@ -2854,0 +2875,4 @@
++
++[[package]]
++name = "strength_reduce"
++version = "0.2.4"
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -229 +229 @@
+-        model.borrow_mut().graphics.attach(creation);
++        if creation.wgpu_render_state.is_some() { model.borrow_mut().graphics.attach(creation); }
+@@ -752,0 +753,6 @@
++
++#[cfg(all(test, target_os = "linux"))]
++mod cpu_view_observation;
++
++#[cfg(all(test, target_os = "linux"))]
++mod view_gpu_reference;

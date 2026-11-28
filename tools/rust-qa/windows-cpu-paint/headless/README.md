@@ -92,3 +92,42 @@ Adding the frame-ready observer produced
 `fc734c1b518acb0e404e792dd3fd3192ab7566aeffb2d023ef4883e29d174ca9`.
 Reversing the canonical Quit-button change in each reconstructed source
 reproduced its earlier editor-selection hash.
+
+## Editor with the staged Linux startup language
+
+The optional replay reconstructs the editor at `c63d91c` using the
+[startup qualification](../../gui/startup/README.md). It authenticates the
+385 original registry archives and compiler trees, regenerates the combined
+GUI/YAML lock and checks all four platform feature graphs before applying
+the [headless test patch](../../gui/startup/headless-view.patch). The
+instrumented manifest, lock and 28-file Rust source tree are checked against
+the first measured headless build. Cargo then runs the original six-frame
+test with one job in the isolated Linux x64 environment.
+
+With the local reviewed archives and combined receipt already present, run
+from the repository root.
+
+```sh
+area=artifacts/rust/combined-profile
+python3 -B tools/rust-qa/windows-cpu-paint/headless/run.py \
+  artifacts/rust/cpu-paint-cache \
+  --build-cache artifacts/rust/egui-cpu-assessment/headless-build \
+  --startup-vendor "$area/startup-vendor/registry/src/reviewed" \
+  --combined-receipt "$area/runs/digest-native-2f63c15"
+```
+
+The two startup arguments select the staged editor. The ordinary invocation
+above continues to reconstruct the original renderer control. In the local
+Fedora replay, both preparations matched all 30 respective original files,
+including the manifest and lock. The staged headless lock had SHA-256
+`b5a1e53f83d3f17811fc88bd0bdfed3b304b3ae8be2c95d337d4662ef771b8ca`.
+
+All 18 newly rendered BGRA files matched both the earlier staged run and
+the original window-Quit editor byte-for-byte. Of 4,992,000 CPU-to-Vulkan
+pixel comparisons, 4,985,368 matched exactly. The largest channel
+difference was two. The source-bound Fedora report is
+`artifacts/rust/egui-cpu-assessment/headless-ycr1rvcu/pixel-comparison.json`,
+SHA-256 `5de2a39b5f3185b11ad0929e3bd3071bf2e7fa7ba353baef08a2d1c9567cea99`.
+This offscreen comparison exercises the model's German and English views.
+The separate [native editor and tray trial](../../gui/startup/README.md#fedora-desktop-readback)
+covers reading the saved language and applying the system fallback at startup.
