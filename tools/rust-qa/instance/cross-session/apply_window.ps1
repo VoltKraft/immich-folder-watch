@@ -53,7 +53,8 @@ function FindControl($type,$labels) {
         if ($matches.Count -eq 1) {return $matches[0]}
         Start-Sleep -Milliseconds 120
     } while ([DateTime]::UtcNow -lt $until)
-    throw "Missing WPF control $labels"
+    $visible = @(Elements $type | Where-Object { $_.Current.ProcessId -eq $ProcessId } | ForEach-Object { "$($_.Current.AutomationId) $($_.Current.Name) offscreen=$($_.Current.IsOffscreen)" })
+    throw "Missing WPF control $labels. Controls of this type: $($visible -join ', ')"
 }
 function SelectPage($key) {
     $item = FindControl ([Windows.Automation.ControlType]::ListItem) $strings[$key]
@@ -70,6 +71,13 @@ try {
         SetField 'UI_ServerApiUrl' $draft.url
         SetField 'UI_ApiKey' $draft.key
         SelectPage 'UI_Folders'
+        $list = FindControl ([Windows.Automation.ControlType]::List) $strings['UI_WatchSources']
+        $entryType = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::ListItem)
+        $entries = @($list.FindAll([Windows.Automation.TreeScope]::Children,$entryType))
+        if ($entries.Count -ne 1 -or $entries[0].Current.ProcessId -ne $ProcessId) { throw 'Expected the single default watch source' }
+        $entries[0].GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        $tab = FindControl ([Windows.Automation.ControlType]::TabItem) $strings['UI_General']
+        $tab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
         SetField 'UI_FolderPath' $draft.media
     }
     $button = FindControl ([Windows.Automation.ControlType]::Button) $strings['App_SaveAndApply']
