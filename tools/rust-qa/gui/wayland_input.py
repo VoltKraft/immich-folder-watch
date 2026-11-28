@@ -14,7 +14,7 @@ from gi.repository import Gio, GLib
 
 from desktop_input import Atspi, read_tree, shortcut, start_accessibility, tap
 from native import action
-from session import check_alive, checked_start, wait_for
+from session import check_alive, checked_start, german_editor_env, wait_for
 from wayland import protocol
 
 
@@ -447,7 +447,9 @@ def exercise(stack, observer, *, ime, monitors, ibus_engine):
             failures["monitor_configuration"] = str(error)
     start_accessibility(stack)
     log = WORK / "gnome-input-application.log"
-    app = checked_start(stack, ["env", "WAYLAND_DEBUG=client", "/app/native-gui-assessment"], log)
+    env = german_editor_env() if ime else os.environ.copy()
+    env["WAYLAND_DEBUG"] = "client"
+    app = checked_start(stack, ["/app/native-gui-assessment"], log, env=env)
     wait_for(lambda: check_alive(app, log) or observer.poll(), 12, "The assessment app did not map")
     observer.focus_for_input()
     if connectors:

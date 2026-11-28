@@ -12,7 +12,16 @@ gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi, Gio, GLib
 
 from native import action, call, second_launch
-from session import checked_start, check_alive, wait_for
+from session import checked_start, check_alive, german_editor_env, wait_for
+
+
+def process_locale(pid):
+    locale = {}
+    for entry in Path(f"/proc/{pid}/environ").read_bytes().split(b"\0"):
+        key, _, value = entry.partition(b"=")
+        if key in (b"LC_ALL", b"LC_MESSAGES", b"LANG"):
+            locale[key.decode()] = os.fsdecode(value)
+    return locale
 
 
 def nodes(target_pid):
@@ -188,7 +197,12 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     if ime:
         ibus_start(stack)
     log = Path("/qa/input-app.log")
-    app = checked_start(stack, ["/app/native-gui-assessment"], log)
+    app = checked_start(stack, ["/app/native-gui-assessment"], log, env=german_editor_env())
+    locales = {"observer": process_locale(os.getpid()), "editor": process_locale(app.pid)}
+    if reader:
+        locales["reader"] = process_locale(reader.orca.pid)
+        if locales["reader"] != locales["observer"]:
+            raise RuntimeError("The private reader did not retain the desktop's message locale")
     tree = partial(read_x11_tree if backend == "x11" else read_tree, app.pid)
     wait_for(lambda: check_alive(app, log) or observer.poll(), 10, "Input probe did not map")
     observer.focus_for_input()
@@ -241,7 +255,7 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     tap(observer, 0x20)
     wait_for(lambda: any(n["name"] == "Filename" for n in tree()), 3, "Keyboard language switch failed")
     english = tree()
-    details = {"backend": backend, "initial": initial, "tab_order": traversal, "password_accessible_text": masked,
+    details = {"backend": backend, "locales": locales, "initial": initial, "tab_order": traversal, "password_accessible_text": masked,
                "after_keyboard_language_switch": english}
     tap(observer, 0xff09)
     if any(n["name"] == "Quit" and n["role"] in ("push button", "button") for n in english):

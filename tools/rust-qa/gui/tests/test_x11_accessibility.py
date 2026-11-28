@@ -1,5 +1,6 @@
 """Regression checks for native X11 accessibility snapshots and transient AT-SPI errors."""
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -28,6 +29,13 @@ def node(role, name, pid, children=()):
 
 
 class X11TreeTests(unittest.TestCase):
+    def test_editor_message_locale_is_private_and_preserves_the_input_method(self):
+        desktop = {"LANG": "C.UTF-8", "LC_ALL": "en_US.UTF-8", "XMODIFIERS": "@im=ibus"}
+        with patch.dict(os.environ, desktop, clear=True):
+            child = ui.german_editor_env()
+            self.assertEqual(dict(os.environ), desktop)
+        self.assertEqual(child, {"LANG": "C.UTF-8", "LC_MESSAGES": "de_DE.UTF-8", "XMODIFIERS": "@im=ibus"})
+
     def test_disappearing_child_restarts_from_desktop_and_retains_the_actual_target_field(self):
         stale = Mock()
         stale.get_role.side_effect = ui.GLib.Error(MESSAGE, "atspi_error", 1)

@@ -17,3 +17,38 @@ The GUI SHA-256 was `9a5f057ca3a34c8e9bdb0ecec73874c05b1101fcb8bd2ba0c58a86e1587
 The focused Quit button occupied a 42 × 22 pixel rectangle. The native pixel sample contained 212 foreground pixels. Pressing Space ended worker 38 with `reason=quit success=true`, released the bus name and exited the GUI with code zero after `DRAINED passes=33`. The ordinary X11 suite also passed foreground startup, absent-tray background startup, close/reopen, masked entry, Unicode clipboard, filename selection and keyboard traversal through the new button. Under `artifacts/rust/gui-run/`, `tray-loss-quit-skh1ffhu/` contains the result, source manifest and process logs and `x11-93fpobrs/results.json` records the input regressions.
 
 The result SHA-256 is `966f54f0053d65692457481c15ba729cd7379e668f6c9fa3867742812ca1d0ab`. This native button observation covers Fedora x64 on X11. The other display backends and architectures have separate evidence requirements.
+
+## Starting the German editor on an English test desktop
+
+The tests that switch from German to English launch the editor with
+`LC_MESSAGES=de_DE.UTF-8` and remove an inherited `LC_ALL` from its environment.
+The desktop, Orca and input method keep their original locale. The worker
+fixture retains its ordinary YAML. The second launch activates the existing
+editor in its selected language. [Process environment](../performance/session.py)
+
+On Fedora x64, the staged startup-language executable with SHA-256
+`2b751a662a093ed7e30b629e66c62654caf3d818d317f00c999b28e18471b76f`
+initially exposed **Filename**, **Password** and **Deutsch** under `LANG=C.UTF-8`.
+The original German-first X11 observer timed out. With the editor's message
+locale set explicitly, Orca spoke **Dateiname entry**, **Kennwort password text**,
+**English button** and **Filename entry** on X11 and Mutter. Both process
+readbacks showed `LANG=C.UTF-8` for the observer, editor and Orca. Only the
+editor had the German `LC_MESSAGES`. Both runs replaced the backward selection
+on the ordinarily reopened editor and produced `Gx – Sommer.jpg`. Anthy also
+committed `あ` through XIM on X11 and through GNOME Shell's text-input protocol
+on Wayland. The original results under `artifacts/rust/gui-run/` are
+`x11-t4gt3h_8`, `wayland-3cgkyozs` and `wayland-xuiyvoul`. The earlier
+English tree is in `x11-bdy2onwv/last-accessibility-tree.json`.
+[Staged compiler and original language cases](startup/README.md#fedora-desktop-readback)
+
+The ordinary Ubuntu x64 GUI and inventory worker from `6ea1b2e` also passed
+the updated private Plasma menu control. The panel opened the German editor,
+published English labels at revision 2, restarted worker 100 as 298 and
+drained both processes on Quit. The original archive matched Actions SHA-256
+`88e74f836491131744bdb52412257eb5e77dc2513dc9c34283e1181920807bb5`.
+The local panel result is under
+`artifacts/rust/plasma/language-controls-6ea1b2e/runs/plasma-xayd2pry/`.
+The same ordinary pair passed the Fedora tray-loss control and the maintained
+editor's glyph and text checks in `tray-loss-quit-7ogw_crh` and
+`profile-text-wg6xonz_` under `artifacts/rust/gui-run/`.
+[Original Ubuntu compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46135261539/artifacts/15259187852)

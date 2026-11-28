@@ -17,7 +17,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Atspi, Gdk, Gio, GLib
 
 sys.path.insert(0, "/app/performance")
-from session import checked_start, check_alive, wait_for
+from session import checked_start, check_alive, german_editor_env, wait_for
 from x11 import Display, WindowAttributes, bind
 from audit import native_architecture, sha, verify_elf
 from brand import SIZES, render
@@ -218,14 +218,16 @@ def run(stack, report, blank, menu):
                     GLib.Variant("(ss)", (WATCHER, "RegisteredStatusNotifierItems")))[0]
     report["itemsBefore"] = items()
     command = ["/app/native-gui-assessment", "--background"]
+    gui_env = None
     if menu:
         from session import fresh_profile
         media = WORK / "files"
         media.mkdir()
         (media / "first.jpg").touch()
         profile = fresh_profile(WORK / "profile", media)
-        command = ["/usr/bin/env", "XDG_CONFIG_HOME=" + profile["XDG_CONFIG_HOME"], "IFW_QA_BENCHMARK=1", *command]
-    subject = start("gui", command)
+        gui_env = german_editor_env()
+        gui_env.update(XDG_CONFIG_HOME=profile["XDG_CONFIG_HOME"], IFW_QA_BENCHMARK="1")
+    subject = checked_start(stack, command, WORK / "gui.log", env=gui_env)
     app = wait_owner(ITEM)
     if app["pid"] != subject.pid:
         raise ValueError("Unexpected GUI service owner")

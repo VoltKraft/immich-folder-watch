@@ -220,7 +220,7 @@ def launch(args):
 
 def inside():
     sys.path[:0] = ["/driver", "/gui", "/graphics"]
-    from session import fresh_profile, private_session, stop, wait_for
+    from session import fresh_profile, german_editor_env, private_session, stop, wait_for
     from observations import Frames
     from native import X11Observer, action
     from x11 import Display
@@ -258,7 +258,7 @@ def inside():
         frames = Frames(stack) if spec["driver"] != "intel-and-mesa" else None
         if spec["case"] not in ("stock", "unavailable"):
             start_accessibility(stack)
-        env = fresh_profile(work / "profile", media)
+        env = german_editor_env(fresh_profile(work / "profile", media))
         env.update(HOME="/tmp/home", IFW_QA_GRAPHICS=spec["case"])
         if spec["case"] == "driver-loss":
             env["RUST_BACKTRACE"] = "1"

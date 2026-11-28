@@ -63,7 +63,7 @@ def inside():
     from desktop_input import Atspi, nodes, shortcut, start_accessibility, tap
     from native import X11Observer, action
     from observe import X11Input
-    from session import checked_start, check_alive, private_session, stop, wait_for
+    from session import checked_start, check_alive, german_editor_env, private_session, stop, wait_for
     work = Path("/qa")
     namespaces = json.loads((work / "namespaces.json").read_text())
     if Path.home() != Path("/tmp/home") or not all(os.readlink("/proc/self/ns/" + n) != v for n, v in namespaces.items()):
@@ -78,7 +78,7 @@ def inside():
         observer = X11Observer(display)
         controls = X11Input(observer)
         log = work / "application.log"
-        app = checked_start(stack, ["/app/native-gui-assessment"], log)
+        app = checked_start(stack, ["/app/native-gui-assessment"], log, env=german_editor_env())
         wait_for(lambda: check_alive(app, log) or observer.poll(), 15, "No native application window")
         observer.focus_for_input()
         def field():

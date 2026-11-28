@@ -27,7 +27,7 @@ def inside():
     from desktop_input import Atspi, nodes, read_x11_tree, start_accessibility, tap
     from native import BUS_NAME, X11Observer, call, desktop_owner, second_launch
     from profile_text import ink
-    from session import checked_start, check_alive, fresh_profile, private_session, stop, wait_for
+    from session import checked_start, check_alive, fresh_profile, german_editor_env, private_session, stop, wait_for
 
     inputs = json.loads((WORK / "inputs.json").read_bytes())
     if (Path.home() != Path("/tmp/home") or os.environ.get("DBUS_SESSION_BUS_ADDRESS") != "unix:path=/tmp/session-bus"
@@ -50,7 +50,7 @@ def inside():
         wait_for(lambda: check_alive(watcher, watcher_log) or "WATCHER_READY" in watcher_log.read_text(),
                  5, "Private watcher did not acquire its name")
         log = WORK / "primary.log"
-        primary = checked_start(stack, ["/app/native-gui-assessment"], log)
+        primary = checked_start(stack, ["/app/native-gui-assessment"], log, env=german_editor_env())
         window = wait_for(lambda: check_alive(primary, log) or x.poll(), 15, "Primary did not map")
         x.focus_for_input()
         def sample():

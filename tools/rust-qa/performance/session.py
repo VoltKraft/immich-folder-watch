@@ -33,9 +33,17 @@ def stop(process):
             process.wait(timeout=4)
 
 
-def checked_start(stack, command, log):
+def german_editor_env(environment=None):
+    """Start the tested editor in German while its desktop, input method and reader keep their locale."""
+    child = dict(os.environ if environment is None else environment)
+    child.pop("LC_ALL", None)
+    child["LC_MESSAGES"] = "de_DE.UTF-8"
+    return child
+
+
+def checked_start(stack, command, log, *, env=None):
     output = stack.enter_context(log.open("w"))
-    process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT, env=env)
     stack.callback(stop, process)
     return process
 
