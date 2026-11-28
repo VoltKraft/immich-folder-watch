@@ -98,6 +98,25 @@ native dependency graph and build receipt. Its `testHarnessReceiptSha256`
 identifies the companion test kit. The retained-window and CPU-renderer
 comparisons use their own executables and measurements.
 
+### Visible Quit when the Windows tray is unavailable
+
+On the standard account's unlocked Server 2025 console, use the original
+`rust-tray-windows-x64-<revision>` ZIP. It contains the ordinary GUI under
+`canonical/`, its build and graph receipts, and the inventory worker.
+Supply the full compiler commit and the Actions digest of that ZIP.
+
+```powershell
+python -B tools/rust-qa/windows-local/window_quit_guest.py --archive D:\tray.zip --archive-sha256 $digest --head $revision
+```
+
+The supervisor temporarily selects a private input desktop without Explorer.
+After native tray registration fails, the observer finds the visible
+German **Beenden** button on the original GUI window and invokes it through
+Windows UI Automation. It records both inventory passes, the GUI and worker
+exits, job closure and return to the original desktop. Keep the original
+`artifacts/rust/gui-native/x86_64-pc-windows-msvc/windows-quit-private/`
+directory with the guest and compiler archives.
+
 ### GUI tests on Server 2025 at 1660aeb
 
 The offline 4 GiB VM ran all five original x64 test executables from
