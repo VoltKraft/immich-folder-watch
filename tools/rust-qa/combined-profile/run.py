@@ -12,6 +12,7 @@ from licenses import inventory, totals
 from native import run_native
 import relink
 from units import compiler_units
+import unix_adapter
 from sources import FIRST_PARTY, HERE, QA, ROOT, SCOPE, SPIKES, catalog, local_caches, prepare, read, sha256, source_profile, write
 
 
@@ -42,6 +43,7 @@ def source_witness():
              QA / "yaml/prepare.py", QA / "realtime/hyper_util_source.py",
              QA / "realtime/hyper-util-connect.patch", QA / "windows-local/combined.py", QA / "realtime/guest.py"]
     files += list((ROOT / "rust/audit").glob("*.json"))
+    files.extend(unix_adapter.reconstruction_inputs())
     files += [p for d in SPIKES for p in [QA / d / "Cargo.toml", QA / d / "Cargo.lock"]]
     files += [QA / d / "inputs.json" for d in ("storage", "yaml", "realtime")]
     for name in ("gui", "yaml"):

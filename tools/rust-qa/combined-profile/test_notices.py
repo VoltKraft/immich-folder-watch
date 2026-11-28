@@ -172,6 +172,15 @@ def check_native(args):
             case.assertEqual(record["upstreamArchiveSha256"], row["archiveSha256"])
             case.assertEqual(record["reviewedTopLevelLicense"], row["selected"])
             case.assertEqual(record["compilerTree"], row["compilerTree"])
+            if "registryCorrection" in row:
+                case.assertIn("linux", args.target)
+                correction = row["registryCorrection"]
+                case.assertEqual(record["registryCorrection"], correction)
+                details = {"repository/" + p: h for p, h in correction["inputs"].items()}
+                case.assertCountEqual(record["reconstructionFiles"], details)
+                case.assertEqual({p.rsplit("/", 1)[-1] for p in paths},
+                                 {"accesskit-MIT", "accesskit-Apache-2.0", "accesskit-Chromium-BSD"})
+                expected.update(details)
             if row["name"] == "md-5":
                 case.assertTrue("linux" in args.target)
                 case.assertEqual(record["reviewedTopLevelLicense"], "MIT")

@@ -70,6 +70,10 @@ def external_notices(row, inventory, revision, caches, members, reuse, target):
     originals = {}
     if row.get("reconstructedSource"):
         record["reconstructedSource"] = row["reconstructedSource"]
+    if "registryCorrection" in row:
+        record["registryCorrection"] = row["registryCorrection"]
+        record["reconstructionFiles"] = [git_member(members, revision, path, digest)
+                                         for path, digest in sorted(row["registryCorrection"]["inputs"].items())]
     if row.get("reconstructedSource") and not row.get("originalCrate"):
         for path, digest in row["notices"].items():
             require(repository.setdefault(path, digest) == digest, f"Conflicting Git notice digests: {path}")

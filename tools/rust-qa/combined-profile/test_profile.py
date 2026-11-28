@@ -7,9 +7,21 @@ import unittest
 import relink
 from sources import HERE, write
 from units import compiler_units
+import unix_adapter
 
 
 class ProfileControls(unittest.TestCase):
+    def test_native_library_needs_both_modified_adapter_inputs(self):
+        source = unix_adapter.SOURCE
+        modules = ["src/atspi/bus.rs", "src/context.rs"]
+        library = Path("/build/synthetic/libaccesskit_unix.rlib")
+        prefix = f"{library}: {source}/src/lib.rs "
+        paths = [str(source / name) for name in modules]
+        unix_adapter.check_depfile(prefix + " ".join(paths), library, modules)
+        for path in paths:
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "both corrected"):
+                unix_adapter.check_depfile(prefix + path, library, modules)
+
     def test_unrelated_lock_edge_aborts_relink(self):
         original = (HERE / "Cargo.lock").read_text(encoding="utf-8")
         source = ('name = "wayland-protocols-plasma"\nversion = "0.3.12"\n'

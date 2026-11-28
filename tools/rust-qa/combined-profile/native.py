@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import upload_trial
+import unix_adapter
 from sources import HERE, HYPER_ROOT, QA, ROOT, read, sha256, source_config, source_profile
 
 
@@ -132,6 +133,7 @@ def run_native(target, toolchain, vendor, build, output, env, jobs, *, vm_inputs
         answer.update(isolation=isolation, **exercise(target, prefix, subject, fixture, env, output, sqlite))
     if sys.platform == "linux":
         answer["sampleMtimeNs"] = mtime_ns
+        answer["accesskitUnix"] = unix_adapter.retain(output, build, target, vendor)
         answer["nativeRendererSymbols"] = linux_renderer_symbols(binary, output / "renderer-symbols.txt", env)
         imports = ["readelf", "--wide", "--dynamic", str(binary)]
     else:

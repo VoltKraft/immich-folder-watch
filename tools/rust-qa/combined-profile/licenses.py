@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sources import HYPER_KEY, HYPER_ROOT, QA, ROOT, read, sha256, source_profile
 import source_notices
+import unix_adapter
 
 # Exact alternatives in the reviewed GUI archives. Preserve cumulative terms and file-level additions.
 GUI_BRANCH = {
@@ -74,6 +75,8 @@ def inventory(rows, vendor, staged, text):
         else:
             row["originalCrate"] = f"https://static.crates.io/crates/{name}/{prefix}.crate"
             row["compilerTree"] = staged[prefix]
+        if prefix == unix_adapter.CRATE:
+            row["registryCorrection"] = unix_adapter.correction(row["compilerTree"], row["supplementalNotices"])
         for field in ("native", "shaders", "fonts"):
             row[field] = {p: files[p] if files is not None else sha256(compiler_root / p) for p in row[field]}
         if row["fonts"]:
@@ -96,7 +99,16 @@ def inventory(rows, vendor, staged, text):
             **{"rust/" + f["path"]: f["sha256"] for f in read(ROOT / "rust/audit/gui-inputs.json")["files"]
                if Path(f["path"]).suffix not in {".ttf", ".otf"}},
             **text["noticeFiles"]}}
-    return source_notices.complete_inventory(record, [vendor.parent.parent / "cache" / vendor.name])
+    source_notices.complete_inventory(record, [vendor.parent.parent / "cache" / vendor.name])
+    adapter = next(row for row in rows if "registryCorrection" in row)
+    for change in adapter["compilerTree"]["transformations"]:
+        name = change["path"]
+        original = adapter["sourceAttributions"][name]
+        data = (vendor / unix_adapter.CRATE / name).read_bytes()
+        if (original["sha256"] != change["before"] or source_notices.sha(data) != change["after"]
+                or source_notices.ranges(data, ".rs") != original["ranges"]):
+            raise ValueError(f"Changed source attribution in {unix_adapter.CRATE}/{name}")
+    return record
 
 
 def totals(record):

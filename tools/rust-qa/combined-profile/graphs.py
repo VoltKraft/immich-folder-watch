@@ -11,7 +11,7 @@ import subprocess
 from sources import (FIRST_PARTY, HERE, HYPER_KEY, HYPER_ROOT, QA, ROOT, catalog, hyper_util_source, locked,
                      read, sha256, source_config, source_profile, write)
 from gui.startup.audit_profile import StartupAudit
-from gui.startup.vendor import RECEIPT_SHA256, selected_inputs, verify_sources
+from gui.startup.vendor import CORRECTED_RECEIPT_SHA256, selected_inputs, verify_sources
 from storage.evidence import target_graph
 
 spec = importlib.util.spec_from_file_location("rw02_audit", QA / "audit-graph.py")
@@ -57,7 +57,7 @@ def verify_gui_sources(vendor, staged):
     receipt = vendor.parents[2] / "registry-sources.json"
     write(receipt, projection)
     digest = sha256(receipt)
-    if digest != RECEIPT_SHA256:
+    if digest != CORRECTED_RECEIPT_SHA256:
         raise ValueError("The combined vendor differs from the reviewed GUI/YAML registry projection")
     return digest
 

@@ -115,6 +115,8 @@ def read_run(location, target, archive_hash):
         receipt = json.loads(raw)
         keep = {"profile.json", "inventory.json", "source-trees.json", "compiler-units.json", "smoke.json",
                 "build.log", target + ".json", target + ".tree"}
+        if "accesskitUnix" in receipt["native"]:
+            keep.add("accesskit-unix.d")
         files = {}
         for name, expected in receipt["outputs"].items():
             require(re.fullmatch(r"[A-Za-z0-9_.-]+", name) and name not in (".", "..", "result.json"),
@@ -186,6 +188,30 @@ def verify(receipt, files, revision, target):
             sha(canonical(features).encode()) == summary["normalBuildFeatureSetsSha256"], "Changed target graph")
     for path, expected in inventory["originalNoticeFiles"].items():
         require(sha(blob(revision, path)) == expected, f"Supplemental notice changed: {path}")
+    for row in inventory["packages"]:
+        if "registryCorrection" not in row:
+            continue
+        import unix_adapter
+        require(row["name"] + "-" + row["version"] == unix_adapter.CRATE, "Unexpected registry correction")
+        correction = row["registryCorrection"]
+        paths = {p.relative_to(ROOT).as_posix() for p in unix_adapter.reconstruction_inputs()}
+        require(set(correction["inputs"]) == paths and
+                all(sources.get(path) == value for path, value in correction["inputs"].items()),
+                "Missing the patch, source review or reconstructor in the compiler witness")
+        tree = trees[unix_adapter.CRATE]
+        require(tree == row["compilerTree"] and tree["originalSha256"] == row["archiveSha256"],
+                "Changed AccessKit Unix compiler tree")
+        key = row["name"] + " v" + row["version"]
+        if "linux" in target:
+            proof = native["accesskitUnix"]
+            library = unix_adapter.compiled_library(files["build.log"].decode(), target)
+            modules = {item["path"]: item["after"] for item in tree["transformations"]}
+            require(key in features and str(library) == proof["library"] and modules == proof["modules"]
+                    and len(modules) == 2 and proof["rlibSha256"] == outputs["accesskit-unix.rlib"]
+                    and proof["depfileSha256"] == outputs["accesskit-unix.d"], "Native Unix adapter evidence differs")
+            unix_adapter.check_depfile(files["accesskit-unix.d"].decode(), library, modules)
+        else:
+            require(key not in features and "accesskitUnix" not in native, "Unix adapter in a Windows build")
     observed = json.loads(files["compiler-units.json"])
     count = native["compilerUnits"]
     # Reuse the native verifier on the retained Cargo machine messages, including host/target and link directives.
@@ -295,6 +321,8 @@ def external_package(key, row, extracted):
                   "inventoryRowSha256": sha(canonical(row).encode())}
     if "reconstructedSource" in row:
         input_data["reconstruction"] = row["reconstructedSource"]
+    if "registryCorrection" in row:
+        input_data["registryCorrection"] = row["registryCorrection"]
     if row.get("sourceAttributions"):
         input_data["sourceAttributions"] = row["sourceAttributions"]
         entry["licenseComments"] += (" Source-local notices are keyed by original file hash and byte range. "
@@ -379,6 +407,10 @@ def assemble(receipt, result_hash, files, revision, target, supplemental=None):
         else:
             row = checked[key]
             entry = external_package(key, row, extracted)
+            if "registryCorrection" in row:
+                details = json.loads(entry["sourceInfo"])
+                details["nativeCompiler"] = receipt["native"]["accesskitUnix"]
+                entry["sourceInfo"] = canonical(details)
             for field, selection in (("ringTargets", "ringTargetSelection"), ("compressionSourceByTarget", "compressionSource")):
                 if field in row:
                     details = json.loads(entry["sourceInfo"])
@@ -434,7 +466,7 @@ def assemble(receipt, result_hash, files, revision, target, supplemental=None):
     epoch = int(git("show", "-s", "--format=%ct", revision))
     date = datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     generator = {p: sha((ROOT / p).read_bytes().replace(b"\r\n", b"\n")) for p in
-                 [PROFILE + "/sbom.py", PROFILE + "/units.py", PROFILE + "/source_notices.py",
+                 [PROFILE + "/sbom.py", PROFILE + "/units.py", PROFILE + "/source_notices.py", PROFILE + "/unix_adapter.py",
                   PROFILE + "/notice-upgrade.json", "tools/rust-qa/audit-graph.py", "tools/rust-qa/font-coverage/inputs.py"]}
     doc = {"spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": DOCUMENT,
            "name": f"Immich Folder Watch combined development profile {target} at {revision}",

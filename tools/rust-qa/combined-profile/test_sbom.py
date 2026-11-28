@@ -115,6 +115,20 @@ def check_build(args):
                      18 if "linux" in args.target else 0)
     ring = next(p for p in cargo.values() if p["name"] == "ring")
     inventory = json.loads(files["inventory.json"])
+    corrected = [r for r in inventory["packages"] if "registryCorrection" in r]
+    if corrected:
+        row, = corrected
+        case.assertEqual(row["name"], "accesskit_unix")
+        selected = [p for p in cargo.values() if p["name"] == row["name"]]
+        case.assertEqual(len(selected), int("linux" in args.target))
+        if selected:
+            entry, = selected
+            case.assertEqual(entry["downloadLocation"], "NOASSERTION")
+            case.assertNotIn("checksums", entry)
+            details = json.loads(entry["sourceInfo"])
+            case.assertEqual(details["registryCorrection"], row["registryCorrection"])
+            case.assertEqual(details["compilerTree"], row["compilerTree"])
+            case.assertEqual(set(details["nativeCompiler"]["modules"]), {"src/atspi/bus.rs", "src/context.rs"})
     if any(row["name"] == "md-5" for row in inventory["packages"]):
         active = [p for p in cargo.values() if p["name"] == "md-5"]
         case.assertEqual(len(active), int("linux" in args.target))
