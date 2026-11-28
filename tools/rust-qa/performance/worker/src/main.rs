@@ -22,6 +22,16 @@ type Fingerprints = HashMap<PathBuf, (u64, SystemTime)>;
 struct Config {
     immich: Server,
     watch: Watch,
+    #[serde(rename = "localization")]
+    _localization: Option<Localization>,
+}
+
+// The editor and its inventory worker share this profile. Language belongs to the editor.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Localization {
+    #[serde(rename = "language")]
+    _language: Option<String>,
 }
 
 #[derive(Deserialize)]

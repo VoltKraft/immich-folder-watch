@@ -10,6 +10,6 @@
   "tools/rust-qa/performance/present.rs": "5243874126ffc274aa4c9f5ee1fce6f7079e036e95f347e2bff1d9cce2b3649b",
   "tools/rust-qa/performance/worker/Cargo.lock": "6d1876027b3c8d55ce479471e51a5c4d0f356e00597c393abeb7b16a1a270905",
   "tools/rust-qa/performance/worker/Cargo.toml": "dbc101945286359d703e79fdb3bedab24429964ecffb0991985cd2e3a059bfa6",
-  "tools/rust-qa/performance/worker/src/main.rs": "edee4a245a8aee38963ce1ee54ce05ad78d5a12f3b4b34deeb73eba2cdbf1a68",
+  "tools/rust-qa/performance/worker/src/main.rs": "8552cc720eb4a79c41d3bb025dad9c9756265bd64d13ddc0689042f23d1172d9",
   "tools/rust-qa/yaml/inputs.json": "6b72c432d9c9330d4c72d1c46bb26c764374423fca24a30a57ee3bd69769de7f"
 }

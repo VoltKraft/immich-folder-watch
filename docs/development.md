@@ -604,6 +604,9 @@ both from separate processes and verifies removal by tag and group. The
 [Command and replay](../tools/rust-qa/windows-services/toast-history.md).
 The integrated graphics and Windows scan fixtures use the same
 [reviewed worker sources](../tools/rust-qa/performance/worker-inputs.json).
+The private Linux inventory profile can include the editor's optional
+`localization.language` setting. The worker still requires its single
+synthetic recursive JPEG source and its closed loopback endpoint.
 Update these hashes after reviewing changes to the inventory or its filesystem
 adapter. The historical comparison uses its original source receipts.
 The [native folder chooser fixture](rust/rw02-portal-dialog.md) exercises
