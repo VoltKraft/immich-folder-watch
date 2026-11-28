@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 mod atomic_config;
+mod installed_writer;
 
 #[allow(dead_code)]
 #[path = "../../gui/src/win32_instance.rs"]
@@ -185,6 +186,9 @@ fn hold_synthetic_configuration() -> io::Result<()> {
 fn main() -> io::Result<()> {
     let (sid, session) = identity()?;
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 1 && args[0] == "--preflight-installed-writer" {
+        return installed_writer::probe();
+    }
     if args.len() == 1 && args[0] == "--hold-synthetic-config" {
         return hold_synthetic_configuration();
     }

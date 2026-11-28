@@ -78,7 +78,7 @@ def main():
         header = int.from_bytes(data[0x3c:0x40], 'little')
         require(data[header:header+6] == b'PE\0\0\x64\x86', 'Expected the native AMD64 image')
         sources = {str(p.relative_to(ROOT)).replace('\\', '/') for p in
-                   (HERE / 'msi_endpoint.rs', HERE / 'atomic_config.rs', HERE / 'build_msi_endpoint.py',
+                   (HERE / 'msi_endpoint.rs', HERE / 'atomic_config.rs', HERE / 'installed_writer.rs', HERE / 'build_msi_endpoint.py',
                     HERE.parents[1] / 'gui/src/win32_instance.rs')}
         require(set(b['sources']) == sources and all(hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest
                 for name, digest in b['sources'].items()), 'Native compile source receipt differs')
