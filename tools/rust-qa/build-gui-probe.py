@@ -9,6 +9,7 @@ import runpy
 import shutil
 import subprocess
 import sys
+import tempfile
 
 from gui import source_profile
 
@@ -23,18 +24,32 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
     parser.add_argument("--offline", action="store_true", help="use pre-fetched locked registry archives")
+    parser.add_argument("--jobs", type=int, choices=range(1, 9), help="limit parallel Cargo build jobs")
     parser.add_argument("--local-x64-inputs", type=Path, metavar="DIRECTORY",
                         help="compile the ordinary x64 GUI and its native test executables for the local VM")
     args = parser.parse_args()
     if args.local_x64_inputs and (os.name != "nt" or args.target != "x86_64-pc-windows-msvc"):
         parser.error("--local-x64-inputs requires the native Windows x64 compiler")
     output = ARTIFACTS / "gui-native" / args.target
-    output.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        output.mkdir(parents=True, exist_ok=True)
+        return build_gui(args, output)
+    from gui import publication
+
+    with publication.writer(output), tempfile.TemporaryDirectory(prefix="gui-probe-", dir=output) as temporary:
+        staging = Path(temporary)
+        build_gui(args, staging)
+        publication.publish(output, staging, publication.NATIVE_FILES)
+
+
+def build_gui(args, output):
     cargo_home = ARTIFACTS / "assessment-cache"
     build = ARTIFACTS / "gui-build"
     profile = source_profile.prepare(fetch=not args.offline, registry=cargo_home / "registry")
     env = {**os.environ, "CARGO_HOME": str(cargo_home), "CARGO_TARGET_DIR": str(build),
            "IFW_QA_FONT_DIR": str(ROOT / "rust/assets/fonts"), "IFW_QA_FALLBACK_DIR": str(source_profile.FONTS)}
+    if args.jobs:
+        env["CARGO_BUILD_JOBS"] = str(args.jobs)
     subprocess.run([sys.executable, str(QA / "check-toolchain.py"), args.target], check=True)
     subprocess.run([sys.executable, str(QA / "verify-gui-inputs.py")], check=True)
     if not args.local_x64_inputs:
@@ -60,16 +75,20 @@ def main():
         compiler_sources = {p.relative_to(ROOT).as_posix(): source_profile.sha(p) for p in source_paths}
     else:
         builder = [sys.executable, str(QA / "gui/build.py"), "--registry", str(cargo_home / "registry")]
+        if args.jobs:
+            builder += ["--jobs", str(args.jobs)]
         subprocess.run([*builder, "--clippy"], env=env, check=True)
-        subprocess.run(builder, env=env, check=True)
-        binary = build / "release/native-gui-assessment"
+        selected = output / "release-generation.txt"
+        subprocess.run([*builder, "--generation-file", str(selected)], env=env, check=True)
+        generation = Path(selected.read_text(encoding="utf-8").strip())
+        binary = generation / "release/native-gui-assessment"
         inputs = json.loads(binary.with_suffix(".inputs.json").read_bytes())
         compiler_sources = dict(inputs["sources"])
         if compiler_sources.pop("tools/rust-qa/gui/Cargo.lock") != source_profile.sha(MANIFEST.with_name("Cargo.lock")):
             raise ValueError("The archived GUI compiler inputs differ from the selected lock")
-        shutil.copyfile(build / "gui-graph.json", output / "graph.json")
-        shutil.copyfile(build / "gui-compiler.jsonl", output / "compiler.jsonl")
-        shutil.copyfile(build / "gui-registry-sources.json", output / "registry-sources.json")
+        shutil.copyfile(generation / "gui-graph.json", output / "graph.json")
+        shutil.copyfile(generation / "gui-compiler.jsonl", output / "compiler.jsonl")
+        shutil.copyfile(generation / "gui-registry-sources.json", output / "registry-sources.json")
         lock_hash = source_profile.sha(MANIFEST.with_name("Cargo.lock"))
         graph_hash = source_profile.sha(output / "graph.json")
         if (inputs["graphSha256"] != graph_hash or inputs["binary_sha256"] != source_profile.sha(binary)
@@ -78,6 +97,7 @@ def main():
             raise ValueError("The Linux GUI and its compiler inputs differ from the build receipt")
         compiler_evidence = {key: inputs[key] for key in
                              ("compilerStreamSha256", "compilerUnits", "registryReceiptSha256", "compilerDrivers")}
+        compiler_evidence["releaseGeneration"] = generation.name
         tests = [*builder, "--test"]
     if args.local_x64_inputs:
         kit = args.local_x64_inputs.resolve()

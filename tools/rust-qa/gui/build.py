@@ -1,7 +1,6 @@
 """Build the assessment offline and retain its exact native source and input binding."""
 
 import argparse
-import fcntl
 import hashlib
 import json
 import os
@@ -13,6 +12,7 @@ import sys
 import tempfile
 
 import source_profile
+import publication
 from compiler_inputs import linux_project_sources, verify_gui_units
 from startup import vendor
 
@@ -35,11 +35,9 @@ def main(args):
     build = args.output.resolve()
     if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
         raise ValueError("Use a build directory below artifacts/rust")
-    build.mkdir(exist_ok=True, parents=True)
-    with (build / ".gui-build.lock").open("ab") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with publication.writer(build):
         with tempfile.TemporaryDirectory(prefix="gui-inputs-", dir=build) as staging:
-            compile_gui(args, build, Path(staging))
+            return compile_gui(args, build, Path(staging))
 
 
 def compile_gui(args, build, staging):
@@ -104,7 +102,7 @@ def compile_gui(args, build, staging):
             subprocess.run([*command, "--ro-bind", str(passwd), "/etc/passwd", "--ro-bind", str(group), "/etc/group",
                             *cargo, "test", *selection, "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
         return
-    drivers = [Path(__file__).resolve(), HERE / "compiler_inputs.py", HERE / "startup/vendor.py",
+    drivers = [Path(__file__).resolve(), HERE / "compiler_inputs.py", HERE / "publication.py", HERE / "startup/vendor.py",
                HERE / "startup/audit_profile.py", HERE / "source_profile.py",
                HERE / "flatpak-accessibility/accesskit_source.py", HERE / "flatpak-accessibility/source-review.json",
                HERE / "flatpak-accessibility/application-bus.patch",
@@ -140,17 +138,15 @@ def compile_gui(args, build, staging):
     record["textNotices"] = profile["noticeFiles"]
     record["sourceProfileSha256"] = source_profile.sha(source_profile.REVIEW)
     record["sourceReconstructionSha256"] = sha(Path(source_profile.__file__))
-    release = build / "release"
-    release.mkdir(exist_ok=True)
-    staged = staging / binary.name
+    release = staging / "release"
+    release.mkdir()
+    staged = release / binary.name
     shutil.copy2(binary, staged)
     inputs = staged.with_suffix(".inputs.json")
     inputs.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    for evidence in (graph_file, log, saved_receipt):
-        evidence.replace(build / evidence.name)
-    staged.replace(release / staged.name)
-    inputs.replace(release / inputs.name)
-    print(f"{target} {record['binary_sha256']} {release / binary.name}")
+    generation = publication.publish(build, staging, publication.BUILD_FILES)
+    print(f"{target} {record['binary_sha256']} {build / 'release' / binary.name}")
+    return generation
 
 
 if __name__ == "__main__":
@@ -161,7 +157,14 @@ if __name__ == "__main__":
     parser.add_argument("--registry", type=Path, default=OUTPUT / "assessment-cache/registry",
                         help="An offline Cargo registry directory containing all locked crate archives")
     parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--generation-file", type=Path, help="write the published release generation into a new file")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--clippy", action="store_true", help="Lint every native fixture target with warnings denied")
     mode.add_argument("--test", action="store_true", help="Run native GUI library and adapter checks offline")
-    main(parser.parse_args())
+    args = parser.parse_args()
+    if args.generation_file and (args.clippy or args.test):
+        parser.error("--generation-file requires a release build")
+    generation = main(args)
+    if args.generation_file:
+        with args.generation_file.open("x", encoding="utf-8") as output:
+            output.write(str(generation) + "\n")
