@@ -98,6 +98,24 @@ log matched the guest report. Real Explorer interactions have separate
 | [Ordinary GUI and compiler receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960/artifacts/15244358084) | `f6d7f5e21b9b723f5582ebb5a131356dbeeacb5bb463401da467c448e865021d` |
 | Guest output in `artifacts/rust/local-windows-server-2025-x64/20261128/gui-1660aeb/original-guest-results.zip` | `c14401996f4afb3af1c7b13120e18e46089e194a57229ce818b77f31b69b49d0` |
 
+### GUI worker Quit during restart at 02d4460
+
+On the 4 GiB Server 2025 VM, the five native test executables at
+`02d4460` passed 27 of 28 cases. The ordinary worker restart and recovery
+after an unsuccessful child exit passed. The Quit-during-restart test
+received Winsock error 10035 within 0.05 seconds. Its listener was in
+nonblocking mode. The early return left the test image in use during
+cleanup. All 11 tray delivery cases passed separately.
+
+The corrected observer explicitly restores blocking mode on the accepted
+test socket before its bounded reads. Dropping the tray owner also waits
+for its thread while other senders are still alive.
+The original [compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46112078964/artifacts/15249986728)
+has SHA-256 `24b045b356a44d39390ef27c8579dfeabf3c81fe6154af3741355fce6b1e63da`.
+The original guest ZIP under
+`artifacts/rust/local-windows-server-2025-x64/20261128/gui-02d4460/`
+has SHA-256 `e56cf7779fd1222c841b18c7d3d5c606dd1be680f05b0849fac6b24ec9ee23cf`.
+
 ## Combined native profile
 
 The [x64 profile compiler](../../../.github/workflows/rust-windows-x64-combined-build.yaml)

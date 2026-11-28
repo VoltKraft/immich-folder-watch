@@ -37,6 +37,21 @@ including the separate Windows worker allocation adjustment.
 [Five watcher owners](rust/rw02-linux-services.md#watcher-handover-in-the-original-background-gui) ·
 [Original panel captures and worker results](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload).
 
+The local 4 GiB Server 2025 guest ran all 28 Windows x64 GUI cases at
+`02d4460`. The 11 tray cases and the two worker restart cases passed.
+The Quit-during-restart case received Winsock error 10035 on its private
+test socket. The observer now sets blocking mode on the accepted socket
+before reading the child's PID. The tray owner also joins its worker
+thread on early return. The two ownership tests passed on Fedora and
+both Windows targets passed Clippy. A native x64 repeat is pending.
+[Native result and compiler inputs](../tools/rust-qa/windows-local/README.md#gui-worker-quit-during-restart-at-02d4460).
+
+On a native Windows ARM64 console the notification state changed from
+quiet time to `QUNS_APP` after 49 minutes and 30 seconds. None of the
+131 samples in 65 minutes reported `QUNS_ACCEPTS_NOTIFICATIONS`. The
+strict test stopped before sending and restored Do not disturb.
+[Original ARM64 traces](../tools/rust-qa/windows-services/toast-history.md).
+
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.
 Both windows gained keyboard focus and kept their inventory worker.

@@ -230,6 +230,8 @@ to reconcile project decisions, defaults, and recorded state.
   For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
   use the tested native writer and its identity oracle in two sessions of
   the same account. Verify the Actions digest before reusing a hosted build.
+  Use the [installed WPF handover trial](tools/rust-qa/instance/cross-session/wpf-handover.md)
+  to follow a normal tray Quit on the original RDP desktop before Rust acquires the writer.
   Run every feasible Windows x64 rewrite test on the [local disposable
   VM](tools/rust-qa/windows-local/README.md). The x64 Actions jobs compile inputs.
   Run the [combined Windows x64 profile](tools/rust-qa/windows-local/README.md#combined-native-profile)

@@ -624,3 +624,15 @@ QMP recorded 4 GiB of base memory and zero hotplugged bytes. The guest
 had no network adapter. After ACPI shutdown, the host confirmed that
 QEMU had exited and the scratch files had no open handles before
 discarding the overlay. A successful guarded atomic save remains open.
+
+### Ordinary WPF shutdown before Rust writer admission
+
+The separate `wpf-handover` trial uses the installed 3.0.4 application
+on the local standard user's RDP desktop. During a synthetic upload the
+Rust endpoint in the console must identify the WPF pipe owner and refuse
+admission. After the upload commits, the observer selects Quit in the
+original WPF menu. It checks the exit time and code of that process
+before the Rust endpoint and writer acquire ownership. It retains the
+config identity, the upload and the SQLite row across the handover.
+The original two launch-order trials keep their own evidence.
+[Native setup, compiler inputs and replay](../../tools/rust-qa/instance/cross-session/wpf-handover.md).

@@ -207,7 +207,7 @@ impl Restarts {
 
 pub(super) enum Owner {
     Direct(Box<Benchmark>),
-    Tray(Restarts, JoinHandle<io::Result<()>>),
+    Tray(Restarts, Option<JoinHandle<io::Result<()>>>),
 }
 
 impl Owner {
@@ -232,7 +232,7 @@ impl Owner {
                 worker.stop_child("quit")?;
                 Ok(())
             })?;
-        Ok(Self::Tray(Restarts { wake, closing }, thread))
+        Ok(Self::Tray(Restarts { wake, closing }, Some(thread)))
     }
 
     pub(super) fn restarts(&self) -> Option<Restarts> {
@@ -242,18 +242,35 @@ impl Owner {
         }
     }
 
-    pub(super) fn finish(self) -> io::Result<()> {
+    pub(super) fn finish(mut self) -> io::Result<()> {
+        self.shutdown()
+    }
+
+    fn shutdown(&mut self) -> io::Result<()> {
         match self {
-            Self::Direct(mut worker) => {
+            Self::Direct(worker) => {
                 worker.stop_child("quit")?;
                 Ok(())
             }
             Self::Tray(requests, thread) => {
+                let Some(thread) = thread.take() else {
+                    return Ok(());
+                };
                 requests.begin_quit();
                 thread
                     .join()
                     .map_err(|_| io::Error::other("Inventory owner panicked"))?
             }
+        }
+    }
+}
+
+impl Drop for Owner {
+    fn drop(&mut self) {
+        // An early return must also join the owner before its executable can be removed.
+        // Direct workers already reap their child in Benchmark::drop.
+        if let Self::Tray(_, Some(_)) = self {
+            let _ = self.shutdown();
         }
     }
 }
@@ -347,6 +364,25 @@ mod tests {
     }
 
     #[test]
+    fn dropping_the_tray_owner_joins_the_thread_with_a_sender_held() -> io::Result<()> {
+        let (wake, events) = mpsc::sync_channel(1);
+        let closing = Arc::new(AtomicBool::new(false));
+        let requests = Restarts { wake, closing };
+        let held = requests.clone();
+        let (stopped, observed) = mpsc::sync_channel(1);
+        let thread = thread::spawn(move || {
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(io::Error::other)?;
+            stopped.send(()).map_err(io::Error::other)
+        });
+        drop(Owner::Tray(requests, Some(thread)));
+        assert!(held.closing.load(Ordering::Acquire));
+        assert_eq!(observed.try_recv(), Ok(()));
+        Ok(())
+    }
+
+    #[test]
     fn quit_during_a_drain_supersedes_queued_restarts() -> io::Result<()> {
         const PORT: &str = "IFW_QA_WINDOWS_TEST_WORKER_DRAIN_PORT";
         let timeout = Duration::from_secs(5);
@@ -397,6 +433,8 @@ mod tests {
                 Err(error) => return Err(error),
             }
         };
+        // Winsock can inherit nonblocking mode from the listening socket.
+        peer.set_nonblocking(false)?;
         peer.set_read_timeout(Some(timeout))?;
         let mut pid = [0; 4];
         peer.read_exact(&mut pid)?;
