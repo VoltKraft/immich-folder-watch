@@ -1,7 +1,8 @@
 # Rust secondary with the installed WPF primary
 
-This Windows x64 and ARM64 fixture runs on an empty, disposable GitHub-hosted
-runner on `rewrite/rust`. Give each direction its own complete MSI transaction,
+This fixture uses a disposable native Windows system. ARM64 runs on the hosted
+runner and x64 uses the [local test VM](../../windows-local/README.md).
+Give each direction its own complete MSI transaction,
 KnownFolder profile, scratch directory and evidence directory.
 
 The compiled Rust executable first runs while the shipping election is absent.
@@ -15,6 +16,19 @@ ordinary eight-byte `SHOW_GUI` message. WPF reads to EOF and shows its original
 window. The observer saves the WinEvent sequence, the cursor measured before
 releasing the suspended secondary, both process identities, the Rust log and
 the empty secondary job in `before-quit.json` and its associated logs.
+
+On the original ARM64 Default input desktop, the observer samples the WPF
+root and the foreground window's root at the first visible WPF window,
+after Rust reactivates it and before the Quit helper starts. Each sample
+records the window class, executable basename, session, desktop and bounds
+from `GetWindowRect` in the observer's screen coordinates. The held WPF
+process, desktop membership and foreground are checked around the reads.
+The receipt distinguishes the WPF root, another root, a missing foreground
+and a window that changed during sampling. An unavailable native query is
+recorded as such. The installed worker backup captures startup and pre-Quit
+for each WPF lifetime in `upload-observation.json`. Its `--live-only` reader
+includes the pre-Quit sample when the first worker reached it. These passive
+samples issue no input. The menu helper verifies the actual cursor target.
 
 To request a regular exit, the observer verifies the original process,
 creation time, UI thread and message-only tray receiver. PowerShell 7
@@ -55,7 +69,7 @@ python -B tools/rust-qa/windows-msi-interop/reverse/readback.py artifacts/rust/w
 
 ### WPF activation and Quit on one private ARM64 input desktop
 
-A fifth workflow job uses a fresh Windows ARM64 host. It sets
+A separate workflow job uses a fresh Windows ARM64 host. It sets
 `TRIAL_VARIANT=arm64-private-input` and passes `--private-input-desktop`
 to both commands below. The MSI still installs into the empty disposable
 runner and the WPF starts without arguments. A supervisor holds the

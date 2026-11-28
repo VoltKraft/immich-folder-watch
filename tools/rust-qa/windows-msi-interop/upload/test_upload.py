@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from shared import ROOT, backup, configuration, endpoint_port, peer
 from database import main_rows, replay_pair, restore
-from upload.readback import asset_history, database_rows
+from upload.readback import asset_history, database_rows, default_foreground
 from owners import decode_connection, select_connection
 
 
@@ -34,6 +34,21 @@ class UploadTests(unittest.TestCase):
         store.executescript(sql.split("INSERT INTO")[0] + "PRAGMA user_version=1; COMMIT;")
         store.execute("PRAGMA journal_mode=WAL")
         return store
+
+    def test_foreground_in_live_backup_and_after_a_refused_quit(self):
+        view = dict(basename="Wpf.exe", bounds=[20, 60, 400, 240], desktop="Default", session=3,
+                    **{"class": "WPF Class"})
+        first = dict(defaultSession=3, primary=dict(startQpc=10, image=r"C:\fixture\Wpf.exe"),
+                     foregroundAtStartup=dict(beginQpc=11, endQpc=12, relation="wpfRoot", root=view, foreground=view))
+        self.assertEqual(default_foreground(first, before_quit=False), {"startup": "wpfRoot"})
+        refused = dict(first, after={"qpc": 15}, quit={"issuedQpc": 20},
+                       foregroundBeforeQuit=dict(beginQpc=16, endQpc=17, relation="otherRoot", root=view,
+                                                 foreground={**view, "basename": "Other.exe"}))
+        self.assertEqual(default_foreground(refused, before_quit=True), {"startup": "wpfRoot", "beforeQuit": "otherRoot"})
+        for obj, change in ((refused, {"defaultSession": 9}), (refused["after"], {"qpc": 19}),
+                            (refused["quit"], {"issuedQpc": 16}), (refused["primary"], {"startQpc": 12})):
+            with self.subTest(change=change), patch.dict(obj, change), self.assertRaises(ValueError):
+                default_foreground(refused, before_quit=True)
 
     def insert(self, store):
         values = ("account", "source", "SOURCE", peer.FILENAME, peer.FILENAME.upper(), peer.ASSET_ID, "",

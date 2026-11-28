@@ -17,6 +17,7 @@ from msi_evidence import payload_details
 from owners import client_connection, database_owner
 import private_desktop
 from reverse import observe as wpf
+from reverse.foreground import ForegroundSamples
 
 
 class PrivateServer(ThreadingHTTPServer):
@@ -51,7 +52,8 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
     recorder = launch.recorder
     desktop = launch.check(desk.thread_desktop(desk.thread()), "GetThreadDesktop")
     name = desk.name(desktop)
-    require(name == (private.name if private else "Default") and launch.ordinary_console(desk.context(), name),
+    context = desk.context()
+    require(name == (private.name if private else "Default") and launch.ordinary_console(context, name),
             "Expected the originally selected input desktop")
     api.ensure_no_primary(recorder.sid())
     folder.mkdir()
@@ -71,6 +73,10 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
         handle = int(proc._handle)
         row["primary"] = dict(pid=proc.pid, created=api.process_identity(handle), image=str(image), sha256=sha(image),
                               arguments=[], machine=list(api.machine(handle)), startQpc=proc.benchmark_start_qpc)
+        sample_default = not private and machine == TARGETS[private_desktop.ARM][1]
+        if sample_default:
+            row["defaultSession"] = context["session"]
+        samples = ForegroundSamples(sample_default, launch, api, desk, desktop, context["session"], proc, row)
         api.verify_job_member(proc.benchmark_job, proc.pid, handle)
         require(api.machine(handle) == (machine, machine), "The installed process is not native to the target")
         def wait(check, label, seconds=30):
@@ -82,6 +88,7 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
         try:
             hwnd = wait(lambda: windows.visible(waiting_for_first=True), "Missing installed WPF window")
             row["root"] = dict(hwnd=hwnd, pid=proc.pid, tid=wpf.owned_root(windows, hwnd, proc.pid))
+            samples.record("foregroundAtStartup")
             if private:
                 row["privateRoot"] = private.root(row)
             yield proc, wait, log
@@ -89,6 +96,7 @@ def process(launch, api, desk, image, work, folder, row, machine, private):
             row["quit"] = {}
             if private:
                 row["beforeQuitDesktop"] = private.root(row)
+            samples.record("foregroundBeforeQuit")
             wpf.invoke_quit(launch, api, windows, proc, folder, row, start_helper=private.quit if private else None)
             row["quit"]["empty"] = api.wait_job_empty(proc.benchmark_job, 5)
             row["quit"]["jobDrainedQpc"] = api.clock()

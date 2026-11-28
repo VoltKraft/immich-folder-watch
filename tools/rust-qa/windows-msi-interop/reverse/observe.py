@@ -15,6 +15,7 @@ sys.path.insert(0, str(HERE.parent))
 from common import AREA, QA, ROOT, TARGETS, launcher, module, read, sha, write
 from msi_evidence import payload_details
 import private_desktop
+from reverse.foreground import ForegroundSamples
 
 START = "Folder watcher started with 1 source(s)."
 STOP = "Folder watch worker received shutdown signal."
@@ -165,6 +166,8 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile,
         primary = private_desktop.start_wpf(stack, launch, api, image, work, stream, watch, private)
         first = row["primary"] = dict(pid=primary.pid, created=api.process_identity(int(primary._handle)),
                                       image=str(image), sha256=digest, arguments=[])
+        samples = ForegroundSamples(not private and row["target"] == private_desktop.ARM, launch, api, desk,
+                                    desktop, row["desktopBefore"]["session"], primary, row)
         if private:
             machine = api.machine(int(primary._handle))
             if machine != (TARGETS[row["target"]][1],) * 2:
@@ -197,6 +200,7 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile,
             hwnd = wait(lambda: windows.visible(waiting_for_first=True), "Missing initial WPF window")
             tid = owned_root(windows, hwnd, primary.pid)
             row["root"] = dict(hwnd=hwnd, tid=tid, pid=primary.pid)
+            samples.record("foregroundAtStartup")
             def worker_ready():
                 text = wpf_log.read_text(encoding="utf-8", errors="replace")
                 return START in text and text.count(empty_sweep) >= 2
@@ -253,6 +257,7 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile,
             owned_root(windows, hwnd, primary.pid, tid)
             row["after"] = dict(qpc=api.clock(), observedTick=tick(), hwnd=hwnd, visible=bool(windows.is_visible(hwnd)),
                                 job=sorted(api.job_pids(primary.benchmark_job)), created=api.process_identity(int(primary._handle)))
+            samples.record("foregroundAfterReactivation")
             row["events"] = list(windows.events)
             row["lifetimes"] = list(life.events)
             # Persist the already completed activation and original logs even if the menu
@@ -267,6 +272,7 @@ def exercise(launch, api, desk, gui, trial, env, image, work, out, row, profile,
             except ValueError as exc:
                 row.update(showOrder="inconclusive", orderingError=str(exc))
             status = "inconclusive" if row["showOrder"] == "inconclusive" else "reactivated"
+            samples.record("foregroundBeforeQuit")
             write(out / "before-quit.json", {**row, "status": status, "rustLog": sha(out / "rust.log"),
                                              "wpfPrefix": sha(out / "wpf-before-quit.log")})
             row["quit"] = {}

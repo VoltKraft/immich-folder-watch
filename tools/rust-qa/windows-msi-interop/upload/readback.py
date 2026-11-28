@@ -10,6 +10,7 @@ import private_desktop
 from owners import decode_connection
 from msi_evidence import payload_details, verify_transactions
 from reverse.evidence import engine_lines, shutdown
+from reverse import foreground
 
 
 def asset_history(out, posts, phases, media_port):
@@ -91,6 +92,21 @@ def process_image(row, installed, machine):
             "The original WPF process, machine or window owner differs")
 
 
+def default_foreground(row, *, before_quit):
+    session = row["defaultSession"]
+    require(type(session) is int and session > 0, "Expected the original input console session")
+    start = foreground.verify(row, "foregroundAtStartup", session)
+    require(row["primary"]["startQpc"] <= start["beginQpc"], "Foreground predates the installed WPF process")
+    result = {"startup": start["relation"]}
+    if before_quit:
+        last = foreground.verify(row, "foregroundBeforeQuit", session)
+        require(start["endQpc"] <= row["after"]["qpc"] <= last["beginQpc"]
+                and ("issuedQpc" not in row["quit"] or last["endQpc"] <= row["quit"]["issuedQpc"]),
+                "Foreground sample falls outside the installed worker's pre-Quit interval")
+        result["beforeQuit"] = last["relation"]
+    return result
+
+
 def verify(out, report, live_only):
     from backup_build import verify_archived_build
     require(observer_sources(out, report["revision"]) == report["observerSources"]
@@ -140,14 +156,26 @@ def verify(out, report, live_only):
     private = report.get("desktopMode")
     require(private in (None, private_desktop.MODE) and bool(private) == ("privateRoot" in first)
             == (out / "private-desktop.json").is_file(), "Different desktop selection for the installed worker")
+    default_arm = not private and report["target"] == private_desktop.ARM
+    if default_arm:
+        result["defaultForeground"] = {"original": default_foreground(first, before_quit=False)}
     if live_only:
         if private:
             result["desktop"] = private_desktop.replay(out, report, first, [])
+        elif default_arm and (out / "upload-observation.json").is_file():
+            original = read(out / "upload-observation.json")["original"]
+            require(all(original[k] == v for k,v in first.items()), "The later WPF differs from the live backup")
+            if "foregroundBeforeQuit" in original:
+                result["defaultForeground"]["original"] = default_foreground(original, before_quit=True)
         return result
     row = read(out / "upload-observation.json")
     original, second = row["original"], row["restored"]
     if private:
         result["desktop"] = private_desktop.replay(out, report, first, [original, second])
+    elif default_arm:
+        require(original["defaultSession"] == second["defaultSession"], "The restored WPF moved to another session")
+        result["defaultForeground"] = {label: default_foreground(phase, before_quit=True) for label, phase in
+                                       (("original", original), ("restored", second))}
     process_image(second, installed, machine)
     require(row["status"] == "observed" and all(original[k] == v for k,v in first.items())
             and second["primary"]["created"] > first["primary"]["created"]

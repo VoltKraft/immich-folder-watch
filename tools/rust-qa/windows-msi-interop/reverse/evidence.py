@@ -10,6 +10,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from common import QA, TARGETS, module, read, require, sha
 import private_desktop
+from reverse import foreground
 
 QUIT_SOURCE = "f50baad6accfd09afc3e86beb9908027b8498525f6a787f35d217841c86c9e5c"
 
@@ -190,6 +191,14 @@ def activation_desktop(out, report, row, log, *, completed):
                 "The original Rust input desktop, native process or bound profile differs")
     else:
         name, session, desktop = "Default", row["desktopBefore"]["session"], None
+        if report["target"] == private_desktop.ARM:
+            startup = foreground.verify(row, "foregroundAtStartup", session)
+            reopened = foreground.verify(row, "foregroundAfterReactivation", session)
+            prequit = foreground.verify(row, "foregroundBeforeQuit", session)
+            require(startup["endQpc"] <= row["before"]["qpc"] <= row["after"]["qpc"] <= reopened["beginQpc"]
+                    and reopened["endQpc"] <= prequit["beginQpc"]
+                    and (not completed or prequit["endQpc"] <= row["quit"]["issuedQpc"]),
+                    "Foreground samples fall outside the original WPF start, reactivation or Quit interval")
     for key in (("desktopBefore", "desktopAfter") if completed else ("desktopBefore",)):
         require(context.ordinary_console(row[key], name) and row[key]["session"] == session,
                 "The original shipping and Rust processes require the same unlocked input session")
@@ -211,6 +220,9 @@ def verify_prequit(out, report, build, installed):
     desktop = activation_desktop(out, report, row, rust_log, completed=False)
     if desktop is not None:
         result["privateDesktop"] = desktop
+    elif report["target"] == private_desktop.ARM:
+        result["defaultForeground"] = {k: row[k]["relation"] for k in
+                                       ("foregroundAtStartup", "foregroundAfterReactivation", "foregroundBeforeQuit")}
     return result
 
 
@@ -233,6 +245,8 @@ def verify_activation(out, report, build, installed):
     fields = ["primary", "secondary", "root", "events", "lifetimes", "before", "after", "missingWpf", "desktopBefore"]
     if report.get("desktopMode") == private_desktop.MODE:
         fields.extend(("privateRoot", "hiddenDesktop", "beforeQuitDesktop", "profile", "stagedProfile"))
+    elif report["target"] == private_desktop.ARM:
+        fields.extend(("foregroundAtStartup", "foregroundAfterReactivation", "foregroundBeforeQuit"))
     if any(row[k] != before[k] for k in fields):
         raise ValueError("The completed activation differs from the capture saved before Quit")
     worker = worker_files(out, row["profileFiles"])
