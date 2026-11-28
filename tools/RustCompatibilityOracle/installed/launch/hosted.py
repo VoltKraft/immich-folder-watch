@@ -17,14 +17,11 @@ ROOT = HERE.parents[3]
 
 def prepare(hosted_platform):
     sys.path.insert(0, str(ROOT / 'tools/rust-qa/portal-dialog'))
-    from graphics import graphics_deployment, hosted_work, pinned_extension
-    from hosted_runtime import install_signed_ref
+    from graphics import hosted_work, install_hosted_graphics
     from run import COMMITS, SIGNATURES
 
     work = hosted_work(hosted_platform)
-    pin = pinned_extension()
-    install_signed_ref(work, pin['ref'], pin['commit'], 'graphics-signature.txt', 'verified-graphics.json')
-    graphics, _ = graphics_deployment(hosted_platform)
+    graphics, _ = install_hosted_graphics(hosted_platform)
 
     arch = platform.machine()
     target = {'aarch64': 'linux-arm64', 'x86_64': 'linux-x64'}[arch]

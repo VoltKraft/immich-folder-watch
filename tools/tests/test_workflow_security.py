@@ -104,9 +104,12 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             ("ubuntu-24.04-arm", "aarch64-unknown-linux-gnu"),
         })
         desktop = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
-        for observer in ("tools/rust-qa/linux-services/gui_watcher.py", "--restart-watcher"):
+        for observer in ("tools/rust-qa/linux-services/gui_watcher.py", "--restart-watcher",
+                         'flatpak/run.py plasma-native --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu'):
             self.assertIn(observer, source)
             self.assertNotIn(observer, desktop)
+        self.assertIn('tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"', source)
+        self.assertIn("artifacts/rust/flatpak-gui-launch-assessment/", source)
 
     def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
         for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):

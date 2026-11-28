@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import platform
+import sys
 
 GL = 'org.freedesktop.Platform.GL.default'
 PINS = {
@@ -52,3 +53,20 @@ def graphics_deployment(hosted_platform):
             raise ValueError('The private GL deployment differs from its Flathub signature receipt')
         return path, {**pin, 'acquisition': receipt}
     return path, pin
+
+
+def install_hosted_graphics(hosted_platform):
+    """Install the signed native GL extension alongside its verified Platform."""
+    from hosted_runtime import install_signed_ref
+
+    work = hosted_work(hosted_platform)
+    pin = pinned_extension()
+    install_signed_ref(work, pin['ref'], pin['commit'], 'graphics-signature.txt', 'verified-graphics.json')
+    return graphics_deployment(hosted_platform)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        raise SystemExit('Pass the native hosted Platform deployment')
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'tools/rust-qa/portal-dialog'))
+    install_hosted_graphics(Path(sys.argv[1]))

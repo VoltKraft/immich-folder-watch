@@ -330,5 +330,10 @@ The dedicated Plasma job builds the native GUI and its inventory worker
 on both Ubuntu architectures. Each runner records the five-owner D-Bus
 trial, the two ordinary panel clicks and the three menu selections after
 the watcher reload. Its artifact contains the original executables and
-their compiler receipts alongside the desktop observations.
+their compiler receipts alongside the desktop observations. The same
+job installs that GUI in a private Flatpak profile. A separate protocol
+peer sends Open and Quit through the installed proxy after watcher
+replacement. The artifact retains the signed Platform and GL deployment
+receipts, both metadata files and the native GUI process evidence.
+[Installed Flatpak procedure](rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak) ·
 [Native jobs and source inputs](../../.github/workflows/rust-linux-plasma.yaml).
