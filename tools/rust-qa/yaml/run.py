@@ -111,6 +111,19 @@ def verify_scalar_fields(exported):
             or inputs["typed-tag-padded-boolean"]["accepted"] or inputs["typed-integer-octal-prefix"]["accepted"]):
         raise ValueError("The shipping reader's explicit scalar type conversions changed")
 
+    grouped = inputs["tagged-float-group"]["editable"]["watch"]
+    specials = inputs["tagged-float-symbols"]["editable"]["watch"]["sources"]
+    implicit = inputs["implicit-scalar-alias-types"]["editable"]["watch"]
+    rejected = ("tagged-float-infinity-integer", "tagged-float-negative-infinity-integer", "tagged-float-nan-integer",
+                "tagged-float-plain-infinity", "tagged-float-plain-nan", "implicit-text-alias-to-boolean")
+    if (grouped["batchIntervalSeconds"] != 1000 or grouped["sources"][0]["albumName"] != "1000.5"
+            or grouped["sources"][0]["includeSubdirectories"] is not True
+            or [src["albumName"] for src in specials] != ["Infinity", "-Infinity", "NaN"]
+            or not all(src["includeSubdirectories"] for src in specials)
+            or implicit["maxBatchSize"] != 8 or [src["albumName"] for src in implicit["sources"]] != ["8", "True"]
+            or any(inputs[name]["accepted"] for name in rejected)):
+        raise ValueError("The shipping float formatter or typed scalar alias changed")
+
 
 def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust: dict, csharp: dict) -> None:
     if (exported["format"] != "ifw-rw02-yaml-reference-v2" or rust["format"] != "ifw-rw02-yaml-result-v2"

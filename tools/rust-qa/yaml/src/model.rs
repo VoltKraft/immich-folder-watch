@@ -112,18 +112,23 @@ impl Scalar {
         let invalid = || serde::de::Error::custom("invalid configuration scalar");
         // An alias replays the value assigned to its defining property. An
         // integer stored in an album name therefore reaches later uses as text.
-        if let Some((kind @ ("bool" | "int" | "float"), property)) =
+        if let Some((kind @ ("bool" | "int" | "float" | "string" | "implicit"), property)) =
             tag.as_deref().and_then(|t| t.split_once(':'))
         {
-            let text = value.ok_or_else(invalid)?;
-            let typed = match kind {
-                "int" => legacy_integer(&text).map(Self::Int),
-                "bool" => legacy_flag(&text, false).map(Self::Bool),
-                _ => text.trim().parse().ok().map(Self::Float),
+            let typed = match (kind, value) {
+                ("implicit", None) => Some(Self::Null),
+                ("implicit", Some(text)) => Some(Self::Text(text, false)),
+                ("string", Some(text)) => Some(Self::Text(text, true)),
+                ("int", Some(text)) => legacy_integer(&text).map(Self::Int),
+                ("bool", Some(text)) => legacy_flag(&text, false).map(Self::Bool),
+                ("float", Some(text)) => legacy_float(&text).map(Self::Float),
+                _ => None,
             }
             .ok_or_else(invalid)?;
             return match property {
-                "text" => Ok(Self::Text(typed.text().ok_or_else(invalid)?, true)),
+                "text" => Ok(typed
+                    .text()
+                    .map_or(Self::Null, |value| Self::Text(value, true))),
                 "integer" => typed.integer().map(Self::Int).ok_or_else(invalid),
                 "boolean" => typed.flag().map(Self::Bool).ok_or_else(invalid),
                 _ => Err(invalid()),
@@ -183,6 +188,39 @@ impl<'de> Deserialize<'de> for RawText {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self(Scalar::read(deserializer)?.text()))
     }
+}
+
+// YamlDotNet supplies its own NumberFormatInfo to Double.Parse. Its group
+// separator is allowed in the integral part after the first digit.
+fn legacy_float(text: &str) -> Option<f64> {
+    let text = text.trim_ascii();
+    let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
+    if unsigned.eq_ignore_ascii_case(".inf") {
+        return Some(if text.starts_with('-') {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        });
+    }
+    if unsigned.eq_ignore_ascii_case(".nan") {
+        return Some(f64::NAN);
+    }
+    if !text
+        .bytes()
+        .all(|b| matches!(b, b'0'..=b'9' | b'.' | b'+' | b'-' | b'e' | b'E' | b'_'))
+    {
+        return None;
+    }
+    if !text.contains('_') {
+        return text.parse().ok();
+    }
+    let integer_end = unsigned.find(['.', 'e', 'E']).unwrap_or(unsigned.len());
+    if !unsigned.as_bytes().first().is_some_and(u8::is_ascii_digit)
+        || unsigned[integer_end..].contains('_')
+    {
+        return None;
+    }
+    text.replace('_', "").parse().ok()
 }
 
 // .NET 10 general-format Double uses shortest round-trip digits and switches

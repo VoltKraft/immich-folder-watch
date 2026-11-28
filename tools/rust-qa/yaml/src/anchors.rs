@@ -269,7 +269,8 @@ pub(super) fn typed_scalar_input<'a>(
     input: &'a str,
     options: &mut serde_saphyr::Options,
 ) -> Result<Cow<'a, str>, Failure> {
-    if !input.contains('!') {
+    let has_alias = input.contains('*') && input.contains('&');
+    if !has_alias && !input.contains('!') {
         return Ok(Cow::Borrowed(input));
     }
     let lines = Lines::for_input(input);
@@ -277,7 +278,9 @@ pub(super) fn typed_scalar_input<'a>(
     let original = |offset| lines.as_ref().map_or(offset, |v| v.original(offset));
     let mut stack = Vec::new();
     let mut tags = Vec::new();
-    let settings = crate::scalar_breaks::parser_options(options);
+    let mut implicit_anchor = None;
+    let mut settings = crate::scalar_breaks::parser_options(options);
+    settings.emit_anchor_events = true;
     for event in Parser::new_from_str_with_options(syntax, settings) {
         let (event, span) = event.map_err(|_| Failure::InvalidYaml)?;
         match event {
@@ -303,23 +306,44 @@ pub(super) fn typed_scalar_input<'a>(
             Event::MappingEnd | Event::SequenceEnd => {
                 stack.pop().ok_or(Failure::InvalidYaml)?;
             }
-            Event::Scalar(value, _, _, tag) => {
+            Event::Scalar(value, _, anchor, tag) => {
                 let property = match next_role(stack.last_mut(), Some(&value)) {
                     Role::Text => "text",
                     Role::Integer => "integer",
                     Role::Boolean => "boolean",
                     _ => continue,
                 };
+                if has_alias && anchor != 0 && tag.is_none() {
+                    // The following Anchor event locates the name before any scalar
+                    // style, including a block header or an implicit empty value.
+                    implicit_anchor = Some((anchor, property));
+                    continue;
+                }
                 let source = match tag.as_ref().and_then(|t| t.core_suffix()) {
                     Some("bool") => "bool",
                     Some("int") => "int",
                     Some("float") => "float",
+                    // Preserve explicitly string-tagged null spellings verbatim.
+                    // Reusing one as a non-string property already fails conversion.
+                    Some("str")
+                        if has_alias
+                            && anchor != 0
+                            && !matches!(value.as_ref(), "" | "~" | "null" | "Null" | "NULL") =>
+                    {
+                        "string"
+                    }
                     _ => continue,
                 };
                 let span = span.tag_span().ok_or(Failure::InvalidYaml)?;
                 let start = original(span.start.byte_offset().ok_or(Failure::InvalidYaml)?);
                 let end = original(span.end.byte_offset().ok_or(Failure::InvalidYaml)?);
                 tags.push((start, end, source, property));
+            }
+            Event::Anchor(id, _) => {
+                if let Some((_, property)) = implicit_anchor.take_if(|(anchor, _)| *anchor == id) {
+                    let offset = original(span.end.byte_offset().ok_or(Failure::InvalidYaml)?);
+                    tags.push((offset, offset, "implicit", property));
+                }
             }
             Event::Alias(_) | Event::UnresolvedAlias(_) => {
                 next_role(stack.last_mut(), None);
@@ -337,7 +361,11 @@ pub(super) fn typed_scalar_input<'a>(
         let before = input.get(copied..start).ok_or(Failure::InvalidYaml)?;
         checked.push_str(before);
         typed.push_str(before);
-        checked.push('!');
+        if start == end {
+            typed.push(' ');
+        } else {
+            checked.push('!');
+        }
         write!(typed, "!<{source}:{property}>").expect("writing to a string");
         copied = end;
     }

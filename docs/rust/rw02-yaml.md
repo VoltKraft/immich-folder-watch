@@ -127,6 +127,40 @@ The run also passed formatting, Clippy and 14 Rust tests. Its receipt under
 has SHA-256 `cad9f8e90acceda9cf4505ad783045f93b0ee27ed5cde6af1633b105720ae015`.
 These results cover Fedora x64 with its recorded runtime and culture.
 
+## Grouped floats and untagged scalar aliases
+
+The signed 3.0.4 YAML formatter uses `_` as the group separator in a
+float's integer part. Assigning `!!float 1_000.5` to an integer setting
+produces 1000, to an album name produces `1000.5`, and to a Boolean
+setting produces true. The formatter spells its special values `.inf`,
+`-.inf` and `.nan`. All three convert to true or to the album names
+`Infinity`, `-Infinity` and `NaN` respectively. Conversion to an integer
+fails. The signed reader also rejects `!!float inf` and `!!float NaN`.
+
+The defining configuration property supplies the type for an anchored
+value. For example, `maxBatchSize: &duration 010` stores 8. Reusing
+`*duration` as an album name produces the string `8`.
+With `includeSubdirectories: &enabled yes`, the album name from `*enabled`
+is `True`. Rust records that property type beside the anchor in its
+internal parsing view. The original YAML bytes remain available for
+comparison. [Rust scalar conversion](../../tools/rust-qa/yaml/src/model.rs) ·
+[Shipping reference cases](../../tools/rust-qa/yaml/dotnet/Program.cs).
+
+On Fedora x64, the signed 3.0.4 assemblies and the earlier Rust executable
+at `c63d91c` agreed on 21 of 45 float cases and three of 14 scalar alias
+cases. The revised reader agreed on all 59 and also reproduced the preceding
+89 comparisons. The signed assemblies reopened, validated and resaved 20
+unchanged or edited Rust outputs from ten profiles. The readback receipt
+under `artifacts/rust/yaml-assessment/ordinary-scalars-20261128/signed-grouped-native-final/readback.json`
+has SHA-256 `d27770c02cbc5b793931125833f82fcb1ce7bfdf9cfc2fa8759138afd2960840`.
+
+The frozen Fedora x64 run passed 330 byte checks on 110 original inputs,
+475 differential assertions and 268 C# readbacks. All 101 prior case records
+and their 128 emitted YAML files matched. The audited graph contained the
+same 30 packages. The run receipt under
+`artifacts/rust/yaml-assessment/runs/grouped-float-alias-fedorax64-01/result.json`
+has SHA-256 `085f35d2f56a03668294821340dc70523ebddbc345ab5b49fe688b369aebdbaa`.
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects
