@@ -739,6 +739,30 @@ original console. The observer requires the real Shell refusal, including its
 receiver and registration token. [Native observer](../../tools/rust-qa/windows-launcher/window_quit.py)
 · [UI Automation action](../../tools/rust-qa/windows-launcher/window-quit.ps1).
 
+At `07c0d70` the native ARM64 editor (PID 11180) opened HWND 328388
+after the Shell refused its initial tray add. The original ARM64 worker
+(PID 4860) completed two passes over the synthetic file. UI Automation
+invoked the enabled, visible 70 × 22 **Beenden** button on that HWND.
+The worker exited successfully, the GUI cleaned up the tray receiver and
+stopped its control reader, then recorded `DRAINED passes=11` and exited
+with status zero. The supervisor confirmed profile cleanup and restored
+the unlocked `Default` input desktop in the original console session 2.
+Both PE headers and image hashes matched their native compiler receipts.
+The original ZIP matched the Actions SHA-256
+`d9d80b40e752bfca1b8c3b0add67634a9517226e686f669eb29ba414672d02e2`.
+[ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46128570840/job/140928524047)
+· [Original archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46128570840/artifacts/15256159953).
+
+The earlier `245a921` verifier rejected the same shutdown order for worker
+8212 because it required tray cleanup to precede worker exit. Replaying
+that archive reproduces the original error and confirms both events before
+the control reader stopped. In the `07c0d70` run both separate source-frame
+checks on `Default` failed because the field center still belonged to a
+different HWND after the editor was raised. Both private-desktop frame
+checks passed. The console had one 96-DPI monitor. Mixed-DPI and native
+RDP rendering on ARM64 remain open. [Earlier job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127111222)
+· [Display criteria](rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
 Explorer can accept the icon before the separate version-4 handshake
 finishes. An isolated API model returned success for `NIM_ADD`, failure
 for `NIM_SETVERSION` and failure for the attempted `NIM_DELETE`. With
