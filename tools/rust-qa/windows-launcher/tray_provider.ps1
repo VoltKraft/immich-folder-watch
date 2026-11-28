@@ -575,10 +575,37 @@ function Get-OverflowButton($State) {
     }
     $point = [Windows.Point]::new([Math]::Floor($bounds.Left+$bounds.Width/2), [Math]::Floor($bounds.Top+$bounds.Height/2))
     $hit = $guard.ButtonHit($point.X,$point.Y)
-    if (-not (Test-ProviderPoint $button $root $point $ShellPid)) { throw [InvalidOperationException]::new('The physical chevron did not hit its provider') }
+    $binding='uia-point'
+    if (-not (Test-ProviderPoint $button $root $point $ShellPid)) {
+        # Server 2025 can project the taskbar root at the center of a separately enumerated button.
+        # Qualify only the auxiliary chevron. The app icon still has to pass both marker challenges.
+        if (!$localVm) { throw [InvalidOperationException]::new('The physical chevron did not hit its provider') }
+        $pointElement=[Windows.Automation.AutomationElement]::FromPoint($point)
+        $rootPoint=$null -ne $pointElement -and [Windows.Automation.Automation]::Compare($pointElement,$root)
+        $overlappingButtons=@()
+        if ($rootPoint) {
+            $buttons=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::Button)
+            foreach ($candidate in $root.FindAll([Windows.Automation.TreeScope]::Descendants,$buttons)) {
+                $item=$candidate.Current
+                $box=$item.BoundingRectangle
+                if ($item.ProcessId -eq $ShellPid -and $item.IsEnabled -and !$item.IsOffscreen -and !$box.IsEmpty -and
+                    $box.Left -le $point.X -and $point.X -lt $box.Right -and $box.Top -le $point.Y -and $point.Y -lt $box.Bottom) {
+                    $overlappingButtons+= $candidate
+                }
+            }
+        }
+        $unique=$overlappingButtons.Count -eq 1 -and [Windows.Automation.Automation]::Compare($button,$overlappingButtons[0])
+        Write-Event 'chevron-projection' @{rootAtPoint=$rootPoint;matchingButtons=$overlappingButtons.Count;original=$unique;
+            point=@([int]$point.X,[int]$point.Y);bounds=@($bounds.Left,$bounds.Top,$bounds.Right,$bounds.Bottom);nativeHit=$hit}
+        if (!$rootPoint -or !$unique -or $guard.ButtonHit($point.X,$point.Y) -ne $hit -or
+            ![Windows.Automation.Automation]::Compare([Windows.Automation.AutomationElement]::FromPoint($point),$root)) {
+            throw [InvalidOperationException]::new('The physical chevron did not hit its provider')
+        }
+        $binding='unique-local-button-at-taskbar-root-point'
+    }
     $runtime = $button.GetRuntimeId() -join ','
     if (-not $runtime) { throw [InvalidOperationException]::new('The original chevron lacked a runtime identity') }
-    return @{runtimeId=$runtime; nativeHit=$hit; bar=$script:Bar; pid=$script:ShellPid; bounds=@($bounds.Left,$bounds.Top,$bounds.Right,$bounds.Bottom)
+    return @{runtimeId=$runtime; nativeHit=$hit; bar=$script:Bar; pid=$script:ShellPid; binding=$binding; bounds=@($bounds.Left,$bounds.Top,$bounds.Right,$bounds.Bottom)
              point=@([int]$point.X,[int]$point.Y)}
 }
 
