@@ -28,6 +28,15 @@ if (![Environment]::Is64BitProcess -or (Split-Path -Leaf $NativeDirectory) -cne 
 }
 [void](New-Item -ItemType Directory -Path $OutputDirectory)
 $report = [ordered]@{status='unavailable'; target=$target; frequency=[Diagnostics.Stopwatch]::Frequency}
+# The native Windows PowerShell host may lack the Get-FileHash module.
+function Get-ObserverDigest([string]$path) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [IO.File]::OpenRead($path)
+        try { $digest = $algorithm.ComputeHash($stream) } finally { $stream.Dispose() }
+        return [BitConverter]::ToString($digest).Replace('-', '').ToLowerInvariant()
+    } finally { $algorithm.Dispose() }
+}
 if ($HostedArm64) {
     $profileToken = $env:IFW_QA_INVENTORY_TOKEN
     $scratch = Join-Path $env:RUNNER_TEMP ("ifw-shell-" + $profileToken)
@@ -41,7 +50,7 @@ if ($HostedArm64) {
     $report.head = $env:GITHUB_SHA
     $report.run = $env:GITHUB_RUN_ID
     $report.attempt = $env:GITHUB_RUN_ATTEMPT
-    $report.scriptSha256 = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $report.scriptSha256 = Get-ObserverDigest $PSCommandPath
     $report.observerPid = $PID
 }
 try {
@@ -152,7 +161,7 @@ public static class IfwToastPoint {
         } finally { $graphics.Dispose(); $bitmap.Dispose() }
         return [ordered]@{hwnd=$root.ToInt64(); windowClass=[IfwToastPoint]::Class($root); pid=$ownerId;
             image=$owner.Path; session=$session; createdUtc=$owner.StartTime.ToUniversalTime().ToString('o');
-            normalView=$normalView; labels=$labels; capture=@($left,$top,$width,$height); imageSha256=(Get-FileHash "$OutputDirectory\popup.png").Hash.ToLowerInvariant()}
+            normalView=$normalView; labels=$labels; capture=@($left,$top,$width,$height); imageSha256=(Get-ObserverDigest "$OutputDirectory\popup.png")}
     }
     # A retained notifier can retry its Setting query before reaching the one
     # ordinary Show. Start the screen interval from that sender's own return.

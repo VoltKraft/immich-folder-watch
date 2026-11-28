@@ -65,6 +65,15 @@ window closed. This run has no physical popup observation. The corrected
 physical observer uses its own pinned marker and scratch directory, checks
 them in PowerShell and records cleanup. [Original fresh-console receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103222352/artifacts/15246364381).
 
+At `8474f1f` the native ARM64 physical observer started in session 2.
+Windows PowerShell 5.1 could not resolve `Get-FileHash` before the
+observer armed. The child exited, its process job drained and the private
+profile was removed. The independent history replay confirmed both sends
+and selective removal. Its 92 screen samples found neither label and
+Settings again reported Do not disturb on. The physical observer now
+uses the runtime SHA-256 implementation to hash its script and image.
+[Original native process log and histories](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46104122444/artifacts/15247386025).
+
 ## Visible normal WinRT popup
 
 On the hosted ARM64 desktop the command above starts a second, native
