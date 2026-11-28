@@ -1,0 +1,26 @@
+{
+  "files": {
+    "src/graphics.rs": [
+      "459f1e45a16ed837c3d4015d29129dc897bd24b6c8d52b37a9dbd8b82d6aaaeb",
+      "fb4fd515ba6874932ea7f762dc07e8a10a2eef58b107f9c10152bbc6fe483d1b"
+    ],
+    "artifacts/cost/egui-wgpu/src/winit.rs": [
+      "9f18a68875268389ad72a49a93f4d63868c2156926bb0cc190f90fe0ecc6bd1b",
+      "684c86abcc42ebeca01d8f012c4e2c94582ca68e338199b331c27cbb42f1ce61"
+    ],
+    "artifacts/retained/eframe/src/native/wgpu_integration.rs": [
+      "3ee72a452d08260907351f95532c9da34c4204c9f37de9508436c6fcc536f03d",
+      "f5054e55c2974055a63b0c90664dc40fad96e1e9d72ed95df812212957ceff14"
+    ]
+  },
+  "libraries": {
+    "eframe": {
+      "files": 36,
+      "sha256": "566f92a97e8321eeebb5daf7658d0598ae7871f3db2a8d0d017836311392840c"
+    },
+    "egui-wgpu": {
+      "files": 13,
+      "sha256": "6571676b1b23225764a067b09ceb263ea3d101ffb62747be2ad04900cc6bfbd6"
+    }
+  }
+}

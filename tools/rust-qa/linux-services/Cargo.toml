@@ -1,0 +1,16 @@
+[package]
+name = "linux-services-assessment"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+async-channel = "=2.5.0"
+desktop-lifecycle = { path = "../../../rust/crates/desktop-lifecycle" }
+safe-fs = { path = "../../../rust/crates/safe-fs" }
+futures-lite = "=2.6.1"
+zbus = { version = "=5.19.0", default-features = false, features = ["async-io"] }

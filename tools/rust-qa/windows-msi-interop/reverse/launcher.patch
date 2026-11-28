@@ -1,0 +1,134 @@
+--- a/src/windows_launcher.rs
++++ b/src/windows_launcher.rs
+@@ -3,7 +3,7 @@
+ use std::fs::{File, OpenOptions};
+ use std::io::{self, Read, Write};
+ use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+-use std::os::windows::io::{AsRawHandle, OwnedHandle, RawHandle};
++use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
+ use std::path::{Path, PathBuf};
+ use std::ptr::null_mut;
+ use std::sync::Arc;
+@@ -55,6 +55,7 @@
+ 
+ #[link(name = "kernel32")]
+ unsafe extern "system" {
++    fn OpenMutexW(access: u32, inherit: i32, name: *const u16) -> RawHandle;
+     fn PeekNamedPipe(
+         pipe: RawHandle,
+         data: *mut c_void,
+@@ -258,24 +259,28 @@
+     open: impl Fn() -> Result<(), TrySendError<T>> + Send + 'static,
+ ) -> io::Result<Launch> {
+     if std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").is_none() {
+-        return Ok(Launch::Disabled);
+-    }
+-    let (temp, local_vm) = crate::fixture_temp()
+-        .ok_or_else(|| io::Error::other("expected the private native launcher fixture"))?;
+-    if std::env::var("IFW_QA_WINDOWS_LAUNCHER").as_deref() != Ok("1")
+-        || std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1")
+-        || (!local_vm
+-            && (std::env::var("GITHUB_REPOSITORY").as_deref()
+-                != Ok("VoltKraft/immich-folder-watch")
+-                || std::env::var("GITHUB_REF").as_deref() != Ok("refs/heads/rewrite/rust")))
+-    {
+-        return Err(io::Error::other(
+-            "expected the private native launcher fixture",
+-        ));
++        return Err(io::Error::other("Missing installed secondary fixture"));
++    }
++    for (key, value) in [
++        ("IFW_QA_WINDOWS_LAUNCHER", "1"),
++        ("IFW_QA_MSI_SECONDARY", "1"),
++        ("IFW_QA_ISOLATED", "1"),
++        ("RUNNER_ENVIRONMENT", "github-hosted"),
++        ("RUNNER_OS", "Windows"),
++        ("GITHUB_ACTIONS", "true"),
++        ("GITHUB_REPOSITORY", "VoltKraft/immich-folder-watch"),
++        ("GITHUB_REF", "refs/heads/rewrite/rust"),
++    ] {
++        if std::env::var(key).as_deref() != Ok(value) {
++            return Err(io::Error::other(
++                "expected the private native launcher fixture",
++            ));
++        }
+     }
+     let token = std::env::var("IFW_QA_INVENTORY_TOKEN").unwrap_or_default();
+     let sid = std::env::var("IFW_QA_LAUNCHER_SID").unwrap_or_default();
+     let root = PathBuf::from(std::env::var_os("IFW_QA_INVENTORY_ROOT").unwrap_or_default());
++    let temp = PathBuf::from(std::env::var_os("RUNNER_TEMP").unwrap_or_default());
+     if !local::valid_sid(&sid)
+         || token.len() != 32
+         || !token.bytes().all(|b| b.is_ascii_hexdigit())
+@@ -289,21 +294,69 @@
+     if read_bounded(&marker, 32)? != token {
+         return Err(io::Error::other("launcher ownership marker mismatch"));
+     }
+-    let mutex = format!(r"Local\ImmichFolderWatch-qa-{sid}-{token}");
+-    let pipe = format!(r"\\.\pipe\ifw-qa-{sid}-{token}");
++    if std::env::args_os().len() != 1 {
++        return Err(io::Error::other(
++            "Expected the argument-free MSI secondary test",
++        ));
++    }
++    let mutex = format!(r"Local\ImmichFolderWatch-{sid}");
++    let pipe = format!(r"\\.\pipe\ifw-{sid}");
++    let wide: Vec<u16> = mutex.encode_utf16().chain(Some(0)).collect();
++    // Hold the existing election object before ordinary admission. Missing WPF must
++    // never create an election object, enter the server branch or start a worker.
++    let existing = unsafe { OpenMutexW(0x0010_0000, 0, wide.as_ptr()) };
++    if existing.is_null() {
++        let error = io::Error::last_os_error();
++        if error.raw_os_error() == Some(2) {
++            eprintln!("MSI_REVERSE_ELECTION_ABSENT");
++        }
++        return Err(error);
++    }
++    let _existing = unsafe { OwnedHandle::from_raw_handle(existing) };
+     let (owner, primary) = local::mutex(&mutex, Some(&sid))?;
++    if primary {
++        return Err(io::Error::other("Existing WPF election changed"));
++    }
+     if !primary {
+         // The primary publishes and pins its PID before making its first pipe available.
+         let connection = local::connect(&pipe, TIMEOUT)?;
+         let pid_file = pinned(&root.join("launcher.pid"), false, false)?;
+         let (expected, created) =
+             launcher_delivery::primary_identity(&read_bounded(&pid_file, 31)?)?;
++        let actual = local::peer_pid(&connection, true)?;
++        if actual != expected {
++            return Err(io::Error::other(
++                "The connected server differs from the held MSI process",
++            ));
++        }
++        let stamp = created.ok_or_else(|| io::Error::other("Missing MSI process identity"))?;
++        // Keep this process reference through the ordinary send on this same connection.
++        let process = unsafe {
++            Owned::new(OpenProcess(
++                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
++                false,
++                actual,
++            )?)
++        };
++        if creation_time(*process) != Some(stamp)
++            || unsafe { WaitForSingleObject(*process, 0) } != WAIT_TIMEOUT
++        {
++            return Err(io::Error::other(
++                "The original MSI process has exited or changed",
++            ));
++        }
++        println!(
++            "MSI_REVERSE_CONNECTED client={} server={actual} created={stamp}",
++            std::process::id()
++        );
+         let grant = if std::env::args_os().len() == 1 {
+             Some(offer_foreground(&connection, expected, created)?)
+         } else {
+             None
+         };
+         local::send(&connection, expected, SHOW)?;
++        drop(connection);
++        println!("MSI_REVERSE_SENT server={actual} bytes={}", SHOW.len());
+         if let Some(state) = grant {
+             println!("LAUNCHER_FOREGROUND_GRANT server={expected} state={state}");
+         }

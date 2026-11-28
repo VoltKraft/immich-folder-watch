@@ -7,10 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Use the Windows contrast palette for text, selections and buttons in the Rust feasibility window, including changes while the window is hidden.
+- Document the proposed full Rust rewrite, GUI/library assessment, compatibility and security gates, staged migration, and reusable desktop architecture standard. No application implementation or runtime behavior changes.
+- Select the complete Rust candidate implementation on `rewrite/rust`, with a fixed RW-01 through RW-07 goal contract and explicit native, compatibility, security, licensing and reuse acceptance gates. Stable publication remains separate.
+- Add synthetic C# compatibility oracles for legacy YAML/SQLite, HTTP and synchronization behavior, and window lifecycle, with a four-platform native reference workflow isolated from publication. Shipping application behavior and dependencies are unchanged.
+- Exercise the original 3.0.4 MSI and Flatpak packages against synthetic migration profiles, including native repair, uninstall and retained-data checks.
+- Add a pinned Rust feasibility workspace for window lifecycle, legacy value codecs, handle-bound filesystem operations and realtime framing. Add native differential tests and an isolated 100,000-file desktop benchmark.
+- Add isolated Rust desktop, SQLite and TLS/WebSocket assessments with audited inputs, native window observations and C# readback of Rust-written WAL backups.
+- Add native Linux and Windows file-watch probes with overflow recovery. Exercise real screen readers, platform logs, document-portal file locking, and Windows display and resource behavior in the rewrite assessment.
+- Add an offline combined Rust dependency build, native SQLite crash and full-disk recovery checks, and Linux desktop assessments for system colors and activation through the visible Plasma tray icon.
+- Add Rust CodeQL checks for the Linux and Windows configurations of the foundation workspace on the rewrite draft PR.
+- Compare original UTF-8, UTF-16 and UTF-32 configuration files against the shipping reader and preserve damaged inputs during the rewrite assessment.
+- Compare Windows visibility timings across the shipping WPF application, retained eframe window and a Rust GDI control during a 100,000-file scan.
+- Capture the shipping worker’s SQLite backups and downloaded bytes around a synthetic transfer, then check its restart and account history on the native reference runners.
+- Exercise the native Rust SQLite backup with a completed worker download and verify that the shipping worker reconciles the same file after restoring the returned bytes.
+- Verify that the shipping worker's synthetic peer retains the bytes it received before a database restart and that the worker reconciles the same asset without another upload.
+
 ## [3.0.4] - 2026-11-13
 
 ### Fixed
 
+- Reopen Linux watch subfolders inside an existing Documents grant in the Rust feasibility client. The client walks from the granted directory and reads the display label from the opened subfolder.
 Maintenance release focused on Windows distribution; Linux application behavior is unchanged. Configuration and stored data remain compatible; no migration is required.
 
 Before updating, choose Quit in the Windows tray menu. If an application process remains running, the installer safely aborts before removing the existing version; close the application and retry. Automatic installer-driven shutdown is not guaranteed. (Windows)

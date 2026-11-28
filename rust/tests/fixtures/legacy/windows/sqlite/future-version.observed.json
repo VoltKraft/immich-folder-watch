@@ -1,0 +1,9 @@
+{
+  "Rejected": true,
+  "UserVersion": 999,
+  "Sentinel": "preserve",
+  "JournalModeBefore": "delete",
+  "JournalModeAfter": "wal",
+  "DatabaseBytesUnchanged": false,
+  "BaselineGap": "The legacy store configures WAL before rejecting the version. Rust must inspect unsupported schemas read-only without this mutation."
+}

@@ -1,0 +1,422 @@
+"""Observe live Windows contrast colors on the ordinary Rust filename label."""
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
+import ctypes as c
+from ctypes import wintypes as w
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import sys
+import time
+import traceback
+import uuid
+
+HERE = Path(__file__).resolve().parent
+QA, ROOT = HERE.parent, HERE.parents[2]
+sys.path[:0] = [str(HERE), str(QA / "windows-text"), str(QA / "windows-desktop"),
+                str(QA / "windows-performance"), str(QA)]
+from native import Win32, pin_path
+from storage.evidence import sha256, write_json
+from job import run_worker
+from win32 import Desktop, GA_ROOT, READ_OBJECTS, bind, check, ordinary_console, same_name, unlocked_console
+from windows_colors import SystemColors, contrast_cycle, label_bitmap, label_colors
+from windows_observer import isolated_windows_vm, private_gui_environment, private_profile, select_powershell
+from worker import hosted, named_desktop, powershell
+
+TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
+
+
+def job_guard():
+    if (not hosted() or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
+            or os.getenv("GITHUB_REF") != "refs/heads/rewrite/rust"
+            or not re.fullmatch("[0-9a-f]{40}", os.getenv("GITHUB_SHA", ""))
+            or not os.getenv("GITHUB_RUN_ID", "").isdecimal() or not os.getenv("GITHUB_RUN_ATTEMPT", "").isdecimal()):
+        raise ValueError("Use the dedicated Windows rewrite job for the temporary contrast setting")
+
+
+def verify_frames(output, phase, record, pid, hwnd, state):
+    if (record.get("status"), record.get("phase"), record.get("pid"), record.get("hwnd"),
+            record.get("label")) != ("observed", phase, pid, hwnd, "Dateiname"):
+        raise ValueError("The two label samples must belong to the original Rust HWND")
+    rect = record["rect"]
+    if len(rect) != 4 or any(type(n) is not int for n in rect) or len(record["samples"]) != 2:
+        raise ValueError("Missing the physical rectangle or the two repeat samples")
+    rasters = []
+    for i, item in enumerate(record["samples"], start=1):
+        expected = f"{phase}.json.{i}.bmp"
+        path = output / expected
+        if item["file"] != expected or sha256(path) != item["sha256"]:
+            raise ValueError("The original label frame differs from its receipt")
+        width, height, colors, raster = label_bitmap(path)
+        rasters.append(raster)
+        if [width, height] != rect[2:]:
+            raise ValueError("The captured bitmap differs from its physical UIA label bounds")
+        metrics = label_colors(colors, state)
+    if rasters[0] != rasters[1]:
+        raise ValueError("Two successive samples of the static label have different pixels")
+    return {"dimensions": rect[2:], "rasterSha256": rasters[0], **metrics}
+
+
+def announce(folder, name, token, **fields):
+    temp = folder / (name + ".tmp")
+    final = folder / (name + ".json")
+    if final.exists():
+        raise ValueError("Duplicate Windows contrast phase " + name)
+    write_json(temp, {"token": token, **fields})
+    temp.replace(final)
+
+
+def message(folder, name, token, worker=None, timeout=85):
+    deadline = time.monotonic() + timeout
+    while not (folder / (name + ".json")).is_file():
+        if name != "stop" and (folder / "stop.json").exists():
+            raise RuntimeError("The contrast supervisor ended the observation")
+        if worker is not None and worker.done():
+            raise RuntimeError(f"The native capture worker ended with {worker.result()} before {name}")
+        if time.monotonic() >= deadline:
+            raise TimeoutError("Waiting for the contrast phase " + name)
+        time.sleep(.1)
+    data = TEXT["read"](folder / (name + ".json"))
+    if not isinstance(data, dict) or data.pop("token", None) != token:
+        raise ValueError("The contrast phase belongs to another native trial")
+    return data
+
+
+def require_live_window(api, session, name, pid, hwnd, *, publisher_desktop=None):
+    def reject(operation, expected, observed):
+        raise ValueError(f"The original visible Rust root HWND {hwnd} of PID {pid} in session {session} "
+                         f"on {name!r} failed {operation} (expected {expected!r}, observed {observed!r})")
+
+    def desktop_name(value):
+        # Keep the private fixture name, the original Default desktop and native error values.
+        if isinstance(value, str) and not (same_name(value, name) or same_name(value, "Default")):
+            return "<different desktop>"
+        return value
+
+    def nonzero(operation, native, *args):
+        c.set_last_error(0)
+        value = native(*args)
+        if not value:
+            reject(operation, "nonzero", {"returned": value, "win32LastError": c.get_last_error()})
+        return value
+
+    context = api.context()
+    if context["session"] != session:
+        reject("observer session", session, context["session"])
+    if not unlocked_console(context):
+        fields = {key: context[key] for key in ("windowStation", "stationVisible", "session", "activeConsoleSession", "wts")}
+        if isinstance(fields["windowStation"], str) and not same_name(fields["windowStation"], "WinSta0"):
+            fields["windowStation"] = "<different window station>"
+        reject("unlocked_console", "visible WinSta0 in its active unlocked console session", fields)
+    if not same_name(context["inputDesktop"], name):
+        reject("input desktop name", name, desktop_name(context["inputDesktop"]))
+    if context["inputObjectReceivesInput"] is not True:
+        reject("UOI_IO on the input desktop", True, context["inputObjectReceivesInput"])
+    subject_session = api.pid_session(pid)
+    if subject_session != session:
+        reject("ProcessIdToSessionId", session, subject_session)
+    owner = w.DWORD()
+    thread = nonzero("GetWindowThreadProcessId", api.owner, hwnd, c.byref(owner))
+    if owner.value != pid:
+        reject("GetWindowThreadProcessId owner PID", pid, owner.value)
+    if publisher_desktop is None:
+        handle = nonzero(f"GetThreadDesktop for subject thread {thread}", api.thread_desktop, thread)
+        c.set_last_error(0)
+        thread_name = api.name(handle)
+        if not same_name(thread_name, name):
+            reject("GetUserObjectInformationW(UOI_NAME) on the subject thread desktop", name, desktop_name(thread_name))
+    else:
+        if not named_desktop(name) or not ordinary_console(context, name):
+            reject("publisher thread on the owned input desktop", (name, True),
+                   (desktop_name(context["threadDesktop"]), context["threadReceivesInput"]))
+        held_name = api.name(publisher_desktop)
+        if not same_name(held_name, name):
+            reject("publisher desktop handle name", name, desktop_name(held_name))
+        receives_input = api.receiving_input(publisher_desktop)
+        if receives_input is not True:
+            reject("publisher desktop handle receives input", True, receives_input)
+        matches = api.count_top_level_window(publisher_desktop, hwnd)
+        if matches != 1:
+            reject("EnumDesktopWindows membership", 1, matches)
+        after = w.DWORD()
+        after_thread = nonzero("GetWindowThreadProcessId after enumeration", api.owner, hwnd, c.byref(after))
+        if (after.value, after_thread) != (pid, thread):
+            reject("window owner after enumeration", (pid, thread), (after.value, after_thread))
+    if not api.visible(hwnd):
+        reject("IsWindowVisible", True, False)
+    if api.iconic(hwnd):
+        reject("IsIconic", False, True)
+    ancestor = nonzero("GetAncestor(GA_ROOT)", api.ancestor, hwnd, GA_ROOT)
+    if ancestor != hwnd:
+        reject("GetAncestor(GA_ROOT)", hwnd, ancestor)
+    return thread
+
+
+def on_subject_desktop(api, name, cycle, report):
+    if not named_desktop(name):
+        raise ValueError("The contrast publisher requires the test-owned input desktop")
+    handle = check(api.open_named(name, 0, False, READ_OBJECTS), "OpenDesktopW(contrast publisher)")
+    try:
+        def publish():
+            attach = bind(c.WinDLL("user32", use_last_error=True), "SetThreadDesktop", w.BOOL, w.HANDLE)
+            thread = api.thread()
+            original = check(api.thread_desktop(thread), "GetThreadDesktop(contrast publisher)")
+            original_name = api.name(original)
+            if not same_name(original_name, "Default") and not same_name(original_name, name):
+                raise RuntimeError("The contrast publisher started on an unexpected desktop")
+            report["originalThreadDesktop"] = original_name
+            changed = not same_name(original_name, name)
+            if changed:
+                check(attach(handle), "SetThreadDesktop(contrast publisher)")
+            try:
+                if not ordinary_console(api.context(), name):
+                    raise RuntimeError("The contrast publisher did not join the owned input desktop")
+                return cycle(handle)
+            finally:
+                if changed:
+                    # GetThreadDesktop lends the original handle. Only the handle we opened is closed.
+                    check(attach(original), "SetThreadDesktop(restore contrast publisher)")
+                current = check(api.thread_desktop(thread), "GetThreadDesktop(restored contrast publisher)")
+                report["originalThreadDesktopRestored"] = same_name(api.name(current), original_name)
+                if not report["originalThreadDesktopRestored"]:
+                    raise RuntimeError("Could not verify the contrast publisher's original thread desktop")
+        # Join the publisher after it drops its association with our handle.
+        with ThreadPoolExecutor(max_workers=1) as publisher:
+            return publisher.submit(publish).result()
+    finally:
+        report["ownedHandleClosed"] = bool(api.close(handle))
+        check(report["ownedHandleClosed"], "CloseDesktop(contrast publisher)")
+
+
+def capture_job(target, desktop, report, archive=None):
+    args = [target, "--capture-worker"]
+    if archive is not None:
+        args.extend(["--isolated-vm", "--cpu-archive", str(archive)])
+    return run_worker(Path(__file__).resolve(), args,
+                      desktop, ROOT, report, timeout_seconds=300)
+
+
+def exercise(api, context, pid, hwnd, env, ps, output, report):
+    name = context["threadDesktop"]
+    control = output / "control"
+    setup = TEXT["read"](control / "session.json")
+    report["hwnd"], report["pid"] = hwnd, pid
+    if (setup["session"] != context["session"] or setup["source"] != report["build"]["source"]
+            or setup["target"] != report["target"] or setup["run"] != os.getenv("GITHUB_RUN_ID")
+            or setup["attempt"] != os.getenv("GITHUB_RUN_ATTEMPT")
+            or not named_desktop(name)):
+        raise ValueError("The capture worker does not belong to its contrast supervisor")
+    def window_guard():
+        require_live_window(api, context["session"], name, pid, hwnd)
+    window_guard()
+    token = setup["token"]
+    announce(control, "ready", token, pid=pid, hwnd=hwnd, build=report["build"], desktop=name)
+    system = SystemColors(bind, check)
+    for phase in ("original", "changed", "restored"):
+        request = message(control, "request-" + phase, token)
+        state = system.read()
+        if vars(state) != request["state"]:
+            raise ValueError("The worker and supervisor see different Windows accessibility settings")
+        window_guard()
+        path = output / (phase + ".json")
+        args = ["-SubjectId", pid, "-WindowHandle", hwnd, "-Phase", phase, "-OutputFile", path]
+        code = powershell(ps, HERE / "windows-label.ps1", args, env, output, output / (phase + ".log"), 60)
+        observed = TEXT["read"](path) if path.is_file() else {}
+        if code:
+            raise RuntimeError(observed.get("error") or f"The {phase} label observer exited {code}")
+        window_guard()
+        if state != system.read():
+            raise ValueError("The Windows palette changed while the worker observed the label")
+        signature = verify_frames(output, phase, observed, pid, hwnd, state)
+        announce(control, "observed-" + phase, token, pid=pid, hwnd=hwnd, frame=signature, state=vars(state))
+        if phase == "original" and not state.scheme:
+            if message(control, "stop", token) != {"baselineOnly": True}:
+                raise RuntimeError("The supervisor did not confirm the read-only contrast baseline")
+            report["baselineOnly"] = True
+            return
+
+
+def inputs(folder, revision, archived=False):
+    files = [*TEXT["observer_paths"](), Path(__file__).resolve(), HERE / "windows_colors.py",
+             HERE / "windows-label.ps1", HERE / "test_windows_colors.py", QA / "windows-services/service_sources.py",
+             QA / "windows-performance/native.py", ROOT / ".gitattributes"]
+    if archived:
+        files.append(QA / "windows-display/cpu_archive.py")
+    else:
+        files += [ROOT / name for name in TEXT["read"](folder / "build.json")["compilerSources"]]
+    verify = runpy.run_path(str(QA / "windows-services/service_sources.py"))["verify_checkout"]
+    return verify(ROOT, files, revision)
+
+
+def capture_profile(output):
+    name = TEXT["read"](output / "control/session.json")["profile"]
+    if not isinstance(name, str) or not re.fullmatch(r"profile-[a-zA-Z0-9_-]+", name):
+        raise ValueError("The capture worker needs the supervisor's private profile")
+    path = output.resolve(strict=True) / name
+    if path.resolve(strict=True) != path or not path.is_dir():
+        raise ValueError("The capture profile must be the supervisor's original directory")
+    return path
+
+
+def source_revision(target, archive):
+    if archive is None:
+        job_guard()
+        return os.environ["GITHUB_SHA"]
+    if (not isolated_windows_vm(True) or target != "x86_64-pc-windows-msvc"
+            or Win32().machine(-1) != (0x8664, 0x8664) or not archive.is_file()):
+        raise ValueError("Select a disposable native Windows x64 VM and the original CPU archive")
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+
+
+def check_subject(target, folder, binary, archived):
+    if not archived:
+        return TEXT["check_build"](target, binary, folder)
+    module = runpy.run_path(str(QA / "windows-display/cpu_archive.py"))
+    if TEXT["DESKTOP"]["pe_machine"](binary) != 0x8664 or sha256(binary) != module["GUI_SHA256"]:
+        raise ValueError("The observed native executable differs from the qualified x64 renderer")
+    return {"source": module["ORIGIN"]["revision"], "target": target, "binarySha256": module["GUI_SHA256"],
+                    "archiveSha256": module["ARCHIVE_SHA256"]}
+
+
+def capture_worker(target, folder, output, archive=None):
+    revision = source_revision(target, archive)
+    report = {"status": "failed", "target": target}
+    try:
+        with ExitStack() as stack:
+            profile = capture_profile(output)
+            report["inputs"] = inputs(folder, revision, archive is not None)
+            binary = (profile / "cpu.exe" if archive else TEXT["DESKTOP"]["GUI_BINARY"]).resolve(strict=True)
+            stack.enter_context(pin_path(Win32(), binary, False))
+            report["build"] = check_subject(target, folder, binary, archive is not None)
+            env = private_gui_environment(profile)
+            ps, report["observerHosts"] = select_powershell(profile, "accessibility", env=env)
+            if not ps:
+                raise RuntimeError("The native UI Automation observer could not start")
+            TEXT["observe"](binary, output, env, ps, report, exercise=exercise)
+        report["status"] = "baseline-only" if report.get("baselineOnly") else "passed"
+    except Exception:
+        report["error"] = traceback.format_exc()
+    write_json(output / "worker.json", report)
+    return int(report["status"] == "failed")
+
+
+def finish_contrast(report, child, worker_exit, unavailable):
+    baseline_only = unavailable is not None
+    child_status = "baseline-only" if baseline_only else "passed"
+    if (worker_exit or not report["captureJob"].get("jobClosed") or child.get("status") != child_status
+            or child.get("subjectExit") != 0 or not child.get("drained") or not report.get("profileRemoved")):
+        raise RuntimeError("The native capture or process cleanup is unconfirmed")
+    if baseline_only:
+        if (report["settingChangeAttempted"] is not False or report["baselineReadback"] != report["original"]
+                or not report["originalFrame"] or report["original"]["scheme"] not in (None, "")):
+            raise ValueError("The read-only baseline and the original Windows contrast setting disagree")
+        report.update(status="unavailable", reason=unavailable)
+    elif report.get("restoreVerified"):
+        report["status"] = "passed"
+    else:
+        raise RuntimeError("The Windows contrast restoration is unconfirmed")
+
+
+def supervise(target, folder, output, archive=None):
+    revision = source_revision(target, archive)
+    output.mkdir(exist_ok=False)
+    control = output / "control"
+    control.mkdir()
+    desk, processes = Desktop(), Win32()
+    token = uuid.uuid4().hex
+    report = dict(target=target, run=os.getenv("GITHUB_RUN_ID"), attempt=os.getenv("GITHUB_RUN_ATTEMPT"),
+                  source=revision, status="failed")
+    try:
+        report["inputs"] = inputs(folder, revision, archive is not None)
+        context = desk.context()
+        if not ordinary_console(context, "Default"):
+            raise RuntimeError("Start the contrast supervisor on the active unlocked disposable runner")
+        session = context["session"]
+        placement = report["placement"] = {}
+        selected = TEXT["DESKTOP"]["named_input_desktop"](desk, placement)
+        with (private_profile(output, "profile-", report) as profile, selected as desktop,
+              ThreadPoolExecutor(max_workers=1) as pool, ExitStack() as stack):
+            binary_revision = revision
+            if archive is not None:
+                stack.enter_context(pin_path(processes, profile, True))
+                stage = runpy.run_path(str(QA / "windows-display/cpu_archive.py"))["stage"]
+                binary, receipt = stage(archive, profile)
+                stack.enter_context(pin_path(processes, binary, False))
+                report["archivedBuild"] = receipt
+                binary_revision = receipt["revision"]
+            announce(control, "session", token, session=session, source=binary_revision, target=target,
+                     run=report["run"], attempt=report["attempt"], profile=profile.name)
+            job = report["captureJob"] = {}
+            placement["selected"] = desktop
+            worker = pool.submit(capture_job, target, desktop, job, archive)
+            unavailable = None
+            try:
+                ready = report["ready"] = message(control, "ready", token, worker, timeout=100)
+                pid, hwnd = ready["pid"], ready["hwnd"]
+                exe = (profile / "cpu.exe" if archive else TEXT["DESKTOP"]["GUI_BINARY"]).resolve(strict=True)
+                if (type(pid) is not int or pid <= 0 or type(hwnd) is not int or hwnd <= 0
+                        or desk.pid_session(pid) != session or not same_name(ready["desktop"], desktop)):
+                    raise ValueError("The observed GUI does not belong to the supervisor's session")
+                handle = check(processes.open(0x101000, False, pid), "OpenProcess(contrast subject)")
+                def close_image():
+                    check(processes.close(handle), "CloseHandle(contrast subject)")
+                stack.callback(close_image)
+                image, size = c.create_unicode_buffer(32768), w.DWORD(32768)
+                check(desk.image(handle, 0, image, c.byref(size)), "QueryFullProcessImageNameW")
+                report["creation100ns"] = processes.process_identity(handle)
+                if Path(image.value) != exe or ready["build"] != check_subject(target, folder, exe, archive is not None):
+                    raise ValueError("The observed process differs from the pinned native executable")
+                alive = bind(processes.kernel, "WaitForSingleObject", w.DWORD, w.HANDLE, w.DWORD)
+                def session_guard():
+                    if archive is None:
+                        job_guard()
+                    if desk.pid_session(os.getpid()) != session:
+                        raise ValueError("The contrast supervisor left its original logon session")
+                def capture(phase, state):
+                    announce(control, "request-" + phase, token, state=vars(state))
+                    ack = message(control, "observed-" + phase, token, worker)
+                    original = verify_frames(output, phase, TEXT["read"](output / (phase + ".json")), pid, hwnd, state)
+                    if ack != {"pid": pid, "hwnd": hwnd, "frame": original, "state": vars(state)}:
+                        raise ValueError("The capture receipt differs from the native files or supervisor's palette")
+                    return original
+                def change_and_restore(publisher_desktop):
+                    checks = report["publisher"]["windowChecks"] = []
+                    def window_guard():
+                        if worker.done() or alive(handle, 0) != 258:
+                            raise RuntimeError("The capture worker or original Rust process exited")
+                        tid = require_live_window(desk, session, desktop, pid, hwnd, publisher_desktop=publisher_desktop)
+                        checks.append(dict(desktop=desktop, hwnd=hwnd, pid=pid, tid=tid, enumerated=1))
+                    return contrast_cycle(SystemColors(bind, check), session_guard, window_guard, capture, report)
+                unavailable = on_subject_desktop(desk, desktop, change_and_restore, report.setdefault("publisher", {}))
+            finally:
+                stop = {"baselineOnly": True} if unavailable is not None else {}
+                announce(control, "stop", token, **stop)
+        child = TEXT["read"](output / "worker.json")
+        finish_contrast(report, child, worker.result(), unavailable)
+    except Exception:
+        report["error"] = traceback.format_exc()
+    write_json(output / "result.json", report)
+    files = sorted(p for p in output.rglob("*") if p.is_file() and p.parent in (output, control))
+    (output / "evidence.sha256").write_text("".join(f"{sha256(p)}  {p.relative_to(output).as_posix()}\n" for p in files),
+                                            encoding="utf-8", newline="\n")
+    print(report.get("error") or report.get("reason") or report["status"])
+    return int(report["status"] != "passed")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
+    parser.add_argument("--capture-worker", action="store_true", help="read the owned label on the chosen input desktop")
+    parser.add_argument("--isolated-vm", action="store_true", help="use an expressly selected disposable native Windows VM")
+    parser.add_argument("--cpu-archive", type=Path, help="original x64 CPU timing and recovery ZIP for the VM")
+    args = parser.parse_args()
+    if bool(args.cpu_archive) != args.isolated_vm:
+        parser.error("The disposable VM requires both --isolated-vm and --cpu-archive")
+    build_dir = ROOT / "artifacts/rust/gui-native" / args.target
+    if args.cpu_archive:
+        build_dir.mkdir(parents=True, exist_ok=True)
+    method = capture_worker if args.capture_worker else supervise
+    sys.exit(method(args.target, build_dir, build_dir / "windows-contrast", args.cpu_archive))

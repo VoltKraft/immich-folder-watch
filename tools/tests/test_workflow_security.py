@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -53,6 +55,205 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn("secrets.", smoke)
         self.assertNotIn("environment:", smoke)
         self.assertNotIn("uses: actions/deploy-pages@", smoke)
+        downloads = re.findall(r"uses: actions/download-artifact@([0-9a-f]{40})[^\n]*\n(.*?)(?=\n      -|\Z)", smoke, re.S)
+        self.assertEqual(len(downloads), 2)
+        self.assertEqual(downloads[0][0], downloads[1][0])
+        for _, settings in downloads:
+            self.assertIn("artifact-ids: ${{ steps.upload.outputs.artifact_id }}", settings)
+        self.assertNotIn("continue-on-error: true", smoke.split("      - name: Retry the exact", 1)[1])
+
+    def check_rust_workflow(self, filename, expected_actions):
+        source = (WORKFLOWS / filename).read_text()
+        self.assertIn("branches: [rewrite/rust]", source)
+        self.assertIn("if: github.ref == 'refs/heads/rewrite/rust'", source)
+        self.assertIn("\npermissions:\n  contents: read\n", source)
+        self.assertNotRegex(source, r"(?m)^\s*[\w-]+: write\s*$")
+        self.assertNotIn("secrets.", source)
+        self.assertNotIn("secrets: inherit", source)
+        self.assertNotIn("environment:", source)
+        self.assertIn("persist-credentials: false", source)
+        self.assertIn("${{ github.sha }}", source)
+        actions = re.findall(r"^\s*- uses: (\S+)|^\s*uses: (\S+)", source, re.M)
+        self.assertEqual({(first or second).split("@", 1)[0] for first, second in actions}, expected_actions)
+        # Release listens to the exact CI workflow name. Rust feasibility work
+        # must remain outside that publication event chain even if it succeeds.
+        name = re.search(r"^name: (.+)$", source, re.M).group(1)
+        release = (WORKFLOWS / "release.yaml").read_text()
+        trigger = release.split("\npermissions:", 1)[0]
+        self.assertNotIn(name, trigger)
+        self.assertNotRegex(source, r"(?i)gh\s+(release|workflow)|dispatches|deploy-pages|flatpak\s+build-update-repo")
+
+    def test_rust_reference_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-compatibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_rust_feasibility_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-feasibility.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_rust_desktop_assessment_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-desktop-assessment.yaml",
+                                 {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+
+    def test_plasma_menu_and_watcher_have_both_native_linux_runners(self):
+        filename = "rust-linux-plasma.yaml"
+        self.check_rust_workflow(filename, {"actions/checkout", "actions/upload-artifact"})
+        source = (WORKFLOWS / filename).read_text()
+        self.assertEqual(set(re.findall(r"- runner: (\S+)\s+target: (\S+)", source)), {
+            ("ubuntu-24.04", "x86_64-unknown-linux-gnu"),
+            ("ubuntu-24.04-arm", "aarch64-unknown-linux-gnu"),
+        })
+        desktop = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        for observer in ("tools/rust-qa/linux-services/gui_watcher.py", "--restart-watcher",
+                         'flatpak/run.py plasma-native --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu'):
+            self.assertIn(observer, source)
+            self.assertNotIn(observer, desktop)
+        self.assertIn('tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"', source)
+        self.assertIn("artifacts/rust/flatpak-gui-launch-assessment/", source)
+
+    def test_native_linux_worker_budget_reuses_the_two_desktop_measurements(self):
+        name = "rust-linux-worker-budget.yaml"
+        self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        source = (WORKFLOWS / name).read_text()
+        self.assertEqual(re.findall(r"^      - '(.*)'$", source.split("permissions:", 1)[0], re.M), [".github/workflows/" + name])
+        self.assertIn("  workflow_dispatch:", source)
+        self.assertNotIn("pull_request", source)
+        self.assertEqual(set(re.findall(r"- runner: (\S+)\s+target: (\S+)", source)), {
+            ("ubuntu-24.04", "x86_64-unknown-linux-gnu"), ("ubuntu-24.04-arm", "aarch64-unknown-linux-gnu")})
+        self.assertIn("  actions: read", source)
+        broad = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        for phase in ("reference", "candidate"):
+            command = "bash tools/rust-qa/performance/hosted_budget.sh " + phase
+            self.assertIn(command, source)
+            self.assertIn(command, broad)
+
+    def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
+        for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):
+            with self.subTest(workflow=name):
+                self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        for name in ("rust-windows-x64-build.yaml", "rust-windows-x64-gui-build.yaml",
+                     "rust-windows-x64-combined-build.yaml", "rust-windows-x64-tray-build.yaml",
+                     "rust-windows-arm64-notification.yaml", "rust-windows-arm64-display.yaml"):
+            self.check_rust_workflow(name, {"actions/checkout", "actions/upload-artifact"})
+
+    def test_arm64_display_keeps_both_attempts_and_the_native_builds(self):
+        source = (WORKFLOWS / "rust-windows-arm64-display.yaml").read_text()
+        self.assertEqual(re.findall(r"runs-on: (\S+)", source), ["windows-11-arm"])
+        self.assertIn("NATIVE_TARGET: aarch64-pc-windows-msvc", source)
+        default, job = source.split("\njobs:\n", 1)
+        self.assertNotIn("actions: read", default)
+        self.assertIn("    permissions:\n      contents: read\n      actions: read\n", job)
+        steps = dict(step.split("\n", 1) for step in job.split("      - name: ")[1:])
+        canonical = steps["Observe the canonical source-monitor edit"]
+        retained = steps["Observe the retained source-monitor edit"]
+        private = steps["Measure the canonical source frame on a private input desktop"]
+        private_retained = steps["Measure the retained source frame on a private input desktop"]
+        selection = steps["Select the current or requested original ARM64 selection subject"]
+        reopened = steps["Reopen the selected filename in the original ARM64 primary"]
+        archive = steps["Retain both measurements and the original compiler outputs"]
+        self.assertIn("windows-display/run.py $env:NATIVE_TARGET --require source-frame", canonical)
+        self.assertIn("windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame", retained)
+        self.assertIn("windows-display/private_source.py\n", private)
+        self.assertIn("windows-display/private_source.py --retained", private_retained)
+        for step in (canonical, retained, private, private_retained, selection, archive):
+            self.assertIn("!cancelled() && steps.inputs.outcome == 'success'", step)
+        self.assertIn("windows-display/selection_archive.py $id", selection)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", selection)
+        self.assertEqual(job.count("GH_TOKEN:"), 1)
+        self.assertIn("!cancelled() && steps.selection.outcome == 'success'", reopened)
+        self.assertIn("windows-display/private_selection.py --archive", reopened)
+        self.assertIn("windows-display/private_selection.py\n", reopened)
+        self.assertIn("windows-display/archive_pair.py", steps["Compile both native GUI subjects and archive the corresponding worker"])
+        self.assertIn("windows-display/venue.py", steps["Read the existing Remote Desktop settings and aggregate WTS session states"])
+        for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/",
+                     "windows-display-private/", "windows-display-retained-private/", "windows-display-venue/",
+                     "windows-selection-private/"):
+            self.assertIn(path, archive)
+
+    def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):
+        compiler = "rust-windows-x64-build.yaml"
+        gui_compiler = "rust-windows-x64-gui-build.yaml"
+        combined_compiler = "rust-windows-x64-combined-build.yaml"
+        tray_compiler = "rust-windows-x64-tray-build.yaml"
+        storage_compiler = "rust-windows-x64-storage-build.yaml"
+        yaml_compiler = "rust-windows-x64-yaml-build.yaml"
+        for path in WORKFLOWS.glob("rust-*.yaml"):
+            source = path.read_text()
+            # Look at runner selections, including inline matrix rows.
+            windows = re.findall(r"(?:runs-on|runner|os):\s*['\"]?(windows-[\w.-]+)", source)
+            allowed = {"windows-2025"} if path.name in (
+                compiler, gui_compiler, combined_compiler, tray_compiler, storage_compiler, yaml_compiler) else {"windows-11-arm"}
+            self.assertLessEqual(set(windows), allowed, path.name)
+        source = (WORKFLOWS / compiler).read_text()
+        commands = re.findall(r"^          python -B (.+)$", source, re.M)
+        self.assertEqual(commands, [
+            "tools/rust-qa/instance/cross-session/build_msi_endpoint.py $env:NATIVE_TARGET",
+            "tools/rust-qa/windows-local/workspace.py build artifacts/rust/local-vm-inputs/workspace",
+            "tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --build-only --output artifacts/rust/local-vm-inputs/realtime",
+        ])
+        gui = (WORKFLOWS / gui_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", gui, re.M), [
+            "tools/rust-qa/build-gui-probe.py $env:NATIVE_TARGET --local-x64-inputs artifacts/rust/local-vm-inputs/gui",
+        ])
+        combined = (WORKFLOWS / combined_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", combined, re.M), [
+            "tools/rust-qa/combined-profile/run.py --x64-vm-inputs --fetch "
+            "--output artifacts/rust/combined-profile/runs/local-x64-inputs",
+        ])
+        tray = (WORKFLOWS / tray_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", tray, re.M), [
+            "tools/rust-qa/windows-launcher/local_build.py $env:NATIVE_TARGET",
+        ])
+        storage = (WORKFLOWS / storage_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", storage, re.M), [
+            "tools/rust-qa/storage/run.py x86_64-pc-windows-msvc --compile-for-local-vm "
+            "--output artifacts/rust/local-vm-inputs/storage",
+        ])
+        self.check_rust_workflow(storage_compiler, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        yaml_build = (WORKFLOWS / yaml_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", yaml_build, re.M), [
+            "tools/rust-qa/yaml/run.py x86_64-pc-windows-msvc --compile-for-local-vm "
+            "--output artifacts/rust/yaml-assessment/runs/local-x64-inputs",
+        ])
+        self.check_rust_workflow(yaml_compiler, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        ci = (WORKFLOWS / "ci.yaml").read_text().split("  build-windows:\n", 1)[1].split("    steps:", 1)[0]
+        self.assertIn("github.ref != 'refs/heads/rewrite/rust'", ci)
+        self.assertIn("github.head_ref == 'rewrite/rust'", ci)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", ci)
+        for name in ("rust-compatibility", "rust-feasibility", "rust-realtime", "rust-desktop-assessment", "rust-legacy-install"):
+            with self.subTest(workflow=name):
+                runners = re.findall(r"runner: ([\w.-]+)", (WORKFLOWS / (name + ".yaml")).read_text())
+                self.assertCountEqual(runners, ["ubuntu-24.04", "ubuntu-24.04-arm", "windows-11-arm"])
+        activation = (WORKFLOWS / "rust-windows-msi-interop.yaml").read_text()
+        self.assertIn("        arch: [arm64]\n        primary: [Rust, WPF]", activation)
+        self.assertIn("arch: arm64-private-input, sdkArch: arm64, primary: WPF", activation)
+
+    def test_native_linux_notification_workflow_is_branch_bound_and_cannot_publish(self):
+        self.check_rust_workflow("rust-linux-notification.yaml", {"actions/checkout", "actions/upload-artifact"})
+
+    def test_native_notices_use_the_hash_of_the_uploaded_receipt(self):
+        source = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        stages = source.split("      - name: Retain the exact native compiler receipt ZIP\n", 1)[1]
+        original, rest = stages.split("      - name: Assemble and read back the original notices", 1)
+        assembly, rest = rest.split("      - name: Retain the verified native development notices", 1)
+        published = rest.split("      - name:", 1)[0]
+        self.assertIn("id: receipt_zip", original)
+        self.assertIn("archive: false", original)
+        self.assertIn("rust-native-input-${{ matrix.target }}-${{ github.sha }}.zip", original)
+        self.assertIn("steps.receipt_zip.outputs.artifact-digest", assembly)
+        self.assertEqual(assembly.count('--archive-sha256 "$digest"'), 2)
+        self.assertIn("steps.notices.outcome == 'success'", published)
+        self.assertIn("archive: false", published)
+
+    def test_native_compiler_download_record_is_identical_with_windows_newlines(self):
+        script = (ROOT / "tools/rust-qa/install-toolchain.sh").read_text()
+        selection = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+        inputs = ROOT / "rust/toolchain-inputs.json"
+        for target, spec in json.loads(inputs.read_text())["targets"].items():
+            with self.subTest(target=target):
+                code = "import sys\nsys.stdout.reconfigure(newline='\\r\\n')\n" + selection
+                pair = subprocess.check_output([sys.executable, "-c", code, str(inputs), target])
+                self.assertEqual(pair, f"{spec['rust']['url']} {spec['rust']['sha256']}\n".encode("ascii"))
 
     def test_winget_scripts_do_not_interpolate_expression_source(self):
         source = (WORKFLOWS / "winget.yaml").read_text()

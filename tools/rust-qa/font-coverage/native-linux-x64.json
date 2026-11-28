@@ -1,0 +1,296 @@
+{
+  "date": "2026-11-20",
+  "observation": "native Xvnc XTEST and wgpu viewport readback",
+  "target": "x86_64-unknown-linux-gnu",
+  "samples": {
+    "released": {
+      "observationPath": "artifacts/rust/font-coverage/x86_64-unknown-linux-gnu-41zceqqp/result.json",
+      "observationSha256": "da96d86f24058e63d8160226f06ef531a9b599ad1a0046fc9c94c52ed84662fc",
+      "subjectSha256": "ae3a3a6101a93352362d4d8ff0c9b3041d7d1ac9970f025600cde20e3c1f8565",
+      "binarySha256": "8b1f9ea00ac3589aba0e3d2b4c5f2a8476d1b6f434c76c44f3f389011af0873f",
+      "renderer": "Vulkan Cpu llvmpipe (LLVM 23.1.5, 256 bits)",
+      "oracle": [
+        "fribidi (GNU FriBidi) 1.0.18",
+        "interface version 4,",
+        "Unicode Character Database version 18.0.0,"
+      ],
+      "criteriaExit": 1,
+      "cases": [
+        {
+          "profile": "latin",
+          "name": "glyphs",
+          "before": "あ界⬟.jpg",
+          "expectedVisual": "あ界⬟.jpg",
+          "observedVisual": "あ界⬟.jpg",
+          "visualOrderMatches": true,
+          "renderedCoverageMatches": true,
+          "frameSha256": "8aa5b00cb0441b0974081754196e28f609c565dd41919b78953ae289e2cb65d5",
+          "nativeLogSha256": "326ae44a1df988edd2c704e33a8219b6da7a6a5cb409c629a657f70bc778a88f"
+        },
+        {
+          "profile": "fallback",
+          "name": "glyphs",
+          "before": "あ界⬟.jpg",
+          "expectedVisual": "あ界⬟.jpg",
+          "observedVisual": "あ界⬟.jpg",
+          "visualOrderMatches": true,
+          "expectedSelected": "界",
+          "selected": "界",
+          "afterDelete": "あ⬟.jpg",
+          "expectedAfterDelete": "あ⬟.jpg",
+          "editMatches": true,
+          "caretAfterRightFromStart": 1,
+          "renderedCoverageMatches": true,
+          "frameSha256": "2726ca609ab2167a9297642963ac4da4b71cc6eefffe3ac336e92cc4a3e78acf",
+          "nativeLogSha256": "320bd600f7fcc06dddcde177e46689da85a15197c2cd7078369bff4d1aeab0ca"
+        },
+        {
+          "profile": "fallback",
+          "name": "mixed",
+          "before": "L-بتث-R.jpg",
+          "expectedVisual": "L-ثتب-R.jpg",
+          "observedVisual": "L-ثتب-R.jpg",
+          "visualOrderMatches": true,
+          "expectedSelected": "ث",
+          "selected": "ب",
+          "afterDelete": "L-تث-R.jpg",
+          "expectedAfterDelete": "L-بت-R.jpg",
+          "editMatches": false,
+          "arrowLogicalIndices": [
+            3,
+            4,
+            3
+          ],
+          "expectedArrowIndices": [
+            4,
+            3,
+            4
+          ],
+          "arrowVisualPixels": [
+            74,
+            85,
+            74
+          ],
+          "keyboardMatches": false,
+          "renderedCoverageMatches": true,
+          "frameSha256": "23124fa39ef50041dc308225c7485f6f0b5d71a8869d72091e6fd1112c4f14a4",
+          "nativeLogSha256": "4d2613fe8becd0e7c51f603336390828b358529a98367329374772958ec3dc0a"
+        },
+        {
+          "profile": "fallback",
+          "name": "numbers",
+          "before": "L-ب12ت-R.jpg",
+          "expectedVisual": "L-ت12ب-R.jpg",
+          "observedVisual": "L-ب12ت-R.jpg",
+          "visualOrderMatches": false,
+          "expectedSelected": "ت",
+          "selected": "ب",
+          "afterDelete": "L-12ت-R.jpg",
+          "expectedAfterDelete": "L-ب12-R.jpg",
+          "editMatches": false,
+          "arrowLogicalIndices": [
+            3,
+            4,
+            3
+          ],
+          "expectedArrowIndices": [
+            3,
+            4,
+            3
+          ],
+          "arrowVisualPixels": [
+            71,
+            88,
+            71
+          ],
+          "keyboardMatches": true,
+          "fieldPixelMatches": [
+            {
+              "character": "ب",
+              "maskOverlap": {
+                "628": 0.815,
+                "62A": 0.13,
+                "62B": 0.093
+              }
+            },
+            {
+              "character": "ت",
+              "maskOverlap": {
+                "628": 0.157,
+                "62A": 0.792,
+                "62B": 0.137
+              }
+            }
+          ],
+          "fieldPixelOrderMatchesOracle": false,
+          "renderedCoverageMatches": true,
+          "frameSha256": "6a556cd46a46d4455482c9d98964783507b3e3d07b94654228208655324362f3",
+          "nativeLogSha256": "01defe227329b723d8678b974f0d9a9dd918e241cb79fdd424df0ac6cf7848a9"
+        }
+      ]
+    },
+    "upstreamCaret": {
+      "observationPath": "artifacts/rust/font-coverage/x86_64-unknown-linux-gnu-as2nloqd/result.json",
+      "observationSha256": "6041946241dc174f6613613ba76590dbc04ce04c780363ec552e42c459661146",
+      "subjectSha256": "df0672238cf2f441845aa69d1b359b115849250b5f63f4b81cd7630dfbf93437",
+      "binarySha256": "36c0fda9279f819620d83b3af0af921120be1efb2b568ae0e63c18b96903aa3e",
+      "renderer": "Vulkan Cpu llvmpipe (LLVM 23.1.5, 256 bits)",
+      "oracle": [
+        "fribidi (GNU FriBidi) 1.0.18",
+        "interface version 4,",
+        "Unicode Character Database version 18.0.0,"
+      ],
+      "criteriaExit": 0,
+      "cases": [
+        {
+          "profile": "latin",
+          "name": "glyphs",
+          "before": "あ界⬟.jpg",
+          "expectedVisual": "あ界⬟.jpg",
+          "observedVisual": "あ界⬟.jpg",
+          "visualOrderMatches": true,
+          "renderedCoverageMatches": true,
+          "frameSha256": "8aa5b00cb0441b0974081754196e28f609c565dd41919b78953ae289e2cb65d5",
+          "nativeLogSha256": "326ae44a1df988edd2c704e33a8219b6da7a6a5cb409c629a657f70bc778a88f"
+        },
+        {
+          "profile": "fallback",
+          "name": "glyphs",
+          "before": "あ界⬟.jpg",
+          "expectedVisual": "あ界⬟.jpg",
+          "observedVisual": "あ界⬟.jpg",
+          "visualOrderMatches": true,
+          "expectedSelected": "界",
+          "selected": "界",
+          "afterDelete": "あ⬟.jpg",
+          "expectedAfterDelete": "あ⬟.jpg",
+          "editMatches": true,
+          "caretAfterRightFromStart": 1,
+          "renderedCoverageMatches": true,
+          "frameSha256": "2726ca609ab2167a9297642963ac4da4b71cc6eefffe3ac336e92cc4a3e78acf",
+          "nativeLogSha256": "320bd600f7fcc06dddcde177e46689da85a15197c2cd7078369bff4d1aeab0ca"
+        },
+        {
+          "profile": "fallback",
+          "name": "mixed",
+          "before": "L-بتث-R.jpg",
+          "expectedVisual": "L-ثتب-R.jpg",
+          "observedVisual": "L-ثتب-R.jpg",
+          "visualOrderMatches": true,
+          "expectedSelected": "ث",
+          "selected": "ث",
+          "afterDelete": "L-بت-R.jpg",
+          "expectedAfterDelete": "L-بت-R.jpg",
+          "editMatches": true,
+          "arrowLogicalIndices": [
+            4,
+            3,
+            4
+          ],
+          "expectedArrowIndices": [
+            4,
+            3,
+            4
+          ],
+          "arrowVisualPixels": [
+            74,
+            85,
+            74
+          ],
+          "keyboardMatches": true,
+          "renderedCoverageMatches": true,
+          "frameSha256": "19a67b6ed5a7c36e0473053fb3bb444165a35ffa8974499521c9ddfef4805400",
+          "nativeLogSha256": "b6356167b9548e7a48f1b43907f49e58dadabf0529705b9d75fa70df6737237e"
+        },
+        {
+          "profile": "fallback",
+          "name": "numbers",
+          "before": "L-ب12ت-R.jpg",
+          "expectedVisual": "L-ت12ب-R.jpg",
+          "observedVisual": "L-ت12ب-R.jpg",
+          "visualOrderMatches": true,
+          "expectedSelected": "ت",
+          "selected": "ت",
+          "afterDelete": "L-ب12-R.jpg",
+          "expectedAfterDelete": "L-ب12-R.jpg",
+          "editMatches": true,
+          "arrowLogicalIndices": [
+            3,
+            4,
+            3
+          ],
+          "expectedArrowIndices": [
+            3,
+            4,
+            3
+          ],
+          "arrowVisualPixels": [
+            71,
+            88,
+            71
+          ],
+          "keyboardMatches": true,
+          "fieldPixelMatches": [
+            {
+              "character": "ت",
+              "maskOverlap": {
+                "628": 0.157,
+                "62A": 0.792,
+                "62B": 0.137
+              }
+            },
+            {
+              "character": "ب",
+              "maskOverlap": {
+                "628": 0.815,
+                "62A": 0.13,
+                "62B": 0.093
+              }
+            }
+          ],
+          "fieldPixelOrderMatchesOracle": true,
+          "renderedCoverageMatches": true,
+          "frameSha256": "eeb935ae365cdb65a25445b9175c87a97ef421b3818f9ce91360976d775576bf",
+          "nativeLogSha256": "63dba5f46c1ccf50b7d54e4b5a9e79447db4a92df219dfce64bc9c34c7775266"
+        }
+      ]
+    }
+  },
+  "candidate": {
+    "patchHead": "e0bc7924dac211c5ff727d55922662ce371ec819",
+    "patchBase": "fc9d66dda742d722eedaa8684d23f86369cf8e5f",
+    "appliedRustDiffSha256": "e88857f13581c6363781817cb7a3536fb1a089f1b11a6123479b08701cac3160",
+    "recreatedUnicodeTable": "8cbe4b6a4fc690e76107d4654047d3f0d8988b870fc3234f76dc265ad2e2a9ca",
+    "lockedGraph": {
+      "sha256": "19aa12ab5d107dbc4b6a7257b3f0e41aa36771da335feccb079d6bba0b4da173",
+      "inventories": {
+        "aarch64-pc-windows-msvc": {
+          "packages": 135,
+          "nativeFeatureSetsSha256": "498bbd192f051ca274ccc2f2d09433662a9a8f65dd4bea246aa7a0fb12469b3d"
+        },
+        "aarch64-unknown-linux-gnu": {
+          "packages": 235,
+          "nativeFeatureSetsSha256": "657eb6625ab78dad9cc9c2da0fe9714c880dd2b4b61345f540ac358def514ce0"
+        },
+        "x86_64-pc-windows-msvc": {
+          "packages": 135,
+          "nativeFeatureSetsSha256": "8f66fa7116a313d323d7c29495140d51e8e5f0d7e26880f27f6c485175208ae3"
+        },
+        "x86_64-unknown-linux-gnu": {
+          "packages": 235,
+          "nativeFeatureSetsSha256": "657eb6625ab78dad9cc9c2da0fe9714c880dd2b4b61345f540ac358def514ce0"
+        }
+      }
+    },
+    "notices": {
+      "Unicode-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "egui-LICENSE-APACHE": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+      "egui-LICENSE-MIT": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+      "ucd-readme.txt": "14cafa23788d3a20dd21d6b0cdcb8d6dab520781fcd9ad9392f3b88ea607e633",
+      "unicode-bidi-AUTHORS": "1ff3a7c8519b29544bb28ba9b1e7502df0cb764051fb9a1172e60006aa2b8dcc",
+      "unicode-bidi-COPYRIGHT": "edb20b474f6cbd4f4db066b54a9e0f687d0009d309412a63431189b59b8e2a07",
+      "unicode-bidi-LICENSE-APACHE": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "unicode-bidi-LICENSE-MIT": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0"
+    }
+  }
+}

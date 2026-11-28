@@ -1,0 +1,136 @@
+--- a/src/epi.rs
++++ b/src/epi.rs
+@@ -422,6 +422,14 @@
+     /// Defaults to true.
+     pub clipboard_shortcuts: bool,
+
++    /// The native host sets this while it owns a deliberately hidden WGPU root window.
++    ///
++    /// When the HWND is also invisible, eframe processes input and application logic
++    /// without presenting to it. Explicit pixel requests and visible child viewports
++    /// are still serviced. The host must request a redraw after showing the root.
++    #[cfg(target_os = "windows")]
++    pub externally_hidden_root: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
++
+     /// Android application for `winit`'s event loop.
+     ///
+     /// This value is required on Android to correctly create the event loop. See
+@@ -453,6 +461,9 @@
+
+             persistence_path: self.persistence_path.clone(),
+
++            #[cfg(target_os = "windows")]
++            externally_hidden_root: self.externally_hidden_root.clone(),
++
+             #[cfg(target_os = "android")]
+             android_app: self.android_app.clone(),
+
+@@ -500,6 +511,9 @@
+             dithering: true,
+
+             clipboard_shortcuts: true,
++
++            #[cfg(target_os = "windows")]
++            externally_hidden_root: None,
+
+             #[cfg(target_os = "android")]
+             android_app: None,
+--- a/src/native/wgpu_integration.rs
++++ b/src/native/wgpu_integration.rs
+@@ -449,8 +449,20 @@
+     ) -> Result<EventResult> {
+         self.initialized_all_windows(event_loop);
+
++        #[cfg(target_os = "windows")]
++        let externally_hidden_root = self
++            .native_options
++            .externally_hidden_root
++            .as_ref()
++            .is_some_and(|hidden| hidden.load(std::sync::atomic::Ordering::Relaxed))
++            && self.window_id_from_viewport_id(ViewportId::ROOT) == Some(window_id)
++            && self
++                .window(window_id)
++                .is_some_and(|window| window.is_visible() == Some(false));
++        #[cfg(not(target_os = "windows"))]
++        let externally_hidden_root = false;
+         if let Some(running) = &mut self.running {
+-            running.run_ui_and_paint(window_id, event_loop, mode)
++            running.run_ui_and_paint(window_id, event_loop, mode, externally_hidden_root)
+         } else {
+             Ok(EventResult::Wait)
+         }
+@@ -612,6 +624,7 @@
+         window_id: WindowId,
+         event_loop: &ActiveEventLoop,
+         mode: PassMode,
++        externally_hidden_root: bool,
+     ) -> Result<EventResult> {
+         profiling::function_scope!();
+
+@@ -683,7 +696,7 @@
+
+             // A hidden window is not painted, since nothing would be shown — unless someone
+             // wants the pixels anyway, e.g. to screenshot an app that is in the background:
+-            let is_visible = viewport.info.visible().unwrap_or(true)
++            let is_visible = (!externally_hidden_root && viewport.info.visible().unwrap_or(true))
+                 || viewport
+                     .actions_requested
+                     .iter()
+@@ -700,7 +713,7 @@
+             let mut raw_input = egui_winit.take_egui_input(window);
+
+             let show_ui = mode == PassMode::Full
+-                && (is_visible || is_viewport_or_descendant_visible(viewports, viewport_id));
++                && (is_visible || has_visible_descendant(viewports, viewport_id));
+
+             integration.pre_update();
+
+@@ -751,13 +764,15 @@
+                 }
+             }
+
+-            sleep_if_invisible_or_minimized(
+-                shared
+-                    .borrow()
+-                    .viewports
+-                    .get(&viewport_id)
+-                    .and_then(|viewport| viewport.window.as_deref()),
+-            );
++            if !externally_hidden_root {
++                sleep_if_invisible_or_minimized(
++                    shared
++                        .borrow()
++                        .viewports
++                        .get(&viewport_id)
++                        .and_then(|viewport| viewport.window.as_deref()),
++                );
++            }
+
+             return Ok(if integration.should_close() {
+                 EventResult::CloseRequested
+@@ -1181,21 +1196,16 @@
+     Ok((window, viewport_builder))
+ }
+
+-/// Is this viewport, or any of its (transitive) descendant viewports, visible?
++/// Does this viewport have a visible descendant?
+ ///
+ /// Immediate viewports are rendered inline while their parent's UI runs, so even
+ /// if this viewport's window is occluded or minimized we must still run its UI to
+ /// give any visible descendant a chance to be painted.
+-fn is_viewport_or_descendant_visible(viewports: &Viewports, viewport_id: ViewportId) -> bool {
+-    let Some(viewport) = viewports.get(&viewport_id) else {
+-        return false;
+-    };
+-    if viewport.info.visible().unwrap_or(true) {
+-        return true;
+-    }
++fn has_visible_descendant(viewports: &Viewports, viewport_id: ViewportId) -> bool {
+     viewports.values().any(|child| {
+         child.ids.parent == viewport_id
+             && child.ids.this != viewport_id
+-            && is_viewport_or_descendant_visible(viewports, child.ids.this)
++            && (child.info.visible().unwrap_or(true)
++                || has_visible_descendant(viewports, child.ids.this))
+     })
+ }

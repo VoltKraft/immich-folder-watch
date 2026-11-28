@@ -1,0 +1,46 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-WORKER-01",
+      "parity": [
+        "PAR-01",
+        "PAR-03",
+        "PAR-04"
+      ],
+      "mode": "uploadNew",
+      "existingUploadCount": 0,
+      "createdUploadCount": 1,
+      "existingPreserved": true,
+      "createdPreserved": true
+    },
+    {
+      "id": "BEH-WORKER-02",
+      "parity": [
+        "PAR-01",
+        "PAR-03",
+        "PAR-04"
+      ],
+      "mode": "uploadAll",
+      "existingUploadCount": 1,
+      "createdUploadCount": 1,
+      "existingPreserved": true,
+      "createdPreserved": true
+    },
+    {
+      "id": "BEH-WORKER-03",
+      "parity": [
+        "PAR-01",
+        "PAR-03",
+        "PAR-04"
+      ],
+      "mode": "sync",
+      "existingUploadCount": 1,
+      "createdUploadCount": 1,
+      "existingPreserved": true,
+      "createdPreserved": true
+    }
+  ]
+}

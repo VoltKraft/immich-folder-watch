@@ -1,0 +1,55 @@
+"""Verify the cold and warm subjects before passing them to a native observer."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+QA, ROOT = HERE.parent, HERE.parents[2]
+TARGETS = ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")
+DX12_WAIT_OPTION = "WGPU_DX12_USE_FRAME_LATENCY_WAITABLE_OBJECT"
+TWO_FRAME_EDIT = "mailbox-two-retained-edit"
+sys.path[:0] = [str(QA / "windows-performance"), str(HERE), str(QA)]
+import run as recorder
+from compiler_units import VARIANT_INPUTS
+from windows_observer import isolated_windows_vm
+
+
+def sha(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def subjects(target, *, isolated_vm=False):
+    hosted = recorder.hosted()
+    if target not in TARGETS or not (hosted or isolated_windows_vm(isolated_vm)):
+        raise ValueError("Use a native hosted Windows runner or an explicitly selected disposable Windows VM")
+    art = ROOT / "artifacts/rust"
+    output = art / "windows-warm-window" / target
+    warm = output / "build/release/native-gui-assessment.exe"
+    cold = art / "gui-build/release/native-gui-assessment.exe"
+    receipt_path = output / "build.json"
+    record = json.loads(receipt_path.read_text(encoding="utf-8"))
+    canonical = art / "gui-native" / target / "build.json"
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if (record["revision"] != revision or record["target"] != target or record["baselineReceipt"] != sha(canonical)
+            or sha(cold) != record["baseline"] or sha(warm) != record["binary"]
+            or record["eframeSource"]["archive"] != "eframe-source.zip"
+            or sha(output / "eframe-source.zip") != record["eframeSource"]["archiveSha256"]
+            or record["compilerEvidence"]["file"] != "compiler.jsonl"
+            or sha(output / "compiler.jsonl") != record["compilerEvidence"]["sha256"]
+            or record["compilerEvidence"]["application"] != {"target": "native-gui-assessment", "crateRoot": "src/main.rs",
+                                                            "output": warm.name, "sha256": record["binary"]}
+            or record["variantInputs"] != {name: sha(HERE / name) for name in VARIANT_INPUTS}):
+        raise ValueError("Unexpected warm-window native build inputs")
+    api = recorder.Win32()
+    machine = 0xaa64 if target.startswith("aarch64-") else 0x8664
+    if api.machine(-1) != (machine, machine) or any(recorder.pe_machine(path) != machine for path in (warm, cold)):
+        raise ValueError("The observer and subjects must run natively on the same architecture")
+    evidence = dict(target=target, run=os.getenv("GITHUB_RUN_ID") if hosted else None,
+                    attempt=os.getenv("GITHUB_RUN_ATTEMPT") if hosted else None,
+                    revision=revision, buildReceipt=sha(receipt_path), baselineReceipt=record["baselineReceipt"],
+                    baseline=record["baseline"], binary=record["binary"])
+    return api, cold, warm, output, evidence

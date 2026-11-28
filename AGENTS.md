@@ -9,6 +9,15 @@ Immich API; it must never write directly to Immich storage. See
 for the existing architecture, canonical specifications, and selected scope.
 The project is initialized. Preserve its implementation, data, and history;
 do not restart template onboarding or infer a new product plan from maintenance.
+The [Rust rewrite plan](docs/rust-rewrite-plan.md) and
+[desktop standard](docs/rust-desktop-standard.md) govern the selected
+`M-RUST-IMPLEMENTATION-20261114` goal: RW-01 through RW-07 form one complete
+implementation assignment. Follow its fixed contract in the project brief and
+[acceptance record](docs/rust/acceptance.md); advance through verified prerequisites,
+without treating an intermediate stage as goal completion. RW-08/publication is
+excluded. Existing .NET rules continue to apply to the shipping reference product.
+Keep Rust rewrite planning and development on the dedicated `rewrite/rust` branch;
+`main` retains the shipping .NET baseline until a separately selected integration.
 
 Before substantive project work:
 
@@ -146,6 +155,250 @@ to reconcile project decisions, defaults, and recorded state.
 
 ## Project-specific engineering rules
 
+- Rust work follows the selected [desktop standard](docs/rust-desktop-standard.md)
+  and stage gates. Keep first-party runtime and GUI code in Rust, with domain,
+  synchronization, storage and native adapters independent of egui. The C# oracle
+  is development-only. Use synthetic isolated profiles; do not read personal
+  configuration/media or connect to production Immich. Audit exact dependencies,
+  features, native libraries and fonts before adoption; pin compiler and lockfile.
+  Required native runtime/GUI evidence on four targets cannot be replaced by a
+  cross-build. Independently review filesystem, migration and final integration.
+  Use the [worker activity reference](docs/development.md#download-activity-backups-and-restart)
+  and [native Rust backup trials](tools/rust-qa/storage/README.md#restore-after-a-synthetic-download)
+  for synthetic downloads, uploads, deletions and interrupted timestamp repairs.
+  Each restarted C# worker consumes the backup returned by Rust.
+  The [RW-02 stack decision](docs/rust/rw02-stack-decision.md) records the
+  qualified components, native resource limits and remaining desktop checks.
+  Follow the [Windows import-library reconstruction](docs/rust/rw02-windows-imports.md)
+  for the native x64 winit and ARM64 transport consumers.
+  Native log adapters use the [isolated host tests](docs/rust/rw02-platform-logs.md);
+  the [development guide](docs/development.md#rust-feasibility-workspace)
+  lists the other native feasibility entry points.
+  The [retained Windows window comparison](docs/rust/rw02-windows-window.md)
+  reconstructs its eframe and winit sources and measures against the same
+  host's WPF references. Preserve the native results, both library receipts,
+  compiler stream and source archive together. Exercise ordinary second-launch,
+  the [foreground keyboard launch](docs/rust/rw02-instance.md#second-launch-from-a-foreground-test-window)
+  and actual Shell activation for the same retained executable. Verify its
+  [ordinary filename after reopening](docs/rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd)
+  with the native glyph and editing observer. Exercise the [focused selection
+  across an ordinary second launch](docs/rust/rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch)
+  with the original first keystroke on the reopened editor. Use the same retained executable for
+  [mixed-DPI and RDP observations](docs/rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop)
+  on a disposable Windows test desktop.
+  Select the [archived x64 CPU executable](docs/rust/rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable)
+  for display checks of the renderer that passed the WPF limits and device recovery.
+- The [Rust feasibility workspace](rust/Cargo.toml) uses a checksum-pinned native
+  toolchain. Assign every workspace member a role in the
+  [Cargo dependency check](tools/rust-qa/workspace-boundaries/check.py).
+  The [Rust CodeQL workflow](docs/development.md#rust-foundation-codeql)
+  checks semantic coverage of the workspace under the Linux and Windows
+  configurations on the rewrite draft PR.
+  Follow the [native test commands](docs/development.md#rust-feasibility-workspace)
+  and retain source-bound observations for each target in the acceptance record.
+  Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
+  when changing the candidate desktop profile.
+  Build the ordinary Linux GUI with its [reviewed AccessKit directory source](tools/rust-qa/gui/flatpak-accessibility/README.md#cargo-directory-source-for-the-normal-compiler)
+  and keep its Cargo target cache separate from the stock control.
+  Run the [Windows x64 YAML exchange in the local guest](tools/rust-qa/windows-local/yaml.md).
+  Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
+  the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders),
+  [physical Unicode separators saved by .NET](docs/rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves),
+  [type conversion of repeated configuration properties](docs/rust/rw02-yaml.md#repeated-properties-in-the-shipping-configuration),
+  [alias scope across skipped configuration properties](docs/rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties) and the
+  [private portal comparison](docs/rust/rw02-portal-upstream.md) reproducible.
+  Compare [Linux file modification ticks](docs/rust/rw02-legacy.md#linux-file-modification-times)
+  using metadata from the held file. Verify [legacy upload identities](docs/rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file)
+  and the rewound retry body against the C# multipart cases. For realtime changes, verify the
+  [disconnect packets observed by the peer](docs/rust/rw02-realtime-transport.md#stopping-an-established-session).
+  Use the [transport workflow](.github/workflows/rust-realtime.yaml) on
+  Windows ARM64 and both Linux targets. For comparison with the x64 shipping
+  MSI, use the [compiler archive on the local VM](tools/rust-qa/windows-local/README.md#workspace-and-network).
+  Use the [private bundle and directory](docs/rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates)
+  for the Linux platform-verifier trials. For [Linux HTTPS proxy routing](docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime),
+  verify the CONNECT authority, the route taken by authenticated origin
+  requests, and the direct connection when the endpoint is in `NO_PROXY`.
+  For [authenticated plaintext proxy routes](docs/rust/rw02-linux-basic-proxy.md),
+  compare both ends of the CONNECT with the signed Linux client.
+  Include the [UTF-8 realm](docs/rust/rw02-linux-basic-proxy.md#localized-digest-realm)
+  when changing challenge parsing or the Digest response bytes.
+  For a detached FUSE name, check the current grant and follow the
+  [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
+  Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)
+  for host-package installation and rollback feasibility. Archive the stock,
+  patched and restored service observations from the same guest.
+  Preserve the [combined source and offline relink evidence](docs/rust/rw02-combined-profile.md),
+  its [target-specific SPDX inventories](docs/rust/rw02-combined-sbom.md), the
+  [original native notices](docs/rust/rw02-combined-notices.md) and the
+  original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
+  For a [schema version committed only in the WAL](docs/rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal),
+  keep the fixture writer stopped and verify the original database and sidecars after refusal.
+  On Windows x64 run the [original storage binaries in the local VM](tools/rust-qa/windows-local/storage.md).
+  Bind hosted notices to the Actions digest of the native compiler receipt.
+  For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
+  use the tested native writer and its identity oracle in two sessions of
+  the same account. Verify the Actions digest before reusing a hosted build.
+  Read back the [hosted ARM64 writer events and profile cleanup](tools/rust-qa/instance/cross-session/hosted-arm64/README.md)
+  separately for the interactive and batch logon trial.
+  Use the [installed WPF handover trial](tools/rust-qa/instance/cross-session/wpf-handover.md)
+  to follow a normal tray Quit on the original RDP desktop before Rust acquires the writer.
+  Use the [read-only MSI preflight](tools/rust-qa/instance/cross-session/installed-writer.md)
+  to identify the shipping installation with its editor closed or open.
+  Run every feasible Windows x64 rewrite test on the [local disposable
+  VM](tools/rust-qa/windows-local/README.md). Use the shared
+  [QEMU launch helper](tools/rust-qa/windows-local/guest_slot.py) for one
+  guest at a time with at most 3072 MiB of RAM. The x64 Actions jobs compile inputs.
+  Run the [combined Windows x64 profile](tools/rust-qa/windows-local/README.md#combined-native-profile)
+  from its original compiler archive in that guest.
+  Use the [GUI compiler and guest harnesses](tools/rust-qa/windows-local/README.md#ordinary-gui-and-native-gui-test-executables)
+  for the ordinary x64 GUI.
+  The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns
+  Windows ARM64 VHD recovery. The desktop assessment owns Linux tmpfs recovery.
+  The [system appearance](docs/rust/rw02-appearance.md) and
+  [Plasma tray](docs/rust/rw02-plasma.md) observers run on disposable desktops.
+  Check the [older GTK contrast setting](docs/rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals)
+  through the private Settings portal when changing Linux appearance.
+  The Windows contrast supervisor owns the temporary setting and verifies its
+  restoration even if the bounded native capture worker exits. Verify the
+  [original GUI window on its held private desktop](docs/rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4)
+  before changing the palette. With an unnamed original scheme, retain the
+  read-only [Windows contrast baseline](docs/rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
+  The Plasma fixture uses separate audited Ubuntu package sets for x64 and
+  ARM64. The [native Plasma jobs](.github/workflows/rust-linux-plasma.yaml)
+  run the matching GUI, worker and panel on both architectures.
+  For [Linux tray menu changes](docs/rust/rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu),
+  follow the original GUI and both inventory workers through the three
+  Plasma menu selections after the private KDED watcher reloads.
+  Use the dedicated native service fixtures with disposable profiles.
+  For [installed Windows activation](tools/rust-qa/windows-msi-interop/reverse/README.md)
+  and [live worker backup](docs/development.md#installed-windows-worker-backup),
+  use the pinned 3.0.4 menu helper and verify the worker's own shutdown log.
+  The [Windows tray check](docs/rust/rw02-windows-services.md) requires an
+  owned desktop, a visible synthetic icon and a matching native Shell callback.
+  Use the [tray rectangle and HICON measurements](docs/rust/rw02-windows-services.md#sampling-the-explorer-tray-rectangle-at-989bb33)
+  to compare the supplied icon with the pixels on the original Explorer surface.
+  For a registered x64 icon with no visible marker at the returned rectangle,
+  use the [taskbar color comparison](docs/rust/rw02-windows-services.md#comparing-marker-colors-across-the-original-x64-taskbar).
+  The [Windows Server 2022 check](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml)
+  previously ran the same retained tray and canonical contrast subjects on its original desktop.
+  For [Quit after tray loss](tools/rust-qa/gui/tray-loss-quit.md), follow the
+  original worker through window close, ordinary reopen and keyboard Quit.
+  On Windows exercise the [visible fallback button](docs/rust/rw02-windows-services.md#partial-windows-tray-registration)
+  on a private input desktop after a genuine Shell refusal.
+  Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+  when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
+  match the accessible button and physical marker before its default action.
+  Exercise [Open, Restart and Quit](tools/rust-qa/windows-launcher/tray-menu.md)
+  through the real Explorer menu with the primary's input pipe held open.
+  Compare the provider and receiver performance counters when ordering a fast callback.
+  For a registered icon without a rectangle, follow the [ordinary second launch](docs/rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle)
+  on the same hidden primary.
+  Verify visible Windows
+  notifications on the [original disposable desktop](docs/rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+  The separate [WinRT history trial](tools/rust-qa/windows-services/toast-history.md)
+  scopes posting, readback and removal to the test shortcut's app identity.
+  Match a [visible WinRT popup](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup)
+  to the ordinary sender's timed call and the exact title and body shown by the Shell.
+  Use the [fresh ARM64 console](tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console)
+  to compare early notification history, physical labels and the post-test Settings readback.
+  Use the [archived native sender](tools/rust-qa/windows-services/toast-history.md#original-sender-on-a-disposable-windows-x64-vm)
+  for the isolated x64 console. For the [ARM64 banner](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup),
+  replay the separate screen capture against the notification history from the same job.
+  Preserve the [original job CPU and member working sets](docs/rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget)
+  in the three-trial WPF budget. Compare Windows renderer timings with the same host's WPF reference and
+  qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)
+  with observed screen pixels and independent file activity.
+  Use the [Windows x64 frame observer](tools/rust-qa/windows-frame-cost/README.md)
+  to diagnose scan response delays. Compare the ordinary GUI with the same-host WPF limits.
+  Replay the [frame-ready message wait](tools/rust-qa/windows-frame-cost/README.md#one-shot-frame-readiness-in-the-windows-message-loop)
+  against the original close, file reads, DXGI presents and reopened editor on that host.
+  For the [Windows x64 transition comparison](tools/rust-qa/windows-warm-window/dwm-transitions.md),
+  retain the per-window API outcome, file and frame timings, and editor pixels
+  alongside the three WPF and ordinary retained trials on the same host.
+  Run the [full-view GDI comparison](tools/rust-qa/windows-gdi-present/README.md)
+  on the same x64 desktop and retain its real editor pixels, GDI transfers,
+  [buffer reuse and map timings](tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer)
+  and file observations.
+  The separate [CPU paint comparison](tools/rust-qa/windows-cpu-paint/README.md)
+  uses the retained meshes and atlas. Preserve its original crate notices,
+  native adapter decision, compiler outputs, real editor pixels and same-host WPF limits.
+  Verify a partial texture update remains visible in the [native wgpu handoff](tools/rust-qa/windows-cpu-paint/handoff/README.md).
+  Exercise [device recovery](tools/rust-qa/windows-cpu-paint/recovery/README.md)
+  with the measured CPU executable and its original inventory worker.
+  For the separate [deferred-frame trial](tools/rust-qa/windows-frame-cost/README.md#deferred-readiness-on-the-windows-x64-cpu-adapter),
+  retain the native renderer trace and the changed pixels on the reopened window.
+  Keep the integrated Linux and Windows inventory subjects bound to the
+  [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
+  [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
+  a private desktop and installs only into its disposable test repository.
+  Verify [installed editor speech and focus](tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs)
+  through the test Flatpak's own accessibility proxy with the original package permissions.
+  For [escaped directory names](docs/rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name),
+  verify the returned grant and a surviving control grant in the same fresh process after revocation.
+  For [saved watch subfolders](docs/rust/rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant),
+  verify the held directory's label with and without a session bus, then revoke its parent grant.
+  Verify [visible GNOME notifications on ARM64](docs/rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64)
+  against the installed sender, Shell owner and original screen captures.
+  Verify [ordinary Linux second launches](docs/rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui)
+  with the real executable and the original window, bus owner and inventory worker.
+  For the [installed test Flatpak](docs/rust/rw02-instance.md#second-launch-through-the-installed-flatpak),
+  distinguish the D-Bus proxy PID from the GUI's outer and sandbox PIDs.
+  Verify [tray delivery across watcher replacement](docs/rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak)
+  against the original proxy and reopened window. The [native Plasma menu](docs/rust/rw02-plasma.md#native-ubuntu-tray-menu-and-worker-restart-at-9487dbe)
+  also exercises worker restart on Ubuntu x64 and ARM64.
+  For an [installed tray restart with live inventory](docs/rust/rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory),
+  verify both worker identities, the replacement scans and the return to the signed GUI.
+  Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
+  shipping sources. The actual Windows IPC names require a disposable runner.
+  For [Windows WPF-primary activation](tools/rust-qa/windows-msi-interop/reverse/README.md),
+  keep the two ordinary console results and the private ARM64 result identifiable.
+  Follow the original WPF window and verify restoration of the input desktop.
+  For Linux installed worker continuity, run the [signed second launch while
+  the Rust GUI inventories synthetic files](docs/rust/rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
+  Exercise the opposite launch order during a [configured shipping upload](docs/rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload)
+  with the isolated loopback peer and retain the final SQLite row.
+  For the [signed worker's restart from Rust's live backup](docs/development.md#installed-flatpak-worker-backup-on-fedora-x64),
+  retain the original main/WAL pair and both installed processes' asset requests.
+  Bind each [signed Flatpak Quit](docs/rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore)
+  to its menu owner, sandbox proxy and original process exit.
+  The [Ubuntu installed handover](docs/development.md#installed-worker-handover-on-native-ubuntu-runners)
+  uses the signed native Platform and GL extension with source-bound GUI,
+  worker and backup executables on the matching runner.
+  For the [installed Linux pairing](docs/rust/rw02-instance.md#shipping-launch-while-the-rust-flatpak-owns-the-endpoint),
+  exercise both start orders and the return to the signed shipping GUI
+  after the Rust primary has drained and released its endpoint.
+  The [installed 3.0.4 reference](docs/rust/rw01-installed-packages.md) uses
+  original release packages, disposable installs and the synthetic legacy corpus.
+  For the [installed Windows second launch](docs/rust/rw02-instance.md#ordinary-launch-of-the-installed-windows-application-with-rust-running),
+  follow the installed executable, original Rust HWND and inventory worker
+  through the close and reopen on the same disposable desktop.
+  For the [x64 single-file trace](tools/rust-qa/windows-msi-interop/file-trace.md),
+  retain the four session counter samples and both completed worker queries.
+  Run the [opposite start order](tools/rust-qa/windows-msi-interop/reverse/README.md)
+  on its own runner and retain the original WPF activation evidence before Quit.
+  For the [installed Windows worker backup](docs/development.md#installed-windows-worker-backup),
+  preserve the original main/WAL pair and both WPF processes' PNG requests.
+  The additional ARM64 private-desktop trial must bind both installed
+  processes and Quit helpers to its desktop and verify return to the
+  original unlocked console.
+  The [two normal Flatpak starts](docs/rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference) use the separately signed original commit.
+  For [native Ubuntu launch trials](docs/rust/rw01-installed-packages.md#signed-native-launch-inputs-on-ubuntu-x64-and-arm64),
+  retain the signed application and both runtime receipts with the original
+  sandbox, apphost and X11 observations.
+  The [two installed refs](docs/rust/rw02-instance.md#shipping-flatpak-and-rust-probe-in-two-installed-refs)
+  distinguish a shared socket name from verified activation across Flatpak PID namespaces.
+  Exercise [Rust startup with the signed legacy Flatpak running](docs/rust/rw02-instance.md#rust-startup-while-the-shipping-flatpak-is-running) before changing Linux instance admission.
+  Preserve the [worker rollback fixtures](docs/development.md#repair-and-deletion-after-restoring-the-worker-database)
+  and their external media, journal, peer request and assembly evidence.
+  The [native FAT adapter check](docs/rust/rw02-storage-faults.md) runs only
+  after the eight recovery cases on the owned Windows test volume. Preserve
+  the separate provider outcome, volume readback and cleanup evidence.
+  The [stored-key assessment](docs/rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles)
+  uses the complete casing table emitted by each C# writer and preserves
+  original SQLite keys across both qualified profiles. The [shipping C# upsert after rollback](docs/rust/rw02-legacy.md#first-c-upsert-after-rollback)
+  checks for duplicate entries when the rollback runtime uses a different table.
+  The [native insert trial](docs/rust/rw02-legacy.md#native-shipping-upserts-after-a-concordant-rust-insert)
+  follows the new row through both shipping upserts and compares all stored ROWIDs.
 - Preserve the per-user security model, portal-based Linux folder access, .NET 10,
   and Windows/Linux compatibility unless the selected task explicitly changes it.
   Keep Core independent of UI/runtime hosts; keep HTTP and realtime API-version
@@ -161,7 +414,9 @@ to reconcile project decisions, defaults, and recorded state.
   source pins, exclusive private package mapping, exact compiler/provenance checks
   and offline reconstruction. Framework updates require source-level license review.
 - Dependabot configuration in [`.github/dependabot.yml`](.github/dependabot.yml)
-  covers NuGet and GitHub Actions. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
+  covers NuGet and GitHub Actions. The rewrite also defines weekly Cargo
+  version checks for its [product workspace](rust/Cargo.toml), targeting
+  `rewrite/rust`. Follow the [dependency-update workflow](docs/development.md#dependency-updates)
   for license review, coordinated packaging pins and validation before merging updates.
 - Use four-space C# indentation, file-scoped namespaces, PascalCase types/public
   members, camelCase locals/parameters, and `Async` suffixes. Preserve enabled

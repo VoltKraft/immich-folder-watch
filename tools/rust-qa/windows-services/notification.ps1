@@ -1,0 +1,408 @@
+# Observe only the fresh synthetic title and body on the disposable runner's original desktop.
+param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$Token,
+      [Parameter(Mandatory)][string]$Fixture,
+      [ValidateSet('Shell','WinrtNormal')][string]$Kind='Shell',
+      [switch]$IsolatedVm)
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+if ($IsolatedVm) {
+    if ($env:GITHUB_ACTIONS -or $Kind -cne 'WinrtNormal' -or $env:IFW_QA_ISOLATED -cne '1' -or
+        $env:IFW_QA_INVENTORY_TOKEN -cne $Token) { throw 'Expected the isolated WinRT fixture' }
+    $tempRoot = $env:IFW_QA_VM_TEMP
+} else {
+    if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows' -or
+        $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') {
+        throw 'Expected the disposable Windows rewrite runner'
+    }
+    $tempRoot = $env:RUNNER_TEMP
+}
+if ($Kind -cnotin @('Shell','WinrtNormal') -or ($Kind -ceq 'Shell' -and $env:IFW_QA_LATE_NOTIFICATION -cne '1') -or
+    ($Kind -ceq 'WinrtNormal' -and $env:IFW_QA_TOAST_HISTORY -cne '1') -or
+    [IO.Path]::GetFullPath($Fixture) -ine (Join-Path $tempRoot "ifw-shell-$Token") -or
+    [IO.File]::ReadAllText((Join-Path $Fixture 'synthetic.fixture')) -cne $Token) { throw 'Expected the disposable notification fixture' }
+function Emit([hashtable]$Record) {
+    [Console]::Out.WriteLine('NOTICE_OBSERVER ' + ($Record | ConvertTo-Json -Depth 8 -Compress))
+    [Console]::Out.Flush()
+}
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Text;
+
+public static class IfwNoticeDesktop {
+    [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }
+    delegate bool Visitor(IntPtr hwnd, IntPtr arg);
+    [DllImport("user32",SetLastError=true)] static extern bool EnumDesktopWindows(IntPtr desktop, Visitor cb, IntPtr arg);
+    [DllImport("kernel32")] static extern uint GetCurrentThreadId();
+    [DllImport("kernel32")] static extern uint GetCurrentProcessId();
+    [DllImport("kernel32")] static extern uint WTSGetActiveConsoleSessionId();
+    [DllImport("kernel32")] static extern bool ProcessIdToSessionId(uint pid, out uint id);
+    [DllImport("kernel32")] public static extern ulong GetTickCount64();
+    [DllImport("kernel32")] public static extern bool QueryPerformanceCounter(out long value);
+    [DllImport("kernel32")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32",SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32")] static extern bool GetExitCodeProcess(IntPtr h, out uint exit);
+    [DllImport("kernel32")] static extern bool GetProcessTimes(IntPtr h, out long created, out long ended, out long kernel, out long user);
+    [DllImport("kernel32",CharSet=CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr h, uint flags, StringBuilder path, ref int size);
+    [DllImport("advapi32")] static extern bool OpenProcessToken(IntPtr h, uint access, out IntPtr token);
+    [DllImport("user32")] static extern IntPtr GetThreadDesktop(uint tid);
+    [DllImport("user32")] static extern IntPtr GetProcessWindowStation();
+    [DllImport("user32",CharSet=CharSet.Unicode)] static extern bool GetUserObjectInformation(IntPtr h, int kind, StringBuilder value, uint length, out uint used);
+    [DllImport("user32",EntryPoint="GetUserObjectInformationW")] static extern bool InputFlag(IntPtr h, int kind, out int value, uint length, out uint used);
+    [DllImport("user32")] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+    [DllImport("user32",SetLastError=true)] static extern bool CloseDesktop(IntPtr h);
+    [DllImport("user32")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32")] static extern IntPtr GetShellWindow();
+    [DllImport("user32")] static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32")] static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder cls, int count);
+    [DllImport("user32")] static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32")] static extern IntPtr GetAncestor(IntPtr hwnd, uint kind);
+    [DllImport("user32")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
+    [DllImport("dwmapi")] static extern int DwmGetWindowAttribute(IntPtr hwnd, uint attr, out uint value, int size);
+    [DllImport("user32")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
+
+    public class Root { public long hwnd, creation; public uint pid, session; public string image, windowClass; public bool sameUser; }
+    public static uint ShellPid() {
+        uint pid; return GetWindowThreadProcessId(GetShellWindow(), out pid) != 0 ? pid : 0;
+    }
+    static string ObjName(IntPtr h) {
+        var s = new StringBuilder(256); uint used;
+        return h != IntPtr.Zero && GetUserObjectInformation(h,2,s,512,out used) ? s.ToString() : "";
+    }
+    static bool OnDefault(IntPtr h) {
+        int flag; uint ignored;
+        return ObjName(h) == "Default" && InputFlag(h,6,out flag,4,out ignored) && flag != 0;
+    }
+    public static bool Active() {
+        uint id;
+        if (!ProcessIdToSessionId(GetCurrentProcessId(),out id) || id == 0 || id != WTSGetActiveConsoleSessionId() ||
+            ObjName(GetProcessWindowStation()) != "WinSta0" || !OnDefault(GetThreadDesktop(GetCurrentThreadId()))) return false;
+        IntPtr h = OpenInputDesktop(0,false,1);
+        if (h == IntPtr.Zero) return false;
+        try { return OnDefault(h); }
+        finally { if (!CloseDesktop(h)) throw new Win32Exception(Marshal.GetLastWin32Error()); }
+    }
+    static readonly string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+    static readonly HashSet<string> images = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+        Path.Combine(windows,"explorer.exe"), Path.Combine(windows,@"System32\ShellHost.exe"),
+        Path.Combine(windows,@"SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe"),
+        Path.Combine(windows,@"SystemApps\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe"),
+        Path.Combine(windows,@"SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\ShellHost.exe"),
+        Path.Combine(windows,@"SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe")
+    };
+    static void Close(IntPtr h) { if (!CloseHandle(h)) throw new Win32Exception(Marshal.GetLastWin32Error()); }
+    public static Root Describe(IntPtr hwnd) {
+        uint pid, session, cloaked;
+        uint tid = GetWindowThreadProcessId(hwnd,out pid);
+        if (tid == 0 || !OnDefault(GetThreadDesktop(tid)) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
+            !ProcessIdToSessionId(pid,out session) || session != WTSGetActiveConsoleSessionId() ||
+            DwmGetWindowAttribute(hwnd,14,out cloaked,4) != 0 || cloaked != 0) return null;
+        var handle = OpenProcess(0x1000,false,pid);
+        if (handle == IntPtr.Zero) return null;
+        try {
+            var image = new StringBuilder(32768); int size = image.Capacity;
+            uint state; long created, ended, system, user;
+            if (!QueryFullProcessImageName(handle,0,image,ref size) || !images.Contains(image.ToString()) ||
+                !GetExitCodeProcess(handle,out state) || state != 259 ||
+                !GetProcessTimes(handle,out created,out ended,out system,out user)) return null;
+            IntPtr token;
+            if (!OpenProcessToken(handle,8,out token)) return null;
+            try {
+                using (var their = new WindowsIdentity(token))
+                using (var ours = WindowsIdentity.GetCurrent()) {
+                    if (their.User == null || !their.User.Equals(ours.User)) return null;
+                }
+            } finally { Close(token); }
+            var cls = new StringBuilder(256);
+            if (GetClassName(hwnd,cls,cls.Capacity) == 0) return null;
+            if (Path.GetFileName(image.ToString()).Equals("explorer.exe",StringComparison.OrdinalIgnoreCase) &&
+                (cls.ToString() == "CabinetWClass" || cls.ToString() == "ExploreWClass" || cls.ToString() == "Progman" ||
+                 cls.ToString() == "WorkerW")) return null;
+            return new Root{hwnd=hwnd.ToInt64(),pid=pid,creation=created,session=session,image=image.ToString(),
+                            windowClass=cls.ToString(),sameUser=true};
+        } finally { Close(handle); }
+    }
+    public static Root[] Roots() {
+        if (!Active()) throw new InvalidOperationException("The original input desktop or console changed");
+        var result = new List<Root>();
+        Exception error = null;
+        if (!EnumDesktopWindows(GetThreadDesktop(GetCurrentThreadId()),delegate(IntPtr hwnd,IntPtr arg) {
+            try { var root = Describe(hwnd); if (root != null) result.Add(root); return result.Count <= 128; }
+            catch (Exception e) { error = e; return false; }
+        },IntPtr.Zero)) {
+            if (error != null) throw error;
+            throw new InvalidOperationException("Could not enumerate visible notification hosts on the original desktop");
+        }
+        return result.ToArray();
+    }
+    public sealed class NativeHit { public long hwnd, root, monitor; public uint pid, tid; }
+    public static NativeHit Hit(Root root, int x, int y) {
+        if (!Active()) return null;
+        var hwnd = new IntPtr(root.hwnd);
+        var now = Describe(hwnd);
+        var point = new Point{X=x,Y=y};
+        var hit = WindowFromPoint(point); uint pid;
+        var monitor = MonitorFromPoint(point,0);
+        var tid = GetWindowThreadProcessId(hit,out pid);
+        var ancestor = GetAncestor(hit,2);
+        if (now == null || now.pid != root.pid || now.creation != root.creation || now.image != root.image ||
+            monitor == IntPtr.Zero || tid == 0 || !OnDefault(GetThreadDesktop(tid)) || pid != root.pid || ancestor != hwnd) return null;
+        return new NativeHit{hwnd=hit.ToInt64(),root=ancestor.ToInt64(),monitor=monitor.ToInt64(),pid=pid,tid=tid};
+    }
+
+    // Work in integer desktop pixels with half-open bounds, including negative monitor origins.
+    public static int[] LabelPoint(double[] own, double[] other) {
+        var r = new int[4]; var s = new int[4];
+        for (int i=0;i<4;i++) {
+            if (Double.IsNaN(own[i]) || Double.IsInfinity(own[i]) || Math.Abs(own[i]) > 10000000 ||
+                Double.IsNaN(other[i]) || Double.IsInfinity(other[i]) || Math.Abs(other[i]) > 10000000) return null;
+            r[i]=(int)Math.Ceiling(own[i]); s[i]=(int)Math.Ceiling(other[i]);
+        }
+        if (r[2] <= r[0] || r[3] <= r[1]) return null;
+        var tiles = new int[][] {
+            new int[]{r[0],r[1],Math.Min(r[2],s[0]),r[3]}, new int[]{Math.Max(r[0],s[2]),r[1],r[2],r[3]},
+            new int[]{r[0],r[1],r[2],Math.Min(r[3],s[1])}, new int[]{r[0],Math.Max(r[1],s[3]),r[2],r[3]}
+        };
+        long best=0; int[] chosen=r;
+        foreach (var tile in tiles) {
+            int width=tile[2]-tile[0], height=tile[3]-tile[1];
+            if (width>0 && height>0 && (long)width*height>best) {best=(long)width*height; chosen=tile;}
+        }
+        return new int[]{chosen[0]+(chosen[2]-chosen[0])/2,chosen[1]+(chosen[3]-chosen[1])/2};
+    }
+}
+'@
+
+function Read-Label($Node, $Root, [string]$Expected, $Container, [bool]$AllowParentHit, $Bounds, $Point) {
+    $c = $Node.Current
+    $r = $c.BoundingRectangle
+    if ($c.ProcessId -ne $Root.pid -or $c.IsOffscreen -or $c.Name -cne $Expected -or $r.IsEmpty -or -not $r.Equals($Bounds)) { return }
+    $nativeHit = [IfwNoticeDesktop]::Hit($Root,$Point[0],$Point[1])
+    if ($null -eq $nativeHit) { return }
+    $hit = [Windows.Automation.AutomationElement]::FromPoint([Windows.Point]::new($Point[0],$Point[1]))
+    $walker = [Windows.Automation.TreeWalker]::RawViewWalker
+    $directParent = $walker.GetParent($Node)
+    if ($null -eq $directParent -or $directParent.Current.ProcessId -ne $Root.pid) { return }
+    $parentId = $directParent.GetRuntimeId() -join ','
+    $path = @(); $kind = $null
+    for ($depth=0; $null -ne $hit -and $depth -lt 8; $depth++) {
+        if ($hit.Current.ProcessId -ne $Root.pid) { return }
+        $path += ($hit.GetRuntimeId() -join ',')
+        if ([Windows.Automation.Automation]::Compare($hit,$Node)) {
+            $kind = if ($depth -eq 0) { 'label' } else { 'descendant' }
+            break
+        }
+        if ([Windows.Automation.Automation]::Compare($hit,$Container)) {
+            if ($depth -eq 0 -and $AllowParentHit -and [Windows.Automation.Automation]::Compare($directParent,$Container)) { $kind='sharedParent' }
+            break
+        }
+        $hit = $walker.GetParent($hit)
+    }
+    if ($null -ne $kind) {
+        return @{text=$Expected; pid=$c.ProcessId; bounds=@($r.Left,$r.Top,$r.Right,$r.Bottom); point=$Point
+                 offscreen=$c.IsOffscreen; runtimeId=($Node.GetRuntimeId() -join ','); directParent=$parentId
+                 nativeHit=$nativeHit; providerHit=@{kind=$kind; runtimePath=$path; pid=$Root.pid}}
+    }
+}
+
+function Match-Notice($HostWindow, $TitleCondition, $BodyCondition, $UiRoot) {
+    $uia = if ($null -ne $UiRoot) { $UiRoot } else { [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$HostWindow.hwnd) }
+    if ($uia.Current.ProcessId -ne $HostWindow.pid) { return }
+    $scope = [Windows.Automation.TreeScope]::Descendants
+    $titles = $uia.FindAll($scope,$TitleCondition)
+    if ($titles.Count -ne 1) { return }
+    $bodies = $uia.FindAll($scope,$BodyCondition)
+    if ($bodies.Count -ne 1) { return }
+    $titleNode = $titles.Item(0); $bodyNode = $bodies.Item(0)
+    $walker = [Windows.Automation.TreeWalker]::RawViewWalker
+    $container = $walker.GetParent($titleNode)
+    for ($level = 0; $null -ne $container -and $level -lt 5; $level++) {
+        if ($container.Current.ProcessId -ne $HostWindow.pid) { return }
+        $parent = $walker.GetParent($bodyNode)
+        for ($i = 0; $null -ne $parent -and $i -lt 5; $i++) {
+            if ($parent.Current.ProcessId -ne $HostWindow.pid) { break }
+            if ([Windows.Automation.Automation]::Compare($parent,$container)) {
+                $titleBounds = $titleNode.Current.BoundingRectangle; $bodyBounds = $bodyNode.Current.BoundingRectangle
+                if ($titleBounds.IsEmpty -or $bodyBounds.IsEmpty) { return }
+                $ta = @($titleBounds.Left,$titleBounds.Top,$titleBounds.Right,$titleBounds.Bottom)
+                $ba = @($bodyBounds.Left,$bodyBounds.Top,$bodyBounds.Right,$bodyBounds.Bottom)
+                $tp = [IfwNoticeDesktop]::LabelPoint($ta,$ba); $bp = [IfwNoticeDesktop]::LabelPoint($ba,$ta)
+                if ($null -eq $tp -or $null -eq $bp -or ($tp[0] -eq $bp[0] -and $tp[1] -eq $bp[1])) { return }
+                $allowParentHit = $level -eq 0 -and $i -eq 0 -and -not [Windows.Automation.Automation]::Compare($uia,$container) -and
+                    -not ($tp[0] -ge $ba[0] -and $tp[0] -lt $ba[2] -and $tp[1] -ge $ba[1] -and $tp[1] -lt $ba[3]) -and
+                    -not ($bp[0] -ge $ta[0] -and $bp[0] -lt $ta[2] -and $bp[1] -ge $ta[1] -and $bp[1] -lt $ta[3])
+                $a = Read-Label $titleNode $HostWindow $title $container $allowParentHit $titleBounds $tp
+                $b = Read-Label $bodyNode $HostWindow $body $container $allowParentHit $bodyBounds $bp
+                if ($null -ne $a -and $null -ne $b -and $titleNode.Current.BoundingRectangle.Equals($titleBounds) -and
+                    $bodyNode.Current.BoundingRectangle.Equals($bodyBounds)) {
+                    $match = @{title=$a; body=$b; host=$HostWindow; container=($container.GetRuntimeId() -join ',')
+                             rootId=($uia.GetRuntimeId() -join ','); desktop='Default'}
+                    if ($Kind -ceq 'WinrtNormal') {
+                        $ancestor = $container
+                        $ancestorPath = @()
+                        for ($depth=0; $null -ne $ancestor -and $depth -lt 16; $depth++) {
+                            $properties = $ancestor.Current
+                            if ($properties.ProcessId -ne $HostWindow.pid) { break }
+                            $ancestorPath += ($ancestor.GetRuntimeId() -join ',')
+                            $explorer = [IO.Path]::GetFileName($HostWindow.image) -ieq 'explorer.exe'
+                            $shellPid = [IfwNoticeDesktop]::ShellPid()
+                            if ((-not $explorer -or $shellPid -eq $HostWindow.pid) -and
+                                $HostWindow.windowClass -ceq 'Windows.UI.Core.CoreWindow' -and
+                                $properties.ControlType -eq [Windows.Automation.ControlType]::Window -and
+                                $properties.AutomationId -cin @('NormalToastView','Normal Toast View')) {
+                                $match.popup = @{runtimeId=$ancestorPath[-1]; pid=$properties.ProcessId
+                                    controlType='Window'; automationId=$properties.AutomationId; shellPid=$shellPid
+                                    containerPath=$ancestorPath}
+                                break
+                            }
+                            if ([Windows.Automation.Automation]::Compare($ancestor,$uia)) { break }
+                            $ancestor = $walker.GetParent($ancestor)
+                        }
+                    }
+                    $lastA = [IfwNoticeDesktop]::Hit($HostWindow,$tp[0],$tp[1]); $lastB = [IfwNoticeDesktop]::Hit($HostWindow,$bp[0],$bp[1])
+                    if ($null -eq $lastA -or $null -eq $lastB -or $lastA.hwnd -ne $a.nativeHit.hwnd -or $lastB.hwnd -ne $b.nativeHit.hwnd -or
+                        -not $titleNode.Current.BoundingRectangle.Equals($titleBounds) -or -not $bodyNode.Current.BoundingRectangle.Equals($bodyBounds)) { return }
+                    $match.tick = [IfwNoticeDesktop]::GetTickCount64()
+                    $match.qpc = [Diagnostics.Stopwatch]::GetTimestamp()
+                    return $match
+                }
+                return
+            }
+            if ([Windows.Automation.Automation]::Compare($uia,$parent)) { break }
+            $parent = $walker.GetParent($parent)
+        }
+        if ([Windows.Automation.Automation]::Compare($container,$uia)) { return }
+        $container = $walker.GetParent($container)
+    }
+}
+
+function Read-NoticeRoots($roots, $uiRoots=@()) {
+    $errorsSeen = 0; $lastHresult = $null; $found = $null; $unclassified = $null
+    $candidates = @($roots | ForEach-Object { @{hostWindow=$_; node=$null} }) + @($uiRoots)
+    foreach ($candidate in $candidates) {
+        try { $found = Match-Notice $candidate.hostWindow $titleCondition $bodyCondition $candidate.node }
+        catch [System.Windows.Automation.ElementNotAvailableException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
+        catch [Runtime.InteropServices.COMException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
+        if ($null -ne $found) {
+            if ($Kind -cne 'WinrtNormal' -or $found.ContainsKey('popup')) { break }
+            if ($null -eq $unclassified) { $unclassified = $found }
+        }
+    }
+    if ($null -eq $found -or -not $found.ContainsKey('popup') -and $null -ne $unclassified) { $found = $unclassified }
+    return @{roots=$candidates.Count; match=$found; errors=$errorsSeen; lastHresult=$lastHresult}
+}
+
+$modernArm = $Kind -ceq 'WinrtNormal' -and !$IsolatedVm -and $env:RUNNER_ARCH -ceq 'ARM64'
+if ($modernArm) {
+    . (Join-Path $PSScriptRoot 'toast_roots.ps1')
+    $toastImages = @(Get-ToastShellImages)
+    $viewFilter = Get-ToastViewFilter
+    $session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+}
+function Read-NoticeScan {
+    $roots = [IfwNoticeDesktop]::Roots()
+    if (!$modernArm) { return Read-NoticeRoots $roots }
+    $modern = Get-ToastModernRoots $toastImages $viewFilter $session
+    $extra = @(foreach ($candidate in @(Get-ToastCandidates 0 @() $modern)) {
+        $owner = [IfwNoticeDesktop]::Describe([IntPtr]$candidate.hwnd)
+        if ($null -ne $owner -and ($null -eq $candidate.node -or $owner.pid -eq $candidate.pid)) {
+            @{hostWindow=$owner; node=$candidate.node}
+        }
+    })
+    $result = Read-NoticeRoots $roots $extra
+    $result.errors += $modern.errors
+    return $result
+}
+
+function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) {
+    $frequency = [Diagnostics.Stopwatch]::Frequency
+    $first = [Diagnostics.Stopwatch]::GetTimestamp()
+    $go = Join-Path $Fixture 'notice.go'; $sent = Join-Path $Fixture 'notice.sent'; $finish = Join-Path $Fixture 'notice.finish'
+    $sentQpc = $null; $count = 0; $peak = 0; $errorsSeen = 0; $lastHresult = $null; $sawMatch = $false
+    while ($true) {
+        if ([IO.File]::Exists($finish)) {
+            Emit @{stage='unavailable'; complete=$false; reason='Observer stopped before the post-request interval completed'}
+            return 2
+        }
+        if ($null -eq $sentQpc -and [IO.File]::Exists($sent)) {
+            if ([IO.File]::ReadAllText($sent) -cne $Token) { throw 'Notification marker did not match' }
+            $sentQpc = [Diagnostics.Stopwatch]::GetTimestamp()
+        }
+        $released = [IO.File]::Exists($go)
+        $start = [Diagnostics.Stopwatch]::GetTimestamp()
+        if ($null -eq $sentQpc -and $start - $first -ge 25L * $frequency) {
+            Emit @{stage='unavailable'; complete=$false; reason='No completed native request arrived before the observer deadline'}
+            return 2
+        }
+        $scan = & $ReadScan
+        $end = [Diagnostics.Stopwatch]::GetTimestamp()
+        $count++; $peak = [Math]::Max($peak,$scan.roots); $errorsSeen += $scan.errors
+        if ($null -ne $scan.lastHresult) { $lastHresult = $scan.lastHresult }
+        $sample = @{stage='sample'; number=$count; startQpc=$start; endQpc=$end; released=$released; sent=($null -ne $sentQpc)
+                    roots=$scan.roots; providerErrors=$scan.errors}
+        if ($null -ne $scan.match) { $sample.match=$scan.match; $sawMatch=$true }
+        Emit $sample
+        if ($null -ne $scan.match -and -not [IO.File]::Exists($go)) {
+            Emit @{stage='unavailable'; complete=$false; reason='The fresh title and body were visible before the request was released'}
+            return 2
+        }
+        if ($null -ne $sentQpc -and $start - $sentQpc -ge 10L * $frequency) {
+            $summary = @{complete=$true; samples=$count; peakKnownRoots=$peak; providerErrors=$errorsSeen
+                         lastHresult=$lastHresult; sentObservedQpc=$sentQpc}
+            if ($sawMatch) {
+                $summary.stage='visible'; Emit $summary
+                return 0
+            }
+            $summary.stage='unavailable'; $summary.reason='No exact visible title and body on the observed native Shell hosts'
+            Emit $summary
+            return 2
+        }
+        # The synchronous Shell call can return between polls. Re-scan immediately until its marker arrives.
+        if ($null -ne $sentQpc -or $Kind -ceq 'WinrtNormal') { Start-Sleep -Milliseconds 100 }
+    }
+}
+
+if ($Kind -ceq 'WinrtNormal') {
+    $title = "IFW synthetic normal $Token"; $body = "Rust normal notification history $Token"
+    $controlDir = Join-Path $Fixture "ifw-rw02-$Token"
+} else {
+    $title = "IFW notice $Token"; $body = "Synthetic IFW notification $Token"
+    $controlDir = $Fixture
+}
+$name = [Windows.Automation.AutomationElement]::NameProperty
+$titleCondition = [Windows.Automation.PropertyCondition]::new($name,$title)
+$bodyCondition = [Windows.Automation.PropertyCondition]::new($name,$body)
+$oldDpi = [IfwNoticeDesktop]::SetThreadDpiAwarenessContext([IntPtr](-4))
+if ($oldDpi -eq [IntPtr]::Zero) { Emit @{stage='unavailable'; reason='Physical coordinate context unavailable'}; exit 2 }
+try {
+    if (-not [Diagnostics.Stopwatch]::IsHighResolution) { throw 'The native performance counter is unavailable' }
+    $baseline = Read-NoticeScan
+    if ($null -ne $baseline.match -or $baseline.errors -ne 0) {
+        Emit @{stage='unavailable'; complete=$false; reason='Could not confirm an empty original notification baseline'
+               preexistingMatch=($null -ne $baseline.match); providerErrors=$baseline.errors}
+        exit 2
+    }
+    [long]$nativeBefore = 0; [long]$nativeAfter = 0
+    if (-not [IfwNoticeDesktop]::QueryPerformanceCounter([ref]$nativeBefore)) { throw 'The original QPC is unavailable' }
+    $baselineQpc = [Diagnostics.Stopwatch]::GetTimestamp()
+    if (-not [IfwNoticeDesktop]::QueryPerformanceCounter([ref]$nativeAfter) -or
+        $baselineQpc -lt $nativeBefore -or $baselineQpc -gt $nativeAfter) { throw 'Stopwatch did not read the original QPC epoch' }
+    Emit @{stage='armed'; tick=[IfwNoticeDesktop]::GetTickCount64(); qpc=$baselineQpc; nativeBeforeQpc=$nativeBefore; nativeAfterQpc=$nativeAfter
+           frequency=[Diagnostics.Stopwatch]::Frequency; initialRoots=$baseline.roots; preexistingMatch=$false}
+    exit (Watch-Notice $controlDir $Token { Read-NoticeScan })
+} catch {
+    $cause = $_.Exception.GetBaseException()
+    if ($cause -is [InvalidOperationException] -or $cause -is [Runtime.InteropServices.COMException]) {
+        Emit @{stage='unavailable'; reason=$cause.Message; hresult=$cause.HResult}
+        exit 2
+    }
+    throw
+} finally {
+    if ([IfwNoticeDesktop]::SetThreadDpiAwarenessContext($oldDpi) -eq [IntPtr]::Zero) { throw 'Could not restore the observer thread DPI context' }
+}

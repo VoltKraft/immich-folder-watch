@@ -1,0 +1,15 @@
+{
+  "rust/Cargo.toml": "7f4c1489640d1351a8d0fdeaea2df72fc17ad98ae3df5946fca34fa643e4e96a",
+  "rust/crates/safe-fs/Cargo.toml": "43d4b45c895966202490d387dcc9a2e1d720c6afc52db67c2bb6d253bd67eb86",
+  "rust/crates/safe-fs/src/lib.rs": "2b7fbcc469953135f77d91edc241629484e541cad7ecdf84d8ab014f15a2fb51",
+  "rust/crates/safe-fs/src/linux.rs": "d8cf6235364feda742f66a1d12d66eb9c7f9118fb929844c8d6a29ada740ae3b",
+  "rust/crates/safe-fs/src/staging.rs": "42ae0f4f31f3bd0553abd53357ee8bfd039bdaf13f282ddd24707ac17a3594a4",
+  "rust/crates/safe-fs/src/windows.rs": "db08ad5aac1cbb26045b90a3dd4477641337d0095f765ed49a6dc14594c702cd",
+  "rust/crates/safe-fs/src/windows_identity.rs": "ae4f4505c88fec0eab6e7b624d6ac4c15cd67d1a3b78249195ffa9fbe5bde136",
+  "tools/rust-qa/performance/build_worker.py": "f30b388b9836ac4082e75519e226a79380f6a23cee8cb8590f7c5ff418b008a1",
+  "tools/rust-qa/performance/present.rs": "5243874126ffc274aa4c9f5ee1fce6f7079e036e95f347e2bff1d9cce2b3649b",
+  "tools/rust-qa/performance/worker/Cargo.lock": "6d1876027b3c8d55ce479471e51a5c4d0f356e00597c393abeb7b16a1a270905",
+  "tools/rust-qa/performance/worker/Cargo.toml": "dbc101945286359d703e79fdb3bedab24429964ecffb0991985cd2e3a059bfa6",
+  "tools/rust-qa/performance/worker/src/main.rs": "8552cc720eb4a79c41d3bb025dad9c9756265bd64d13ddc0689042f23d1172d9",
+  "tools/rust-qa/yaml/inputs.json": "6b72c432d9c9330d4c72d1c46bb26c764374423fca24a30a57ee3bd69769de7f"
+}

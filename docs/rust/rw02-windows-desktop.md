@@ -1,0 +1,161 @@
+# RW-02 Windows foreground and keyboard observation
+
+## Reader, Japanese input and display at 4e3dbc4
+
+NVDA 2026.3.1 spoke the seven expected German and English field, masking
+and language announcements on both native GUIs. The reader examined 15
+utterances on x64 and 12 on ARM64. The portable reader used the x64 build
+on both hosts. In separate runs, the system Japanese IME produced preedit
+and committed U+3042 (`あ`) into the ordinary filename field on both hosts.
+Both restored their original keyboard layouts and removed the test profiles.
+
+Each display observer found one 1024 × 768 monitor at 96 DPI and a console
+session. On x64 both display trials obtained the edited source-monitor
+frame. On ARM64 the display trials could not focus the field for that frame.
+The Japanese input and reader trials used their own windows. Readback
+matched 40 observer sources per host to the native checkout.
+[Original x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14979507507) · [Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050/artifacts/14978878237) · [Required mixed-DPI and RDP observations](rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## ARM64 reader and input method at 13e4af8
+
+On native Windows ARM64, portable x64 NVDA 2026.3.1 read the ARM64 Rust
+window using OneCore. Its observer found all seven expected announcements
+in order across twelve utterances, including the German filename and
+password fields, three mask states and the English filename label. Ordinary
+Delete emptied the accessible document range and the Unicode filename
+survived a clipboard round trip. NVDA quit through its own window and its
+temporary profile was removed. The archive contains the observer's results
+and the SHA-256 of the private speech log.
+
+The preinstalled input layouts lacked Japanese. In the separate Basic
+Typing trial, the native IME showed a preedit, Enter committed U+3042
+(`あ`) to the ordinary filename, and the observer verified restoration
+of the original layout. Both display inventories saw one console monitor.
+The contrast supervisor stopped at its window-ownership check before
+changing the palette. The independent accessibility readback has SHA-256
+`eaa774749eed1ad3407db7b70259c4971ccafabafca0fdd9dda3e3faa55acfeb`.
+[Original Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14970348839).
+
+On x64, NVDA spoke the seven expected announcements in order across
+sixteen utterances. Ordinary Delete, the Unicode clipboard and the
+prepared Japanese IME all passed. The contrast supervisor stopped at
+the same window-ownership check. Closing the private desktop handle
+then returned Win32 error 170. Neither architecture reached the first
+palette change. The x64 accessibility readback has SHA-256
+`5a84bccf71b49a34804ccc60250a713f100bb7961cdbb948184342a96b62ef40`.
+[Original Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847/artifacts/14972721704).
+
+## ARM64 keyboard, reader and input method at 21e794f
+
+A genuine F24 key-up in the foreground launcher's message loop started a
+second retained GUI process on the private desktop. Windows brought the
+existing HWND 1442392 (PID 2924) to the foreground. The first independent
+focus sample found it visible, active and keyboard-focused. Inventory worker
+2460 survived the hide/reopen cycle. Quit drained the processes, and the
+supervisor restored the original Default desktop. An ordinary observer-launched
+secondary on Default reopened its original window without obtaining foreground.
+[Ordinary launch](rw02-instance.md#retained-windows-on-the-original-desktop-at-21e794f) · [Foreground keyboard trial](rw02-instance.md#second-launch-from-a-foreground-test-window).
+
+The Japanese Basic Typing trial produced a preedit and committed U+3042
+(`あ`) in the actual filename field. Cleanup restored the original input
+layout and language capabilities. NVDA 2026.3.1 started and remained active
+during its separate trial. The UI Automation driver timed out looking for
+the German filename label on the owned HWND 131810 (PID 1556). The driver
+exited 1 before it attempted keyboard input. NVDA matched none of the seven
+expected announcements, quit through its own window, and its profile was
+removed. On a separate private desktop the same ARM64 GUI and input driver
+found the German labels, accepted three masked characters and completed
+the Unicode clipboard round trip without the reader.
+
+The revised input observer records the last number of owned UI Automation
+editors and whether it identified each expected German label. An incomplete
+read leaves the unexamined labels unknown and retains the provider error
+type and HRESULT when available. The five-second search and the native
+reader acceptance criteria still apply. The earlier archive lacks these
+observations.
+
+The retained display inventory found a single 1024 × 768 monitor at 96 DPI
+in a console session. The filename field did not receive focus on that
+display. Mixed DPI and RDP remain unmeasured. The full ARM64 archive SHA-256
+is `70b8bd9527c6f8ac70cb2bfa12fb7a06ba2d429e43a464ecf2304b14738f1698`.
+[Original Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14962421675).
+
+## Windows x64 reader and display at 21e794f
+
+NVDA 2026.3.1 ran with OneCore on the original Default desktop in session 2.
+Across 16 speech-log utterances it announced `Dateiname`, `Kennwort`, one,
+two and three mask characters, `English` and `Filename` in order. The GUI
+held foreground on HWND 1245204 (PID 8936). Ordinary Delete cleared both
+the UI Automation value and document range, and the Unicode filename
+round-tripped through the clipboard. The input driver exited zero, NVDA
+quit through its own window and the temporary profile was removed.
+The reader result SHA-256 is
+`458109939b855e5171e4d2f9e5bc2182a07d2d3624710382ca238db8d3155dcf`.
+
+The canonical and retained GUI each showed the source field frame on
+one 1024 × 768 monitor at 96 DPI. Both native processes drained and
+exited zero. The WTS protocol reported a console. A second monitor with
+different DPI and an RDP session remain unmeasured. The full x64 archive
+SHA-256 is `53e2f74827d7653c64b7539c72ceeb67b98d21168d84c53655b456562921df43`.
+[Original Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14963163292).
+
+## Native observations
+
+On Windows ARM64, the German filename and password editors exposed their accessible names and password protection on both recorded runs. Windows declined the foreground request. The guarded observer found a different window or no window at the filename field center, successfully raised its own HWND, and declined the click after its final hit test. It timed out before reaching the keyboard test. On both x64 controls the subject acquired the foreground, accepted three masked keystrokes, switched language and round-tripped the synthetic Unicode filename through the Windows clipboard.
+
+| Hosted run and source | ARM64 filename center | ARM64 input.json SHA-256 | x64 input.json SHA-256 |
+| --- | --- | --- | --- |
+| [44831851264](https://github.com/voltkraft/immich-folder-watch/actions/runs/44831851264), `5895c0b1dc0b25717a2b5c81ad24c85b27c12b38` | (286, 201) | `946ba2cf12eb33de449a2456373d25c4f9f09d1beec68514ff6944cca2c80a58` | `48b9b101ec0bf404931fff4a79f0ea2e55d359f8a462386327529662fff75edb` |
+| [44835826452](https://github.com/voltkraft/immich-folder-watch/actions/runs/44835826452), `8b071ab9089a87a65ae1cc23325fcbba452fe4d2` | (182, 97) | `6db6644a35893be2a0e0b210dd3765872733db40a530d109ecca31a4d84dccc3` | `5b6b667558672a60202849bba973226d382bee8fb74ab87d25267904a13657fb` |
+
+The downloaded archives are under `artifacts/rust/hosted-desktop/<run>/windows-{arm64,x64}.zip`. Their `gui-native/<target>/windows-input/results.json` binds the executable and observer source hashes. In the first run both architectures reported process session 2, active console session 2, matching thread/input desktop names, one 1024 × 768 monitor and 96 DPI. The x64 system was Windows Server 2025 build 26100. The ARM64 system was Windows 11 build 26200. These records leave the occluding HWND and the Windows session lock state unidentified. A desktop-name match can also occur in a disconnected session. [Microsoft OpenInputDesktop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop)
+
+At `8a8adaa` both native runners had an active, unlocked console in
+session 2. On ARM64, a full-screen `WWAHost.exe` window owned the field
+center before and after raising the subject. The observer sent no click at
+that point. Both architectures switched to their newly created input desktop
+and restored Default. Before a test window appeared, enumeration returned
+zero with Win32 error zero on both hosts. The observer now enumerates the
+worker’s own desktop explicitly and permits this empty result to retry only
+during a bounded wait for a visible window. A fresh native run is required
+for the guarded input on that desktop.
+[Native archives](rw02-native-gui.md#native-follow-up-at-8a8adaa) and
+[EnumDesktopWindows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdesktopwindows).
+
+The follow-up runs the passive observation before keyboard, recovery, mixed
+text, NVDA and IME. A matching build, run, attempt and evidence digest are
+required to select a private desktop. The same foreign HWND and PID must have
+covered the editor before and after its own nonactivating raise. Other cases
+use the ordinary guarded observer on the original desktop. Both routes run
+the same application and input checks. The private worker verifies the active,
+unlocked session and creates one hidden, observable window of its own. This
+keeps enumeration meaningful while the application has no visible window.
+Each case records placement, the native test exit and desktop restoration.
+Replaying the two archived observations selected the original x64 desktop and
+the private route on ARM64. Native results from this revision are outstanding.
+[Desktop selection](../../tools/rust-qa/windows-desktop/session.py) and
+[Win32 window creation](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexw).
+
+## Native reproduction
+
+Run from the source checkout in the existing hosted Windows x64 and ARM64 jobs, after building the native GUI assessment. The fixture uses Python's standard library, the existing Windows PowerShell/UI Automation observer and Windows system DLLs. It requires the current hosted runner identity and the target-specific executable and evidence directory.
+
+```bash
+python3 tools/rust-qa/windows-desktop/run.py \
+  artifacts/rust/gui-build/release/native-gui-assessment.exe \
+  "artifacts/rust/gui-native/$NATIVE_TARGET/windows-desktop"
+```
+
+1. The supervisor records its window station and visibility, assigned desktop, input-desktop name, the system's `UOI_IO` indicators, process session, active console session, and WTS connection/lock state of its own session. It records the immediate launcher executable and system shell/foreground window identities through native HWND, PID, thread ID, window class, rectangle and executable basename. [Microsoft user-object information](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getuserobjectinformationw) and [WTS session flags](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ns-wtsapi32-wtsinfoex_level1_w)
+2. On the original desktop it launches a fresh subject with a private synthetic profile. It resolves the German filename rectangle through the subject's own UIA tree and reads its physical center with `WindowFromPoint` and `GetAncestor(GA_ROOT)`. It records the native window and client rectangles, DWM frame bounds, DWM cloak state or failure HRESULT, styles, visibility, minimization, DPI and the subject thread's desktop. On an active unlocked console it repeats the hit test after briefly raising the subject without activation and then restores its Z order. This original-desktop phase sends zero pointer and keyboard events. [Microsoft WindowFromPoint](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-windowfrompoint) and [DWM attributes](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute)
+3. An active, unlocked `WinSta0\Default` session with both native input indicators set permits the named-desktop trial. A separate creator thread makes a random desktop in the same window station. The supervisor retains the original desktop handle, switches to the named one and independently reads the active desktop back. It launches its worker suspended with an explicit `STARTUPINFOW.lpDesktop`, assigns it to a process-tree job with kill-on-close and resumes it. The worker independently checks the actual subject HWND's session and desktop. Observer processes run without a new console window. [Microsoft CreateDesktopW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createdesktopw), [STARTUPINFOW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfow) and [job objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+4. The named worker runs the shared Windows input observer on the verified test HWND. Each keyboard operation requires the current input desktop, the subject PID, and the subject HWND in the foreground. A pointer attempt additionally checks the native hit-tested root and PID. Success requires the guarded keyboard path, the protected editor, three typed characters, the translated field labels and the Unicode clipboard round trip. The inherited `T` and `Q` bytes start and stop the fixture's supervisor. The named worker and the subject must exit cleanly. [Shared input observer](../../tools/rust-qa/observe-windows-input.ps1) and [Microsoft foreground policy](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+5. The supervisor closes the fixture job, restores the original desktop when the active desktop still belongs to this trial, verifies its name and closes its handles. A locked session or an independently selected desktop prevents a switch. The worker has a bounded runtime. The fixture uses no direct window-message substitute for keyboard input. [Microsoft SwitchDesktop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-switchdesktop)
+
+The report is `results.json`. The two phases write `original/observation.json` and `named/observation.json`. The latter also writes the shared observer's `input.json` when the named input trial reaches it. The top-level `evidence.sha256` covers the captured files. A missing prerequisite, an observer failure or unverified cleanup returns a failing exit status. Application, worker, keyboard observer and launcher source hashes appear in the report. System object names and window geometry are diagnostic data. A hardware keyboard, a different Windows account and a physical desktop are outside this hosted trial.
+
+The historical runs above predate the named-desktop launcher. Nine portable regression tests cover desktop/session checks, restoration ownership, field and process checks, input acceptance, native structure layout and PE machine identification. The PowerShell observer parses on the locally available PowerShell 7.7. The initial hosted trials reached the newly created desktop on both architectures. Their input phase awaits a successful native rerun.
+
+```bash
+python3 -B -m unittest discover -s tools/rust-qa/windows-desktop -p 'test_*.py'
+```

@@ -224,6 +224,14 @@ settings, and deletion behavior for each mode.
 - [Development](./docs/development.md)
 - [Project brief and selected scope](./docs/project.md)
 - [Project status and next action](./docs/status.md)
+- [Rust rewrite and migration plan](./docs/rust-rewrite-plan.md)
+- [Reusable Rust desktop standard](./docs/rust-desktop-standard.md)
+- [Rust implementation acceptance record](./docs/rust/acceptance.md)
+
+The full Rust candidate and reusable desktop foundation are being developed on
+`rewrite/rust`. The released application continues to use .NET/WPF/Avalonia.
+The acceptance record distinguishes implemented behavior from outstanding native
+validation; publication and replacement of the shipping product require a separate decision.
 
 For Codex-assisted work, start at [AGENTS.md](./AGENTS.md). Discuss an idea or
 request a concrete change; Codex maintains the plan and status. Once a milestone

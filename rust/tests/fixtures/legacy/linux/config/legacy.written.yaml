@@ -1,0 +1,40 @@
+immich:
+  allowInsecureHttp: false
+  serverApiUrl: https://immich.example.invalid/api/
+  apiKey: RW01-SYNTHETIC-NOT-A-CREDENTIAL
+watch:
+  sources:
+  - path: media/../Média
+    albumName: Legacy album
+    includeSubdirectories: false
+    extensions:
+    - .jpg
+    - .png
+    excludeDirectories:
+    - temp
+    excludeFileNames:
+    - '*.tmp'
+    syncMode: uploadNew
+    deleteAfterUpload: false
+  - path: second
+    albumName: ""
+    includeSubdirectories: false
+    extensions:
+    - .heic
+    excludeDirectories: []
+    excludeFileNames: []
+    syncMode: uploadAll
+    deleteAfterUpload: false
+  transferOrder: oldestFirst
+  batchIntervalSeconds: 5
+  maxBatchSize: 25
+  fileReadyTimeoutSeconds: 30
+retry:
+  maxAttempts: 5
+  baseDelayMilliseconds: 500
+logging:
+  level: Information
+  target: journald
+  logDirectory: logs/../logs
+localization:
+  language: DE

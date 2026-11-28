@@ -1,0 +1,2 @@
+# A blank unified-diff context line carries one leading space.
+application-bus.patch whitespace=-blank-at-eol

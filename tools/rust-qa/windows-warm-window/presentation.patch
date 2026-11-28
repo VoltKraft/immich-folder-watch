@@ -1,0 +1,63 @@
+--- a/src/graphics.rs
++++ b/src/graphics.rs
+@@ -1,4 +1,8 @@
+ //! Own graphics generations and bounded renderer recovery independently of the desktop model.
++#[cfg(target_os = "windows")]
++#[path = "windows_present.rs"]
++mod windows_present;
++
+ use eframe::{egui_wgpu::WgpuSetup, wgpu};
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicU8, Ordering};
+@@ -28,6 +32,8 @@
+     #[cfg(target_os = "linux")]
+     surface_has_mailbox: Arc<std::sync::atomic::AtomicBool>,
+     change_surface_mode: bool,
++    #[cfg(target_os = "windows")]
++    windows_surface_mode: Option<wgpu::PresentMode>,
+     attempt: u8,
+     generation: u64,
+     raw: bool,
+@@ -46,6 +52,8 @@
+             #[cfg(target_os = "linux")]
+             surface_has_mailbox: Arc::default(),
+             change_surface_mode: false,
++            #[cfg(target_os = "windows")]
++            windows_surface_mode: None,
+             attempt: 0,
+             generation: 0,
+             raw: scenario == "raw-loss",
+@@ -75,6 +83,11 @@
+         {
+             let original = Arc::clone(&setup.device_descriptor);
++            let dx12 = &setup.instance_descriptor.backend_options.dx12;
++            println!(
++                "GRAPHICS_DX12_WAIT generation={} policy={:?}",
++                self.generation, dx12.latency_waitable_object
++            );
+             let control =
+                 std::env::var("IFW_QA_WINDOWS_RESIDENCY").as_deref() == Ok("performance-control");
+             let generation = self.generation;
+             setup.device_descriptor = Arc::new(move |adapter| {
+@@ -156,6 +169,10 @@
+                     .and_then(|w| w.window_handle().ok())
+                     .is_some_and(|h| matches!(h.as_raw(), RawWindowHandle::Wayland(_)));
+         }
++        #[cfg(target_os = "windows")]
++        {
++            self.windows_surface_mode = windows_present::choose(creation, self.generation);
++        }
+         let render = creation
+             .wgpu_render_state
+             .as_ref()
+@@ -183,6 +200,10 @@
+     }
+
+     pub(super) fn apply_surface_choice(&mut self, frame: &mut eframe::Frame) {
++        #[cfg(target_os = "windows")]
++        if let Some(mode) = self.windows_surface_mode.take() {
++            windows_present::apply(frame, self.generation, mode);
++        }
+         // On Wayland, keep the compositor's latest ready buffer without waiting for a FIFO slot.
+         // The selected Vulkan adapter must have advertised Mailbox for this exact surface.
+         if std::mem::take(&mut self.change_surface_mode)

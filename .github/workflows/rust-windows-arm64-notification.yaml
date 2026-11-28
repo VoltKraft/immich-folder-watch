@@ -1,0 +1,153 @@
+name: Rust Windows ARM64 notification on a fresh console
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-arm64-notification.yaml'
+      - 'tools/rust-qa/windows-services/**'
+      - '!tools/rust-qa/windows-services/*.md'
+      - 'tools/rust-qa/gui/src/windows_tray_shell.rs'
+      - 'tools/rust-qa/gui/src/tray-icon.argb'
+      - 'tools/rust-qa/windows-desktop/**'
+      - 'rust/toolchain-inputs.json'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      wait_eligible:
+        type: boolean
+        default: false
+      after_quiet_app:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/rewrite/rust' && (!inputs.after_quiet_app || inputs.wait_eligible)
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.after_quiet_app && '{"include":[{"policy":"permitted","artifact":"rust-after-quiet-app-arm64"}]}' || inputs.wait_eligible && '{"include":[{"policy":"permitted","artifact":"rust-eligible-console-arm64"}]}' || '{"include":[{"policy":"original","artifact":"rust-fresh-console-arm64"},{"policy":"permitted","artifact":"rust-permitted-console-arm64"}]}') }}
+    runs-on: windows-11-arm
+    timeout-minutes: ${{ inputs.wait_eligible && 105 || 35 }}
+    env:
+      NATIVE_TARGET: aarch64-pc-windows-msvc
+      IFW_QA_TOAST_POLICY: ${{ matrix.policy }}
+      IFW_QA_TOAST_ELIGIBILITY: ${{ inputs.after_quiet_app && 'after-quiet-app' || inputs.wait_eligible && 'wait' || 'immediate' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Build and measure the original native sender
+        id: services
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture arm64
+          python -B tools/rust-qa/windows-services/run.py $env:NATIVE_TARGET --hosted-startup --output "artifacts/rust/windows-services/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Exercise switch ownership and restoration
+        id: switch_controls
+        shell: pwsh
+        run: ./tools/rust-qa/windows-services/test_toast_settings.ps1
+
+      - name: Permit the ordinary popup on the dedicated comparison console
+        id: prepare
+        if: ${{ !cancelled() && matrix.policy == 'permitted' && steps.switch_controls.outcome == 'success' && hashFiles(format('artifacts/rust/windows-services/native-{0}/pe-imports.json', env.NATIVE_TARGET)) != '' }}
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action Permit
+          exit $LASTEXITCODE
+
+      - name: Wait for the requested Shell notification state on the original console
+        id: wait_for_shell
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.prepare.outcome == 'success' }}
+        timeout-minutes: 67
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --wait
+          exit $LASTEXITCODE
+
+      - name: Recheck the actual notification and Do not disturb switches after waiting
+        id: confirm_permitted
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.wait_for_shell.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action ConfirmPermitted
+          exit $LASTEXITCODE
+
+      - name: Observe the ordinary WinRT popup and read its history
+        id: sender
+        if: ${{ !cancelled() && (!inputs.wait_eligible || steps.confirm_permitted.outcome == 'success') && (matrix.policy == 'original' || steps.prepare.outcome == 'success') && (steps.services.outcome == 'success' || steps.services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/pe-imports.json', env.NATIVE_TARGET)) != '' }}
+        shell: pwsh
+        run: |
+          $extra = @()
+          if ($env:IFW_QA_TOAST_ELIGIBILITY -cin @('wait','after-quiet-app')) { $extra += '--after-eligibility' }
+          python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64 @extra
+          exit $LASTEXITCODE
+
+      - name: Restore the original Do not disturb setting
+        if: ${{ always() && matrix.policy == 'permitted' && (steps.prepare.outcome == 'success' || steps.prepare.outcome == 'failure' || steps.prepare.outcome == 'cancelled') }}
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action Restore
+          exit $LASTEXITCODE
+
+      - name: Read the notification settings after the screen observation
+        if: ${{ !cancelled() && (steps.sender.outcome == 'success' || steps.sender.outcome == 'failure' || inputs.wait_eligible && steps.prepare.outcome == 'success') }}
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1
+          exit $LASTEXITCODE
+
+      - name: Retain native sender and console evidence
+        if: ${{ !cancelled() && (steps.services.outcome == 'success' || steps.services.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.artifact }}-${{ github.sha }}
+          path: |
+            artifacts/rust/windows-services/native-aarch64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-history-aarch64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-physical-aarch64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-eligibility-aarch64-pc-windows-msvc/
+            artifacts/rust/windows-services/toast-settings-aarch64-pc-windows-msvc*.json
+            ${{ inputs.wait_eligible && 'artifacts/rust/windows-services/build/aarch64-pc-windows-msvc/release/ifw-windows-services-probe.exe' || '' }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify the initial console policy and any restoration
+        if: ${{ !cancelled() && (steps.sender.outcome == 'success' || steps.sender.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_console.py --check-policy $env:IFW_QA_TOAST_POLICY "artifacts/rust/windows-services/toast-history-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Verify restoration when the eligible send did not start
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.prepare.outcome == 'success' && hashFiles(format('artifacts/rust/windows-services/toast-history-{0}/result.json', env.NATIVE_TARGET)) == '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --check-unsent-policy
+          exit $LASTEXITCODE
+
+      - name: Verify both visible labels against the original native sender
+        if: ${{ !cancelled() && steps.sender.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $area = 'artifacts/rust/windows-services'
+          python -B tools/rust-qa/windows-services/toast_console.py --require-visible "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Replay Shell eligibility against the original ordinary Show and physical observation
+        if: ${{ !cancelled() && inputs.wait_eligible && steps.sender.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $area = 'artifacts/rust/windows-services'
+          python -B tools/rust-qa/windows-services/toast_eligibility.py --verify "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE

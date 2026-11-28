@@ -1,0 +1,416 @@
+//! Return a finalized SQLite backup to the running synthetic worker assessment.
+#![forbid(unsafe_code)]
+
+use ifw_legacy::timestamp::UtcTicks;
+use ifw_sqlite_assessment::{Result, digest, field, limited, verify_backup};
+use rusqlite::backup::Backup;
+use rusqlite::types::Value as SqlValue;
+use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
+use serde_json::{Value, json};
+use std::ffi::OsStr;
+use std::fs::{self, File, OpenOptions};
+use std::io::{ErrorKind, Read};
+use std::path::Path;
+use std::time::Duration;
+
+#[cfg(windows)]
+const GOLDEN: &str =
+    include_str!("../../../../rust/tests/fixtures/legacy/windows/sqlite/sensitive.sql");
+#[cfg(not(windows))]
+const GOLDEN: &str =
+    include_str!("../../../../rust/tests/fixtures/legacy/linux/sqlite/sensitive.sql");
+const RETURNED: &str = "returned.db";
+const MAX_DB_BYTES: u64 = 16 * 1024 * 1024;
+type Catalog = Vec<(String, String, String, Option<String>)>;
+
+fn lower_hex(value: &str, size: usize) -> bool {
+    value.len() == size
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+}
+
+fn select_exchange(path: &Path) -> Result<()> {
+    let checkout = fs::canonicalize(".")?;
+    if checkout != fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.."))? {
+        return Err("run the activity backup from its source checkout".into());
+    }
+    let artifacts = checkout.join("artifacts/rust");
+    let resolved = fs::canonicalize(path)?;
+    if fs::canonicalize(&artifacts)? != artifacts
+        || !resolved.starts_with(&artifacts)
+        || path.file_name() != Some(OsStr::new("exchange"))
+        || resolved.file_name() != path.file_name()
+        || !fs::symlink_metadata(path)?.is_dir()
+    {
+        return Err("expected the prepared exchange directory below artifacts/rust".into());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if fs::metadata(&resolved)?.permissions().mode() & 0o077 != 0 {
+            return Err("the exchange directory must be owner-only".into());
+        }
+    }
+    // All SQLite URI filenames below are literals relative to the private exchange.
+    std::env::set_current_dir(resolved)?;
+    Ok(())
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Transfer {
+    Download,
+    Upload,
+    Deletion,
+    Repair,
+}
+
+fn read_request() -> Result<(Value, Transfer)> {
+    let path = Path::new("request.json");
+    if !fs::symlink_metadata(path)?.is_file() {
+        return Err("expected a regular worker request".into());
+    }
+    let request: Value = serde_json::from_slice(&limited(File::open(path)?, 4096)?)?;
+    let transfer = match field(&request, "format")? {
+        "ifw-worker-backup-request-v1" => Transfer::Download,
+        "ifw-worker-upload-backup-request-v1" => Transfer::Upload,
+        "ifw-worker-deletion-backup-request-v1" => Transfer::Deletion,
+        "ifw-worker-repair-backup-request-v1" => Transfer::Repair,
+        _ => return Err("invalid worker backup request format".into()),
+    };
+    if !lower_hex(field(&request, "token")?, 32)
+        || !lower_hex(field(&request, "beforeSha256")?, 64)
+        || !lower_hex(field(&request, "afterSha256")?, 64)
+    {
+        return Err("invalid worker backup request".into());
+    }
+    Ok((request, transfer))
+}
+
+fn immutable(name: &str) -> Result<Connection> {
+    let mut header = [0; 20];
+    File::open(name)?.read_exact(&mut header)?;
+    if &header[..16] != b"SQLite format 3\0" || header[18..20] != [1, 1] {
+        return Err("expected a finalized rollback-journal database".into());
+    }
+    let db = Connection::open_with_flags(
+        format!("file:{name}?mode=ro&immutable=1"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    db.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA query_only=ON;")?;
+    Ok(db)
+}
+
+fn catalog(db: &Connection) -> rusqlite::Result<Catalog> {
+    db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name")?
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?
+        .collect()
+}
+
+fn canonical_catalog(mut rows: Catalog) -> Catalog {
+    // The native C# compiler preserves host line endings in multiline SQL strings.
+    for (_, _, _, sql) in &mut rows {
+        if let Some(sql) = sql {
+            *sql = sql.replace("\r\n", "\n");
+        }
+    }
+    rows
+}
+
+fn single_row(db: &Connection, sql: &str) -> rusqlite::Result<Vec<SqlValue>> {
+    let mut stmt = db.prepare(sql)?;
+    let columns = stmt.column_count();
+    stmt.query_one([], |row| (0..columns).map(|i| row.get(i)).collect())
+}
+
+#[derive(PartialEq)]
+struct Activity {
+    schema: Catalog,
+    entries: Vec<SqlValue>,
+    account_status: Vec<SqlValue>,
+    counts: [i64; 4],
+    repair: Option<Vec<SqlValue>>,
+}
+
+fn read_activity(
+    db: &Connection,
+    golden: &Catalog,
+    transfer: Transfer,
+) -> Result<Option<Activity>> {
+    let schema = catalog(db)?;
+    if db.query_one::<i64, _, _>("PRAGMA user_version", [], |r| r.get(0))? != 1
+        || db.query_one::<String, _, _>("PRAGMA integrity_check", [], |r| r.get(0))? != "ok"
+        || &canonical_catalog(schema.clone()) != golden
+    {
+        return Err(
+            "the database differs from the reviewed v1 schema or fails integrity checking".into(),
+        );
+    }
+    let counts = db.query_one(
+        "SELECT (SELECT count(*) FROM owned_albums), (SELECT count(*) FROM sync_account_status),
+                (SELECT count(*) FROM sync_entries), (SELECT count(*) FROM sync_timestamp_repairs)",
+        [],
+        |r| Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?]),
+    )?;
+    let ready = match transfer {
+        Transfer::Download | Transfer::Upload if counts == [0; 4] => false,
+        Transfer::Download | Transfer::Upload => {
+            check_transfer(db, counts, transfer)?;
+            true
+        }
+        Transfer::Deletion | Transfer::Repair => rollback::ready(db, counts, transfer)?,
+    };
+    if !ready {
+        return Ok(None);
+    }
+    Ok(Some(Activity {
+        schema,
+        counts,
+        entries: single_row(db, "SELECT * FROM sync_entries")?,
+        account_status: single_row(db, "SELECT * FROM sync_account_status")?,
+        repair: if counts[3] == 1 {
+            Some(single_row(db, "SELECT * FROM sync_timestamp_repairs")?)
+        } else {
+            None
+        },
+    }))
+}
+
+#[path = "worker_activity_backup/rollback.rs"]
+mod rollback;
+
+fn check_transfer(db: &Connection, counts: [i64; 4], transfer: Transfer) -> Result<()> {
+    if counts != [0, 1, 1, 0] {
+        return Err("unexpected worker activity counts".into());
+    }
+    let (filename, asset, size, modified, direction) = match transfer {
+        Transfer::Download => (
+            "photo.jpg",
+            "remote".to_owned(),
+            6,
+            if cfg!(windows) {
+                "2004-02-06T06:08:10.0000000+00:00"
+            } else {
+                "2004-02-04T06:08:10.0000000+00:00"
+            },
+            1,
+        ),
+        Transfer::Upload => (
+            "capture.jpg",
+            format!(
+                "asset-{}",
+                digest(&[0xff, 0xd8, 0, 1, 0x7f, 0x80, 0xff, 0xd9])
+            ),
+            8,
+            "2011-08-06T04:02:00.0000000+00:00",
+            0,
+        ),
+        Transfer::Deletion | Transfer::Repair => return Err("expected a file transfer".into()),
+    };
+    let key = if cfg!(windows) {
+        filename.to_ascii_uppercase()
+    } else {
+        filename.to_owned()
+    };
+    let (source, synchronized, history): (String, String, String) = db.query_one(
+        "SELECT e.source_path, e.last_synchronized_at_utc, a.last_successful_sync_utc
+         FROM sync_entries AS e JOIN sync_account_status AS a USING(account_scope)
+         WHERE e.account_scope=?1 AND e.relative_path=?2 AND e.relative_path_key=?3
+           AND e.asset_id=?4 AND e.album_name='Camera' AND e.file_size=?5 AND e.last_write_time_utc=?6
+           AND e.direction=?7 AND e.status=0 AND e.tombstone_expires_at_utc IS NULL",
+        params![digest(b"https://immich.example/api\ntest-key"), filename, key, asset, size, modified, direction],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    ).optional()?.ok_or("mapping or account history differs from the requested synthetic transfer")?;
+    check_source(&source)?;
+    if UtcTicks::parse_sql(&history)? < UtcTicks::parse_sql(&synchronized)? {
+        return Err("unexpected last successful sync".into());
+    }
+    Ok(())
+}
+
+fn check_source(source: &str) -> Result<()> {
+    let source = Path::new(source);
+    let temp_id = source
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(OsStr::to_str)
+        .and_then(|name| name.strip_prefix("immich-folder-watch-worker-tests-"));
+    if !source.is_absolute()
+        || source.file_name() != Some(OsStr::new("watch"))
+        || !temp_id.is_some_and(|id| lower_hex(id, 32))
+    {
+        return Err("unexpected synthetic source".into());
+    }
+    Ok(())
+}
+
+fn require_fresh_destination() -> Result<()> {
+    for name in [
+        RETURNED,
+        "returned.db-journal",
+        "returned.db-wal",
+        "returned.db-shm",
+    ] {
+        match fs::symlink_metadata(name) {
+            Ok(_) => return Err("destination or its SQLite companions already exist".into()),
+            Err(e) if e.kind() == ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
+fn reserve_destination() -> Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(RETURNED)?;
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let [directory, phase, hash] = args.as_slice() else {
+        return Err(
+            "usage: worker_activity_backup <exchange> <before|after> <snapshot-sha256>".into(),
+        );
+    };
+    let (name, hash_field) = match phase.to_str() {
+        Some("before") => ("before.db", "beforeSha256"),
+        Some("after") => ("after.db", "afterSha256"),
+        _ => return Err("expected before or after".into()),
+    };
+    select_exchange(Path::new(directory))?;
+    let (request, transfer) = read_request()?;
+    let expected = field(&request, hash_field)?;
+    if hash.to_str() != Some(expected) {
+        return Err("requested donor digest differs from the worker observation".into());
+    }
+    verify_backup(Path::new(name), expected)?;
+    let donor = immutable(name)?;
+    let sqlite_source: String = donor.query_one("SELECT sqlite_source_id()", [], |r| r.get(0))?;
+    let options: Vec<String> = donor
+        .prepare("PRAGMA compile_options")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let reviewed: Value = serde_json::from_str(include_str!("../inputs.json"))?;
+    if reviewed["sqlite"]["version"] != rusqlite::version()
+        || reviewed["sqlite"]["source_id"] != sqlite_source
+        || !options.iter().any(|s| s == "OMIT_LOAD_EXTENSION")
+        || options.iter().any(|s| s == "ENABLE_LOAD_EXTENSION")
+        || donor.query_one::<i64, _, _>(
+            "SELECT count(*) FROM pragma_function_list WHERE name='load_extension'",
+            [],
+            |r| r.get(0),
+        )? != 0
+    {
+        return Err("unexpected SQLite build or extension-loading capability".into());
+    }
+    let golden = Connection::open_in_memory()?;
+    golden.execute_batch(GOLDEN)?;
+    let golden = canonical_catalog(catalog(&golden)?);
+    let observed = read_activity(&donor, &golden, transfer)?;
+    require_fresh_destination()?;
+    let Some(original) = observed else {
+        donor.close().map_err(|(_, error)| error)?;
+        verify_backup(Path::new(name), expected)?;
+        let (format, reason) = match transfer {
+            Transfer::Download => ("ifw-worker-backup-stale-v1", "no completed worker download"),
+            Transfer::Upload => (
+                "ifw-worker-upload-backup-stale-v1",
+                "no completed worker upload",
+            ),
+            Transfer::Deletion => ("ifw-worker-deletion-backup-stale-v1", "no worker tombstone"),
+            Transfer::Repair => (
+                "ifw-worker-repair-backup-stale-v1",
+                "no pending worker timestamp repair",
+            ),
+        };
+        eprintln!(
+            "IFW_WORKER_STALE={}",
+            json!({
+                "format": format, "token":request["token"], "sourceSha256":expected
+            })
+        );
+        return Err(reason.into());
+    };
+    if matches!(transfer, Transfer::Deletion | Transfer::Repair) {
+        let before_hash = field(&request, "beforeSha256")?;
+        verify_backup(Path::new("before.db"), before_hash)?;
+        let before = immutable("before.db")?;
+        if read_activity(&before, &golden, transfer)?.is_some() {
+            return Err("expected the original pre-activity database".into());
+        }
+        rollback::check_transition(&before, &donor, transfer)?;
+        before.close().map_err(|(_, error)| error)?;
+        verify_backup(Path::new("before.db"), before_hash)?;
+    }
+    reserve_destination()?;
+    let mut destination = Connection::open_with_flags(
+        RETURNED,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    destination.execute_batch("PRAGMA trusted_schema=OFF;")?;
+    Backup::new(&donor, &mut destination)?.run_to_completion(16, Duration::from_millis(1), None)?;
+    if destination.query_one::<String, _, _>("PRAGMA journal_mode=DELETE", [], |r| r.get(0))?
+        != "delete"
+    {
+        return Err("could not finalize returned SQLite backup".into());
+    }
+    destination.close().map_err(|(_, error)| error)?;
+    donor.close().map_err(|(_, error)| error)?;
+    let restored_hash = digest(&limited(File::open(RETURNED)?, MAX_DB_BYTES)?);
+    verify_backup(Path::new(RETURNED), &restored_hash)?;
+    if read_activity(&immutable(RETURNED)?, &golden, transfer)?.as_ref() != Some(&original) {
+        return Err("reopened Rust backup differs from the finalized worker state".into());
+    }
+    verify_backup(Path::new(RETURNED), &restored_hash)?;
+    verify_backup(Path::new(name), expected)?;
+    let [owned, status, entries, repairs] = original.counts;
+    let format = match transfer {
+        Transfer::Download => "ifw-rust-worker-activity-backup-v1",
+        Transfer::Upload => "ifw-rust-worker-upload-backup-v1",
+        Transfer::Deletion => "ifw-rust-worker-deletion-backup-v1",
+        Transfer::Repair => "ifw-rust-worker-repair-backup-v1",
+    };
+    serde_json::to_writer(
+        std::io::stdout().lock(),
+        &json!({
+            "format":format, "token":request["token"],
+            "sourceSha256":expected, "restoredSha256":restored_hash, "sqliteSourceId":sqlite_source,
+            "sqliteVersion":rusqlite::version(), "compileOptions":options,
+            "os":std::env::consts::OS, "arch":std::env::consts::ARCH,
+            "tableRows":{"owned_albums":owned,"sync_account_status":status,"sync_entries":entries,"sync_timestamp_repairs":repairs}
+        }),
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_valid_empty_snapshot_qualifies_as_stale() -> Result<()> {
+        let db = Connection::open_in_memory()?;
+        db.execute_batch(GOLDEN)?;
+        let golden = canonical_catalog(catalog(&db)?);
+        db.execute_batch("DELETE FROM owned_albums; DELETE FROM sync_entries; DELETE FROM sync_timestamp_repairs;")?;
+        assert!(read_activity(&db, &golden, Transfer::Download).is_err()); // Inconsistent account history survives.
+        db.execute_batch("DELETE FROM sync_account_status;")?;
+        assert!(read_activity(&db, &golden, Transfer::Download)?.is_none());
+        assert!(read_activity(&db, &golden, Transfer::Upload)?.is_none());
+        db.execute_batch("PRAGMA user_version=2;")?;
+        assert!(read_activity(&db, &golden, Transfer::Download).is_err());
+        assert!(read_activity(&db, &golden, Transfer::Upload).is_err());
+        Ok(())
+    }
+}

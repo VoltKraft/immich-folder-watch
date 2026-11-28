@@ -1,0 +1,52 @@
+{
+  "format": "ifw-rw01-window-v1",
+  "baseline": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "LIFE-01-close-reopen-quit",
+      "steps": [
+        { "command": "show", "visible": true, "closed": false, "trayUnavailable": false },
+        { "command": "close", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "show", "visible": true, "closed": false, "trayUnavailable": false },
+        { "command": "quit", "visible": false, "closed": true, "trayUnavailable": false }
+      ]
+    },
+    {
+      "id": "LIFE-02-background-fallback-once",
+      "steps": [
+        { "command": "trayUnavailable", "visible": true, "closed": false, "trayUnavailable": true },
+        { "command": "close", "visible": false, "closed": false, "trayUnavailable": true },
+        { "command": "trayUnavailable", "visible": false, "closed": false, "trayUnavailable": true },
+        { "command": "trayAvailable", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "trayUnavailable", "visible": false, "closed": false, "trayUnavailable": true },
+        { "command": "show", "visible": true, "closed": false, "trayUnavailable": true }
+      ]
+    },
+    {
+      "id": "LIFE-03-background-tray-loss",
+      "steps": [
+        { "command": "trayAvailable", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "trayUnavailable", "visible": false, "closed": false, "trayUnavailable": true },
+        { "command": "trayAvailable", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "quit", "visible": false, "closed": true, "trayUnavailable": false }
+      ]
+    },
+    {
+      "id": "LIFE-04-closed-before-tray-reply",
+      "steps": [
+        { "command": "show", "visible": true, "closed": false, "trayUnavailable": false },
+        { "command": "close", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "trayUnavailable", "visible": false, "closed": false, "trayUnavailable": true }
+      ]
+    },
+    {
+      "id": "LIFE-05-shutdown-prevents-fallback",
+      "steps": [
+        { "command": "beginShutdown", "visible": false, "closed": false, "trayUnavailable": false },
+        { "command": "trayUnavailable", "visible": false, "closed": false, "trayUnavailable": true },
+        { "command": "quit", "visible": false, "closed": true, "trayUnavailable": true }
+      ]
+    }
+  ]
+}

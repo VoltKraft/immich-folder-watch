@@ -1,0 +1,159 @@
+{
+  "allCompilerTreesSha256": "99e9d56cfa775b763633986e90691589d23bbedacc7e5539f4c056f1f74f2be0",
+  "inventorySha256": "b88b6c7c6fda70fd0829fb58dc1e7216c935455561f57a91d4a76b3ba07f1ebe",
+  "lockSha256": "ff44785e595316c7182d7a020b5904f632c67fa0ac0e8d5d239c684794c00793",
+  "registryLockCount": 472,
+  "summary": {
+    "activeExternalPackages": 352,
+    "buildScriptOrMacroPackages": 69,
+    "fonts": 5,
+    "multiVersion": {
+      "calloop": [
+        "0.13.0",
+        "0.14.5"
+      ],
+      "calloop-wayland-source": [
+        "0.3.0",
+        "0.4.1"
+      ],
+      "foldhash": [
+        "0.1.5",
+        "0.2.0"
+      ],
+      "getrandom": [
+        "0.2.17",
+        "0.3.4",
+        "0.4.3"
+      ],
+      "hashbrown": [
+        "0.15.5",
+        "0.16.1",
+        "0.17.1"
+      ],
+      "linux-raw-sys": [
+        "0.12.1",
+        "0.4.15"
+      ],
+      "miniz_oxide": [
+        "0.8.9",
+        "0.9.1"
+      ],
+      "rustc-hash": [
+        "1.1.0",
+        "2.1.3"
+      ],
+      "rustix": [
+        "0.38.44",
+        "1.1.6"
+      ],
+      "smithay-client-toolkit": [
+        "0.19.2",
+        "0.20.0"
+      ],
+      "syn": [
+        "2.0.119",
+        "3.0.10"
+      ],
+      "thiserror": [
+        "1.0.69",
+        "2.0.21"
+      ],
+      "thiserror-impl": [
+        "1.0.69",
+        "2.0.21"
+      ],
+      "windows-sys": [
+        "0.52.0",
+        "0.61.2"
+      ]
+    },
+    "native": 509,
+    "notices": 641,
+    "protocols": 101,
+    "registryPackages": 348,
+    "shaders": 16,
+    "sourceAttributionBlocks": 1188,
+    "sourceAttributionFiles": 1982,
+    "supplementalNoticeFiles": 19
+  },
+  "targets": {
+    "aarch64-pc-windows-msvc": {
+      "individualPackageCounts": {
+        "gui": 135,
+        "performance/worker": 25,
+        "realtime": 114,
+        "storage": 26,
+        "windows-services": 16,
+        "yaml": 30
+      },
+      "newFeatureCombinations": [
+        "windows 0.62.2",
+        "windows-sys 0.61.2"
+      ],
+      "newlyActiveFeatures": {},
+      "normalBuildFeatureSetsSha256": "50fa98571ea1d0719fc73585b7d28c861757355ef6786ff21564cb2c485c91db",
+      "packages": 249,
+      "registryPackages": 239,
+      "treeSha256": "8bd5a38dd9ca687a46189f94494c1a0380cc92ea07c231d10234fcbdd77be350"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "individualPackageCounts": {
+        "gui": 250,
+        "linux-services": 70,
+        "performance/worker": 25,
+        "portal-dialog": 118,
+        "realtime": 113,
+        "storage": 27,
+        "yaml": 30
+      },
+      "newFeatureCombinations": [
+        "futures-util 0.3.34",
+        "syn 3.0.10"
+      ],
+      "newlyActiveFeatures": {},
+      "normalBuildFeatureSetsSha256": "f22518809b99b3f69a1817a676805d95c2f70cb7cc3d0b6c46a06ed44ff81fe9",
+      "packages": 337,
+      "registryPackages": 327,
+      "treeSha256": "32395145b32ecba819d8c78523a32f191907d6ed3e51589fae2e73d3e52820b9"
+    },
+    "x86_64-pc-windows-msvc": {
+      "individualPackageCounts": {
+        "gui": 135,
+        "performance/worker": 26,
+        "realtime": 111,
+        "storage": 26,
+        "windows-services": 16,
+        "yaml": 31
+      },
+      "newFeatureCombinations": [
+        "windows 0.62.2",
+        "windows-sys 0.61.2"
+      ],
+      "newlyActiveFeatures": {},
+      "normalBuildFeatureSetsSha256": "29c99c7d57feaba22a9cf1ae5e378c363fe892b58b60e87120d93e3cc95ecf3a",
+      "packages": 250,
+      "registryPackages": 240,
+      "treeSha256": "f76fad398b5896f1065a7a5455c0c84b31a010bbe9212fffeac3010923884627"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "individualPackageCounts": {
+        "gui": 251,
+        "linux-services": 70,
+        "performance/worker": 26,
+        "portal-dialog": 118,
+        "realtime": 113,
+        "storage": 26,
+        "yaml": 31
+      },
+      "newFeatureCombinations": [
+        "futures-util 0.3.34",
+        "syn 3.0.10"
+      ],
+      "newlyActiveFeatures": {},
+      "normalBuildFeatureSetsSha256": "62e26a16fe3939da5bc22afa8fa2ca617c099dd32b3e763919c7423b295037a9",
+      "packages": 338,
+      "registryPackages": 328,
+      "treeSha256": "11c99a1f1ba30dd075c1082c4b0da3df731ed9d8e5e63f10561713d31004c7b9"
+    }
+  }
+}

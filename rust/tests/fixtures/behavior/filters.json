@@ -1,0 +1,247 @@
+{
+  "fixtureVersion": 1,
+  "baselineSourceRevision": "19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc",
+  "dataClassification": "synthetic",
+  "cases": [
+    {
+      "id": "BEH-FILTER-01",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "photo.JPG",
+      "expected": true
+    },
+    {
+      "id": "BEH-FILTER-02",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "nested/deep/photo.png",
+      "expected": true
+    },
+    {
+      "id": "BEH-FILTER-03",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "photo.gif",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-04",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "photo",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-05",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "private/photo.jpg",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-06",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "nested/private/deep/photo.jpg",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-07",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "cache/session/deep/photo.jpg",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-08",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "cache/photo.jpg",
+      "expected": true
+    },
+    {
+      "id": "BEH-FILTER-09",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "photo.tmp.jpg",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-10",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "secret1.jpg",
+      "expected": false
+    },
+    {
+      "id": "BEH-FILTER-11",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "secret12.jpg",
+      "expected": true
+    },
+    {
+      "id": "BEH-FILTER-12",
+      "parity": [
+        "PAR-03"
+      ],
+      "extensions": [
+        " jpg ",
+        ".PNG"
+      ],
+      "excludeDirectories": [
+        "**/private",
+        "cache/*"
+      ],
+      "excludeFileNames": [
+        "*.tmp.*",
+        "secret?.jpg"
+      ],
+      "path": "../outside.jpg",
+      "expected": false
+    }
+  ]
+}

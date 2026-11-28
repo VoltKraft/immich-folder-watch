@@ -1,0 +1,88 @@
+--- a/src/context.rs
++++ b/src/context.rs
+@@ -54,18 +54,11 @@
+ 
+             thread::spawn(|| {
+                 let executor = Executor::new();
+-                block_on(executor.run(async {
+-                    if let Ok(session_bus) = Builder::session() {
+-                        if let Ok(session_bus) = session_bus.internal_executor(false).build().await
+-                        {
+-                            if let Err(error) = run_event_loop(&executor, session_bus, rx).await {
+-                                if zbus_error_is_unrecoverable(&error) {
+-                                    panic!("Accessibility event loop failed: {error}");
+-                                }
+-                            }
+-                        }
++                if let Err(error) = block_on(executor.run(run_event_loop(&executor, rx))) {
++                    if zbus_error_is_unrecoverable(&error) {
++                        panic!("Accessibility event loop failed: {error}");
+                     }
+-                }))
++                }
+             });
+ 
+             tx
+@@ -168,9 +161,30 @@
+ 
+ async fn run_event_loop(
+     executor: &Executor<'_>,
+-    session_bus: Connection,
+     rx: Receiver<Message>,
+ ) -> zbus::Result<()> {
++    #[cfg(not(feature = "tokio"))]
++    let messages = rx.fuse();
++    #[cfg(feature = "tokio")]
++    let messages = UnboundedReceiverStream::new(rx).fuse();
++    pin!(messages);
++
++    let mut adapters: Vec<AdapterEntry> = Vec::new();
++
++    if std::path::Path::new("/.flatpak-info").is_file() {
++        // Flatpak exposes its application-side AT-SPI proxy separately from the session bus.
++        const ADDRESS: &str = "unix:path=/run/flatpak/at-spi-bus";
++        if std::env::var("AT_SPI_BUS_ADDRESS").as_deref() != Ok(ADDRESS) {
++            return Ok(());
++        }
++        let bus = Some(Bus::connect(ADDRESS, executor).await?);
++        while let Some(message) = messages.next().await {
++            process_adapter_message(&bus, &mut adapters, message).await?;
++        }
++        return Ok(());
++    }
++
++    let session_bus = Builder::session()?.internal_executor(false).build().await?;
+     let session_bus_copy = session_bus.clone();
+     let _session_bus_task = executor.spawn(
+         async move {
+@@ -184,15 +198,7 @@
+     let status = StatusProxy::new(&session_bus).await?;
+     let changes = status.receive_is_enabled_changed().await.fuse();
+     pin!(changes);
+-
+-    #[cfg(not(feature = "tokio"))]
+-    let messages = rx.fuse();
+-    #[cfg(feature = "tokio")]
+-    let messages = UnboundedReceiverStream::new(rx).fuse();
+-    pin!(messages);
+-
+     let mut atspi_bus = None;
+-    let mut adapters: Vec<AdapterEntry> = Vec::new();
+ 
+     loop {
+         select! {
+--- a/src/atspi/bus.rs
++++ b/src/atspi/bus.rs
+@@ -44,7 +44,11 @@
+             Ok(address) if !address.is_empty() => address,
+             _ => BusProxy::new(session_bus).await?.get_address().await?,
+         };
+-        let address: Address = address.as_str().try_into()?;
++        Self::connect(&address, executor).await
++    }
++
++    pub(crate) async fn connect(address: &str, executor: &Executor<'_>) -> zbus::Result<Self> {
++        let address: Address = address.try_into()?;
+         let conn = Builder::address(address)?
+             .internal_executor(false)
+             .build()

@@ -1,0 +1,13 @@
+[package]
+name = "native-watch-hints"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "AGPL-3.0-only"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

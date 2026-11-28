@@ -1,0 +1,26 @@
+{
+  "crate": "winit-0.30.13",
+  "upstreamRevision": "e9809ef54b18499bb4f2cac945719ecc2a61061b",
+  "pathInVcs": "",
+  "archiveUrl": "https://static.crates.io/crates/winit/winit-0.30.13.crate",
+  "archiveSha256": "a6755fa58a9f8350bd1e472d4c3fcc25f824ec358933bba33306d0b63df5978d",
+  "originalTree": {
+    "files": 217,
+    "sha256": "2442e0fdad60181d08db94b18dfc90061147b4b91261148ea3172d5827c0a28f"
+  },
+  "compilerTree": {
+    "files": 217,
+    "sha256": "8cc2eec803bc6d84ce02e58e8942dfc8a924c8aced2510bd6788dedc8ec98102"
+  },
+  "patchSha256": "56c272c865b4829d2a4f483e2d7fe35fbde9ed514fda1f9adb80612ea22f4d95",
+  "modified": {
+    "src/platform_impl/windows/window_state.rs": {
+      "original": "505e7ea90e1fa75500cb296cf6ec4cf3f04407c44731ffc9ae1f48e78d8d0f34",
+      "compiled": "7b9e0df5ff94495ea1b506018272de797323964827585768531c2dd44ff699b6"
+    }
+  },
+  "license": "Apache-2.0",
+  "licenseFile": "LICENSE",
+  "licenseSha256": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a",
+  "licenseSource": "https://raw.githubusercontent.com/rust-windowing/winit/e9809ef54b18499bb4f2cac945719ecc2a61061b/LICENSE"
+}

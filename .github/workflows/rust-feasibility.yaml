@@ -1,0 +1,171 @@
+name: Rust native feasibility
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-feasibility.yaml'
+      - 'rust/**'
+      - 'tools/rust-qa/**'
+      - '!tools/rust-qa/windows-warm-window/dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/test_dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
+      - '!tools/rust-qa/windows-frame-cost/frame*ready*'
+      - '!tools/rust-qa/windows-frame-cost/test_frame_ready.py'
+      - '!tools/rust-qa/windows-cpu-paint/**'
+      - '!tools/rust-qa/windows-msi-interop/**'
+      - 'tools/RustCompatibilityOracle/verify_activity.py'
+      - 'tools/RustCompatibilityOracle/verify_rollback.py'
+      - 'src/ImmichFolderWatch.Tests.Core/Services/FolderWatchWorkerPersistenceTests*.cs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-feasibility-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  feasibility:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Native (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout feasibility sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # The watch comparison hashes the original shipping worker.
+
+      - name: Install the checksum-pinned compiler and tools in the checkout
+        id: pinned
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "artifacts/rust/feasibility/$NATIVE_TARGET"
+          bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET" 2>&1 | tee "artifacts/rust/feasibility/$NATIVE_TARGET/install.log"
+
+      - name: Select the native development-only compatibility oracle SDK
+        id: oracle
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Exercise the release probes on their native host
+        shell: bash
+        env:
+          IFW_RUST_REQUIRE_WINDOWS_SHORT_NAME: ${{ runner.os == 'Windows' && '1' || '0' }}
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          export CARGO_HOME="$PWD/artifacts/rust/cargo-home"
+          python3 tools/rust-qa/test-native.py "$NATIVE_TARGET"
+
+      - name: Build and exercise the writer for standard-user Windows desktops
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --keep-windows-build \
+            --output "artifacts/rust/desktop-writer/$NATIVE_TARGET"
+
+      - name: Retain the tested Windows writer and development identity oracle
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-desktop-writer-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/desktop-writer/${{ matrix.target }}/writer/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Exercise handle-bound operations over an actual loopback SMB share
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\artifacts\rust\toolchain\bin;$env:PATH"
+          ./tools/rust-qa/test-windows-smb.ps1 -Target $env:NATIVE_TARGET
+
+      - name: Observe bounded native watch events and complete synthetic rescans
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/watch-events/run.py "$NATIVE_TARGET"
+
+      - name: Retain native watch results
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-watch-events-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/watch-events/${{ matrix.target }}/result.json
+            artifacts/rust/watch-events/${{ matrix.target }}/evidence.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain native observations
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-feasibility-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/feasibility/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Recover Windows databases and observe ordinary access on the private FAT volume
+        id: recovery
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          export CARGO_HOME="$PWD/artifacts/rust/storage-cargo-home"
+          cargo fetch --locked --manifest-path tools/rust-qa/storage-faults/Cargo.toml
+          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" --windows-vhd --windows-provider \
+            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET"
+
+      - name: Retain the full Windows recovery evidence
+        if: ${{ !cancelled() && (steps.recovery.outcome == 'success' || steps.recovery.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-recovery-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-faults/${{ matrix.target }}/
+            !artifacts/rust/storage-faults/${{ matrix.target }}/build/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore native Rust backups after download, upload, deletion and interrupted repair
+        id: activity
+        if: ${{ !cancelled() && steps.pinned.outcome == 'success' && steps.oracle.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/storage/run.py "$NATIVE_TARGET" --worker-activity \
+            --output "artifacts/rust/worker-backup-native/$NATIVE_TARGET"
+
+      - name: Retain the worker, Rust backup and original recovery evidence
+        if: ${{ !cancelled() && (steps.activity.outcome == 'success' || steps.activity.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-worker-backup-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/worker-backup-native/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14

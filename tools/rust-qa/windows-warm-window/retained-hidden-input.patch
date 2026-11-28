@@ -1,0 +1,92 @@
+--- a/src/native_window.rs
++++ b/src/native_window.rs
+@@ -4,6 +4,8 @@
+ use std::error::Error;
+ use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+ use std::sync::Arc;
++#[cfg(target_os = "windows")]
++use std::sync::atomic::{AtomicBool, Ordering};
+ use winit::application::ApplicationHandler;
+ use winit::event::{DeviceEvent, DeviceId, Ime, StartCause, WindowEvent};
+ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+@@ -15,6 +17,8 @@
+     model: &'a RefCell<Model>,
+     control: &'a Control,
+     initial_pass: u64,
++    #[cfg(target_os = "windows")]
++    hidden_root: Arc<AtomicBool>,
+     mapping_events: Vec<WindowEvent>,
+     repaint_after_map: bool,
+ }
+@@ -58,9 +62,12 @@
+             .cloned()
+     }
+
+-    fn hide(window: &Window) {
+-        #[cfg(target_os = "windows")]
+-        crate::ui_trace::visibility(window, false);
++    fn hide(&self, window: &Window) {
++        #[cfg(target_os = "windows")]
++        {
++            self.hidden_root.store(true, Ordering::Relaxed);
++            crate::ui_trace::visibility(window, false);
++        }
+         #[cfg(not(target_os = "windows"))]
+         window.set_visible(false);
+         println!("WINDOW_HIDDEN");
+@@ -82,6 +89,8 @@
+             match action {
+                 Some(HostCommand::ShowAndFocus) => {
+                     #[cfg(target_os = "windows")]
++                    self.hidden_root.store(false, Ordering::Relaxed);
++                    #[cfg(target_os = "windows")]
+                     if window.is_minimized() == Some(true) {
+                         window.set_minimized(false);
+                     }
+@@ -106,7 +115,7 @@
+                     {
+                         self.model.borrow_mut().restore_focus = true;
+                     }
+-                    Self::hide(window);
++                    self.hide(window);
+                 }
+                 Some(HostCommand::StopBackground) => {
+                     event_loop.exit();
+@@ -157,7 +166,7 @@
+                         {
+                             self.model.borrow_mut().restore_focus = true;
+                         }
+-                        Self::hide(&window);
++                        self.hide(&window);
+                         return;
+                     }
+                 }
+@@ -284,12 +293,28 @@
+     #[cfg(target_os = "windows")]
+     control.loop_wake.install(event_loop);
+     let passes_before = model.borrow().passes;
++    #[cfg(target_os = "windows")]
++    let hidden_root = Arc::new(AtomicBool::new(false));
++    #[cfg(target_os = "windows")]
++    let options = {
++        let original_policy = std::env::var("IFW_QA_ISOLATED").as_deref() == Ok("1")
++            && std::env::var("IFW_QA_WINDOWS_HIDDEN_PAINT_CONTROL").as_deref() == Ok("1");
++        if original_policy {
++            println!("WINDOW_HIDDEN_PAINT mode=original");
++        }
++        eframe::NativeOptions {
++            externally_hidden_root: (!original_policy).then(|| Arc::clone(&hidden_root)),
++            ..options
++        }
++    };
+     let app = eframe::create_native("Desktop input probe", options, create, event_loop);
+     let mut handler = Handler {
+         eframe: app,
+         model,
+         control,
+         initial_pass: passes_before,
++        #[cfg(target_os = "windows")]
++        hidden_root,
+         mapping_events: Vec::new(),
+         repaint_after_map: false,
+     };

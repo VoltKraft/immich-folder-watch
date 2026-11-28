@@ -1,0 +1,72 @@
+name: Rust native realtime transport
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-realtime.yaml'
+      - 'tools/rust-qa/realtime/**'
+      - 'rust/crates/ifw-immich/**'
+      - 'rust/toolchain-inputs.json'
+      - 'tools/rust-qa/enter-windows-build.ps1'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/audit-graph.py'
+      - 'tools/rust-qa/check-toolchain.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transport:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Transport (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Run the Linux transport suite
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/realtime/run.py "$NATIVE_TARGET" --output "artifacts/rust/realtime-native/$NATIVE_TARGET"
+
+      - name: Run the Windows transport suite
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Retain the native test results
+        if: ${{ !cancelled() && hashFiles('artifacts/rust/realtime-native/*/result.json') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-realtime-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/realtime-native/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14

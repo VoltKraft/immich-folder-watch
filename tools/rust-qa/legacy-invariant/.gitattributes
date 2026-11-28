@@ -1,0 +1,4 @@
+*.tsv -text
+*.cs text eol=lf
+*.py text eol=lf
+*.json text eol=lf

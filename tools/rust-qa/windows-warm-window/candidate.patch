@@ -1,0 +1,432 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -14,6 +14,8 @@
+ mod linux;
+ #[cfg(target_os = "linux")]
+ mod linux_appearance;
++#[cfg(target_os = "windows")]
++mod loop_wake;
+ mod native_window;
+ 
+ use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, TrayAvailability, WindowIntent};
+@@ -32,12 +34,16 @@
+     Close,
+     Quit,
+     DestroyGraphics,
++    #[cfg(target_os = "windows")]
++    AllocatorReport,
+ }
+ 
+ #[derive(Clone)]
+ struct Control {
+     sender: SyncSender<Command>,
+     window: Arc<Mutex<Option<Wake>>>,
++    #[cfg(target_os = "windows")]
++    loop_wake: Arc<loop_wake::LoopWake>,
+     #[cfg(target_os = "linux")]
+     graphics_attention: Arc<std::sync::atomic::AtomicBool>,
+     #[cfg(target_os = "linux")]
+@@ -45,20 +51,35 @@
+ }
+ 
+ struct Wake {
+     context: egui::Context,
+-    x11: Option<Arc<winit::window::Window>>,
++    retained: Option<Arc<winit::window::Window>>,
+ }
+ 
+ impl Control {
+     fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
+-        self.sender.try_send(command)?;
+-        self.wake();
+-        Ok(())
++        #[cfg(target_os = "windows")]
++        {
++            // This private input thread may backpressure. Preserve a queued Quit in bursts.
++            self.sender
++                .send(command)
++                .map_err(|err| TrySendError::Disconnected(err.0))?;
++            self.wake();
++            Ok(())
++        }
++        #[cfg(target_os = "linux")]
++        {
++            self.sender.try_send(command)?;
++            self.wake();
++            Ok(())
++        }
+     }
+ 
+     fn wake(&self) {
++        #[cfg(target_os = "windows")]
++        self.loop_wake.notify();
++        #[cfg(target_os = "linux")]
+         if let Some(wake) = &*self.window.lock().expect("window wake mutex poisoned") {
+-            if let Some(window) = &wake.x11 {
++            if let Some(window) = &wake.retained {
+                 window.request_redraw();
+                 return;
+             }
+@@ -101,6 +123,11 @@
+             }
+             Command::DestroyGraphics => {
+                 self.graphics.request_test_fault();
++                None
++            }
++            #[cfg(target_os = "windows")]
++            Command::AllocatorReport => {
++                self.graphics.report_allocator();
+                 None
+             }
+         };
+@@ -150,7 +177,7 @@
+         }
+         fonts::add_fallbacks(&mut fonts);
+         creation.egui_ctx.set_fonts(fonts);
+-        model.borrow_mut().graphics.attach(creation);
++        model.borrow_mut().graphics.attach(creation, &control);
+         if let Some(render) = &creation.wgpu_render_state {
+             let info = render.adapter.get_info();
+             println!(
+@@ -158,15 +184,13 @@
+                 info.backend, info.device_type, info.name
+             );
+         }
+-        // Winit's X11 backend reports actual visibility and supports unmap/remap. Its
+-        // Wayland backend reports None and needs a fresh toplevel after a close.
+-        let can_hide = cfg!(target_os = "linux")
+-            && creation
+-                .winit_window()
+-                .is_some_and(|w| w.is_visible().is_some());
++        // Windows and X11 expose native hide/show. Wayland needs a new toplevel after close.
++        let can_hide = creation
++            .winit_window()
++            .is_some_and(|w| w.is_visible().is_some());
+         *control.window.lock().expect("window wake mutex poisoned") = Some(Wake {
+             context: creation.egui_ctx.clone(),
+-            x11: creation.winit_window().filter(|_| can_hide).cloned(),
++            retained: creation.winit_window().filter(|_| can_hide).cloned(),
+         });
+         if !can_hide {
+             creation.egui_ctx.request_repaint();
+@@ -205,6 +231,8 @@
+                 self.applied_appearance = Some(state);
+             }
+         }
++        #[cfg(target_os = "windows")]
++        self.control.loop_wake.observe(ctx);
+         self.model.borrow_mut().graphics.apply_surface_choice(frame);
+         // Count native composition stages without disclosing entered text.
+         ctx.input(|i| {
+@@ -221,7 +249,7 @@
+             }
+         });
+         if self.can_hide {
+-            return; // The X11 native event handler owns the top-level controls.
++            return; // The native event handler owns the retained toplevel.
+         }
+         let mut model = self.model.borrow_mut();
+         if ctx.input(|i| i.viewport().close_requested())
+@@ -386,6 +414,8 @@
+     let control = Control {
+         sender,
+         window: Arc::new(Mutex::new(None)),
++        #[cfg(target_os = "windows")]
++        loop_wake: Arc::default(),
+         #[cfg(target_os = "linux")]
+         graphics_attention: Arc::default(),
+         #[cfg(target_os = "linux")]
+@@ -497,10 +527,21 @@
+             }
+             return;
+         }
++        let report_memory = matches!(
++            std::env::var("IFW_QA_WINDOWS_RESIDENCY").as_deref(),
++            Ok("1" | "performance-control")
++        );
+         loop {
+             let command = match input.read_byte() {
+                 Ok(b'O') => Command::Open,
+                 Ok(b'C') => Command::Close,
++                Ok(b'M') => {
++                    if report_memory {
++                        Command::AllocatorReport
++                    } else {
++                        continue;
++                    }
++                }
+                 Ok(b'G') => {
+                     if graphics::allows_test_fault() {
+                         Command::DestroyGraphics
+--- a/src/native_window.rs
++++ b/src/native_window.rs
+@@ -47,15 +47,15 @@
+         }
+         #[cfg(windows)]
+         self.focus_if_requested(event_loop);
+     }
+-    fn x11_root(&self) -> Option<Arc<Window>> {
++    fn retained_root(&self) -> Option<Arc<Window>> {
+         self.control
+             .window
+             .lock()
+             .expect("window wake mutex poisoned")
+             .as_ref()
+-            .and_then(|wake| wake.x11.as_ref())
++            .and_then(|wake| wake.retained.as_ref())
+             .cloned()
+     }
+
+     fn hide(window: &Window) {
+@@ -63,29 +63,53 @@
+         println!("WINDOW_HIDDEN");
+     }
+
+     fn controls_allow_redraw(&self, event_loop: &ActiveEventLoop, window: &Window) -> bool {
+-        let mut model = self.model.borrow_mut();
+-        while let Ok(command) = model.commands.try_recv() {
+-            match model.command(command) {
++        loop {
++            let action = {
++                let mut model = self.model.borrow_mut();
++                let Ok(command) = model.commands.try_recv() else {
++                    break;
++                };
++                model.command(command)
++            };
++            match action {
+                 Some(HostCommand::ShowAndFocus) => {
++                    #[cfg(target_os = "windows")]
++                    if window.is_minimized() == Some(true) {
++                        window.set_minimized(false);
++                    }
+                     window.set_visible(true);
+                     #[cfg(not(windows))]
+                     window.focus_window();
+-                }
+-                Some(HostCommand::Hide) => Self::hide(window),
++                    #[cfg(target_os = "windows")]
++                    window.request_redraw();
++                }
++                Some(HostCommand::Hide) => {
++                    #[cfg(target_os = "windows")]
++                    {
++                        self.model.borrow_mut().restore_focus = true;
++                    }
++                    Self::hide(window);
++                }
+                 Some(HostCommand::StopBackground) => {
+                     event_loop.exit();
+                     return false;
+                 }
+                 _ => (),
+             }
+         }
++        let model = self.model.borrow();
+         if model.graphics.lost() {
+             event_loop.exit();
+             return false;
+         }
+         model.lifecycle.window_intent() == WindowIntent::Visible
++    }
++
++    #[cfg(target_os = "windows")]
++    fn hidden(&self) -> bool {
++        self.model.borrow().lifecycle.window_intent() == WindowIntent::HiddenByUser
+     }
+
+     fn flush_mapping(&mut self, event_loop: &ActiveEventLoop, window: &Window) {
+         for event in std::mem::take(&mut self.mapping_events) {
+@@ -103,17 +127,25 @@
+         if self.model.borrow().graphics.lost() {
+             event_loop.exit();
+             return;
+         }
+-        if let Some(window) = self.x11_root().filter(|window| window.id() == id) {
++        if let Some(window) = self.retained_root().filter(|window| window.id() == id) {
+             match event {
+                 WindowEvent::CloseRequested => {
+-                    if self.model.borrow_mut().command(super::Command::Close)
+-                        == Some(HostCommand::Hide)
+-                    {
++                    let action = self.model.borrow_mut().command(super::Command::Close);
++                    if action == Some(HostCommand::Hide) {
++                        #[cfg(target_os = "windows")]
++                        {
++                            self.model.borrow_mut().restore_focus = true;
++                        }
+                         Self::hide(&window);
+                         return;
+                     }
++                }
++                #[cfg(target_os = "windows")]
++                WindowEvent::Destroyed => {
++                    event_loop.exit();
++                    return;
+                 }
+                 WindowEvent::RedrawRequested
+                     if !self.controls_allow_redraw(event_loop, &window) =>
+                 {
+@@ -121,9 +155,11 @@
+             }
+             // Winit marks a mapped X11 window visible after returning from its Occluded callback.
+             // Before that acknowledgement eframe paints and sleeps synchronously on each of these
+             // notifications. Preserve their order, then dispatch once X11 can schedule normal frames.
+-            if self.model.borrow().passes > self.initial_pass && window.is_visible() == Some(false)
++            if cfg!(target_os = "linux")
++                && self.model.borrow().passes > self.initial_pass
++                && window.is_visible() == Some(false)
+             {
+                 match event {
+                     WindowEvent::RedrawRequested => {
+                         self.repaint_after_map = true;
+@@ -149,11 +185,22 @@
+     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+         self.dispatch(event_loop, |app| app.resumed(event_loop));
+     }
+     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
++        #[cfg(target_os = "windows")]
++        if self.hidden() {
++            return; // A hidden HWND has no paint deadline. External control and loss have their own wake.
++        }
+         self.dispatch(event_loop, |app| app.new_events(event_loop, cause));
+     }
+     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: eframe::UserEvent) {
++        #[cfg(target_os = "windows")]
++        if let Some(window) = self.retained_root()
++            && !self.controls_allow_redraw(event_loop, &window)
++            && (event_loop.exiting() || matches!(event, eframe::UserEvent::RequestRepaint { .. }))
++        {
++            return;
++        }
+         self.dispatch(event_loop, |app| app.user_event(event_loop, event));
+     }
+     fn device_event(&mut self, event_loop: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
+         self.dispatch(event_loop, |app| app.device_event(event_loop, id, event));
+@@ -162,9 +209,19 @@
+         if self.model.borrow().graphics.lost() {
+             event_loop.exit();
+             return;
+         }
+-        if let Some(window) = self.x11_root().filter(|w| w.is_visible() == Some(true)) {
++        #[cfg(target_os = "windows")]
++        if let Some(window) = self.retained_root()
++            && !self.controls_allow_redraw(event_loop, &window)
++        {
++            event_loop.set_control_flow(ControlFlow::Wait);
++            return;
++        }
++        if let Some(window) = self
++            .retained_root()
++            .filter(|w| w.is_visible() == Some(true))
++        {
+             self.flush_mapping(event_loop, &window);
+         }
+         self.dispatch(event_loop, |app| app.about_to_wait(event_loop));
+     }
+@@ -191,8 +248,10 @@
+         Some(existing) => existing,
+         empty => empty.insert(EventLoop::with_user_event().build()?),
+     };
+     event_loop.set_control_flow(ControlFlow::Wait);
++    #[cfg(target_os = "windows")]
++    control.loop_wake.install(event_loop);
+     let passes_before = model.borrow().passes;
+     let app = eframe::create_native("Desktop input probe", options, create, event_loop);
+     let mut handler = Handler {
+         eframe: app,
+--- a/src/graphics.rs
++++ b/src/graphics.rs
+@@ -71,11 +71,28 @@
+         let WgpuSetup::CreateNew(setup) = &mut options.wgpu_options.wgpu_setup else {
+             unreachable!()
+         };
+         #[cfg(target_os = "windows")]
+-        if !software && !prefer_hardware {
+-            // Keep the system's default DX12 adapter selection for ordinary Windows startup.
+-            return;
++        {
++            let original = Arc::clone(&setup.device_descriptor);
++            let control =
++                std::env::var("IFW_QA_WINDOWS_RESIDENCY").as_deref() == Ok("performance-control");
++            let generation = self.generation;
++            setup.device_descriptor = Arc::new(move |adapter| {
++                let mut descriptor = original(adapter);
++                if !control {
++                    descriptor.memory_hints = wgpu::MemoryHints::MemoryUsage;
++                }
++                println!(
++                    "GRAPHICS_MEMORY generation={generation} hint={:?}",
++                    descriptor.memory_hints
++                );
++                descriptor
++            });
++            if !software && !prefer_hardware {
++                // Keep the system's default DX12 adapter selection for ordinary Windows startup.
++                return;
++            }
+         }
+         #[cfg(target_os = "linux")]
+         let (mailbox, generation) = (Arc::clone(&self.surface_has_mailbox), self.generation);
+         setup.native_adapter_selector = Some(Arc::new(move |adapters, surface| {
+@@ -124,9 +141,13 @@
+                 .ok_or_else(|| "No compatible adapter for this native graphics attempt".to_owned())
+         }));
+     }
+
+-    pub(super) fn attach(&mut self, creation: &eframe::CreationContext<'_>) {
++    pub(super) fn attach(
++        &mut self,
++        creation: &eframe::CreationContext<'_>,
++        _control: &super::Control,
++    ) {
+         #[cfg(target_os = "linux")]
+         {
+             use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+             self.change_surface_mode = self.surface_has_mailbox.load(Ordering::Acquire)
+@@ -141,14 +162,18 @@
+             .expect("wgpu render state");
+         let state = Arc::clone(&self.state);
+         let generation = self.generation;
+         let wake = creation.winit_window().map(Arc::downgrade);
++        #[cfg(target_os = "windows")]
++        let dispatcher = Arc::clone(&_control.loop_wake);
+         render.device.set_device_lost_callback(move |reason, _| {
+             if state
+                 .compare_exchange(ACTIVE, LOST, Ordering::AcqRel, Ordering::Acquire)
+                 .is_ok()
+             {
+                 println!("GRAPHICS_LOST generation={generation} reason={reason:?}");
++                #[cfg(target_os = "windows")]
++                dispatcher.notify();
+                 if let Some(w) = wake.as_ref().and_then(|window| window.upgrade()) {
+                     w.request_redraw();
+                 }
+             }
+@@ -185,8 +210,26 @@
+             self.destroy();
+         }
+     }
+
++    #[cfg(target_os = "windows")]
++    pub(super) fn report_allocator(&self) {
++        match self
++            .device
++            .as_ref()
++            .and_then(wgpu::Device::generate_allocator_report)
++        {
++            Some(report) => println!(
++                "WGPU_ALLOCATOR allocated={} reserved={} blocks={} allocations={}",
++                report.total_allocated_bytes,
++                report.total_reserved_bytes,
++                report.blocks.len(),
++                report.allocations.len()
++            ),
++            None => println!("WGPU_ALLOCATOR unavailable"),
++        }
++    }
++
+     pub(super) fn finish_ui_for_test(&mut self) {
+         if std::mem::take(&mut self.queued_fault) {
+             assert!(!self.unrelated, "Unrelated UI test failure");
+             println!("GRAPHICS_IN_PAINT generation={}", self.generation);

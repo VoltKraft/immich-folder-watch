@@ -1,0 +1,992 @@
+name: Rust native desktop, storage and transport assessment
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-desktop-assessment.yaml'
+      - 'rust/**'
+      - 'tools/rust-qa/**'
+      # Windows x64-only renderer comparisons run on the local VM.
+      - '!tools/rust-qa/windows-warm-window/dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/test_dwm_transitions.py'
+      - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
+      - '!tools/rust-qa/windows-frame-cost/frame*ready*'
+      - '!tools/rust-qa/windows-frame-cost/test_frame_ready.py'
+      - '!tools/rust-qa/windows-cpu-paint/**'
+      - '!tools/rust-qa/windows-msi-interop/**'
+      - 'tools/RustCompatibilityOracle/installed/interop/**'
+      - 'tools/RustCompatibilityOracle/installed/launch/**'
+      - 'tools/RustCompatibilityOracle/installed/run.py'
+      - 'tools/RustCompatibilityOracle/installed/release.json'
+      - 'packaging/flatpak/repository-signing-key.asc'
+      - '.gitattributes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assess:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    name: Native assessment (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    # Each host owns its synthetic profile, same-host baseline and artifacts.
+    concurrency:
+      group: rust-desktop-assessment-${{ github.ref }}-${{ matrix.target }}
+      queue: max
+    # Each Windows profile uses three independent 100,000-file trials.
+    timeout-minutes: ${{ contains(matrix.target, 'windows') && 190 || 95 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout assessment sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # Source-bound controls also replay the original GUI commit.
+
+      - name: Install the reviewed native Rust distribution
+        id: install
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Select native SDK for the legacy storage oracle
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Exercise the legacy writers, WAL backup and production readers
+        id: storage
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/storage/run.py "$NATIVE_TARGET" --stored-keys --output "artifacts/rust/storage-native/$NATIVE_TARGET"
+
+      - name: Retain the native SQLite insert and rollback evidence before desktop trials
+        if: ${{ !cancelled() && (steps.storage.outcome == 'success' || steps.storage.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-storage-diagnostics-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-native/${{ matrix.target }}/result.json
+            artifacts/rust/storage-native/${{ matrix.target }}/*.log
+            artifacts/rust/storage-native/${{ matrix.target }}/evidence-hashes.json
+            artifacts/rust/storage-native/${{ matrix.target }}/first-party-source-hashes.json
+            artifacts/rust/storage-native/${{ matrix.target }}/casing-fixtures/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-sensitive/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-insensitive/
+            artifacts/rust/storage-native/${{ matrix.target }}/native-insert-upserts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Round-trip legacy YAML with the filtered offline source bundle
+        id: yaml
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/yaml/run.py "$NATIVE_TARGET" --output "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET"
+
+      - name: Retain the native C# and Rust YAML round trips
+        if: ${{ !cancelled() && steps.yaml.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-yaml-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Exchange activation with the shipping coordinator and observe native writer locks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/instance/run.py "$NATIVE_TARGET" --output "artifacts/rust/instance-native/$NATIVE_TARGET"
+
+      - name: Verify the native writer guard across same-account Windows sessions
+        id: cross_session
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          ./tools/rust-qa/instance/cross-session/test_hosted_service.ps1
+          ./tools/rust-qa/instance/cross-session/test_scheduler_cleanup.ps1
+          ./tools/rust-qa/instance/cross-session/hosted.ps1 -Target $env:NATIVE_TARGET
+
+      - name: Retain the completed cross-session observation before the desktop trials
+        if: ${{ !cancelled() && (steps.cross_session.outcome == 'success' || steps.cross_session.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-writer-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/instance-native/${{ matrix.target }}/hosted-secondary-logon.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/scheduler.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Exercise Linux TLS, polling and WebSocket loopback sessions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/realtime/run.py "$NATIVE_TARGET" --output "artifacts/rust/realtime-native/$NATIVE_TARGET"
+
+      - name: Exercise native Windows TLS, polling and WebSocket loopback sessions
+        id: windows_transport
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/realtime/run.py $env:NATIVE_TARGET --output "artifacts/rust/realtime-native/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Retain native transport results before the desktop trials
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-realtime-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/realtime-native/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rebuild the ARM64 import library and relink the tested transport
+        if: ${{ !cancelled() && matrix.target == 'aarch64-pc-windows-msvc' && steps.windows_transport.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture arm64
+          python tools/rust-qa/windows-imports/run.py --acquire --native --transport
+          exit $LASTEXITCODE
+
+      - name: Install native Linux test desktop components
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' }}
+        id: desktop
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
+            gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
+            xvfb libx11-6 libxdamage1 libxres1 libxtst6 libxkbcommon-x11-0 libwayland-client0 mutter pkg-config gpg gpgv \
+            xdg-desktop-portal xdg-desktop-portal-gtk fuse3 x11-utils libfribidi-bin gir1.2-gtk-3.0
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Compare native file logs and an isolated Linux journal to the shipping reference
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.desktop.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/platform-logs/observe.py "$NATIVE_TARGET" --output "artifacts/rust/platform-logs/native-$NATIVE_TARGET"
+
+      - name: Recover Linux WAL transactions after process termination and private tmpfs exhaustion
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.storage.outcome == 'success' && steps.desktop.outcome == 'success' }}
+        shell: bash
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/storage-faults/run.py "$NATIVE_TARGET" --tmpfs \
+            --cargo-home artifacts/rust/storage-cargo-home --output "artifacts/rust/storage-faults/$NATIVE_TARGET"
+
+      - name: Compare native file logs and read back events from a disposable Windows log
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/platform-logs/observe.py $env:NATIVE_TARGET --output "artifacts/rust/platform-logs/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Observe Windows Shell services and per-user Startup shortcuts
+        id: windows_services
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/windows-services/run.py "$NATIVE_TARGET" --hosted-startup \
+            --output "artifacts/rust/windows-services/native-$NATIVE_TARGET"
+
+      - name: Activate the application's tray icon from its own disposable Windows desktop
+        id: windows_tray
+        if: ${{ !cancelled() && steps.windows_services.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/windows-services/activation.py "$NATIVE_TARGET"
+
+      - name: Retain Windows tray results before the scan measurements
+        if: ${{ !cancelled() && (steps.windows_tray.outcome == 'success' || steps.windows_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-tray-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/native-${{ matrix.target }}/activation/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify the GUI graph and build with the pinned native compiler
+        id: gui
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (runner.os == 'Windows' || steps.desktop.outcome == 'success') }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+
+      - name: Reopen the hidden Windows GUI through an ordinary second launch
+        id: windows_launcher
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the launcher result before the resource measurements
+        if: ${{ !cancelled() && (steps.windows_launcher.outcome == 'success' || steps.windows_launcher.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-launcher-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-launcher/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Observe the primary GUI registering and reopening through its Windows tray icon
+        id: windows_gui_tray
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the primary GUI tray and cleanup observations
+        if: ${{ !cancelled() && (steps.windows_gui_tray.outcome == 'success' || steps.windows_gui_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-gui-tray-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-gui-tray/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rebuild the x64 import library and run its native winit consumer
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.gui.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/windows-imports/run.py --target x86_64-pc-windows-msvc --acquire --native
+          exit $LASTEXITCODE
+
+      - name: Observe native X11 lifecycle and AT-SPI
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input
+
+      - name: Observe system colors, high contrast and restored settings on the live Linux window
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/gui/build.py --test
+          python3 -B tools/rust-qa/appearance/linux.py --binary artifacts/rust/gui-build/release/native-gui-assessment
+
+      - name: Observe native Wayland lifecycle and AT-SPI with application-selected presentation
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input
+
+      - name: Install the reviewed Ubuntu screen reader and speech synthesizer
+        id: reader_linux
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          sudo apt-get install --yes --no-install-recommends \
+            orca=46.1-1ubuntu1 speech-dispatcher-espeak-ng=0.12.0~rc2-2build3
+
+      - name: Observe Orca announcements and synthesized audio on X11
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input --screen-reader
+
+      - name: Observe Orca announcements and synthesized audio on Wayland
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input --screen-reader
+
+      - name: Verify both recorded Orca traversals against the native Ubuntu packages
+        if: ${{ !cancelled() && steps.reader_linux.outcome == 'success' }}
+        run: python3 tools/rust-qa/ubuntu-reader/verify.py "$NATIVE_TARGET"
+
+      - name: Exercise the integrated filename editor and rendered glyphs on X11
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/profile_text.py
+
+      - name: Install GNOME and its available Japanese input engine on Ubuntu
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        id: gnome_ime
+        run: sudo apt-get install --yes --no-install-recommends gnome-shell ibus ibus-mozc gir1.2-ibus-1.0
+
+      - name: Observe Mozc composition in the native GNOME Wayland filename field
+        if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --ibus-engine mozc
+
+      - name: Observe native GNOME Wayland output membership, scale and buffer sizes
+        if: ${{ !cancelled() && steps.gnome_ime.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --monitor-changes
+
+      - name: Build the offline native Linux service probes
+        id: linux_services
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/linux-services/native.py lint
+          python3 tools/rust-qa/linux-services/native.py build
+
+      - name: Observe StatusNotifierItem loss, replacement and activation
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        run: python3 tools/rust-qa/linux-services/native.py tray
+
+      - name: Build the shipping Documents grant reference
+        id: portal_oracle
+        if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
+        env:
+          IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 tools/rust-qa/linux-services/native.py oracle
+
+      - name: Observe real Documents grants and the distribution's file lock behavior
+        if: ${{ !cancelled() && steps.portal_oracle.outcome == 'success' }}
+        env:
+          IFW_QA_REFERENCE_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 tools/rust-qa/linux-services/native.py documents --expect-lock enosys
+
+      - name: Compare cooperative file locks using the Ubuntu Documents portal and its upstream fix
+        if: ${{ !cancelled() && steps.portal_oracle.outcome == 'success' }}
+        run: |
+          export IFW_QA_REFERENCE_SDK="${DOTNET_ROOT:?}"
+          python3 -B -m unittest discover -s tools/rust-qa/portal-noble -p 'test_*.py'
+          python3 -B -m unittest discover -s tools/rust-qa/portal-noble/installed/package -p 'test_*.py'
+          python3 -B -m unittest discover -s tools/rust-qa/portal-noble/installed -p 'test_*.py'
+          python3 -B tools/rust-qa/portal-noble/run.py --hosted --download
+
+      - name: Observe native Windows show events, close and reopen
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/observe-windows-gui.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows"
+
+      - name: Measure the native Windows display topology, window DPI and session transport
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-display/run.py "$NATIVE_TARGET"
+
+      - name: Build the native portal dialog fixture
+        id: portal_dialog
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/portal-dialog/build.py --lint
+          python3 tools/rust-qa/portal-dialog/build.py --test
+          python3 tools/rust-qa/portal-dialog/build.py
+
+      - name: Observe X11 folder chooser parenting, selection and refusal
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --host-chooser-only
+
+      - name: Observe Wayland folder chooser parenting, selection and refusal
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --host-chooser-only
+
+      - name: Obtain the signed freedesktop Platform for a private Flatpak profile
+        if: ${{ !cancelled() && steps.portal_dialog.outcome == 'success' }}
+        id: platform
+        run: |
+          sudo apt-get install --yes --no-install-recommends flatpak ostree
+          python3 tools/rust-qa/portal-dialog/hosted_runtime.py
+
+      - name: Observe an installed disposable Flatpak under X11
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Observe an installed disposable Flatpak under Wayland
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: python3 tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Verify input ownership on the runner and its disposable Windows desktop
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 tools/rust-qa/windows-desktop/run.py artifacts/rust/gui-build/release/native-gui-assessment.exe \
+            "artifacts/rust/gui-native/$NATIVE_TARGET/windows-desktop"
+
+      - name: Observe Windows UI Automation and foreground keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" keyboard
+
+      - name: Verify a replacement DX12 window preserves focus, editing and screen output
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" recovery
+
+      - name: Observe rendered font coverage and mixed-direction editing on the native desktop
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/font-coverage/build.py "$NATIVE_TARGET" --bidi-candidate --acquire
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" mixed
+          else
+            python3 tools/rust-qa/font-coverage/observe.py "$NATIVE_TARGET" --bidi-candidate --require-bidi
+          fi
+
+      - name: Observe native mixed-direction editing in the ordinary Windows filename field
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" text
+
+      - name: Observe portable NVDA announcing the owned Windows GUI
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" reader
+
+      - name: Stage the integrated Linux GUI with its reviewed inventory worker and observer
+        id: worker
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.yaml.outcome == 'success' && steps.gui.outcome == 'success' }}
+        run: |
+          mkdir -p artifacts/rust/graphics/worker-vendor
+          tar -xf "artifacts/rust/yaml-assessment/runs/$NATIVE_TARGET/filtered-sources.tar" -C artifacts/rust/graphics/worker-vendor
+          python3 tools/rust-qa/performance/build_worker.py --name graphics-ci --vendor artifacts/rust/graphics/worker-vendor/vendor
+          python3 tools/rust-qa/graphics/stage_integrated.py runtime-ci artifacts/rust/performance/subjects/graphics-ci
+
+      - name: Reopen the Linux GUI by launching its ordinary executable while the inventory worker runs
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' }}
+        run: python3 -B tools/rust-qa/performance/worker/check_hidden.py graphics-ci --second-launch
+
+      - name: Rebuild the native installed-worker backup helper from cached inputs
+        id: installed_backup
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.storage.outcome == 'success' }}
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 -B tools/rust-qa/storage/run.py "$NATIVE_TARGET" --offline --installed-upload-backup \
+            --output "artifacts/rust/storage-native/installed-$NATIVE_TARGET"
+
+      - name: Stage the signed shipping Flatpak and native graphics extension
+        id: shipping
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/launch/hosted.py "$PLATFORM_DEPLOYMENT"
+
+      - name: Exercise both installed launch orders and restore a signed worker after an upload
+        id: installed_handover
+        if: ${{ !cancelled() && steps.shipping.outcome == 'success' && steps.worker.outcome == 'success' && steps.installed_backup.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: |
+          /usr/bin/python3 -B -m unittest discover -s tools/RustCompatibilityOracle/installed/interop -p test_assess.py
+          /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py \
+            --gui-build artifacts/rust/gui-build --inventory-subject artifacts/rust/performance/subjects/graphics-ci \
+            --tray-worker-restart --shipping-upload --rust-backup "artifacts/rust/storage-native/installed-$NATIVE_TARGET" \
+            --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Retain the installed handover, original WAL and returned database
+        if: ${{ !cancelled() && (steps.installed_handover.outcome == 'success' || steps.installed_handover.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-installed-handover-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/shipping-flatpak-launch/hosted-inputs/
+            artifacts/rust/shipping-flatpak-interop/same-id-*/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Release the original staged Windows image after a temporary sharing violation
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        run: python -B -m unittest discover -s tools/rust-qa/windows-launcher -p test_staged_images.py -v
+
+      - name: Verify native process ownership and cleanup in the resource fixture
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.install.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tools/rust-qa/windows-performance -v
+          exit $LASTEXITCODE
+
+      - name: Build the retained Windows GUI with the reviewed native dependency graph
+        id: warm
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Observe retained Windows handles, native input and DX12 allocation policy
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" warm
+
+      - name: Observe filename glyphs and editing after reopening the retained Windows GUI
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/windows-desktop/session.py "$NATIVE_TARGET" retained-text
+
+      - name: Measure the retained Windows GUI on the available monitors and session
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' }}
+        shell: bash
+        run: python3 -B tools/rust-qa/windows-display/run.py "$NATIVE_TARGET" --retained
+
+      - name: Reopen the retained Windows HWND through an ordinary second launch
+        id: retained_launcher
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/observe.py $env:NATIVE_TARGET --subject retained
+          exit $LASTEXITCODE
+
+      - name: Activate the retained Windows GUI through its actual Shell icon
+        id: retained_gui_tray
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-launcher/native_tray.py $env:NATIVE_TARGET --subject retained
+          exit $LASTEXITCODE
+
+      - name: Retain the ordinary-launch and tray observations for the retained HWND
+        if: ${{ !cancelled() && (steps.retained_launcher.outcome == 'success' || steps.retained_launcher.outcome == 'failure' || steps.retained_gui_tray.outcome == 'success' || steps.retained_gui_tray.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-retained-activation-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/windows-launcher-retained/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray-retained/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Measure the shipping WPF host and native Rust GUI on the same Windows desktop
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-performance/run.py $env:NATIVE_TARGET --output "artifacts/rust/windows-performance/native-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Compare the retained Windows GUI with the previously measured WPF budgets
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Measure the FIFO control on the same retained Windows GUI
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --fifo-control
+          exit $LASTEXITCODE
+
+      - name: Verify Windows bitmap and native trace controls for the frame comparison
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        run: python -B -m unittest discover -s tools/rust-qa/windows-warm-window -p test_frame_latency.py
+
+      - name: Measure two queued Mailbox frames on the same Windows software adapter
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --mailbox-two
+          exit $LASTEXITCODE
+
+      - name: Trace retained-window activation and hidden presentations during the Windows scan
+        if: ${{ !cancelled() && steps.warm.outcome == 'success' && steps.yaml.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --dispatch
+          exit $LASTEXITCODE
+
+      - name: Compare visible GDI frames and native window timing with the same-host WPF reference
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.warm.outcome == 'success' && hashFiles(format('artifacts/rust/windows-warm-window/{0}/measured/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-gdi-control -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-gdi-control/assess.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Measure visible frame stages on the Windows x64 software adapter
+        id: frame_cost
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.warm.outcome == 'success' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/dispatch/result.json') != '' }}
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B -m unittest discover -s tools/rust-qa/windows-frame-cost -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --frame-cost
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-frame-cost/readback.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/frame-cost
+          exit $LASTEXITCODE
+
+      - name: Compare deadline-based redraw on the Windows x64 software adapter
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.frame_cost.outcome == 'success' }}
+        timeout-minutes: 16
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --deferred-frame
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-frame-cost/deferred_case.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/deferred-frame
+          exit $LASTEXITCODE
+
+      - name: Compare full egui frames presented through GDI on Windows x64
+        if: ${{ !cancelled() && matrix.target == 'x86_64-pc-windows-msvc' && steps.warm.outcome == 'success' && hashFiles('artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/measured/result.json') != '' }}
+        timeout-minutes: 23
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-gdi-present
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/measure.py $env:NATIVE_TARGET --gdi-present
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-gdi-present/gdi_case.py artifacts/rust/windows-warm-window/x86_64-pc-windows-msvc/gdi-present
+          exit $LASTEXITCODE
+
+      - name: Observe Vulkan loss and redraw on X11
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-loss-ci --case driver-loss --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe Vulkan loss and redraw on Wayland
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-loss-ci --case driver-loss --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Destroy the owned X11 render device during a frame and verify recovery
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name x11-paint-ci --case during-paint --backend x11 --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Destroy the owned Wayland render device during a frame and verify recovery
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name wayland-paint-ci --case during-paint --backend wayland --driver mesa --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Observe worker and tray behavior when no renderer is available
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        run: python3 tools/rust-qa/graphics/probe.py --integrated --name no-driver-ci --case unavailable --backend x11 --driver absent --subject artifacts/rust/graphics/runtime-ci/subject
+
+      - name: Measure the shipping Linux reference and record the same-host budgets
+        id: budget
+        if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: bash tools/rust-qa/performance/hosted_budget.sh reference
+
+      - name: Compare Rust startup, memory, CPU, idle rendering and response during the native scan
+        if: ${{ !cancelled() && steps.budget.outcome == 'success' }}
+        run: bash tools/rust-qa/performance/hosted_budget.sh candidate artifacts/rust/performance/subjects/graphics-ci "$GITHUB_SHA"
+
+      - name: Observe Windows input-method composition with native Japanese Basic Typing
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: powershell
+        timeout-minutes: 35
+        run: ./tools/rust-qa/windows-ime/hosted.ps1
+
+      - name: Retain the checksum-pinned originals for the offline build and notices
+        id: notice_sources
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' && steps.yaml.outcome == 'success' && (runner.os == 'Linux' || steps.windows_transport.outcome == 'success') }}
+        shell: bash
+        run: python3 -B tools/rust-qa/native-notice-input.py cache --fetch-missing
+
+      - name: Build the combined Linux dependency profile and relink a modified Wayland binding
+        id: combined_linux
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.notice_sources.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/combined-profile/run.py --native "$NATIVE_TARGET" --relink \
+            --output "artifacts/rust/combined-profile/runs/$NATIVE_TARGET"
+
+      - name: Build and exercise the combined Windows dependency profile
+        id: combined_windows
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.notice_sources.outcome == 'success' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B tools/rust-qa/combined-profile/run.py --native $env:NATIVE_TARGET --output "artifacts/rust/combined-profile/runs/$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Observe a policy-respecting Windows notification after the GUI measurements
+        id: late_notification
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.windows_services.outcome == 'success' || steps.windows_services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/notification.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Retain the late native notification evidence
+        if: ${{ !cancelled() && (steps.late_notification.outcome == 'success' || steps.late_notification.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-notification-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/notification-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Read back ordinary and suppressed notifications under a test-owned Windows identity
+        id: toast_history
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.windows_services.outcome == 'success' || steps.windows_services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64
+          exit $LASTEXITCODE
+
+      - name: Retain the original Windows notification history records
+        if: ${{ !cancelled() && (steps.toast_history.outcome == 'success' || steps.toast_history.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-toast-history-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/toast-history-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain the original physical ARM64 Shell observation
+        if: ${{ !cancelled() && (steps.toast_history.outcome == 'success' || steps.toast_history.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-toast-physical-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/toast-physical-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify the screen crop against the native ARM64 notification sender
+        if: ${{ !cancelled() && steps.toast_history.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $area = "artifacts/rust/windows-services"
+          python -B tools/rust-qa/windows-services/toast_console.py "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
+
+      - name: Compare the rendered Windows label with the system contrast palette and restore it
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 -B -m unittest discover -s tools/rust-qa/appearance -p 'test_windows*.py'
+          python3 -B tools/rust-qa/appearance/windows.py "$NATIVE_TARGET"
+
+      - name: Open the retained Windows app from a foreground test window using keyboard input
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.warm.outcome == 'success' && hashFiles(format('artifacts/rust/windows-launcher-retained/{0}/result.json', matrix.target)) != '' }}
+        shell: pwsh
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture $env:NATIVE_ARCH
+          python -B -m unittest discover -s tools/rust-qa/windows-launcher -p 'test_input*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-launcher/input_launch.py $env:NATIVE_TARGET
+          exit $LASTEXITCODE
+
+      - name: Record the reviewed components of the native development build
+        id: components
+        if: ${{ !cancelled() && (steps.combined_linux.outcome == 'success' || steps.combined_windows.outcome == 'success') }}
+        shell: bash
+        run: |
+          python3 -B tools/rust-qa/combined-profile/sbom.py "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --output "artifacts/rust/combined-profile/sboms/$NATIVE_TARGET.spdx.json"
+          python3 -B tools/rust-qa/combined-profile/test_sbom.py --target "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --document "artifacts/rust/combined-profile/sboms/$NATIVE_TARGET.spdx.json"
+          python3 -B tools/rust-qa/native-notice-input.py pack "$NATIVE_TARGET" \
+            --input "artifacts/rust/combined-profile/runs/$NATIVE_TARGET" --revision "$GITHUB_SHA" \
+            --output "artifacts/rust/combined-profile/receipts/rust-native-input-$NATIVE_TARGET-$GITHUB_SHA.zip"
+
+      - name: Retain the exact native compiler receipt ZIP
+        id: receipt_zip
+        if: ${{ !cancelled() && steps.components.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          archive: false
+          path: artifacts/rust/combined-profile/receipts/rust-native-input-${{ matrix.target }}-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Assemble and read back the original notices for the uploaded native build
+        id: notices
+        if: ${{ !cancelled() && steps.receipt_zip.outcome == 'success' }}
+        shell: bash
+        env:
+          UPLOADED_SHA256: ${{ steps.receipt_zip.outputs.artifact-digest }}
+        run: |
+          input="artifacts/rust/combined-profile/receipts/rust-native-input-$NATIVE_TARGET-$GITHUB_SHA.zip"
+          output="artifacts/rust/combined-profile/notices/rust-notices-$NATIVE_TARGET-$GITHUB_SHA.zip"
+          digest="${UPLOADED_SHA256#sha256:}"
+          python3 -B tools/rust-qa/combined-profile/notices.py "$NATIVE_TARGET" \
+            --input "$input" --archive-sha256 "$digest" --revision "$GITHUB_SHA" --output "$output"
+          python3 -B tools/rust-qa/combined-profile/test_notices.py --target "$NATIVE_TARGET" \
+            --input "$input" --archive-sha256 "$digest" --revision "$GITHUB_SHA" --notices "$output"
+
+      - name: Retain the verified native development notices
+        if: ${{ !cancelled() && steps.notices.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          archive: false
+          path: artifacts/rust/combined-profile/notices/rust-notices-${{ matrix.target }}-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove the job-specific namespace launcher
+        if: ${{ always() && runner.os == 'Linux' }}
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
+
+      - name: Retain native assessment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-desktop-storage-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/storage-native/
+            artifacts/rust/storage-faults/${{ matrix.target }}/
+            !artifacts/rust/storage-faults/${{ matrix.target }}/build/**
+            artifacts/rust/appearance/runs/*/*.json
+            artifacts/rust/appearance/runs/*/*.log
+            artifacts/rust/combined-profile/runs/**
+            artifacts/rust/combined-profile/sboms/*.spdx.json
+            artifacts/rust/instance-native/${{ matrix.target }}/result.json
+            artifacts/rust/instance-native/${{ matrix.target }}/hosted-secondary-logon.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/*.json
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/evidence.sha256
+            artifacts/rust/instance-native/${{ matrix.target }}/cross-session/scheduler.log
+            artifacts/rust/yaml-assessment/runs/${{ matrix.target }}/
+            artifacts/rust/realtime-native/
+            artifacts/rust/windows-services/native-*/
+            artifacts/rust/windows-services/notification-${{ matrix.target }}/
+            artifacts/rust/windows-services/toast-history-${{ matrix.target }}/
+            artifacts/rust/windows-launcher/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray/${{ matrix.target }}/
+            artifacts/rust/windows-launcher-retained/${{ matrix.target }}/
+            artifacts/rust/windows-launcher-input/${{ matrix.target }}/
+            artifacts/rust/windows-gui-tray-retained/${{ matrix.target }}/
+            artifacts/rust/windows-reader/native-*/result.json
+            artifacts/rust/windows-reader/native-*/gui/*.json
+            artifacts/rust/windows-imports/runs/*/result.json
+            artifacts/rust/windows-imports/build-*/winit-published/inputs.rsp
+            artifacts/rust/windows-imports/build-*/winit-published/symbols.map
+            artifacts/rust/windows-imports/build-*/winit-llvm/inputs.rsp
+            artifacts/rust/windows-imports/build-*/winit-llvm/symbols.map
+            artifacts/rust/linux-services/inputs.json
+            artifacts/rust/linux-services/documents-*/*.json
+            artifacts/rust/linux-services/documents-*/*.log
+            artifacts/rust/linux-services/tray-*/*.json
+            artifacts/rust/linux-services/tray-*/*.log
+            artifacts/rust/portal-noble/runs/*/result.json
+            artifacts/rust/portal-noble/runs/*/packaged/*.json
+            artifacts/rust/portal-noble/runs/*/packaged/*.log
+            artifacts/rust/portal-noble/runs/*/unmodified/*.json
+            artifacts/rust/portal-noble/runs/*/unmodified/*.log
+            artifacts/rust/portal-noble/runs/*/backport/*.json
+            artifacts/rust/portal-noble/runs/*/backport/*.log
+            artifacts/rust/portal-noble/runs/*/development/*.json
+            artifacts/rust/portal-noble/runs/*/build/*.log
+            artifacts/rust/portal-dialog/build-inputs.json
+            artifacts/rust/portal-dialog/x11-*/*.json
+            artifacts/rust/portal-dialog/x11-*/*.log
+            artifacts/rust/portal-dialog/wayland-*/*.json
+            artifacts/rust/portal-dialog/wayland-*/*.log
+            artifacts/rust/gui-native/
+            artifacts/rust/gui-run/*/*.json
+            artifacts/rust/gui-run/*/*.log
+            artifacts/rust/gui-run/*/orca-audio.raw
+            artifacts/rust/gui-run/*/*.conf
+            artifacts/rust/gui-run/*/evidence.sha256
+            artifacts/rust/graphics/*-ci/*.json
+            artifacts/rust/graphics/*-ci/*.log
+            artifacts/rust/graphics/runtime-ci/subject/*.json
+            artifacts/rust/performance/hosted-*.json
+            artifacts/rust/performance/graphics-ci-second-launch.json
+            artifacts/rust/windows-launcher-staging/${{ matrix.target }}/result.json
+            artifacts/rust/windows-performance/native-*/*
+            artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.json
+            artifacts/rust/windows-gdi-control/${{ matrix.target }}/*.log
+            artifacts/rust/windows-warm-window/*/build.json
+            artifacts/rust/windows-warm-window/*/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/observed/
+            artifacts/rust/windows-warm-window/*/windows-text/
+            artifacts/rust/windows-warm-window/*/eframe-source.zip
+            artifacts/rust/windows-warm-window/*/measured/
+            artifacts/rust/windows-warm-window/*/measured-mailbox-two/
+            artifacts/rust/windows-warm-window/*/measured-fifo/*.json
+            artifacts/rust/windows-warm-window/*/measured-fifo/*.log
+            artifacts/rust/windows-warm-window/*/dispatch/*.json
+            artifacts/rust/windows-warm-window/*/dispatch/*.log
+            artifacts/rust/windows-warm-window/*/frame-cost/*.log
+            artifacts/rust/windows-warm-window/*/frame-cost/*.json
+            artifacts/rust/windows-warm-window/*/frame-cost/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/frame-cost/source.zip
+            artifacts/rust/windows-warm-window/*/frame-cost/diagnostic.exe
+            artifacts/rust/windows-warm-window/*/deferred-frame/*.log
+            artifacts/rust/windows-warm-window/*/deferred-frame/*.json
+            artifacts/rust/windows-warm-window/*/deferred-frame/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/deferred-frame/deferred-source.zip
+            artifacts/rust/windows-warm-window/*/deferred-frame/deferred.exe
+            artifacts/rust/windows-warm-window/*/deferred-frame/retained-edit/
+            artifacts/rust/windows-warm-window/*/gdi-present/*.json
+            artifacts/rust/windows-warm-window/*/gdi-present/*.log
+            artifacts/rust/windows-warm-window/*/gdi-present/compiler.jsonl
+            artifacts/rust/windows-warm-window/*/gdi-present/source.zip
+            artifacts/rust/windows-warm-window/*/gdi-present/gdi.exe
+            artifacts/rust/windows-warm-window/*/gdi-present/retained-edit/
+            artifacts/rust/platform-logs/native-*/*.json
+            artifacts/rust/platform-logs/native-*/daemon.log
+            artifacts/rust/gui-build/release/*.inputs.json
+            artifacts/rust/font-coverage/*/result.json
+            artifacts/rust/font-coverage/*/*/native.log
+            artifacts/rust/font-coverage/*/*/pointer.json
+            artifacts/rust/font-coverage/*/*/observed.ppm
+            artifacts/rust/font-coverage/subjects/*/subject.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,58 @@
+--- a/artifacts/gdi/egui-wgpu/src/winit.rs
++++ b/artifacts/gdi/egui-wgpu/src/winit.rs
+@@ -10,0 +11,4 @@
++
++#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++#[path = "cpu_present.rs"]
++mod cpu_present;
+@@ -32,0 +37,2 @@
++    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++    cpu: cpu_present::Route,
+@@ -69,0 +76,2 @@
++            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++            cpu: cpu_present::Route::FirstSurface,
+@@ -304,0 +313,8 @@
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        self.cpu.install(
++            self.render_state.as_ref().unwrap(),
++            viewport_id == ViewportId::ROOT
++                && !self.support_transparent_backbuffer
++                && self.options.msaa_samples <= 1
++                && self.options.depth_stencil_format.is_none(),
++        );
+@@ -354,0 +371,7 @@
++
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if matches!(self.cpu, cpu_present::Route::Cpu(_)) {
++            // The first ordinary GPU frame will configure this root at its latest nonzero size.
++            surface_state.needs_reconfigure = true;
++            return;
++        }
+@@ -500,0 +524,27 @@
++
++        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
++        if let cpu_present::Route::Cpu(cpu) = &mut self.cpu
++            && let Some(surface) = self.surfaces.get(&viewport_id)
++        {
++            match cpu.paint(
++                window,
++                [surface.width, surface.height],
++                pixels_per_point,
++                clear_color,
++                clipped_primitives,
++                textures_delta,
++                !capture_data.is_empty(),
++            ) {
++                Ok(()) => {
++                    cpu.finish(
++                        self.render_state.as_ref().unwrap(),
++                        textures_delta,
++                        [surface.width, surface.height],
++                        capture_data,
++                    );
++                    return 0.0;
++                }
++                Err(cpu_present::PaintError::Unsupported(reason)) => self.cpu.fallback(reason),
++                Err(cpu_present::PaintError::Failure(error)) => panic!("CPU root paint failed: {error}"),
++            }
++        }

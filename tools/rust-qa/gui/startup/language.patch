@@ -1,0 +1,106 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -14,6 +14,7 @@
+ wgpu = { version = "=30.0.0", default-features = false, features = ["std", "parking_lot", "wgsl"] }
+ 
+ [target.'cfg(target_os = "linux")'.dependencies]
++ifw-yaml-assessment = { path = "../yaml" }
+ winit = { version = "=0.30.13", default-features = false }
+ futures-lite = "=2.6.1"
+ zbus = { version = "=5.19.0", default-features = false, features = ["async-io"] }
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -602,6 +602,9 @@
+         commands,
+         filename: "Grüße – Sommer.jpg".to_owned(),
+         password: String::new(),
++        #[cfg(target_os = "linux")]
++        german: native.startup_german,
++        #[cfg(windows)]
+         german: true,
+         passes: 0,
+         graphics: graphics::Graphics::new(),
+--- a/src/linux.rs
++++ b/src/linux.rs
+@@ -189,6 +189,7 @@
+     connection: Connection,
+     installed_socket: Option<legacy::Guard>,
+     publisher: Arc<menu::Publisher>,
++    pub(super) startup_german: bool,
+     watcher: watcher::Watcher,
+ }
+ 
+@@ -288,7 +289,10 @@
+             Err(error) => return Err(error.into()),
+             Ok(_) => return Err("Unexpected D-Bus ownership result for a new connection".into()),
+         };
+-        let labels = menu::SharedLabels::default();
++        let startup = ifw_yaml_assessment::startup_language::load();
++        let startup_german =
++            startup.language == ifw_yaml_assessment::startup_language::Language::German;
++        let labels = Arc::new(Mutex::new(menu::Labels::new(startup_german)));
+         connection
+             .object_server()
+             .at(menu::PATH, menu::Menu::new(actions.clone(), labels.clone()))
+@@ -308,6 +312,7 @@
+                 connection,
+                 installed_socket,
+                 publisher,
++                startup_german,
+                 watcher,
+             },
+             available,
+--- a/src/linux_tray_menu.rs
++++ b/src/linux_tray_menu.rs
+@@ -25,10 +25,10 @@
+     publishing: bool,
+ }
+ 
+-impl Default for Labels {
+-    fn default() -> Self {
++impl Labels {
++    pub(super) fn new(german: bool) -> Self {
+         Self {
+-            german: true,
++            german,
+             revision: 1,
+             publishing: false,
+         }
+@@ -293,7 +293,10 @@
+             },
+             quitting: Arc::default(),
+         };
+-        (Menu::new(actions, SharedLabels::default()), commands)
++        (
++            Menu::new(actions, Arc::new(Mutex::new(Labels::new(true)))),
++            commands,
++        )
+     }
+ 
+     #[test]
+@@ -357,7 +360,7 @@
+ 
+     #[test]
+     fn language_changes_share_one_writer_until_the_latest_revision_is_sent() {
+-        let mut labels = Labels::default();
++        let mut labels = Labels::new(true);
+         assert_eq!(labels.change(true), None);
+         assert_eq!(labels.change(false), Some(2));
+         assert_eq!(labels.change(true), None);
+--- a/src/linux_legacy.rs
++++ b/src/linux_legacy.rs
+@@ -429,11 +429,13 @@
+             control,
+             crate::linux::INSTALLED_NAME,
+         ));
+-        let publisher = menu::Publisher::new(connection.clone(), Default::default());
++        let labels = Arc::new(std::sync::Mutex::new(menu::Labels::new(true)));
++        let publisher = menu::Publisher::new(connection.clone(), labels);
+         let primary = Primary {
+             connection,
+             installed_socket: Some(guard),
+             publisher,
++            startup_german: true,
+             watcher,
+         };
+         // Retaining a language control across bus loss must allow the primary to drain.

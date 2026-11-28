@@ -1,0 +1,15 @@
+[package]
+name = "unicode-bidi"
+version = "0.3.18"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+publish = false
+[features]
+default = []
+hardcoded-data = []
+std = []
+flame_it = []
+serde = []
+smallvec = []
+bench_it = []
+unstable = []

@@ -1,0 +1,101 @@
+name: Native Ubuntu ARM64 editor
+
+# gh workflow run ci.yaml --ref rewrite/rust -f rw02_editor_arm64=true
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  editor:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      NATIVE_TARGET: aarch64-unknown-linux-gnu
+    steps:
+      - name: Check out the dispatched revision and its GUI replay history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Retain the exact sources and runner identity
+        run: |
+          out="artifacts/rust/gui-native/$NATIVE_TARGET"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(uname -m)" = aarch64
+          mkdir -p "$out"
+          git archive --format=tar.gz --output="$out/source.tar.gz" "$GITHUB_SHA"
+          jq -n --arg source "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg job "$GITHUB_JOB" --arg target "$NATIVE_TARGET" \
+            '{source:$source,run:$run,attempt:$attempt,job:$job,target:$target}' > "$out/dispatch.json"
+
+      - name: Install the reviewed native Rust distribution
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Prepare the private X11 and Mutter desktops with the reviewed Ubuntu reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus libglib2.0-bin python3-gi \
+            gir1.2-glib-2.0 gir1.2-atspi-2.0 at-spi2-core libvulkan1 mesa-vulkan-drivers \
+            xvfb libx11-6 libxdamage1 libxres1 libxtst6 libxkbcommon-x11-0 libwayland-client0 \
+            mutter pkg-config x11-utils orca=46.1-1ubuntu1 speech-dispatcher-espeak-ng=0.12.0~rc2-2build3
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Compile and test the ordinary editor against its pinned native graph
+        id: gui
+        shell: bash
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          python3 tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET" 2>&1 \
+            | tee "artifacts/rust/gui-native/$NATIVE_TARGET/compiler.log"
+
+      - name: Reopen the editor on X11 with AT-SPI and Orca
+        id: x11
+        run: python3 tools/rust-qa/gui/native.py --backend x11 --input --screen-reader
+
+      - name: Reopen the editor on Mutter Wayland with AT-SPI and Orca
+        id: wayland
+        if: ${{ !cancelled() && steps.gui.outcome == 'success' }}
+        run: python3 tools/rust-qa/gui/native.py --backend wayland --input --screen-reader
+
+      - name: Replay the original speech and reopened selection for both backends
+        if: ${{ !cancelled() && steps.x11.outcome == 'success' && steps.wayland.outcome == 'success' }}
+        run: |
+          python3 tools/rust-qa/ubuntu-reader/verify.py "$NATIVE_TARGET"
+          out="artifacts/rust/gui-native/$NATIVE_TARGET"
+          jq -e --arg head "$GITHUB_SHA" --slurpfile reader "$out/ubuntu-reader.json" \
+            '.source == $head and $reader[0].source == $head and .binarySha256 == $reader[0].binarySha256' \
+            "$out/build.json"
+          for backend in x11 wayland; do
+            directory=$(jq -er --arg b "$backend" '.observations[$b].directory' "$out/ubuntu-reader.json")
+            run="artifacts/rust/gui-run/$directory"
+            jq -e --slurpfile saved "$run/selection-reopen.json" \
+              '.input.selectionReopen as $s | $saved == [$s] and ($s.beforeClose == $s.afterReopen)
+               and $s.afterReopen.focused and $s.afterReopen.selections == [[2,5]]
+               and $s.afterShiftLeft.caret == 1 and $s.afterShiftLeft.selections == [[1,5]]
+               and $s.afterReplacement.text == "Gx – Sommer.jpg" and $s.afterReplacement.selections == []
+               and (if any(.input.after_keyboard_language_switch[]; .name == "Quit" and (.role == "button" or .role == "push button"))
+                    then .input.tab_order == ["Dateiname","Kennwort","English","Quit"] else true end)' \
+              "$run/results.json"
+          done
+
+      - name: Remove the job-specific namespace launcher
+        if: always()
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup
+
+      - name: Preserve the executable, compiler records and original observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-editor-ubuntu-arm64-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/rust/gui-native/aarch64-unknown-linux-gnu/
+            artifacts/rust/gui-build/release/native-gui-assessment
+            artifacts/rust/gui-build/release/native-gui-assessment.inputs.json
+            artifacts/rust/gui-run/
+          if-no-files-found: error
+          retention-days: 14

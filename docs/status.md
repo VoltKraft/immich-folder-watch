@@ -1,5 +1,3614 @@
 # Project Status
 
+## Current Rust implementation goal
+
+Goal `M-RUST-IMPLEMENTATION-20261114` is active on `rewrite/rust` in chat
+`01a1db8f-b8ef-7903-8dfc-932f9b39c743`. RW-01 is accepted. RW-02 is
+qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
+The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
+[Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
+
+The local Windows Server 2025 x64 VM passed the connected RDP and
+mixed-DPI trials with 96- and 192-DPI displays. Windows ARM64 still
+needs both observations. Its runner reported a single 96-DPI console
+display, and the user currently has no separate ARM64 test system.
+[Local x64 display trial](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial) ·
+[ARM64 console](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
+
+At `048b0d7`, Orca spoke the four focused controls of the ordinary installed
+Flatpak in German and English on both Ubuntu x64 and ARM64. Both targets
+used their existing application accessibility proxy. The separate unpackaged
+x64 language trial found the test watcher's bus name before its object was
+available. At `68a8123` each native job passed its four language starts
+and its installed Orca comparison. [Original Ubuntu run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406) ·
+[Repeat with the watcher correction](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46142640444) ·
+[Compiler and installed controls](../tools/rust-qa/gui/flatpak/README.md#installed-reader-from-the-ordinary-compiler-directory).
+
+Both Ubuntu targets repeated the four starts, installed Orca and all
+40 native GUI tests at `fd14d4c`. Each original ZIP preserved the ELF
+and its matching compiler, registry and unit-test evidence under the
+public filenames. [Ubuntu build and archive readback](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
+
+The ordinary Fedora x64 ELF passed all 40 native GUI tests and spoke all
+eight focused labels in the installed ref. On X11 it followed four
+accessibility settings on the same window. On Mutter, Orca announced the
+password field and masked its input. A concurrent build had truncated
+the compiler stream during the first local attempt. The repeat used
+separate staged evidence, a per-directory build lock and a freshly
+compiled AccessKit library. [Fedora compiler and desktop evidence](rust/rw02-native-gui.md#ordinary-linux-compiler-and-orca-in-the-installed-flatpak).
+
+The combined Fedora x64 profile at `f47753b` linked 403 units across
+338 packages, passed Clippy, its renderer smoke test and all five
+held-file uploads. Two independent readbacks reproduced its native ZIP,
+SPDX inventory and notice archive byte for byte.
+[Combined result and original licenses](rust/rw02-combined-profile.md#linux-accessibility-adapter-in-the-combined-profile).
+
+On Windows 11 ARM64 at `e610d61`, three Tab presses moved native focus from
+the filename through the protected password and language button to Quit.
+Space closed the original GUI and its inventory worker and restored the
+original desktop. The separate default-desktop display checks in the same
+job failed. [Keyboard, process exit and original archive](rust/rw02-windows-services.md#keyboard-activation-of-the-visible-windows-arm64-quit-button).
+
+At `446fc1f` the local Server 2025 x64 guest passed all 30 GUI tests in
+five native test executables as the standard user. QEMU reported 3072 MiB
+of RAM. The guest shut down through ACPI and released its slot.
+[Local run and original compiler archives](../tools/rust-qa/windows-local/README.md#native-gui-tests-at-446fc1f).
+
+The Fedora x64 Flatpak check recorded at `70f9713` used the staged
+editor built from `c63d91c`. Two launches of the same installed commit
+showed the respective saved German and English languages.
+All eight visible labels and both initial tray menus matched. The
+unmodified Unix accessibility adapter did not expose those windows to
+the external AT-SPI client. A GTK control was visible on the same test
+desktop. On unpackaged X11 and Mutter the private German-first trials
+now set the editor's language independently of Orca and the desktop.
+[Installed Flatpak](../tools/rust-qa/gui/flatpak/README.md) ·
+[Desktop and Orca controls](../tools/rust-qa/gui/tray-loss-quit.md#starting-the-german-editor-on-an-english-test-desktop).
+
+In the private Flatpak build at `9cbbf41`, Orca spoke all four
+focused controls in each saved language. The external reader matched
+both applications to the original Flatpak proxies. The same ref also
+started and exited with no accessibility bus. At `1862b75` the ordinary
+Fedora GUI compiled from 372 authenticated archives, matched all 289
+compiler units to its native graph and passed all 40 tests.
+[Installed screen reader comparison](../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs) ·
+[Ordinary Linux compiler inputs](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
+
+At `9d4d550`, the SQLite preflight read the committed version from the
+WAL on all four native targets. Two newer profiles retained every original
+byte and filename. A supported read-only file was also refused, and the
+writable control passed a real update and rollback. The 3 GiB Windows x64
+guest ran both Rust and C# and shut down after the trial. The separate
+Windows ARM64 recovery fixture failed to compile its copied storage source.
+At `fc2738f` both native readers recovered all eight cases, including
+two full FAT16 volumes, and C# passed 208 assertions. The local reinstalled WPF editor
+also showed the exact Unicode album from a returned native Rust document
+and preserved all four input files through an orderly tray Quit.
+The Fedora YAML reader matched the signed 3.0.4 reference for all 34
+ordinary profiles at `d9b9e72`, then for the 89 comparisons including
+explicit scalar tags at `c63d91c`.
+[Database evidence](rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal) ·
+[ARM64 recovery repeat](rust/rw02-storage-faults.md#recovery-through-the-existing-profile-opener-at-fc2738f-2026-11-28) ·
+[Returned Windows profile](../tools/rust-qa/instance/cross-session/transaction/rust-return.md#local-windows-x64-result) ·
+[YAML comparisons](rust/rw02-yaml.md#explicit-scalar-tags-on-typed-properties).
+
+At `bb3afd5`, the Fedora YAML reader also passed all 45 signed float
+comparisons and all 14 scalar-alias comparisons. The signed 3.0.4
+assemblies reopened, validated and saved 20 Rust outputs. Separately,
+a Linux GUI built from the staged `c63d91c` sources selected the
+correct initial editor and tray language on all four Fedora desktops.
+The running inventory worker honored the same profile. The ordinary GUI
+integrated the current settings library at `c361c69`. Replaying the four
+complete source reports reproduced all four target digests.
+The ordinary binary subsequently passed all 40 Fedora tests, the four
+signed language comparisons and both installed Flatpak startup cases.
+Mutter retained the selected filename range after a normal second launch.
+[Ordinary editor and installed Flatpak](rust/rw02-native-gui.md#ordinary-linux-startup-language-at-c361c69).
+Both native Ubuntu architectures repeated all four language starts at
+`17437d0`. Each first editor and first tray menu used the expected
+language and all eight sessions exited normally.
+[Ubuntu x64 and ARM64 jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46139648505).
+An independent review matched the GUI and compiler sources to `446fc1f`,
+traced the single Linux primary's language read to both the editor and the
+first menu, and checked the four Fedora settings against the signed reader.
+With the same ordinary sources, the private Flatpak adapter also passed
+all eight Orca focus checks under the original package permissions.
+[Installed screen reader on the current sources](../tools/rust-qa/gui/flatpak/README.md#orca-with-the-ordinary-gui-and-current-settings-reader).
+[Typed YAML values](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases) ·
+[Linux startup language](rust/rw02-native-gui.md#saved-language-at-linux-editor-and-tray-startup).
+
+At `14541fb` the local Windows x64 VM also executed the complete synthetic
+YAML exchange. The two native programs preserved all 110 original files,
+passed 330 byte checks, 475 Rust comparisons and 268 C# comparisons.
+All 14 Rust tests and three source-filter tests passed. The host verified
+the 255 files returned from the guest. A clean Fedora x64 run at
+`cdfd328` passed the same comparison counts.
+[Windows guest run](../tools/rust-qa/windows-local/yaml.md) ·
+[Fedora readback](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases).
+
+At `c268a82` the Fedora x64 editor showed the German and English notice
+after its tray watcher exited. A normal second launch reopened the same
+window after the worker found another synthetic JPEG. Pressing Space on
+Quit ended the original worker and GUI and released the D-Bus name.
+The Windows editor exposes the same action when its tray is unavailable.
+At `a7d42dc` the Windows tray adapter also preserves the running GUI and
+tracks the outstanding icon after a failed version handshake and withdrawal.
+The three partial-registration API responses were exercised in the model.
+The local Windows x64 VM ran the ordinary GUI at `245a921` and passed
+all 30 native GUI tests. After Explorer refused the icon on a private
+input desktop, UI Automation invoked the visible Beenden button.
+Worker and GUI both exited successfully and the original desktop returned.
+The first x64 and ARM64 observations recorded the worker exit before tray
+cleanup. The observer at `07c0d70` accepts either completion order before
+the final drain and passed the x64 repeat on the same binaries.
+The native ARM64 repeat also passed the visible button and shutdown
+check. The two separate editor observations on the runner's Default
+desktop failed. Mixed DPI and connected RDP on ARM64 remain open.
+[Fedora desktop record](../tools/rust-qa/gui/tray-loss-quit.md) ·
+[Local x64 console and original logs](../tools/rust-qa/windows-local/README.md#visible-quit-when-the-windows-tray-is-unavailable) ·
+[ARM64 repeat](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46128570840/job/140928524047) ·
+[Windows tray and shutdown trial](rust/rw02-windows-services.md#partial-windows-tray-registration).
+
+On Ubuntu ARM64 at `245a921`, X11 and Mutter both retained the backwards
+filename selection after an ordinary second launch. The Tab key reached
+Quit on both desktops and Orca spoke both translations. The paired
+Fedora render comparison also passed at 100% and 150% scale with the new
+button. [Ubuntu editor and speech](rust/rw02-native-gui.md#ubuntu-arm64-selection-and-quit-focus-at-245a921) ·
+[Six-frame pixel measurements](../tools/rust-qa/windows-cpu-paint/headless/README.md#editor-with-a-window-quit-button).
+
+The local Server 2025 x64 guest also repeated the ordinary private MSI
+transaction at `2e7a0f3`. Two process queries found no WPF worker after
+commit, the installed WPF path was absent, and the private successor
+still refused writes. Four profile digests matched across the measured
+transitions, including restoration of 3.0.4. This checks the installed
+paths on the observed host. Full writer exclusion remains open.
+[Original transaction, data digests and rollback](../tools/rust-qa/instance/cross-session/installed-writer.md#installed-path-and-process-snapshot-after-commit).
+
+The Fedora x64 portal client now decodes a selected directory URI into
+the original Unix filename bytes. At `c7c614f` two installed Flatpak trials
+opened `Grüße #2 %2F` and lost access after revocation while the control
+grant remained readable. Both native host chooser trials also passed.
+Both installed trials passed again on Ubuntu ARM64 at the same revision.
+On Fedora the installed client then resolved the exact host label through
+the portal attribute and the v5 interface while accessing the selected
+directory through its grant. At `3116139` the Ubuntu ARM64 client displayed
+the grant path under Documents v4 on both X11 and Wayland. Both fresh
+clients verified revocation and read the surviving control grant.
+[Display-name readback](rust/rw02-portal-dialog.md#resolving-the-display-name-inside-the-installed-flatpak).
+On Fedora x64 both installed clients also opened a saved subfolder and
+read its label through the held directory with the session bus unavailable.
+After the parent grant was revoked, both returned `ENOENT` while the
+original marker remained on the host.
+The Ubuntu ARM64 repeat at `5aeb45f` passed under X11 and Wayland with
+Documents v4. The saved FUSE path remained the label with the bus offline.
+[Native subfolder trials](rust/rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
+The editor at `b71b573` retained its focused field, backwards selection
+and first keystroke after reopening on Mutter and X11.
+The ordinary Windows x64 executable from `03b0b8e` also retained the
+selection across close and a second launch. Without resetting focus,
+Shift+Left extended the left edge and typing `x` produced
+`Gx – Sommer.jpg` in both native text interfaces.
+[Two x64 console runs](rust/rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch).
+[Folder results](rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
+[Editor results](rust/rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
+
+Both Ubuntu worker-budget trials at `d118426` passed all eleven limits
+using the native pairs from `9487dbe`. The ordinary Windows ARM64 sender
+posted successfully in Shell application mode. A repeat observed the
+foreground window in all 87 screen sweeps. A second observer completed
+92 passes without finding the notification title and body. Windows retained
+both messages and restored Do not disturb. Banner visibility remains open.
+[Ubuntu budgets](rust/rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
+[ARM64 original send and screen observations](../tools/rust-qa/windows-services/toast-history.md#foreground-and-desktop-root-coverage-on-windows-arm64).
+
+Two offline builds on native Ubuntu ARM64 at `378b36a` produced identical
+executables and identical modified Wayland relinks. Both passed all five
+held-file upload cases. Independent reconstruction reproduced the 446-package
+SPDX inventory and the notices archive byte for byte.
+[Native ARM64 compiler and archive comparison](rust/rw02-combined-profile.md#native-ubuntu-arm64-digest-inventory-at-378b36a).
+
+The local 4 GiB Windows x64 VM passed all three physical Explorer menu
+selections with the GUI from `56b7ae8`. Open focused the original editor,
+Restart drained worker 3412 before spawning worker 6396, and Quit ended
+both processes and removed the icon. Offline replay passed. The same VM
+previously refused an ordinary NTFS replacement of two open synthetic
+configuration files at `fa337fa`. Independent readback confirmed the
+original names, file IDs and bytes.
+[NTFS save trial](rust/rw02-cross-session.md#ordinary-replacement-of-two-rust-owned-config-files-on-ntfs) ·
+[Explorer menu trial](../tools/rust-qa/windows-launcher/tray-menu.md#local-server-2025-result-at-56b7ae8).
+
+On Fedora x64 the hidden Linux GUI registered with five successive private
+watcher owners. Only the two current accepting owners made its tray
+available. The GUI stayed hidden through both late replies and drained on
+desktop Quit. On two isolated Plasma desktops the x64 GUI registered
+again after a KDED module reload. Physical Open, Restart and Quit worked.
+The English editor button updated the visible menu. All 31 GUI compiler
+inputs in these local Plasma runs match `c1171b9`. The native Linux GUI suite passed
+39 tests. Clippy passed on native Linux x64 and for both Windows targets,
+including the separate Windows worker allocation adjustment.
+[Five watcher owners](rust/rw02-linux-services.md#watcher-handover-in-the-original-background-gui) ·
+[Original panel captures and worker results](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload).
+
+The local 4 GiB Server 2025 guest ran all 28 Windows x64 GUI cases at
+`02d4460`. The 11 tray cases and the two worker restart cases passed.
+The Quit-during-restart case received Winsock error 10035 on its private
+test socket. The observer now sets blocking mode on the accepted socket
+before reading the child's PID. The tray owner also joins its worker
+thread on early return. The two ownership tests passed on Fedora and
+both Windows targets passed Clippy. On the same 4 GiB VM all 29 cases at
+`cdb69d4` passed, including close during a restart and dropping the owner
+with a sender still alive. All five original test logs verified.
+[Native result and compiler inputs](../tools/rust-qa/windows-local/README.md#gui-worker-quit-during-restart-at-02d4460).
+
+On a native Windows ARM64 console the notification state changed from
+quiet time to `QUNS_APP` after 49 minutes and 30 seconds. None of the
+131 samples in 65 minutes reported `QUNS_ACCEPTS_NOTIFICATIONS`. The
+strict test stopped before sending and restored Do not disturb.
+[Original ARM64 traces](../tools/rust-qa/windows-services/toast-history.md).
+
+The installed 3.0.4 WPF worker on the local x64 guest completed one
+upload before its ordinary tray Quit in RDP. Its process (9076) exited
+with code 0 before Rust acquired the endpoint and writer guard in the
+console. The config and single SQLite upload row survived. Replay at
+`b1e8fb2` verified the original guest ZIP and a separate source supplement.
+The opposite start order still allows a legacy writer to run.
+[Orderly handover](rust/rw02-cross-session.md#ordinary-wpf-shutdown-before-rust-writer-admission) ·
+[Rust-first result](rust/rw02-cross-session.md#installed-304-worker-in-another-session).
+
+Two Windows ARM64 hosted runs observed eight ordered lock events from
+five Rust writer processes using one standard SID and two distinct logons.
+The interactive and batch sessions each refused a competing writer and
+later reacquired the file. Both jobs failed profile cleanup. After 720
+seconds in the repeat Windows reported the synthetic profile loaded,
+with all seven case processes exited and the temporary account, task,
+task folder and staging data removed. An ARM64 console/RDP pair remains open.
+[Original writer archive at 8505dad](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46121262901/artifacts/15254108999).
+
+A fresh 4 GiB x64 guest ran the read-only MSI preflight at `3913061` as
+a standard user in RDP. Both before first launch and while the WPF
+editor was visible, it returned exit 20 for the exact installed 3.0.4
+machine package. Independent replay matched both raw outputs, the
+installer log and the ordinary WPF Quit. The VM shut down and its
+temporary disks were removed. A later x64 MSI trial on the 3584 MiB guest
+replaced the installed launch paths after WPF had stopped. Forced failure
+restored the original executable. Success removed its shortcut and executable,
+and reinstall restored both. The returning WPF opened and quit in RDP
+session 2. The YAML, SQLite database and its two sidecars stayed byte-identical.
+At `1c5bc66` the private MSI also refused the upgrade when WPF was already
+open in RDP. The original window and tray survived until the user selected
+Quit. This passed again in the 3072 MiB guest, including rollback, retry
+and return to the installed WPF. RI-AC05 still requires exclusion across
+the remaining launch window.
+[Running WPF and the 3 GiB repeat](../tools/rust-qa/instance/cross-session/transaction/running-wpf.md#windows-server-2025-x64-results) ·
+[MSI rollback and return to WPF](../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006) ·
+[Installed MSI preflight and guest archive](../tools/rust-qa/instance/cross-session/installed-writer.md).
+
+Both native Ubuntu runners at `9487dbe` passed the five-owner D-Bus trial,
+two ordinary panel activations and all three physical menu selections
+after KDED reloaded its watcher. Each replacement worker found two new
+files then two unchanged files. Quit left KDED's tray list empty.
+Independent readback matched both original Actions ZIPs and the six popup
+images. On Fedora the same-host Avalonia budget repeat stopped before
+the first scan when inotify refused the first synthetic directory watch.
+[Ubuntu x64 and ARM64 results](rust/rw02-plasma.md#native-ubuntu-tray-menu-and-worker-restart-at-9487dbe) ·
+[Fedora scan preflight](rust/rw02-native-gui.md#fedora-reference-measurement-after-the-tray-worker-change).
+
+On Fedora x64 the installed Rust test Flatpak re-registered with the new
+watcher through the original bus proxy. A separate peer opened the same
+X11 window through the exported menu and Quit ended all four original
+processes. Both installed second launches and the final uninstall passed.
+[Installed Flatpak menu and native identities](rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak).
+
+At `e772fd0` the installed GUI-only trial also passed on Ubuntu x64 and
+ARM64. Both original archives matched their Actions digests. On Fedora
+the separate worker-enabled trial replaced the original worker through
+the installed menu, observed two scans and returned to the signed 3.0.4
+GUI after Quit. The Ubuntu installed handover now requests this additional
+worker trial.
+[Ubuntu artifacts](rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak) ·
+[Fedora worker result](rust/rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory).
+
+On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
+GUI from a background start and reopened its original window after close.
+Both windows gained keyboard focus and kept their inventory worker.
+Independent replay verified the color changes, two native callbacks and
+clean Quit for both starts. On Fedora x64 the combined profile at
+`2f63c15` passed Clippy, its native smoke test, five upload cases and
+the offline Wayland relink. Its SPDX inventory contains 447 packages.
+[Explorer results](rust/rw02-windows-services.md#both-explorer-starts-on-windows-server-2025) ·
+[Combined build and notices](rust/rw02-combined-profile.md#native-linux-x64-digest-inventory-at-2f63c15).
+
+The same x64 VM passed 35 workspace tests, 18 realtime unit tests, 49
+network scenarios and 16 Windows system proxy cases at `a2e54f5`. It
+restored the original proxy settings. Five held-file uploads at `6c4a364`
+passed and the host reproduced the guest's 258-package SPDX inventory
+byte for byte. On Ubuntu x64 and ARM64, each proxy accepted all thirteen
+Digest nonce counts from the HTTPS adapter for both SHA-256 and MD5.
+[Three native x64 archives](../tools/rust-qa/windows-local/README.md#workspace-realtime-and-combined-on-the-same-server-2025-guest) ·
+[Original Ubuntu relay observations](rust/rw02-linux-tls-basic-proxy.md#native-nonce-counts-on-ubuntu-x64-and-arm64-at-a2e54f5).
+
+On Fedora x64 at `00443e0` the Rust adapter passed 24 unit tests and 72
+wire cases. For explicitly allowed HTTP origins the relay verified Digest
+responses for the original inventory, polling and CONNECT targets, the
+exact POST bytes with `auth-int`, and the UTF-8 realm `München`. The
+signed 3.0.4 client sent no Digest response for that localized realm.
+At `85936d4` Ubuntu x64 and ARM64 each passed the same 24 unit and
+72 network cases. Windows ARM64 passed 18 unit and 49 network cases.
+[Signed comparison](rust/rw02-linux-basic-proxy.md#localized-digest-realm) ·
+[Three original native archives](rust/rw02-linux-basic-proxy.md#native-ubuntu-and-windows-comparison-at-85936d4).
+
+On Windows ARM64 at `ee0bcd2` the ordinary and quiet WinRT sends and
+history checks passed on two fresh consoles. Neither physical observer
+found a matching popup, including when Do not disturb was off. Independent
+readback verified restoration. The Shell reported quiet time. At `c0dd89c`
+both installed launch orders reactivated their primary. WPF Quit and
+desktop restoration passed on the private desktop. On Default all 16
+points hit another window before the menu could open.
+[Notification trial](../tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console) ·
+[Three installed ARM64 trials](../tools/rust-qa/windows-msi-interop/reverse/README.md#native-arm64-activation-at-c0dd89c).
+
+Two native ARM64 runners displayed filename edits in both Rust GUI
+variants at 96 DPI on their private desktops. Each restored its original
+desktop. On Default the fields were covered. The runner at `0ae5d1c`
+reported no connected RDP session. Native ARM64 mixed-DPI and RDP
+measurements remain open. On November 28 the user confirmed that they
+currently have no separate Windows ARM64 test system. [Original frame and session observations](rust/rw02-windows-display.md#arm64-source-monitor-focus-at-3d55500).
+At `b0fb23c` the current ordinary and retained GUI each produced a
+645-pixel filename edit on the private ARM64 desktop. The two Default
+trials timed out before capturing the field. The ARM64 console still
+reported one 96-DPI monitor and zero connected RDP sessions.
+[Compiler, frames and session readback](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
+The selection trial at `d8386a0` used the archived `b0fb23c` executable.
+After the ordinary second launch the first Shift+Left grew the selection
+from `üße` to `rüße` and the next `x` yielded `Gx – Sommer.jpg`.
+[ARM64 filename selection](rust/rw02-windows-text.md#arm64-filename-selection-on-the-private-console).
+
+New Windows x64 tests for the rewrite run on the local Server 2025 VM.
+The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
+and Linux ARM64 still have hosted test jobs. Already started mixed runs may
+finish. At `30e2a9c` the local guest passed 35 workspace cases, 14 transport
+unit tests and all 49 loopback scenarios. The GitHub x64 compiler job
+succeeded, and PR CI skipped its Windows test job. At `a8828b5` GitHub
+scheduled the two ordinary ARM64 activation orders and the private desktop
+trial. [Workspace and guest evidence](../tools/rust-qa/windows-local/README.md#workspace-execution-on-server-2025-at-30e2a9c)
+· [Compiler job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066266349)
+· [ARM64 activation jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066405965).
+The guest also showed the expected WinRT notification title and body on the
+original Shell window. The console observer retained the screenshot and the
+original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
+
+The local Server 2025 guest now uses 3072 MiB, down from 3584 MiB.
+All twelve desktop, workspace, MSI, tray, setup and proxy launchers
+now use the same [host launch helper](../tools/rust-qa/windows-local/README.md).
+At `62219be` two successive 8 MiB QEMU processes each held the slot
+after daemonizing, refused a second start and released it on exit. Host
+readback verified the installed helper, the RAM arguments in all twelve
+launchers and the base launcher's refusal while the slot was occupied.
+Three host kernel
+OOM events ended QEMU processes before the reduction. A fresh
+SSD-backed guest reported 3,221,225,472 bytes of base RAM and zero
+hot-plugged memory through QMP.
+The three .NET test images and nine other completed Windows test DVDs
+now reside on the SSD. The twelve original paths resolve to copies
+verified by SHA-256, freeing 3,901,890,560 bytes on the host's tmpfs.
+The standard user
+also completed Japanese IME composition in the filename field with the 4 GiB
+limit. [Native IME result](rust/rw02-windows-ime.md#standard-user-console-result-at-065ae57).
+
+In the ARM64 Default desktop trials at `f69065e`,
+the installed WPF window reopened and the separate backup run logged its
+first upload. A different foreground window covered all sixteen sampled
+Quit menu anchor points in both runs. The private desktop trials passed.
+[ARM64 activation run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133157) ·
+[ARM64 backup run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133243).
+
+QEMU reported 4,294,967,296 bytes of base memory and zero hot-plugged
+bytes from the running local x64 test guest. On Windows ARM64 at
+`1910195`, detached replay verified the first worker's live backup on
+Default and the complete installed restart on the private desktop. On
+Default all sixteen Quit points still hit one other window. Its process
+name remains unknown.
+[Backup and desktop observations](rust/rw01-storage-contract.md#installed-arm64-worker-and-foreground-at-1910195).
+
+On the 4 GiB x64 guest, all 20 Rust GUI cases across five native
+executables passed at `1660aeb`. At `343ebd3`, the shipping .NET
+solution built locally. Its three TRX files report 646 passes and 28
+Linux/Unix-specific skips, with no failures. The 39 Python regression
+cases also passed.
+[Original native GUI results](../tools/rust-qa/windows-local/README.md#gui-tests-on-server-2025-at-1660aeb) ·
+[Local .NET reference](../tools/rust-qa/windows-local/README.md#local-shipping-reference-at-343ebd3).
+
+On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
+checks on a local Windows Server 2025 Standard Evaluation VM. Windows
+measured 96 and 192 DPI and the observer verified visible edits in the same
+window on both displays. Both checks passed again after a cold start.
+The same native executable also followed both contrast transitions on a named
+Windows scheme and restored the original desktop palette and text pixels.
+[Contrast measurements](rust/rw02-appearance.md#reversible-windows-server-2025-x64-contrast-on-a-named-scheme).
+A clean guest required the Microsoft Visual C++
+x64 runtime before the GUI could start. Windows ARM64 still needs a suitable
+native display session. The next packaging check is to verify the runtime
+prerequisite during a clean candidate installation.
+[Server 2025 reports and runtime](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial).
+
+The Windows x64 file guard passed in two active sessions of the same local
+standard user on Server 2025. Five Rust processes demonstrated refusal in
+both directions, release and reacquisition of the same file. The managed
+reference read the account SID. Old/new cross-session exclusion during
+candidate migration and the ARM64 standard-user trial remain open.
+[Cross-session guard](rust/rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64).
+
+On November 28, the installed 3.0.4 WPF process uploaded a synthetic PNG
+from RDP while Rust held both the endpoint and writer guard in the console.
+When WPF started first, Rust identified the WPF pipe server and refused
+admission. In a separate trial Rust held the existing configuration file
+exclusively. A fresh WPF process remained visible for 12 seconds without an
+upload or SQLite file. After release, a new WPF process uploaded the PNG and
+committed one row. At `92b26c2` the same installed window also tried to
+save an edited draft under the lock. Windows returned sharing violation
+32. The original 416-byte config remained intact. After release, the same
+window saved the draft, uploaded the 69-byte test PNG and committed one
+matching row. QEMU confirmed 4 GiB base memory and zero hot-plugged
+memory. The guest shut down and released its slot. Handling an already
+active worker and replacing the guarded file during a Rust save remain open.
+[Both launch orders and original archives](rust/rw02-cross-session.md#installed-304-worker-in-another-session) ·
+[Held and released configuration](rust/rw02-cross-session.md#an-exclusive-configuration-handle-during-wpf-startup).
+
+The Fedora x64 Rust transport at `51f7bf2` passed 54 loopback scenarios and
+17 unit tests. For an explicitly allowed plaintext connection, HTTP polling,
+REST and the WebSocket CONNECT matched the signed 3.0.4 client's Basic proxy
+challenge. The direct-route control sent no proxy credentials to the origin.
+[Native suites and paired observations](rust/rw02-linux-basic-proxy.md#first-party-linux-transport).
+
+The Fedora x64 transport suite passed all 62 wire scenarios and 17 unit
+tests with the reviewed CONNECT change. An HTTPS tunnel now starts
+anonymously. The client sends Basic credentials on one retry when the
+selected proxy offers that scheme. Ten paired runs compared the Rust
+client with signed 3.0.4. Digest authentication remains open.
+[TLS proxy cases and original receipts](rust/rw02-linux-tls-basic-proxy.md).
+
+The Ubuntu x64 and ARM64 runs at `bbd1b73` each repeated all 62 wire
+cases and 17 unit tests. Windows ARM64 passed 49 wire cases and 18 unit
+tests. In a separate sixteen-case Fedora comparison, the signed client
+completed SHA-256 and MD5 proxy authentication when the fixed relay
+accepted the client's `/` Digest URI for CONNECT. The Rust client
+stopped at the proxy challenge in each Digest case.
+[Three native archives](rust/rw02-linux-tls-basic-proxy.md#native-hosted-transport-at-bbd1b73) ·
+[Digest comparison](rust/rw02-linux-tls-basic-proxy.md#connect-digest-in-the-shipping-linux-client).
+
+At `1910195`, Ubuntu x64 and ARM64 each passed all 54 wire scenarios and
+17 unit tests. Windows ARM64 passed its 49 wire scenarios and 18 unit
+tests. All three original archives matched their Actions digests. On the
+local Windows x64 guest, `79bcd3f` passed 17 unit tests, 49 wire scenarios
+and 16 Windows system proxy cases. Both the fixture and its supervisor
+verified restoration of the standard user's settings.
+[Three native transport jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223475)
+· [Local x64 system proxy](rust/rw02-realtime-transport.md#windows-per-user-system-proxy-on-the-local-x64-guest).
+
+The Windows x64 shipping assemblies passed six proxy wire trials using
+HTTP and HTTPS on the offline guest. The Rust environment adapter at
+`3104009` passed 49 Fedora wire scenarios and 14 unit tests. Windows
+environment routing and system proxy resolution have separate native
+checks. [Network observations](rust/rw02-realtime-transport.md#windows-environment-proxy-selection-with-the-shipping-client).
+
+On Server 2022 x64 an ordinary second launch at `db1f126` reopened the
+previously closed window 16 ms after the secondary process resumed, with
+keyboard focus and the original inventory worker. This complements the
+earlier hidden-start result on a separate desktop. The Shell action and
+callback on the latest desktop shared a clock tick.
+[Native tray and ordinary-launch observations](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
+
+On native Noble x64 an installed test Flatpak staged, published and cancelled
+downloads through a Documents grant on the stock package, private backport
+and restored stock package. An independent read of the stopped guest disk
+matched all six expected file identities and contents. The stock upload read
+lease still returned `ENOSYS`; distribution of the backport remains undecided.
+[Installed download and rollback results](rust/rw02-portal-noble.md#installed-download-publication-and-cancellation-on-noble-x64).
+
+On Fedora x64 the normalized Rust config now formats diagnostic summaries
+without its API key or endpoint. All 114 serialized YAML files matched the
+previous native run byte for byte, and the shipping C# reader passed 228
+checks. Thirty further signed 3.0.4 profiles matched Rust for both watch
+and log paths with dot components and repeated or trailing separators.
+[Configuration diagnostics and native comparisons](rust/rw02-yaml.md#configuration-diagnostics-and-native-path-comparisons).
+
+The native Fedora x64 transport suite passed 39 cases and six unit tests.
+Rust and the signed .NET 3.0.4 assemblies accepted the same private CA
+through a Linux trust bundle or a hashed directory. Both rejected a foreign
+issuer and a wrong endpoint at initial connection and at the subsequent
+WebSocket handshake. The four native feasibility jobs, regular CI and Rust
+CodeQL passed at `d97eb33`.
+[TLS comparison](rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates) ·
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039459327) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039467065) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46039466914).
+
+The signed Linux 3.0.4 client honored a configured proxy for authenticated
+inventory, polling and the subsequent WebSocket upgrade. The Rust build
+at `3d55500` sent those requests directly. The corrected Linux HTTPS
+adapter sent all nine authenticated requests through the fixed proxy,
+including the WebSocket upgrade. Its CONNECT requests carried no API key.
+The direct and `NO_PROXY` controls bypassed the relay. The native Fedora
+x64 suite passed 44 wire scenarios and nine unit tests. Proxy use for
+opted-in plaintext WebSockets subsequently passed on Fedora x64. The signed
+reference and Rust used the same proxy request forms and direct-host exception.
+The Rust suite passed 49 wire scenarios and thirteen unit tests.
+[Plaintext proxy readback](rust/rw02-realtime-transport.md#opted-in-plaintext-websocket-through-a-linux-http-proxy). The most recent four-host transport
+readback at `47fe26d` passed 22 wire scenarios and four unit tests per
+target.
+[Proxy comparison](rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime) ·
+[Four native hosts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437251).
+
+On Fedora x64 the combined Rust subject matched the shipping client's five
+legacy upload identifiers, including an empty file and a 70,679-byte file.
+Each retry used the original open file after its name was replaced. The C#
+multipart reference passed all five cases on native Ubuntu and Windows x64
+and ARM64 at `6cd7757`. The realtime subject also passed
+22 loopback scenarios after correcting the namespace of encoded API paths.
+Ten URL comparisons against signed 3.0.4 assemblies matched. On native
+Ubuntu x64 and ARM64 the 22 scenarios and four unit tests passed at
+`6cd7757`. Both Ubuntu hosts also reproduced all five Rust upload
+identifiers and retry bodies from the open file. Their upload reports
+match the Fedora report byte for byte. The 22 transport cases and four
+unit tests passed on Windows x64 and ARM64 as well. Both Windows builds
+reproduced all five held-file identifiers and retry bodies. Their upload
+reports were byte-identical, and each architecture's 23 archived files
+matched the corresponding desktop archive. Windows ARM64 also reproduced
+the 22 wire cases after offline reconstruction of its import library.
+[Upload comparison](rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file) ·
+[Realtime transport](rust/rw02-realtime-transport.md).
+
+The local realtime comparison found that Rust resubscribed after the server
+explicitly ended the namespace. On Fedora x64 the corrected client
+preserved the original session through Stop and kept periodic inventory
+running through transport loss. All 27 transport scenarios and four unit
+tests passed. Native hosted repeats are pending.
+[Signed C# and Rust server-disconnect comparison](rust/rw02-realtime-transport.md#server-ends-the-selected-namespace).
+
+A longer comparison on Fedora x64 also found that .NET 3.0.4 kept a
+single application session after WebSocket close code 1001. Its REST
+client could still read inventory 77.8 seconds later. Rust now acknowledges
+the peer's close, keeps inventory running and retries after an abrupt TCP
+loss. Both namespace paths passed the three clean-close variants and their
+abrupt-loss controls. All 29 strict wire scenarios and five unit tests
+passed. The signed client reconnected directly over WebSocket, while Rust
+still used polling and upgrade at `20dfb10`.
+[Signed observations and Rust comparison](rust/rw02-realtime-transport.md#server-closes-an-established-websocket).
+
+The Rust client now opens a direct WebSocket after losing an upgraded
+connection. Native Fedora x64 passed all 33 wire scenarios and five unit
+tests. Root and named subscriptions recovered, including after a refused
+direct request. A redirected direct request sent zero traffic to the other
+origin. The original polling-only path also recovered.
+On an initial upgrade refusal the signed client delivered zero events.
+Rust at `91ca61b` delivered one on polling and a second after a later
+transport loss. Pausing polling during promotion corrected this difference
+on Fedora x64. Six refusal trials across both namespaces delivered zero
+events and completed 59 REST requests each. Both successful promotion
+controls recovered after abrupt loss.
+[Direct reconnect and signed reference](rust/rw02-realtime-transport.md#opening-the-next-session-after-an-abrupt-disconnect).
+
+The signed 3.0.4 client accepted both the initial and direct WebSocket
+reconnect handshakes when the server omitted `maxPayload`. Rust now
+accepts this input with the local 4 MiB bound. All 34 transport cases
+and six unit tests passed on Fedora x64.
+[Original packets and limits](rust/rw02-realtime-transport.md#opening-a-session-without-maxpayload).
+
+The revised upgrade passed the 35-case native wire suite and six unit tests
+on Fedora x64. A separate comparison used the original Socket.IO and
+Engine.IO server versions from Immich 3.4.2. Both signed .NET 3.0.4 and
+Rust connected, received an event, reconnected after abrupt loss and
+received another event in both tested namespaces. Hosted repeats for
+these changes are pending.
+[Upgrade, refusal and recovery](rust/rw02-realtime-transport.md#pausing-polling-before-the-initial-websocket-upgrade).
+
+On Fedora x64 the full offline build reproduced the same five Rust upload
+results. All 78 source inputs matched `6cd7757`. The modified Wayland
+binding was rebuilt and its new interface version observed. The native
+feasibility matrix, regular CI and both Rust CodeQL configurations also
+passed for that commit.
+[Offline build and SBOM](rust/rw02-combined-profile.md#offline-reconstruction-with-the-legacy-upload-comparison) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242485) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021250087) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021249956).
+
+In the desktop run at `9313f39`, Ubuntu's snapshot server returned HTTP 503
+for one pinned package on each architecture, before either Plasma panel
+started. Fresh downloads matched both package digests. The acquisition helper
+now retries a transient 503 within the existing limit of three attempts.
+The preceding matrix at `cd15d1c` had passed on both architectures. In an
+offline x64 replay with the prepared Noble guest and the current GUI sources,
+two panel clicks reopened the original window, and Quit removed the item.
+[Desktop run for 9313f39](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691) ·
+[Noble x64 replay](rust/rw02-plasma.md#two-panel-activations-with-the-current-gui-at-6cd7757).
+
+The same matrix finished on both Windows targets with outstanding desktop
+checks. Both retained Mailbox profiles on x64 met all eleven same-host
+WPF limits. The ordinary GUI exceeded five. The x64 Japanese input trial
+showed composition, committed U+3042 and restored the original input
+settings. The ARM64 trial stopped before composition.
+[Original Windows measurements](rust/rw02-windows-window.md#windows-x64-profiles-at-9313f39).
+
+The pre-fix run at `6cd7757` also received HTTP 503 during both Ubuntu
+panel setups and during the ARM64 portal package setup. Both integrated
+Linux inventory trials stopped at the worker-receipt check in that run.
+The subsequent source pins and retry fixes are on `47fe26d`.
+[Ubuntu x64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/job/140581122907) ·
+[Ubuntu ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/job/140581122971).
+
+On Windows Server 2022 x64 at `47fe26d`, Explorer displayed the registered
+Rust tray icon and its color change at the same physical point. The
+accessibility lookup found no item to invoke. The GUI received no Shell
+activation callback. Both trials retired their icon and drained the worker.
+The four-target native feasibility run, regular CI and Rust CodeQL passed
+at that revision.
+[Windows Server 2022 observation](rust/rw02-windows-services.md#visible-background-start-icon-on-windows-server-2022-at-47fe26d) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437145) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025454532) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025454701).
+
+The installed Windows activation run at `47fe26d` finished with four of
+five jobs passing. Both Rust-primary trials passed, as did WPF-primary on
+x64 and on the private ARM64 input desktop. In the ARM64 Default-desktop
+trial, Rust's secondary exited successfully and the original WPF window
+(HWND 131434) changed from hidden to visible. During Quit, the menu helper
+could not find a sampled point on that window's client area. The fixture
+confirmed cleanup and MSI removal. Normal Quit on that console remains open.
+[Five native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341) ·
+[ARM64 Default-desktop original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46025437341/artifacts/15212717516).
+
+At `3d55500` the installed WPF worker backup and restore passed on Windows
+x64 and on the private ARM64 desktop. On the ARM64 Default desktop all 16
+sampled points inside the original WPF client hit a different foreground
+window. The test stopped before Quit, then removed its MSI and synthetic
+profile. The four native feasibility jobs passed at this revision.
+[Installed worker jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105278) ·
+[ARM64 Default original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105278/artifacts/15220713764) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105356).
+
+The x64 Server 2022 trial at `3c4d62c` opened the hidden-start Rust GUI
+through Explorer. The registered icon's default action produced one
+`NIN_KEYSELECT`, one GUI Open and immediate keyboard focus. Worker 7208
+continued in the original process job. In the separate visible-start trial,
+Explorer returned `S_FALSE` for the icon rectangle both before and after
+the original window was closed. All four original native library and metadata
+files were present in this run's archive and matched their compiler receipts.
+[Background-start activation and original archive](rust/rw02-windows-services.md#explorer-activation-after-a-hidden-start-at-3c4d62c).
+
+In the visible-first repeat at `f148e30`, Explorer activated the original
+closed-to-tray window and its inventory worker survived. The callback and
+window SHOW had the same Windows timer tick. Their order was unresolved in that run.
+Explorer did not expose the background-start icon in the second case.
+The repeat now samples that root on its UI thread as it consumes the
+identified callback. Both the ordinary and retained sources passed
+Windows x64 and ARM64 compile checks. On Fedora all 18 editor image
+files matched the original captures. At `29ce1c0` the native x64 GUI
+confirmed its original root was hidden when it consumed the Shell Open.
+Explorer reopened and focused that window and its original worker survived
+through normal Quit. The second GUI still lacked a usable icon rectangle.
+[Visible-first original](rust/rw02-windows-services.md#visible-start-first-on-windows-server-2022-at-f148e30) ·
+[Qualified reopen on x64](rust/rw02-windows-services.md#explorer-reopened-the-original-closed-window-at-29ce1c0).
+
+For a registered icon without a usable rectangle, the native observer now
+starts the ordinary executable on the same desktop while the original GUI
+and inventory worker are running. It records whether that launcher opens
+and focuses the window and checks both processes through Quit. Across
+123 local launcher tests, 120 passed and three platform cases skipped.
+At `3d55500` a second launch opened and focused the original background-start
+GUI on Windows Server 2022 x64 when Explorer exposed no usable icon rectangle.
+Windows showed the window 171 ms after the second process was released.
+The original worker survived and the secondary exited zero. The same
+condition after closing a visible window is still open. The next run
+starts the background GUI first on a fresh Explorer desktop.
+[Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453) ·
+[Ordinary launcher when the icon has no rectangle](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
+
+The ARM64 IME observer lost its filename field during Japanese layout
+selection at `9313f39`. At `3d55500` the bounded lookup found the focused
+filename on its first attempt. The native observer saw preedit before Enter,
+commit after Enter and U+3042 in the filename. The original layout, language
+list and capability state returned, and the private profile was removed.
+[ARM64 source and archive](rust/rw02-windows-ime.md).
+
+The remaining Windows desktop tests cover ARM64 Explorer activation,
+visible notifications, a restorable contrast setting, a move between two
+outputs with different DPI, and rendering in an actual RDP session. The available
+hosted consoles each report one 96-DPI output. The user currently has
+neither a dedicated Windows installation medium nor an additional approved
+test desktop. The standard-user cross-session test also needs two sessions
+for the same user. The Ubuntu portal package was qualified for installation
+and rollback only. Its distribution is undecided.
+[Windows display trial](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop) ·
+[Shell observations](rust/rw02-windows-services.md#native-notification-observations-at-5efe1f1) ·
+[Writer exclusion](rust/rw02-cross-session.md) ·
+[Ubuntu portal decision](rust/rw02-stack-decision.md).
+
+On Windows Server 2022 x64 at `db1d33a`, the original Explorer reported
+quiet time and acknowledged the classic notification. Both WinRT requests
+succeeded, and independent processes read and selectively removed their
+history entries. The observers completed 97 classic and 93 WinRT samples
+without finding the visible title and body. In a separate run at `20dfb10`
+the original Explorer reported that notifications were allowed after 48
+minutes of quiet time.
+The classic sender received a show callback and the exact WinRT entries
+appeared in history. None of the 96 classic or 93 WinRT screen samples
+showed the expected title and body. Visible presentation remains open.
+[Earlier observations](rust/rw02-windows-services.md#classic-and-winrt-notifications-on-windows-server-2022-at-db1d33a) ·
+[Original archive after quiet time](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46034955133/artifacts/15221500889).
+
+At `6cd7757` two source digests in the inventory worker's review still
+referred to the files preceding the Windows last-write timestamp adapter.
+Local replay of the Windows staging check rejected the new sources before
+building the worker. The reviewed list now covers both changed files. Detached verification
+matched all 13 entries, and the Linux worker built with the original 25
+registry packages. On private X11 the worker found a new file while the GUI
+was hidden. Both second launches reopened the original window with the same
+worker. The ordinary Windows Server 2025 and Windows 11 ARM64
+matrix retains its existing checks. An additional Server 2022 x64 job
+builds the same tray subject and checks the original contrast setting.
+[Worker sources](../tools/rust-qa/performance/worker-inputs.json) ·
+[Server 2022 Shell comparison](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml).
+
+At `9313f39` the archived x64 CPU executable from `483f053` rendered
+a real filename edit on a second hosted console. Both original field
+images reproduce 646 changed pixels. The console reported a single 96-DPI
+monitor. Mixed-DPI and RDP qualification still require those environments.
+[Archived x64 test](rust/rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable).
+
+The Rust YAML reader now checks each recognized property before a later
+occurrence replaces it. At `9313f39`, Windows and Ubuntu on x64 and ARM64
+each passed 87 inputs with 228 C# readbacks. Rust and C# both reject an
+invalid integer or malformed section followed by a valid replacement.
+[Repeated YAML properties](rust/rw02-yaml.md#repeated-properties-in-the-shipping-configuration).
+
+The desktop matrix for `cd15d1c` finished with both Ubuntu jobs passing.
+Both Windows jobs recorded outstanding standard-user, tray, notification
+and contrast checks. On x64 the ordinary retained GUI regained focus on
+second launch, but the canonical and two retained Mailbox comparisons
+exceeded WPF limits. On ARM64 both retained Mailbox comparisons passed.
+Ordinary retained activation remained in the background and the separate
+GDI control did not capture its first complete frame. The tested x64
+CPU renderer has its own successful timing and recovery run at `483f053`.
+The regular CI, C# compatibility and installer references, and Rust
+CodeQL passed at `cd15d1c`.
+[Desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883765) ·
+[Windows x64 CPU renderer](rust/rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053) ·
+[CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980891775) ·
+[C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883821) ·
+[Installer reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980883855) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45980891768).
+
+At `dddb21a` the first native Windows x64 CPU-painter trial passed all
+eleven same-host WPF limits. Under inventory load, close/reopen p95 was
+5.71/9.66 ms and every one of the 421 eligible reopens drew the full
+editor before the next close. From the request to a completed GDI flush
+the p95 was 24.04 ms. The ordinary retained renderer met eight limits.
+The repeat at `972adc6` also met all eleven limits. Scan close/reopen p95
+was 7.11/8.32 ms. Of 172 eligible reopens, 171 had a complete transfer
+after the visible sample and before the next close.
+[First native archive](rust/rw02-windows-window.md#native-windows-x64-cpu-renderer-at-dddb21a) ·
+[Second native archive and frame coverage](rust/rw02-windows-window.md#native-windows-x64-cpu-repeat-at-972adc6).
+
+The private x64 build at `3b488ca` selects CPU painting from the actual WARP
+adapter and root surface. It retains wgpu's texture state across CPU
+frames so a later unsupported sampler can switch renderers without
+losing a partial texture update. Local frozen reconstruction and
+Windows x64 cross-Clippy passed. Both Rust CodeQL configurations, all
+eight regular CI jobs and all four native feasibility jobs passed. On native
+Windows x64 automatic WARP selection met all eleven WPF limits. All 246
+eligible reopens received a complete editor frame, with request-to-flush
+p95 of 17.39 ms. The separate example compiled but stopped before the
+first of three visible texture samples when Cargo reported the application
+library under its internal path. The larger desktop matrix passed on both
+Ubuntu architectures. Both Windows jobs reported outstanding desktop checks.
+[Native timing and compiler evidence](rust/rw02-windows-window.md#automatic-warp-selection-on-windows-x64-at-3b488ca) ·
+[Desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644176) ·
+[Renderer comparison](../tools/rust-qa/windows-cpu-paint/README.md) ·
+[Texture handoff and readback](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
+[Four native feasibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908644102) ·
+[Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908649768) ·
+[Regular CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45908649763).
+
+At `de3eec4` the foreground F24 launch restored keyboard focus to the
+original window on both Windows architectures. On x64 a hidden-window
+sample after resume resolved the tied 7,585,140 ms timestamps. On ARM64
+SHOW followed resume by 16 ms. The original workers survived and both
+input desktops were restored.
+[Native keyboard observations](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
+
+At `10ab0b8` the Windows x64 CPU renderer again met all eleven WPF limits.
+Of 423 eligible reopens, 421 had a complete editor frame after the
+window became visible and before the next close. The separate example
+switched to wgpu when a texture required nearest filtering. Its original
+red texture and green partial update remained visible next to the new blue
+texture on the same window. Detached replay matched all 225 sampled pixels
+and both copies of the application library. The recovery observer stopped
+before requesting device destruction. The original log contains two
+complete CPU frames and two empty inventories.
+The original recovery observer required exactly two job members. The
+timed GUI on the same host also had a Windows console host attached to
+its worker. Recovery now checks each member's actual image and parent
+against the original GUI, worker and Windows system directory. The first
+recovery run did not retain the membership list that failed its check.
+[Native comparisons and original archive](rust/rw02-windows-window.md#visible-texture-handoff-on-windows-x64-at-10ab0b8) ·
+[Library evidence](../tools/rust-qa/windows-cpu-paint/handoff/README.md) ·
+[Device-recovery trial](../tools/rust-qa/windows-cpu-paint/recovery/README.md).
+
+At `483f053` the revised Windows x64 run passed. After destruction of
+the original WARP device the replacement window displayed
+`recoverydraft` and accepted the edit to `recoverydraftafter`. The
+same worker completed another inventory and exited normally. The three
+original screen captures and the 177 changed pixels passed independent
+readback. In the separate timing trial, the same GUI binary met all
+eleven WPF limits and completed an editor frame on all 436 eligible
+reopens. All three texture-handoff observations passed again.
+[Windows x64 recovery and original archive](rust/rw02-windows-window.md#warp-device-recovery-on-windows-x64-at-483f053).
+
+At `10ab0b8` the installed Ubuntu ARM64 Flatpak delivered its exact
+notification and withdrawal to the real GNOME Shell. The private
+WirePlumber session stopped before producing any monitor images, leaving
+visible delivery open. The Fedora x64 control verified the visible text
+and its withdrawal on the same revision. An isolated Ubuntu 24.04 x64
+control reproduced the failure with WirePlumber 0.4.17. With the unused
+Bluetooth seat monitors disabled in that private profile, the same sender
+produced all three captures. The title and body disappeared from the
+still-open message list after withdrawal. At `1a62d5c` the native ARM64
+run passed with the same Rust ELF as the first trial. All three original
+GNOME screen captures and both portal messages passed detached replay.
+[ARM64 notification trial](rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64).
+
+Ubuntu ARM64 at `10ab0b8` committed both restored upload mappings, then
+the signed application disconnected before its Quit reply reached the
+observer. Both Ubuntu hosts completed the original test at `1a62d5c`.
+On Fedora x64 the revised test bound each of four menu replies to the
+original signed GUI's Flatpak proxy. Both configured workers logged
+shutdown, the two mappings survived restart and the installation was empty
+at the end. A private bus test covered the precise disconnected-recipient
+reply. At `cd15d1c`, both native Ubuntu hosts also passed all four Quit
+observations. Each restarted worker kept ROWID 1, uploaded the new PNG as
+ROWID 2 and exited normally. Both private installs were empty after removal.
+[Installed Quit observations](rust/rw01-storage-contract.md#menu-shutdown-after-an-installed-linux-restore).
+
+The installed Windows 3.0.4 worker restarted from its Rust-returned live
+backup at `c4d05b6` on x64 Default and on an owned ARM64 desktop. The
+original database included 16 WAL frames. In both trials a new WPF worker
+kept the first mapping and uploaded only the second PNG. On ARM64 the
+original input desktop was restored. The separate ARM64 Default trial
+verified the live backup, then stopped before a covered Quit. The three
+MSI uninstalls passed. At `69b3ddd` both installed WPF secondary launches
+reactivated the Rust primary. The x64 recorder captured both native file
+queries and reported zero losses at all four snapshots and in the finished
+trace. Ordinary ARM64 WPF-primary shutdown and standard-user cross-session
+writer exclusion remain open.
+[Windows restore archives](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-c4d05b6) ·
+[Native Windows file traces](../tools/rust-qa/windows-msi-interop/file-trace.md).
+
+An independent review found that the x64 CPU renderer reader accepted a
+late WARP device loss when the process then quit. The reader now checks
+the first device's attempt, memory policy and readiness in order, and
+rejects an active loss, error or retry. Twelve ordinary native log files
+passed the device check. A native device-recovery log was correctly
+rejected for this timing trial. All 18 portable checks and three Rust
+raster tests passed.
+[CPU measurement and readback](../tools/rust-qa/windows-cpu-paint/README.md).
+
+At `972adc6` the argument-free Rust secondary reactivated the original
+installed WPF window on the ARM64 private desktop. The same WPF process
+then quit via its own menu, and the supervisor restored the original
+input desktop in session 2. The separate ARM64 Default trial reactivated
+WPF and stopped before the covered Quit. Both MSIs were removed.
+[Both native archives and process identities](rust/rw02-instance.md#installed-arm64-wpf-activation-and-quit-at-972adc6).
+
+At `0bb39bf` the native Windows and Ubuntu jobs on both architectures
+each passed 82 YAML profiles and 224 C# readbacks. Independent replay
+verified all 448 output files, including edits to profiles with Unicode
+separators and shared anchors. On Fedora x64 the two 3.0.4 release
+assemblies agreed with Rust on all 27 additional compact profiles.
+[Four native archives](rust/rw02-yaml.md#four-native-anchor-and-compact-mapping-exchanges-at-0bb39bf) ·
+[Original package comparisons](rust/rw02-yaml.md#anchored-scalars-in-compact-mappings).
+
+All four native feasibility jobs passed at `0bb39bf`. Independent replay
+matched all 16 restarted C# workers to the backup returned by Rust after
+a download, upload, deletion or interrupted timestamp repair. Files,
+peer requests and SQLite history matched their expected state.
+[Four native worker archives](rust/rw01-storage-contract.md#native-worker-recovery-at-0bb39bf).
+
+At `5b6cebf` the Fedora x64 YAML adapter preserved U+2028 and U+2029 in the watch
+path, album name, log directory and filters. It also resolves aliases
+against declarations on recognized configuration values when an ignored
+property reuses the name. All 74 profiles and 204 C# readbacks passed.
+The two managed assemblies from .NET 3.0.4 each read and resaved 34
+Unicode outputs and 22 alias outputs from the same frozen Rust build.
+Windows and Ubuntu each passed all 74 profiles on x64 and ARM64.
+Independent replay verified the 102 unchanged and edited Rust outputs per
+target against the native C# observations.
+[Original archives and replay](rust/rw02-yaml.md#four-native-yaml-exchanges-at-5b6cebf) ·
+[Local result and package readbacks](rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves) ·
+[Alias scope and compact mapping controls](rust/rw02-yaml.md#anchors-on-recognized-and-skipped-properties).
+
+At `5b6cebf` both native Ubuntu hosts reopened the original signed 3.0.4
+Flatpak window on an ordinary second launch. Both processes exited zero
+and the private uninstall completed. All four reference packages also passed
+installation, repair, removal and retained-profile readback.
+[Installed launch and repair results](rust/rw01-installed-packages.md#two-signed-launches-on-both-ubuntu-architectures-at-5b6cebf).
+
+At `3d67a46` the installed worker handover passed on Ubuntu x64 and
+ARM64. In both launch orders the active worker kept its identity. The
+signed 3.0.4 worker restarted from Rust’s live backup, kept the first
+asset and uploaded only the new PNG. Independent replay checked all
+16 WAL frames, both original request bodies and the final ROWIDs on
+each architecture. This repeats the Fedora x64 result. Both earlier
+Ubuntu runs at `0bb39bf` had stopped in the Python 3.12 directory-read
+observer. All 24 PR checks outside the separate desktop assessment
+passed at `3d67a46`. Both Ubuntu desktop jobs also completed successfully.
+Both targets met all eleven resource limits. All 173 x64 and 178 ARM64
+Rust window requests counted during file activity also finished within it.
+[Ubuntu resource measurements](rust/rw02-native-gui.md#ubuntu-native-results-at-3d67a46) ·
+[Two native Ubuntu archives](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46) ·
+[Original observer failure](rust/rw01-storage-contract.md#native-linux-handover-and-backup-observer) ·
+[PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks).
+
+At `ead9fb3` all 20 regular PR checks passed, including all four native
+feasibility jobs. The two Ubuntu desktops met all eleven resource limits.
+All 120 x64 and 186 ARM64 window requests issued during file reads completed
+while reads were still in progress. Both Windows hosts completed all three
+WPF reference trials and passed the native child-exit control. Both retained
+ARM64 Mailbox profiles met all eleven limits. Both x64 profiles exceeded
+the scan-close and scan-reopen limits.
+[Ubuntu observations](rust/rw02-native-gui.md#ubuntu-native-results-at-ead9fb3) ·
+[Windows observations](rust/rw02-windows-window.md#windows-results-at-ead9fb3) ·
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602415) ·
+[Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45865602688).
+
+At `e2f161b`, all 20 regular PR checks passed. Both Ubuntu desktop
+assessments passed all eleven resource limits. Each of the four native
+hosts passed 59 YAML cases with 160 C# readbacks and all 20 realtime
+scenarios. Both Ubuntu offline relinks preserved the exact SQLite timestamp
+read from the held file. [YAML originals](rust/rw02-yaml.md#native-format-mark-exchange-at-e2f161b) ·
+[Realtime originals](rust/rw02-realtime-transport.md#four-native-transport-results-at-e2f161b) ·
+[Ubuntu measurements](rust/rw02-native-gui.md#ubuntu-native-results-at-e2f161b) ·
+[Four-target feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563616).
+
+Both Windows desktop assessments failed. On ARM64 both retained Mailbox
+profiles met all eleven WPF limits. An ordinary second launch reopened the
+original window in the background. On x64 the third WPF trial failed while
+opening a process to sample idle resources. Two complete trials survive,
+but no x64 reference budget was produced. Both Windows filename
+editors passed. Visible Shell activation and notification, a reversible
+contrast change, mixed DPI, RDP and standard-user cross-session ownership
+remain open. A dedicated Windows medium or test VM is currently unavailable.
+The Ubuntu package trial establishes feasibility. Distribution is undecided.
+[Windows receipts and failure](rust/rw02-windows-window.md#native-results-at-e2f161b) ·
+[Completed desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45565563795).
+
+The Windows resource recorder now samples the original trial job and verifies
+a complete set of live working sets. Its portable timing and membership tests
+passed. At `ead9fb3` independent replay verified 4,340 Windows working-set
+snapshots across 70 idle intervals on the two hosts. Independent review covered CPU after member exit, incomplete
+samples, and the canonical and GDI callers. The earlier native worker-backup
+archives also reproduced all sixteen C# restarts at `e2f161b`.
+[Recorder](rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget) ·
+[Native backup replay](rust/acceptance.md#native-evidence-matrix).
+
+The earlier Windows x64 full-GDI scan spent a median 50.92 ms from window
+reopen to first full transfer and 0.14 ms in the transfer and flush. The
+private GDI presenter now reuses its readback buffer for frames with the
+same dimensions. The native observer separately times preparation, mapping
+and display. Eleven Python tests, five Rust controls, x64 MSVC-target Clippy
+on Linux and independent source review passed. The twice-reconstructed
+source archive has SHA-256
+`5016b74fe6aab44510535574d4f50d39c0bb57c293a84653581f0bdb797002a4`.
+At `ead9fb3` the x64 scan reused one buffer 354 times. During the 341
+observed reopens the median wait for CPU-readable pixels was 42.59 ms.
+Only five reopens completed their first blit before the next close.
+[Native GDI timings](rust/rw02-windows-window.md#native-gdi-readback-phases) ·
+[Original measurements and new trial](../tools/rust-qa/windows-gdi-present/README.md#reusing-the-mapped-readback-buffer).
+
+The Windows x64 transition recorder compares the same retained executable
+with the ordinary window policy and with DWM transitions disabled on its
+original HWND. Each leg requires native file reads, completed DXGI presents
+and a visible edit after reopening. The source review, five portable
+regressions and x64 MSVC-target Clippy passed. Replaying the three original
+Mailbox scans at `ead9fb3` found 584, 553 and 585 qualifying reopens
+with complete presents. At `de3eec4` the native workflow and detached
+replay passed. The ordinary and disabled windows closed in 41.40 and
+41.34 ms and reopened in 30.41 and 30.49 ms. Both exceeded the WPF
+limits of 30.71 and 21.94 ms on this host.
+[Comparison and readback](../tools/rust-qa/windows-warm-window/dwm-transitions.md#native-windows-x64-result-at-de3eec4) ·
+[Native x64 workflow](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-transitions.yaml).
+
+On the `ead9fb3` x64 foreground keyboard trial, the original HWND obtained
+focus, but Windows timestamped its SHOW and the secondary process resume
+in the same millisecond. The keyboard observer now queries the window’s
+visibility immediately after resume. Historical tied events remain
+unqualified. A native repeat must record the new sample.
+[Input timing and original archive](rust/rw02-instance.md#ordering-a-fast-foreground-keyboard-launch).
+
+At `0bb39bf` both Windows foreground keyboard trials passed. ARM64 met
+all eleven resource limits in both retained Mailbox profiles. Both x64
+profiles exceeded three limits, including idle close on this host.
+None of 144 GDI reopens during verified file activity delivered a full
+frame before the next close. The ordinary one-frame Mailbox trial did so
+in 257 of 276 reopens. The per-window transition comparison at `de3eec4`
+uses the ordinary DXGI renderer.
+[Windows receipts](rust/rw02-windows-window.md#windows-results-at-0bb39bf) ·
+[Focused native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45885538844).
+
+In the x64 trace at `0bb39bf`, the observer issued 59 close requests while
+the window thread was already in the DX12 wait that dominated their
+latency. The new private build waits for the next frame inside winit's
+message loop. Offline reconstruction matched all 136 feature rows.
+Seven portable Rust lifecycle tests and the Windows x64 target Clippy
+check passed. Independent review replayed 744 original Windows job
+resource samples and rejected all twelve controls with a foreign PID.
+The detached comparison preserves a measured idle present rate over
+budget. At `c52da2d` the original x64 window hid before
+the frame was available on 238 requests. The private GUI passed nine of
+eleven WPF limits. During the scan its p95 close and reopen were 22.03 and
+45.88 ms against 19.77 and 21.70 ms. Both processes exited cleanly.
+[Native one-shot result](rust/rw02-windows-window.md#one-shot-frame-readiness-on-windows-x64-at-c52da2d).
+[Original timing and planned native observation](rust/rw02-windows-window.md#closing-the-window-during-a-dxgi-wait).
+
+At `1d3af9a`, starting the installed Windows 3.0.4 application reopened
+the original Rust window on x64 and ARM64. Each inventory worker kept its
+identity and read the new synthetic file on two successive passes.
+Both Rust jobs drained on Quit. Both original MSIs uninstalled cleanly.
+Independent replay verified the two archives. The ARM64 foreground request
+was declined even though the window became visible.
+[Native activation, file observations and installer receipts](rust/rw02-instance.md#installed-windows-secondary-at-1d3af9a).
+
+At `ef28520`, both Windows x64 and ARM64 passed the activation check
+in both directions. The Rust secondary reopened the original installed
+WPF window in 16 ms on both hosts. Its process exited zero each time.
+UI Automation failed to confirm the Quit command at its native menu
+point on both architectures. The observers terminated their own WPF
+processes and both MSIs uninstalled. Detached replay confirmed two full
+Rust-primary runs and two WPF activations before Quit. The next test
+uses the original 3.0.4 upgrade fixture's verified native menu click.
+[Original archives and process identities](rust/rw02-instance.md#both-installed-windows-launch-orders-at-ef28520).
+
+The installed Windows upload trial now has a native Rust helper for
+the original WPF profile and a separate loopback PNG peer. On Fedora x64,
+the rebuilt helper returned byte-identical backups from the two original
+Ubuntu main/WAL pairs at `3d67a46`. The four tables and ROWIDs matched
+each archived return. The Windows entry point passed type checking on
+both MSVC targets. At `f5322ff` the native builds and 40 C# checks per
+host passed. On both Windows architectures a portable test opened its
+UTF-8 fixture with code page 1252 and failed before MSI installation.
+At `2dd5f93` both installed Windows workers uploaded a PNG and Rust
+returned their committed history from 16 WAL frames. On x64 the restarted
+WPF process opened that backup and uploaded only the second PNG. On ARM64
+the native menu helper declined the first Quit selection during its hit
+and ownership check. The ARM64 restore and second upload remain open.
+[Both native Windows backups and the x64 restart](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-2dd5f93) ·
+[Original Windows build and test logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45896231136) ·
+[Native commands](development.md#installed-windows-worker-backup) ·
+[Original Ubuntu databases](rust/rw01-storage-contract.md#installed-ubuntu-worker-restart-at-3d67a46).
+
+At `2dd5f93` the full installed WPF-primary activation passed on Windows
+x64 and the full Rust-primary repeat passed on ARM64. The x64 Rust
+repeat lost 134 kernel file events. The ARM64 WPF primary reopened but
+the shipping helper refused the covered Quit item. At `f8cf6b1` the x64
+worker again restored its live upload history and uploaded only the new
+PNG. The ARM64 backup passed. A different foreground window covered the
+selected point on the WPF client. The observer now samples up to 16
+interior points and only moves the cursor after verifying the original
+WPF root and UI thread. The native ARM64 restart is still outstanding.
+[Activation results](rust/rw02-instance.md#both-installed-windows-launch-orders-at-2dd5f93) ·
+[Second upload and restore run](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-f8cf6b1).
+
+The Fedora x64 offscreen CPU painter reproduced all six real editor frames
+within two color levels. An independent rebuild reproduced all 18 raw
+images byte for byte. Both modes used the pinned font atlas, including
+the partial texture update during the edit. The native x64 trial stages
+a separate executable and retains its compiler stream, library outputs
+and original sources. Its window response under inventory remains open.
+[Pixel counts and native trial](rust/rw02-windows-window.md#cpu-rendering-of-the-original-editor-meshes).
+
+At `d7c084c` both WPF Quit selections and the return of the live
+backup passed for a third time on Windows x64. On the ARM64 runner all
+16 tested points in the original client hit the same foreign foreground
+window. The first upload and 16-frame backup passed. Restore remains open.
+[Native originals](rust/rw01-storage-contract.md#installed-windows-worker-restart-at-d7c084c).
+
+The `f8cf6b1` x64 Rust-primary activation recorded 1,273 lost kernel
+events after an earlier repeat lost 134. The new single-file diagnostic
+records its own session counters at four points and checks the finalized
+ETL header. Both query passes must still complete without event loss.
+[Original activation receipts](rust/rw02-instance.md#installed-windows-activation-at-f8cf6b1) ·
+[Native observation and acceptance](../tools/rust-qa/windows-msi-interop/file-trace.md).
+
+The additional installed-worker trial for Windows ARM64 selects a new
+input desktop on its own hosted runner. It uses the two original WPF
+processes, the original menu helper and the existing synthetic peer.
+The private desktop and return to the unlocked console require native
+readback. The two ordinary desktop trials retain independent results.
+On Fedora x64 the five-crate Rust workspace passed 38 frozen tests
+and its Cargo dependency boundary check. Clippy passed for all workspace
+targets with warnings denied.
+[Native run and evidence](development.md#installed-windows-worker-backup).
+
+At `d7c084c` the installed Rust-primary runs passed on both Windows
+architectures. The x64 worker produced both required file events with
+the original recorder, before the changes to ETW collection. The x64
+WPF-primary run passed. ARM64 WPF reactivated but all 16 tested Quit
+points were covered by the same foreign window. All four MSIs were removed.
+[Four original archives and native outcomes](rust/rw02-instance.md#installed-windows-activation-at-d7c084c).
+
+## Compatibility fixes and earlier desktop runs (2026-11-25)
+
+On Fedora x64 the signed .NET 3.0.4 assemblies confirmed three RW-02
+compatibility findings. A saved album beginning with U+FEFF now survives
+Rust read, edit and C# save at `83fd2d0`. At `c51491b` Rust matched all
+six Linux file modification times read by the shipping worker's handle
+adapter, including one nanosecond before the Unix epoch. At `bcacfaf`
+the Rust realtime client sent the same disconnect packets as the shipping
+client on both polling and WebSocket. All 18 local transport cases passed.
+[Album name](rust/rw02-yaml.md#leading-ufeff-in-a-saved-album-name) ·
+[File timestamps](rust/rw02-legacy.md#linux-file-modification-times) ·
+[Realtime shutdown](rust/rw02-realtime-transport.md#stopping-an-established-session).
+
+At `ff55f52` the realtime client accepted the namespace acknowledgement
+over polling or over the upgraded WebSocket. If the WebSocket probe
+stalled, the client kept receiving polling events and answering heartbeats
+on the original session. All 20 Fedora x64 transport cases passed. The
+signed client and Rust also received the subscribed event from the same
+synthetic server in both namespace configurations.
+[Wire traces and native controls](rust/rw02-realtime-transport.md#namespace-acknowledgement-during-a-transport-upgrade).
+
+The `5efe1f1` desktop matrix passed on Ubuntu x64 and ARM64 and failed
+on both Windows hosts. Both Ubuntu GUIs and both retained Windows ARM64
+Mailbox profiles met all eleven same-host limits. The two x64 profiles
+each met nine. Both exceeded the close and reopen limits during inventory.
+The ordinary and reopened filename editors passed on both Windows hosts. NVDA spoke the expected cues
+and the native Japanese IME committed U+3042 on both Windows hosts.
+Actual Windows tray activation, a visible notification, a reversible
+contrast change and ordinary-user cross-session exclusion remain open.
+The hosted consoles supply one 96-DPI display each. Mixed DPI and RDP
+require a suitable disposable Windows test desktop, currently unavailable.
+The next native acceptance run needs that environment and a visible Shell
+on the test account. The Ubuntu portal package decision remains limited
+to the completed feasibility trial.
+[Windows timings](rust/rw02-windows-window.md#native-results-at-5efe1f1) ·
+[Ubuntu desktops](rust/rw02-native-gui.md#ubuntu-native-results-at-5efe1f1) ·
+[Completed matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758).
+
+All 20 regular PR checks at `f155b65` passed, including native feasibility
+on Windows and Ubuntu x64 and ARM64. Independent replay of the four
+worker-backup archives matched all 16 C# restarts to the databases returned
+by Rust. [Four-target feasibility run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45525937394) ·
+[Worker restart evidence](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
+In the `f155b65` x64 Windows trials two staged filenames initially returned access denied
+after disposition and then returned file-not-found on the eighth and seventh
+reads. Both retained Explorer trials proceeded through cleanup. On both Windows
+hosts the native icon bitmap was correct and both WinRT notices reached
+history. The independent popup observers found no visible matching alert.
+Actual Shell tray activation and standard-user cross-session exclusion remain open.
+[Ubuntu](rust/rw02-native-gui.md#ubuntu-native-results-at-f155b65) ·
+[Windows launcher](rust/rw02-instance.md#native-staged-image-readback-at-f155b65) ·
+[Icon pixels and popup](rust/rw02-windows-services.md#native-icon-pixels-and-winrt-popup-at-f155b65).
+
+At `f155b65` neither Windows contrast trial verified restoration after
+changing an unnamed original scheme. With the guard at `5efe1f1`, both
+recorded the original pixels and the same eight colors before and after
+capture. Both returned unavailable with `settingChangeAttempted=false`
+and verified cleanup. [Contrast results](rust/rw02-appearance.md#native-read-only-contrast-baseline-at-5efe1f1).
+
+Both x64 source-display captures and all four ordinary and reopened
+filename trials recovered after fixing the shared PNG digest helper.
+Each filename trial distinguished eight glyphs and verified three edits
+through both native text interfaces. The ARM64 display observers still
+could not obtain foreground focus for their separate source-display
+pictures. [Native text](rust/rw02-windows-text.md#ordinary-and-reopened-filenames-at-5efe1f1) ·
+[Displays](rust/rw02-windows-display.md#source-monitor-capture-at-5efe1f1).
+
+On Fedora x64 the shipping C# loader accepted ordinary synthetic profiles
+that exceeded the Rust YAML probe's initial limits. The 100-folder profile
+failed when edited, and both 300-folder forms failed on admission. At
+`0468771` all six original profiles passed the full cross-language round
+trip. The native regression includes a 330,124-byte UTF-32LE C# save and
+verifies the edit through folder 301. All four hosts at `5efe1f1` passed
+57 cases each, with 171 byte comparisons, 277 semantic checks and 152 C#
+readback assertions per host. The edited 301-folder file had the same
+byte digest on each host. The delivered Linux x64 3.0.4 Flatpak assemblies
+also read, validated, saved and reopened both Rust outputs. Saving the
+unchanged 300-folder case reproduced the original C# file byte for byte.
+[Folder lists and native evidence](rust/rw02-yaml.md#four-native-saved-folder-exchanges-at-5efe1f1) · [Signed package assemblies](rust/rw02-yaml.md#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
+
+All 20 regular PR checks passed at `5efe1f1`, including the four native
+feasibility jobs. The combined desktop assessment covers both Windows
+observer fixes and the larger YAML cases. The intermediate desktop runs
+at `e23fd9f` and `210291d` were cancelled before their Windows contrast
+trials. [Four-target feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715810) ·
+[Combined desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758).
+
+## Windows retained launch and test profile cleanup (2026-11-25)
+
+At `989bb33` ordinary second launches reopened the original retained HWND
+and kept the same worker on both architectures. It gained keyboard focus
+on x64. On ARM64 it remained in the background for all 41 observations.
+Two separate x64 Shell preflights stopped at a single access-denied
+readback after Windows had accepted deletion of the staged image.
+The observer now gives that read up to five seconds and still requires
+file-not-found. On ARM64 both profiles completed cleanup and Explorer
+refused the icon. The local launcher suite passed 100 checks and skipped
+two native Windows controls. [Retained launcher results and control](rust/rw02-instance.md#retained-windows-second-launches-at-989bb33).
+
+The normal WinRT popup observer uses the fixture's existing guarded
+directory creation with a per-run name at `068cab4`. Its 73 portable
+service checks passed. The subsequent native popup results are recorded
+in the [Windows Shell trials](rust/rw02-windows-services.md#native-notification-observations-at-5efe1f1).
+[Ordinary WinRT popup](../tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup).
+The user confirmed that a Windows evaluation medium and an approved
+test VM are currently unavailable for the mixed-DPI and RDP trials.
+[Required desktop observations](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## Windows tray raster and icon producer (2026-11-25)
+
+At `989bb33` Explorer on x64 accepted the native notification icon.
+All 256 measured points in its reported rectangle belonged to the original
+Explorer surface. None showed the fixture's marker. On ARM64 the Shell
+declined registration and two retries. Both ordinary GUI launchers
+reopened and retained their workers. The producer test at `bfe10f5`
+draws both archived marker colors through native HICONs into private
+bitmaps for comparison with these screen results. Seventy-two service
+tests and frozen cross-Clippy on both Windows targets passed locally.
+Its native result is pending. [Both Shell and launcher observations](rust/rw02-windows-services.md#sampling-the-explorer-tray-rectangle-at-989bb33).
+
+All 20 PR checks reported at `38557b5` passed, including native feasibility
+on all four targets and both CodeQL workflows. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521494827) · [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521503142) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45521498776).
+
+Both `989bb33` Ubuntu desktop jobs passed all eleven limits. All 321 x64
+and 178 ARM64 requests made during observed file reads completed during
+the inventory. Both hosts retained the original window and worker on both
+second launches. [Native Ubuntu performance and desktop records](rust/rw02-native-gui.md#ubuntu-native-repeat-at-989bb33).
+
+## Windows editor capture and visible WinRT notification (2026-11-25)
+
+The corrected editor capture at `09b3087` reproduced the hash of the
+original x64 image from the interrupted deadline-based redraw. The new
+WinRT observer at `e174bac` checks the actual ordinary notification against
+its sender's native `Show` interval, two visible Shell labels and their
+popup ancestry. Independent review covered attribution, timing and cleanup.
+Both earlier Windows notification archives passed replay. Locally, 70
+service tests and the PowerShell point, popup and timing checks passed.
+The retained-window suite passed 29 tests with one Windows-only skip.
+Frozen Clippy checks for both MSVC targets passed. The full-view GDI
+and frame observers passed 10 and 15 tests respectively,
+plus four compiled bitmap-layout checks. The native tests for these fixes
+and the contrast publisher at `a2bd24a` follow the `989bb33` matrix.
+[Editor and original failure](rust/rw02-windows-window.md#native-results-at-4e3dbc4) ·
+[WinRT delivery and popup observer](rust/rw02-windows-services.md#winrt-history-and-classic-shell-delivery-at-4e3dbc4) ·
+[Contrast publisher](rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4).
+
+## Windows native results at 4e3dbc4 (2026-11-25)
+
+The full desktop matrix finished with two successful Ubuntu jobs and two
+failed Windows jobs. Both Windows hosts passed the WinRT history test,
+including selective removal, NVDA, Japanese composition and all eleven
+WPF limits for both retained Mailbox profiles. During an ordinary second
+launch, the WPF and retained Rust windows obtained foreground on x64 and
+stayed in the background on ARM64. The foreground keyboard trial gave
+Rust focus on both. Actual Shell activation, visible notifications,
+Windows contrast, a standard-user cross-session writer and the display
+checks still lack their required evidence. Both displays supplied one
+96-DPI console monitor. [Full run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050) ·
+[WinRT and Shell](rust/rw02-windows-services.md#winrt-history-and-classic-shell-delivery-at-4e3dbc4) ·
+[WPF and Rust launches](rust/rw02-instance.md#wpf-and-retained-rust-second-launches-at-4e3dbc4) ·
+[NVDA, IME and display](rust/rw02-windows-desktop.md#reader-japanese-input-and-display-at-4e3dbc4).
+
+In the x64 deadline-based redraw trial, 264 resumed frame submissions
+matched independent DXGI events during the first inventory. Its first
+editor capture stopped when the isolated PowerShell host could not resolve
+`Get-FileHash`. Evidence for a reopened editor remains outstanding. The
+four desktop jobs for `989bb33` have started. The prior 24 PR checks at
+that revision passed. [x64 measurements](rust/rw02-windows-window.md#native-results-at-4e3dbc4) ·
+[989bb33 desktop matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900105) ·
+[989bb33 native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45512900291).
+
+## Windows contrast observer on the private test desktop (2026-11-25)
+
+At `4e3dbc4` Windows ARM64 denied the supervisor's query for the GUI
+thread's desktop before the first palette read. The capture worker had
+verified the original HWND. The publisher restored Default and closed its
+handle. It now checks for the same HWND on its own held desktop handle.
+Independent review and 40 portable tests covered window identity, partial
+enumeration, capture and cleanup, including the PowerShell label checks.
+Windows contrast presentation is still open.
+[Native error, ownership check and restoration](rust/rw02-appearance.md#contrast-publisher-on-the-private-desktop-at-4e3dbc4).
+
+## Full egui rendering through GDI on Windows x64 (2026-11-25)
+
+At `c00a863` the isolated x64 comparison rebuilds the complete retained
+view with offscreen WARP rendering and GDI bitmap output. Two offline
+reconstructions matched. Ten Python tests and four compiled Rust layout
+checks passed. Independent review verified the corrected client clipping
+checks around each transfer and release of the window DC before recording
+success. The full-view comparison needs native editor pixels, idle and
+100,000-file measurements against the original WPF limits. RW-02 remains
+open. [Implemented comparison and checks](rust/rw02-windows-window.md#presenting-the-full-retained-view-with-gdi).
+
+## Ordinary second launch on Ubuntu x64 and ARM64 (2026-11-25)
+
+Both Ubuntu desktop assessments at `4e3dbc4` completed successfully.
+Ordinary and background second launches reached the original GUI and
+inventory worker. All 407 x64 and 178 ARM64 window operations issued
+during observed file reads completed within the measured work. Both
+hosts passed all eleven resource limits. [Original archives and native readback](rust/rw02-native-gui.md#ordinary-second-launch-during-the-ubuntu-inventories-at-4e3dbc4).
+
+All 28 PR checks reported for `e534887` passed, including the four native
+feasibility jobs, the four compatibility reference jobs and original
+installers on all four targets. [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088803) ·
+[Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088805) ·
+[Original installers](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45510088763).
+
+## Installed signed worker restart and corrected Windows launcher (2026-11-25)
+
+On Fedora x64 the Rust helper backed up a committed upload from the live
+3.0.4 WAL. A new signed process consumed that database, preserved the first
+mapping and uploaded a second file. The private peer recorded one empty
+permission probe and one successful image POST from each process. Eleven
+fixture tests passed. [Installed restart and native evidence](rust/rw01-storage-contract.md#installed-fedora-worker-resumes-from-a-live-rust-backup).
+
+Both canonical Windows launchers at `4e3dbc4` started and drained their
+workers and cleaned up the staged directories. The x64 primary obtained
+foreground on reopen. The ARM64 primary was visible in the background.
+The x64 Shell registered the tray icon, but its marker was absent at the
+sampled point. The observer did not activate it. The resource, retained
+window and late notification measurements have separate outcomes.
+[Original launcher and tray results](rust/rw02-windows-services.md#corrected-canonical-windows-launcher-at-4e3dbc4).
+
+The x64 timing observer at `86ee4bd` records synchronous messages during
+the retained window's direct show. Independent replay reproduced both
+earlier raw traces (450 and 1,157 presents). The tray observer at
+`236c852` additionally samples the Shell's reported rectangle after a
+center miss. Four raster tests and seven restoration tests passed. Native
+measurements with both new observers are pending.
+
+All 24 checks reported on draft PR 46 passed at `e911883`, including the
+four reference and four original installer jobs. [Compatibility reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506878586) ·
+[Shipping installer matrix](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506878266) ·
+[Regular CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45506888371).
+
+## Cross-language SQLite writes on four native targets (2026-11-25)
+
+At `4e3dbc4`, Windows and Ubuntu on x64 and ARM64 all passed the new
+SQLite insertion trial. Each C# donor gained exactly one Rust-created row.
+Two C# upserts preserved its ROWID and every previous row. The independent
+readback compared all 32 original database files. The hosted C# programs
+used the shipping store sources and .NET 10.0.15. The separate local
+comparison used .NET 10.0.12. Product migration remains open.
+[Four sets of original databases](rust/rw02-legacy.md#native-sqlite-insert-and-two-c-upserts-at-4e3dbc4).
+
+## Configured shipping upload and Windows desktop results (2026-11-24)
+
+On isolated Fedora x64 the signed 3.0.4 worker uploaded a synthetic PNG.
+The test peer held its response while the Rust Flatpak attempted to start
+with its previously verified inventory inputs. Rust exited at the occupied
+socket. The original process kept its established TCP connection, committed
+one synchronized SQLite row and quit normally. Reopening the saved database
+confirmed the filename, size and asset ID. Seven fixture tests passed at
+`f5e84bc`. [Configured upload](rust/rw02-instance.md#rust-startup-during-a-signed-worker-upload).
+
+At `13e4af8` both Ubuntu desktop jobs passed. Both Windows jobs failed.
+ARM64 passed eleven of eleven WPF limits with either Mailbox profile.
+Windows x64 passed eight, exceeding idle close and both scan response limits.
+Both architectures passed NVDA and Japanese IME. The contrast observer on
+each host stopped before the first palette change. The revised native
+desktop assessment at `4e3dbc4` started on all four hosts.
+[Windows measurements](rust/rw02-windows-window.md#native-results-at-13e4af8) ·
+[Windows keyboard and reader](rust/rw02-windows-desktop.md#arm64-reader-and-input-method-at-13e4af8) ·
+[Four-target desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050).
+
+## Windows notification result when the setting is unavailable (2026-11-24)
+
+The six senders at `21e794f` received a notifier from Windows, then
+stopped because the optional setting query returned `0x80070490`. After
+the bounded lookup, the revised trial sends through its own verified
+notifier once in this case. An explicit disabled setting still ends the
+trial. The observer records the actual Show HRESULT and requires separate
+history reads and selective removal before claiming delivery. The 65
+service checks and the three Rust readiness tests passed locally, and
+both Windows targets passed cross-Clippy. Native results are pending.
+[WinRT procedure and evidence requirements](../tools/rust-qa/windows-services/toast-history.md).
+
+## Candidate checks at 4e3dbc4 and bcbf326 (2026-11-24)
+
+All 20 PR checks at `4e3dbc42cb22f4aa9cdae932fc897791e594fbca` passed,
+including the four native feasibility jobs and both Rust CodeQL jobs.
+All 28 checks reported on draft PR 46 passed at
+`bcbf3262517af1bb9f73832c1d2426b8b67e0cca`, including four native Rust
+feasibility jobs, four C# reference jobs, four reference installer jobs
+and both Rust CodeQL jobs. The queued desktop assessments at `1b4d050`
+and `bcbf326` were both superseded before any job ran. The consolidated
+`4e3dbc4` assessment includes the Win32 staging correction, the new
+four-target SQLite check and the WinRT notification trial.
+[PR checks](https://github.com/VoltKraft/immich-folder-watch/pull/46/checks) ·
+[Native feasibility at 4e3dbc4](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496491986) ·
+[Desktop assessment at 4e3dbc4](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45496492050) ·
+[Native feasibility at bcbf326](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45493088022).
+
+## Signed Flatpak second launch during a live Rust inventory (2026-11-24)
+
+The installed Fedora x64 GUI kept its original inventory worker across
+a signed 3.0.4 launch. The worker discovered one new file on each side
+of the launch, with independent kernel notifications for the same album
+directory. The signed process exited, a Rust second launch reopened the
+original window, and both installed refs were removed after Quit.
+The ordinary shipping profile had no watch entries. The Rust worker
+received two temporary read-only inputs for this trial. Five fixture
+tests passed and the original signature and source archives were verified.
+[Native trial](rust/rw02-instance.md#installed-shipping-launch-during-a-rust-inventory).
+
+## Windows launcher and contrast observers (2026-11-24)
+
+On both architectures at `13e4af8`, the six canonical launcher and tray
+primaries exited with Windows error 32 after election and before worker
+startup. The test driver held DELETE access to the directory that the
+Rust worker needed to open. It now requests deletion after process drain
+and verifies the directory identity before removing it. The affected
+observer sources at `1b4d050` still contain the original collision.
+[Native logs and correction](rust/rw02-windows-services.md#canonical-gui-startup-on-the-staged-windows-desktop-at-13e4af8).
+
+An independent change at `12833b5` allows the contrast observer to read
+a visible, unobstructed label on its private desktop without activating
+the window. All 24 appearance tests passed locally. Native Windows runs
+are required for both corrections.
+[Contrast observation](rust/rw02-appearance.md#passive-capture-of-the-filename-label).
+
+## Native checks for the 1b4d050 candidate (2026-11-24)
+
+All four native feasibility jobs passed at
+`1b4d0509c6e3482b9fc203151a06f6536b83c9c1` on Windows and Ubuntu,
+x64 and ARM64. The four C# reference jobs completed successfully.
+This revision includes the installed Linux single-instance fix,
+cross-language SQLite insertions and Windows controls for WPF activation
+and DX12 timing. The separate desktop matrix covers these new observations.
+The regular Windows CI job timed out after 30 seconds in the WPF watermark
+test for a collapsed password input. Its WPF assembly reported 35 passes
+and one timeout. The native Windows Core suite reported 562 passes and
+nine skips. The targeted retry at the same revision passed all 36 WPF
+assembly tests in eight seconds and repeated the 562 Core passes.
+[First Windows CI job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138787595722) ·
+[Successful retry](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490606578/job/138794638967).
+
+The four jobs for the shipping 3.0.4 installer passed again. Independent
+readback matched the published archive digests and 54 indexed files in
+total. On every host, the installed and repaired payload inventories matched.
+The retained YAML and SQLite database were byte-identical to their seeded
+copies. Reopening each database reproduced every row and the complete schema.
+[Installer jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591405) ·
+[Installed reference procedure](rust/rw01-installed-packages.md#installed-reference-on-all-four-hosts).
+
+[Draft PR](https://github.com/VoltKraft/immich-folder-watch/pull/46) ·
+[Native feasibility at 1b4d050](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591654) ·
+[Desktop assessment at 1b4d050](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45490591328) ·
+[Desktop assessment at 13e4af8](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
+## Windows x64 frame-readiness comparison (2026-11-24)
+
+The separate diagnostic GUI can return control to the event loop while the
+DX12 software adapter is waiting for a frame. The native test compares its
+single scan with the original WPF limits and ordinary three-trial medians.
+Its readback checks that a deferred frame was presented while the reopened
+window was visible and that an edit changed actual pixels. The native Windows
+result is pending. The qualifying GUI still uses its existing frame policy.
+[Measured delay and comparison](rust/rw02-windows-window.md#native-results-at-21e794f).
+
+## Windows cross-session writer check at 13e4af8 (2026-11-24)
+
+Five elevated writers on each Windows host produced all eight expected
+lock events across sessions 2 and 0. Both sessions listed the Basic User
+level. All four separate launch utilities returned zero, with empty launch
+screens. Neither host produced a standard user's identity or writer receipt.
+The scheduler removed its task registrations and restored Secondary Logon.
+Standard-user exclusion remains open on x64 and ARM64.
+[Original archives and readback](rust/rw02-cross-session.md#native-basic-user-console-results-at-13e4af8).
+
+## Signed 3.0.4 launch while the installed Rust GUI is running (2026-11-24)
+
+On Fedora x64 the original version previously opened a second window
+when launched after the Rust GUI. The revised Rust primary reserved the
+legacy socket. A later shipping process saw that same socket and exited
+zero while Rust stayed hidden. A Rust second launch reopened the original
+window. After Rust quit the socket was absent and the shipping GUI started
+normally again. Both refs were removed and the unconfigured profile retained
+its original marker. This covers the two observed start orders in one
+Flatpak runtime. Installed migration after sync and overlapping package
+changes remain open.
+All 27 native GUI and tray tests passed. A separate private D-Bus loss test
+confirmed that the Rust primary held its socket until supervisor shutdown.
+On the same binary, ordinary Rust second launches kept their original
+owners on X11 and Wayland. The independent X11 inventory worker found
+the subsequently added file in 4.6592 s and exited on Quit.
+[Original and corrected installed trials](rust/rw02-instance.md#shipping-launch-while-the-rust-flatpak-owns-the-endpoint).
+
+## Four native desktop assessments at 21e794f (2026-11-24)
+
+Both Ubuntu desktop jobs passed. The retained Windows ARM64 GUI met all
+eleven WPF limits, and the default Windows x64 GUI met nine. On x64 idle
+close took 33.56 ms against 14.30 ms and scan reopen took 39.38 ms against
+22.26 ms. The recorded frame-latency wait dominated 24 of 25 slow diagnostic
+closes. Synchronous window display dominated 71 of 88 slow diagnostic
+reopens. Both Windows hosts passed the foreground keyboard relaunch. NVDA
+delivered all seven expected cues on x64. ARM64 stopped at the first field.
+The Windows desktop jobs remain failed, including contrast and notification
+presentation. Mixed DPI and RDP still need a suitable test desktop.
+The revised contrast publisher restores its original thread desktop before
+closing the test handle. All 23 portable appearance tests passed. The
+native repeat is pending.
+[Original jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661)
+· [Frame and window measurements](rust/rw02-windows-window.md#native-results-at-21e794f)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+## Native C# upserts after a Rust insert (2026-11-24)
+
+On Fedora x64 the shipping C# store read and updated the Rust-created
+Unicode filename twice in both case modes. Independent reads of all eight
+databases verified the original rows, schema and ROWIDs and the new file
+sizes of 83, 101 and 101. The four hosted desktop jobs now include the
+same check. Its first Windows and Ubuntu results are pending.
+[Native study](rust/rw02-legacy.md#native-shipping-upserts-after-a-concordant-rust-insert).
+
+## Windows ARM64 native desktop at 21e794f (2026-11-24)
+
+The retained GUI met all eleven WPF resource limits. A second process
+started by a real foreground keyboard handler brought the original window
+back with keyboard focus. Japanese input composed and committed its filename.
+NVDA timed out looking for the German filename label. The contrast observer
+stopped at its first ownership check, before changing any setting. The
+revised guard reports each failing operation and passed 22 portable tests.
+The input observer now records how many editors Windows exposed when it
+looked for the German filename. PowerShell fixture checks exercised empty,
+partial and interrupted reads. The native repeat is pending.
+[Timing](rust/rw02-windows-window.md#native-results-at-21e794f) · [Native input](rust/rw02-windows-desktop.md#arm64-keyboard-reader-and-input-method-at-21e794f) · [Contrast](rust/rw02-appearance.md#windows-arm64-before-the-first-capture-at-21e794f).
+
+## Rust startup beside the installed 3.0.4 Flatpak (2026-11-24)
+
+An ordinary Rust launch and a launch requesting its inventory worker each
+stopped before taking the bus name or writing application data while the
+original GUI held its socket. After a normal 3.0.4 Quit, the same Rust
+executable started, rendered and quit on the private Fedora x64 desktop.
+A later or simultaneous legacy start and other sessions remain open.
+[Native trial with the installed applications](rust/rw02-instance.md#rust-startup-while-the-shipping-flatpak-is-running).
+
+## Windows notification registration on a fresh user profile (2026-11-24)
+
+At `21e794f` Windows ARM64 created both WinRT notifiers, then returned
+`0x80070490` for every notification-setting query. The original profile
+lacked the standard per-user registration namespace. No sender reached
+`Show`. The revised comparison can create the namespace on a disposable
+hosted runner. All 63 portable service checks passed. The next native trial
+must establish delivery and separate history readback.
+[Original results and procedure](rust/rw02-windows-services.md#fresh-windows-user-profile-at-21e794f).
+
+## Preventing duplicate entries on rollback (2026-11-24)
+
+On six copies produced by three Linux x64 C# writers, Rust inserted 24
+new rows whose normalized keys agreed across all qualified rollback
+profiles. The shipping store updated these rows 144 times without adding
+a duplicate. Each of 26 refused batches left its database byte-for-byte
+intact. Independent SQL readback matched the 71 original rows and all 36
+post-write backups. These results cover the selected profiles on native
+Fedora x64. Installed migration after Rust sync activity remains open.
+[Inputs, implementation and native results](rust/rw02-legacy.md#inserting-a-new-row-across-three-qualified-rollback-profiles).
+
+## Installed Flatpak socket and process identity (2026-11-24)
+
+The signed 3.0.4 application and the isolated Rust probe saw the same Unix
+socket when installed under the shipping app ID on two branches. A separate
+test ID had its own runtime directory. Each application ran in its own PID
+namespace, so the probe could not establish the positive peer PID required
+by the existing interop check. Both processes exited and both refs were
+removed on each desktop. Installed old/new activation remains open.
+[Paired native observations](rust/rw02-instance.md#shipping-flatpak-and-rust-probe-in-two-installed-refs).
+
+## Ordinary second launch of the shipping Linux Flatpak (2026-11-24)
+
+On a private x64 X11 desktop the original 3.0.4 Flatpak reopened its
+existing window after a normal second launch. Both app processes exited
+zero. The original deployment matched the public release signature and
+the independent installed-file inventory. The trial used no watch entries.
+[Installed application and evidence](rust/rw01-installed-packages.md#two-ordinary-launches-of-the-installed-linux-x64-reference).
+
+## Windows foreground comparison (2026-11-24)
+
+After a normal second launch at `21e794f`, both retained windows reopened
+with the original worker. On x64 the window received keyboard focus.
+On ARM64 Windows refused foreground access after the secondary granted
+it. The separate reference will observe what happens when a second
+original WPF executable launches on the same host. The 31 portable
+performance checks passed, with two Windows-only checks pending.
+[Native results and control](rust/rw02-instance.md#retained-windows-on-the-original-desktop-at-21e794f).
+
+## First shipping database write after rollback (2026-11-24)
+
+The original C# store wrote to 16 fresh copies of Rust-generated Linux x64
+databases. When its Unicode casing table differed, four case-insensitive
+copies gained two rows each. The old and new rows had the same visible
+spelling and asset ID, but the readers returned different file sizes for
+that spelling. A repeated write added no further rows. Independent replay
+confirmed all 204 original rows retained their ROWIDs. The product migration
+must prevent this ambiguity before either implementation resumes writing.
+[Inputs, original receipts and reproduction](rust/rw02-legacy.md#first-c-upsert-after-rollback).
+
+## Native Ubuntu desktop results at 21e794f (2026-11-24)
+
+Ubuntu x64 and ARM64 both passed all eleven same-host X11 limits.
+Orca spoke the expected labels under X11 and Wayland and both stock
+Noble portals drove visible high-contrast changes in the Rust window.
+The original archives matched their published digests. The next desktop
+run covers the Linux ordinary second launch with its inventory worker.
+[Native results and archives](rust/rw02-native-gui.md#ubuntu-native-results-at-21e794f)
+· [Desktop run for 13e4af8](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45476186847).
+
+## Windows mixed-DPI and RDP test desktop (2026-11-24)
+
+The user currently has neither Windows evaluation media nor an available
+test VM for this observation. The hosted runners exposed one 96-DPI output
+in a console session. Moving the same window between two DPI settings and
+observing its rendering in an actual RDP session remain open in RW-02.
+[Measured topology and required observations](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## Two launches of an installed Linux test Flatpak (2026-11-24)
+
+On native x64 a normal launch and a background launch from the temporary
+Flatpak both reopened the original X11 window through its filtered bus.
+The observer identified the GUI separately from the bus proxy, verified
+both exited on Quit and removed the private installation. A separate
+installed portal run completed grant revocation and notification withdrawal
+after its test observer began publishing complete JSON receipts atomically.
+[Flatpak launch evidence](rust/rw02-instance.md#second-launch-through-the-installed-flatpak) ·
+[Portal rerun](rust/rw02-portal-dialog.md#notifications-and-autostart).
+
+## Shipping C# lookup of new Rust-written rows (2026-11-24)
+
+The development writer inserted 24 new entries on eight synthetic
+database copies. Both Linux x64 C# runtimes found the stable key. When
+the casing tables disagreed, an insensitive lookup missed the new relative
+name. A difference in the source path also made its listing miss the entry.
+Independent readback matched 96 lookups, 64 lists, 32 history values and
+all 78 existing rows. The offline run used an isolated network and immutable
+donors. Production handling of these new keys remains open.
+[Two casing profiles and original evidence](rust/rw02-legacy.md#c-readback-of-newly-inserted-rust-rows).
+
+## Ordinary Windows GUI restart at 21e794f (2026-11-24)
+
+The x64 primary reopened in the foreground with its original inventory
+worker. Both jobs exited cleanly. Removal of the staged executable then
+failed with Windows sharing violation 32, so the private restart trial
+was skipped. ARM64 completed both restart trials and kept its worker.
+Its reopened window on the original desktop did not gain foreground focus.
+The revised fixture retains the original file identity while waiting for
+that sharing violation to clear. The dedicated Windows control is pending.
+[Native receipts and cleanup procedure](rust/rw02-instance.md#staged-executable-cleanup-at-21e794f).
+
+## Ordinary Windows writer launch (2026-11-24)
+
+At `21e794f` the elevated controls again completed the writer handover
+between sessions 2 and 0. Neither native Windows host established the
+standard-user case. The revised observer runs the fixed Basic User
+command once per role in its own console and retains its output and exit.
+Independent review added verification that the console helper exits before
+cleanup. All 29 portable writer controls and 13 PowerShell controls passed.
+[Guard and console evidence](rust/rw02-cross-session.md#basic-user-launch-on-a-private-console) ·
+[Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14957562590) ·
+[Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433661/artifacts/14956013931).
+
+## Early Windows Shell observations at 21e794f (2026-11-24)
+
+All four native feasibility jobs passed. The separate desktop trial found
+the private Explorer taskbar before its receiver could start on either
+Windows host. On x64 the rectangle still had zero area. Both original
+input desktops were restored. The observer now waits for a visible
+taskbar with real bounds and retains each ownership failure condition.
+All 62 portable service tests passed. Native pointer activation remains open.
+[Windows archives and checks](rust/rw02-windows-services.md#private-explorer-startup-at-21e794f) ·
+[Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45469433140).
+
+## Linux second launch and inventory ownership (2026-11-24)
+
+On Fedora x64 the GUI at `21e794f` lost its bus name to a second ordinary
+launch under X11 and Wayland. The X11 run observed two simultaneous
+inventory workers. The corrected build passed both native window lifecycles.
+On X11, normal and background launches reopened the original window, and
+the original worker discovered a new file before draining on Quit. The
+Ubuntu x64 and ARM64 workflow now exercises the same worker check.
+[Control and corrected results](rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui).
+
+## Windows recovery and notification comparison (2026-11-24)
+
+The GUI and the independent capture worker now respect the lifetime of the
+system-owned contrast scheme. Independent review checked the memory ownership,
+desktop restoration and capture cleanup. Twenty contrast and thirteen desktop
+tests passed, and the ordinary and retained sources passed frozen Clippy checks
+for both Windows architectures. Checkpoint `fb01b52` contains the fix.
+The resource observer now records the actual native exit code if the GUI stops
+before a timed trial drains. At `e796d30` one x64 scan finished and exceeded
+both WPF-derived limits. The stage-level timing comparison needs three trials.
+
+The notification comparison now tests a per-user display name after both original
+shortcut-only senders fail during the WinRT settings lookup. It uses an existing
+registry namespace and removes its own temporary app identity. Sixty local service
+checks passed. The keyboard-launch trial still requires both a live primary and a
+successful foreground handover.
+[Native contrast failures and fix](rust/rw02-appearance.md#windows-contrast-theme-observation) ·
+[Incomplete timing runs](rust/rw02-windows-window.md#native-process-exits-at-a1011bf-and-e796d30) ·
+[Native notifier lookup](rust/rw02-windows-services.md#native-notification-setting-at-e796d30) ·
+[Keyboard launch](rust/rw02-instance.md#named-input-desktop-at-e796d30).
+
+## System contrast on native Linux x64 (2026-11-24)
+
+On a stock Ubuntu 24.04.5 userspace, the old Linux GUI missed the
+high-contrast setting exposed by the GTK portal. A build with only the
+Rust appearance adapter changed rendered both high-contrast palettes,
+reopened its original window and followed contrast-only changes after a
+portal restart. Fedora 45 passed the same checks with its standard key.
+All 21 native GUI tests passed. Hosted ARM64 and the corrected Windows
+color capture remain open.
+[Native results and exact inputs](rust/rw02-appearance.md#high-contrast-on-older-ubuntu-settings-portals).
+
+## Native desktop and feasibility checks at e796d30 (2026-11-24)
+
+All four native feasibility jobs, the compatibility reference, CI and
+CodeQL passed. Both Ubuntu desktop jobs also passed. Each met all eleven
+X11 resource limits, reopened the original window twice from Plasma and
+completed 110 Documents operations. On Windows both desktop jobs failed.
+The x64 process terminated with heap corruption during a graphics check.
+On both architectures the history senders created the WinRT notifier but
+its `Setting` lookup returned `0x80070490` before delivery. The dedicated
+keyboard trial lost its primary process before the second launch.
+RW-02 remains open. Verify Windows again after correcting the lifetime of
+the system-provided contrast scheme pointer.
+[Ubuntu timings](rust/rw02-native-gui.md#ubuntu-native-results-at-e796d30) ·
+[Documents evidence](rust/rw02-portal-noble.md#native-ubuntu-grant-replay-at-e796d30) ·
+[Four native feasibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221926) ·
+[Desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45271221266).
+
+## Four desktop jobs at 6084b23 (2026-11-23)
+
+Native Ubuntu x64/ARM64 and the retained Windows ARM64 Mailbox GUI met
+all eleven same-host limits. Both Windows x64 Mailbox depths met eight.
+With one frame, scan close/reopen took 22.70/42.59 ms against limits of
+15.79/18.82 ms. Each Windows display inventory found one 96-DPI console
+monitor. Neither could qualify mixed DPI or RDP. Both WinRT trials
+verified their shortcut, read empty history and removed their resources.
+The quiet and ordinary senders stopped before `Show` on both hosts.
+The follow-up desktop run at `a1011bf` is running.
+[Window measurements](rust/rw02-windows-window.md#native-results-at-6084b23)
+· [Display evidence](rust/rw02-windows-display.md#both-retained-windows-display-inventories-at-6084b23)
+· [Current contrast run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863212).
+
+## Windows notification lookup at 6084b23 (2026-11-23)
+
+Windows x64 verified the installed shortcut and independently read its
+empty history. Both senders reported `ERROR_NOT_FOUND` before a notification
+was sent. Cleanup removed the synthetic shortcut and profile. The updated
+observer records separate native results for creating a notifier and
+reading its setting. Two Rust wait controls, 55 service tests and both
+frozen Windows Clippy checks passed. Native delivery remains open.
+[Native archive and revised trial](rust/rw02-windows-services.md#native-winrt-senders-at-6084b23).
+
+## Windows foreground keyboard launch (2026-11-23)
+
+The new retained-window trial launches the ordinary secondary from a real
+Win32 key message addressed to a fixture-owned foreground window. It
+records the two process identities, window, worker and actual keyboard
+focus, then restores the original input desktop. Independent review found
+that the first control class could not take keyboard focus. The fixture
+now uses a focusable button. Native focus on x64 and ARM64 is pending.
+[Native procedure](rust/rw02-instance.md#second-launch-from-a-foreground-test-window).
+
+## Native Ubuntu desktop and Documents observations at 6084b23 (2026-11-23)
+
+Both desktops passed all eleven X11 resource limits and two Plasma panel
+clicks reopened each original window. ARM64 completed all 110 portal
+operations. On x64 the stock-package observer stopped before sending its
+third Rust read when the grant descriptor's displayed name changed during
+the check. The unmodified source and backport completed 32 and 46 operations
+respectively. All three x64 grants were revoked and the original bytes
+survived. The x64 guest's independent installed-package comparison passed.
+[Desktop times and original archives](rust/rw02-native-gui.md#ubuntu-native-results-at-6084b23)
+· [Descriptor observations](rust/rw02-portal-noble.md#native-descriptor-replay-at-6084b23).
+
+At `f57e680` a native x64 run with Noble userspace on the Fedora kernel
+completed all 110 operations and three revocations. The revised observer
+opened the relative album through the Rust reader's original grant.
+Independent readback verified seven permission replies and original-parent
+lookups covering thirteen detached names. All 26 fixture tests passed,
+including a detached name during initial binding and a replaced album.
+[Handle checks](rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
+
+## Windows x64 visible frame and visibility observer (2026-11-23)
+
+The extra instrumented build passed a Linux-hosted compiler check for
+Windows x64 and two offline source reconstructions. Eight analysis controls
+passed locally. Independent review found that the DX12 backend can
+present a frame after its wait times out. The reader now retains that
+frame's wait result and DXGI timestamps. The ordinary GUI supplies the
+eleven same-host comparisons. No new native timing has been collected.
+[Command and evidence](rust/rw02-windows-window.md#separating-visible-frame-and-window-timing).
+
+## Installed and restored the Ubuntu portal on native x64 (2026-11-23)
+
+The same installed Flatpak and ordinary user exercised all three APT
+states in one offline Noble guest. Only the installed private backport
+supported cooperative read/write exclusion. After APT restored the Ubuntu
+package both running service executables matched their original bytes,
+and the grant again returned errno 38. All three backing files retained
+their individual identities and contents. The trial establishes x64
+feasibility. Ubuntu distribution approval and maintenance remain open.
+[Phase results and native receipts](rust/rw02-portal-noble.md#installed-patch-and-rollback-on-the-same-native-guest).
+
+## Installed Ubuntu original and private build verification (2026-11-23)
+
+On a fresh Noble x64 VM the installed Flatpak received its directory grant.
+The normal Rust reader and an independent call to the actual shared-lock
+operation both returned errno 38. Revocation denied subsequent access.
+The original file retained its identity and contents. Offline verification
+bound the five rebuilt Debian packages to their source, binary and debug
+records, including all 27 loaded sections of the Documents executable.
+The genuine package installation and rollback trial is running in a separate
+guest. [Native evidence and hashes](rust/rw02-portal-noble.md#installing-the-portal-package-on-an-offline-noble-guest).
+
+## Offline Ubuntu package trial and four native backup replays (2026-11-23)
+
+The user selected Ubuntu package feasibility and deferred distribution
+approval. A signed Noble image booted on KVM. Independent checks matched
+all 204 build packages, 23 runtime packages and four Ubuntu source objects.
+The first native build passed 28 of 29 distro suites before a
+GeoClue timeout. With the packaged agent and a synthetic location, all
+29 suites passed and dpkg produced five archives. The build-ID comparison
+then rejected the Debian postprocessing of the linked executable. The first installed Flatpak trial matched both live stock
+services and found an incompatible export descriptor before the file lock.
+With the pinned descriptor reopened, the stock service granted both rights
+and revoked them again. The observer now resolves the application mount to its canonical sandbox
+path, as seen in the existing installed chooser trial. The corrected stock
+check and comparison of the final ELF with the build inputs are in progress.
+[Guest observations](rust/rw02-portal-noble.md#installing-the-portal-package-on-an-offline-noble-guest).
+
+At `a1011bf`, native feasibility on all four targets, CI and CodeQL passed.
+Detached replay verified all four worker archive digests and the sixteen
+shipping-worker restarts from Rust-created SQLite backups. The replay
+result SHA-256 is `6daa4c654403949df520b17e6e34a733709737003e86f9480866f207affd7273`.
+[Native run and archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257863767)
+· [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257882511)
+· [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45257882346).
+
+## Windows text and scan response at 1904be7 (2026-11-23)
+
+Both native Windows targets passed the ordinary and reopened filename
+checks. Four original images matched byte for byte. During a 100,000-file
+scan the default retained x64 GUI took 38.75 ms to close and 39.32 ms
+to reopen against 29.88 and 21.08 ms limits. ARM64 again met all eleven
+limits. The separate x64 trace places much of the delay before Present on
+close and inside the visibility call on reopen. Further timing of frame
+acquisition and thread scheduling is in progress. [Original measurements](rust/rw02-windows-window.md#native-results-at-1904be7) · [Native glyphs and editing](rust/rw02-windows-text.md#captured-ordinary-and-reopened-filenames-at-1904be7).
+
+## Windows system colors in the Rust feasibility window (2026-11-23)
+
+The canonical and retained Windows sources passed frozen compiler checks
+for x64 and ARM64 using the existing dependency graphs. Five portable Rust
+tests exercised the palette and glyph colors. Eighteen observer tests
+covered the bitmap comparison, setting restoration and process ownership.
+Independent review checked the native window callback and the supervisor's
+rollback when the capture process exits. The native comparison of original,
+high-contrast and restored pixels on both Windows hosts is pending.
+[Implementation, evidence and native command](rust/rw02-appearance.md#windows-contrast-theme-observation).
+
+## Native panel, portal and activation at 1904be7 (2026-11-23)
+
+Both Ubuntu desktops passed all eleven X11 limits. Two real panel clicks
+on each host reopened the original window. Both stock Documents services
+and their unmodified source rebuilds refused the upload lock. The private
+backport on each architecture handled a held writer and reacquired the
+original file after release. On Windows the ordinary second launch kept
+the same HWND and worker on both architectures. The x64 window received
+keyboard focus on the first sample. The ARM64 window remained in the
+background for all 41 samples. [Ubuntu desktop archives](rust/rw02-native-gui.md#ubuntu-native-results-at-1904be7) · [Documents comparisons](rust/rw02-portal-noble.md#native-ubuntu-repeats-with-the-earlier-observer-at-1904be7) · [Windows launch receipts](rust/rw02-instance.md#ordinary-second-launch-at-1904be7).
+
+## Four native feasibility runs at 6084b23 (2026-11-23)
+
+Both Ubuntu hosts passed 37 Rust workspace tests and 15 watch scenarios.
+Both Windows hosts passed 34 Rust workspace tests, 14 watch scenarios and
+208 C# recovery assertions. Across the four hosts, all sixteen C# worker
+restarts from Rust-created SQLite backups passed after download, upload,
+deletion or pending timestamp repair. Readback matched the four original
+worker archives, their 1,454 indexed files and the external effects.
+The core and worker readbacks have SHA-256 digests
+`785183acefe5ed50eb5d50dce3d2a1a9e0e006b07dc824c3c07f1e950f6caaf1` and
+`6c740f07d3cc8b7bbb4cc9a0f458510051fde94b64e28448c8187073cb4a4309`.
+CI and CodeQL passed. The desktop run for the revised WinRT launcher,
+retained Windows display observer and Noble portal fixture is pending.
+[Feasibility and original archives](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083169) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242097717) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242097731) · [Desktop](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45242083236).
+
+## Windows launch, editing and notification evidence at 653f255 (2026-11-23)
+
+Both native Windows targets met all eleven same-host WPF limits for the
+retained GUI at both DX12 frame depths. The twelve trials completed two
+100,000-file inventories each. The normal second launch on x64 gave the
+original window keyboard focus. On ARM64 it reopened the same window
+without foreground or keyboard focus. Both ordinary text tests completed
+the three edits and stopped at the older caret-free capture check.
+The follow-up desktop run with the corrected check and the additional
+reopened filename case started on all four native targets at `1904be7`.
+[Measurements](rust/rw02-windows-window.md#native-results-at-653f255) · [Follow-up run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156).
+
+The first WinRT history trial stopped before creating a Windows process
+on either host. The corrected caller supplies its pinned private profile
+token and isolation flag to the existing launcher. The regression test
+reproduced the original refusal and verified the corrected launch path
+through the native API boundary. Native delivery and history cleanup
+remain open. The independent general tooling suite at `dc339e4` passed
+all 181 tests with an isolated GPG keyring. [Native originals and regression](rust/rw02-windows-services.md#native-winrt-startup-at-653f255).
+
+## Matching live portal names to the Rust reader's original handles (2026-11-23)
+
+The private Noble x64 comparison completed all 110 operations and revoked
+all three grants. At the start of six observations both original descriptor
+links carried the kernel's detached label. Each time the private exporter
+confirmed the same test origin and permissions. With both named directories
+open, the Rust reader's original slots showed the exact canonical labels
+and matched the original identities. Independent readback verified all
+24 slot measurements. A subsequent working-tree run also checked the kernel
+mount IDs. Its result SHA-256 is
+`9821340dbd834d76125c323ee7c60980eff81afa6609ebb4f28594a289f8c190`.
+Twenty focused controls passed. The offline run from the clean `dc339e4`
+commit repeated all 110 operations. The independent readback matched
+sixteen Git source files, the built executables, six permission lookups and
+all three revocations. A corrected hosted ARM64 comparison and a
+supported distribution portal with upload-lock support are still required.
+Alpine, Gentoo and NixOS package sources also retained the upstream
+`ENOSYS` handler. [Observer and results](rust/rw02-portal-noble.md#checking-the-reader-while-both-named-directories-are-open) · [Distribution sources](rust/rw02-portal-upstream.md#further-host-package-sources-checked-on-2026-11-23).
+
+The local x64 host also started a diskless QEMU instance with KVM enabled
+and stayed in prelaunch until it quit. The project contains a synthetic
+storage-fault VHD. On November 23 the user reported having no dedicated
+Windows installation ISO for these tests. The hosted native runs continue.
+A suitable Windows desktop for the interactive display and RDP tests
+remains outstanding. [Disposable VM test procedure](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## Noble portal directory names during a held writer (2026-11-23)
+
+Both hosted Ubuntu desktops at `653f255` passed all eleven X11 resource
+limits and reopened the original window on two Plasma panel clicks. The
+private x64 portal comparison passed. ARM64 completed all 46 backport
+operations and lacked the final proof for the two directory handles.
+[Desktop archives](rust/rw02-native-gui.md#ubuntu-native-results-at-653f255) · [ARM64 evidence](rust/rw02-portal-noble.md#incomplete-arm64-retry-at-653f255).
+
+Locally, the observer recorded the original descriptor numbers, type,
+device, inode, flags and kernel link labels. All three private services
+showed both names as detached before the second retry. Independent lookup
+matched the same directories and the test application's current grant.
+All three explicit revocations passed. The three original failures remain
+in the results. Eighteen focused tests, including seven original descriptor
+controls and independent failure/cleanup cases, and actionlint passed.
+Next, compare the still-open Rust descriptors while the corresponding
+named directories are observed. The supported host's upload lock and
+the interactive Windows requirements remain open.
+[Source and native observations](rust/rw02-portal-noble.md#name-and-permission-observations-during-a-refused-retry).
+
+## Retained display selection for an interactive Windows VM (2026-11-23)
+
+The existing mixed-DPI and RDP observer now accepts the paired retained
+Windows executable. Its local VM mode records the native compiler, exact
+PE and all 15 variant sources. It keeps the original hide and object-lifetime
+events even if the display observation fails. Independent review closed two
+findings concerning omitted build inputs and lost failure evidence.
+Replay of the original Windows x64 and ARM64 logs at `1b95ba0` reproduced
+generation 1, Mailbox with a requested maximum of one frame, and Wait.
+Five focused suites ran 84 Python tests with one Windows-only bitmap skip.
+Four nested Rust tests and actionlint passed. Both new commands refused
+execution on the Fedora host. The new display path awaits a native run.
+The active mixed-DPI and RDP desktops remain required for qualification.
+[Commands and evidence](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
+## Sixteen native worker restores through Rust SQLite backups (2026-11-23)
+
+At `1904be7` the original C# worker resumed after download, upload, deletion
+and interrupted timestamp repair on Windows and Ubuntu, x64 and ARM64.
+Two independent readbacks matched all 16 xUnit execution IDs, the returned
+databases, 1,454 indexed files and the external file or peer state. The
+separate C# reference passed 2,266 tests across the four hosts, with 18
+Linux-specific skips on Windows. [Archive identifiers and readback digests](rust/rw01-storage-contract.md#four-worker-restarts-on-each-native-target).
+
+The four-target feasibility run passed. Each Ubuntu architecture passed
+37 Rust workspace tests and 15 watch scenarios. Each Windows architecture
+passed 34 and 14, plus 208 C# recovery assertions. CI and Rust CodeQL
+passed on this source revision. The desktop run for the corrected glyph
+capture and reopened filename is queued behind the first WinRT history
+trial. RW-02 remains open. [Feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321106) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230336154) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230335666) · [Desktop](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45230321156).
+
+## Complete filename check on the reopened Windows executable (2026-11-23)
+
+The new native step runs the ordinary eight-glyph and three-edit
+observer against the same retained executable, HWND and renderer used
+after the first hide and reopen. Detached replay verifies the original
+Git sources, build inputs, native session and input desktop. A failed
+observation retains the original window events and available field
+results. Independent review closed three findings concerning desktop
+identity, source binding and partial failure evidence. The four focused
+local suites ran 68 tests, with one Windows-only bitmap test skipped.
+Both changed workflow files passed actionlint. The general tooling suite
+at `e278fbf` passed all 181 tests. Actual glyphs and full editing on
+the reopened retained HWND still require the new native run.
+[Native entry point and readback](rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd).
+
+## One- and two-frame Windows measurements (2026-11-23)
+
+At `1b95ba0` the retained egui window passed all eleven same-host WPF
+limits at both DX12 frame depths on Windows x64 and ARM64. All twelve
+timed trials completed two 100,000-file inventories. The original PNGs
+showed 209 changed filename pixels on x64 and 177 on ARM64 after
+reopening. Keep the existing one-frame configuration for the retained
+GUI. Both Ubuntu hosts also passed all eleven X11 limits. The two
+Windows desktop jobs finished with failures in independent steps.
+[Timing and raw archives](rust/rw02-windows-window.md#native-results-at-1b95ba0) · [Ubuntu](rust/rw02-native-gui.md#ubuntu-native-results-at-1b95ba0).
+
+Both native Windows text observers completed all three edits and failed
+the caret-free screenshot at the shared focus guard. The fix at `e2ec5e9`
+requires the exact owned password control to hold focus while capturing
+the verified filename rectangle. Its native rerun remains pending. The
+x64 Shell sent a show callback, and the visible title and body remained
+unobserved. ARM64 refused icon registration. The separate WinRT history
+run at `653f255` has started. RW-02 still requires interactive Windows
+activation and display evidence.
+[Text observer](rust/rw02-windows-text.md#focus-when-capturing-the-caret-free-field) · [Notification evidence](rust/rw02-windows-services.md#windows-notification-history) · [Active native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45216595514).
+
+## Windows glyph capture and fixed-revision worker restore (2026-11-23)
+
+The Fedora x64 run at `e728e86` exercised all four shipping worker
+restarts through Rust's SQLite backup API. Detached replay verified 364
+indexed files, 158 exact Git sources, the Rust executable, the C# test
+assembly and all four consumed database hashes. The readback SHA-256 is
+`0aa46b58ac93a6a911de7580ddec3c16cb5d85947fb1db10df25ae5e589c2cff`.
+[Worker restore contract](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+The Windows glyph observer now verifies the intentionally focused control
+and the exact geometry of the filename it captures. Independent review
+identified a possible one-pixel shift and verified that the corrected
+guard detects it. The seven portable text tests and PowerShell checks
+passed locally. The working change still requires a native repeat on
+both Windows desktops.
+[Caret-free capture](rust/rw02-windows-text.md#focus-when-capturing-the-caret-free-field).
+
+## Rust backups after propagated deletion and pending repair (2026-11-23)
+
+On Fedora x64 four shipping workers restarted after download, upload,
+deletion or interrupted repair from the bytes returned by Rust. Independent
+review matched the eight changed sources, the four xUnit executions and
+the before/after SQLite tables. The deletion peer retained the same nine
+bytes. Restart completed the pending repair and preserved account history.
+Two review findings were resolved. A failed case now retains its original
+evidence while the independent cases continue. Executable regression
+tests reject donors from different worker profiles and a journal that
+contradicts its original entry. The four-target rerun from a clean source
+revision and rollback after the installed Rust candidate's own activity
+remain open. [Inputs, controls and replay](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+## Native repair and deletion references (2026-11-23)
+
+At `e558b42` both new C# worker cases passed on all four native targets
+and on Fedora x64. After restoring the pending backup, each worker
+completed its timestamp repair with the original transfer and account
+history. After restoring the latest deletion backup, the peer retained
+the same nine bytes in trash and received zero additional writes.
+Detached replay matched all eight reports from their SQLite backups,
+media and xUnit results and verified the three compiled DLL hashes
+on each target. The full Ubuntu suites passed
+571 cases per host. Both Windows suites passed 562 with nine Linux-only
+skips. The tooling suite ran 181 tests with five platform skips using a
+temporary GPG test keyring. The installed Rust candidate's own activity
+and rollback remain pending.
+[Native originals and four-host readback](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+The same revision passed the four native feasibility jobs, CI and CodeQL.
+Ubuntu passed 37 workspace tests and 15 watch scenarios per architecture.
+Windows passed 34 and 14, and separately passed 208 C# recovery assertions
+per architecture. Detached replay matched all eight Rust backup exchanges
+for uploads and downloads. Its SHA-256 is
+`90c72fdcac81b3bd74bfc85d1a6e2fc214f61138fa707839789783d60729e43f`.
+[Native results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220170042) · [CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220184362) · [CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45220184524).
+
+Both Noble desktops at `1b95ba0` completed the pinned package rebuild,
+reopened the Rust GUI from two Plasma panel clicks and met all eleven
+native X11 resource limits. The stock Documents portal still refused
+the required lock on both hosts. On Windows the ordinary-user launch
+exited with no diagnostic bytes on either architecture. The elevated
+control again completed its eight ownership events. Interactive Windows
+evidence and the two frame-depth measurements remain under review.
+[Ubuntu desktops](rust/rw02-native-gui.md#ubuntu-native-results-at-1b95ba0) · [Windows writer](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541).
+
+## Eight native worker restores and two external side effects (2026-11-23)
+
+All four targets at `653f255` passed the shipping worker upload and
+download through Rust's SQLite backup API. Independent replay matched
+all eight reports, all 1,270 indexed files and the 154 original source
+files in each archive. The detached readback SHA-256 is
+`6099697c7aa98840aeab7bef95ac2ffc48728e998b29c32cf62243e6b4a75709`.
+All four reference suites also passed. Ubuntu ran 569 cases on each
+architecture. Windows passed 560 and skipped nine Linux-only cases per
+host. [Native results](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+Two separate working-tree references ran on Fedora x64. After an
+interrupted timestamp correction, the C# worker reopened a standalone
+backup with the repair still pending. The corrected file time survived
+both database restores and the worker completed the journal. Three
+negative trials detected an incorrect donor, an incorrect file time
+and altered file content. In the deletion trial the shipping HTTP client
+trashed one exact asset. Its synthetic peer retained the original bytes
+and observed zero additional trash requests after restart. The original
+grouped timestamp suite passed nine of ten locally. A separate inotify
+watch on an empty test directory returned `ENOSPC` immediately before
+the repeat, and the existing cancellation test timed out on its file event.
+Both new tests passed in their focused runs. The next check uses the
+same revision and original first-party DLLs on the four native targets.
+[Side effects and replay](rust/rw01-storage-contract.md#external-state-after-deletion-and-timestamp-repair).
+
+## Worker backup replay and Windows notification history (2026-11-23)
+
+At `c4b876c`, the offline Fedora x64 storage trial restored both a download
+and an upload through Rust's SQLite backup API. Each restarted C# worker
+reconciled the same file and album without another transfer. Replay matched
+both original reports byte-for-byte, all 318 indexed files and 154 archived
+sources from Git. The peer retained the eight uploaded bytes and the same
+asset ID. The readback SHA-256 is
+`a9f0a6c8f030a4a9daf3a4662d5593106c26343588b4a46573205eca24b09565`.
+[Activity evidence](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+The new Windows trial observes normal and suppressed notifications through a
+test shortcut's own WinRT history. It verifies each entry's content and
+removal in separate processes. Both MSVC targets passed cross-Clippy and
+the service tests passed 51 portable checks. The independent review
+verified that detached replay requires the original PE import table,
+native build report and input desktop. Native delivery, banner visibility
+and user activation still require Windows observations. RW-02 remains open.
+[Windows trial](rust/rw02-windows-services.md#windows-notification-history).
+
+## Released installer behavior on the four hosted targets (2026-11-23)
+
+At `1b95ba0`, both original Windows MSI files installed and uninstalled
+successfully during cleanup. The test stopped before repair because it
+expected a migration action absent from the compiled MSI tables. Both Noble
+jobs imported the original OSTree commit and failed to reach a system bus at
+deployment. The revised Linux fixture completed the entire offline installation,
+repair and removal in Noble and Fedora x64 userspace on the local Fedora kernel.
+The Windows fixture now checks the actual compiled actions and sole desktop
+shortcut. At `0f29659`, all four jobs then completed actual install, repair
+and uninstall. Both native Linux payloads matched all 785 entries. Windows
+x64 verified 439 files and ARM64 verified 438. Direct replay of the four
+original archives recovered the complete SQL fixture and original YAML
+after uninstall. The four-host readback SHA-256 is
+`ccf92ed76a89e2ce5aeafaeec38b2fa0c0ce48c2e8ea94095b93d03ad17b31d9`.
+[Original run and receipts](rust/rw01-installed-packages.md#first-native-package-run).
+
+The Fedora x64 upload exchange returned a Rust-generated SQLite backup to
+the shipping worker. The peer retained all eight uploaded bytes through the
+second reconciliation. The reference formerly missed some album mutation
+methods. Independent review verified the corrected peer covers all 17 asset
+client signatures and rejects unexpected writes even if the caller catches
+the error. Ten native negative trials failed at the intended check. The
+working-tree receipt has SHA-256
+`85dfb12e8cae044794260191290fd62857a27ebd681709622435f8179ba12af0`.
+The subsequent clean Fedora result is recorded above.
+[Reference and replay](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+## Four native upload references and package migration baseline (2026-11-23)
+
+At `9efe6f4` all four shipping upload references passed. Ubuntu passed
+568 tests on each architecture. Windows passed 559 and skipped nine
+Linux-only tests per host. All four independent feasibility jobs passed,
+including 37 workspace tests and 15 watch cases on each Linux host and
+34 and 14 on each Windows host. Both Windows targets completed 208 C#
+recovery assertions. [Upload reference](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload) · [Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45175252054).
+
+The original 3.0.4 Flatpak completed a clean, private Fedora x64 install,
+repair and uninstall. The 785-entry payload and both retained synthetic
+profile files matched. The two original Windows cabinets supplied the
+expected hashes for 877 files. Independent review verified the original
+cabinet contents and the full Fedora result, including all 16 evidence
+hashes. The four native hosted package jobs are the next check.
+[Installed package reference](rust/rw01-installed-packages.md).
+
+The Fedora rehearsal repeated at `285101b` from clean fixture sources.
+Direct SQL replay again recovered the full synthetic corpus. The eight
+portable Python tests, PowerShell controls and both workflow syntax checks
+passed locally. The repository tooling suite completed 178 tests with
+five platform skips using a temporary GPG keyring and the reviewed
+PowerShell 7.7.0 executable.
+
+At `549066f` and `ba02f8b` the x64 GDI control met all four WPF response
+limits. Full egui exceeded the scan close and reopen limits on x64 and
+met all eleven limits on ARM64. The ARM64 GDI control stopped at its first
+screen observation. The dated Ubuntu snapshots reproduced all six
+authenticated release indexes and the four original portal source files.
+The local Noble guest rebuilt from all 696 x64 packages and the
+Noble-linked GUI reopened after two Plasma panel clicks.
+RW-02 remains active. Next, test the full egui software renderer with the
+second frame-queue setting on the two Windows targets and repeat the
+Ubuntu desktop trials with these pinned inputs.
+[Windows controls](rust/rw02-windows-window.md#visible-gdi-and-retained-egui-under-the-same-inventory) · [Ubuntu sources](rust/rw02-plasma.md#reproduction).
+
+The two-frame software-adapter trial at `a44848d` passed both Windows
+cross-Clippy configurations, native Fedora release compilation and local
+offline reconstruction. Thirty-seven portable window, text and display
+tests passed. A native Windows bitmap test remains for the hosted run.
+Independent review replayed twelve original scan trials and rejected
+missing or corrupt raw traces. The portable editor controls rejected
+cursor-only changes. [Frame queue comparison](rust/rw02-windows-window.md#one-or-two-queued-frames-on-the-windows-software-adapter).
+
+On both recent Windows runs, independent replay confirmed the x64 Shell's
+show callback without observing the notification title and body. On ARM64
+the Shell refused registration before the send. All 16 launcher profiles
+were removed. Two separate retained-tray profiles at `ba02f8b` completed
+removal on the same handles after Windows error 145. Foreground keyboard
+handover on ARM64 remains open. [Notification results](rust/rw02-windows-services.md#sampling-across-the-shell-request) · [Launcher results](rust/rw02-instance.md#launcher-cleanup-and-foreground-at-549066f-and-ba02f8b).
+
+## Worker download reference and Ubuntu desktop checks (2026-11-23)
+
+The shipping worker downloaded a six-byte synthetic photo on Fedora x64.
+The before backup contained no mapping or account history. The after backup
+contained the downloaded asset and its account Last Sync. Restart from that
+backup reconciled the same album and watch root with zero additional
+transfers. Independent review added a positive album-list observation on
+both runs and bound the two loaded assemblies and the original evidence
+to their xUnit result. At `cf38f1a`, all four native reference jobs passed.
+Each Ubuntu target passed 567 tests. Each Windows target passed 558 with
+nine Linux-specific skips. Independent readback verified all eight original
+backups and all four media files. The local focused case passed from the
+same commit. An earlier local repeat of the full persistence class passed
+34 of 66 tests. Six cases explicitly reported the shared inotify limit,
+and a single native descriptor also failed at that time. The other failures
+were timing, transfer and ordering assertions. The earlier local full-class
+run passed 66 of 66. Both full hosted Ubuntu runs passed with the new case.
+[Download activity reference](rust/rw01-storage-contract.md#download-activity-and-the-latest-backup).
+
+The Rust backup example at `2353424` ran eleven cases on Fedora x64 with
+the pinned compiler and bundled SQLite. The two complete donors passed,
+including one with a different fixture label. Nine controls refused their
+inputs. The stale refusal carries the actual request token and database SHA.
+The C# exchange at `738e1d6` refused an oversized response before restarting
+the worker. At `ba02f8b` the combined offline run passed on Fedora x64.
+The real second C# worker opened the Rust backup and retained the original
+mapping, history, six-byte photo and native file times after reconciling
+the same album. Independent replay reproduced all 1,278 readback bytes and
+matched all 153 archived project sources. The same trial then passed on
+Windows and Ubuntu x64 and ARM64. The four original worker reports
+reproduced byte-for-byte. On each host Rust refused the pre-download
+backup and the restarted C# worker made zero transfers from the newer
+one. Each of the four separate C#-only reference jobs also passed.
+[Native backup procedure](../tools/rust-qa/storage/README.md#restore-after-a-synthetic-download) · [Four-host worker run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804585) · [C# reference](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45172804686).
+
+The shipping upload reference at `c0abae3` also passed on Fedora x64.
+The peer received the opened stream once and retained its bytes after
+the worker restarted from SQLite. Independent review identified unobserved
+trash and album mutation requests. Two test-only mutations then confirmed
+the corrected assertions fail on either request.
+[Upload reference and limits](rust/rw01-storage-contract.md#peer-content-after-a-synthetic-upload).
+
+At `8566f81`, the original Linux archives verified all eleven X11 budgets
+and the SQLite and realtime results on both architectures. ARM64 observed
+two real Plasma panel clicks. Both x64 fixture downloads lost their HTTP
+connection before response headers. Commit `549066f` passed seven
+downloader tests and a private HTTP replay. Its hosted desktop run also
+exercises the Windows GDI, tray, notification and profile-cleanup changes.
+RW-02 remains open.
+[Ubuntu results](rust/rw02-native-gui.md#ubuntu-native-results-at-8566f81) · [Native run at 549066f](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45167710471).
+
+Independent readback of the completed Windows archives at `8566f81` found
+that the retained Mailbox window met eleven of eleven limits on ARM64 and
+eight on x64. Windows x64 exceeded the limits for idle close, scan close
+and scan reopen. The independent observer found no matching notification title and body
+on either host. All four native archives passed the
+detached YAML and SQLite checks, and their development notices and SPDX
+documents reproduced byte-for-byte. [Windows timings](rust/rw02-windows-window.md#retained-window-at-8566f81) · [Shell observations](rust/rw02-windows-services.md#original-desktop-at-8566f81) · [YAML checks](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes) · [Storage matrix](rust/acceptance.md#native-evidence-matrix).
+
+## Four-target checks and the Windows renderer comparison (2026-11-23)
+
+At `8566f81`, the raw YAML round trip passed its native step on Windows
+and Ubuntu, on both x64 and ARM64. All four native feasibility jobs also
+passed. Independent readback of their ten archives verified 37 workspace
+tests and 15 file-watch cases per Linux target, 34 and 14 per Windows
+target, and 208 C# recovery assertions per Windows target. The readback
+SHA-256 is `3a5a827726dea94d3e3f7fabdb63cccd25e777b0ee374562facc0e8b3ba92b54`.
+The draft PR CI passed. Both hosted Rust CodeQL configurations again ran
+40 queries on the recorded foundation tree and reported zero alerts.
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516267) · [Desktop and YAML run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159516037) · [Draft PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159526233) · [Rust CodeQL](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45159525936).
+
+The GDI diagnostic at `763048a` passed six portable tests, Rustfmt and
+strict Clippy for both Windows targets. Independent review verified that
+the idle timings use the WPF warm-up sequence, and that qualifying scan
+samples bind the visible pixels, frame and HWND to real file activity.
+Commit `89883ea` also reads the shipping WPF tray icon after each idle
+trial. Its lookup passed the independent receiver and error-path review.
+Both comparisons await native Windows results. RW-02 remains open.
+[Renderer procedure](../tools/rust-qa/windows-gdi-control/README.md) · [Shipping tray control](rust/rw02-windows-services.md#shipping-wpf-tray-lookup).
+
+Commit `effae21` closes the earlier gap between the UIA observer's baseline
+and the return of the Windows notification request. Independent review
+replayed four timing edge cases. All 41 Python checks, the PowerShell
+pixel and timing controls and the 178 repository tooling tests passed.
+The native measurements still need to establish
+whether the real desktop presents the unique title and body.
+[Notification timing](rust/rw02-windows-services.md#sampling-across-the-shell-request).
+
+The original Windows launcher at `8566f81` reopened on both architectures.
+x64 obtained foreground immediately. ARM64 stayed in the background for
+40 samples over 2,005 ms. Its separate private restart drained, then profile
+cleanup received error 145. Commit `579fbcc` preserves the error and limits
+retries to the same verified directory handle. Independent review passed.
+[Native launcher results and cleanup test](rust/rw02-instance.md#private-launcher-cleanup-at-8566f81).
+
+## Legacy YAML byte compatibility (2026-11-23)
+
+At `a7a62fa`, a clean Fedora x64 build passed all 13 offline assessment
+steps. Rust read 54 archived original files. The shipping C# loader reopened
+70 Rust-written files and passed 140 comparisons. Ten damaged files were
+readable with the same replacement characters in both languages and retained
+their original bytes. Independent review verified the relocated archive and
+22 rejection controls. [Raw file evidence](rust/rw02-yaml.md#reading-the-original-yaml-file-bytes).
+
+## Rust foundation CodeQL (2026-11-23)
+
+The extended CodeQL suite analyzed the five-crate foundation locally with
+both target configurations. It ran 40 queries, including 20 security rules,
+and reported zero alerts and zero extraction errors on each. The source
+archive matched all 19 Rust files in Git. The Linux configuration activated
+17 files and the Windows configuration activated 18. Their combined
+coverage includes the platform-specific filesystem and logging modules.
+The Rust tree was `51b7bff74a760b6f888b6c06b551303dc0a50be7`.
+Commit `3b08278` adds the read-only draft-PR workflow. Native runtime and
+the standalone GUI have separate assessments. [Reproduction and scope](development.md#rust-foundation-codeql).
+
+The first hosted run on `267c217` passed both configurations. The downloaded
+SARIF documents and coverage tables matched the Git sources and independent
+local analyses. They report 2,914 Linux and 2,906 Windows lines of user code,
+with zero alerts, extraction errors or warning-level diagnostics per target.
+[Linux report](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45152719796/artifacts/14807885505) · [Windows report](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45152719796/artifacts/14806698523).
+
+## Native candidate assessment at 6af7100 (2026-11-23)
+
+All four native feasibility jobs passed at `6af7100`. Readback of the ten
+Actions archives confirmed 37 Rust workspace tests and 15 watch-event cases
+on each Linux target, and 34 tests and 14 cases on each Windows target.
+All four matched 5,844 requests in each casing profile. Both Windows hosts
+observed encrypted SMB 3.1.1, and their eight storage recovery cases each
+passed a total of 208 C# assertions. The independent four-host readback
+SHA-256 is `af82995f54e10d8bb266808535aa56f2dcb9338ad33a73ad7f75b57528655784`.
+The local repository suite passed all 178 tests. Draft PR CI passed.
+GitHub's default CodeQL jobs analyzed Actions, C#, JavaScript/TypeScript
+and Python. The four native desktop jobs run separately.
+[Native feasibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662890) · [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144674806) · [Desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858).
+
+Both Ubuntu desktops passed all eleven same-host budgets and two pointer
+activations through the running Plasma panel. Their offline compiler
+receipts, notices and SPDX reports reproduced exactly. The retained Windows
+x64 launcher obtained keyboard focus. The ARM64 HWND remained in the
+background for 41 samples despite a successful handoff grant.
+[Desktop measurements and archives](rust/rw02-native-gui.md#native-follow-up-at-6af7100) · [Windows visibility](rust/rw02-windows-window.md#testing-visibility-changes-without-resetting-the-window-frame).
+
+Both Windows desktop jobs finished with failures. ARM64 met all eleven
+retained-window resource limits. On x64 the p95 values for idle close,
+scan close and scan reopen were 26.561, 35.398 and 35.614 ms against
+14.571, 30.582 and 22.003 ms. The original x64 Shell accepted a late
+notification and returned a show callback. Independent title/body
+presentation is still unconfirmed on either host. All four compiler
+receipts, notice archives and SPDX documents reproduced offline.
+[Windows timings](rust/rw02-windows-window.md#native-retained-window-results-at-6af7100) · [Four-target notices](rust/rw02-combined-notices.md#native-notices-at-6af7100).
+
+The canonical Windows launcher reopened on both original desktops. x64
+obtained foreground immediately. On ARM64, Windows declined the granted
+handoff and the window remained visible in the background for 2,044 ms.
+Both private restart and cleanup cases passed. The original x64 Explorer
+registered the integrated icon, but none of the four button queries found
+an overflow provider. ARM64 Explorer rejected the initial add and both
+retries. Both hosts again excluded an elevated writer across two sessions.
+Standard-user exclusion still requires two eligible sessions.
+[Ordinary launches](rust/rw02-instance.md#native-windows-launcher-at-6af7100)
+· [Explorer observations](rust/rw02-windows-services.md#original-and-private-explorer-at-6af7100)
+· [Cross-session writer evidence](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541).
+
+## Windows activation and resource results (2026-11-23)
+
+The retained Windows candidate at `4975c45` changes only visibility on a
+normal owned HWND when both native style words match its cached state.
+Commit `9de3ded` checks the actual hide and reopen paths separately.
+Independent review reproduced the 217-file winit tree, the paired source
+archive and the native Fedora compiler outputs. Four Rust controls and 18
+portable fixture tests passed, as did cross-Clippy for Windows x64 and
+ARM64. Both native Windows performance runs are required to evaluate
+the change. [Candidate and evidence requirements](rust/rw02-windows-window.md#testing-visibility-changes-without-resetting-the-window-frame).
+
+The Linux ARM64 Plasma panel fixture at `725f1cd` has its own signed Ubuntu package
+inventory. Its 691 archives include 598 ARM64 builds and 93
+architecture-independent packages. Their payload and copyright hashes were
+verified. The previously observed physical panel activations were on x64.
+The ARM64 panel requires its own native run. [KDE panel fixture](rust/rw02-plasma.md).
+
+At `1e58541` both Ubuntu desktop jobs, all four native feasibility jobs,
+the draft PR's CI and CodeQL passed. Both Windows desktop jobs failed.
+The original x64 Desktop confirmed ordinary second-launch foreground and
+retained keyboard focus. On ARM64 the retained window reopened with its
+worker. Windows refused its foreground request. The canonical ARM64 private
+restart drained, then cleanup received Win32 error 32 before the independent
+Default-desktop test. Commit `68f68c0` preserves the original-desktop result
+first and identifies any busy entry during cleanup.
+[Launcher evidence](rust/rw02-instance.md#native-windows-launcher-at-1e58541)
+· [Native assessments](rust/rw02-native-gui.md#native-follow-up-at-1e58541)
+· [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124503587).
+
+ARM64 again met all eleven retained-window limits. The x64 candidate
+exceeded three. Every over-budget x64 close in the regular dispatch trial
+waited through visible redraw. On 78 of 81 slow reopens the native show
+call overlapped at least half of the response time. The original x64 Shell
+registered the integrated icon but no provider activation was observed.
+The ARM64 Shell refused all nine adds. Both late notification trials
+stopped before sending a notification. Commit `5321181` fixes the
+fixture-directory mismatch and its portable regression passes.
+[Window measurements](rust/rw02-windows-window.md#retained-measurements-with-explicit-foreground-requests-at-1e58541)
+· [Notifications](rust/rw02-windows-services.md#late-notification-on-the-original-desktop).
+
+The native writer guard again performed eight ordered ownership operations
+in two elevated sessions of the same account per Windows host. Both
+scheduled-task cleanups returned zero. Neither standard-user launcher reached
+its writer. On November 23 the repository reported no registered self-hosted
+runners. Existing standard-user sessions and an actual mixed-DPI/RDP desktop
+remain necessary for those trials. RW-01 is accepted and RW-02 remains open.
+[Writer results and scheduler cleanup](rust/rw02-cross-session.md#native-writer-and-scheduler-cleanup-at-1e58541)
+· [Display requirements](rust/rw02-windows-display.md)
+· [Full acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+## Four-host storage and the Windows desktop rerun (2026-11-23)
+
+RW-01 is accepted and RW-02 is active under the original RW-01–07 goal.
+At `93ecc35` all four targets passed the storage build and native tests.
+Direct SQL readback covered 32 databases, eight live-WAL backups, 120
+stored-key lookups and eight untouched version-99 controls. All eight
+database files per operating system were byte-identical between x64 and
+ARM64. The native compiler inputs, notice archives and SPDX documents
+for the combined development executable also reproduced on all four hosts.
+[Storage readback](rust/rw02-legacy.md#native-desktop-storage-at-93ecc35)
+· [Four notice and SPDX receipts](rust/rw02-combined-notices.md#native-notices-at-93ecc35).
+
+Both Ubuntu desktop jobs passed. Windows ARM64 met all eleven retained
+window performance limits. Windows x64 met eight. Its idle close took
+46.72 ms at p95, its scan close 37.55 ms and its scan reopen 39.10 ms.
+The x64 limits were 14.26, 31.58 and 22.79 ms respectively. Root repaint
+produced zero DXGI presentations in all 547 verified hidden x64 intervals.
+Earlier x64 results at `0a2b5ca` met all eleven limits. Windows interactive
+tray activation, ordinary-user writer exclusion and the mixed-DPI/RDP
+observations remain open. [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45083264235)
+· [Retained-window measurements](rust/rw02-windows-window.md).
+
+The candidate at `1e58541` preserves an explicit Windows Open until the
+new or retained window is visible. Its original-Explorer check preserves the
+identity of the popup and handles an invocation that already took effect
+when COM returned an error. Both changes received independent source and
+regression review. The same native Linux build passed all four lifecycle
+cases, keyboard input, clipboard and password masking on private Fedora
+X11 and Wayland desktops. The corrected Windows paths and the comparison
+with the original WPF budgets are in the new native run.
+[Explicit activation](rust/rw02-instance.md#explicit-windows-foreground-requests)
+· [Fedora results](rust/rw02-native-gui.md#fedora-input-and-lifecycle-after-the-focus-change)
+· [Four native desktop jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494708)
+· [Native filesystem and compatibility jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45124494628)
+· [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
+
+## Windows ordinary launch, Shell registration and writer authority (2026-11-23)
+
+At `93ecc35` a second launch on each original Windows desktop reopened the
+canonical GUI, retained its worker and exited as the only member of its job.
+The x64 window was foreground immediately. The ARM64 window was visible
+throughout 41 samples over 2,042 ms and stayed in the background. On both
+private desktops native enumeration found the titled visible GUI and its
+hidden witness. The additional name query failed with Win32 error 5 before
+the private restart. On the original x64 desktop the first physical icon
+pixel differed from the requested marker. ARM64 refused the initial add.
+Readback verified six archives and 31 Git source files per architecture.
+[Original console and private desktop](rust/rw02-instance.md#ordinary-second-launch-and-private-desktop-at-93ecc35)
+· [Shell observations](rust/rw02-windows-services.md#original-explorer-and-the-primary-gui-at-93ecc35).
+
+The cross-session writer guard excluded each competing writer in two
+elevated sessions of the same account on both Windows architectures. Both
+hosts identified the ordinary-user trust level on a private console. The
+subsequent launch exited before a standard-user writer could be measured.
+The x64 scheduler had already stopped an instance during cleanup. Commit
+`c4ba904` checks that race against a fresh empty instance collection.
+[Writer results and original archives](rust/rw02-cross-session.md#hosted-private-console-and-lock-results-at-93ecc35).
+
+Local integration now schedules the retained-window launcher, real Explorer
+activation and late notification assessment on both Windows targets. The
+native compiler evidence binds the GUI binary to its Cargo executable
+target. The retained observer requires a native ordering witness for
+same-tick visibility events. The notification observer requires separate
+physical hits for title and body and corroborates the original Explorer
+throughout the attempt. Commit `974bf45` checks process liveness on the
+open handle. Both MSVC cross-Clippy runs, 34 service controls and all
+178 repository tests passed locally. Commit `7fd8706` verifies private
+window membership directly on the held desktop. The corrected observers
+and retained activation still require their native runs. RW-02 remains
+open under the original seven-package goal.
+[Windows measurement](rust/rw02-windows-window.md)
+· [Late notification](rust/rw02-windows-services.md#late-notification-on-the-original-desktop)
+· [Stack decision](rust/rw02-stack-decision.md).
+
+Both Ubuntu jobs at `93ecc35` subsequently passed. All eleven X11 limits
+held, including scan reopen p95 of 1.08 ms on x64 and 0.92 ms on ARM64.
+Both original compiler and notice ZIPs reproduced on each architecture.
+The direct SQL replay checked all nine rows of both WAL backups, all 30
+stored-key lookups and the ten controls per host. The four-host storage
+readback above includes the completed Windows jobs.
+[Ubuntu desktop, transport and notices](rust/rw02-native-gui.md#native-follow-up-at-93ecc35)
+· [Storage and SQL](rust/rw02-legacy.md#native-desktop-storage-at-93ecc35).
+
+## Four native compatibility runs at 93ecc35 (2026-11-23)
+
+RW-01 is accepted and RW-02 is active. All four targets passed the complete
+native feasibility run at `93ecc35`. Both scalar modes passed 5,844 requests
+per target. Each Windows target passed encrypted SMB and all eight recovery
+cases, including 208 C# assertions. The native and C# reference archives
+were independently replayed. The two readback SHA-256 values are
+`0b479754d9b3f1e49ceef572dde4163994b6c5c66f63b4f71e1f575c7852753d`
+and `db19d34284b8ba1c51ffc6db5f8f327f32250486a687ff761eaf854cb76f2d9f`.
+The desktop and installer criteria have separate evidence gates.
+[Native casing receipts](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012)
+· [Filesystem and recovery](rust/rw02-filesystem.md#four-native-hosts)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+The completed desktop run at `0a2b5ca` qualified all eleven retained Mailbox
+limits on both Windows hosts. During a 100,000-file scan, reopening took
+11.343 ms at p95 on x64 and 4.261 ms on ARM64. The x64 regular root-wake
+trace had zero hidden presentations in 303 intervals. Each target's
+original notice ZIP and development SPDX document reproduced byte-for-byte.
+Both native Windows logs confirm the SQLite example warning corrected at
+`dff8cb0`. Native activation of the integrated window and Shell remains
+open. [Windows performance evidence](rust/rw02-windows-window.md#native-retained-window-results-at-0a2b5ca)
+· [Four-target notice and SPDX readback](rust/rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
+## Ubuntu desktop, storage and native notices (2026-11-23)
+
+Both Ubuntu desktop jobs passed at `0a2b5ca`. Replaying the three
+100,000-file trials per target reproduced all eleven X11 response and
+resource checks. Direct SQL on the archived C# databases matched all
+30 stored-key answers per target. The two published development notice
+ZIPs and SPDX inventories reproduced byte-for-byte from their native
+compiler receipts. [Native results](rust/rw02-native-gui.md#native-follow-up-at-0a2b5ca)
+· [Original notices](rust/rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
+Commit `8e32c84` requires evidence that the original Windows Shell process
+actually exited before accepting a missing tray icon during shutdown.
+The retained and canonical GUI source checks at `ccf42f1` matched on all
+four target graphs. Commit `dff8cb0` corrected the Windows build of the
+private SQLite study directory. Its normal Fedora storage run passed all
+16 steps. Commit `17b3199` added ordered Shell registration and removal
+observations. Independent review confirmed the remaining two observer
+fixes at `a4d951d` against 35 tests and 77 reachable operation sequences.
+The corrected launcher, tray and storage trials still require native runs.
+Both hosted writer fixtures also returned empty pipes on their trust-level
+queries. The next native run can repeat that query on its own private console.
+[GUI dependency verification](rust/rw02-gui-dependencies.md#windows-notification-area-bindings)
+· [Storage example](rust/rw02-legacy.md#windows-storage-example-compilation).
+[Windows Shell review](rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+· [Standard-user query](rust/rw02-cross-session.md#trust-level-query-on-the-hosted-machines).
+
+## Runtime selection and Windows launcher evidence (2026-11-22)
+
+RW-01 is accepted. RW-02 remains active. At `0a2b5ca` all four hosted
+C# references matched 29 files and 215 assertions. The four native Rust
+jobs passed the ordinary comparison and rejected the hosted CoreLib patch
+before the managed comparison. The clean Fedora repeat of `c1fd776` built
+the oracle once and passed all fourteen steps with both children using the
+selected .NET 10.0.12 runtime. The original feasibility and reference
+readbacks have SHA-256
+`1ba52ce8f5ae6f63acfaaa7ef00141974a79c0603b1329c9352aacc6a045aec0`
+and `b0cd60e4e9535305a4a6b197a6c9c464ab77ab9bbda4ee1fd1079ecf3927e6c6`.
+[Casing results](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012)
+· [Acceptance matrix](rust/acceptance.md#native-evidence-matrix).
+
+Both Windows hosts reopened the elected GUI through a normal second launch
+on the original desktop, retaining the same primary and worker. Both private
+launches created their visible window on the wrong desktop. Each secondary
+job recorded a second, unidentified process. The launcher results are failed.
+At `706cb94` the primary GUI gained its own native Shell receiver. At
+`76650d4` the four revised GUI dependency graphs and the retained eframe
+source were verified. The Fedora combined offline build and Wayland relink
+passed, including the 74 source hashes checked against that commit.
+The next Windows runs must observe the corrected private launch, actual Shell
+callback, secondary process count and same-worker cleanup on both architectures.
+Commit `3dbc123` selects the named desktop at process creation.
+Commit `8beb432` requires a visible on-screen window, an exact Shell item
+and a callback ordered after its provider invocation. Thirty launcher tests
+passed. At `9282426` the receiver retries registration if a new Shell first
+refuses the icon. Nine GUI tests passed on Fedora and both Windows MSVC
+targets passed cross-Clippy. The local repository suite passed all 178 tests.
+[Ordinary launcher](rust/rw02-instance.md#native-desktop-selection-and-ordinary-reopening-at-0a2b5ca)
+· [Primary GUI tray](rust/rw02-windows-services.md#primary-gui-and-shell-callback)
+· [Combined native qualification](rust/rw02-combined-profile.md#native-qualification).
+
+## Native rewrite assessments and independent storage review (2026-11-22)
+
+RW-01 is accepted. RW-02 remains the active package of
+[M-RUST-IMPLEMENTATION-20261114](project.md#m-rust-implementation-20261114).
+Both Ubuntu desktop jobs passed at `7517e3b`. Both Windows targets passed
+all three ordinary filename edits, all four standalone font cases and seven
+ordered NVDA speech cues. At both `8b64330` and `7517e3b` the Japanese IME
+showed preedit, committed あ, restored the language settings and removed the
+temporary profile on each architecture. The hosted Windows desktops each
+reported one 96-DPI console monitor. The Linux GUI built from the later
+`f4d5b3a` sources also passed private Fedora X11 lifecycle, clipboard, Orca
+and Japanese input checks, plus Wayland Japanese input and four transitions
+between two outputs. [Four native desktop archives](rust/rw02-native-gui.md#native-follow-up-at-7517e3b)
+· [IME receipts](rust/rw02-windows-ime.md) · [Font observations](rust/rw02-font-coverage.md).
+
+At `8091469` both Ubuntu desktop jobs again passed. Recomputing their three
+100,000-file trials reproduced all eleven same-host performance checks per
+architecture. Ubuntu x64 and ARM64 reopened in 0.89 and 0.90 ms at scan p95
+and each passed all sixteen loopback transport cases. [Ubuntu native receipts](rust/rw02-native-gui.md#native-follow-up-at-8091469)
+· [TLS identity observations](rust/rw02-realtime-transport.md#tls-endpoint-identity).
+Both Windows private Shells refused two registration attempts on the same
+taskbar. The x64 original Shell accepted the icon and reported its balloon.
+Neither host delivered a tray activation. The guard excluded writers in two
+elevated sessions on both hosts. The ordinary-user fixture again stopped
+before either writer ran. Source inspection across Fedora, Ubuntu, Debian,
+Arch and openSUSE found the released Documents-portal read lock unavailable
+in the examined packages. [Portal package sources](rust/rw02-portal-upstream.md#additional-distribution-sources-checked-on-2026-11-22).
+
+The two official Unicode data inputs reproduce the distinct .NET invariant
+uppercase tables observed on Fedora and on all four hosted targets. The
+Fedora Rust probe passed 5,844 requests with each independently generated
+table, and the strict comparison rejected a third synthetic mapping. The
+four native jobs at `8091469` each qualified the 15.1.0 table. The shipping
+C# store on Fedora produced two distinct insensitive keys with ICU 74.2 and
+one with ICU 78. Changing either reader's library hid the existing entries
+and repairs while leaving both accounts' transfer history readable. The
+Rust read-only probe passed 56 lookups on the original C# backups and
+eighteen controls on copies across the two environments, including
+native source normalization and the complete same-process writer table.
+The same .NET version in globalization-invariant mode produced identical
+fixture databases to ICU 78 but a different 1,475-row casing table. Both
+reference readers refused the unfamiliar writer. Independent replay at
+`b77fc12` matched all 56 lookup answers, 299 evidence hashes and 137
+source files. It also identified a whitespace-only account that the C#
+store rejects. The correction passed 60 lookups and twenty controls across
+the two genuine writers. At `727d052` the full Fedora storage entry point
+passed all 16 steps. Its 302 evidence files and 137 Git source hashes matched.
+The production new-key
+policy and installed migration remain open.
+[Casing qualification](rust/rw02-legacy.md#independently-reproduced-casing-profiles)
+· [Stored-key experiment](rust/rw02-legacy.md#stored-sqlite-identities-across-two-casing-profiles).
+
+The tagged .NET source and Unicode 16.0 independently reproduce the third
+profile. With the same twelve input filenames the legacy C# store retained
+eleven, ten or eight distinct insensitive entries under the three profiles.
+The native Fedora scalar probe passed 5,844 comparisons each using the ICU
+and managed tables at clean revision `da448ed`. All twelve native steps
+passed. The comparison matched both oracle assemblies and CoreLib files.
+The additional hosted comparison is selected in the normal feasibility
+entry point. [Managed casing evidence](rust/rw02-legacy.md#managed-globalization-invariant-casing-in-net-10012).
+At `733194b` all 318 Rust lookups on the three original writer profiles
+matched the independent SQL projection. Fourteen controls passed. The separate
+two-profile qualifier still refused the managed writer.
+Independent review reproduced all 36 archived C# outputs, matched 5,400
+additional Rust queries to SQLite and confirmed 25 additional refusals.
+[Stored-key observations](rust/rw02-legacy.md#read-only-lookup-across-three-historical-writers).
+
+Commit `66d9fd6` produced four SPDX inventories from the verified native
+builds at `a66e045`. Each passed the pinned SPDX 2.3.1 schema and reproduced
+byte-for-byte. The independent review checked source licenses, font assets
+and all 74 indexed build outputs. The documents cover 337 and 336 compiled
+Cargo packages on Linux x64 and ARM64, and 250 and 249 on Windows x64 and
+ARM64. The packaged product inventory remains open under RI-AC09.
+At `7517e3b` the assessment workflow generated all four inventories on the
+native hosts. Local replay from the authenticated archives reproduced each
+uploaded document byte-for-byte and passed the official schema and native
+inventory controls.
+Independent review of the four locally reconstructed development notice
+ZIPs at `577843b` found three omissions. The two Linux inventories omit
+the core Wayland protocol XML and five Plasma protocol license texts.
+All four initial bundles omitted applicable per-file ring copyright and
+permission notices. Independent review of `9f68c58` closed all three findings
+for the development builds. Across the four corrected ZIPs, 2,356 complete
+original files and 9,714 byte-range references matched their sources. All
+four corrected SPDX documents passed the schema. The native workflow now
+selects notice generation using its uploaded compiler receipt as input.
+The native Fedora build at `9f68c58` produced the corrected inventory,
+402 build units, 1,799 notice ZIP members and an SPDX document with 446
+packages. Its relinked executable reported the edited Wayland interface.
+Offline replay reconstructed that receipt twice from each of the four
+`7517e3b` archives. All 1,798 indexed files in the resulting Linux x64
+notice ZIP matched the independently reviewed ZIP. The manifest identified
+the new receipt archive by its own SHA-256.
+[Four build inventories and digests](rust/rw02-combined-sbom.md)
+· [Development notice reconstruction](rust/rw02-combined-notices.md).
+
+At `8091469` retained Mailbox met all eleven WPF limits on ARM64 for a
+fourth native run. Windows x64 met eight. Reopening during a scan took
+119.95 ms at p95 against 21.987 ms. In two dispatch traces x64 drew twice
+inside each of 439 confirmed hidden intervals. ARM64 drew zero times in
+all 402 intervals. The application and eframe change at `88fb4ba` keeps
+processing input while the root HWND is hidden and requests a frame on show.
+The two platform archives reproduce every original dispatch result. The
+new behavior and the same-host response budgets still need a native run.
+[Measured response and source change](rust/rw02-windows-window.md#presentations-while-the-root-hwnd-was-hidden).
+
+The launcher trial timed out before its first visible window on both
+Windows targets. The x64 cleanup error obscured the original timeout in
+the JSON report. The new fixture records the initial window and cleanup
+separately and also exercises an ordinary first launch on the disposable
+input desktop. Native ordinary activation remains open. Both Windows hosts
+passed the Japanese IME with profile cleanup a third time and passed all
+sixteen realtime transport cases. Each still had one 96-DPI console output.
+[Complete native archives](rust/rw02-native-gui.md#native-follow-up-at-8091469)
+· [Launcher procedure](rust/rw02-instance.md#ordinary-second-launch-of-the-windows-gui).
+
+The Rust study at `b7190ea` updated one known physical row on each of six
+finalized copies from three genuine legacy writers. Independent review
+reproduced all twelve before/after files and confirmed all 36 shipping C#
+readbacks. It found a stale-value reporting error, permissive direct scratch
+file modes, and a C# readback that ignored a live WAL. The correction at
+`5d4ce2d` passed all thirteen Fedora checks, including a committed WAL and
+direct output with umask 000. Independent re-review closed all three fixture
+findings. Twelve new directories and 24 files had the required permissions,
+both readers refused a separate live WAL, and all 144 lookup/list observations
+matched raw SQL.
+[Known-row update and independent findings](rust/rw02-legacy.md#updating-a-known-row-on-finalized-copies).
+At `3b4854d` both Windows architectures passed all thirteen notification
+scenarios. Their nonrecursive watch reported the direct child directory's
+metadata and the direct file's creation and change. Both Ubuntu targets
+passed all fifteen scenarios. On each Windows host the candidate guard
+again excluded the other writer across two sessions of the same elevated
+account. The fixture started and restored Secondary Logon. Its standard-user
+probe stopped during the trust-level query before either writer ran.
+Installed old/new handover and ordinary-user exclusion remain open.
+[Four-platform run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099706),
+[Window comparison](rust/rw02-windows-window.md) and [watch delivery](rust/rw02-watch-events.md).
+
+The Windows watch fixture now exercises the ordinary 32 KiB notification
+buffer with a bounded batch of 512 synthetic files. An independent review
+checked request lifetimes, full replacement inventories and cleanup. Its
+timeout finding was addressed by running the compiled test as the Python
+parent's direct child. A local run of the pinned Cargo compiler exposed its
+test-program layout under `debug/build`. The runner now validates the program
+from Cargo's compiler message on every host. Eight portable controls and
+Clippy on both Windows targets passed. At clean revision `21e07c4` Fedora
+ran the same entry point and passed all fifteen watch scenarios. At
+`7517e3b` both Windows hosts observed real notification loss, registered
+a new watch and recovered all 514 files. Each passed fourteen scenarios.
+All four targets also passed the new offline Cargo dependency boundary
+checks. [Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45047460118).
+[Notification loss trial](rust/rw02-watch-events.md#windows-notification-loss-and-recovery-trial).
+
+The .NET reference, PR CI, CodeQL and dependency submission completed
+successfully at the same commit. Both Windows archives at `3b4854d` reached
+six recovery cases and 144 C# checks each. Inside each test VHD, Windows
+reported disk-full error 112, SQLite reported code 13 and the supervisor
+measured zero available bytes. The Rust worker then declined a CRLF-terminated
+release command. Both VHDs detached. Revision `d708301` sends the exact LF
+acknowledgement. A private Linux tmpfs reproduced the original failure and
+recovered with the corrected sender. The complete Fedora trial passed all
+eight cases and 208 C# assertions. At `7517e3b` Windows x64 and ARM64 each
+completed all eight cases and 208 C# assertions. Both path comparison modes
+recovered after zero free bytes and detached their VHD. All 465 indexed
+files and 150 retained sources per Windows archive matched their hashes.
+The native feasibility workflow now runs this Windows trial independently of
+the desktop performance measurements and retains its entire evidence directory.
+[Compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099738)
+· [Desktop and storage](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730).
+
+The standard native Linux x64 entry point at clean revision `c47d9b1`
+passed all ten steps, including 36 Rust tests and 5,844 comparisons to the
+C# oracle. The new offline Cargo graph check verified the roles of all five
+workspace crates. Eight regression cases cover actual Cargo resolution,
+development-only features and target-specific renamed or build dependencies.
+[Architecture check](../tools/rust-qa/workspace-boundaries/check.py).
+
+Revision `26ed5dd` compares two non-tearing DX12 presentation modes and
+records their actual timing during scans. Revision `27ade4b` records
+guarded keyboard submission and refreshes both Windows text interfaces
+after Delete. Revision `e575bb3` accepts the observed token flag and
+Japanese language representations in the respective native fixtures.
+The [strict display checks](rust/rw02-windows-display.md) at `6a88744`
+require a real mixed-DPI or RDP session when that qualification is selected.
+The [filesystem adapter](rust/rw02-filesystem.md) at `f538828` declines
+missing file identifiers. All eighteen Linux filesystem checks and Clippy
+for Linux x64 and both Windows targets passed. Both Windows targets then
+passed the native NTFS and encrypted SMB tests at `a66e045`. Revision
+`88fd180` also checks the current identity of the held file. An independent
+review and native tests on all four hosts passed. Linux ran 19 filesystem
+checks per host. Windows ran 16 per host on local storage and again over
+encrypted SMB. Both NTFS hosts observed a distinct short alias. The ARM64
+SMB share also provided one. Both Windows storage VHDs returned FAT legacy
+file identifiers across one rename. An independent review of `16781c2`
+closed five findings in the opt-in adapter fixture. A Fedora repeat passed
+eight recovery cases and all 208 C# assertions, with 476 evidence hashes
+verified. At `8091469` both Windows hosts completed all eight cases and then
+read and renamed a 45-byte file on the private FAT volume through the Rust
+adapter. The held handle and the new name returned the same bytes. The
+independent GUID readback confirmed the renamed file and the mount was removed.
+[FAT16 adapter result](rust/rw02-filesystem.md#ordinary-fat16-adapter-on-native-windows-2026-11-22)
+· [Independent recovery review](rust/rw02-storage-faults.md#native-windows-fat16-follow-up-at-8091469-2026-11-22)
+· [Four native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45067343481).
+
+The appearance-enabled desktop at `a66e045` passed all eleven fixed
+Fedora X11 budgets over three 100,000-file runs. Median startup was
+194.18 ms. Scan p95 was 5.60 ms to close and 1.95 ms to reopen.
+[Paired .NET and Rust measurements](rust/rw02-performance.md#system-appearance-on-fedora-x64).
+
+At `966b861` the Linux x64 storage fixture passed four real process kills,
+two SQLite page limits and two 8 MiB tmpfs exhaustion cases. An independent
+reviewer replayed all eight recoveries and 208 C# assertions, rejected 16
+altered snapshots in both languages and verified all 453 evidence hashes.
+The two previous review findings are closed for this experiment.
+Ubuntu x64 and ARM64 each repeated all eight cases and 208 C# assertions
+in the native run at `a66e045`. All 453 files in each evidence inventory
+matched the archive. The later Windows recovery results are recorded above.
+Production migration and installed rollback remain open.
+[Storage sources and evidence](rust/rw02-storage-faults.md).
+
+At `3b4854d` both Ubuntu jobs repeated all eight recoveries. Each archive
+contained 465 of 466 indexed evidence files. The omitted 78-byte Git
+attributes file matched the original commit when verified separately. At
+`93d424a` the source snapshot preserves its logical path and bytes under a
+visible artifact name. Fedora passed all eight recoveries again, and all
+469 evidence files and 150 sources survived the local ZIP round trip.
+
+The combined dependency assessment at `f22015a` built the native
+Linux x64 executable offline and relinked a changed Wayland binding. A real
+Plasma panel at `26b7aac` reopened the hidden application twice. At `6f55f36`
+the visible panel followed system light, dark and high-contrast settings
+and recovered after a portal service restart. Both Ubuntu hosts repeated the combined offline relink, the native
+Noble portal comparison and light/dark changes at `a66e045`. Ubuntu x64
+repeated two actual Plasma panel clicks. Both Windows combined smoke tests
+passed. The earlier scan trials rejected a stale filesystem input digest.
+The four subsequent archives at `3b4854d` contain the capacity, tray
+and scan-time results above. Mixed-DPI and RDP require an appropriate
+Windows session.
+Released distro portals on the tested Linux hosts still refuse the required
+cooperative file lock. [Combined build](rust/rw02-combined-profile.md),
+[Plasma](rust/rw02-plasma.md), [appearance](rust/rw02-appearance.md) and
+[acceptance matrix](rust/acceptance.md).
+
+At `1efe254` the private Noble x64 trial distinguished a host without
+file-lock support from an ordinary busy file on the same retained grant.
+The packaged and pristine services reported `UnsupportedFileLock` on three
+attempts each. With the existing backport, the reader acquired the file,
+reported `FileBusy` while an independent writer held its lease, and acquired
+the same file again after release. An independent reviewer verified the
+reader and descriptor identities, the source hashes and all three native
+service receipts. [Native portal evidence](rust/rw02-portal-noble.md).
+
+The [current native desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45039099730)
+uses `c5606ec` for the scan workload,
+`c19a88e` for tray input ownership, `048cc27` for the disposable writer
+service and `0ed4dc4` for the locked Windows WAL-index capture. The tray
+review closed all three findings. The separate VHD review closed its
+parameter-layout finding at `2a49051`. At `daf7d85` Fedora repeated all
+eight storage cases, including six portable cases before the volume
+trials. The 14 workflow security checks passed. Cargo version-update
+configuration is prepared on the rewrite branch at `54fac8b`.
+
+At `8b64330` and `7517e3b` native Windows x64 rebuilt the published import
+library byte-for-byte with MSVC. The independently reconstructed LLVM
+library and the published library both ran the actual winit event loop with
+the same 105 imports from eleven DLLs. All four linker responses and four
+symbol maps matched their receipts. Both maps per run attributed the two
+executed bindings to the selected library. [Native import evidence](rust/rw02-windows-imports.md#native-windows-x64-reconstruction).
+
+## Windows directory identity at cd1d7d7 (2026-11-21)
+
+Both Windows runners traced the failed subscription to `ReOpenFile`.
+Opening the same volume and 128-bit file ID succeeded on both. The revised
+watch adapter uses this identity and checks the second handle before
+starting asynchronous reads. It passed Clippy for both MSVC targets.
+The same diagnostic revision again passed all fifteen scenarios on each
+Ubuntu target. Windows event delivery and cancellation await a native
+run of the revised adapter. [Native receipts](rust/rw02-watch-events.md#distribution-inputs-and-integration).
+
+## Native watch registration at 45dc03b (2026-11-21)
+
+Ubuntu x64 and ARM64 each passed eight unit tests and fifteen real watch
+scenarios, including a 16,384-event kernel overflow and renewed coverage
+after a directory was replaced. Both Windows targets passed seven unit tests
+and returned Windows error 5 before the first native subscription was ready.
+The next run records the failing operation and checks independent handles
+to the same synthetic directory. The native Windows watch remains open.
+[Four verified watch archives](rust/rw02-watch-events.md#distribution-inputs-and-integration).
+
+## Native watch hints, platform logging and Windows desktop follow-up (2026-11-21)
+
+Three Fedora x64 runs of the reviewed watch adapter passed eight unit checks
+and fifteen native scenarios each. A real inotify queue overflowed at the
+unchanged 16,384-event limit. Cancelling an inventory kept the previous
+baseline pending. A second identity check detected a directory replaced
+during watch registration, and the renewed subscription observed its next
+edit. The completed runs used the same ELF binary. Both MSVC targets passed Clippy.
+The four-target native feasibility workflow now includes this adapter.
+[Detailed observations and hashes](rust/rw02-watch-events.md).
+
+The Windows x64 and ARM64 platform log steps at `72fff40` passed. Both
+Ubuntu jobs failed their logging step. A native Ubuntu 24.04 userspace
+reproduced systemd 255.4's missing cgroup root. It delivered all six records
+after a read-only mapping of the current test process’s cgroup. The writer
+had zero effective capabilities. [Windows jobs and local Ubuntu receipt](rust/rw02-platform-logs.md).
+
+The next GUI assessment compares retained Windows handles and smaller
+DX12 allocations with the existing reference budgets. Independently reported
+writer trials exercise ordinary inherited authority and verified standard
+users across two sessions. Native results for those changes are pending.
+Both private-desktop input steps at `72fff40` passed. Replaying the earlier
+desktop reports selected the original desktop on x64 and the fixture desktop
+on ARM64. [Retained GUI](rust/rw02-windows-window.md),
+[writer authority](rust/rw02-cross-session.md) and
+[desktop selection](rust/rw02-windows-desktop.md).
+
+Both Ubuntu jobs at `72fff40` met all eleven same-host resource limits.
+The downloaded archives confirmed the same systemd failure on both native
+architectures. Windows x64 passed ordinary mixed-direction editing and
+replacement-window input. The independent compatibility, native feasibility
+and PR CI workflows passed. [Hosted measurements](rust/rw02-native-gui.md#native-follow-up-at-72fff40).
+
+All four archives at that revision matched the Actions SHA-256 sums and
+passed their CRC checks. Both Windows hosts met six of nine measured WPF
+limits. The ETW recorder's SDK compilation error prevented all scan timing
+comparisons. Windows x64 NVDA read all seven cues and the password masks.
+Both text interfaces still returned 18 characters after Delete. Both hosts
+installed and removed Japanese Basic Typing without reaching a composition trial.
+The Ubuntu Noble package and its unmodified rebuild refused read leases.
+The private backport passed 42 lock operations. Three native x64 builds
+reproduced the same executable hashes. [Windows receipts](rust/rw02-native-gui.md#native-follow-up-at-72fff40)
+and [Noble comparison](rust/rw02-portal-noble.md).
+
+Orca's four ordered field and role announcements, three password masks and
+non-silent private audio passed on both X11 and Wayland in Ubuntu Noble and
+Fedora x64. The hosted Ubuntu ARM64 speech result is pending. The Windows
+display recorder now checks the actual WTS transport and window DPI on each
+available monitor. Both older Windows desktops had a single 96-DPI screen.
+[Linux speech evidence](rust/rw02-ubuntu-reader.md) and
+[Windows display evidence](rust/rw02-windows-display.md).
+
+## Four hosted desktop results and Windows follow-up (2026-11-21)
+
+Both Ubuntu jobs passed every step at `8a8adaa`. Each met all 11 paired
+.NET limits with three 100,000-file trials. Both also passed actual renderer
+replacement, Mozc, GNOME monitor changes and installed Flatpak grant/revocation.
+On Windows x64 NVDA produced the seven expected announcements. The subsequent
+clipboard clear failed. Windows ARM64 produced the first label. A full-screen
+WWAHost window covered the test field on its active console. The private
+desktop was restored on both architectures after its initial window enumeration
+failed. Each Windows host exceeded three of nine limits, for visible working
+set, idle close and idle reopen. All four ZIP digests and CRCs were verified.
+[Archive inventory](rust/rw02-native-gui.md#native-follow-up-at-8a8adaa) and
+[stack decision and remaining work](rust/rw02-stack-decision.md).
+
+Commit `e80c205` added a real native Windows 100,000-file worker and independent
+NTFS completion checks to the paired WPF and Rust trials. The local fixture
+suite passed 23 tests with one Windows-only case. The next native jobs also
+exercise the revised selection/foreground observers, the ordinary mixed-text
+field, the native Japanese IME and the platform log readbacks. RW-02 remains
+open. [Windows performance](rust/rw02-windows-performance.md),
+[Windows text](rust/rw02-windows-text.md), [input method](rust/rw02-windows-ime.md)
+and [native logging](rust/rw02-platform-logs.md).
+
+## Intel Wayland presentation and idle checks (2026-11-21)
+
+Three independent Fedora x64 sessions recovered from loss of the Intel
+render device and resumed on llvmpipe. Both real adapters offered Mailbox on
+their Wayland surfaces. In each run the regular filename field retained
+text and focus, accepted the next key, and drew the change. The original
+worker processed a new synthetic file. Six 15-second visible or hidden
+idle intervals recorded zero application buffer commits. The output was a
+private Mutter virtual monitor driven by an Intel render node. [Native
+observations and source hashes](rust/rw02-wayland-recovery.md).
+
+## Native log adapter and hosted desktop results (2026-11-21)
+
+The new Rust logging crate passed the native Fedora x64 file and journal
+comparison against the shipping .NET provider. Twelve file records survived
+reopening. An isolated systemd journal preserved six distinct messages and
+their priorities. Its writer reported zero effective capabilities. The
+Windows implementation passed Clippy checks against each pinned MSVC target.
+Windows native Event Log readback and Ubuntu native journal readback remain
+open. [Receipts and reproduction](rust/rw02-platform-logs.md).
+
+At `8a8adaa`, both hosted Ubuntu architectures passed native Mozc composition,
+GNOME output scaling and installed Flatpak access and revocation under X11 and
+Wayland. Windows x64 passed the complete DX12 replacement-window edit,
+including restored focus and changed pixels. The same-account cross-session
+test failed on both Windows hosts. [Native assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44941845642).
+
+## Native desktop follow-up and Windows writer ownership (2026-11-21)
+
+The integrated Linux x64 GUI recovered and accepted a real edit on both X11
+and Wayland after an application-owned device was destroyed during painting.
+The separate Vulkan fixture now waits for its submitted queue work to finish
+before returning a controlled device-loss result. A repeat of the Linux .NET
+reference with 20,000 synthetic files reached every measurement phase after
+resolving the exact .NET 10 targeting pack from the SDK. The established
+100,000-file budgets remain the acceptance reference.
+[Graphics observations](rust/rw02-graphics.md) and [resource evidence](rust/rw02-performance.md).
+
+An isolated Ubuntu 24.04 x64 userspace reproduced the installed Flatpak
+launcher's missing system-bus socket. With an isolated empty bus and the five
+empty device directories required by Flatpak 1.14, the installed app passed
+parented folder selection, grant readback, revocation and notification on both
+X11 and Wayland. The next hosted run repeats the checks on both architectures.
+[Ubuntu component hashes and native results](rust/rw02-portal-dialog.md).
+
+Five tests for the cross-session driver passed locally, including file-lock
+exclusion and reacquisition in two real POSIX sessions. Two distinct native
+Windows sessions still need to pass. Six portable-reader parser and cleanup
+tests and the window-targeted pointer sequence passed locally. The native
+desktop jobs exercise those changes on both Windows architectures.
+[Cross-session checks](rust/rw02-cross-session.md) and [Windows screen reader](rust/rw02-windows-reader.md).
+
+## Native GUI checks at the integrated revision (2026-11-21)
+
+At `8b071ab` the four native GUI builds reproduced their reviewed package
+and feature inventories. Ubuntu x64 and ARM64 passed all three filename
+editing cases and eight glyph controls in the integrated UI, and both
+passed X11 and Wayland lifecycle, accessibility and host folder chooser
+checks. All four compatibility jobs, all four Rust feasibility jobs and
+all eight PR checks passed. The separate desktop assessment still has
+failures. The Ubuntu jobs stopped before the paired performance measurements
+and installed Flatpak selection. Windows x64 received the device-loss
+callback and created a replacement WARP device, then exposed two HWNDs
+during teardown. ARM64 still refused foreground input. NVDA initialized
+with OneCore on both hosts but did not reach the application's speech checks.
+The new Windows fixtures measure desktop availability and same-host WPF
+budgets. Their native results are pending.
+[Assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44835826452),
+[Windows desktop fixture](rust/rw02-windows-desktop.md)
+and [resource measurements](rust/rw02-windows-performance.md).
+
+## Four-host IPC, native ARM64 relink and desktop checks (2026-11-21)
+
+All four native hosts passed six old/new activation and profile-lock
+observations at `5895c0b`. The ARM64 Microsoft toolchain reproduced the
+published Windows import library byte-for-byte. Three independently linked
+test images agreed with 64 processor feature results, and the rebuilt
+transport passed all 15 loopback cases. The four compatibility jobs, four
+Rust feasibility jobs and eight pull-request checks passed. Desktop assessment
+still had failures. Windows ARM64 could not obtain foreground input, both
+Windows font observers stopped at a Windows-1252 console write, and Ubuntu
+did not supply the requested Anthy package.
+[Old/new results](rust/rw02-instance.md#native-results-on-all-four-targets),
+[ARM64 source reconstruction](rust/rw02-windows-imports.md),
+[desktop run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264)
+and [pull-request checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831858586).
+
+## Integrated native GUI text and rendering (2026-11-21)
+
+The same Linux x64 GUI executable, SHA-256
+`80898c73bf97c9d6622ef837cd5361810b041e5d007a1fe742d32ad7921c1002`,
+passed mixed-direction selection and editing in the ordinary filename field,
+eight rendered glyph controls, and restoration of input after a controlled
+graphics loss. On GNOME Wayland it also committed Japanese text without a
+presentation override. The source review covers the exact features and inputs
+of all 235 packages on each Linux target and 135 on each Windows
+target. Native execution of this revision on the three other targets is
+pending. [Text and source receipts](rust/rw02-gui-dependencies.md) and
+[graphics observations](rust/rw02-graphics.md).
+
+## Older portal hosts and signed Flatpak test runtimes (2026-11-21)
+
+On Fedora x64, seven control runs covered both GTK chooser backends, the
+registered and unregistered host paths, real installed Flatpak grants and
+revocation, and GNOME notification and autostart. All 54 indexed files matched.
+The signed public freedesktop 26.08 metadata supplied the pinned runtime
+commits for both Linux architectures. The hosted jobs now test host selection
+separately from attributed Flatpak actions. Ubuntu 24.04 lacks `ibus-anthy`.
+Its failed package setup at `5895c0b` led to separate provisioning for GNOME
+and its available Mozc engine. Its independent IPC tests passed on both native
+Ubuntu hosts. [Portal evidence](rust/rw02-portal-dialog.md) and
+[hosted runs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44831851264).
+
+## Windows screen reader fixture (2026-11-20)
+
+The new disposable Windows scenario pairs UI Automation with NVDA 2026.3.1
+speech records. Three local regression tests passed for ordered labels,
+protected utterances and partial log writes. The native x64 and ARM64 runs
+must still demonstrate actual reader output.
+[Inputs, isolated profile and evidence requirements](rust/rw02-windows-reader.md).
+
+## GNOME Wayland composition and mixed monitor scaling (2026-11-20)
+
+Fedora x64 completed real IBus Anthy composition in the Rust filename field
+with Mesa Mailbox. A single window moved between monitors and produced the
+expected 100%, 200%, 125% and 100% buffers. The default presentation case
+lost the composition after preedit. All four GNOME indexes and both existing
+Orca regression receipts matched the retained files. The Ubuntu jobs now
+exercise the combined scenario on both native architectures.
+[Wayland observations and open compositor limits](rust/rw02-wayland-input.md).
+
+## Native Linux graphics loss and recovery (2026-11-20)
+
+Fourteen X11/Wayland cases on Fedora x64 exercised initial adapter failure,
+device destruction, a software-driver `VK_ERROR_DEVICE_LOST`, repeat failure
+and an unrelated application panic. The isolated recovery variant retained the
+worker, draft and focus across an Intel-to-llvmpipe switch. New input produced
+observable frames. All 71 indexed artifacts matched their hashes. Integration
+in the shared build and Windows DX12 recovery remain open.
+[Adapters, controls and native evidence](rust/rw02-graphics.md).
+
+## Bidirectional filename editing (2026-11-20)
+
+The released egui 0.37 selected the wrong logical character in mixed Arabic
+filenames. With the upstream caret correction, Linux x64 passed the same four
+native text cases, including Japanese glyphs, mixed digits, pointer deletion
+and left/right movement. The selected candidate adds one runtime dependency,
+`unicode-bidi` 0.3.18. Its Unicode table was reconstructed from upstream data.
+The four-host workflow now runs the corrected fixture. Integration in the
+shared GUI and repeat measurements remain open. [Native comparison, original
+fonts and exact source review](rust/rw02-font-coverage.md).
+
+## Hosted Windows input and Ubuntu portal results (2026-11-20)
+
+At `2e7ed89`, Windows x64 passed the entire keyboard, password and Unicode
+clipboard scenario. On ARM64, UI Automation returned the expected names and
+protection, while the observer could not acquire the foreground. It sent no
+keys. Native ARM64 reconstructed the same LLVM import archive twice, then
+stopped before MSVC setup. Both Ubuntu architectures passed the tray and
+real FUSE tests and encountered a missing host Registry in the separate chooser
+case. All four standard Rust jobs and eight general PR jobs passed. The desktop
+workflow recorded one passing and three failing jobs. The follow-up initializes
+the ARM64 build shell per step and retries foreground only on the owned window.
+[Desktop results](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363871),
+[standard Rust checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828363958)
+and [PR checks](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44828375760).
+
+## Native old/new activation and file guard (2026-11-20)
+
+Two Fedora x64 runs passed six process-level observations. The shipping .NET
+coordinator and Rust fixture activated each other, a second Rust writer was
+refused, and orderly and abrupt exit both released the native file lock. The
+shipping program could still start while the Rust file guard was held. The
+four-host assessment now includes the same fixture. Windows cross-session
+handover remains open. [Source and run receipt](rust/rw02-instance.md).
+
+## Installed Flatpak dialogs, notifications and autostart (2026-11-20)
+
+Five Fedora x64 runs exercised the real GTK portal and a temporary installed
+Flatpak. X11 and Wayland both verified the parent window, cancellation and
+selection. A fresh process lost access to the selected grant after revocation.
+GNOME Shell displayed and withdrew the notification. Its Background portal
+created and removed the app's autostart file and respected explicit denial.
+All 25 indexed evidence files matched their hashes. The next native Ubuntu
+runs cover the registered host application's folder picker on both architectures.
+[Reproduction, images and source evidence](rust/rw02-portal-dialog.md).
+
+## Four native YAML runs and Windows input (2026-11-20)
+
+At `11e4e6f` all four native YAML runs passed with identical filtered sources
+and independently checked evidence. Both Windows hosts passed WScript
+readback of the private and known Startup shortcuts. Both observed German
+UI Automation names and password protection. The x64 input test encountered
+a sharing violation while reading a live log. The ARM64 observer could not
+foreground the owned window, so it sent no keys. The follow-up reads the active
+log with read/write sharing and checks the input desktop as well as the HWND
+and PID. [YAML evidence](rust/rw02-yaml.md) and [Windows input and Shell results](rust/rw02-native-gui.md#reproduction).
+
+## Native Ubuntu tray results and clean reference build (2026-11-20)
+
+At `11e4e6f` both Ubuntu architectures passed the eight-step tray-owner
+test and the full 183/116-assertion YAML comparison. All 204 files in each
+YAML evidence index matched their hashes. The Documents oracle failed before
+launch because bubblewrap could not create a mount point under read-only
+Core sources on a clean checkout. Binding only tracked source files fixed
+the build locally and preserved both reference DLL digests. Semantic FUSE
+results for Ubuntu still require the rerun.
+[CI run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44825008977)
+and [Linux service evidence](rust/rw02-linux-services.md).
+
+## Windows ARM64 import reconstruction (2026-11-20)
+
+All 20,551 symbols in Microsoft's original ARM64 import library matched the
+three WinMD sources and 371 C baselines. Two LLVM rebuilds produced identical
+libraries. The actual Rust binding used by ring produced the same ARM64 PE
+bytes with the original and reconstructed library. The offline source replay
+checked all 152 registry archive pins in the transport graph. Its next
+Windows ARM64 assessment runs the native observer, MSVC generator and all
+15 loopback cases with the reconstructed library.
+[Reconstruction receipts and source archive](rust/rw02-windows-imports.md).
+
+## X11 composition and native Orca output (2026-11-20)
+
+At the GUI source in `6c953e3`, the private Fedora X11 test received
+a nonempty preedit and committed `あ` from IBus Anthy. Independent AT-SPI
+read the committed text. Both X11 and Wayland runs passed the keyboard and
+language scenarios with Orca speaking the expected labels and protected
+input. Both produced real eSpeak samples on a private ALSA file device.
+Wayland composition, broader font coverage and accessibility on the other
+native targets remain open. [Desktop input evidence](rust/rw02-native-gui.md#native-composition-and-screen-reader-output).
+
+## Native X11 resource comparison (2026-11-20)
+
+Under three 100,000-file scans, the Rust GUI and synthetic inventory worker
+met all 11 precommitted reference bounds on Fedora x64/X11. Median startup
+was 176.99 ms. Visible and hidden RSS were 125.617 MiB. The median of the
+three close p95s was 10.51 ms, with one individual p95 at 15.76 ms against
+a 15.61 ms bound. Reopen was 1.44 ms. Native presentation and XDamage
+counters both stayed at zero during idle and rose after reopen. The hidden
+worker found a newly created file after 4.82 seconds and drained at Quit.
+The exact executable passed all four lifecycle cases and keyboard checks on
+X11 and Wayland. The other native environments and graphics recovery remain
+open. [Paired runs, rule and artifact hashes](rust/rw02-performance.md#paired-x11-measurements).
+
+## Real portal grants, SMB and desktop input (2026-11-20)
+
+Three Fedora grant runs added an in-grant symlink to a readable control. The
+adapter's own policy refused both existing symlinks. Independent review closed
+the earlier ambiguous refusal and verified the private daemon builds, source
+bindings and YAML archive. The [service evidence index](../tools/rust-qa/linux-services/evidence.sha256)
+binds the strengthened runs on the stock, pristine and patched daemons.
+
+The native Ubuntu assessment now includes the same tray ownership and FUSE
+grant tests, with a separate read-only offline .NET reference build. The
+Fedora reference build completed with zero compiler warnings or errors.
+Hosted observations for these two new steps remain pending.
+
+On Windows x64, both independent shortcut readbacks passed. The shell accepted
+the icon, reported the notification shown, and accepted re-registration.
+The native Windows ARM64 shortcut readbacks and cleanup passed, while the
+independent PowerShell readers timed out and Explorer refused the icon.
+The next candidate run tests the scripting hosts for each capability before
+launching the native probe. Both Windows targets passed the updated cross-target
+Clippy check, and five host-selection and cleanup regressions passed locally.
+[Windows Shell evidence](rust/rw02-windows-services.md#native-observations-on-both-windows-architectures).
+
+On Fedora x64 both the shipping .NET reader and Rust encountered `ENOSYS`
+when requesting their shared upload lock through a real Documents grant.
+Both acquired it on a private build of 1.22.1 with the upstream flock fix.
+Cross-view cooperating writers received `EAGAIN` while the reader held its
+lock and could write after release. The independent tests also verified
+write refusal, publication, cancellation and revocation through the portal.
+The native tray service recovered from watcher replacement and ignored a
+late acknowledgement from the prior owner. [Linux service and portal evidence](rust/rw02-linux-services.md).
+
+Both native Windows targets passed 13 filesystem tests over encrypted SMB
+3.1.1 at `4961746`. Both Ubuntu architectures passed four native GUI lifecycle
+cases and the complete AT-SPI keyboard, language, protected-field and
+clipboard scenario under X11 and Wayland. [Filesystem evidence](rust/rw02-filesystem.md#four-native-hosts)
+and [native desktop evidence](rust/rw02-native-gui.md).
+
+## Cross-platform source archive identity (2026-11-20)
+
+At `4961746` the Ubuntu YAML jobs correctly refused the compressed bundle
+digest from Fedora. Both archives contained the same 19,486,720-byte tar as
+the local reference. The source inventory now binds this canonical tar to
+`f4caf0051b7bfd73f366bf3918721ddc6f0ebd35dd526fed1ddbd1335a8cab05`.
+All package checksums, filtered files, licenses and target features matched
+the previous inventory. The new local run passed all 13 steps and verified
+all 204 indexed evidence files. Four native reruns are required for YAML.
+[Source evidence](rust/rw02-yaml.md#reviewed-inputs-and-corresponding-sources).
+
+## Native Linux lifecycle and SMB fixture follow-up (2026-11-20)
+
+Both Ubuntu targets passed all four native GUI lifecycle cases on X11 and
+Wayland at `06298d9`. The input observer then timed out on an empty AT-SPI
+desktop. The revised fixture uses an in-memory settings backend on its
+private bus and checks the application's accessibility tree by process ID.
+Local X11 and Wayland both passed the full input case with the change.
+[Native assessment](rust/rw02-native-gui.md).
+
+On both Windows targets the temporary SMB share passed the ACL, encryption
+configuration and UNC marker checks. The connection query then supplied a
+parameter that the runner's cmdlet does not support. Filtering the returned
+connections by the fixture's exact share name preserves the negotiated
+dialect and encryption checks. Native Rust operations over SMB still need
+the follow-up run. [SMB job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44818255768)
+and [cmdlet reference](https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbconnection).
+
+## YAML round-trip and filtered build inputs (2026-11-20)
+
+The [YAML feasibility fixture](rust/rw02-yaml.md) passed 183 Rust differential
+checks across 38 synthetic cases and 116 assertions reading the Rust-written
+files through the production .NET reader on Linux x64. Cases include repeated
+keys, aliases, explicit nulls, absent fields, unknown keys and integer
+spellings. The offline release build used a fresh Cargo home and a filtered
+source bundle with SHA-256
+`b453c3cb5bc96839ae7766d40beae9b7dc97bea3ec1860150babb5b981d15714`.
+The bundle retained 1,571 source files and 68 original notices. The source
+filter, Rust parser budgets, formatter and Clippy passed. All 203 indexed
+evidence files matched their hashes. Only the fresh run output is included in
+the hosted artifact. Results for the remaining native hosts and migration
+verification are pending.
+
+## Windows desktop lifecycle and native service probes (2026-11-20)
+
+Windows x64 and ARM64 each passed all four native DX12 lifecycle cases at
+`167a03d`. A separate Windows observer confirmed zero show events on a
+never-activated background start. The four downloaded assessment archives
+matched the Actions digests and the nested SQLite and network evidence
+hashes. All four hosts backed up both live WALs, passed 40 C# readback
+assertions, and completed 15 isolated TLS/polling/WebSocket cases.
+[Per-host results and archive digests](rust/rw02-native-gui.md#four-native-assessment-archives).
+
+The [Windows services fixture](rust/rw02-windows-services.md) adds real Shell
+icon/notification requests, a private-desktop fallback and per-user COM
+shortcuts with independent WScript and UI Automation observations. Both
+target ABIs passed cross-Clippy and the three recovery cases passed locally.
+Native service results come from its dedicated Windows job steps.
+
+## First hosted desktop and storage assessment (2026-11-20)
+
+At `167a03d` the SQLite and network steps passed on Windows and Linux x64 and
+ARM64. The GUI on the two Ubuntu runners reached Clippy and then Bubblewrap
+was denied the operation to set up the private loopback interface. The GUI
+executable did not run there. The job now probes the distribution launcher
+and, on restricted disposable Ubuntu hosts, provisions an owner-controlled
+copy of the launcher with Ubuntu's per-executable user-namespace permission.
+It verifies the caller UID, runs the existing isolated fixture, and removes
+the temporary profile and executable at job end. The rerun is the evidence
+for this provisioning change. [Assessment run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389612)
+and [Ubuntu user-namespace policy](https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890/1).
+
+The [general PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44815614962)
+passed all eight jobs at `7ba7056`. Its hidden=false smoke check exercised the
+retry against the exact uploaded ID. All eight passed again at `167a03d`,
+alongside all four [compatibility](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389013)
+and [filesystem/codec](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44816389480) jobs.
+
+## Native GUI, storage and transport assessments (2026-11-20)
+
+The development fixtures now exercise three RW-02 paths on a native Linux x64
+host. The [GUI](rust/rw02-native-gui.md) with its lazy window lifecycle opened,
+closed and reopened on X11 and Wayland. The Linux release build using the
+reviewed 232 external packages for that target and two Noto fonts has SHA-256
+`06abf418bfefa3a0b21011663e2ba9d234767c6ebc21d87c84f27f52c1bbd4d9`.
+The [storage assessment](rust/rw02-storage-inputs.md) verified 31 original source
+archives and exercised two live 24,752-byte WALs. The shipping C# readers made
+40 successful assertions across the originals and backups. The same WAL
+initializer refused future schema 99 before changing either synthetic database.
+The [transport](rust/rw02-realtime-transport.md) completed 15 controlled sessions
+including scoped TLS, redirects, authentication, limits and inventory recovery.
+
+The next hosted assessment exercises those probes natively with separate
+observations on Windows/Linux x64/ARM64. RW-02 also needs the remaining
+native desktop services, portal/filesystem coverage, YAML handling and
+performance evidence before stack selection.
+
+## First four native Rust feasibility results (2026-11-20)
+
+All four archives from [the clean `4dcccb7` run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811901356)
+matched their published ZIP digests. Each Windows host passed 27 Rust tests,
+including distinct NTFS short-name denial. Each Linux host passed 30 tests.
+All four passed five window-policy traces and 5,844 C#/Rust scalar comparisons.
+Their .NET 10.0.15 reference casing maps are byte-identical. The Fedora map
+differs at 55 scalars. [Per-host counts and hashes](rust/rw02-filesystem.md#four-native-hosts).
+
+RW-02 continues with native window, storage, transport and desktop-service
+probes. Linux x64 observed the eframe startup flash independently on X11.
+Delaying window creation until activation passed hidden start, close, reopen,
+missing-tray startup and orderly quit on both X11 and Wayland. Broader native
+integration, accessibility, graphics fallback and the Rust resource comparison
+remain open.
+
+The general PR CI twice failed to download newly finalized synthetic Pages
+artifacts at `4dcccb7`. The logs show the upload IDs and an index response
+within one second that omitted them. The API subsequently returned those IDs
+and their digests. Retrying an entire job generated new IDs and reproduced
+the failure. The nonpublishing smoke check now retries the same ID once after
+30 seconds and still requires the tar contents to verify. Its next hosted
+run must confirm the result. [Affected PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44811912153).
+
+## RW-02 filesystem review and hosted follow-up (2026-11-20)
+
+The independent [filesystem re-review](rust/rw02-filesystem.md#independent-review-of-the-feasibility-boundary)
+closed the staging-acknowledgement and short-name coverage findings in source.
+The corrected implementation passed 16 Linux filesystem tests on tmpfs and
+Btrfs, including a real rename followed by an injected lost acknowledgement.
+The native Windows workflow now requires a distinct working alias and the
+protected API's denial. The first follow-up Windows run installed the pinned
+compiler and reached Clippy, which requested typed two-byte UTF-16 chunks.
+The implementation now uses that form. [Windows follow-up](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44810590778).
+
+Both Linux artifacts of the original hosted feasibility run matched their
+published ZIP digests and recorded clean `2ff9880` sources. Their uppercase
+maps are byte-identical. Direct comparison to Fedora found 55 differing scalar
+mappings. U+019B stays U+019B on the hosted references and maps to U+A7DC on
+the local reference. The existing stored key is authoritative during migration.
+
+## First hosted Rust results (2026-11-20)
+
+At `2ff988095045739b6eeb0735750f5ec9aa9baca6` both Linux hosts passed all 27
+Rust tests, five window-policy traces and 5,844 scalar comparisons. The two
+Ubuntu references each produced 1,449 non-identity Unicode scalar mappings.
+The Fedora reference produced 1,504. Each probe used its native reference map.
+Migration must preserve stored keys and qualify conversion across legacy
+environments before choosing a production normalizer.
+[Native jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44808944620).
+
+The first Windows runs stopped during toolchain installation. Native Python's
+CRLF output appended a carriage return to the checksum field read by Bash.
+The installer now emits a binary ASCII record, exercised with simulated
+Windows newlines. Subsequent Windows jobs must supply the native results.
+Independent source review requested explicit reconciliation after an
+unacknowledged rename and observable coverage of distinct NTFS short names.
+
+## RW-02 first Rust native probes (2026-11-20)
+
+The four native Rust distributions are pinned to 1.100.0, compiler
+`0ef1bc386059596dada8fb65b50425aab2ea637a`. The verified Linux x64 distribution
+ran the workspace locally. Rustfmt, Clippy with warnings denied, 27 tests,
+release probe builds, five C# window trace comparisons and 5,844 native scalar
+comparisons passed. The workspace lock contains four unpublished first-party
+crates. The accepted .NET resource reference is checkpoint `4245831`.
+
+The [filesystem tests](rust/rw02-filesystem.md) ran on tmpfs and Btrfs. The
+[legacy scalar probe](rust/rw02-legacy.md) tested both SQLite casing modes and
+1,335 reference timestamps. The [realtime assessment](rust/rw02-realtime.md)
+identified transport settings that rule out unmodified rust_socketio 0.6.0.
+The [GUI review](rust/rw02-gui-dependencies.md) identifies exact source and
+notice inputs. Native desktop, network-session, database/YAML and manual
+accessibility evidence remain open. The new four-host workflow records Rust
+results and regenerated oracle comparisons at the source SHA. Verify its
+first run, review the filesystem boundary independently and continue the GUI
+and transport assessments.
+
+## RW-02 Linux performance reference measured (2026-11-20)
+
+The Linux x64 .NET reference completed three isolated 100,000-file scans with
+35 close and 37 activation responses during traversal. Median startup was
+906.63 ms and median hidden RSS was 233.262 MiB. The instrumented compositor
+observed zero render passes in the 15-second idle windows and observed a render
+after each reopening. The [measurement and budgets](rust/rw02-performance.md)
+give the exact build, workload, driver, environment and raw evidence digest.
+The Rust comparison on this host and the other native desktop environments
+are pending.
+
+At `27f5b02848a51bcdb63b4cf930bc5154c74bbd82`, all four native reference
+jobs passed the checked-in golden comparison and all eight PR CI jobs passed.
+[Golden rerun](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803987836)
+and [PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/44803996983).
+
+## RW-01 accepted and RW-02 started (2026-11-20)
+
+The user resumed `M-RUST-IMPLEMENTATION-20261114` in its original Goal run.
+The active chat, branch and open [draft PR #46](https://github.com/VoltKraft/immich-folder-watch/pull/46)
+were verified at source `3ca5b0a89d266e61e219239f84d896dc71528ba0`.
+
+The [native reference run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634286661)
+passed on all four targets. Both Windows architectures produced identical golden
+files, as did both Linux architectures. The four downloaded archives matched
+GitHub's digests. The [native evidence](rust/rw01-native-reference.md) records
+the platform path/encoding differences and the nine Linux-specific tests skipped
+on Windows. All nine passed on both Linux architectures. The existing
+[PR CI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/43634333824)
+also passed. Every PAR row and security rule has a reference or an explicit
+stronger candidate requirement in the [parity mapping](rust/rw01-parity.md).
+
+RW-02 is active. Its first work covers the GUI feature and font audit, the
+native filesystem and legacy codecs, and an isolated .NET desktop resource
+baseline for side-by-side measurement. The [acceptance record](rust/acceptance.md)
+tracks the remaining native gates.
+
+## RW-01 local compatibility baseline verified (2026-11-14)
+
+- Goal remains active under `M-RUST-IMPLEMENTATION-20261114`; selection checkpoint
+  `8d517342b0ebc9d0a6379be67ac32272269abded`. RW-01 remains in progress until native
+  platform outputs are collected/reviewed. RW-02 dependency research is independent
+  preparation; no later gate is declared passed.
+- Added the [storage oracle](rust/rw01-storage-contract.md): 29 generated Linux
+  files and 215 assertions, with hashes of 10 C#/oracle sources and 28 payloads.
+  Added [63 behavior cases](rust/rw01-behavior-contract.md) and five real-view
+  [window lifecycle traces](rust/rw01-parity.md). All inputs are synthetic; production
+  application code, configuration, state and package dependencies are unchanged.
+- Local native Linux x64 checks with SDK 10.0.401/runtime 10.0.12: existing portable
+  suite 503/503; existing Linux headless/protocol suite 60/60; new behavior corpus
+  63/63; new lifecycle corpus 5/5. Storage export and independent verification pass;
+  an intentional ARM64 assertion on x64 fails before fixture generation. Reduced
+  Avalonia provenance verification passes. Existing obsolete D-Bus/Bitmap API
+  warnings remain; oracle restore reported NU1900 when advisory retrieval was
+  unavailable. No skipped application tests in these four executed suites.
+- Raw TRX/log evidence is in ignored `artifacts/rust/baseline-results/`,
+  `artifacts/rust/behavior/results/` and `artifacts/rust/`. Commands and fixture
+  limits are in [development](development.md#rust-rewrite-reference-corpus).
+- Independent read-only review checked oracle/test isolation, native architecture
+  assertion, source/payload hashes and candidate workflow. No open blocking finding.
+  Renamed a success-only journal observation so it does not claim failure atomicity.
+  [Security mapping](rust/rw01-security-contract.md) explicitly retains legacy
+  future-schema WAL mutation, Windows cross-session writer and config durability,
+  IPC deadline and parser-bound gaps as stronger Rust acceptance requirements.
+- Prepared `Rust compatibility reference` workflow: four native OS/architecture
+  lanes, read-only permissions, exact action/SDK pins, source-SHA artifact names,
+  branch/job restriction to `rewrite/rust`, no signing/publication path. New and
+  existing workflow security checks: seven passed; four PowerShell-only cases
+  skipped locally and retained for Windows CI. Workflow preparation is not execution.
+- Next action: commit/push this reference checkpoint, create the authorized single
+  draft PR, collect native C# reference evidence including Windows golden output,
+  review platform differences, and close RW-01 only after its evidence is sufficient.
+
+## Rust implementation Goal selected (2026-11-14)
+
+- Active milestone: `M-RUST-IMPLEMENTATION-20261114`; fixed RI-AC01 through RI-AC10
+  in the [brief](project.md#m-rust-implementation-20261114), RW-01 through RW-07 as
+  one assignment. The user's full implementation request supersedes the historical
+  analysis-only scope. RW-08/publication remains excluded.
+- Actual Goal control returned `active`; run/chat reference
+  `01a1db8f-b8ef-7903-8dfc-932f9b39c743`, created 2026-11-14. No token budget was
+  requested. This record does not activate or transfer a goal in another chat.
+- Verified before changes: `rewrite/rust`, clean tree, HEAD
+  `009246552cb4c0091196bab9a58cd64d44e5b629`. Local and live GitHub `main` remain
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`; no existing rewrite PR was found.
+- Persisted goal boundaries and [acceptance matrix](rust/acceptance.md). RW-01
+  synthetic storage/config oracle, behavior fixtures and independent security/
+  workflow-trigger audit are assigned with disjoint ownership. No Rust capability
+  or native acceptance is claimed at selection.
+- Environment: .NET/Rust tools are absent from PATH; `/home/jan/.dotnet` supplies
+  only SDK 10.0.203, which correctly refuses the pinned 10.0.401 project. Verified
+  `artifacts/flatpak-local-2.11.2/sdk/dotnet --info`: SDK 10.0.401, runtime 10.0.12,
+  Linux x64. Baseline tests use this existing SDK and isolated outputs; `global.json`
+  is unchanged. The sandbox refused MSBuild's local IPC sockets; an authorized
+  execution outside that restriction is running, without application/profile startup.
+- Independent static workflow audit: existing `rewrite/rust` pushes trigger no
+  shipping CI; PR CI is read-only. Release requires successful same-repository
+  push CI on `main` (or explicit dispatch on `main`); downstream publication has
+  separate release/manual triggers. No publication workflow is dispatched.
+  Local workflow-security suite: six passed, four PowerShell-only cases skipped.
+- Next action: finish and run RW-01 fixtures against the C# reference, map every
+  parity/security rule, independently review the evidence and then begin RW-02.
+  Audit publication triggers before the first authorized branch push/draft PR.
+- Template cleanup was already completed on 2026-10-16; no reinitialization.
+
+## Rust rewrite branch established (2026-11-14)
+
+- User selected a dedicated branch for the existing rewrite changes and all
+  subsequent rewrite work. Created and checked out `rewrite/rust`, preserving
+  planning commit `c123ce9d253d72c928ac83892984a30f2748a576` unchanged.
+- Moved local `main` back to its preceding commit
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc` with an expected-old-value ref update,
+  after securing the planning commit on the new branch. No working files were
+  reset and no commit was lost. Local `main` equals the existing `origin/main`
+  tracking ref; no fetch or remote update occurred.
+- Recorded the branch in AGENTS.md and the brief. Branch/ref checks confirm that
+  the seven-file planning change is on `rewrite/rust` and absent from `main`.
+  This follow-up changes only branch guidance/status; runtime files, the detailed
+  rewrite plan and desktop standard are unchanged. No application tests are
+  required for branch organization and documentation.
+- Next action: continue review and subsequently selected implementation work on
+  `rewrite/rust`. RW-01 through RW-08 remain unstarted. No push, merge, release or
+  implementation is performed by this branch migration.
+
+## Rust rewrite analysis and standard proposal (2026-11-14)
+
+- Selected milestone: `M-RUST-ANALYSIS-20261114` / RW-00; completed for analysis
+  and planning only, `RUST-AC01` through `RUST-AC06` met. User explicitly defers
+  implementation and confirms that all first-party application/GUI code must be
+  Rust while native libraries and SQLite are allowed.
+  No Goal was requested or started.
+- Baseline inspected: clean local `main` at
+  `19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc`, product 3.0.4 and SDK 10.0.401 with
+  roll-forward disabled. No fetch; historical CI/catalog evidence is not renewed.
+- Prepared [rewrite assessment and migration plan](rust-rewrite-plan.md) and
+  [Rust Desktop Standard proposal](rust-desktop-standard.md), with current source
+  evidence for egui/eframe, alternatives and native integration. Preferred egui
+  selection remains conditional on actual lifecycle/accessibility/GPU/native
+  tests, full dependency/license inventory and independently reviewed fonts.
+- Recorded exact YAML/SQLite identity/codec contracts, startup authority revocation,
+  retained-handle filesystem invariants, single-instance interoperability,
+  backup/cutover/rollback rules, four-target packaging and phased acceptance.
+  The Windows Event Log message-resource dependency and incomplete notification
+  parity are explicitly included. No existing residual risk is marked repaired.
+- Updated project/entry/README links and the Unreleased documentation entry;
+  corrected the brief's stale SDK description against `global.json`. Product
+  sources, build files, dependency pins, versions, release history and runtime
+  user data remain unchanged. No Rust scaffold, build, test execution, installation,
+  live Immich request, push or publication occurred.
+- Validation: independent security/compatibility and GUI/license/reuse reviews
+  completed. Incorporated cross-session Windows writer-exclusion and exact startup
+  ordering gates; corrected native-toolkit language eligibility and kept locales
+  product-configurable. The security reviewer verified the corrections. Local
+  Markdown target/anchor checks, code-fence balance, documentation-only scope and
+  `git diff --check` pass. Product tests are intentionally not run for this
+  documentation-only assignment; no native spike or resolved-graph license
+  certification is implied. Keep the final local checkpoint hash in the chat
+  handoff; no push is selected.
+- Next action: user review/selection of the proposed plan. After explicit
+  implementation selection, start RW-01. RW-01 through RW-08 are proposed and
+  unstarted; do not infer implementation authorization from these documents or a generic
+  continuation prompt.
+
 ## Release 3.0.4 published and WinGet submitted (2026-11-13)
 
 - Published [v3.0.4](https://github.com/VoltKraft/immich-folder-watch/releases/tag/v3.0.4)

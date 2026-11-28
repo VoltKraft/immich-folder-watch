@@ -1,0 +1,7 @@
+{
+  "CommittedWalPresent": true,
+  "BackupApi": "Microsoft.Data.Sqlite.SqliteConnection.BackupDatabase",
+  "ExpectedLastSuccessfulSyncUtc": "2024-03-05T03:04:05.1234567+00:00",
+  "IntegrityCheck": "ok",
+  "Boundary": "Storage primitive only; no engine quiescence, process crash, disk-full or application rollback acceptance implied."
+}

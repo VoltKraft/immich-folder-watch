@@ -1,0 +1,57 @@
+name: Compile Windows x64 storage inputs for the local VM
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-x64-storage-build.yaml'
+      - '.gitattributes'
+      - 'global.json'
+      - 'Directory.Build.*'
+      - 'NuGet.Config'
+      - 'src/ImmichFolderWatch.Core/**'
+      - 'rust/Cargo.toml'
+      - 'rust/toolchain-inputs.json'
+      - 'rust/crates/ifw-legacy/**'
+      - 'rust/tests/fixtures/legacy/windows/**'
+      - 'tools/rust-qa/storage/**'
+      - 'tools/rust-qa/check-toolchain.py'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/enter-windows-build.ps1'
+      - 'tools/rust-qa/legacy/InvariantUppercaseProfile.cs'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh x86_64-pc-windows-msvc
+
+      - name: Build the audited SQLite assessment and shipping-format reader
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/storage/run.py x86_64-pc-windows-msvc --compile-for-local-vm --output artifacts/rust/local-vm-inputs/storage
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-storage-windows-x64-${{ github.sha }}
+          path: artifacts/rust/local-vm-inputs/storage/guest/
+          if-no-files-found: error
+          retention-days: 14

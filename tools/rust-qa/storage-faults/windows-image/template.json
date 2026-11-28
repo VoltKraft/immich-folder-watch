@@ -1,0 +1,15 @@
+{
+  "format": "ifw-empty-fat16-v1",
+  "filesystem_bytes": 15728640,
+  "filesystem_sha256": "7a2e1de34d343d0ed8e6844c1011b7b1f4867b73df6e4d06adb6e2c362ef3f93",
+  "compressed_sha256": "adf67fb9d2e2c2d46fdeb0866eedeb318585b9654a25ef26a26524f46aad7de3",
+  "compressed_bytes": 15409,
+  "license_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+  "generator_source_url": "https://github.com/dosfstools/dosfstools/releases/download/v4.2/dosfstools-4.2.tar.gz",
+  "generator_source_sha256": "64926eebf90092dca21b14259a5301b7b98e7b1943e8a201c7d726084809b527",
+  "license": "GPL-3.0-or-later",
+  "zeroed_boot_code_range": [
+    62,
+    510
+  ]
+}

@@ -1,0 +1,112 @@
+name: Rust Linux ARM64 portal grants and GNOME notification
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-linux-notification.yaml'
+      - 'tools/rust-qa/portal-dialog/**'
+      - '!tools/rust-qa/portal-dialog/*.md'
+      - 'tools/rust-qa/hosted-linux-namespace.*'
+      - 'tools/rust-qa/performance/linux.py'
+      - 'tools/rust-qa/performance/session.py'
+      - 'tools/rust-qa/performance/x11.py'
+      - 'tools/rust-qa/linux-services/native.py'
+      - 'tools/rust-qa/gui/source_profile.py'
+      - 'rust/toolchain-inputs.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notification:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned native Rust compiler
+        run: bash tools/rust-qa/install-toolchain.sh aarch64-unknown-linux-gnu
+
+      - name: Prepare the native GNOME Shell, Flatpak and private display
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus python3-gi gir1.2-glib-2.0 \
+            xvfb x11-utils libxtst6 libxdamage1 libxres1 libwayland-dev libxkbcommon-x11-0 pkg-config \
+            gnome-shell mutter xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome \
+            flatpak ostree fuse3 gnupg mesa-vulkan-drivers libgl1-mesa-dri \
+            pipewire wireplumber gstreamer1.0-tools gstreamer1.0-pipewire gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
+            python3-pil libtesseract5 tesseract-ocr-eng
+          mkdir -p artifacts/rust/portal-dialog
+          dpkg-query -W gnome-shell xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
+            pipewire wireplumber gstreamer1.0-pipewire flatpak python3-pil libtesseract5 tesseract-ocr-eng \
+            > artifacts/rust/portal-dialog/native-packages.txt
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Check the pixel and D-Bus readers and build the frozen Rust portal sender
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          /usr/bin/python3 -B -m unittest discover -s tools/rust-qa/portal-dialog -p 'test_notification.py'
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py --fetch
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py --test
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py
+
+      - name: Install the signed Platform in the disposable runner profile
+        id: platform
+        run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/hosted_runtime.py
+
+      - name: Observe the installed sender on its private GNOME display
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: |
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/native.py wayland --flatpak --gnome \
+            --notification-only --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Read the message list before posting, after delivery and after withdrawal
+        run: |
+          area=artifacts/rust/portal-dialog
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/notification_readback.py \
+            "$area"/gnome-wayland-flatpak-* "$area/build/release/portal-dialog-assessment" \
+            --arch aarch64 --revision "$GITHUB_SHA" --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            > "$area/notification-readback.json"
+
+      - name: Open and revoke the two installed X11 directory grants
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Open and revoke the two installed Wayland directory grants
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Retain native observations and sender
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-linux-notification-arm64-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            artifacts/rust/portal-dialog/build-inputs.json
+            artifacts/rust/portal-dialog/native-packages.txt
+            artifacts/rust/portal-dialog/build/release/portal-dialog-assessment
+            artifacts/rust/portal-dialog/x11-flatpak-*/*.json
+            artifacts/rust/portal-dialog/x11-flatpak-*/*.log
+            artifacts/rust/portal-dialog/wayland-flatpak-*/*.json
+            artifacts/rust/portal-dialog/wayland-flatpak-*/*.log
+            artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.json
+            artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.log
+            artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.png
+            artifacts/rust/portal-dialog/notification-readback.json
+
+      - name: Remove the job-specific namespace launcher
+        if: ${{ always() }}
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup

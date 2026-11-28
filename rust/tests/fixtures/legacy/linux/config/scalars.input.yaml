@@ -1,0 +1,26 @@
+immich:
+  serverApiUrl: 'https://immich.example.invalid/api'
+  apiKey: 'RW01-SYNTHETIC-NOT-A-CREDENTIAL'
+  allowInsecureHttp: true
+watch:
+  sources:
+    - path: 'C:\Pictures\2024'
+      albumName: 'null'
+      includeSubdirectories: true
+      extensions: ['jpg', '.MOV']
+      syncMode: sync
+    - path: '001'
+      albumName: '123'
+      deleteAfterUpload: true
+      syncMode: uploadAll
+    - path: 'Média/日本語/😀'
+      albumName: 'true'
+    - path: 'colon: hash#'
+      albumName: 'a: b # c'
+retry:
+  maxAttempts: 7
+  baseDelayMilliseconds: 123
+logging:
+  target: file
+localization:
+  language: en

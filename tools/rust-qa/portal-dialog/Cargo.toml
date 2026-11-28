@@ -1,0 +1,21 @@
+[package]
+name = "portal-dialog-assessment"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+async-io = "=2.6.0"
+blocking = "=1.7.0"
+futures-lite = "=2.6.1"
+raw-window-handle = "=0.6.2"
+safe-fs = { path = "../../../rust/crates/safe-fs" }
+wayland-backend = { version = "=0.3.17", features = ["client_system", "dlopen"] }
+wayland-client = "=0.31.15"
+wayland-protocols = { version = "=0.32.13", features = ["client", "unstable"] }
+winit = { version = "=0.30.13", default-features = false, features = ["rwh_06", "wayland", "x11"] }
+zbus = { version = "=5.19.0", default-features = false, features = ["async-io"] }

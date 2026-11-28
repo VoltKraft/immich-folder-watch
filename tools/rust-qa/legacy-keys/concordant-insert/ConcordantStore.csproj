@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <StartupObject>ImmichFolderWatch.StorageAssessment.ConcordantStore</StartupObject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../src/ImmichFolderWatch.Core/ImmichFolderWatch.Core.csproj" />
+    <Compile Include="../../legacy/InvariantUppercaseProfile.cs" Link="InvariantUppercaseProfile.cs" />
+    <Compile Include="../../storage/dotnet/CasingCases.cs" Link="CasingCases.cs" />
+    <Compile Include="../new-entry/Readback.cs" Link="Readback.cs" />
+    <Compile Include="../rollback-upsert/Rollback.cs" Link="Rollback.cs" />
+  </ItemGroup>
+</Project>

@@ -46,3 +46,15 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore(deps)
+
+  - package-ecosystem: cargo
+    directory: /rust
+    target-branch: rewrite/rust
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)

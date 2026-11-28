@@ -1,0 +1,33 @@
+{
+  "version": "3.0.4",
+  "tag": "v3.0.4",
+  "commit": "4149763b7f322603a012aebad5f8a252450eb08b",
+  "repository": "VoltKraft/immich-folder-watch",
+  "releaseId": 444746888,
+  "assets": {
+    "linux-x64": {
+      "id": 745213366,
+      "name": "immich-folder-watch-3.0.4-linux-x64.flatpak",
+      "bytes": 33929104,
+      "sha256": "2fbd98827ccb5bd142a3d00710c7dbac692a103993623e6d6ab11569d54324cc"
+    },
+    "linux-arm64": {
+      "id": 745213373,
+      "name": "immich-folder-watch-3.0.4-linux-arm64.flatpak",
+      "bytes": 30531728,
+      "sha256": "b5bb588a93ca8ac95875321d528adfc35e5fa5ed773b6c80eddbef6713c2bda4"
+    },
+    "windows-x64": {
+      "id": 745213371,
+      "name": "immich-folder-watch-3.0.4-win-x64.msi",
+      "bytes": 54796470,
+      "sha256": "419938c3fec0c113bf0f33dbf1a9bd4a6748df1e7930acb20fec5fc3f265a187"
+    },
+    "windows-arm64": {
+      "id": 745213370,
+      "name": "immich-folder-watch-3.0.4-win-arm64.msi",
+      "bytes": 49430591,
+      "sha256": "7669e1dfa319fa012e01dd7d728456716b1a1040478429b4137c7ba7fbfd11da"
+    }
+  }
+}

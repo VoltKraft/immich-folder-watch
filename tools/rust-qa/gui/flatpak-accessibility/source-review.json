@@ -1,0 +1,34 @@
+{
+  "archiveSha256": "30d5192871228c54f1b0fb4a85cef000e11a3804f25d2165f14afa0daa67f3f6",
+  "compilerTree": {
+    "files": 28,
+    "sha256": "5d2c0ad1d4ca2534018a9ede877a77c1c3fd9470c01707ef4bf493ed1ad34f0f"
+  },
+  "crate": "accesskit_unix-0.24.1",
+  "files": {
+    "src/atspi/bus.rs": {
+      "after": "4b3d42bc788d485320fcf2a0136991c8c545720e747976a0f1eb07040aa5054b",
+      "before": "3e29c138a0e5da9b884638e62d54a0f44acd1d6c8b1dddd8a91d1761d6e480b2"
+    },
+    "src/context.rs": {
+      "after": "4f9493fd8afd347edc18de8967da37a1bd0d4947a3506f8e835958b95063969e",
+      "before": "af91b78d479ea7c857557e94ae8ee8e258763976f14cc37f897e8f2eff0a05df"
+    }
+  },
+  "notices": {
+    "accesskit-Apache-2.0": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+    "accesskit-Chromium-BSD": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
+    "accesskit-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+  },
+  "originalTree": {
+    "files": 28,
+    "sha256": "aea5404726ec1310d727fbc4f9f093fe2e3743a692ff494dc5be53c3d249bb69"
+  },
+  "patchSha256": "19e869d57178174b6f704a5fc507d54ae5b8af3eee949211990f2c5f5c90ba69",
+  "sourceRevision": {
+    "git": {
+      "sha1": "f3026222559c7f5f46d8f25cb7404de68eb149f0"
+    },
+    "path_in_vcs": "adapters/unix"
+  }
+}

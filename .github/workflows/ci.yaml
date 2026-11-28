@@ -14,20 +14,37 @@ on:
       - '**/*.md'
       - 'docs/**'
   workflow_dispatch:
+    inputs:
+      rw02_editor_arm64:
+        description: Run only the native Ubuntu ARM64 Rust editor assessment on rewrite/rust
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  rw02-editor-arm64:
+    if: github.event_name == 'workflow_dispatch' && inputs.rw02_editor_arm64 && github.ref == 'refs/heads/rewrite/rust'
+    uses: ./.github/workflows/rust-ubuntu-arm64-editor.yaml
+
   validate-pages-artifact:
+    if: ${{ !inputs.rw02_editor_arm64 }}
     name: Validate Pages artifact
     uses: ./.github/workflows/pages-artifact-validation.yaml
 
   validate-flatpak:
+    if: ${{ !inputs.rw02_editor_arm64 }}
     name: Validate native Flatpak packages
     uses: ./.github/workflows/flatpak-validation.yaml
 
   build-windows:
+    # The rewrite's Windows x64 tests execute on its local Server 2025 VM.
+    if: >-
+      github.ref != 'refs/heads/rewrite/rust' &&
+      !inputs.rw02_editor_arm64 &&
+      !(github.event_name == 'pull_request' && github.head_ref == 'rewrite/rust' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
     name: Build and Test (windows-latest)
     runs-on: windows-latest
 
@@ -94,6 +111,7 @@ jobs:
           retention-days: 7
 
   build-linux:
+    if: ${{ !inputs.rw02_editor_arm64 }}
     name: Build and Test (ubuntu-latest)
     runs-on: ubuntu-latest
 
@@ -145,6 +163,7 @@ jobs:
           dotnet test src/ImmichFolderWatch.Tests.Linux/ImmichFolderWatch.Tests.Linux.csproj --configuration Release --no-build
 
   lint-flatpak:
+    if: ${{ !inputs.rw02_editor_arm64 }}
     name: Lint Flatpak packaging
     runs-on: ubuntu-latest
 

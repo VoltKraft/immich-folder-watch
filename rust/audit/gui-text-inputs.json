@@ -1,0 +1,133 @@
+{
+  "baseCrates": {
+    "egui": "bec9144f49b7a28b5f395d3147e325b4fe3e77ba686eac11d1bdf0a7da3f375f",
+    "epaint": "97bac86ae3dde93fc3951e790951caea739ff39a6c89d909cdaf1d9278dbb1bd"
+  },
+  "patchBase": "fc9d66dda742d722eedaa8684d23f86369cf8e5f",
+  "patchHead": "e0bc7924dac211c5ff727d55922662ce371ec819",
+  "appliedRustDiffSha256": "e88857f13581c6363781817cb7a3536fb1a089f1b11a6123479b08701cac3160",
+  "reconstructedTableSha256": "8cbe4b6a4fc690e76107d4654047d3f0d8988b870fc3234f76dc265ad2e2a9ca",
+  "nativeFeatureReports": {
+    "aarch64-pc-windows-msvc": {
+      "packages": 135,
+      "nativeFeatureSetsSha256": "d4257db8af496165dd32d43172d7d39142a5108fbccbab9a3105f8cf855d313b"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "packages": 250,
+      "nativeFeatureSetsSha256": "c428080cb3223c510832051d449526a6f6b125324d9b51a4337cb5f0fdac3201"
+    },
+    "x86_64-pc-windows-msvc": {
+      "packages": 135,
+      "nativeFeatureSetsSha256": "b32b53dc0616ce7d73e664dcdc5eb19f6ade2f1c6c6d8a96a4ef5e7b9e49a3e1"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "packages": 251,
+      "nativeFeatureSetsSha256": "ffba14418cefd6534b37a6ca7a5fb3dbdd5c4cd873074c59cf4d9cd50dbd15f2"
+    }
+  },
+  "fonts": {
+    "NotoSansSymbols2-Regular.ttf": {
+      "sha256": "630846d528dbe4c4981370a4d0a9475a1fd1491a129bb411f8e157cdb5de13c6",
+      "bytes": 656852,
+      "family": "Noto Sans Symbols2",
+      "copyright": [
+        "Copyright 2017 Google Inc. All Rights Reserved."
+      ],
+      "trademark": [
+        "Noto is a trademark of Google Inc."
+      ],
+      "version": "Version 2.003",
+      "notice": "OFL-1.1.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf"
+    },
+    "NotoSansArabic-Regular.ttf": {
+      "sha256": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+      "bytes": 240456,
+      "family": "Noto Sans Arabic",
+      "copyright": [
+        "Copyright 2015-2021 Google LLC. All Rights Reserved."
+      ],
+      "trademark": [
+        "Noto is a trademark of Google LLC"
+      ],
+      "version": "Version 2.009; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D arab -f none -a qsq -X \"\"",
+      "notice": "OFL-1.1.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf"
+    },
+    "NotoSansCJKjp-Regular.otf": {
+      "sha256": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5",
+      "bytes": 16467736,
+      "family": "Noto Sans CJK JP",
+      "copyright": [
+        "© 2014-2021 Adobe (http://www.adobe.com/)."
+      ],
+      "trademark": [
+        "Noto is a trademark of Google Inc."
+      ],
+      "version": "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603",
+      "notice": "OFL-CJK-1.1.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf"
+    }
+  },
+  "noticeFiles": {
+    "tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "rust/audit/notices/egui-MIT": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+    "rust/audit/notices/egui-Apache-2.0": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+    "rust/audit/notices/ucd-readme.txt": "14cafa23788d3a20dd21d6b0cdcb8d6dab520781fcd9ad9392f3b88ea607e633",
+    "rust/audit/notices/unicode-bidi-AUTHORS": "1ff3a7c8519b29544bb28ba9b1e7502df0cb764051fb9a1172e60006aa2b8dcc",
+    "rust/audit/notices/unicode-bidi-COPYRIGHT": "edb20b474f6cbd4f4db066b54a9e0f687d0009d309412a63431189b59b8e2a07",
+    "rust/audit/notices/unicode-bidi-LICENSE-APACHE": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "rust/audit/notices/unicode-bidi-LICENSE-MIT": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0",
+    "rust/assets/fonts/OFL-1.1.txt": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+    "rust/assets/fonts/OFL-CJK-1.1.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+  },
+  "trees": {
+    "egui": {
+      "files": 137,
+      "sha256": "3de18c96e5c4e6b0fb954a3038e18948ee01075a372885722ca2427a1c6986cd"
+    },
+    "epaint": {
+      "files": 59,
+      "sha256": "de790cf0d86e9040acfa80d0181a57d84f7bcdbb086d730b9252658ab38dc255"
+    },
+    "unicode-bidi": {
+      "files": 17,
+      "sha256": "117a1cfb3da4328ed8428ac7d29a87f42d0b26c9bfd7c3aa892db629d9bed781"
+    }
+  },
+  "unicodeBidiRevision": "580b9c6c68fdb689916017e61d5052be3ed349b5",
+  "originals": {
+    "pr-8828.diff": {
+      "url": "https://github.com/ahmedhosnypro/egui/compare/fc9d66dda742d722eedaa8684d23f86369cf8e5f...e0bc7924dac211c5ff727d55922662ce371ec819.diff",
+      "sha256": "6d849fed4a055ef4b9f7b198fb1d8f195d47f7c3e1ce2a1cc745953983ab569b"
+    },
+    "egui-LICENSE-MIT": {
+      "url": "https://raw.githubusercontent.com/ahmedhosnypro/egui/e0bc7924dac211c5ff727d55922662ce371ec819/LICENSE-MIT",
+      "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c"
+    },
+    "egui-LICENSE-APACHE": {
+      "url": "https://raw.githubusercontent.com/ahmedhosnypro/egui/e0bc7924dac211c5ff727d55922662ce371ec819/LICENSE-APACHE",
+      "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90"
+    },
+    "unicode-bidi-0.3.18.crate": {
+      "url": "https://static.crates.io/crates/unicode-bidi/unicode-bidi-0.3.18.crate",
+      "sha256": "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+    },
+    "unicode-bidi-source.tgz": {
+      "url": "https://codeload.github.com/servo/unicode-bidi/tar.gz/580b9c6c68fdb689916017e61d5052be3ed349b5",
+      "sha256": "f720ab2f8acbda7ca47b09f8145afb9418119057eeba0a8aa13733d775c38020"
+    },
+    "UnicodeData.txt": {
+      "url": "https://www.unicode.org/Public/16.0.0/ucd/UnicodeData.txt",
+      "sha256": "ff58e5823bd095166564a006e47d111130813dcf8bf234ef79fa51a870edb48f"
+    },
+    "BidiBrackets.txt": {
+      "url": "https://www.unicode.org/Public/16.0.0/ucd/BidiBrackets.txt",
+      "sha256": "b8f32554c6f658821fb0ee742d21c5b1f2086b9bf13071fed04894b022f93d67"
+    },
+    "ucd-readme.txt": {
+      "url": "https://www.unicode.org/Public/16.0.0/ucd/ReadMe.txt",
+      "sha256": "14cafa23788d3a20dd21d6b0cdcb8d6dab520781fcd9ad9392f3b88ea607e633"
+    }
+  }
+}

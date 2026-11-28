@@ -1,0 +1,524 @@
+"""Measure the selected Windows GUI on the displays and transport of an existing test session."""
+
+import argparse
+from contextlib import ExitStack, contextmanager
+import ctypes as c
+from ctypes import wintypes as w
+import json
+import math
+import os
+from pathlib import Path
+import runpy
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+
+HERE = Path(__file__).resolve().parent
+QA, ROOT = HERE.parent, HERE.parents[2]
+sys.path[:0] = [str(QA / "windows-text"), str(QA / "windows-desktop"), str(QA / "windows-performance"), str(QA)]
+from native import Win32, pin_path, start_owned_subject
+from storage.evidence import sha256, write_json
+from win32 import Desktop, GA_ROOT, GWL_EXSTYLE, WS_EX_TOPMOST, check, ordinary_console, rect_values
+from worker import hosted, named_desktop, powershell, shared_windows
+from windows_observer import private_gui_environment as environment, private_profile, select_powershell
+from topology import Topology, active_input, contains, physical_coordinates, protocol
+
+TEXT = runpy.run_path(str(QA / "windows-text/run.py"))
+FIRST, SECOND = "IFW MMMM 27.jpg", "IFW IIII 27.jpg"
+QUALIFICATIONS = {"source-frame": "sourceFrameObserved", "mixed-dpi": "mixedDpiPassed", "rdp": "rdpRenderingObserved"}
+
+
+def wait_for(read, label, timeout=35):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        value = read()
+        if value:
+            return value
+        time.sleep(.075)
+    raise TimeoutError("Waiting for " + label)
+
+
+@contextmanager
+def source_field_order(api, hwnd, pid, rect, available, evidence):
+    """Expose a covered source field while priming it, then restore the subject's window band."""
+    x, y = round((rect[0] + rect[2]) / 2), round((rect[1] + rect[3]) / 2)
+
+    def point_owner():
+        hit = api.point_window(w.POINT(x, y))
+        root = api.ancestor(hit, GA_ROOT) if hit else None
+        owner = w.DWORD()
+        if not root or not api.owner(hit, c.byref(owner)):
+            return "unavailable"
+        return "subject" if root == hwnd and owner.value == pid else "other"
+
+    def owned_topmost():
+        c.set_last_error(0)
+        style = api.style(hwnd, GWL_EXSTYLE)
+        error = c.get_last_error() if not style else 0
+        if error:
+            raise OSError(error, "GetWindowLongW could not read the source window band")
+        owner = w.DWORD()
+        if not api.owner(hwnd, c.byref(owner)) or owner.value != pid:
+            raise RuntimeError("The source window owner changed during its band readback")
+        return bool(style & WS_EX_TOPMOST)
+
+    if not available():
+        raise RuntimeError("The original source window, geometry or input desktop changed")
+    topmost = owned_topmost()
+    evidence.update(point=[x, y], initialPointOwner=point_owner(), originallyTopmost=topmost, raised=False)
+    try:
+        if evidence["initialPointOwner"] == "other" and not topmost:
+            if not available():
+                raise RuntimeError("The source window changed before exposing its covered field")
+            if api.order_subject(hwnd, pid, True) is not True:
+                raise RuntimeError("Windows could not expose the owned source window")
+            evidence["raised"] = True
+            def exposed():
+                if not available():
+                    raise RuntimeError("The input desktop or source geometry changed while exposing the field")
+                evidence["pointAfterRaise"] = point_owner()
+                return evidence["pointAfterRaise"] == "subject"
+            wait_for(exposed, "the source HWND at its field center", timeout=1.5)
+        yield
+    finally:
+        if evidence["raised"]:
+            # order_subject checks the owning PID again, including after a failed observer process.
+            evidence["bandRestored"] = False
+            if api.order_subject(hwnd, pid, False) is not True or owned_topmost():
+                raise RuntimeError("Windows could not restore the source window's original non-topmost band")
+            evidence["bandRestored"] = True
+
+
+def owned_layout(api, display, hwnd, pid):
+    owner = w.DWORD()
+    if not api.owner(hwnd, c.byref(owner)) or owner.value != pid or not api.visible(hwnd):
+        raise RuntimeError("Expected the sole visible window of the pinned Rust process")
+    outer, client = w.RECT(), w.RECT()
+    check(api.window_rect(hwnd, c.byref(outer)), "GetWindowRect")
+    check(api.client_rect(hwnd, c.byref(client)), "GetClientRect")
+    top, bottom = w.POINT(client.left, client.top), w.POINT(client.right, client.bottom)
+    check(api.to_screen(hwnd, c.byref(top)), "ClientToScreen(top)")
+    check(api.to_screen(hwnd, c.byref(bottom)), "ClientToScreen(bottom)")
+    return {"pid": pid, "hwnd": hwnd, "session": api.pid_session(pid), "monitor": hex(check(
+            display.from_window(hwnd, 0), "MonitorFromWindow")), "dpi": api.dpi(hwnd), "awareness": display.awareness(hwnd),
+            "perMonitorV2": bool(display.equal_context(display.get_context(hwnd), -4)),
+            "outer": rect_values(outer), "client": [top.x, top.y, bottom.x, bottom.y],
+            "dwmFrame": api.dwm(hwnd, 9, w.RECT()), "dwmCloaked": api.dwm(hwnd, 14, w.DWORD())}
+
+
+def choose_monitor(inventory, current):
+    monitors = inventory["monitors"]
+    source = next((m for m in monitors if m["handle"] == current), None)
+    if source is None:
+        raise ValueError("The application HWND does not occupy an enumerated display")
+    for other in monitors:
+        if other["handle"] != current and other["dpi"] != source["dpi"]:
+            return source, other
+    return source, None
+
+
+def monitor_state(inventory):
+    return {m["handle"]: (m["bounds"], m["work"], m["dpi"], m["primary"]) for m in inventory["monitors"]}
+
+
+def field_geometry(stage, layout, monitor, initial):
+    if (stage.get("status") != "observed" or stage.get("pid") != layout["pid"] or stage.get("hwnd") != layout["hwnd"]
+            or stage.get("field") != "Dateiname" or stage.get("expectedText") != initial or stage.get("dpi") != layout["dpi"]
+            or layout["awareness"] != 2 or layout["monitor"] != monitor["handle"] or layout["dpi"] != monitor["dpi"]
+            or not contains(layout["client"], stage["rect"]) or not contains(monitor["bounds"], stage["rect"])):
+        raise ValueError("The measured UIA filename, app HWND, physical geometry or monitor DPI differs")
+    rect = stage["rect"]
+    return {"logicalFieldSizeAt96": [round((rect[2] - rect[0]) * 96 / layout["dpi"], 3),
+                                     round((rect[3] - rect[1]) * 96 / layout["dpi"], 3)]}
+
+
+def scaled_geometry(original, moved):
+    factor = moved["dpi"] / original["dpi"]
+    if factor == 1:
+        raise ValueError("The window did not change DPI")
+    measurements = {}
+    for label, key, axis, rounding in (("fieldHeight", "rect", 1, 1), ("prefixHeight", "prefixRect", 1, 1),
+                                      ("prefixWidth", "prefixRect", 0, 3)):
+        a, b = original[key], moved[key]
+        old, new = a[axis + 2] - a[axis], b[axis + 2] - b[axis]
+        # Both physical measurements include pixel rounding. The fixed width covers three glyph advances.
+        limit = rounding * (1 + factor)
+        if old <= 0 or new <= 0 or abs(new - factor * old) > limit:
+            raise ValueError(f"The measured physical {label} does not follow the monitor DPI change")
+        measurements[label] = {"before": old, "after": new, "expected": old * factor, "rounding": limit}
+    return measurements
+
+
+def frame_evidence(record, profile, screen_dpi):
+    if not (record["focusAtEntry"] is True and record["focusAtExit"] is True and record["textAfter"] == SECOND
+            and record["expectedText"] == FIRST and record["before"]["width"] == record["after"]["width"]
+            and record["before"]["height"] == record["after"]["height"] and record["before"]["sha256"] != record["after"]["sha256"]):
+        raise ValueError("The preserved focus, text or fixed native crop changed unexpectedly")
+    delta = record["difference"]
+    if (not math.ceil(6 * screen_dpi / 96) <= delta["columns"] <= record["after"]["width"]
+            or not math.ceil(3 * screen_dpi / 96) <= delta["rows"] <= record["after"]["height"]
+            or not max(delta["rows"], delta["columns"]) <= delta["pixels"] <= delta["rows"] * delta["columns"]):
+        raise ValueError("Stationary glyph differences do not extend beyond the blinking caret")
+    if record["phase"] not in ("Frame", "SourceFrame"):
+        raise ValueError("Unexpected private field capture role")
+    images = []
+    for role in ("before", "after"):
+        image = profile / (record["phase"] + ".json." + role + ".png")
+        with image.open("rb") as stream:
+            head = stream.read(24)
+        expected = record[role]
+        if (sha256(image) != expected["sha256"] or head[:16] != b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR"
+                or int.from_bytes(head[16:20], "big") != expected["width"] or int.from_bytes(head[20:24], "big") != expected["height"]
+                or not 0 < expected["width"] <= 1024 or not 0 < expected["height"] <= 128):
+            raise ValueError("The independently hashed synthetic field frame differs")
+        images.append(image)
+    return images
+
+
+def field_presenter(snapshot, client, begin, end):
+    """Bind a CPU transfer to this field interaction on the current display."""
+    frame = snapshot["fullEditorFrame"]
+    if snapshot["route"] == "cpu-gdi":
+        if (not frame or (frame["width"], frame["height"]) != (client[2] - client[0], client[3] - client[1])
+                or not begin <= frame["begin"] <= frame["end"] <= end):
+            raise ValueError("The field interaction lacks a current full CPU transfer at the observed client size")
+    else:
+        # An earlier CPU mesh can precede the move or a switch to wgpu.
+        frame = None
+    return {**snapshot, "fullEditorFrame": frame, "interactionQpc": [begin, end]}
+
+
+def stop_subject(proc, _rust):
+    if proc.poll() is None:
+        try:
+            proc.stdin.write(b"Q")
+            proc.stdin.flush()
+            proc.wait(timeout=15)
+        except (OSError, subprocess.TimeoutExpired):
+            proc.kill()
+            proc.wait(timeout=10)
+
+
+def archived_subject(archive, profile, processes, resources, target, report):
+    from cpu_archive import stage
+    if target != "x86_64-pc-windows-msvc" or processes.machine(-1) != (0x8664, 0x8664):
+        raise ValueError("The measured x64 image requires a native x64 observer and desktop")
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    verify = runpy.run_path(str(QA / "windows-services/service_sources.py"))["verify_checkout"]
+    if (os.getenv("GITHUB_SHA", revision) != revision
+            or verify(ROOT, [ROOT / p for p in report["inputs"]], revision) != report["inputs"]):
+        raise ValueError("The display observer differs from its recorded Git revision")
+    report["observerRevision"] = revision
+    resources.enter_context(pin_path(processes, profile, True))
+    binary, receipt = stage(archive, profile)
+    resources.enter_context(pin_path(processes, binary, False))
+    if TEXT["DESKTOP"]["pe_machine"](binary) != 0x8664 or sha256(binary) != receipt["binary"]:
+        raise ValueError("The held display image differs from the qualified Windows x64 executable")
+    report["archivedBuild"] = receipt
+    return binary
+
+
+def eligible_input(context, transport, private):
+    if private is None:
+        return active_input(context, transport)
+    return (named_desktop(private) and transport.get("status") == "observed" and transport.get("code") == 0
+            and ordinary_console(context, private))
+
+
+def private_membership(api, private, window, pid, witness):
+    desktop = api.thread_desktop(api.thread())
+    owner = w.DWORD()
+    tid = api.owner(window, c.byref(owner))
+    if not tid or owner.value != pid or api.name(desktop) != private or not ordinary_console(api.context(), private):
+        raise RuntimeError("The source frame requires the original GUI and active private input desktop")
+    counts = dict(window=api.count_top_level_window(desktop, window), witness=api.count_top_level_window(desktop, witness))
+    if (counts != {"window": 1, "witness": 1} or api.visible(witness)
+            or api.owner(window, c.byref(owner)) != tid or owner.value != pid or not ordinary_console(api.context(), private)):
+        raise RuntimeError("The private desktop did not enumerate the hidden witness and the same owned GUI")
+    return dict(pid=pid, tid=tid, hwnd=window, witness=hex(witness), counts=counts, desktop=private)
+
+
+def measure(target, build_dir, output, profile, report, *, require_interactive, retained=False, cpu_archive=None, private=None):
+    api, display, processes = Desktop(), Topology(), Win32()
+    env = environment(profile)
+    held_window = retained or cpu_archive is not None
+    with ExitStack() as resources:
+        resources.enter_context(physical_coordinates(api))
+        if cpu_archive is not None:
+            binary = archived_subject(cpu_archive, profile, processes, resources, target, report)
+        else:
+            binary = TEXT["DESKTOP"]["GUI_BINARY"].resolve(strict=True)
+            resources.enter_context(pin_path(processes, binary, False))
+            report["build"] = TEXT["check_build"](target, binary, build_dir)
+        if held_window:
+            import retained as retained_gui
+            env[retained_gui.DX12_WAIT_OPTION] = "Wait"
+        if retained:
+            binary = retained_gui.subject(target, binary, build_dir, TEXT["read"], sha256, report, require_interactive)
+            resources.enter_context(pin_path(processes, binary.parent, True))
+            resources.enter_context(pin_path(processes, binary, False))
+            if sha256(binary) != report["retainedBuild"]["binary"]:
+                raise ValueError("The selected retained executable changed before launch")
+        context = api.context()
+        report["desktop"] = {**context, **{key: (context[key] if context[key] in ("Default", "WinSta0", private) else "other")
+                                           for key in ("inputDesktop", "threadDesktop", "windowStation")}}
+        transport = report["protocol"] = protocol(api, context["session"])
+        report["rdpSessionObserved"] = None if transport["status"] != "observed" else transport["code"] == 2
+        if private is not None:
+            if not eligible_input(context, transport, private):
+                raise RuntimeError("The child requires the selected unlocked private console desktop")
+            resources.enter_context(api.enumeration_witness(private, report))
+        if require_interactive and not active_input(context, transport):
+            raise RuntimeError("The selected test VM must already have an active, unlocked console or RDP input desktop")
+        inventory = report["topology"] = display.inventory(api)
+        # Inactive connectors can be available even when only one HWND destination is active.
+        report["possibleTargets"] = display.display_paths({}, all_targets=True)
+        ps, attempts = select_powershell(profile, "accessibility", env)
+        report["observerHosts"] = [{k: v for k, v in row.items() if k != "diagnostic"} for row in attempts]
+        if not ps:
+            raise RuntimeError("The system UI Automation observer could not start")
+        log = output / "subject.log"
+        stream = resources.enter_context(log.open("wb"))
+        child = None
+        def exited():
+            if child:
+                report["subjectExit"] = child.poll()
+                report["drained"] = any(s.startswith("DRAINED passes=") for s in logs())
+        def logs():
+            return log.read_text(encoding="utf-8", errors="replace").splitlines()
+        resources.callback(exited)
+        child = start_owned_subject(resources, processes, binary, profile, env, stream, True, stop_subject)
+        report["process"] = dict(pid=child.pid, creation100ns=processes.process_identity(child._handle),
+                                 executable=binary.relative_to(ROOT).as_posix())
+        observer = shared_windows()(child.pid, api.thread_desktop(api.thread()))
+        resources.callback(observer.close)
+        if held_window:
+            lifetime = retained_gui.WindowLifetime(child.pid)
+            resources.callback(lifetime.close)
+            report["retainedEvents"] = {"visibility": observer.events, "objects": lifetime.events}
+        processes.resume_owned_process(child.pid)
+        child.stdin.write(b"T")
+        child.stdin.flush()
+        def visible():
+            if child.poll() is not None:
+                raise RuntimeError("Rust GUI exited before the requested observation")
+            return observer.visible(waiting_for_first=True)
+        hwnd = wait_for(visible, "owned visible Rust assessment HWND")
+        adapter = None
+        try:
+            adapter = wait_for(lambda: next((s for s in logs() if s.startswith("ADAPTER Dx12 ")), None), "native DX12 adapter")
+            report["adapter"] = adapter
+            base = report["originalWindow"] = owned_layout(api, display, hwnd, child.pid)
+            if base["session"] != context["session"]:
+                raise RuntimeError("The Rust window is outside the observer's existing session")
+            if report["rdpSessionObserved"]:
+                report["rdpRenderer"] = {"session": base["session"], "hwnd": hwnd, "adapter": adapter, "dpi": base["dpi"]}
+            source, destination = choose_monitor(inventory, base["monitor"])
+            if private is not None:
+                destination = None
+                witness = int(report["hiddenEnumerationWindow"], 16)
+                report["privateWindowBefore"] = private_membership(api, private, hwnd, child.pid, witness)
+            def input_available():
+                now = api.context()
+                return (now["session"] == context["session"] and protocol(api, now["session"]) == transport
+                        and eligible_input(now, transport, private))
+            def stage(name, layout, monitor, expected):
+                if visible() != hwnd or (name != "Read" and not input_available()):
+                    raise RuntimeError("The owned HWND, input desktop or WTS transport changed")
+                record_path = profile / (name + ".json")
+                code = powershell(ps, HERE / "field.ps1", ["-SubjectId", child.pid, "-WindowHandle", hwnd,
+                                  "-Phase", name, "-OutputFile", record_path], env, profile, output / (name + ".log"), 75)
+                record = report.setdefault("stages", {})[name] = json.loads(record_path.read_text(encoding="utf-8-sig"))
+                if code or record.get("phase") != name:
+                    raise RuntimeError("UIA " + name + " failed: " + record.get("error", "unknown observer error"))
+                record.update(field_geometry(record, layout, monitor, expected))
+                return record
+            initial = TEXT["PLAN"]["initial"]
+            field = stage("Read", base, source, initial)
+            config = inventory["displayConfig"]
+            if (config["status"] == "failed" or (config["status"] == "observed" and
+                    not any(row.get("monitor") == source["index"] and row["active"] for row in config["paths"]))):
+                raise RuntimeError("The active DisplayConfig query or source-to-HMONITOR observation failed")
+            if destination and config["status"] == "observed" and not any(
+                    row.get("monitor") == destination["index"] and row["active"] for row in config["paths"]):
+                raise RuntimeError("The different-DPI destination has no matching active DisplayConfig path")
+            report["inventoryPassed"] = True
+            rdp = report["rdpSessionObserved"]
+            if private is not None:
+                report["mixedDpiReason"] = "The private desktop trial observes only the stationary source frame"
+            elif not destination:
+                report["mixedDpiReason"] = "Only one active monitor" if len(inventory["monitors"]) == 1 else "All active monitors have the same window DPI"
+            if not rdp:
+                report["rdpReason"] = "The current WTS protocol did not report RDP"
+            if not input_available():
+                report["interactionPrerequisite"] = "An unlocked existing Default input desktop receiving input is required"
+            else:
+                def record_frame(name, layout, monitor):
+                    started = processes.clock() if cpu_archive is not None else None
+                    frame = stage(name, layout, monitor, FIRST)
+                    for image in frame_evidence(frame, profile, layout["dpi"]):
+                        shutil.copyfile(image, output / image.name)
+                    if not input_available() or owned_layout(api, display, hwnd, child.pid) != layout:
+                        raise RuntimeError("Session, monitor or physical window metrics changed during the stationary frame control")
+                    if cpu_archive is not None:
+                        route = retained_gui.archived_presenter(log, adapter, child.pid, hwnd)
+                        frame["presenter"] = field_presenter(route, layout["client"], started, processes.clock())
+                    return frame
+
+                if destination:
+                    report["mixedDpiPassed"] = False
+                if rdp:
+                    report["rdpRenderingObserved"] = False
+                report["sourceFrameObserved"] = False
+                try:
+                    order = report["sourceFieldOrder"] = {}
+                    def source_available():
+                        return visible() == hwnd and input_available() and owned_layout(api, display, hwnd, child.pid) == base
+                    with source_field_order(api, hwnd, child.pid, field["rect"], source_available, order):
+                        prime = stage("Prime", base, source, initial)
+                    if not prime["focusAtExit"] or prime["textAfter"] != FIRST:
+                        raise RuntimeError("Could not establish native filename focus and initial text")
+                    on_source = record_frame("SourceFrame", base, source)
+                    if on_source.get("textRestored") != FIRST:
+                        raise ValueError("The frame control did not restore the fixed filename")
+                    if private is not None:
+                        report["privateWindowAfter"] = private_membership(api, private, hwnd, child.pid, witness)
+                        if report["privateWindowAfter"] != report["privateWindowBefore"]:
+                            raise RuntimeError("The private GUI or desktop changed during the source frame")
+                    report["sourceFrameObserved"] = True
+                    if rdp:
+                        report["rdpRenderingObserved"] = True
+                except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as error:
+                    report["sourceFrameError"] = str(error)
+                    if destination or rdp:
+                        raise
+
+                if destination:
+                    if visible() != hwnd or not input_available() or owned_layout(api, display, hwnd, child.pid) != base:
+                        raise RuntimeError("The subject or display changed before the move")
+                    work = destination["work"]
+                    scale = destination["dpi"] / source["dpi"]
+                    width, height = base["outer"][2] - base["outer"][0], base["outer"][3] - base["outer"][1]
+                    left = work[0] + max(0, round((work[2] - work[0] - width * scale) / 2))
+                    top = work[1] + max(0, round((work[3] - work[1] - height * scale) / 2))
+                    # Position only this verified HWND. Windows and winit choose its new size.
+                    check(api.position(hwnd, None, left, top, 0, 0, 0x215), "SetWindowPos(owned Rust HWND)")
+                    def moved():
+                        current = owned_layout(api, display, hwnd, child.pid)
+                        return current if current["monitor"] == destination["handle"] and current["dpi"] == destination["dpi"] else None
+                    current = report["movedWindow"] = wait_for(moved, "the same HWND at its new monitor DPI")
+                    frame = record_frame("Frame", current, destination)
+                    report["physicalScaling"] = scaled_geometry(prime, frame)
+                    after = report["topologyAfterInteraction"] = display.inventory(api)
+                    if monitor_state(after) != monitor_state(inventory):
+                        raise RuntimeError("The active monitor inventory changed during this observation")
+                    report["mixedDpiPassed"] = True
+        finally:
+            original_error = sys.exc_info()[1]
+            try:
+                if child.poll() is None and observer.visible() == hwnd:
+                    if held_window and adapter:
+                        report["closedToSupervisor"] = retained_gui.close(observer, lifetime, child, hwnd, log, adapter, wait_for, report,
+                                                                         archived_cpu=cpu_archive is not None)
+                    elif not held_window:
+                        observer.close_window(hwnd)
+                        def hidden():
+                            return observer.visible() is None and any(line.startswith("WINDOW_RELEASED passes=") for line in logs())
+                        report["closedToSupervisor"] = bool(wait_for(hidden, "native close and renderer release"))
+            except Exception:
+                report["closeError"] = traceback.format_exc()
+                if original_error is None:
+                    raise
+    if report["subjectExit"] or not report["drained"] or not report.get("closedToSupervisor"):
+        raise RuntimeError("The owned Rust supervisor did not close and drain normally")
+
+
+def unmet_qualifications(report, required):
+    return [name for name in required if report.get(QUALIFICATIONS[name]) is not True]
+
+
+def assess(target, build_dir, required, *, require_interactive, retained=False, cpu_archive=None, private=None):
+    subject = "archived-cpu" if cpu_archive is not None else "retained" if retained else "canonical"
+    name = "windows-display" if subject == "canonical" else "windows-display-" + subject
+    if private is not None:
+        if (target != "aarch64-pc-windows-msvc" or not named_desktop(private) or required != ["source-frame"]
+                or cpu_archive or require_interactive):
+            raise ValueError("The named ARM64 trial supports only the stationary source frame")
+        output = build_dir / (name + "-private") / "observation"
+        output.mkdir(exist_ok=False)
+    elif required:
+        runs = build_dir / (name + "-runs")
+        runs.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(prefix="-".join(required) + "-", dir=runs))
+    else:
+        output = build_dir / name
+        output.mkdir(exist_ok=False)
+    inputs = [*sorted(HERE.glob("*.py")), HERE / "field.ps1", QA / "windows-text/run.py", QA / "windows-text/evidence.py",
+              QA / "windows-text/Pointer.cs", QA / "windows-performance/native.py", QA / "observe-windows-gui.py",
+              QA / "observe-windows-input.ps1", QA / "windows_observer.py", QA / "windows-desktop/run.py",
+              QA / "windows-desktop/win32.py", QA / "windows-desktop/worker.py"]
+    if private is not None:
+        inputs.append(QA / "windows-desktop/job.py")
+    if retained or cpu_archive is not None:
+        inputs.extend(QA / p for p in ("windows-launcher/retained_subject.py", "windows-services/service_sources.py",
+            "windows-warm-window/inputs.py", "windows-warm-window/frame_latency.py", "windows-warm-window/window_lifetime.py",
+            "windows-performance/build.py", "windows-performance/run.py"))
+        inputs.extend((ROOT / ".gitattributes", ROOT / "rust/toolchain-inputs.json"))
+    report = {"status": "failed", "target": target, "subject": subject,
+              "host": "isolated-vm" if require_interactive else "github-hosted",
+              "run": None if require_interactive else os.getenv("GITHUB_RUN_ID"),
+              "attempt": None if require_interactive else os.getenv("GITHUB_RUN_ATTEMPT"),
+              "inventoryPassed": False, "sourceFrameObserved": None, "mixedDpiPassed": None, "rdpRenderingObserved": None,
+              "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in inputs}}
+    report["profileRemoved"] = None
+    if private is not None:
+        report.update(requestedPrivateDesktop=private, privateWorkerPid=os.getpid())
+    try:
+        with private_profile(output, "ifw-display-", report) as profile:
+            measure(target, build_dir, output, profile, report, require_interactive=require_interactive, retained=retained,
+                    cpu_archive=cpu_archive, private=private)
+        report["status"] = "observed"
+    except Exception:
+        report["error"] = traceback.format_exc()
+    report["requiredQualifications"] = required
+    report["unmetQualifications"] = unmet_qualifications(report, required)
+    if report["status"] == "observed" and report["unmetQualifications"]:
+        report["status"] = "requirements-unmet"
+    write_json(output / "result.json", report)
+    (output / "evidence.sha256").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in sorted(output.iterdir()) if p.is_file()),
+                                           encoding="utf-8", newline="\n")
+    print(output / "result.json")
+    print(report.get("error") or f"Inventory observed, mixed DPI={report['mixedDpiPassed']}, RDP rendering={report['rdpRenderingObserved']}")
+    return 0 if report["status"] == "observed" and report["inventoryPassed"] and report["profileRemoved"] else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", choices=sorted(TEXT["TARGETS"]))
+    parser.add_argument("--isolated-vm", action="store_true", help="explicitly authorized disposable Windows VM and current test desktop")
+    subject = parser.add_mutually_exclusive_group()
+    subject.add_argument("--retained", action="store_true", help="use the paired retained Windows GUI build")
+    subject.add_argument("--cpu-archive", type=Path, help="observe the measured x64 executable in the original 483f053 ZIP")
+    parser.add_argument("--require", action="append", choices=sorted(QUALIFICATIONS), default=[],
+                        help="require the actual observation for success, repeat for multiple requirements in one session")
+    args = parser.parse_args()
+    hosted_job = hosted() and os.getenv("GITHUB_REPOSITORY") == "VoltKraft/immich-folder-watch" and os.getenv("GITHUB_REF") == "refs/heads/rewrite/rust"
+    if (os.name != "nt" or not (hosted_job or args.isolated_vm)
+            or (os.getenv("GITHUB_ACTIONS") == "true" and not hosted_job)):
+        parser.error("Use the native rewrite job or an expressly authorized isolated Windows test VM")
+    build_dir = ROOT / "artifacts/rust/gui-native" / args.target
+    if args.cpu_archive is not None:
+        if args.target != "x86_64-pc-windows-msvc" or not args.cpu_archive.is_file():
+            parser.error("Select Windows x64 and provide the original CPU timing and recovery ZIP")
+        build_dir.mkdir(parents=True, exist_ok=True)
+    elif not (build_dir / "build.json").is_file():
+        parser.error("Build the canonical native GUI for this target before observing its display")
+    return assess(args.target, build_dir, sorted(set(args.require)), require_interactive=not hosted_job, retained=args.retained,
+                  cpu_archive=args.cpu_archive)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,947 @@
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
+
+use futures_util::{SinkExt, StreamExt};
+use ifw_immich::realtime::{IncomingMessage, MAX_MESSAGE_BYTES};
+use reqwest::{Certificate, Client, Method, RequestBuilder, Response, StatusCode, Url, header};
+use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::{
+    self, Message,
+    handshake::{client::generate_key, derive_accept_key},
+    protocol::{Role, WebSocketConfig},
+};
+
+use crate::Error;
+
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) type Socket = WebSocketStream<reqwest::Upgraded>;
+
+pub(crate) struct Transport {
+    api: Url,
+    endpoint: Url,
+    client: Client,
+    tls_proxy: Option<TunnelProxy>,
+    plaintext_proxy: Option<Url>,
+    plaintext_credentials: Option<crate::plaintext_proxy::Credentials>,
+    header: header::HeaderValue,
+    pub namespace: String,
+}
+
+/// Select the proxy for one HTTP(S) origin with the platform-specific System.Net precedence.
+/// The endpoint is kept separate so the loopback harness can check its
+/// ownership even when the destination is on the bypass list.
+pub(crate) struct SelectedProxy {
+    pub endpoint: Option<Url>,
+    pub(crate) bypass: bool,
+}
+
+fn environment_proxy_endpoint(value: &str) -> Option<Url> {
+    let (scheme, authority) = value.split_once("://").unwrap_or(("http", value));
+    if !["http", "https", "socks4", "socks4a", "socks5"]
+        .iter()
+        .any(|supported| scheme.eq_ignore_ascii_case(supported))
+    {
+        return None;
+    }
+    // System.Net reads the decimal port prefix after the host, ignoring a
+    // subsequent suffix. A colon with no valid port falls through to the
+    // next environment variable. Ignore colons in credentials and IPv6.
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let colon = host
+        .rfind(':')
+        .filter(|pos| host.find(']').is_none_or(|end| *pos > end));
+    if let Some(colon) = colon {
+        let port = &host[colon + 1..];
+        let digits = port.bytes().take_while(u8::is_ascii_digit).count();
+        let port_number = port[..digits].parse::<u16>().ok()?;
+        let name = &authority[..authority.len() - port.len() - 1];
+        return Url::parse(&format!("{scheme}://{name}:{port_number}")).ok();
+    }
+    Url::parse(&format!("{scheme}://{authority}")).ok()
+}
+
+/// System.Uri compares the literal bypass entry to its canonical Host. Some
+/// bracketed IPv6 hosts end in dotted IPv4 there, while Url writes hexadecimal.
+fn embedded_ipv4_host(host: &str) -> Option<String> {
+    let raw = host.strip_prefix('[')?.strip_suffix(']')?;
+    let address = raw.parse::<Ipv6Addr>().ok()?;
+    let [a, b, c, d, e, f, high, _] = address.segments();
+    let translated =
+        [a, b, c, d] == [0; 4] && high != 0 && matches!((e, f), (0, 0 | 0xffff) | (0xffff, 0));
+    if !translated && (e, f) != (0, 0x5efe) {
+        return None;
+    }
+    // A trailing compressed pair can occur in an ISATAP address. Otherwise
+    // the final two hexadecimal fields are explicit in these address forms.
+    let prefix = raw
+        .strip_suffix("::")
+        .or_else(|| raw.rsplitn(3, ':').nth(2))?;
+    let [.., w, x, y, z] = address.octets();
+    Some(format!("[{prefix}:{}]", Ipv4Addr::new(w, x, y, z)))
+}
+
+impl SelectedProxy {
+    #[cfg(any(not(windows), test))]
+    pub fn unix(api: &Url, read: impl Fn(&str) -> Option<String>) -> Self {
+        let (lower, upper) = if api.scheme() == "http" {
+            (
+                "http_proxy",
+                read("GATEWAY_INTERFACE").is_none().then_some("HTTP_PROXY"),
+            )
+        } else {
+            ("https_proxy", Some("HTTPS_PROXY"))
+        };
+        let endpoint = [Some(lower), upper, Some("all_proxy"), Some("ALL_PROXY")]
+            .into_iter()
+            .flatten()
+            .filter_map(&read)
+            .find_map(|value| environment_proxy_endpoint(&value));
+        let excluded = read("no_proxy").or_else(|| read("NO_PROXY"));
+        Self::new(api, endpoint, excluded)
+    }
+
+    /// Windows looks up a single case-insensitive spelling of each variable.
+    /// None selects the system provider for the whole process. If a usable
+    /// opposite-scheme proxy exists, the missing scheme connects directly.
+    #[cfg(any(windows, test))]
+    pub fn windows(api: &Url, read: impl Fn(&str) -> Option<String>) -> Option<Self> {
+        let proxy = |name| read(name).as_deref().and_then(environment_proxy_endpoint);
+        let http = if read("GATEWAY_INTERFACE").is_none() {
+            proxy("HTTP_PROXY")
+        } else {
+            None
+        };
+        let https = proxy("HTTPS_PROXY");
+        let all = if http.is_none() || https.is_none() {
+            proxy("ALL_PROXY")
+        } else {
+            None
+        };
+        if http.is_none() && https.is_none() && all.is_none() {
+            return None;
+        }
+        let endpoint = match api.scheme() {
+            "http" | "ws" => http,
+            _ => https,
+        };
+        Some(Self::new(api, endpoint.or(all), read("NO_PROXY")))
+    }
+
+    fn new(api: &Url, endpoint: Option<Url>, excluded: Option<String>) -> Self {
+        let host = api.host_str().unwrap_or_default();
+        let embedded = embedded_ipv4_host(host);
+        let host = embedded.as_deref().unwrap_or(host);
+        let bypass = excluded.as_deref().is_some_and(|list| {
+            list.split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .any(|entry| {
+                    let Some(domain) = entry.strip_prefix('.') else {
+                        return host.eq_ignore_ascii_case(entry);
+                    };
+                    host.eq_ignore_ascii_case(domain)
+                        || host
+                            .get(host.len().saturating_sub(entry.len())..)
+                            .is_some_and(|tail| tail.eq_ignore_ascii_case(entry))
+                })
+        });
+        Self { endpoint, bypass }
+    }
+
+    pub fn route(self) -> Option<Url> {
+        self.endpoint.filter(|_| !self.bypass)
+    }
+}
+
+fn escaped_byte(path: &str) -> Option<u8> {
+    let digits = path.strip_prefix('%')?.get(..2)?;
+    if !digits.bytes().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    u8::from_str_radix(digits, 16).ok()
+}
+
+/// System.Uri re-escapes valid IRI path characters in uppercase. Escapes for
+/// private-use, control, noncharacter or invalid UTF-8 bytes retain their spelling.
+fn iri_escape_length(path: &str, first: u8) -> Option<usize> {
+    let size = match first {
+        0xc2..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf4 => 4,
+        _ => return None,
+    };
+    let mut scalar = [first; 4];
+    for (index, byte) in scalar[..size].iter_mut().enumerate().skip(1) {
+        *byte = escaped_byte(path.get(index * 3..)?)?;
+    }
+    let value = std::str::from_utf8(&scalar[..size]).ok()?.chars().next()? as u32;
+    let eligible = match value {
+        0xa0..=0xd7ff | 0xf900..=0xfdcf | 0xfdf0..=0xffef => true,
+        0x10000..=0xdfffd | 0xe1000..=0xefffd => value & 0xffff <= 0xfffd,
+        _ => false,
+    };
+    eligible.then_some(3 * size)
+}
+
+/// Translate the ASCII serialization of an HTTP(S) URL path to the spelling
+/// used by the shipping System.Uri reader. Preserve escaped path separators.
+fn shipping_path(mut path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    while let Some(&first) = path.as_bytes().first() {
+        if let Some(byte) = escaped_byte(path) {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                out.push(char::from(byte));
+            } else if let Some(len) = iri_escape_length(path, byte) {
+                out.push_str(&path[..len].to_ascii_uppercase());
+                path = &path[len..];
+                continue;
+            } else {
+                out.push_str(&path[..3]);
+            }
+            path = &path[3..];
+        } else {
+            match first {
+                b'%' => out.push_str("%25"),
+                b'|' => out.push_str("%7C"),
+                b'^' => out.push_str("%5E"),
+                _ => out.push(char::from(first)),
+            }
+            path = &path[1..];
+        }
+    }
+    out
+}
+
+fn http_client(allow_http: bool, roots: Option<&[Certificate]>) -> reqwest::ClientBuilder {
+    let base = Client::builder()
+        .tls_backend_rustls()
+        .http1_only()
+        .no_proxy()
+        .https_only(!allow_http)
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT);
+    match roots {
+        Some(roots) => base.tls_certs_only(roots.to_vec()),
+        None => base,
+    }
+}
+
+struct TunnelProxy {
+    basic: Client,
+    #[cfg(target_os = "linux")]
+    digest: crate::digest_proxy::DigestState,
+    #[cfg(target_os = "linux")]
+    credentials: Url,
+    #[cfg(target_os = "linux")]
+    endpoint: Url,
+    #[cfg(target_os = "linux")]
+    roots: Option<Vec<Certificate>>,
+    #[cfg(target_os = "linux")]
+    allow_http: bool,
+}
+
+impl TunnelProxy {
+    fn challenged_client(
+        &self,
+        error: &reqwest::Error,
+        _api: &Url,
+    ) -> Result<Option<Client>, Error> {
+        let Some(headers) = tunnel_challenge(error) else {
+            return Ok(None);
+        };
+        #[cfg(target_os = "linux")]
+        {
+            let authority = crate::plaintext_proxy::connect_authority(_api)?;
+            let exchange = crate::digest_proxy::DigestRequest {
+                method: &Method::CONNECT,
+                target: authority.authority().ok_or(Error::Origin)?.as_str(),
+                entity: &[],
+            };
+            if let Some(credential) = crate::digest_proxy::authorization(
+                headers,
+                &self.credentials,
+                &exchange,
+                &self.digest,
+            )? {
+                let proxy =
+                    reqwest::Proxy::https(self.endpoint.clone())?.custom_http_auth(credential);
+                return Ok(Some(
+                    http_client(self.allow_http, self.roots.as_deref())
+                        .pool_max_idle_per_host(0)
+                        .proxy(proxy)
+                        .build()?,
+                ));
+            }
+        }
+        Ok(crate::plaintext_proxy::offers_basic(headers).then(|| self.basic.clone()))
+    }
+}
+
+impl Transport {
+    pub fn new(
+        mut api: Url,
+        allow_http: bool,
+        api_key: &str,
+        roots: Option<Vec<Certificate>>,
+        proxy: Option<Url>,
+    ) -> Result<Self, Error> {
+        if !(api.scheme() == "https" || allow_http && api.scheme() == "http")
+            || api.host().is_none()
+            || !api.username().is_empty()
+            || api.password().is_some()
+        {
+            return Err(Error::Origin);
+        }
+        // SocketIOClient uses the URL path (minus terminal "api") as its
+        // namespace; Engine.IO always uses the distinct default transport path.
+        api.set_path(&shipping_path(api.path()));
+        let segments: Vec<_> = api
+            .path_segments()
+            .ok_or(Error::Origin)?
+            .filter(|s| !s.is_empty())
+            .collect();
+        let prefix = if segments
+            .last()
+            .is_some_and(|s| s.eq_ignore_ascii_case("api"))
+        {
+            &segments[..segments.len() - 1]
+        } else {
+            &segments[..]
+        };
+        let namespace = format!("/{}", prefix.join("/"));
+        let endpoint = api.join("/socket.io/").map_err(|_| Error::Origin)?;
+        let mut header = header::HeaderValue::from_str(api_key).map_err(|_| Error::Origin)?;
+        header.set_sensitive(true);
+        let mut primary = http_client(allow_http, roots.as_deref());
+        let mut tls_proxy = None;
+        let mut plaintext_proxy = None;
+        let mut credentials = None;
+        if let Some(mut proxy) = proxy {
+            if cfg!(target_os = "linux")
+                && proxy.scheme() == "http"
+                && (!proxy.username().is_empty() || proxy.password().is_some())
+            {
+                let credential_url = proxy.clone();
+                proxy.set_username("").map_err(|_| Error::Origin)?;
+                proxy.set_password(None).map_err(|_| Error::Origin)?;
+                if api.scheme() == "https" {
+                    let basic = http_client(allow_http, roots.as_deref())
+                        .pool_max_idle_per_host(0)
+                        .proxy(reqwest::Proxy::https(credential_url.clone())?)
+                        .build()?;
+                    tls_proxy = Some(TunnelProxy {
+                        basic,
+                        #[cfg(target_os = "linux")]
+                        digest: crate::digest_proxy::DigestState::default(),
+                        #[cfg(target_os = "linux")]
+                        credentials: credential_url,
+                        #[cfg(target_os = "linux")]
+                        endpoint: proxy.clone(),
+                        #[cfg(target_os = "linux")]
+                        roots: roots.clone(),
+                        #[cfg(target_os = "linux")]
+                        allow_http,
+                    });
+                } else {
+                    credentials = Some(credential_url);
+                }
+            }
+            if api.scheme() == "http" {
+                primary = primary.proxy(reqwest::Proxy::http(proxy.clone())?);
+                plaintext_proxy = Some(proxy);
+            } else {
+                primary = primary.proxy(reqwest::Proxy::https(proxy)?);
+            }
+        }
+        let client = primary.build()?;
+        // Reqwest decodes URL userinfo and builds a sensitive Basic header. This
+        // request is never sent. Only a challenged proxy receives its header.
+        let plaintext_credentials = credentials
+            .map(|url| {
+                let basic = client
+                    .get(url.clone())
+                    .build()?
+                    .headers_mut()
+                    .remove(header::AUTHORIZATION)
+                    .ok_or(Error::Origin)?;
+                Ok::<_, Error>(crate::plaintext_proxy::Credentials {
+                    basic,
+                    #[cfg(target_os = "linux")]
+                    url,
+                    #[cfg(target_os = "linux")]
+                    digest: crate::digest_proxy::DigestState::default(),
+                })
+            })
+            .transpose()?;
+        Ok(Self {
+            api,
+            endpoint,
+            namespace,
+            header,
+            client,
+            tls_proxy,
+            plaintext_credentials,
+            plaintext_proxy,
+        })
+    }
+
+    fn uri(&self, transport: &str, sid: Option<&str>) -> Url {
+        let mut url = self.endpoint.clone();
+        {
+            let mut query = url.query_pairs_mut();
+            query
+                .append_pair("EIO", "4")
+                .append_pair("transport", transport);
+            if let Some(sid) = sid {
+                query.append_pair("sid", sid);
+            }
+        }
+        url
+    }
+
+    fn request(&self, method: Method, url: Url) -> Result<RequestBuilder, Error> {
+        if url.origin() != self.api.origin()
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err(Error::Origin);
+        }
+        Ok(self
+            .client
+            .request(method, url)
+            .header("x-api-key", &self.header))
+    }
+
+    async fn send(&self, request: RequestBuilder) -> Result<Response, Error> {
+        if let Some(proxy) = &self.tls_proxy {
+            let retry = request.try_clone().ok_or(Error::Protocol)?;
+            let deadline = tokio::time::Instant::now() + REQUEST_TIMEOUT;
+            return match request.send().await {
+                Err(error) => {
+                    let Some(authenticated) = proxy.challenged_client(&error, &self.api)? else {
+                        return Err(error.into());
+                    };
+                    let remaining = deadline
+                        .checked_duration_since(tokio::time::Instant::now())
+                        .ok_or(Error::Timeout)?;
+                    let request = RequestBuilder::from_parts(authenticated, retry.build()?);
+                    Ok(request.timeout(remaining).send().await?)
+                }
+                Ok(response) => Ok(response),
+            };
+        }
+        let Some(credentials) = &self.plaintext_credentials else {
+            return Ok(request.send().await?);
+        };
+        // The adapter's GET/POST bodies are bounded and replayable. Redirects
+        // remain disabled, so the fixed proxy and origin do not change.
+        let mut retry = request.try_clone().ok_or(Error::Protocol)?.build()?;
+        let deadline = tokio::time::Instant::now() + REQUEST_TIMEOUT;
+        let response = request.send().await?;
+        if response.status() != StatusCode::PROXY_AUTHENTICATION_REQUIRED {
+            return Ok(response);
+        }
+        // Reqwest builds a hyper URI from this URL for the absolute-form
+        // request line. The URI parser drops fragments and preserves escapes.
+        let target = retry
+            .url()
+            .as_str()
+            .parse::<hyper::Uri>()
+            .map_err(|_| Error::Origin)?;
+        let entity = match retry.body() {
+            None => &[][..],
+            Some(body) => body.as_bytes().ok_or(Error::Protocol)?,
+        };
+        let Some(auth) = credentials.challenged(
+            response.headers(),
+            retry.method(),
+            &target.to_string(),
+            entity,
+        )?
+        else {
+            return Ok(response);
+        };
+        drop(response);
+        retry
+            .headers_mut()
+            .insert(header::PROXY_AUTHORIZATION, auth);
+        let remaining = deadline
+            .checked_duration_since(tokio::time::Instant::now())
+            .ok_or(Error::Timeout)?;
+        *retry.timeout_mut() = Some(remaining);
+        Ok(self.client.execute(retry).await?)
+    }
+
+    pub async fn poll(&self, sid: Option<&str>) -> Result<Vec<u8>, Error> {
+        let request = self.request(Method::GET, self.uri("polling", sid))?;
+        let resp = self.send(request).await?;
+        bounded_ok_body(resp).await
+    }
+
+    pub async fn post(&self, sid: &str, packet: String, max_payload: usize) -> Result<(), Error> {
+        if packet.len() > max_payload.min(MAX_MESSAGE_BYTES) {
+            return Err(Error::Limit);
+        }
+        let request = self
+            .request(Method::POST, self.uri("polling", Some(sid)))?
+            .header(header::CONTENT_TYPE, "text/plain;charset=UTF-8")
+            .body(packet);
+        let resp = self.send(request).await?;
+        if bounded_ok_body(resp).await? != b"ok" {
+            return Err(Error::Protocol);
+        }
+        Ok(())
+    }
+
+    pub async fn websocket(&self, sid: Option<&str>) -> Result<Socket, Error> {
+        // Keep the exact origin, headers, TLS verifier and no-redirect policy of
+        // polling. Only switch the I/O stream after the RFC 6455 response.
+        let key = generate_key();
+        let accept = derive_accept_key(key.as_bytes());
+        let request = self
+            .request(Method::GET, self.uri("websocket", sid))?
+            .header(header::CONNECTION, "Upgrade")
+            .header(header::UPGRADE, "websocket")
+            .header(header::SEC_WEBSOCKET_VERSION, "13")
+            .header(header::SEC_WEBSOCKET_KEY, key);
+        let stream = self.upgrade(request, &accept).await?;
+        let config = WebSocketConfig::default()
+            .read_buffer_size(16 * 1024)
+            .write_buffer_size(16 * 1024)
+            .max_frame_size(Some(MAX_MESSAGE_BYTES))
+            .max_message_size(Some(MAX_MESSAGE_BYTES))
+            .max_write_buffer_size(MAX_MESSAGE_BYTES + 32 * 1024);
+        Ok(Socket::from_raw_socket(stream, Role::Client, Some(config)).await)
+    }
+
+    async fn upgrade(
+        &self,
+        request: RequestBuilder,
+        accept: &str,
+    ) -> Result<reqwest::Upgraded, Error> {
+        if let Some(relay) = &self.plaintext_proxy {
+            return tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                crate::plaintext_proxy::websocket(
+                    relay,
+                    self.plaintext_credentials.as_ref(),
+                    request.build()?,
+                    accept,
+                ),
+            )
+            .await?;
+        }
+        let response = self.send(request).await?;
+        validate_upgrade(response.status(), response.headers(), accept)?;
+        Ok(response.upgrade().await?)
+    }
+
+    pub async fn probe(&self, sid: &str) -> Result<Socket, Error> {
+        let mut ws = self.websocket(Some(sid)).await?;
+        ws.send(Message::text("2probe")).await?;
+        loop {
+            match ws.next().await.ok_or(Error::Disconnected)?? {
+                Message::Text(text) if text == "3probe" => return Ok(ws),
+                Message::Ping(_) => ws.flush().await?,
+                Message::Pong(_) => {}
+                Message::Close(_) => {
+                    ws.flush().await?;
+                    return Err(Error::Disconnected);
+                }
+                _ => return Err(Error::Protocol),
+            }
+        }
+    }
+
+    /// The feasibility consumer demonstrates a real bounded HTTP inventory
+    /// request after a refresh. Its fixture supplies only an empty album list.
+    pub async fn fixture_inventory(&self) -> Result<(), Error> {
+        let mut url = self.api.clone();
+        url.set_query(None);
+        url.set_fragment(None);
+        url.path_segments_mut()
+            .map_err(|_| Error::Origin)?
+            .pop_if_empty()
+            .push("albums");
+        let resp = self.send(self.request(Method::GET, url)?).await?;
+        if bounded_ok_body(resp).await? == b"[]" {
+            Ok(())
+        } else {
+            Err(Error::Protocol)
+        }
+    }
+}
+
+pub(crate) fn validate_upgrade(
+    status: StatusCode,
+    headers: &header::HeaderMap,
+    accept: &str,
+) -> Result<(), Error> {
+    if status != StatusCode::SWITCHING_PROTOCOLS {
+        return Err(Error::Status(status.as_u16()));
+    }
+    let contains_upgrade = headers
+        .get_all(header::CONNECTION)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(','))
+        .any(|s| s.trim().eq_ignore_ascii_case("upgrade"));
+    let mut upgrades = headers.get_all(header::UPGRADE).iter();
+    let mut challenges = headers.get_all(header::SEC_WEBSOCKET_ACCEPT).iter();
+    if !contains_upgrade
+        || !upgrades
+            .next()
+            .is_some_and(|h| h.as_bytes().eq_ignore_ascii_case(b"websocket"))
+        || upgrades.next().is_some()
+        || !challenges
+            .next()
+            .is_some_and(|h| h.as_bytes() == accept.as_bytes())
+        || challenges.next().is_some()
+        || headers.contains_key(header::SEC_WEBSOCKET_EXTENSIONS)
+        || headers.contains_key(header::SEC_WEBSOCKET_PROTOCOL)
+    {
+        return Err(Error::Protocol);
+    }
+    Ok(())
+}
+
+async fn bounded_ok_body(mut response: Response) -> Result<Vec<u8>, Error> {
+    if response.status() != StatusCode::OK {
+        return Err(Error::Status(response.status().as_u16()));
+    }
+    if response
+        .content_length()
+        .is_some_and(|n| n > MAX_MESSAGE_BYTES as u64)
+    {
+        return Err(Error::Limit);
+    }
+    let mut input = IncomingMessage::default();
+    while let Some(chunk) = response.chunk().await? {
+        input.append(&chunk).map_err(|_| Error::Limit)?;
+    }
+    input.finish().map_err(|_| Error::Limit)
+}
+
+fn tunnel_challenge(error: &reqwest::Error) -> Option<&header::HeaderMap> {
+    use hyper_util::client::legacy::connect::proxy::ProxyAuthChallenge;
+    use std::error::Error as StdError;
+
+    if !error.is_connect() {
+        return None;
+    }
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        if let Some(challenge) = error.downcast_ref::<ProxyAuthChallenge>() {
+            return Some(challenge.headers());
+        }
+        cause = error.source();
+    }
+    None
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(value: reqwest::Error) -> Self {
+        if value.is_timeout() {
+            Self::Timeout
+        } else {
+            Self::Transport
+        }
+    }
+}
+
+impl From<tungstenite::Error> for Error {
+    fn from(value: tungstenite::Error) -> Self {
+        match value {
+            tungstenite::Error::Capacity(_) => Self::Limit,
+            tungstenite::Error::ConnectionClosed
+            | tungstenite::Error::AlreadyClosed
+            | tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ) => Self::Disconnected,
+            _ => Self::Transport,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn proxy_for(host: &str, environment: &[(&str, &str)]) -> Option<Url> {
+        proxy_for_url(&format!("https://{host}/api"), environment)
+    }
+
+    fn proxy_for_url(url: &str, environment: &[(&str, &str)]) -> Option<Url> {
+        let api = Url::parse(url).unwrap();
+        SelectedProxy::unix(&api, |name| {
+            environment
+                .iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| value.to_string())
+        })
+        .route()
+    }
+
+    #[test]
+    fn windows_env_provider_applies_to_both_schemes_before_system_fallback() {
+        let http = "http://127.0.0.1:8100";
+        let https = "http://127.0.0.1:8200";
+        let all = "http://127.0.0.1:8300";
+        for (vars, http_route, https_route, uses_environment) in [
+            (vec![], None, None, false),
+            (vec![("HTTP_PROXY", "http://[")], None, None, false),
+            (vec![("hTtP_PrOxY", http)], Some(http), None, true),
+            (vec![("https_proxy", https)], None, Some(https), true),
+            (
+                vec![("all_proxy", all), ("https_proxy", https)],
+                Some(all),
+                Some(https),
+                true,
+            ),
+            (
+                vec![("http_proxy", http), ("gateway_interface", "CGI/1.1")],
+                None,
+                None,
+                false,
+            ),
+            (
+                vec![
+                    ("Http_Proxy", http),
+                    ("Https_Proxy", https),
+                    ("All_Proxy", all),
+                    ("Gateway_Interface", ""),
+                ],
+                Some(all),
+                Some(https),
+                true,
+            ),
+            (
+                vec![("HTTPS_PROXY", "http://["), ("ALL_PROXY", all)],
+                Some(all),
+                Some(all),
+                true,
+            ),
+            (
+                vec![("ALL_PROXY", all), ("No_Proxy", ".example.test")],
+                None,
+                None,
+                true,
+            ),
+            (
+                vec![("ALL_PROXY", all), ("No_Proxy", "example.test:443")],
+                Some(all),
+                Some(all),
+                true,
+            ),
+        ] {
+            for (scheme, expected) in [
+                ("http", http_route),
+                ("ws", http_route),
+                ("https", https_route),
+                ("wss", https_route),
+            ] {
+                let api = Url::parse(&format!("{scheme}://example.test/api")).unwrap();
+                let selection = SelectedProxy::windows(&api, |name| {
+                    vars.iter()
+                        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                        .map(|(_, value)| value.to_string())
+                });
+                assert_eq!(selection.is_some(), uses_environment, "{scheme} {vars:?}");
+                assert_eq!(
+                    selection.and_then(SelectedProxy::route),
+                    expected.map(|s| Url::parse(s).unwrap()),
+                    "{scheme} {vars:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn linux_http_skips_uppercase_http_proxy_in_cgi_but_keeps_lowercase_and_all_proxy() {
+        let url = "http://127.0.0.1/api";
+        let upper = "http://127.0.0.1:8200";
+        let all = "http://127.0.0.1:8201";
+        let lower = "http://127.0.0.1:8202";
+        for (vars, expected) in [
+            (vec![("HTTP_PROXY", upper), ("all_proxy", all)], upper),
+            (
+                vec![
+                    ("GATEWAY_INTERFACE", ""),
+                    ("HTTP_PROXY", upper),
+                    ("all_proxy", all),
+                ],
+                all,
+            ),
+            (
+                vec![
+                    ("GATEWAY_INTERFACE", "CGI/1.1"),
+                    ("HTTP_PROXY", upper),
+                    ("http_proxy", lower),
+                    ("all_proxy", all),
+                ],
+                lower,
+            ),
+        ] {
+            assert_eq!(
+                proxy_for_url(url, &vars),
+                Some(Url::parse(expected).unwrap())
+            );
+        }
+        assert_eq!(
+            proxy_for_url(
+                url,
+                &[
+                    ("GATEWAY_INTERFACE", ""),
+                    ("HTTP_PROXY", upper),
+                    ("HTTPS_PROXY", all)
+                ]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn linux_https_uses_the_first_valid_protocol_then_all_proxy() {
+        let lower = "127.0.0.1:8200";
+        let upper = "http://[::1]:8201";
+        let all = "http://127.0.0.1:8202";
+        let expected = Url::parse("http://127.0.0.1:8200").unwrap();
+        for value in [
+            lower,
+            "http://127.0.0.1:8200x",
+            "http://127.0.0.1:8200/path",
+        ] {
+            assert_eq!(
+                proxy_for(
+                    "example.test",
+                    &[
+                        ("https_proxy", value),
+                        ("HTTPS_PROXY", upper),
+                        ("all_proxy", all)
+                    ]
+                ),
+                Some(expected.clone())
+            );
+        }
+        for invalid in ["", "http://[", "http://127.0.0.1:", "ftp://127.0.0.1:8200"] {
+            assert_eq!(
+                proxy_for(
+                    "example.test",
+                    &[
+                        ("https_proxy", invalid),
+                        ("HTTPS_PROXY", upper),
+                        ("all_proxy", all)
+                    ]
+                ),
+                Some(Url::parse(upper).unwrap())
+            );
+        }
+        assert_eq!(
+            proxy_for(
+                "example.test",
+                &[
+                    ("HTTP_PROXY", upper),
+                    ("all_proxy", lower),
+                    ("ALL_PROXY", all)
+                ]
+            ),
+            Some(expected)
+        );
+        assert_eq!(proxy_for("example.test", &[("HTTP_PROXY", upper)]), None);
+    }
+
+    #[test]
+    fn linux_https_bypass_matches_hosts_and_dot_domains_with_lowercase_precedence() {
+        for (host, exclusions, bypass) in [
+            ("example.test", " , EXAMPLE.TEST , ", true),
+            ("a.example.test", "example.test", false),
+            ("a.example.test", ".example.test", true),
+            ("example.test", ".example.test", true),
+            ("otherexample.test", ".example.test", false),
+            ("127.0.0.1", "*", false),
+            ("127.0.0.1", "127.0.0.1:443", false),
+            ("[::1]", "[::1]", true),
+            ("[::1]", "::1", false),
+            ("[::ffff:7f00:1]", "[::ffff:127.0.0.1]", true),
+            ("[::ffff:127.0.0.1]", "[::ffff:7f00:1]", false),
+            ("[::7f00:1]", "[::127.0.0.1]", true),
+            ("[::ffff:0:7f00:1]", "[::ffff:0:127.0.0.1]", true),
+            ("[::ffff:1]", "[::ffff:0.0.0.1]", false),
+            ("[64:ff9b::7f00:1]", "[64:ff9b::127.0.0.1]", false),
+            (
+                "[2001:db8::5efe:7f00:1]",
+                "[2001:db8::5efe:127.0.0.1]",
+                true,
+            ),
+            (
+                "[2001:db8:1:2:0:5efe::]",
+                "[2001:db8:1:2:0:5efe:0.0.0.0]",
+                true,
+            ),
+            ("127.0.0.1", "", false),
+        ] {
+            assert_eq!(
+                proxy_for(
+                    host,
+                    &[
+                        ("HTTPS_PROXY", "127.0.0.1:8200"),
+                        ("no_proxy", exclusions),
+                        ("NO_PROXY", host)
+                    ]
+                )
+                .is_none(),
+                bypass,
+                "{host} {exclusions}"
+            );
+        }
+    }
+
+    #[test]
+    fn authenticated_requests_require_the_configured_scheme_host_port_and_no_user_info() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let api = Url::parse("https://127.0.0.1:4443/collection/api").unwrap();
+        let transport = Transport::new(api, false, "synthetic", Some(Vec::new()), None).unwrap();
+        assert_eq!(transport.namespace, "/collection");
+        for foreign in [
+            "http://127.0.0.1:4443/socket.io/",
+            "https://127.0.0.1:4444/socket.io/",
+            "https://127.0.0.2:4443/socket.io/",
+            "https://other@127.0.0.1:4443/socket.io/",
+        ] {
+            assert!(matches!(
+                transport.request(Method::GET, Url::parse(foreign).unwrap()),
+                Err(Error::Origin)
+            ));
+        }
+        let safe = transport.uri("polling", Some("session&transport=other"));
+        assert_eq!(safe.path(), "/socket.io/");
+        assert_eq!(
+            safe.query_pairs().last().unwrap().1,
+            "session&transport=other"
+        );
+        assert!(transport.request(Method::GET, safe).is_ok());
+    }
+
+    #[test]
+    fn shipping_paths_decode_unreserved_characters_once_and_keep_escaped_separators() {
+        for (path, expected) in [
+            ("/%63ollection/caf%c3%a9/%61PI", "/collection/caf%C3%A9/aPI"),
+            ("/t%2Fr%3fp%23s/%252f", "/t%2Fr%3fp%23s/%252f"),
+            ("/%7e%2d%2e%5f/%20", "/~-._/%20"),
+            ("/%f0%9f%8e%9e", "/%F0%9F%8E%9E"),
+            ("/%c2%80/%ee%80%80/%ff", "/%c2%80/%ee%80%80/%ff"),
+            ("/%f0%9f%bf%bf/%c3%2f", "/%f0%9f%bf%bf/%c3%2f"),
+            ("/discount%/rate|fee", "/discount%25/rate%7Cfee"),
+        ] {
+            assert_eq!(shipping_path(path), expected);
+        }
+    }
+}

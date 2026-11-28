@@ -1,0 +1,90 @@
+name: Rust Linux GUI budget during native inventory
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-linux-worker-budget.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select the native SDK for the shipping reference
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: ${{ matrix.arch }}
+
+      - name: Prepare the private X11 desktop and the pinned native compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends apparmor bubblewrap build-essential pkg-config dbus libglib2.0-bin \
+            python3-gi gir1.2-glib-2.0 xvfb libx11-6 libxdamage1 libxres1 libxtst6 libvulkan1 mesa-vulkan-drivers libxkbcommon-x11-0
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+          bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Stage the source-matched Plasma archive and reproduce its Vulkan counter
+        id: subject
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B tools/rust-qa/performance/hosted/stage.py "$NATIVE_TARGET"
+
+      - name: Build the current native pair when a matching complete input cannot be recovered
+        if: steps.subject.outputs.mode == 'rebuild'
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          /usr/bin/python3 -B tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+          area=artifacts/rust/performance/worker-sources
+          /usr/bin/python3 -B tools/rust-qa/yaml/restore.py --vendor "$area/vendor" --archive "$area/filtered-sources.tar"
+          /usr/bin/python3 -B tools/rust-qa/performance/build_worker.py --name budget-native --vendor "$area/vendor"
+
+      - name: Measure the shipping 3.0.4 reference on this runner
+        env:
+          NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
+        run: bash tools/rust-qa/performance/hosted_budget.sh reference
+
+      - name: Measure the Rust GUI during its native inventory and compare all resource limits
+        env:
+          SUBJECT_REVISION: ${{ steps.subject.outputs.revision }}
+        run: bash tools/rust-qa/performance/hosted_budget.sh candidate artifacts/rust/performance/subjects/budget-native "$SUBJECT_REVISION"
+
+      - name: Retain both original reports, measured subjects and compiler receipts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-linux-worker-budget-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/performance/hosted-*.json
+            artifacts/rust/performance/budget-input.json
+            artifacts/rust/performance/subjects/budget-native/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove the job-specific namespace helper
+        if: always()
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup

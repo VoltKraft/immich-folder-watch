@@ -1,0 +1,112 @@
+{
+  "version": "1.100.0",
+  "commit": "0ef1bc386059596dada8fb65b50425aab2ea637a",
+  "datedManifest": "https://static.rust-lang.org/dist/2026-11-12/channel-rust-1.100.0.toml",
+  "manifestSha256": "3051e859570f64a8c5acb9d09e87425db52c7d97287c67e8f6d57d7d34ef9258",
+  "targets": {
+    "x86_64-pc-windows-msvc": {
+      "rust": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "8c9dabd0a03ebb9d9b8f64fc5298b22ce3c5de7c80e38a075fcc6d81a0e1e7ec"
+      },
+      "rustc": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "4f1f70145ab94e1036b6a9fb0a1fa1393352999701699aedab4dd2724047149e"
+      },
+      "cargo": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "efb63c35df751dbd58b7aa73d6a43d75b00bd356bfdb925901e85379d0de108a"
+      },
+      "rust-std": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "24ad2f28791e08a573b9c7df5efa3ace884eecd1fa7e7f5b62c65f4b49bb4532"
+      },
+      "rustfmt-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "1bdb2b7287fcbaafa002c3c000b94a740e2063df51d2dcdfccf875aa46f9fca7"
+      },
+      "clippy-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "e5c14bc2fe3528d6c3a2b71ccd44a440652e0e01eee761657e72b4a74774d9c5"
+      }
+    },
+    "aarch64-pc-windows-msvc": {
+      "rust": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "7b3cdff0f00579c4810502cd6c2670630ed59071d7ba641b775cb4572d67b002"
+      },
+      "rustc": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "c002385afb94f49cbf0be6fc0da0cc563b509c675ef79cb429601beba418a5dd"
+      },
+      "cargo": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "6aed8eb1e9dc4fb1bd6e294a6ccb9d9fb74ca0e73fb9b9f2d8fc4f497be7abd5"
+      },
+      "rust-std": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "685fe68603036a9726d42ddc287ea8d15a42b50e538018efdd1b4a39dd427fd6"
+      },
+      "rustfmt-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "b28f0acda69ceeec8c0cc1028086536ef064a301a1765d0a353babd906d178f0"
+      },
+      "clippy-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "a50e01a7fb92e908350b2ad3af6fc1a66ce83637a2a13f5b25cb6b4bd5dda150"
+      }
+    },
+    "x86_64-unknown-linux-gnu": {
+      "rust": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "98ee6bec240e1cfe944f17e7092412dc5ef6e008484bb668c6936d35a7d15acd"
+      },
+      "rustc": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "f1d0b1dec81dab6f523cd098507763487b0d4bd7fd2c87582f154128719be03b"
+      },
+      "cargo": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "7e29ce07d7c6e92d1826870575ba27d57fff6cb3e754aa57d99099cb88fab35d"
+      },
+      "rust-std": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "4591b6486594ded52ecd6135db95bf9355bbd3ca7a380888b141528bbcf9a5d4"
+      },
+      "rustfmt-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "4c9389e4722b16499e5d47d89837ec84a4ef755f105ed2a84c038156064e01ab"
+      },
+      "clippy-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "0d18df3bff6c852ef8243727fed075ecb33dbf93b8ab8c138c2f45e3f270102a"
+      }
+    },
+    "aarch64-unknown-linux-gnu": {
+      "rust": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "a21f6a21818df07c1e2e7addb570af5444b3fa9dd61e3a207f4fb1c5a5e665c9"
+      },
+      "rustc": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "fcbfa5b8a0cb28f0c4edfb6dda6910ee910993db31f05258613f5cd5b851263a"
+      },
+      "cargo": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "d07ee80eb6ba3c5845c554ac88086e1ff5d63f83d99c3c09cb32504cbedd6844"
+      },
+      "rust-std": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "c73f62fbe5d837f9807ed9e0076575dd8d3475c79af2b30e3570d328e6713f8f"
+      },
+      "rustfmt-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "f99f80bcd169e8d7de018498d61a544315ead2060fb1e7d515f8ac82c088ef83"
+      },
+      "clippy-preview": {
+        "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-unknown-linux-gnu.tar.xz",
+        "sha256": "941f71acaf2a181d66776b3b889b72d64a90cc405b8f6c41a4b5ac8cd99a36b1"
+      }
+    }
+  }
+}

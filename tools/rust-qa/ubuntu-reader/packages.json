@@ -1,0 +1,111 @@
+{
+  "distribution": "Ubuntu 24.04 noble main",
+  "archiveSigningFingerprint": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+  "inReleaseSha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+  "indexSha256": {
+    "main/binary-amd64/Packages": "8f6f71ae839c8cba390a7643fcbbdacddb0bc7d12c1583a2dd80a1f8443a30e5",
+    "main/binary-arm64/Packages.xz": "4a1901e6124fb0a111f5dffc8f5c14474f449e2ecfa71f2eaf0b29917edb53f9"
+  },
+  "packages": {
+    "espeak-ng-data": {
+      "version": "1.51+dfsg-12build1",
+      "noticeSha256": "bf721eede49d50f84bd2c50f96888629ced572b66ad4087c7a224c4a5e1193bb",
+      "debSha256": {
+        "amd64": "60057f68ba6f79e69aafd943e67e7d9a844de0531e77dc86b1971c43782e4d88",
+        "arm64": "bad0a11bafb8fe969b14e39fe360fafcbee051587a8139cc0a00f2dc5cc9eb1b"
+      },
+      "files": {
+        "usr/lib/{multiarch}/espeak-ng-data/en_dict": {
+          "amd64": "00f82f7503621fa9114e602c210017bc741a8ec50b5524b8e430e71df972562a",
+          "arm64": "00f82f7503621fa9114e602c210017bc741a8ec50b5524b8e430e71df972562a"
+        }
+      }
+    },
+    "libespeak-ng1": {
+      "version": "1.51+dfsg-12build1",
+      "noticeSha256": "bf721eede49d50f84bd2c50f96888629ced572b66ad4087c7a224c4a5e1193bb",
+      "debSha256": {
+        "amd64": "aab65c41ccd62c3998d0fc45cdb9e7e3a2d91031d7ee51b913775718b3f0f60e",
+        "arm64": "1f9e54477fa0388f9dd6613862242ac653acc86476c5d9c1d0624bb1bc53c7dd"
+      },
+      "files": {
+        "usr/lib/{multiarch}/libespeak-ng.so.1.1.51": {
+          "amd64": "a18be542512749ea11dcbb5799f0de86a4bcacc75b3a625198160f67bfd37508",
+          "arm64": "1c9e3ef95292bccae8049f8c97289a50519beb57dd571d719477f8b8568b6d42"
+        }
+      }
+    },
+    "orca": {
+      "version": "46.1-1ubuntu1",
+      "noticeSha256": "5b70c9c6b97fcb6ae9b180c25ae7d4cb3abb2b4dc8024609256e412bb79c6da4",
+      "debSha256": {
+        "all": "2ea414b8aea922b1ac9a1479c1324cba6b28e48dbe57b99d08f9c76806a51c59"
+      },
+      "files": {
+        "usr/bin/orca": {
+          "all": "1c828aa000ed377ecd17efe255cfb7eb08fe6f483977b4dbc90ad39ead72532f"
+        },
+        "usr/lib/python3/dist-packages/orca/orca_modifier_manager.py": {
+          "all": "2042c9cb5809f60372b22fbaf0cba7e246977cc9ea8aa1e9385fce253f12c3e7"
+        },
+        "usr/lib/python3/dist-packages/orca/speechdispatcherfactory.py": {
+          "all": "575622ca72dbc47f3fbc4d8c1d78d49690155fc1b725da6ba4015d81210fc8b1"
+        }
+      }
+    },
+    "python3-speechd": {
+      "version": "0.12.0~rc2-2build3",
+      "noticeSha256": "c22d6252de5ef82d9f5be24ba46b3e8b99648875a64e1a9bdf1dd36ec45c0704",
+      "debSha256": {
+        "all": "ac2ae9a0883ec90cbe4d1cfdf53c5d2d044282e68fc75a37f3e7fe646ddc49ef"
+      },
+      "files": {
+        "usr/lib/python3/dist-packages/speechd/client.py": {
+          "all": "881e7e7eeb1d6a2d6c1854b4c4184e686727d47a778633a22bb03a2d121a6ac4"
+        }
+      }
+    },
+    "speech-dispatcher": {
+      "version": "0.12.0~rc2-2build3",
+      "noticeSha256": "c22d6252de5ef82d9f5be24ba46b3e8b99648875a64e1a9bdf1dd36ec45c0704",
+      "debSha256": {
+        "amd64": "6d7e51a614bd29179a10e4bbbc0b23bb20f313de5500bb322cb5e8483d77d054",
+        "arm64": "5aab439979d3325d955dcf473e026f45e18fa621be5d4f334589103be2e192ba"
+      },
+      "files": {
+        "usr/bin/speech-dispatcher": {
+          "amd64": "d80a0708fa99b3e0414e1a65a6d9fb86e26c0944c2a77888a2d6d962084316a9",
+          "arm64": "5256e7b0c1be7b0f042ec34e88e44ce744f7491ad72843ab6a2896326d9d44cb"
+        }
+      }
+    },
+    "speech-dispatcher-audio-plugins": {
+      "version": "0.12.0~rc2-2build3",
+      "noticeSha256": "c22d6252de5ef82d9f5be24ba46b3e8b99648875a64e1a9bdf1dd36ec45c0704",
+      "debSha256": {
+        "amd64": "9466906807946a29d81f5c2fe48412ff7d4bd0827308281918ca9762c9de1400",
+        "arm64": "a9b97433315192cf2dc2c6b067e071899a9a0f1d4ae8eef46434ed63bf19cf88"
+      },
+      "files": {
+        "usr/lib/{multiarch}/speech-dispatcher/spd_alsa.so": {
+          "amd64": "5dac854904f4332a91a036fd28ebbab8ff7e4e5d32153aa8cc477255d64181f6",
+          "arm64": "8921948da6c0bb7fbad8f0e01dcebb7ebaa3743e7680a842271b86a3eb9c6134"
+        }
+      }
+    },
+    "speech-dispatcher-espeak-ng": {
+      "version": "0.12.0~rc2-2build3",
+      "noticeSha256": "c22d6252de5ef82d9f5be24ba46b3e8b99648875a64e1a9bdf1dd36ec45c0704",
+      "debSha256": {
+        "amd64": "a7218e66608058637159eba623ecf5b8d0648cb27082b6906e37f2c815534836",
+        "arm64": "167b71efcefcbeb06f3ed14492eb0a3fa4c294c4fe8dc9a68d0f2ad3d6b7c942"
+      },
+      "files": {
+        "usr/lib/speech-dispatcher-modules/sd_espeak-ng": {
+          "amd64": "42980f4a9829c2ca80e756c98c1a332e77ff8be41bf1ced10c16f41e1d0b2765",
+          "arm64": "e18f0100a97b57cbfa748038b670133410aa48fd2121dd6f2d9f5b00cb00258f"
+        }
+      }
+    }
+  }
+}

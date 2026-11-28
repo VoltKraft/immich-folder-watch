@@ -1,0 +1,54 @@
+{
+  "crate": "eframe-0.37.0",
+  "upstreamRevision": "3c6eb8261c3293ad9c7ea1ed58487e038860ebef",
+  "pathInVcs": "crates/eframe",
+  "archiveUrl": "https://static.crates.io/crates/eframe/eframe-0.37.0.crate",
+  "archiveSha256": "9c5642501a65ca657d05f00c643a5c14ff2346cb3818032bfe23d58e1f8e5f84",
+  "originalTree": {"files": 36, "sha256": "d6cdf843c50663ae0945bb5bac6587208c3e21fe0225bab605dcf91c54dc337c"},
+  "compilerTree": {"files": 36, "sha256": "4cacd82af9d07932589311f0b9d18bf024ef342595e7263be5736976053bd80b"},
+  "patchSha256": "98f57bfacdfcbb25dc267392611eecc6d32dff236abeeabb1dc65beebe2420b5",
+  "applicationPatchSha256": "133507037f64ab139a6deb7d29ff0f9e65b89baff3a0fc29dab7cc54c2fe2d8c",
+  "modified": {
+    "src/epi.rs": {
+      "original": "8b7a16af6cf7654bfb0c829b5bb52fb75f417f5af231292614c1c7a821173734",
+      "compiled": "b15e17df536e99759a5e8c729370380159fded5a966a073c79014da75ad52cb1"
+    },
+    "src/native/wgpu_integration.rs": {
+      "original": "658a1283f49ecabc308a8dd69fbe7baa694fd745723c623ecb77836e8e1a39a7",
+      "compiled": "80ffc51f9cff75de744b3e8d5a8a8b3a35485def9d7bc462790466f83d71f492"
+    }
+  },
+  "canonicalLockSha256": "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25",
+  "retainedLockSha256": "caa1a5ca07a6f3fa1f7749918a64d828ae8fd8c57b59d43c408676e56a24c304",
+  "canonicalManifestSha256": "aa1d480aebc839c4c5a742be3a547af19273739bcd6634c36afd556a353139ed",
+  "retainedManifestSha256": "c5af87a7ea2c7625cef470132003f3d569c6410aac59fe8547af3f03b88855e6",
+  "license": "MIT OR Apache-2.0",
+  "selectedLicense": "MIT",
+  "adaptedSource": {
+    "file": "src/native/file_storage.rs",
+    "origin": "https://github.com/rust-lang/cargo/blob/6e11c77384989726bb4f412a0e23b59c27222c34/crates/home/src/windows.rs",
+    "feature": "persistence"
+  },
+  "notices": {
+    "eframe/LICENSE-MIT": {
+      "path": "rust/audit/notices/egui-MIT",
+      "source": "https://raw.githubusercontent.com/emilk/egui/3c6eb8261c3293ad9c7ea1ed58487e038860ebef/LICENSE-MIT",
+      "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c"
+    },
+    "eframe/LICENSE-APACHE": {
+      "path": "rust/audit/notices/egui-Apache-2.0",
+      "source": "https://raw.githubusercontent.com/emilk/egui/3c6eb8261c3293ad9c7ea1ed58487e038860ebef/LICENSE-APACHE",
+      "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90"
+    },
+    "cargo-home/LICENSE-MIT": {
+      "path": "artifacts/rust/toolchain/share/doc/cargo/LICENSE-MIT",
+      "source": "https://raw.githubusercontent.com/rust-lang/cargo/6e11c77384989726bb4f412a0e23b59c27222c34/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    "cargo-home/LICENSE-APACHE": {
+      "path": "artifacts/rust/toolchain/share/doc/cargo/LICENSE-APACHE",
+      "source": "https://raw.githubusercontent.com/rust-lang/cargo/6e11c77384989726bb4f412a0e23b59c27222c34/LICENSE-APACHE",
+      "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb"
+    }
+  }
+}

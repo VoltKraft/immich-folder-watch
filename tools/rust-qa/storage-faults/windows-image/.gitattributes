@@ -1,0 +1,3 @@
+*.zlib -text
+*.tar.gz -text
+COPYING.dosfstools -text whitespace=-blank-at-eof

@@ -1,0 +1,158 @@
+{
+  "packages": {
+    "hdrshot-egui-backend": {
+      "version": "0.2.0",
+      "sha256": "088cf499827bfe1ffd6d6c860d1e3c31f52543a7fcc0f1f1734e8d92e79b9319",
+      "bytes": 35791,
+      "files": 23,
+      "unpackedBytes": 155902,
+      "vcsCommit": "e7f82a46faacba74f233e59226587df9b064111f",
+      "registry": "https://index.crates.io/hd/rs/hdrshot-egui-backend"
+    },
+    "constify": {
+      "version": "0.0.1",
+      "sha256": "c3efe35846d8965e78e0e246153416055964610dc2b67ba0e162624dc44fc719",
+      "bytes": 3843,
+      "files": 8,
+      "unpackedBytes": 11550,
+      "vcsCommit": "d17cbcdb2bf4e853543c4c7db61c9d4e2f2233a4",
+      "registry": "https://index.crates.io/co/ns/constify"
+    },
+    "strength_reduce": {
+      "version": "0.2.4",
+      "sha256": "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82",
+      "bytes": 17859,
+      "files": 13,
+      "unpackedBytes": 80457,
+      "vcsCommit": "5b0a43d9d672ee2ac4e471f201fb13417a0a0c71",
+      "registry": "https://index.crates.io/st/re/strength_reduce"
+    }
+  },
+  "notices": {
+    "hdrshot-egui-backend-LICENSE-MIT": {
+      "source": "https://raw.githubusercontent.com/snaketech-tu/hdrshot/e7f82a46faacba74f233e59226587df9b064111f/crates/egui-software-backend/LICENSE-MIT",
+      "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+      "covers": "hdrshot-egui-backend",
+      "license": "MIT",
+      "archiveMember": [
+        "hdrshot-egui-backend",
+        "LICENSE-MIT"
+      ],
+      "alsoCovers": [
+        "Upstream egui_software_backend 0.0.3",
+        "constify 0.0.1"
+      ],
+      "identicalOriginal": "https://raw.githubusercontent.com/DGriffin91/egui_software_backend/d17cbcdb2bf4e853543c4c7db61c9d4e2f2233a4/LICENSE-MIT"
+    },
+    "hdrshot-egui-backend-LICENSE-APACHE": {
+      "source": "https://raw.githubusercontent.com/snaketech-tu/hdrshot/e7f82a46faacba74f233e59226587df9b064111f/crates/egui-software-backend/LICENSE-APACHE",
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+      "covers": "hdrshot-egui-backend",
+      "license": "Apache-2.0",
+      "archiveMember": [
+        "hdrshot-egui-backend",
+        "LICENSE-APACHE"
+      ],
+      "alsoCovers": [
+        "Upstream egui_software_backend 0.0.3",
+        "constify 0.0.1"
+      ],
+      "identicalOriginal": "https://raw.githubusercontent.com/DGriffin91/egui_software_backend/d17cbcdb2bf4e853543c4c7db61c9d4e2f2233a4/LICENSE-APACHE"
+    },
+    "strength_reduce-LICENSE-MIT": {
+      "source": "https://raw.githubusercontent.com/ejmahler/strength_reduce/5b0a43d9d672ee2ac4e471f201fb13417a0a0c71/LICENSE-MIT",
+      "sha256": "8f5442dfa8e9169045697e386bc91d19f393c939635741fa2a665ec36ca6f0ad",
+      "covers": "strength_reduce",
+      "license": "MIT",
+      "archiveMember": [
+        "strength_reduce",
+        "LICENSE-MIT"
+      ]
+    },
+    "strength_reduce-LICENSE-APACHE": {
+      "source": "https://raw.githubusercontent.com/ejmahler/strength_reduce/5b0a43d9d672ee2ac4e471f201fb13417a0a0c71/LICENSE-APACHE",
+      "sha256": "2e54cd84a645bea25943c75dd8ae67cb291e66a47a11578333c9b4b3b6b86c85",
+      "covers": "strength_reduce",
+      "license": "Apache-2.0",
+      "archiveMember": [
+        "strength_reduce",
+        "LICENSE-APACHE"
+      ]
+    },
+    "hdrshot-upstream-README.md": {
+      "source": "https://raw.githubusercontent.com/snaketech-tu/hdrshot/e7f82a46faacba74f233e59226587df9b064111f/crates/egui-software-backend/README.md",
+      "sha256": "0fd7b0d1f32733f89aef1b8993cc6d21afc03e4a49395abee247621d6f1e7a55",
+      "covers": "Original renderer and port attribution",
+      "license": "MIT OR Apache-2.0",
+      "archiveMember": [
+        "hdrshot-egui-backend",
+        "README.md"
+      ]
+    },
+    "num-bigint-MIT.txt": {
+      "source": "https://raw.githubusercontent.com/rust-num/num-bigint/d1e4498cbc02d22b3ddded7216c38d94e494cf90/LICENSE-MIT",
+      "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+      "covers": "BigUint multiplication adapted by strength_reduce",
+      "license": "MIT",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/num-bigint-MIT.txt"
+    },
+    "rust-core-MIT.txt": {
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/e4b521903b3b1a671e26a70b9475bcff385767e5/LICENSE-MIT",
+      "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+      "covers": "Ceiling division in raster/span.rs",
+      "license": "MIT",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/rust-core-MIT.txt"
+    },
+    "egui-MIT.txt": {
+      "source": "https://raw.githubusercontent.com/emilk/egui/c97c065a575ec6e657bb42872890a00d0fb391c1/LICENSE-MIT",
+      "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+      "covers": "Adapted emath vector and epaint atlas reference",
+      "license": "MIT",
+      "repositoryFile": "rust/audit/notices/egui-MIT"
+    },
+    "imgui-software-renderer.txt": {
+      "source": "https://raw.githubusercontent.com/emilk/imgui_software_renderer/b5ae63a9e42eccf7db3bf64696761a53424c53dd/src/imgui_sw.cpp",
+      "sha256": "a64432ed266e182d3fd43444962ba2f0abae15eee4a50d3fdef17ad9b8304c48",
+      "covers": "Rectangle detection in render.rs",
+      "license": "Original public-domain dedication and permissive grant",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/imgui-software-renderer.txt",
+      "sourceSelection": "First five complete lines including the original author and grant."
+    },
+    "hash-prospector-UNLICENSE.txt": {
+      "source": "https://raw.githubusercontent.com/skeeto/hash-prospector/ddb158c3ca12e00baf0fb25b719bf29f236a3c1d/UNLICENSE",
+      "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
+      "covers": "lowbias32 in hash.rs",
+      "license": "Unlicense",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/hash-prospector-UNLICENSE.txt"
+    },
+    "const-currying-MIT.txt": {
+      "source": "https://raw.githubusercontent.com/TennyZhuang/const-currying-rs/8e66afdd5be0b9e57e7b8ca66e0f14ae42884771/LICENSE-MIT",
+      "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652",
+      "covers": "Credited macro source in constify",
+      "license": "MIT",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/const-currying-MIT.txt"
+    },
+    "Fae-MIT.txt": {
+      "source": "https://codeberg.org/LGFae/personal-website/raw/commit/9897f54bf81cc6fd0e9c9898970772b8a2bf55ff/LICENSE",
+      "sha256": "f703978d3f60acc3f07b144ff930ac42a0e015437a00cf13d13ffb4328b43790",
+      "covers": "Color arithmetic and SIMD, original article and example",
+      "license": "MIT",
+      "repositoryFile": "tools/rust-qa/windows-cpu-paint/notices/Fae-MIT.txt"
+    }
+  },
+  "provenance": {
+    "eguiSoftwareBackend003": {
+      "originalCrateSha256": "b8ca3a47168e93a5cca79b7cb830817acaf07ebc1f8756aa368a6b2d6250f6ae",
+      "vcsCommit": "0df1a177abe795b5973d89db2b5901fc2c672dae",
+      "compilerSourceComparison": "Fourteen of sixteen Rust files match byte for byte. The two ported files are src/lib.rs and src/render.rs."
+    },
+    "article": {
+      "url": "https://codeberg.org/LGFae/personal-website/src/commit/9897f54bf81cc6fd0e9c9898970772b8a2bf55ff/zola/content/posts/2025-09-01-alpha-blend-with-simd.md",
+      "sha256": "b58d0076cc574e2a519d935ce1bc5908b72c33cb4508e2ccd826f51f898d61e9"
+    },
+    "constifySource": {
+      "url": "https://raw.githubusercontent.com/DGriffin91/egui_software_backend/d17cbcdb2bf4e853543c4c7db61c9d4e2f2233a4/constify/src/lib.rs",
+      "sha256": "4e151ed55e24aa7e69a869f8cfafb22a6cd089f99c1367b9b6e5904df92ac792"
+    }
+  }
+}
