@@ -215,6 +215,8 @@ to reconcile project decisions, defaults, and recorded state.
   requests, and the direct connection when the endpoint is in `NO_PROXY`.
   For [authenticated plaintext proxy routes](docs/rust/rw02-linux-basic-proxy.md),
   compare both ends of the CONNECT with the signed Linux client.
+  Include the [UTF-8 realm](docs/rust/rw02-linux-basic-proxy.md#localized-digest-realm)
+  when changing challenge parsing or the Digest response bytes.
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
   Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)

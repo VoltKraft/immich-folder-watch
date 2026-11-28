@@ -91,3 +91,75 @@ no proxy header. The native receipt at
 has SHA-256 `d4ff505e74925f334fd19ac1d5222af2c46f95fa04fef5407d705061ce361efa`.
 Its 27 source digests and nine outputs matched independently. The existing
 graph retained 109 registry inputs and 192 original notices.
+
+## Digest for explicitly enabled HTTP origins
+
+On Fedora x64 the signed 3.0.4 assemblies received one challenge before
+retrying each album GET, polling GET/POST and WebSocket CONNECT. For the
+forwarded HTTP requests they signed the path and query. For CONNECT they
+signed `/`. A relay accepting those historical forms delivered the event
+and the normal close with SHA-256 and MD5. A relay requiring the target
+from the request line rejected both initial authenticated operations. The
+previous Rust ELF answered none of the Digest challenges under either
+policy. [Digest request target](https://www.rfc-editor.org/rfc/rfc7616#section-3.4.6) ·
+[HTTP proxy request forms](https://www.rfc-editor.org/rfc/rfc9112#section-3.2.2).
+
+At `1b84ad8` the Rust adapter signs the absolute URI for GET and POST,
+and the destination authority including its port for CONNECT. It shares
+the proxy nonce counter between those operations. In the paired trial
+both relay policies accepted counts 1 through 9, with a confirmed album
+read, event and normal close. Incorrect credentials yielded no inventory
+or event. The CONNECT carried no application key and the inner WebSocket
+upgrade carried no proxy header.
+
+The native run at `d0f0493` passed 22 unit tests and 71 wire cases,
+including a SHA-256 `auth-int` exchange that verified the original POST
+body bytes. In each of the three positive native Digest cases the strict
+relay accepted all thirteen authenticated operations. The ten Basic
+reference cases also passed. The 35 inputs matched the Git revision and
+all twelve outputs matched the native receipt. The following SHA-256
+digests identify the originals in `artifacts/rust/realtime-assessment/`.
+
+| Receipt | SHA-256 |
+| --- | --- |
+| Signed reference and earlier ELF, `plain-digest-reference-d0f0493.json` | `8939a80f63fee49c98d5cf042c64308b0853cf797619991a2b25bf6a3b47d1da` |
+| Signed reference and corrected ELF, `plain-digest-candidate-d0f0493.json` | `5bc0d2f1a54fb0e4f4836568e4d22d34aeedf67e26dfccf91d8ad3eff1feb9ea` |
+| Ten Basic controls, `plain-digest-basic-d0f0493.json` | `5f3b7d21289ffc47e9701f02ed7d99a680aab616b1003f9ffede4f8c7ad7c5a0` |
+| Native compiler, graph and tests, `linux-plain-digest-release-d0f0493/result.json` | `81a0e956004a6320f6e8791db7ad8bf643c18fcac868aca02a355211f88bf31d` |
+
+Use `linux_basic_proxy.py --digest` with the archived inputs above and
+the original ELF SHA-256. Replay the first two reports with
+`replay_linux_basic_proxy.py --digest-reference` and `--digest`
+respectively.
+
+### Localized Digest realm
+
+With `charset=UTF-8` and the realm `München`, the signed 3.0.4
+client and the Rust executable from the preceding trial sent no Digest
+response. At `72cf0a3` Rust reads the selected challenge as UTF-8 and
+preserves the quoted realm bytes in its response and hash. A malformed
+or unrelated challenge in the same response does not hide a valid one.
+
+The independent relay accepted the corrected Rust response with SHA-256
+and MD5, under both strict and shipping-compatible request-target rules.
+Each successful paired trial included nine authenticated operations, one
+event and a normal WebSocket close. The incorrect-password cases did
+not authenticate. The signed client still sent no Digest response.
+The two sixteen-case comparisons are stored in the same evidence directory.
+Use `--digest --utf8-realm` to replay the corrected candidate comparison.
+
+| Original report | SHA-256 |
+| --- | --- |
+| Earlier executable, `plain-digest-utf8-before-01.json` | `f192547c780149710c8b4bcdb759aaa4939e9cdde1342712f27764f263b9d63f` |
+| Corrected executable, `plain-digest-utf8-after-02.json` | `041a9443fba3ecb45e9ae1ea8361f9aee57ca4346a58a059234ba0c72c973cfd` |
+| Ten Basic controls, `plain-digest-basic-after-02.json` | `dea8d39c67158d318b9f0f30c2fa4c508378d032609decae087dbed845cad651` |
+
+At `00443e0` the offline Fedora x64 run passed 24 unit tests, 72 wire
+cases, rustfmt and warnings-denied Clippy. The strict relay verified
+nonce counts 1 through 13 in the localized case and a normal close
+after the event. The 35 original source hashes matched that revision and
+the 12 indexed outputs matched the receipt. The executable SHA-256 was
+`3cab46d8df9258a1bb4e8f3a4469d460be0bc32adcbeb6bc1234b7c66bddcdf2`.
+The original `linux-plain-utf8-source-bound-02/result.json` in the same
+evidence directory has SHA-256
+`c8c59bc7818bbc1ae053b33b08e7ba8093a1d4000250bd59f196b1e67bfa19eb`.

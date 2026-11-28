@@ -18,19 +18,37 @@ the offline Wayland relink. Its SPDX inventory contains 447 packages.
 [Explorer results](rust/rw02-windows-services.md#both-explorer-starts-on-windows-server-2025) ·
 [Combined build and notices](rust/rw02-combined-profile.md#native-linux-x64-digest-inventory-at-2f63c15).
 
-On Server 2025 x64 at `36190f1`, the standard user ran the combined Rust
-executable, its five held-file upload cases and the SPDX generator. The
-host reproduced the guest's 258-package inventory byte for byte. On Fedora
-x64 the Linux HTTPS transport at `ed9268e` passed 19 unit tests, 66 wire
-cases and the sixteen-case paired Digest comparison with .NET 3.0.4.
-[Local combined results](../tools/rust-qa/windows-local/README.md#combined-profile-on-server-2025-at-36190f1) ·
-[Fedora Digest comparison](rust/rw02-linux-tls-basic-proxy.md#authority-bound-digest-on-fedora-x64).
+The same x64 VM passed 35 workspace tests, 18 realtime unit tests, 49
+network scenarios and 16 Windows system proxy cases at `a2e54f5`. It
+restored the original proxy settings. Five held-file uploads at `6c4a364`
+passed and the host reproduced the guest's 258-package SPDX inventory
+byte for byte. On Ubuntu x64 and ARM64, each proxy accepted all thirteen
+Digest nonce counts from the HTTPS adapter for both SHA-256 and MD5.
+[Three native x64 archives](../tools/rust-qa/windows-local/README.md#workspace-realtime-and-combined-on-the-same-server-2025-guest) ·
+[Original Ubuntu relay observations](rust/rw02-linux-tls-basic-proxy.md#native-nonce-counts-on-ubuntu-x64-and-arm64-at-a2e54f5).
 
-On the Windows ARM64 desktop at `3d55500`, the normal WinRT sender and
-history succeeded. The 93 point samples did not establish visible labels.
-The [fresh console trial](../tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console)
-runs the physical observer before the other desktop workloads and reads
-the two Windows notification switches after the sender exits.
+On Fedora x64 at `00443e0` the Rust adapter passed 24 unit tests and 72
+wire cases. For explicitly allowed HTTP origins the relay verified Digest
+responses for the original inventory, polling and CONNECT targets, the
+exact POST bytes with `auth-int`, and the UTF-8 realm `München`. The
+signed 3.0.4 client sent no Digest response for that localized realm.
+[Signed and native proxy results](rust/rw02-linux-basic-proxy.md#localized-digest-realm).
+
+On Windows ARM64 at `ee0bcd2` the ordinary and quiet WinRT sends and
+history checks passed on two fresh consoles. Neither physical observer
+found a matching popup, including when Do not disturb was off. Independent
+readback verified restoration. The Shell reported quiet time. At `c0dd89c`
+both installed launch orders reactivated their primary. WPF Quit and
+desktop restoration passed on the private desktop. On Default all 16
+points hit another window before the menu could open.
+[Notification trial](../tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console) ·
+[Three installed ARM64 trials](../tools/rust-qa/windows-msi-interop/reverse/README.md#native-arm64-activation-at-c0dd89c).
+
+Two native ARM64 runners displayed filename edits in both Rust GUI
+variants at 96 DPI on their private desktops. Each restored its original
+desktop. On Default the fields were covered. The runner at `0ae5d1c`
+reported no connected RDP session. Native ARM64 mixed-DPI and RDP
+measurements remain open. [Original frame and session observations](rust/rw02-windows-display.md#arm64-source-monitor-focus-at-3d55500).
 
 New Windows x64 tests for the rewrite run on the local Server 2025 VM.
 The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
