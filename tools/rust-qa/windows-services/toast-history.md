@@ -334,3 +334,13 @@ the sender binary (`b0b4e2f27c315cd9ee076b4cd04488050134162c0cd388bf46ad3cb49f40
 both observation streams and the independent Settings readback. The
 archive and replay are under
 `artifacts/rust/hosted-toast-history/app-state-trial/46113460191/`.
+
+The original `005-post-normal.txt` recorded `setting=0` from
+`ToastNotifier.Setting` (`NotificationSetting.Enabled`) and
+`suppressPopup=false` for that notification. Windows exposes a separate
+**Show notification banners** preference on each sender's Settings page.
+The archived Settings windows measured the global Notifications and
+Do not disturb switches. The per-sender banner preference for this test
+identity remains unknown.
+[WinRT notifier setting](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.setting) ·
+[Windows per-app notification settings](https://support.microsoft.com/en-us/windows/experience/notifications-and-do-not-disturb-in-windows)
