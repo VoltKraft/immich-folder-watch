@@ -1,11 +1,57 @@
 //! Resolve a FileChooser result inside the application's Documents mount.
 use std::ffi::{OsStr, OsString};
-use std::os::unix::ffi::OsStringExt;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Component, Path, PathBuf};
 
 pub(crate) struct Grant {
-    pub(crate) path: PathBuf,
+    pub(crate) root: PathBuf,
+    pub(crate) relative: PathBuf,
     pub(crate) id: OsString,
+}
+
+impl Grant {
+    pub(crate) fn from_path(path: &Path, mount: &Path) -> Result<Self, &'static str> {
+        let raw = path.as_os_str().as_bytes();
+        if !mount.is_absolute()
+            || raw.contains(&0)
+            || raw
+                .split(|byte| *byte == b'/')
+                .any(|part| matches!(part, b"." | b".."))
+        {
+            return Err("Expected a normalized Documents path");
+        }
+        let mut parts = path
+            .strip_prefix(mount)
+            .map_err(|_| "Path is outside the Documents mount")?
+            .components();
+        let (Some(Component::Normal(id)), Some(Component::Normal(basename))) =
+            (parts.next(), parts.next())
+        else {
+            return Err("Expected a Documents ID and a granted basename");
+        };
+        if id == OsStr::new("by-app") {
+            return Err("Expected a grant in the application's Documents view");
+        }
+        Ok(Self {
+            root: mount.join(id).join(basename),
+            relative: parts.collect(),
+            id: id.to_owned(),
+        })
+    }
+
+    pub(crate) fn path(&self) -> PathBuf {
+        let mut path = self.root.clone();
+        path.extend(&self.relative);
+        path
+    }
+
+    pub(crate) fn open(&self) -> std::io::Result<safe_fs::Directory> {
+        let mut directory = safe_fs::Directory::open_root(&self.root)?;
+        for component in &self.relative {
+            directory = directory.open_directory(component)?;
+        }
+        Ok(directory)
+    }
 }
 
 fn decode_name(encoded: &str) -> Result<OsString, &'static str> {
@@ -61,22 +107,7 @@ pub(crate) fn parse(uri: &str, mount: &Path) -> Result<Grant, &'static str> {
     for component in encoded.strip_suffix('/').unwrap_or(encoded).split('/') {
         path.push(decode_name(component)?);
     }
-    let mut parts = path
-        .strip_prefix(mount)
-        .map_err(|_| "URI is outside the Documents mount")?
-        .components();
-    let (Some(Component::Normal(id)), Some(Component::Normal(_)), None) =
-        (parts.next(), parts.next(), parts.next())
-    else {
-        return Err("Expected a Documents ID and a granted basename");
-    };
-    if id == OsStr::new("by-app") {
-        return Err("Expected a grant in the application's Documents view");
-    }
-    Ok(Grant {
-        id: id.to_owned(),
-        path,
-    })
+    Grant::from_path(&path, mount)
 }
 
 #[cfg(test)]
@@ -95,17 +126,21 @@ mod tests {
             let uri = format!("file:///run/user/7/doc/ab12/{encoded}");
             let grant = parse(&uri, mount).unwrap();
             assert_eq!(grant.id, "ab12");
-            assert_eq!(grant.path, mount.join("ab12").join(OsStr::from_bytes(name)));
+            assert_eq!(
+                grant.path(),
+                mount.join("ab12").join(OsStr::from_bytes(name))
+            );
         }
     }
 
     #[test]
-    fn only_a_single_granted_name_on_the_local_mount_is_accepted() {
+    fn grants_require_local_components_under_the_application_mount() {
         let mount = Path::new("/run/user/7/doc");
         for suffix in [
             "by-app/album",
             "id",
-            "id/album/child",
+            "id/album/child/%2e%2e",
+            "id/album/child/a%2Fb",
             "id//album",
             "id/%2e%2e",
             "id/%00",
@@ -132,7 +167,27 @@ mod tests {
             "file:///run/user/7/doc/id/album/",
             "FILE://LOCALHOST/run/user/7/doc/id/album",
         ] {
-            assert_eq!(parse(uri, mount).unwrap().path, mount.join("id/album"));
+            assert_eq!(parse(uri, mount).unwrap().path(), mount.join("id/album"));
+        }
+    }
+
+    #[test]
+    fn saved_subdirectory_names_remain_literal_through_both_representations() {
+        let mount = Path::new("/run/user/7/doc");
+        let path = mount.join("id/Photos/2026/Sommer %2F");
+        let saved = Grant::from_path(&path, mount).unwrap();
+        let chooser = parse(
+            "file:///run/user/7/doc/id/Photos/2026/Sommer%20%252F",
+            mount,
+        )
+        .unwrap();
+        for grant in [saved, chooser] {
+            assert_eq!(grant.root, mount.join("id/Photos"));
+            assert_eq!(grant.relative, Path::new("2026/Sommer %2F"));
+            assert_eq!(grant.path(), path);
+        }
+        for name in ["../Photos", "child/./name", "child/../name"] {
+            assert!(Grant::from_path(&mount.join("id/Photos").join(name), mount).is_err());
         }
     }
 }

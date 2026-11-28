@@ -19,6 +19,11 @@ directory through its grant. At `3116139` the Ubuntu ARM64 client displayed
 the grant path under Documents v4 on both X11 and Wayland. Both fresh
 clients verified revocation and read the surviving control grant.
 [Display-name readback](rust/rw02-portal-dialog.md#resolving-the-display-name-inside-the-installed-flatpak).
+On Fedora x64 both installed clients also opened a saved subfolder and
+read its label through the held directory with the session bus unavailable.
+After the parent grant was revoked, both returned `ENOENT` while the
+original marker remained on the host.
+[Native subfolder trials](rust/rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` retained its focused field, backwards selection
 and first keystroke after reopening on Mutter and X11.
 [Folder results](rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·

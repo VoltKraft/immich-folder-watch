@@ -98,6 +98,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             return Err("Unexpected installed Flatpak identity".into());
         }
         println!("APPLICATION_FLATPAK {id}");
+        if action == "reopen-saved" {
+            let path = std::env::args_os()
+                .nth(2)
+                .ok_or("Missing saved folder path")?;
+            let check_fallback = std::env::args_os().nth(3).as_deref()
+                == Some(std::ffi::OsStr::new("--observe-portal"));
+            return futures_lite::future::block_on(portal::reopen_saved(
+                std::path::Path::new(&path),
+                check_fallback,
+            ));
+        }
         if action == "recheck-revoked" {
             let uri = std::env::args()
                 .nth(2)
@@ -106,7 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Some(still_granted) = std::env::args().nth(3) {
                 portal::inspect_grant(&still_granted)?;
             }
-            return match safe_fs::Directory::open_root(&grant.path) {
+            return match grant.open() {
                 Err(error)
                     if matches!(
                         error.kind(),

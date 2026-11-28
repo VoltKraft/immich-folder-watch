@@ -15,6 +15,13 @@ parent steps, reserved internal components and Windows streams are rejected.
 Linux names retain their original bytes and Windows names retain their UTF-16
 representation.
 
+On Linux, `Directory::read_user_attribute` reads into a bounded buffer
+with `fgetxattr` on the held directory. A native regression test renamed
+that directory, created a replacement at its former name and recovered the
+original attribute only on the held descriptor. The installed Flatpak
+reads its [subfolder display label](rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant)
+through this operation.
+
 | Operation | Linux | Windows |
 | --- | --- | --- |
 | Pin and descend | `O_DIRECTORY\|O_NOFOLLOW`, then `openat` on the parent fd | Drive or UNC root with backup semantics and open-reparse-point flags, then `NtCreateFile` with a retained `RootDirectory`. Directory handles deny delete sharing. |

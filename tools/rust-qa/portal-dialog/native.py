@@ -313,6 +313,34 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
             record(action, result['steps'][action])
         if chooser_only:
             return
+        if flatpak:
+            parent = grants['-escaped']
+            relative = Path('2026/Urlaub %2F #1')
+            backing = Path(parent['backing']) / relative
+            backing.mkdir(parents=True)
+            marker = 'nested-grant-fixture'
+            contents = b'Synthetic nested folder\n'
+            (backing / marker).write_bytes(contents)
+            saved = Path(parent['application_view']) / relative
+            reopen = flatpak_fixture.command('reopen-saved', str(saved))
+            opened = subprocess.run([*reopen, '--observe-portal'], capture_output=True, text=True, check=True, timeout=10)
+            lines = opened.stdout.splitlines()
+            source, display_text = next(line for line in lines if line.startswith('DOCUMENT_LABEL ')).split(' ', 2)[1:]
+            expected_label = saved if source == 'grant' else backing
+            if (source not in ('xattr', 'Documents.GetHostPaths', 'grant') or display_text != str(expected_label)
+                    or (source == 'grant' and parent['documents_version'] >= 5)
+                    or not {f"DOCUMENT_GRANT {parent['id']} {saved}", f'DOCUMENT_ENTRY {marker}'}.issubset(lines)):
+                raise RuntimeError(f'Fresh Flatpak could not reopen the nested watch folder: {lines}')
+            if parent['documents_version'] >= 5 and f'DOCUMENT_PORTAL_LABEL {backing}' not in lines:
+                raise RuntimeError('GetHostPaths did not map the descendant of the saved grant')
+            record('saved-subfolder', {'access': str(saved), 'backing': str(backing), 'client': lines})
+            disconnected = subprocess.run(flatpak_fixture.command('reopen-saved', str(saved), '--observe-portal', without_session_bus=True),
+                                          capture_output=True, text=True, check=True, timeout=10)
+            lines = disconnected.stdout.splitlines()
+            offline_label = f'DOCUMENT_LABEL xattr {backing}' if source == 'xattr' else f'DOCUMENT_LABEL grant {saved}'
+            if not {f"DOCUMENT_GRANT {parent['id']} {saved}", f'DOCUMENT_ENTRY {marker}', offline_label, 'DOCUMENT_PORTAL_UNAVAILABLE'}.issubset(lines):
+                raise RuntimeError(f'Offline label or access differs for the granted subfolder: {lines}')
+            record('saved-subfolder-without-bus', {'access': str(saved), 'client': lines})
         for suffix, grant in reversed(grants.items()):
             bus.call_sync(service, documents_path, service, 'RevokePermissions',
                 GLib.Variant('(ssas)', (grant['id'], APP, grant['permissions'])), None, Gio.DBusCallFlags.NONE, 2000, None)
@@ -331,6 +359,17 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
                 raise RuntimeError('The same Flatpak process could not read the surviving control grant')
             record('revoked' + suffix, {'uri': grant['uri'], 'remaining_permissions': remaining,
                                         'fresh_process': observed})
+            if suffix == '-escaped':
+                closed = subprocess.run(reopen, capture_output=True, text=True, timeout=10)
+                lines = closed.stdout.splitlines()
+                if (closed.returncode == 0 or not {'DOCUMENT_OPEN_FAILED errno=Some(2)',
+                                                   'DOCUMENT_OPEN_FAILED errno=Some(13)'}.intersection(lines)
+                        or any(line.startswith('DOCUMENT_ENTRY ') for line in lines)):
+                    raise RuntimeError(f'Fresh Flatpak did not observe the revoked parent: {lines}')
+                if (backing / marker).read_bytes() != contents:
+                    raise RuntimeError('The host marker changed during permission revocation')
+                record('revoked-saved-subfolder', {'access': str(saved), 'exit': closed.returncode,
+                                                   'client': lines, 'backing_entry': marker})
 
         def simple(action):
             task, log = app(action)

@@ -48,6 +48,12 @@ const _: () = assert!(std::mem::offset_of!(Statx, device_major) == 136);
 const _: () = assert!(std::mem::offset_of!(Statx, inode) == 32);
 
 unsafe extern "C" {
+    fn fgetxattr(
+        fd: c_int,
+        name: *const c_char,
+        value: *mut std::ffi::c_void,
+        size: usize,
+    ) -> isize;
     fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;
     fn mkdirat(dirfd: c_int, path: *const c_char, mode: u32) -> c_int;
     fn unlinkat(dirfd: c_int, path: *const c_char, flags: c_int) -> c_int;
@@ -61,6 +67,28 @@ unsafe extern "C" {
     fn geteuid() -> u32;
     fn statx(dirfd: c_int, path: *const c_char, flags: c_int, mask: u32, info: *mut Statx)
     -> c_int;
+}
+
+pub(super) fn read_directory_attribute(
+    directory: &File,
+    name: &std::ffi::CStr,
+    buffer: &mut [u8],
+) -> io::Result<usize> {
+    // SAFETY: directory and the NUL-terminated name stay borrowed for the
+    // call, and the buffer is writable for exactly the supplied length.
+    let count = unsafe {
+        fgetxattr(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            buffer.as_mut_ptr().cast(),
+            buffer.len(),
+        )
+    };
+    if count < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(count as usize)
+    }
 }
 
 pub(super) fn open_root(path: &Path) -> io::Result<File> {

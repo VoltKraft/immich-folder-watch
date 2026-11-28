@@ -145,7 +145,7 @@ in its isolated VSTest run, including the D-Bus fallback and timeout.
 The assembly SHA-256 was
 `351baf14b632033244043ed80179fea629bdc148429d0952efff168b6aa1f19c`.
 
-The portal crate uses two existing audited inputs directly for the bounded
+At `3116139` the portal crate used two existing audited inputs directly for the bounded
 attribute read. The offline build reproduced the preceding receipt's 211
 locked archives and the exact 116 active registry input records.
 `rustix` 1.1.6 with its existing `fs` feature and `blocking` 1.7.0 both
@@ -155,6 +155,43 @@ and each contained the MIT license text with SHA-256
 [Portal lockfile](../../tools/rust-qa/portal-dialog/Cargo.lock) ·
 [rustix license](https://github.com/bytecodealliance/rustix/blob/4a563ad698b2c20ff848515821023d2265a788d0/LICENSE-MIT) ·
 [blocking license](https://github.com/smol-rs/blocking/blob/e29a5e6979f56c7537b04ab17ca7bdceee66ef5f/LICENSE-MIT).
+
+## Reopening a subfolder of an existing grant
+
+A saved Linux watch path can include directories below the basename
+exported under a Documents ID. The Rust client at this checkpoint pins
+the exported directory, then opens each child relative to its held parent.
+The display lookup first reads `user.document-portal.host-path` on the
+final directory descriptor. A missing attribute triggers the bounded
+session-bus lookup. An exact ID and matching exported basename permit
+appending the original child components to a `GetHostPaths` reply.
+If neither source supplies a host label, the UI can display the original
+grant path. The source graph still has 211 external archives and 116
+active external packages. The application uses the safe-fs descriptor
+operation for the attribute and has dropped its direct rustix dependency.
+
+In two Fedora x64 installed Flatpak trials, the producer added
+`2026/Urlaub %2F #1` under its previously granted `Grüße #2 %2F` folder.
+A fresh application received the absolute access path as a command
+argument and enumerated the marker. On both desktops the held directory
+attribute and the independent v5 query yielded the exact host label.
+With an unreachable D-Bus socket the attribute still supplied that label.
+After the parent permission was revoked, another process received
+`ENOENT` for the same subfolder, the control grant remained readable
+and the producer verified the original marker bytes. This exercises
+the path handed to the adapter by settings. The YAML round trips have
+their own [codec evidence](rw02-yaml.md).
+
+| Local Fedora trial | SHA-256 of `results.json` |
+| --- | --- |
+| `x11-flatpak-2ng8ldr2` | `2a7066fb2924c18339104734d63a94904a6a6b8dc29f88da1182cf96ab16e74e` |
+| `wayland-flatpak-d9dlmnoz` | `1946b7632903c48f3b46d746c7dd311fd042faf2b79f69d5f1fa883e5e86f9a0` |
+
+Both trials used ELF SHA-256
+`018fc96249c7d9c8af2aa940771636cf1ae9ab1926545404f89e18bbd97b69ef`.
+All six portal unit tests and twenty safe-fs unit and integration tests
+passed on Fedora x64. Independent review checked the Linux ABI, buffer
+bound, descriptor lifetime, per-component descent and display fallback.
 
 ## Notifications and autostart
 

@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reopen Linux watch subfolders inside an existing Documents grant in the Rust feasibility client. The client walks from the granted directory and reads the display label from the opened subfolder.
 Maintenance release focused on Windows distribution; Linux application behavior is unchanged. Configuration and stored data remain compatible; no migration is required.
 
 Before updating, choose Quit in the Windows tray menu. If an application process remains running, the installer safely aborts before removing the existing version; close the application and retry. Automatic installer-driven shutdown is not guaranteed. (Windows)

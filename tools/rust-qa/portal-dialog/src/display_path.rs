@@ -29,11 +29,33 @@ fn label(path: &Path, source: &'static str) -> Label {
 
 fn mapped_host(paths: &HashMap<String, Vec<u8>>, grant: &Grant) -> Option<Label> {
     let host = host_path(paths.get(grant.id.to_str()?)?)?;
-    (host.file_name()? == grant.path.file_name()?).then(|| label(host, "Documents.GetHostPaths"))
+    if host.file_name()? != grant.root.file_name()? {
+        return None;
+    }
+    Some(subdirectory_label(
+        host,
+        &grant.relative,
+        "Documents.GetHostPaths",
+    ))
 }
 
-pub(crate) async fn from_documents(bus: &Connection, grant: &Grant) -> Option<Label> {
+fn subdirectory_label(root: &Path, relative: &Path, source: &'static str) -> Label {
+    let mut path = root.to_owned();
+    path.extend(relative);
+    label(&path, source)
+}
+
+async fn query_documents(bus: Option<&Connection>, grant: &Grant) -> Option<Label> {
     let id = grant.id.to_str()?;
+    let bus = match bus {
+        Some(connection) => connection.clone(),
+        None => zbus::connection::Builder::session()
+            .ok()?
+            .method_timeout(Duration::from_secs(3))
+            .build()
+            .await
+            .ok()?,
+    };
     let reply = bus
         .call_method(
             Some(DOCUMENTS),
@@ -48,31 +70,40 @@ pub(crate) async fn from_documents(bus: &Connection, grant: &Grant) -> Option<La
     mapped_host(&paths, grant)
 }
 
-pub(crate) async fn resolve(bus: &Connection, grant: &Grant) -> Label {
+async fn deadline() -> Option<Label> {
+    async_io::Timer::after(Duration::from_secs(3)).await;
+    None
+}
+
+pub(crate) async fn probe_documents(bus: Option<&Connection>, grant: &Grant) -> Option<Label> {
+    futures_lite::future::or(query_documents(bus, grant), deadline()).await
+}
+
+pub(crate) async fn resolve(
+    bus: Option<&Connection>,
+    grant: &Grant,
+    directory: &safe_fs::Directory,
+) -> Label {
     // This process handles one picker result. Metadata waits run off the UI
     // thread, and share one deadline with the fallback portal request.
     let lookup = async {
-        let access = grant.path.clone();
+        let directory = directory.clone();
         let attribute = blocking::unblock(move || {
             let mut bytes = [0; 4096];
-            let count =
-                rustix::fs::getxattr(access, "user.document-portal.host-path", &mut bytes[..])
-                    .ok()?;
+            let count = directory
+                .read_user_attribute(c"user.document-portal.host-path", &mut bytes)
+                .ok()?;
             Some(label(host_path(&bytes[..count])?, "xattr"))
         })
         .await;
         if attribute.is_some() {
             return attribute;
         }
-        from_documents(bus, grant).await
+        query_documents(bus, grant).await
     };
-    let deadline = async {
-        async_io::Timer::after(Duration::from_secs(3)).await;
-        None
-    };
-    futures_lite::future::or(lookup, deadline)
+    futures_lite::future::or(lookup, deadline())
         .await
-        .unwrap_or_else(|| label(&grant.path, "grant"))
+        .unwrap_or_else(|| label(&grant.path(), "grant"))
 }
 
 #[cfg(test)]
@@ -104,5 +135,16 @@ mod tests {
             mapped_host(&paths, &grant).unwrap().text,
             "/albums/Test %2F"
         );
+        let nested = Grant::from_path(
+            Path::new("/doc/abc/Test %2F/2026/Test %2F"),
+            Path::new("/doc"),
+        )
+        .unwrap();
+        assert_eq!(
+            mapped_host(&paths, &nested).unwrap().text,
+            "/albums/Test %2F/2026/Test %2F"
+        );
+        paths.insert("abc".into(), b"/albums/2026\0".to_vec());
+        assert!(mapped_host(&paths, &nested).is_none());
     }
 }

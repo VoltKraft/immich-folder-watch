@@ -98,6 +98,10 @@ def prepare(commit):
             'empty_device_directories': SYS_DIRS}
 
 
-def command(action, *arguments):
-    return ['env', 'DBUS_SYSTEM_BUS_ADDRESS=' + LAUNCH_BUS, 'flatpak', '--verbose', 'run', '--user',
-            '--branch=test', '--env=IFW_QA_ISOLATED=1', APP, action, *arguments]
+def command(action, *arguments, without_session_bus=False):
+    launch = ['env', 'DBUS_SYSTEM_BUS_ADDRESS=' + LAUNCH_BUS, 'flatpak', '--verbose', 'run', '--user',
+              '--branch=test', '--env=IFW_QA_ISOLATED=1']
+    if without_session_bus:
+        return [*launch, '--command=/usr/bin/env', APP, 'DBUS_SESSION_BUS_ADDRESS=unix:path=/dev/null/ifw-bus',
+                '/app/bin/portal-dialog-assessment', action, *arguments]
+    return [*launch, APP, action, *arguments]

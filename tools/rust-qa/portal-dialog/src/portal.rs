@@ -42,11 +42,14 @@ pub(crate) fn documents_mount() -> Result<PathBuf, Failure> {
 
 pub(crate) fn inspect_grant(uri: &str) -> Result<(), Failure> {
     let grant = crate::document_uri::parse(uri, &documents_mount()?)?;
-    inspect_directory(&grant)
+    inspect_directory(&grant)?;
+    Ok(())
 }
 
-fn inspect_directory(grant: &crate::document_uri::Grant) -> Result<(), Failure> {
-    let root = safe_fs::Directory::open_root(&grant.path)?;
+fn inspect_directory(grant: &crate::document_uri::Grant) -> Result<safe_fs::Directory, Failure> {
+    let root = grant.open().inspect_err(|error| {
+        println!("DOCUMENT_OPEN_FAILED errno={:?}", error.raw_os_error());
+    })?;
     let entries = root.entries(8)?;
     if entries.len() != 1 || entries[0].kind != safe_fs::EntryKind::File {
         return Err("Portal directory does not contain the expected synthetic entry".into());
@@ -55,8 +58,31 @@ fn inspect_directory(grant: &crate::document_uri::Grant) -> Result<(), Failure> 
     println!(
         "DOCUMENT_GRANT {} {}",
         grant.id.to_string_lossy(),
-        grant.path.display()
+        grant.path().display()
     );
+    Ok(root)
+}
+
+async fn report_label(
+    bus: Option<&Connection>,
+    grant: &crate::document_uri::Grant,
+    directory: &safe_fs::Directory,
+    check_fallback: bool,
+) {
+    let display = crate::display_path::resolve(bus, grant, directory).await;
+    println!("DOCUMENT_LABEL {} {}", display.source, display.text);
+    if check_fallback {
+        match crate::display_path::probe_documents(bus, grant).await {
+            Some(label) => println!("DOCUMENT_PORTAL_LABEL {}", label.text),
+            None => println!("DOCUMENT_PORTAL_UNAVAILABLE"),
+        }
+    }
+}
+
+pub(crate) async fn reopen_saved(path: &Path, check_fallback: bool) -> Result<(), Failure> {
+    let grant = crate::document_uri::Grant::from_path(path, &documents_mount()?)?;
+    let directory = inspect_directory(&grant)?;
+    report_label(None, &grant, &directory, check_fallback).await;
     Ok(())
 }
 
@@ -190,15 +216,8 @@ async fn request(bus: &Connection, parent: &str, action: &str) -> Result<(), Fai
             println!("CHOOSER_SELECTED {}", uris[0]);
             if Path::new("/.flatpak-info").is_file() {
                 let grant = crate::document_uri::parse(&uris[0], &documents_mount()?)?;
-                let display = crate::display_path::resolve(bus, &grant).await;
-                println!("DOCUMENT_LABEL {} {}", display.source, display.text);
-                if action == "select-escaped" {
-                    // Observe the fallback API on its own even when the real attribute succeeded.
-                    if let Some(label) = crate::display_path::from_documents(bus, &grant).await {
-                        println!("DOCUMENT_PORTAL_LABEL {}", label.text);
-                    }
-                }
-                inspect_directory(&grant)?;
+                let directory = inspect_directory(&grant)?;
+                report_label(Some(bus), &grant, &directory, action == "select-escaped").await;
             }
             return Ok(());
         }

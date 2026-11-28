@@ -1,8 +1,8 @@
 {
   "rust/Cargo.toml": "7f4c1489640d1351a8d0fdeaea2df72fc17ad98ae3df5946fca34fa643e4e96a",
   "rust/crates/safe-fs/Cargo.toml": "43d4b45c895966202490d387dcc9a2e1d720c6afc52db67c2bb6d253bd67eb86",
-  "rust/crates/safe-fs/src/lib.rs": "2133c6c90184980b1c882a91fc89685890d3d0c3a61e1a32cfef2c64645ee474",
-  "rust/crates/safe-fs/src/linux.rs": "1dc90d5df69e115ad08d3ddc855d3e9e5650a8bc723101e5329692e2ebee90bf",
+  "rust/crates/safe-fs/src/lib.rs": "2b7fbcc469953135f77d91edc241629484e541cad7ecdf84d8ab014f15a2fb51",
+  "rust/crates/safe-fs/src/linux.rs": "d8cf6235364feda742f66a1d12d66eb9c7f9118fb929844c8d6a29ada740ae3b",
   "rust/crates/safe-fs/src/staging.rs": "42ae0f4f31f3bd0553abd53357ee8bfd039bdaf13f282ddd24707ac17a3594a4",
   "rust/crates/safe-fs/src/windows.rs": "db08ad5aac1cbb26045b90a3dd4477641337d0095f765ed49a6dc14594c702cd",
   "rust/crates/safe-fs/src/windows_identity.rs": "ae4f4505c88fec0eab6e7b624d6ac4c15cd67d1a3b78249195ffa9fbe5bde136",

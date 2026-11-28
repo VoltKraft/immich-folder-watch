@@ -8,6 +8,63 @@ use std::time::{Duration, SystemTime};
 mod support;
 use support::Synthetic;
 
+#[cfg(target_os = "linux")]
+#[test]
+fn directory_attribute_follows_the_held_directory_after_an_ordinary_rename() {
+    use std::ffi::{c_char, c_int, c_void};
+    use std::os::fd::AsRawFd;
+    unsafe extern "C" {
+        fn fsetxattr(
+            fd: c_int,
+            name: *const c_char,
+            value: *const c_void,
+            size: usize,
+            flags: c_int,
+        ) -> c_int;
+    }
+
+    let profile = Synthetic::new();
+    let album = profile.0.join("album");
+    fs::create_dir(&album).unwrap();
+    let file = File::open(&album).unwrap();
+    let name = c"user.ifw-test-label";
+    let original = b"original label";
+    // SAFETY: the directory descriptor, name and complete value are live through the call.
+    let result = unsafe {
+        fsetxattr(
+            file.as_raw_fd(),
+            name.as_ptr(),
+            original.as_ptr().cast(),
+            original.len(),
+            0,
+        )
+    };
+    assert_eq!(result, 0, "{}", std::io::Error::last_os_error());
+    let directory = profile.root().open_directory(OsStr::new("album")).unwrap();
+    fs::rename(&album, profile.0.join("moved")).unwrap();
+    fs::create_dir(&album).unwrap();
+    let mut bytes = [0; 32];
+    let count = directory.read_user_attribute(name, &mut bytes).unwrap();
+    assert_eq!(&bytes[..count], original);
+    assert!(
+        directory
+            .read_user_attribute(name, &mut bytes[..1])
+            .is_err()
+    );
+    assert!(directory.read_user_attribute(name, &mut []).is_err());
+    assert!(
+        directory
+            .read_user_attribute(c"system.ifw-test", &mut bytes)
+            .is_err()
+    );
+    assert!(
+        Directory::open_root(&album)
+            .unwrap()
+            .read_user_attribute(name, &mut bytes)
+            .is_err()
+    );
+}
+
 fn sample_time(seconds: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
 }

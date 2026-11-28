@@ -53,6 +53,10 @@ At `3116139` both installed desktops on Fedora x64 displayed the host
 label. On Ubuntu ARM64, Documents v4 yielded the grant path on both
 desktops. Each client retained grant-relative access.
 [Native folder labels](rw02-portal-dialog.md#resolving-the-display-name-inside-the-installed-flatpak).
+On Fedora x64 two fresh installed clients also reopened a saved subfolder
+through its parent grant. With an unreachable session bus the directory's
+own label remained available. Revoking the parent removed subfolder
+access on both desktops. [Saved subfolder trials](rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` also retained keyboard focus and its directional
 Unicode selection after an ordinary reopen on both backends.
 [Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·

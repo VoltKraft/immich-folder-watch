@@ -177,6 +177,26 @@ impl Directory {
         )
     }
 
+    /// Read a Linux user attribute from this open directory. The size of
+    /// the supplied buffer bounds the read even if the attribute changes.
+    #[cfg(target_os = "linux")]
+    pub fn read_user_attribute(
+        &self,
+        name: &std::ffi::CStr,
+        buffer: &mut [u8],
+    ) -> io::Result<usize> {
+        if !name.to_bytes().starts_with(b"user.")
+            || name.to_bytes() == b"user."
+            || buffer.is_empty()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "expected a user attribute and a nonempty buffer",
+            ));
+        }
+        native::read_directory_attribute(&self.0.file, name, buffer)
+    }
+
     fn file_lease(&self, name: &OsStr, writable_times: bool) -> io::Result<VerifiedFile> {
         validate_child(name)?;
         let file = native::open_file(&self.0.file, name, writable_times)?;
