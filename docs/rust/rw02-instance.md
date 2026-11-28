@@ -1190,3 +1190,17 @@ cross-session writer exclusion and visible Explorer activation remain open.
 | --- | --- |
 | [ARM64 private input](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250552/artifacts/15157584251) | `e99177b32271f68b12ecbc3c85239ecebbd9ebe0ac917ca3164d6dc4169d964e` |
 | [ARM64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250552/artifacts/15156964970) | `ba1744ebefc2e5ba60b4c50d20c2aad5e40291be0f72e7403004e282abb8acbf` |
+
+At `1910195` the separate Rust-primary ARM64 job retained the original
+window and observed two directory/file queries from the same worker.
+With WPF primary on its private desktop, Rust reopened the original
+window, WPF exited zero through its Quit menu and the supervisor restored
+Default. With WPF primary on Default, Rust also reopened the original
+HWND 655418. The 16 Quit points all hit the foreground window of another
+process. The passive observer could establish neither its class nor its
+executable at startup, after reactivation or before Quit. Detached replay
+of the three original archives passed the two complete cases and the
+pre-Quit activation on Default.
+[Rust primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223502/artifacts/15244303161) ·
+[Private WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223502/artifacts/15244522728) ·
+[Default WPF primary](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223502/artifacts/15244439309).

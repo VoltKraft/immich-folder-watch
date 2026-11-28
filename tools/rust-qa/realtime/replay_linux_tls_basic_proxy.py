@@ -73,12 +73,46 @@ def check_cases(cases, fixed):
             assert attempts.keys() == {supplied} and attempts[supplied] >= 2
 
 
+def check_digest_reference(cases):
+    modes = {f"digest-{scheme}{policy}{password}"
+             for scheme in ("sha256", "md5") for policy in ("", "-legacy") for password in ("", "-incorrect")}
+    assert Counter((c["client"], c["mode"]) for c in cases) == {
+        (client, mode): 1 for client in ("signed", "candidate") for mode in modes}
+    for case in cases:
+        rows, mode = case["observations"], case["mode"]
+        assert case["procExit"] == 0 and case["netDevices"] == [[1, "lo"]]
+        assert not any(row["kind"] == "handlerError" for row in rows)
+        outer = [row for row in rows if row["kind"] == "connect"]
+        assert outer and all(not row["apiHeader"] for row in outer)
+        counts = Counter((row["credentials"], row["digestUri"], row["status"]) for row in outer)
+        initial = counts.pop(("absent", None, 407))
+        assert initial >= 2
+        signed = case["client"] == "signed"
+        accepted = signed and "legacy" in mode and "incorrect" not in mode
+        if signed:
+            comparison = "incorrect" if "incorrect" in mode else "correct" if accepted else "target-mismatch"
+            assert counts == {(comparison, "root", 200 if accepted else 407): initial}
+        else:
+            assert not counts
+        assert case["inventory"] == case["event"] == accepted
+        if accepted:
+            check_session(rows, tunneled=True)
+        else:
+            assert rows == outer
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("receipt", type=Path)
-    parser.add_argument("--baseline", action="store_true", help="compare the original preemptive client")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--baseline", action="store_true", help="compare the original preemptive client")
+    mode.add_argument("--digest-reference", action="store_true", help="check the signed Digest reference and Basic-only candidate")
     args = parser.parse_args()
     report = json.loads(args.receipt.read_text())
-    check_cases(report["cases"], fixed=not args.baseline)
-    print("Verified the ten original TLS proxy observations.")
+    if args.digest_reference:
+        check_digest_reference(report["cases"])
+        print("Verified the sixteen original TLS Digest reference observations.")
+    else:
+        check_cases(report["cases"], fixed=not args.baseline)
+        print("Verified the ten original TLS proxy observations.")

@@ -90,6 +90,15 @@ selected proxy offers that scheme. Ten paired runs compared the Rust
 client with signed 3.0.4. Digest authentication remains open.
 [TLS proxy cases and original receipts](rust/rw02-linux-tls-basic-proxy.md).
 
+The Ubuntu x64 and ARM64 runs at `bbd1b73` each repeated all 62 wire
+cases and 17 unit tests. Windows ARM64 passed 49 wire cases and 18 unit
+tests. In a separate sixteen-case Fedora comparison, the signed client
+completed SHA-256 and MD5 proxy authentication when the fixed relay
+accepted the client's `/` Digest URI for CONNECT. The Rust client
+stopped at the proxy challenge in each Digest case.
+[Three native archives](rust/rw02-linux-tls-basic-proxy.md#native-hosted-transport-at-bbd1b73) ·
+[Digest comparison](rust/rw02-linux-tls-basic-proxy.md#connect-digest-in-the-shipping-linux-client).
+
 At `1910195`, Ubuntu x64 and ARM64 each passed all 54 wire scenarios and
 17 unit tests. Windows ARM64 passed its 49 wire scenarios and 18 unit
 tests. All three original archives matched their Actions digests. On the

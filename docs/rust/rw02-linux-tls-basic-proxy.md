@@ -122,3 +122,43 @@ the offline release build passed. The compiler also reported an unused
 This result covers Fedora x64. The Ubuntu x64 and ARM64 runners select
 the same Linux cases. Full Digest support and installed product networking
 remain open.
+
+## Native hosted transport at bbd1b73
+
+Ubuntu x64 and ARM64 each passed 62 wire cases and 17 unit tests. In the
+successful Basic case each proxy observed 13 anonymous challenges and
+13 authenticated CONNECTs. Both clients delivered the event and closed
+the WebSocket with code 1000. On both architectures the bypass used a
+direct connection, and an origin 407 inside a successful tunnel sent
+no credentials to the proxy. Windows ARM64 passed its 49 wire cases and
+18 unit tests. Detached readback checked every indexed output and all
+32 source files in each original ZIP.
+
+| Native archive | Actions SHA-256 |
+| --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46100147946/artifacts/15244848026) | `2342c37a29b62322cac4e6f2390e3787d357d4b0e99d6c74fa81ff3722a854e1` |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46100147946/artifacts/15245410870) | `f8964a2dc492d6952bb4591fa70c0f5fe06cc99b70d2d64eb84283b3173cd665` |
+| [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46100147946/artifacts/15245650046) | `ecc088fd019f55215e9dd4193004d9e2739d3ff0fdbc0b5bf2594f31c42d464b` |
+
+## CONNECT Digest in the shipping Linux client
+
+The signed 3.0.4 client responded to both SHA-256 and MD5 challenges
+with `qop=auth`. The request line named the fixed loopback host and port,
+but the Digest `uri` field contained `/`. A relay checking the authority
+rejected the response even with the correct synthetic password. A second
+relay accepted the historical URI only on that same fixed route. It
+verified the response hash before establishing TLS. For each algorithm the
+client then made four authenticated tunnels, read the REST inventory,
+received one event and closed normally. An incorrect password established
+zero tunnels on either relay. The Rust Basic-only binary sent anonymous
+CONNECTs and received 407 in every Digest trial. The application has no
+passing Rust Digest case yet. [Proxy Digest protocol](https://www.rfc-editor.org/rfc/rfc7616#section-3.8).
+
+Add `--digest` to the Fedora comparison command above, using a fresh
+output path. Replay the captured responses with
+`replay_linux_tls_basic_proxy.py --digest-reference <report.json>`.
+The sixteen original cases are in
+`artifacts/rust/realtime-assessment/linux-tls-digest-reference-02.json`,
+SHA-256 `d3ef4d1f0baf52bce96427095e70f7a35af1280e90f9d80231e511165515fafe`.
+The receipt records route, credential outcome and URI form. Passwords
+and challenge responses stay inside the disposable network namespace.

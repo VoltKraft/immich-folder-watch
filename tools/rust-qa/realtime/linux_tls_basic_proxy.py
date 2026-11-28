@@ -29,6 +29,10 @@ def observe(client, mode):
     authority = "127.0.0.1:28431"
     secret = secrets.token_hex(12) + "@:+/"
     required = "Basic " + base64.b64encode(f"fixture:{secret}".encode()).decode()
+    digest = None
+    if mode.startswith("digest-"):
+        from digest_peer import DigestPeer
+        digest = DigestPeer(secret, authority, mode.split("-")[1], legacy_root="legacy" in mode)
     lock = threading.Lock()
     rows = []
 
@@ -66,16 +70,21 @@ def observe(client, mode):
             assert not any(key in self.headers for key in ("x-api-key", "Authorization", "Cookie"))
             values = self.headers.get_all("Proxy-Authorization", [])
             valid = len(values) == 1 and hmac.compare_digest(required, values[0])
-            accepted = mode == "anonymous" or valid and mode != "other-scheme"
+            if digest:
+                credential, uri_form = digest.check(values)
+                accepted = credential == "correct"
+                target = {"digestUri": uri_form}
+            else:
+                credential = ("correct" if valid else "incorrect" if values and values[0].startswith("Basic ")
+                              else "digest" if values and values[0].startswith("Digest ") else "other" if values else "absent")
+                accepted = mode == "anonymous" or valid and mode != "other-scheme"
+                target = {}
             self.server.record("connect", subjectPort=self.client_address[1], apiHeader=False,
-                               credentials=("correct" if valid else "incorrect" if values and values[0].startswith("Basic ")
-                                            else "digest" if values and values[0].startswith("Digest ")
-                                            else "other" if values else "absent"),
-                               status=200 if accepted else 407)
+                               credentials=credential, status=200 if accepted else 407, **target)
             if not accepted:
                 self.send_response(407)
                 scheme = 'Digest realm="other", nonce="fixture"' if mode == "other-scheme" else 'Basic realm="fixture"'
-                self.send_header("Proxy-Authenticate", scheme)
+                self.send_header("Proxy-Authenticate", digest.challenge if digest else scheme)
                 self.send_header("Connection", "close")
                 self.send_header("Content-Length", "0")
                 self.end_headers()
@@ -99,7 +108,7 @@ def observe(client, mode):
     relay = "http://127.0.0.1:28432"
     proxy_url = relay
     if mode != "anonymous":
-        chosen = secret + "wrong" if mode == "incorrect" else secret
+        chosen = secret + "wrong" if mode.endswith("incorrect") else secret
         proxy_url = f"http://fixture:{quote(chosen, safe='')}@127.0.0.1:28432"
     env = {"HOME": "/tmp", "LANG": "C.UTF-8", "PATH": "/usr/bin", "HTTPS_PROXY": proxy_url,
            "SSL_CERT_FILE": str(keys / "ca.crt"), "SSL_CERT_DIR": "/tmp/empty-certs",

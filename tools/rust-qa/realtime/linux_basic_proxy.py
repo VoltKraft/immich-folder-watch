@@ -148,12 +148,15 @@ def inside(client, mode):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tls", action="store_true", help="run the HTTPS origin comparison")
+    parser.add_argument("--digest", action="store_true", help="compare CONNECT Digest with a verifying TLS relay")
     parser.add_argument("--archive", type=Path, required=True, help="paired native proxy-fedora-05 archive")
     parser.add_argument("--sdk", type=Path, required=True, help="shared .NET SDK containing the dotnet host")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, help="additional native release binary")
     parser.add_argument("--candidate-sha256", help="expected digest of the additional binary")
     args = parser.parse_args()
+    if args.digest and not args.tls:
+        parser.error("--digest requires --tls")
     if bool(args.candidate) != bool(args.candidate_sha256):
         parser.error("supply both the candidate and its expected digest")
     archive = args.archive.resolve(strict=True)
@@ -183,11 +186,18 @@ def main():
         tls_script = script.with_name("linux_tls_basic_proxy.py")
         inner = "/tls.py"
         launch.extend(("--ro-bind", str(tls_script), inner))
+        if args.digest:
+            digest_script = script.with_name("digest_peer.py")
+            launch.extend(("--ro-bind", str(digest_script), "/digest_peer.py"))
     launch.extend(("--setenv", "PYTHONPATH", "/fixture", "--chdir", "/tmp", "--", "/usr/bin/python3", "-B", inner, "--inside"))
     cases = MATRIX + CANDIDATE_MATRIX if args.candidate else MATRIX
     if args.tls:
-        cases = [(client, mode) for client in (("signed", "candidate") if args.candidate else ("signed",))
-                 for mode in ("anonymous", "correct", "incorrect", "other-scheme", "bypass")]
+        modes = ("anonymous", "correct", "incorrect", "other-scheme", "bypass")
+        if args.digest:
+            modes = [f"digest-{algorithm}{policy}{password}"
+                     for algorithm in ("sha256", "md5") for policy in ("", "-legacy")
+                     for password in ("", "-incorrect")]
+        cases = [(client, mode) for client in (("signed", "candidate") if args.candidate else ("signed",)) for mode in modes]
     observations = [json.loads(subprocess.check_output([*launch, *case], timeout=25)) for case in cases]
     evidence = {
         "host": Path("/etc/os-release").read_text(), "machine": os.uname().machine, "kernel": os.uname().release,
@@ -196,6 +206,8 @@ def main():
     }
     if args.tls:
         evidence["tlsTrialScript"] = digest(tls_script)
+    if args.digest:
+        evidence["digestPeerScript"] = digest(digest_script)
     if args.candidate:
         evidence["candidateBinarySha256"] = args.candidate_sha256
     with args.output.open("x") as stream:
