@@ -373,3 +373,45 @@ The documented Settings URI opens the Notifications page. The comparison
 records the separate banner switch for the synthetic AUMID as unknown.
 [WinRT notification states](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.notificationsetting) ·
 [Windows Settings URIs](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings)
+
+The [native ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46118613866/job/140897906180)
+at `bc41f495c7a5c56bea39bb7c6d6f57e88aae218e` recorded 96 quiet-time
+queries before state 7 at 2,880.410 seconds. In session 2, sender PID 7972
+reported `setting=0`, `suppressPopup=false` and a successful 5.3204 ms
+WinRT `Show`. Separate queries returned state 7 at 28.1808 ms before and
+29.5077 ms after the call. Independent history reads acquired both synthetic
+notifications, removed each and confirmed an empty history. The permitted
+trial recorded Do not disturb Off and restored On. Its final Settings
+readback confirmed Notifications and Do not disturb both On.
+
+Physical observer PID 4340 sampled from 15.9123 to 9,973.5997 ms after
+the call returned. All 87 sweeps found the visible foreground CoreWindow,
+HWND `0x10202`, belonging to `WWAHost.exe` PID 8332. All 87 matched the
+independent foreground identity from the nearest sample, at most 15.9068 ms
+away. Classic enumeration returned zero CoreWindows throughout. The 87
+successful UI Automation root queries visited 461 direct children in total.
+The physical observer found zero Shell popup candidates and took no image.
+A separate accessibility observer, PID 9640, completed 92 sweeps with up to
+two known Shell roots, zero provider errors and zero exact visible label
+pairs. The visibility check failed. These results establish foreground
+coverage on this desktop and leave ARM64 banner presentation open.
+
+The raw sender record reported `elevated=true`. The local x64 sender
+PID 6732 that produced the archived banner reported `elevated=false`.
+The ARM64 Shell desktop belonged to `explorer.exe` PID 6772, thread 6328,
+HWND `0x20122`. Its token elevation and integrity level, and the integrity
+level of the sender, remain unmeasured. The archive therefore supports a
+difference in sender elevation between these two tests. Windows provides
+read-only access to the elevation flag and integrity label using a process
+handle with limited query rights and a token opened with `TOKEN_QUERY`.
+[Process token access](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken) ·
+[Token information classes](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class)
+
+The [original ZIP](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46118613866/artifacts/15254213665)
+contained 50 entries, 229,993 bytes, with SHA-256
+`0904e1815dcb9db2b944a5e07a62b39de231476de8377bb75e7c4b0e30e23701`.
+Offline replay verified all 55 source hashes, the native sender SHA-256
+`2f35b917e1f5c52eb83240fdc97e86187af8c08a80d5c449d6bd7a40e41e4b20`,
+the full raw accessibility interval, the physical discovery rows and the
+Settings receipts. The original inputs and `discovery-comparison.json`
+are under `artifacts/rust/hosted-toast-history/app-state-trial/46118613866/`.
