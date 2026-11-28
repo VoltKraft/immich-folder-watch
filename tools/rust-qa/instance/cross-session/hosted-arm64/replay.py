@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +25,9 @@ def require(condition, message):
 def replay(folder):
     compiler = verify(folder / "writer.zip")
     sources = read(folder / "observer-sources.json")
+    host, case = [read(folder / name) for name in ("host.json", "case.json")]
+    revision = case["revision"]
+    require(re.fullmatch("[0-9a-f]{40}", revision), "Invalid measured revision")
     required = {"worker.py", "fixture.py", "observe.py", "standard.py", "batch.py", "scheduler.ps1",
                 "scheduler_cleanup.ps1", "native_build.py", "console_levels.py", "hosted-arm64/case.py",
                 "hosted-arm64/logon.py", "hosted-arm64/inputs.py", "hosted-arm64/batch_account.py",
@@ -31,11 +35,15 @@ def replay(folder):
     require(all("tools/rust-qa/instance/cross-session/" + source in sources for source in required),
             "Incomplete observer source manifest")
     require(".github/workflows/rust-windows-arm64-writer.yaml" in sources, "Missing native workflow source")
-    require(all(hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == h for name, h in sources.items()),
-            "Unexpected original observer sources")
-    host, case = [read(folder / name) for name in ("host.json", "case.json")]
+    # The native checkout uses CRLF for sources without an eol rule. Reconstruct the
+    # exact bytes at the archived commit when the independent replay runs on Linux.
+    for name, digest in sources.items():
+        original = subprocess.check_output(["git", "-c", "core.autocrlf=true", "cat-file", "--filters",
+                                            revision + ":" + name], cwd=ROOT)
+        require(hashlib.sha256(original).hexdigest() == digest, f"Unexpected original observer source {name}")
     require(all(host.get(k) is True for k in ("accountCreated", "accountRemoved", "taskRemoved", "profileRemoved",
-                    "stageRemoved", "serviceRestored", "userProcessesExited", "taskFolderRemoved")) and not any(k.startswith("cleanupFailure") for k in host)
+                    "stageRemoved", "serviceRestored", "userProcessesExited", "taskFolderRemoved",
+                    "profileDirectoryRemoved")) and not any(k.startswith("cleanupFailure") for k in host)
             and "error" not in host and host["controllerExit"] == 0, "The isolated host or its cleanup failed")
     require(host["grant"] == {"before":[], "after":["SeBatchLogonRight"]} and
             host["restore"] == {"before":["SeBatchLogonRight"], "after":[]}, "Temporary assignment was not restored")

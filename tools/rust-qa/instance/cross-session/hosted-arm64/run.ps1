@@ -263,22 +263,6 @@ try {
         } 'Receipts'
         if ($rightsAttempted) {Cleanup {$report.restore = Invoke-BatchAssignment restore} 'Assignment'}
         Cleanup {
-            $profile = Get-CimInstance Win32_UserProfile -Filter "SID='$($user.SID.Value)'"
-            if ($profile) {
-                $deadline = [DateTime]::UtcNow.AddSeconds(20)
-                while ($profile.Loaded -and [DateTime]::UtcNow -lt $deadline) {
-                    Start-Sleep -Milliseconds 300
-                    $profile = Get-CimInstance Win32_UserProfile -Filter "SID='$($user.SID.Value)'"
-                    if (!$profile) {break}
-                }
-                if ($profile) {
-                    if ($profile.Loaded -or $profile.Special) {throw 'Own test profile is in use or special.'}
-                    Remove-CimInstance -InputObject $profile
-                }
-            }
-            $report.profileRemoved = $null -eq (Get-CimInstance Win32_UserProfile -Filter "SID='$($user.SID.Value)'")
-        } 'Profile'
-        Cleanup {
             $owned = Get-LocalUser -SID $user.SID
             if ($owned.Name -cne $name -or $owned.Description -cne $description) {throw 'Temporary user identity differs.'}
             Remove-LocalUser -SID $user.SID
@@ -294,6 +278,44 @@ try {
         $service.Refresh()
         $report.serviceRestored = $service.Status.ToString() -eq $report.serviceBefore -and $service.StartType.ToString() -eq $report.startTypeBefore
     } 'Service'}
+    if ($user) {Cleanup {
+        # Release references held by this broker before waiting for the user's normal profile unload.
+        foreach ($variable in @('running','task','action','definition','taskFolder','taskRoot','schedule')) {
+            $item = Get-Variable -Name $variable -ErrorAction SilentlyContinue
+            if ($item -and $item.Value -and [Runtime.InteropServices.Marshal]::IsComObject($item.Value)) {
+                [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($item.Value)
+            }
+        }
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        $report.profileStates = @()
+        $previous = ''
+        $profilePath = $null
+        do {
+            $profile = Get-CimInstance Win32_UserProfile -Filter "SID='$($user.SID.Value)'"
+            if (!$profile) {break}
+            if ($profile.Special -or [IO.Path]::GetFileName($profile.LocalPath) -ine $name) {
+                throw 'Windows returned a special or unexpected profile for the generated test SID.'
+            }
+            $profilePath = $profile.LocalPath
+            $state = "$($profile.Loaded)/$($profile.RefCount)"
+            if ($state -ne $previous) {
+                $report.profileStates += [ordered]@{seconds=[int]$clock.Elapsed.TotalSeconds
+                    loaded=$profile.Loaded; refs=$profile.RefCount; special=$profile.Special}
+                $previous = $state
+            }
+            if (!$profile.Loaded) {
+                Remove-CimInstance -InputObject $profile
+                break
+            }
+            Start-Sleep -Seconds 2
+        } while ($clock.Elapsed.TotalMinutes -lt 12)
+        $report.profileWaitSeconds = [int]$clock.Elapsed.TotalSeconds
+        $report.profileRemoved = $null -eq (Get-CimInstance Win32_UserProfile -Filter "SID='$($user.SID.Value)'")
+        $report.profileDirectoryRemoved = !$profilePath -or !(Test-Path -LiteralPath $profilePath)
+        if (!$report.profileRemoved -or !$report.profileDirectoryRemoved) {
+            throw 'The temporary profile did not unload and disappear within the observation window.'
+        }
+    } 'Profile'}
     if ($created) {Cleanup {
         Remove-Item -LiteralPath $folder -Force -Recurse
         $report.stageRemoved = !(Test-Path -LiteralPath $folder)
